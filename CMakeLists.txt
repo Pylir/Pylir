@@ -1,0 +1,87 @@
+cmake_minimum_required(VERSION 3.15)
+project(Pylir)
+
+set(CMAKE_CXX_STANDARD 17)
+
+option(PYLIR_BUILD_TESTS "Build tests" ON)
+option(PYLIR_COVERAGE "Compile with coverage" OFF)
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND MSVC AND (PYLIR_COVERAGE OR PYLIR_SANITIZER))
+    execute_process(
+            COMMAND ${CMAKE_CXX_COMPILER} /clang:-print-libgcc-file-name /clang:--rtlib=compiler-rt
+            OUTPUT_VARIABLE clang_compiler_rt_file
+            ERROR_VARIABLE clang_cl_stderr
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE clang_cl_exit_code)
+    if (NOT "${clang_cl_exit_code}" STREQUAL "0")
+        message(FATAL_ERROR
+                "Unable to invoke clang-cl to find resource dir: ${clang_cl_stderr}")
+    endif ()
+    file(TO_CMAKE_PATH "${clang_compiler_rt_file}" clang_compiler_rt_file)
+    get_filename_component(clang_runtime_dir "${clang_compiler_rt_file}" DIRECTORY)
+    message(STATUS "Clang-cl runtimes found in ${clang_runtime_dir}")
+    link_directories(${clang_runtime_dir})
+endif ()
+
+if (PYLIR_COVERAGE)
+    message(STATUS "Compiling with Coverage")
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        add_compile_options(--coverage)
+        if (WIN32)
+            link_libraries(gcov)
+        endif ()
+    elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+        add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+        if (NOT MSVC)
+            add_link_options(-fprofile-instr-generate)
+        endif ()
+    else ()
+        message(ERROR "Unknown coverage implementation")
+    endif ()
+endif ()
+
+if (DEFINED PYLIR_SANITIZER)
+    if (MSVC)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Oy- -fsanitize=${PYLIR_SANITIZER} -fno-sanitize-recover=all")
+        link_libraries(clang_rt.asan.lib)
+        link_libraries(clang_rt.asan_cxx.lib)
+        link_libraries(clang_rt.asan-preinit.lib)
+    else ()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize=${PYLIR_SANITIZER} -fno-sanitize-recover=all")
+    endif ()
+endif ()
+
+find_package(MLIR REQUIRED 12)
+include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
+list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
+include(AddMLIR)
+
+if (NOT LLVM_ENABLE_RTTI)
+    if (MSVC)
+        string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /GR-")
+    else ()
+        string(REGEX REPLACE "-frtti" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+    endif ()
+endif ()
+
+if (NOT MSVC)
+    add_compile_options(-pedantic -Wall -Wextra -Wnon-virtual-dtor)
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        if (WIN32)
+            if (NOT ${CMAKE_CXX_FLAGS} MATCHES ".*[ \t\r\n]-flto[^a-zA-Z_].*")
+                add_compile_options(-Wa,-mbig-obj)
+            endif ()
+        endif ()
+    endif()
+elseif (MSVC)
+    add_compile_options(/bigobj /permissive- /W4 /Zc:__cplusplus /utf-8 /EHsc)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+    if (NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+        add_compile_options(/Zc:preprocessor)
+    endif ()
+endif ()
+
+add_executable(Pylir main.cpp)

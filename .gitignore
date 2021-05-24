@@ -1,0 +1,18 @@
+# Project exclude paths
+/cmake-build-coverage/
+/cmake-build-coverage-gcc/
+/cmake-build-coverage-visual-studio-clang/
+/cmake-build-debug/
+/cmake-build-debug-clang-wsl/
+/cmake-build-debug-gcc/
+/cmake-build-debug-visual-studio/
+/cmake-build-debug-visual-studio-clang/
+/cmake-build-fuzzer/
+/cmake-build-fuzzer-visual-studio-clang/
+/cmake-build-release/
+/cmake-build-release-gcc/
+/cmake-build-release-visual-studio/
+/cmake-build-release-visual-studio-clang/
+/cmake-build-release-wsl/
+/cmake-build-sanitizer-visual-studio-clang/
+/cmake-build-sanitizers-wsl/
