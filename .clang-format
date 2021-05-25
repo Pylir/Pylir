@@ -37,18 +37,20 @@ IncludeIsMainRegex: ''
 IncludeCategories:
   - Regex: '[<"]catch\.(hpp|h)[">]'
     Priority: -1
-  - Regex: '<llvm/.*>'
+  - Regex: '<mlir/.*>'
     Priority: 2
-  - Regex: '<cld/.*>'
+  - Regex: '<llvm/.*>'
     Priority: 3
-  - Regex: '<.*\..*>'
-    Priority: 5
-  - Regex: '<.*>'
+  - Regex: '<pylir/.*>'
     Priority: 4
-  - Regex: '"cld/.*"'
+  - Regex: '<.*\..*>'
     Priority: 6
-  - Regex: '".*"'
+  - Regex: '<.*>'
+    Priority: 5
+  - Regex: '"pylir/.*"'
     Priority: 7
+  - Regex: '".*"'
+    Priority: 8
 IndentCaseLabels: true
 IndentPPDirectives: BeforeHash
 IndentWidth: 4
