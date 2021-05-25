@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Text.hpp>
 
 #include <cstdint>
@@ -31,11 +32,14 @@ class Lexer
 
         reference operator*() const
         {
+            PYLIR_ASSERT(m_lexer);
+            PYLIR_ASSERT(m_index < m_lexer->m_tokens.size());
             return m_lexer->m_tokens[m_index];
         }
 
         Iterator& operator++()
         {
+            PYLIR_ASSERT(m_lexer);
             if (m_index + 1 >= m_lexer->m_tokens.size())
             {
                 if (!m_lexer->parseNext())
@@ -57,6 +61,7 @@ class Lexer
 
         Iterator& operator--()
         {
+            PYLIR_ASSERT(m_lexer);
             m_index--;
             return *this;
         }
@@ -93,9 +98,11 @@ class Lexer
     friend class Iterator;
 
     int m_fileId;
+    std::size_t m_currentOffset{};
     std::string_view m_source;
     std::vector<Token> m_tokens;
-
+    std::vector<int> m_lineStarts{0};
+    bool pastFirstTwoLines = false;
     Text::Encoding m_encoding;
 
     bool parseNext();
@@ -109,7 +116,7 @@ public:
     using difference_type = Iterator::difference_type;
     using size_type = std::size_t;
 
-    explicit Lexer(std::string_view source,int fileId);
+    explicit Lexer(std::string_view source, int fileId);
 
     Lexer(const Lexer&) = delete;
     Lexer& operator=(const Lexer&) = delete;

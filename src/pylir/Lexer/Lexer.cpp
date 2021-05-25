@@ -8,5 +8,5 @@ pylir::Lexer::Lexer(std::string_view source, int fieldId) : m_fileId(fieldId), m
 
 bool pylir::Lexer::parseNext()
 {
-    return false;
+    return true;
 }

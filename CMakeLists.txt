@@ -87,6 +87,7 @@ endif ()
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 include_directories(src)
+include_directories(SYSTEM 3rdParty)
 add_subdirectory(src)
 if (PYLIR_BUILD_TESTS)
     add_subdirectory(test)
