@@ -39,4 +39,6 @@ std::optional<Encoding> checkForBOM(std::string_view bytes);
  */
 std::optional<Encoding> readBOM(std::string_view& bytes);
 
+
+
 } // namespace pylir::Text
