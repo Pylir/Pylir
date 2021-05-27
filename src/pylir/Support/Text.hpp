@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Endian.hpp"
+#include "LazyCacheIterator.hpp"
 #include "Macros.hpp"
 
 namespace pylir::Text
@@ -161,77 +162,15 @@ class Transcoder<void, Target>
     Encoding m_encoding;
     std::vector<Target> m_results;
 
-    class Iterator
+    struct TranscodeNextFunctionObject
     {
-        Transcoder* m_transcoder;
-        std::size_t m_index;
+        Transcoder* m_this;
 
-    public:
-        using difference_type = std::ptrdiff_t;
-        using value_type = Target;
-        using pointer = const value_type*;
-        using reference = const value_type&;
-        using iterator_category = std::forward_iterator_tag;
-
-        Iterator() = default;
-
-        Iterator(Transcoder& transcoder, std::size_t index) : m_transcoder(&transcoder), m_index(index) {}
-
-        reference operator*() const
+        auto operator()() const
         {
-            return m_transcoder->m_results[m_index];
-        }
-
-        Iterator& operator++()
-        {
-            if (m_index + 1 >= m_transcoder->m_results.size())
-            {
-                m_transcoder->transcodeNext();
-            }
-            m_index++;
-            return *this;
-        }
-
-        Iterator operator++(int)
-        {
-            auto copy = *this;
-            operator++();
-            return copy;
-        }
-
-        bool operator==(const Iterator& rhs) const
-        {
-            if (m_transcoder != rhs.m_transcoder)
-            {
-                return false;
-            }
-            bool bothPastEnd =
-                m_index >= m_transcoder->m_results.size() && rhs.m_index >= m_transcoder->m_results.size();
-            if (bothPastEnd)
-            {
-                return true;
-            }
-            return m_index == rhs.m_index;
-        }
-
-        bool operator!=(const Iterator& rhs) const
-        {
-            return !(rhs == *this);
-        }
-
-        difference_type operator-(const Iterator& rhs) const
-        {
-            return m_index - rhs.m_index;
-        }
-
-        friend void swap(Iterator& lhs, Iterator& rhs)
-        {
-            std::swap(lhs.m_transcoder, rhs.m_transcoder);
-            std::swap(lhs.m_index, rhs.m_index);
+            return m_this->transcodeNext();
         }
     };
-
-    friend class Iterator;
 
     bool transcodeNext()
     {
@@ -330,24 +269,17 @@ class Transcoder<void, Target>
 public:
     Transcoder(std::string_view source, Encoding encoding) : m_source(source), m_encoding(encoding) {}
 
-    using value_type = const Target;
-    using reference = value_type&;
+    using value_type = Target;
+    using reference = const value_type&;
     using const_reference = reference;
-    using iterator = Iterator;
+    using iterator = LazyCacheIterator<Target, TranscodeNextFunctionObject>;
     using const_iterator = iterator;
     using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
 
     iterator begin()
     {
-        if (m_results.empty())
-        {
-            if (!transcodeNext())
-            {
-                return end();
-            }
-        }
-        return Iterator(*this, 0);
+        return iterator(m_results, 0, {this});
     }
 
     const_iterator cbegin()
@@ -357,7 +289,7 @@ public:
 
     iterator end()
     {
-        return Iterator(*this, -1);
+        return iterator(m_results, -1, {this});
     }
 
     const_iterator cend()
