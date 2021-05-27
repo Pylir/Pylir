@@ -162,16 +162,6 @@ class Transcoder<void, Target>
     Encoding m_encoding;
     std::vector<Target> m_results;
 
-    struct TranscodeNextFunctionObject
-    {
-        Transcoder* m_this;
-
-        auto operator()() const
-        {
-            return m_this->transcodeNext();
-        }
-    };
-
     bool transcodeNext()
     {
         if (m_source.empty())
@@ -272,14 +262,14 @@ public:
     using value_type = Target;
     using reference = const value_type&;
     using const_reference = reference;
-    using iterator = LazyCacheIterator<Target, TranscodeNextFunctionObject>;
+    using iterator = LazyCacheIterator<Target, Transcoder, &Transcoder::transcodeNext, &Transcoder::m_results>;
     using const_iterator = iterator;
     using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
 
     iterator begin()
     {
-        return iterator(m_results, 0, {this});
+        return iterator(*this, 0);
     }
 
     const_iterator cbegin()
@@ -289,7 +279,7 @@ public:
 
     iterator end()
     {
-        return iterator(m_results, -1, {this});
+        return iterator(*this, -1);
     }
 
     const_iterator cend()

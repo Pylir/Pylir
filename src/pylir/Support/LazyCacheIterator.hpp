@@ -2,19 +2,28 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <iterator>
-#include <vector>
 
 #include "Macros.hpp"
 
 namespace pylir
 {
-template <class ValueType, class NextFunc>
+template <class ValueType, class CacheObject, auto nextFunc, auto containerAccess>
 class LazyCacheIterator
 {
-    const std::vector<ValueType>* m_cache;
+    CacheObject* m_cache;
     std::size_t m_index;
-    NextFunc m_nextFunc; // TODO: No unique address in C++20
+
+    decltype(auto) container()
+    {
+        return std::invoke(containerAccess, m_cache);
+    }
+
+    decltype(auto) container() const
+    {
+        return std::invoke(containerAccess, m_cache);
+    }
 
 public:
     using difference_type = std::ptrdiff_t;
@@ -25,25 +34,24 @@ public:
 
     LazyCacheIterator() = default;
 
-    LazyCacheIterator(std::vector<ValueType>& cache, std::size_t index, NextFunc nextFunc = NextFunc{})
-        : m_cache(&cache), m_index(index), m_nextFunc(std::move(nextFunc))
+    LazyCacheIterator(CacheObject& cache, std::size_t index) : m_cache(&cache), m_index(index)
     {
-        if (index == 0 && m_cache->empty())
+        if (index == 0 && container().empty())
         {
-            m_nextFunc();
+            std::invoke(nextFunc, m_cache);
         }
     }
 
     reference operator*() const
     {
-        return (*m_cache)[m_index];
+        return container()[m_index];
     }
 
     LazyCacheIterator& operator++()
     {
-        if (m_index + 1 >= m_cache->size())
+        if (m_index + 1 >= container().size())
         {
-            m_nextFunc();
+            std::invoke(nextFunc, m_cache);
         }
         m_index++;
         return *this;
@@ -62,7 +70,7 @@ public:
         {
             return false;
         }
-        bool bothPastEnd = m_index >= m_cache->size() && rhs.m_index >= m_cache->size();
+        bool bothPastEnd = m_index >= container().size() && rhs.m_index >= container().size();
         if (bothPastEnd)
         {
             return true;
@@ -85,7 +93,6 @@ public:
     {
         std::swap(lhs.m_cache, rhs.m_cache);
         std::swap(lhs.m_index, rhs.m_index);
-        std::swap(lhs.m_nextFunc, rhs.m_nextFunc);
     }
 };
 

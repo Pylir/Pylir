@@ -26,23 +26,11 @@ class Lexer
 
     bool parseNext();
 
-    struct ParseNextFunctionObject
-    {
-        Lexer* m_this;
-
-        auto operator()() const
-        {
-            return m_this->parseNext();
-        }
-    };
-
-    friend struct ParseNextFunctionObject;
-
 public:
     using value_type = Token;
     using reference = const Token&;
     using const_reference = reference;
-    using iterator = LazyCacheIterator<value_type, ParseNextFunctionObject>;
+    using iterator = LazyCacheIterator<value_type, Lexer, &Lexer::parseNext, &Lexer::m_tokens>;
     using const_iterator = iterator;
     using difference_type = iterator::difference_type;
     using size_type = std::size_t;
@@ -57,7 +45,7 @@ public:
 
     iterator begin()
     {
-        return iterator(m_tokens, 0, {this});
+        return iterator(*this, 0);
     }
 
     const_iterator cbegin()
@@ -67,7 +55,7 @@ public:
 
     iterator end()
     {
-        return iterator(m_tokens, -1, {this});
+        return iterator(*this, -1);
     }
 
     const_iterator cend()
