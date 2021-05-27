@@ -26,17 +26,30 @@ bool pylir::Lexer::parseNext()
                                          [](char32_t value) { return value == '\n' || value == '\r'; });
                 if (m_current == m_transcoder->end())
                 {
-                    return false;
+                    break;
                 }
-                if (*m_current == '\r' && std::next(m_current) != m_transcoder->end()
-                    && *std::next(m_current) == '\n')
+            }
+                [[fallthrough]];
+            case U'\r':
+            case U'\n':
+            {
+                auto offset = m_current - m_transcoder->begin();
+                if (*m_current == '\r' && std::next(m_current) != m_transcoder->end() && *std::next(m_current) == '\n')
                 {
-                    m_current++;
+                    std::advance(m_current, 2);
                 }
-                continue;
+                else
+                {
+                    std::advance(m_current, 1);
+                }
+                m_tokens.emplace_back(offset, m_current - m_transcoder->begin() - offset, m_fileId, TokenType::Newline);
             }
         }
         break;
     } while (true);
+    if (m_current == m_transcoder->end())
+    {
+        m_tokens.emplace_back(m_current - m_transcoder->begin(), 0, m_fileId, TokenType::Newline);
+    }
     return true;
 }

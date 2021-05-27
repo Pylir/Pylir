@@ -168,10 +168,10 @@ class Transcoder<void, Target>
 
     public:
         using difference_type = std::ptrdiff_t;
-        using value_type = const Target;
-        using pointer = value_type*;
-        using reference = value_type&;
-        using iterator_category = std::bidirectional_iterator_tag;
+        using value_type = Target;
+        using pointer = const value_type*;
+        using reference = const value_type&;
+        using iterator_category = std::forward_iterator_tag;
 
         Iterator() = default;
 
@@ -186,11 +186,7 @@ class Transcoder<void, Target>
         {
             if (m_index + 1 >= m_transcoder->m_results.size())
             {
-                if (!m_transcoder->transcodeNext())
-                {
-                    m_index = -1;
-                    return *this;
-                }
+                m_transcoder->transcodeNext();
             }
             m_index++;
             return *this;
@@ -203,27 +199,29 @@ class Transcoder<void, Target>
             return copy;
         }
 
-        Iterator operator--()
-        {
-            m_index--;
-            return *this;
-        }
-
-        Iterator& operator--(int)
-        {
-            auto copy = *this;
-            operator--();
-            return copy;
-        }
-
         bool operator==(const Iterator& rhs) const
         {
-            return m_transcoder == rhs.m_transcoder && m_index == rhs.m_index;
+            if (m_transcoder != rhs.m_transcoder)
+            {
+                return false;
+            }
+            bool bothPastEnd =
+                m_index >= m_transcoder->m_results.size() && rhs.m_index >= m_transcoder->m_results.size();
+            if (bothPastEnd)
+            {
+                return true;
+            }
+            return m_index == rhs.m_index;
         }
 
         bool operator!=(const Iterator& rhs) const
         {
             return !(rhs == *this);
+        }
+
+        difference_type operator-(const Iterator& rhs) const
+        {
+            return m_index - rhs.m_index;
         }
 
         friend void swap(Iterator& lhs, Iterator& rhs)
@@ -365,6 +363,11 @@ public:
     const_iterator cend()
     {
         return end();
+    }
+
+    const std::vector<Target>& getResults() const
+    {
+        return m_results;
     }
 };
 
