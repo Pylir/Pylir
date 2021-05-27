@@ -5,6 +5,7 @@
 #include <pylir/Support/Text.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -73,6 +74,11 @@ class Lexer
             return copy;
         }
 
+        difference_type operator-(const Iterator& rhs) const
+        {
+            return m_index - rhs.m_index;
+        }
+
         bool operator==(const Iterator& rhs) const
         {
             return m_lexer == rhs.m_lexer && m_index == rhs.m_index;
@@ -98,12 +104,13 @@ class Lexer
     friend class Iterator;
 
     int m_fileId;
-    std::size_t m_currentOffset{};
     std::string_view m_source;
     std::vector<Token> m_tokens;
     std::vector<int> m_lineStarts{0};
     bool pastFirstTwoLines = false;
     Text::Encoding m_encoding;
+    std::optional<Text::Transcoder<void, char32_t>> m_transcoder; // Not really optional, but have to late init :/
+    Text::Transcoder<void, char32_t>::iterator m_current;
 
     bool parseNext();
 
@@ -126,12 +133,19 @@ public:
 
     iterator begin()
     {
+        if (m_tokens.empty())
+        {
+            if (!parseNext())
+            {
+                return end();
+            }
+        }
         return Iterator(*this, 0);
     }
 
     const_iterator cbegin()
     {
-        return Iterator(*this, 0);
+        return begin();
     }
 
     iterator end()
@@ -141,7 +155,7 @@ public:
 
     const_iterator cend()
     {
-        return Iterator(*this, static_cast<std::size_t>(-1));
+        return end();
     }
 };
 } // namespace pylir
