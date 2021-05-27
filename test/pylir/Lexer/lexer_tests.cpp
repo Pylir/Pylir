@@ -30,3 +30,16 @@ TEST_CASE("Lex comments", "[Lexer]")
         CHECK(std::holds_alternative<std::monostate>(token.getValue()));
     }
 }
+
+TEST_CASE("Lex line continuation", "[Lexer]")
+{
+    SECTION("Correct")
+    {
+        pylir::Lexer lexer("\\\n"
+                           "",
+                           1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 1);
+        CHECK(result.front().getOffset() == 2); // It should be the EOF newline, not the one after the backslash
+    }
+}

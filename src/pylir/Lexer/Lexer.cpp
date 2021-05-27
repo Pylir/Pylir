@@ -10,6 +10,22 @@ pylir::Lexer::Lexer(std::string_view source, int fieldId) : m_fileId(fieldId), m
     m_current = m_transcoder->begin();
 }
 
+namespace
+{
+template <class T>
+auto advancePastNewline(T& iterator, T end)
+{
+    if (*iterator == '\r' && std::next(iterator) != end && *std::next(iterator) == '\n')
+    {
+        std::advance(iterator, 2);
+    }
+    else
+    {
+        std::advance(iterator, 1);
+    }
+}
+} // namespace
+
 bool pylir::Lexer::parseNext()
 {
     if (m_current == m_transcoder->end())
@@ -34,15 +50,27 @@ bool pylir::Lexer::parseNext()
             case U'\n':
             {
                 auto offset = m_current - m_transcoder->begin();
-                if (*m_current == '\r' && std::next(m_current) != m_transcoder->end() && *std::next(m_current) == '\n')
-                {
-                    std::advance(m_current, 2);
-                }
-                else
-                {
-                    std::advance(m_current, 1);
-                }
+                advancePastNewline(m_current, m_transcoder->end());
                 m_tokens.emplace_back(offset, m_current - m_transcoder->begin() - offset, m_fileId, TokenType::Newline);
+                m_lineStarts.push_back(m_current - m_transcoder->begin());
+                break;
+            }
+            case U'\\':
+            {
+                m_current++;
+                if (m_current == m_transcoder->end())
+                {
+                    // TODO: Unexpected end of file
+                    return false;
+                }
+                if (*m_current != U'\n' && *m_current != U'\r')
+                {
+                    // TODO: Expected newline after line continuation
+                    return false;
+                }
+                advancePastNewline(m_current, m_transcoder->end());
+                m_lineStarts.push_back(m_current - m_transcoder->begin());
+                break;
             }
         }
         break;
@@ -50,6 +78,7 @@ bool pylir::Lexer::parseNext()
     if (m_current == m_transcoder->end())
     {
         m_tokens.emplace_back(m_current - m_transcoder->begin(), 0, m_fileId, TokenType::Newline);
+        m_lineStarts.push_back(m_current - m_transcoder->begin());
     }
     return true;
 }

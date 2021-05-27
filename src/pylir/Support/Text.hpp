@@ -303,4 +303,6 @@ public:
     }
 };
 
+bool isWhitespace(char32_t codepoint);
+
 } // namespace pylir::Text

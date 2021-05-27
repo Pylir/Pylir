@@ -2,6 +2,7 @@
 #include "Text.hpp"
 
 #include <llvm/Support/ConvertUTF.h>
+#include <llvm/Support/UnicodeCharRanges.h>
 
 std::optional<pylir::Text::Encoding> pylir::Text::checkForBOM(std::string_view bytes)
 {
@@ -249,4 +250,16 @@ char32_t pylir::Text::toUTF32(char32_t utf32, bool* legal)
         return REPLACEMENT_CHARACTER_UTF32;
     }
     return utf32;
+}
+
+bool pylir::Text::isWhitespace(char32_t codepoint)
+{
+    constexpr static llvm::sys::UnicodeCharRange UnicodeWhitespaceCharRanges[] = {
+        {0x0085, 0x0085}, {0x00A0, 0x00A0}, {0x1680, 0x1680}, {0x180E, 0x180E}, {0x2000, 0x200A},
+        {0x2028, 0x2029}, {0x202F, 0x202F}, {0x205F, 0x205F}, {0x3000, 0x3000}};
+
+    static const llvm::sys::UnicodeCharSet UnicodeWhitespaceChar(UnicodeWhitespaceCharRanges);
+
+    return codepoint == U' ' || codepoint == U'\n' || codepoint == U'\t' || codepoint == U'\r' || codepoint == U'\f'
+           || codepoint == U'\v' || UnicodeWhitespaceChar.contains(codepoint);
 }
