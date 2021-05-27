@@ -88,9 +88,10 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 include_directories(src)
 include_directories(SYSTEM 3rdParty)
+add_subdirectory(3rdParty)
 add_subdirectory(src)
 if (PYLIR_BUILD_TESTS)
     add_subdirectory(test)
 endif ()
 
-add_executable(Pylir main.cpp src/pylir/Support/Text.cpp src/pylir/Support/Text.hpp)
+add_executable(Pylir main.cpp)
