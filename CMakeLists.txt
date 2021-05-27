@@ -52,6 +52,8 @@ if (DEFINED PYLIR_SANITIZER)
     endif ()
 endif ()
 
+find_package(Threads REQUIRED)
+link_libraries(Threads::Threads)
 find_package(MLIR REQUIRED 12)
 include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
 list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
