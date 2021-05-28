@@ -12,7 +12,8 @@ namespace pylir
 {
 enum class TokenType : std::uint8_t
 {
-    Newline
+    Newline,
+    Identifier
 };
 
 class Token

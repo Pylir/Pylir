@@ -4,6 +4,8 @@
 #include <llvm/Support/ConvertUTF.h>
 #include <llvm/Support/UnicodeCharRanges.h>
 
+#include <utf8proc/utf8proc.h>
+
 std::optional<pylir::Text::Encoding> pylir::Text::checkForBOM(std::string_view bytes)
 {
     constexpr auto startsWith = [](std::string_view view, const auto& prefix)
@@ -239,8 +241,7 @@ char32_t pylir::Text::toUTF32(std::u16string_view& utf16, bool* legal)
 char32_t pylir::Text::toUTF32(char32_t utf32, bool* legal)
 {
     // Just verify by converting to another format
-    bool ok;
-    (void)toUTF16(utf32, &ok);
+    bool ok = utf8proc_codepoint_valid(utf32);
     if (legal)
     {
         *legal = ok;
@@ -252,14 +253,129 @@ char32_t pylir::Text::toUTF32(char32_t utf32, bool* legal)
     return utf32;
 }
 
+std::string pylir::Text::toUTF8String(std::u16string_view utf16, bool* legal)
+{
+    if (legal)
+    {
+        *legal = true;
+    }
+    std::string result;
+    result.reserve(utf16.size() * 2);
+    while (!utf16.empty())
+    {
+        bool ok;
+        auto utf8 = toUTF8(utf16, &ok);
+        if (legal)
+        {
+            *legal = *legal && ok;
+        }
+        for (auto character : utf8)
+        {
+            if (!character)
+            {
+                break;
+            }
+            result += character;
+        }
+    }
+    return result;
+}
+
+std::string pylir::Text::toUTF8String(std::u32string_view utf32, bool* legal)
+{
+    if (legal)
+    {
+        *legal = true;
+    }
+    std::string result;
+    result.reserve(utf32.size() * 4);
+    for (auto codepoint : utf32)
+    {
+        bool ok;
+        auto utf8 = toUTF8(codepoint, &ok);
+        if (legal)
+        {
+            *legal = *legal && ok;
+        }
+        for (auto character : utf8)
+        {
+            if (!character)
+            {
+                break;
+            }
+            result += character;
+        }
+    }
+    return result;
+}
+
+std::u32string pylir::Text::toUTF32String(std::string_view utf8, bool* legal)
+{
+    if (legal)
+    {
+        *legal = true;
+    }
+    std::u32string result;
+    result.reserve(utf8.size() / 2);
+    while (!utf8.empty())
+    {
+        bool ok;
+        result += toUTF32(utf8, &ok);
+        if (legal)
+        {
+            *legal = *legal && ok;
+        }
+    }
+    return result;
+}
+
 bool pylir::Text::isWhitespace(char32_t codepoint)
 {
-    constexpr static llvm::sys::UnicodeCharRange UnicodeWhitespaceCharRanges[] = {
-        {0x0085, 0x0085}, {0x00A0, 0x00A0}, {0x1680, 0x1680}, {0x180E, 0x180E}, {0x2000, 0x200A},
-        {0x2028, 0x2029}, {0x202F, 0x202F}, {0x205F, 0x205F}, {0x3000, 0x3000}};
+    auto properties = utf8proc_get_property(codepoint);
+    return properties->category == UTF8PROC_CATEGORY_ZS || properties->bidi_class == UTF8PROC_BIDI_CLASS_WS
+           || properties->bidi_class == UTF8PROC_BIDI_CLASS_B || properties->bidi_class == UTF8PROC_BIDI_CLASS_S;
+}
 
-    static const llvm::sys::UnicodeCharSet UnicodeWhitespaceChar(UnicodeWhitespaceCharRanges);
+std::string pylir::Text::normalize(std::string_view utf8, pylir::Text::Normalization normalization)
+{
+    [[maybe_unused]] bool ok;
+    auto u32 = toUTF32String(utf8, &ok);
+    PYLIR_ASSERT(ok);
+    return toUTF8String(normalize(u32, normalization));
+}
 
-    return codepoint == U' ' || codepoint == U'\n' || codepoint == U'\t' || codepoint == U'\r' || codepoint == U'\f'
-           || codepoint == U'\v' || UnicodeWhitespaceChar.contains(codepoint);
+std::u32string pylir::Text::normalize(std::u32string_view utf32, pylir::Text::Normalization normalization)
+{
+    utf8proc_option_t option;
+    switch (normalization)
+    {
+        case Normalization::NFD: option = static_cast<utf8proc_option_t>(UTF8PROC_STABLE | UTF8PROC_DECOMPOSE); break;
+        case Normalization::NFC: option = static_cast<utf8proc_option_t>(UTF8PROC_STABLE | UTF8PROC_COMPOSE); break;
+        case Normalization::NFKD:
+            option = static_cast<utf8proc_option_t>(UTF8PROC_STABLE | UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT);
+            break;
+        case Normalization::NFKC:
+            option = static_cast<utf8proc_option_t>(UTF8PROC_STABLE | UTF8PROC_COMPOSE | UTF8PROC_COMPAT);
+            break;
+        default: PYLIR_UNREACHABLE;
+    }
+    std::vector<utf8proc_int32_t> buffer(utf32.size());
+    std::size_t actuallyWritten = 0;
+    for (auto codepoint : utf32)
+    {
+        do
+        {
+            auto size = utf8proc_decompose_char(codepoint, buffer.data() + actuallyWritten,
+                                                buffer.size() - actuallyWritten, option, nullptr);
+            PYLIR_ASSERT(size >= 0);
+            if (static_cast<std::size_t>(size) > buffer.size() - actuallyWritten)
+            {
+                buffer.resize(std::max<std::size_t>(buffer.size() * 2, size));
+                continue;
+            }
+            actuallyWritten += size;
+            break;
+        } while (true);
+    }
+    return std::u32string(buffer.begin(), buffer.begin() + actuallyWritten);
 }

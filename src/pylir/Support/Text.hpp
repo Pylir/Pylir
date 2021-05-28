@@ -82,6 +82,10 @@ std::array<char, 4> toUTF8(std::u16string_view& utf16, bool* legal = nullptr);
  */
 std::array<char, 4> toUTF8(char32_t utf32, bool* legal = nullptr);
 
+std::string toUTF8String(std::u16string_view utf16, bool* legal = nullptr);
+
+std::string toUTF8String(std::u32string_view utf32, bool* legal = nullptr);
+
 /**
  * Does no conversion, but instead checks whether the input is proper UTF-16.
  * The utf16 source is 1 to 2 bytes. Read bytes are consumed.
@@ -150,6 +154,10 @@ char32_t toUTF32(std::u16string_view& utf16, bool* legal = nullptr);
  */
 char32_t toUTF32(char32_t utf32, bool* legal = nullptr);
 
+std::u32string toUTF32String(std::string_view utf8, bool* legal = nullptr);
+
+std::u32string toUTF32String(std::u16string_view utf16, bool* legal = nullptr);
+
 template <class Source, class Target>
 class Transcoder;
 
@@ -160,7 +168,7 @@ class Transcoder<void, Target>
 
     std::string_view m_source;
     Encoding m_encoding;
-    std::vector<Target> m_results;
+    std::basic_string<Target> m_results;
 
     bool transcodeNext()
     {
@@ -185,7 +193,7 @@ class Transcoder<void, Target>
                 }
                 else if constexpr (std::is_same_v<char32_t, Target>)
                 {
-                    m_results.emplace_back(toUTF32(m_source));
+                    m_results += toUTF32(m_source);
                 }
                 break;
             case Encoding::UTF16LE:
@@ -218,7 +226,7 @@ class Transcoder<void, Target>
                 }
                 else if constexpr (std::is_same_v<char32_t, Target>)
                 {
-                    m_results.emplace_back(toUTF32(view));
+                    m_results += toUTF32(view);
                 }
                 m_source.remove_suffix(viewSize - view.size());
                 break;
@@ -249,7 +257,7 @@ class Transcoder<void, Target>
                 }
                 else if constexpr (std::is_same_v<char32_t, Target>)
                 {
-                    m_results.emplace_back(toUTF32(value));
+                    m_results += toUTF32(value);
                 }
                 break;
         }
@@ -287,12 +295,24 @@ public:
         return end();
     }
 
-    const std::vector<Target>& getResults() const
+    std::basic_string_view<Target> getResults() const
     {
         return m_results;
     }
 };
 
 bool isWhitespace(char32_t codepoint);
+
+enum class Normalization
+{
+    NFD,
+    NFC,
+    NFKD,
+    NFKC
+};
+
+std::string normalize(std::string_view utf8, Normalization normalization);
+
+std::u32string normalize(std::u32string_view utf32, Normalization normalization);
 
 } // namespace pylir::Text

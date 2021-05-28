@@ -89,6 +89,11 @@ public:
         return m_index - rhs.m_index;
     }
 
+    pointer data() const
+    {
+        return container().data() + m_index;
+    }
+
     friend void swap(LazyCacheIterator& lhs, LazyCacheIterator& rhs)
     {
         std::swap(lhs.m_cache, rhs.m_cache);
