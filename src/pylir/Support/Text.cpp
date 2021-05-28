@@ -81,6 +81,16 @@ std::array<char, 4> pylir::Text::toUTF8(std::string_view& utf8, bool* legal)
     return array;
 }
 
+namespace
+{
+template <class T>
+bool resultOk(llvm::ConversionResult result, T* targetBegin, T* targetNow)
+{
+    return result == llvm::conversionOK || result == llvm::targetExhausted
+           || (result == llvm::sourceExhausted && targetNow - targetBegin > 0);
+}
+} // namespace
+
 std::array<char, 4> pylir::Text::toUTF8(std::u16string_view& utf16, bool* legal)
 {
     std::array<llvm::UTF8, 4> array{};
@@ -90,7 +100,7 @@ std::array<char, 4> pylir::Text::toUTF8(std::u16string_view& utf16, bool* legal)
     auto* targetBegin = array.data();
     auto result = llvm::ConvertUTF16toUTF8(&sourceBegin, sourceBegin + std::min<std::size_t>(2, utf16.size()),
                                            &targetBegin, array.data() + array.size(), llvm::strictConversion);
-    bool ok = result == llvm::conversionOK || result == llvm::targetExhausted;
+    bool ok = resultOk(result, array.data(), targetBegin);
     if (legal)
     {
         *legal = ok;
@@ -113,9 +123,9 @@ std::array<char, 4> pylir::Text::toUTF8(char32_t utf32, bool* legal)
     auto result = llvm::ConvertCodePointToUTF8(utf32, targetBegin);
     if (legal)
     {
-        *legal = result == llvm::conversionOK;
+        *legal = result;
     }
-    if (result != llvm::conversionOK)
+    if (!result)
     {
         return REPLACEMENT_CHARACTER_UTF8;
     }
@@ -152,7 +162,7 @@ std::array<char16_t, 2> pylir::Text::toUTF16(std::string_view& utf8, bool* legal
     auto* targetBegin = llvmUtf16.data();
     auto result = llvm::ConvertUTF8toUTF16(&sourceBegin, sourceBegin + std::min<std::size_t>(4, utf8.size()),
                                            &targetBegin, llvmUtf16.data() + llvmUtf16.size(), llvm::strictConversion);
-    bool ok = result == llvm::conversionOK || result == llvm::targetExhausted;
+    bool ok = resultOk(result, llvmUtf16.data(), targetBegin);
     if (legal)
     {
         *legal = ok;
@@ -176,7 +186,7 @@ std::array<char16_t, 2> pylir::Text::toUTF16(char32_t utf32, bool* legal)
     auto* targetBegin = llvmUtf16.data();
     auto result = llvm::ConvertUTF32toUTF16(&sourceBegin, sourceBegin + 1, &targetBegin,
                                             llvmUtf16.data() + llvmUtf16.size(), llvm::strictConversion);
-    bool ok = result == llvm::conversionOK || result == llvm::targetExhausted;
+    bool ok = resultOk(result, llvmUtf16.data(), targetBegin);
     if (legal)
     {
         *legal = ok;
@@ -201,7 +211,7 @@ char32_t pylir::Text::toUTF32(std::string_view& utf8, bool* legal)
     auto* targetBegin = &llvmUTF32;
     auto result = llvm::ConvertUTF8toUTF32(&sourceBegin, sourceBegin + std::min<std::size_t>(4, utf8.size()),
                                            &targetBegin, targetBegin + 1, llvm::strictConversion);
-    bool ok = result == llvm::conversionOK || result == llvm::targetExhausted;
+    bool ok = resultOk(result, &llvmUTF32, targetBegin);
     if (legal)
     {
         *legal = ok;
@@ -224,7 +234,7 @@ char32_t pylir::Text::toUTF32(std::u16string_view& utf16, bool* legal)
     auto* targetBegin = &llvmUTF32;
     auto result = llvm::ConvertUTF16toUTF32(&sourceBegin, sourceBegin + std::min<std::size_t>(2, utf16.size()),
                                             &targetBegin, targetBegin + 1, llvm::strictConversion);
-    bool ok = result == llvm::conversionOK || result == llvm::targetExhausted;
+    bool ok = resultOk(result, &llvmUTF32, targetBegin);
     if (legal)
     {
         *legal = ok;
@@ -370,7 +380,7 @@ std::u32string pylir::Text::normalize(std::u32string_view utf32, pylir::Text::No
             PYLIR_ASSERT(size >= 0);
             if (static_cast<std::size_t>(size) > buffer.size() - actuallyWritten)
             {
-                buffer.resize(std::max<std::size_t>(buffer.size() * 2, size));
+                buffer.resize(std::max<std::size_t>(buffer.size() * 2, buffer.size() + size));
                 continue;
             }
             actuallyWritten += size;
