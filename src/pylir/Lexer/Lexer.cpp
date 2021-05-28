@@ -3,6 +3,7 @@
 #include <llvm/Support/UnicodeCharRanges.h>
 
 #include <iterator>
+#include <unordered_map>
 
 pylir::Lexer::Lexer(std::string_view source, int fieldId) : m_fileId(fieldId), m_source(source)
 {
@@ -350,8 +351,51 @@ bool pylir::Lexer::parseNext()
                 auto start = m_current;
                 m_current = std::find_if_not(m_current, m_transcoder->end(),
                                              [&](char32_t value) { return legalIdentifierSet.contains(value); });
-                auto normalized = Text::normalize({start.data(), static_cast<std::size_t>(m_current - start)},
-                                                  Text::Normalization::NFKC);
+                auto utf32 = std::u32string_view{start.data(), static_cast<std::size_t>(m_current - start)};
+                static std::unordered_map<std::u32string_view, TokenType> keywords = {
+                    {U"False", TokenType::FalseKeyword},
+                    {U"None", TokenType::NoneKeyword},
+                    {U"True", TokenType::TrueKeyword},
+                    {U"and", TokenType::AndKeyword},
+                    {U"as", TokenType::AsKeyword},
+                    {U"assert", TokenType::AssertKeyword},
+                    {U"async", TokenType::AsyncKeyword},
+                    {U"await", TokenType::AwaitKeyword},
+                    {U"break", TokenType::BreakKeyword},
+                    {U"class", TokenType::ClassKeyword},
+                    {U"continue", TokenType::ContinueKeyword},
+                    {U"def", TokenType::DefKeyword},
+                    {U"del", TokenType::DelKeyword},
+                    {U"elif", TokenType::ElifKeyword},
+                    {U"else", TokenType::ElseKeyword},
+                    {U"except", TokenType::ExceptKeyword},
+                    {U"finally", TokenType::FinallyKeyword},
+                    {U"for", TokenType::ForKeyword},
+                    {U"from", TokenType::FromKeyword},
+                    {U"global", TokenType::GlobalKeyword},
+                    {U"if", TokenType::IfKeyword},
+                    {U"import", TokenType::ImportKeyword},
+                    {U"in", TokenType::InKeyword},
+                    {U"is", TokenType::IsKeyword},
+                    {U"lambda", TokenType::LambdaKeyword},
+                    {U"nonlocal", TokenType::NonlocalKeyword},
+                    {U"not", TokenType::NotKeyword},
+                    {U"or", TokenType::OrKeyword},
+                    {U"pass", TokenType::PassKeyword},
+                    {U"raise", TokenType::RaiseKeyword},
+                    {U"return", TokenType::ReturnKeyword},
+                    {U"try", TokenType::TryKeyword},
+                    {U"while", TokenType::WhileKeyword},
+                    {U"with", TokenType::WithKeyword},
+                    {U"yield", TokenType::YieldKeyword},
+                };
+                if (auto result = keywords.find(utf32); result != keywords.end())
+                {
+                    m_tokens.emplace_back(start - m_transcoder->begin(), m_current - start, m_fileId, result->second);
+                    break;
+                }
+
+                auto normalized = Text::normalize(utf32, Text::Normalization::NFKC);
                 [[maybe_unused]] bool ok;
                 auto utf8 = Text::toUTF8String(normalized, &ok);
                 PYLIR_ASSERT(ok);
