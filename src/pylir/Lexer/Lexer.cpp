@@ -2,6 +2,9 @@
 
 #include <llvm/Support/UnicodeCharRanges.h>
 
+#include <pylir/Diagnostics/DiagnosticMessages.hpp>
+#include <pylir/Diagnostics/Diagnostics.hpp>
+
 #include <iterator>
 #include <unordered_map>
 
@@ -322,7 +325,7 @@ bool pylir::Lexer::parseNext()
                 m_current++;
                 if (m_current == m_transcoder->end())
                 {
-                    // TODO: Unexpected end of file
+                    Diag::emitDiagnostics(Diag::UNEXPECTED_EOF_WHILE_PARSING);
                     return false;
                 }
                 if (*m_current != U'\n' && *m_current != U'\r')
