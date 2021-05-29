@@ -8,28 +8,13 @@
 #include <iterator>
 #include <unordered_map>
 
-pylir::Lexer::Lexer(std::string_view source, int fieldId) : m_fileId(fieldId), m_source(source)
+pylir::Lexer::Lexer(Diag::Document& document, int fieldId)
+    : m_fileId(fieldId), m_document(&document), m_current(m_document->begin())
 {
-    auto encoding = Text::readBOM(m_source);
-    m_encoding = encoding.value_or(Text::Encoding::UTF8);
-    m_transcoder.emplace(m_source, m_encoding);
-    m_current = m_transcoder->begin();
 }
 
 namespace
 {
-template <class T>
-auto advancePastNewline(T& iterator, T end)
-{
-    if (*iterator == '\r' && std::next(iterator) != end && *std::next(iterator) == '\n')
-    {
-        std::advance(iterator, 2);
-    }
-    else
-    {
-        std::advance(iterator, 1);
-    }
-}
 
 #pragma region unicode
 
@@ -293,7 +278,7 @@ constexpr llvm::sys::UnicodeCharRange legalIdentifiers[] = {
 
 bool pylir::Lexer::parseNext()
 {
-    if (m_current == m_transcoder->end())
+    if (m_current == m_document->end())
     {
         return false;
     }
@@ -303,45 +288,41 @@ bool pylir::Lexer::parseNext()
         {
             case U'#':
             {
-                m_current = std::find_if(m_current, m_transcoder->end(),
-                                         [](char32_t value) { return value == '\n' || value == '\r'; });
-                if (m_current == m_transcoder->end())
+                m_current = std::find_if(m_current, m_document->end(), [](char32_t value) { return value == '\n'; });
+                if (m_current == m_document->end())
                 {
                     break;
                 }
             }
                 [[fallthrough]];
-            case U'\r':
             case U'\n':
             {
-                auto offset = m_current - m_transcoder->begin();
-                advancePastNewline(m_current, m_transcoder->end());
-                m_tokens.emplace_back(offset, m_current - m_transcoder->begin() - offset, m_fileId, TokenType::Newline);
-                m_lineStarts.push_back(m_current - m_transcoder->begin());
+                auto offset = m_current - m_document->begin();
+                m_current++;
+                m_tokens.emplace_back(offset, 1, m_fileId, TokenType::Newline);
                 break;
             }
             case U'\\':
             {
                 m_current++;
-                if (m_current == m_transcoder->end())
+                if (m_current == m_document->end())
                 {
-                    //TODO: Diag::UNEXPECTED_EOF_WHILE_PARSING
+                    // TODO: Diag::UNEXPECTED_EOF_WHILE_PARSING
                     return false;
                 }
-                if (*m_current != U'\n' && *m_current != U'\r')
+                if (*m_current != U'\n')
                 {
                     // TODO: Expected newline after line continuation
                     return false;
                 }
-                advancePastNewline(m_current, m_transcoder->end());
-                m_lineStarts.push_back(m_current - m_transcoder->begin());
+                m_current++;
                 break;
             }
             default:
             {
                 if (Text::isWhitespace(*m_current))
                 {
-                    m_current = std::find_if_not(m_current, m_transcoder->end(), Text::isWhitespace);
+                    m_current = std::find_if_not(m_current, m_document->end(), Text::isWhitespace);
                     continue;
                 }
                 static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
@@ -352,7 +333,7 @@ bool pylir::Lexer::parseNext()
                 }
                 static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
                 auto start = m_current;
-                m_current = std::find_if_not(m_current, m_transcoder->end(),
+                m_current = std::find_if_not(m_current, m_document->end(),
                                              [&](char32_t value) { return legalIdentifierSet.contains(value); });
                 auto utf32 = std::u32string_view{start.data(), static_cast<std::size_t>(m_current - start)};
                 static std::unordered_map<std::u32string_view, TokenType> keywords = {
@@ -394,7 +375,7 @@ bool pylir::Lexer::parseNext()
                 };
                 if (auto result = keywords.find(utf32); result != keywords.end())
                 {
-                    m_tokens.emplace_back(start - m_transcoder->begin(), m_current - start, m_fileId, result->second);
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, result->second);
                     break;
                 }
 
@@ -402,17 +383,16 @@ bool pylir::Lexer::parseNext()
                 [[maybe_unused]] bool ok;
                 auto utf8 = Text::toUTF8String(normalized, &ok);
                 PYLIR_ASSERT(ok);
-                m_tokens.emplace_back(start - m_transcoder->begin(), m_current - start, m_fileId, TokenType::Identifier,
+                m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Identifier,
                                       std::move(utf8));
                 break;
             }
         }
         break;
-    } while (m_current != m_transcoder->end());
-    if (m_current == m_transcoder->end())
+    } while (m_current != m_document->end());
+    if (m_current == m_document->end())
     {
-        m_tokens.emplace_back(m_current - m_transcoder->begin(), 0, m_fileId, TokenType::Newline);
-        m_lineStarts.push_back(m_current - m_transcoder->begin());
+        m_tokens.emplace_back(m_current - m_document->begin(), 0, m_fileId, TokenType::Newline);
     }
     return true;
 }

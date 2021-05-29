@@ -7,9 +7,9 @@ TEST_CASE("Lex comments", "[Lexer]")
 {
     SECTION("Comment to end of line")
     {
-        pylir::Lexer lexer("# comment\n"
-                           "",
-                           1);
+        pylir::Diag::Document document("# comment\n"
+                                       "");
+        pylir::Lexer lexer(document, 1);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& token = result.front();
@@ -20,7 +20,8 @@ TEST_CASE("Lex comments", "[Lexer]")
     }
     SECTION("Comment to end of file")
     {
-        pylir::Lexer lexer("# comment", 1);
+        pylir::Diag::Document document("# comment");
+        pylir::Lexer lexer(document, 1);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         auto& token = result.front();
@@ -31,13 +32,42 @@ TEST_CASE("Lex comments", "[Lexer]")
     }
 }
 
+TEST_CASE("Lex newlines", "[Lexer]")
+{
+    pylir::Diag::Document document("Windows\r\n"
+                                   "Unix\n"
+                                   "OldMac\r"
+                                   "");
+    pylir::Lexer lexer(document, 1);
+    std::vector result(lexer.begin(), lexer.end());
+    REQUIRE(result.size() == 7);
+    CHECK(result[0].getTokenType() == pylir::TokenType::Identifier);
+    CHECK(result[0].getOffset() == 0);
+    CHECK(result[0].getSize() == 7);
+    CHECK(result[1].getTokenType() == pylir::TokenType::Newline);
+    CHECK(result[1].getOffset() == 7);
+    CHECK(result[1].getSize() == 1);
+    CHECK(result[2].getTokenType() == pylir::TokenType::Identifier);
+    CHECK(result[2].getOffset() == 8);
+    CHECK(result[2].getSize() == 4);
+    CHECK(result[3].getTokenType() == pylir::TokenType::Newline);
+    CHECK(result[3].getOffset() == 12);
+    CHECK(result[3].getSize() == 1);
+    CHECK(result[4].getTokenType() == pylir::TokenType::Identifier);
+    CHECK(result[4].getOffset() == 13);
+    CHECK(result[4].getSize() == 6);
+    CHECK(result[5].getTokenType() == pylir::TokenType::Newline);
+    CHECK(result[5].getOffset() == 19);
+    CHECK(result[5].getSize() == 1);
+}
+
 TEST_CASE("Lex line continuation", "[Lexer]")
 {
     SECTION("Correct")
     {
-        pylir::Lexer lexer("\\\n"
-                           "",
-                           1);
+        pylir::Diag::Document document("\\\n"
+                                       "");
+        pylir::Lexer lexer(document, 1);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         CHECK(result.front().getOffset() == 2); // It should be the EOF newline, not the one after the backslash
@@ -48,7 +78,8 @@ TEST_CASE("Lex identifiers", "[Lexer]")
 {
     SECTION("Unicode")
     {
-        pylir::Lexer lexer("株式会社", 1);
+        pylir::Diag::Document document("株式会社");
+        pylir::Lexer lexer(document, 1);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
@@ -59,7 +90,8 @@ TEST_CASE("Lex identifiers", "[Lexer]")
     }
     SECTION("Normalized")
     {
-        pylir::Lexer lexer("ＫＡＤＯＫＡＷＡ", 1);
+        pylir::Diag::Document document("ＫＡＤＯＫＡＷＡ");
+        pylir::Lexer lexer(document, 1);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
@@ -72,9 +104,9 @@ TEST_CASE("Lex identifiers", "[Lexer]")
 
 TEST_CASE("Lex keywords", "[Lexer]")
 {
-    pylir::Lexer lexer(
-        "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield",
-        1);
+    pylir::Diag::Document document(
+        "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield");
+    pylir::Lexer lexer(document, 1);
     std::vector<pylir::TokenType> result;
     std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                    [](const pylir::Token& token) { return token.getTokenType(); });

@@ -265,7 +265,10 @@ class Transcoder<void, Target>
     }
 
 public:
-    Transcoder(std::string_view source, Encoding encoding) : m_source(source), m_encoding(encoding) {}
+    Transcoder(std::string_view source, Encoding encoding) : m_source(source), m_encoding(encoding)
+    {
+        m_results.reserve(source.size());
+    }
 
     using value_type = Target;
     using reference = const value_type&;
