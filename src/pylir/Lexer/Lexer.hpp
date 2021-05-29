@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Support/LazyCacheIterator.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Text.hpp>
@@ -62,5 +63,7 @@ public:
     {
         return end();
     }
+
+    Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location,std::string_view message);
 };
 } // namespace pylir

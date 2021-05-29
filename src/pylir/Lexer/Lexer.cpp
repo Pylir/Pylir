@@ -3,7 +3,7 @@
 #include <llvm/Support/UnicodeCharRanges.h>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
-#include <pylir/Diagnostics/Diagnostics.hpp>
+#include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 
 #include <iterator>
 #include <unordered_map>
@@ -325,7 +325,7 @@ bool pylir::Lexer::parseNext()
                 m_current++;
                 if (m_current == m_transcoder->end())
                 {
-                    Diag::emitDiagnostics(Diag::UNEXPECTED_EOF_WHILE_PARSING);
+                    //TODO: Diag::UNEXPECTED_EOF_WHILE_PARSING
                     return false;
                 }
                 if (*m_current != U'\n' && *m_current != U'\r')
@@ -415,4 +415,9 @@ bool pylir::Lexer::parseNext()
         m_lineStarts.push_back(m_current - m_transcoder->begin());
     }
     return true;
+}
+
+pylir::Diag::DiagnosticsBuilder pylir::Lexer::createDiagnosticsBuilder(std::size_t location, std::string_view message)
+{
+
 }
