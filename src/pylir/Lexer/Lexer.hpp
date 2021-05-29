@@ -36,7 +36,7 @@ public:
     using difference_type = iterator::difference_type;
     using size_type = std::size_t;
 
-    explicit Lexer(std::string_view source, int fileId);
+    explicit Lexer(std::string_view source, int fileId = 0);
 
     Lexer(const Lexer&) = delete;
     Lexer& operator=(const Lexer&) = delete;
@@ -64,6 +64,6 @@ public:
         return end();
     }
 
-    Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location,std::string_view message);
+    Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location, std::string_view message);
 };
 } // namespace pylir
