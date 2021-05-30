@@ -16,7 +16,7 @@ class Document
     std::string m_filename;
     Text::Encoding m_encoding;
     std::string m_input;
-    std::u32string m_codePoints;
+    std::u32string m_text;
     std::vector<std::size_t> m_lineStarts{0};
     Text::Transcoder<void, char32_t> m_transcoder;
     decltype(m_transcoder)::iterator m_current;
@@ -36,13 +36,13 @@ class Document
                 {
                     increment = 2;
                 }
-                m_lineStarts.push_back(m_codePoints.size());
-                m_codePoints += '\n';
+                m_lineStarts.push_back(m_text.size());
+                m_text += '\n';
                 std::advance(m_current, increment);
                 return true;
             }
-            case '\n': m_lineStarts.push_back(m_codePoints.size()); [[fallthrough]];
-            default: m_codePoints += *m_current++;
+            case '\n': m_lineStarts.push_back(m_text.size()); [[fallthrough]];
+            default: m_text += *m_current++;
         }
         return true;
     }
@@ -51,7 +51,7 @@ public:
     using value_type = decltype(m_transcoder)::value_type;
     using reference = decltype(m_transcoder)::reference;
     using const_reference = decltype(m_transcoder)::const_reference;
-    using iterator = LazyCacheIterator<value_type, Document, &Document::checkNext, &Document::m_codePoints>;
+    using iterator = LazyCacheIterator<value_type, Document, &Document::checkNext, &Document::m_text>;
     using const_iterator = iterator;
     using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
@@ -70,7 +70,7 @@ public:
               m_encoding)
     {
         m_current = m_transcoder.begin();
-        m_codePoints.reserve(input.size());
+        m_text.reserve(input.size());
     }
 
     iterator begin()
@@ -96,6 +96,11 @@ public:
     tcb::span<const std::size_t> getLineStarts() const
     {
         return m_lineStarts;
+    }
+
+    std::u32string_view getText() const
+    {
+        return m_text;
     }
 };
 } // namespace pylir::Diag

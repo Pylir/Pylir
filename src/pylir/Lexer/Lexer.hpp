@@ -22,6 +22,9 @@ class Lexer
     std::vector<Token> m_tokens;
     Diag::Document* m_document;
     Diag::Document::iterator m_current;
+    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> m_diagCallback;
+
+    static void outputToStderr(Diag::DiagnosticsBuilder&& diagnosticsBuilder);
 
     bool parseNext();
 
@@ -34,7 +37,8 @@ public:
     using difference_type = iterator::difference_type;
     using size_type = std::size_t;
 
-    explicit Lexer(Diag::Document& document, int fileId = 0);
+    explicit Lexer(Diag::Document& document, int fileId = 0,
+                   std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> diagCallback = outputToStderr);
 
     Lexer(const Lexer&) = delete;
     Lexer& operator=(const Lexer&) = delete;
@@ -42,26 +46,26 @@ public:
     Lexer(Lexer&&) noexcept = default;
     Lexer& operator=(Lexer&&) noexcept = default;
 
-    iterator begin()
+    [[nodiscard]] iterator begin()
     {
         return iterator(*this, 0);
     }
 
-    const_iterator cbegin()
+    [[nodiscard]] const_iterator cbegin()
     {
         return begin();
     }
 
-    iterator end()
+    [[nodiscard]] iterator end()
     {
         return iterator(*this, -1);
     }
 
-    const_iterator cend()
+    [[nodiscard]] const_iterator cend()
     {
         return end();
     }
 
-    Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location, std::string_view message);
+    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location, std::string_view message);
 };
 } // namespace pylir

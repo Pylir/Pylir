@@ -5,11 +5,13 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 
+#include <iostream>
 #include <iterator>
 #include <unordered_map>
 
-pylir::Lexer::Lexer(Diag::Document& document, int fieldId)
-    : m_fileId(fieldId), m_document(&document), m_current(m_document->begin())
+pylir::Lexer::Lexer(Diag::Document& document, int fieldId,
+                    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> diagCallback)
+    : m_fileId(fieldId), m_document(&document), m_current(m_document->begin()), m_diagCallback(std::move(diagCallback))
 {
 }
 
@@ -307,12 +309,20 @@ bool pylir::Lexer::parseNext()
                 m_current++;
                 if (m_current == m_document->end())
                 {
-                    // TODO: Diag::UNEXPECTED_EOF_WHILE_PARSING
+                    auto builder =
+                        createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
+                            .addLabel(m_current - m_document->begin(), "\\n", Diag::colour::lime_green);
+                    m_diagCallback(std::move(builder));
                     return false;
                 }
                 if (*m_current != U'\n')
                 {
-                    // TODO: Expected newline after line continuation
+                    auto builder =
+                        createDiagnosticsBuilder(m_current - m_document->begin(),
+                                                 Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
+                            .addLabel(m_current - m_document->begin(), "\\n", Diag::colour::lime_green,
+                                      Diag::emphasis::strikethrough);
+                    m_diagCallback(std::move(builder));
                     return false;
                 }
                 m_current++;
@@ -399,5 +409,10 @@ bool pylir::Lexer::parseNext()
 
 pylir::Diag::DiagnosticsBuilder pylir::Lexer::createDiagnosticsBuilder(std::size_t location, std::string_view message)
 {
+    return Diag::DiagnosticsBuilder(*m_document, location, message);
+}
 
+void pylir::Lexer::outputToStderr(pylir::Diag::DiagnosticsBuilder&& diagnosticsBuilder)
+{
+    std::cerr << diagnosticsBuilder.emitError();
 }
