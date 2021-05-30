@@ -1,7 +1,24 @@
 
+#include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Lexer/Lexer.hpp>
 
+#include <iostream>
+
 #include <catch2/catch.hpp>
+
+#define LEXER_EMITS(source, message)                                                   \
+    [](std::string str)                                                                \
+    {                                                                                  \
+        pylir::Diag::Document document(str);                                           \
+        pylir::Lexer lexer(document, 1,                                                \
+                           [](pylir::Diag::DiagnosticsBuilder&& builder)               \
+                           {                                                           \
+                               auto str = builder.emitError();                         \
+                               std::cerr << str << std::flush;                         \
+                               CHECK_THAT(str, Catch::Contains(std::string(message))); \
+                           });                                                         \
+        std::for_each(lexer.begin(), lexer.end(), [](auto&&) {});                      \
+    }(source)
 
 TEST_CASE("Lex comments", "[Lexer]")
 {
@@ -72,6 +89,9 @@ TEST_CASE("Lex line continuation", "[Lexer]")
         REQUIRE(result.size() == 1);
         CHECK(result.front().getOffset() == 2); // It should be the EOF newline, not the one after the backslash
     }
+    LEXER_EMITS("test\n"
+                "\\",
+                pylir::Diag::UNEXPECTED_EOF_WHILE_PARSING);
 }
 
 TEST_CASE("Lex identifiers", "[Lexer]")

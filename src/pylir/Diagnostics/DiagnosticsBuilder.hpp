@@ -184,6 +184,9 @@ class DiagnosticsBuilder
         Note
     };
 
+    static std::string printLine(std::size_t width, std::size_t lineNumber, pylir::Diag::Document& document,
+                                 std::vector<Label> labels);
+
     std::string emitMessage(const Message& message, Severity severity) const;
 
 public:

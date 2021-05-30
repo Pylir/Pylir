@@ -4,6 +4,7 @@
 #include <pylir/Support/LazyCacheIterator.hpp>
 #include <pylir/Support/Text.hpp>
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 
@@ -36,13 +37,18 @@ class Document
                 {
                     increment = 2;
                 }
-                m_lineStarts.push_back(m_text.size());
                 m_text += '\n';
+                m_lineStarts.push_back(m_text.size());
                 std::advance(m_current, increment);
                 return true;
             }
-            case '\n': m_lineStarts.push_back(m_text.size()); [[fallthrough]];
+            case '\n': m_lineStarts.push_back(m_text.size() + 1); [[fallthrough]];
             default: m_text += *m_current++;
+        }
+        if (m_current == m_transcoder.end())
+        {
+            // + 1 for imaginary newline that does not exist
+            m_lineStarts.push_back(m_text.size() + 1);
         }
         return true;
     }
@@ -93,6 +99,34 @@ public:
         return end();
     }
 
+    std::size_t getLineNumber(std::size_t offset) const
+    {
+        auto result = std::lower_bound(m_lineStarts.begin(), m_lineStarts.end(), offset);
+        return result - m_lineStarts.begin();
+    }
+
+    std::size_t getColNumber(std::size_t offset) const
+    {
+        auto lineNumber = getLineNumber(offset);
+        return offset - m_lineStarts[lineNumber - 1] + 1;
+    }
+
+    std::pair<std::size_t, std::size_t> getLineCol(std::size_t offset) const
+    {
+        auto lineNumber = getLineNumber(offset);
+        return {lineNumber, offset - m_lineStarts[lineNumber - 1] + 1};
+    }
+
+    std::u32string_view getLine(std::size_t lineNumber)
+    {
+        while (lineNumber >= m_lineStarts.size() && m_current != m_transcoder.end())
+        {
+            m_current++;
+        }
+        return std::u32string_view(m_text).substr(m_lineStarts[lineNumber - 1],
+                                                  m_lineStarts[lineNumber] - m_lineStarts[lineNumber - 1] - 1);
+    }
+
     tcb::span<const std::size_t> getLineStarts() const
     {
         return m_lineStarts;
@@ -101,6 +135,11 @@ public:
     std::u32string_view getText() const
     {
         return m_text;
+    }
+
+    std::string_view getFilename() const
+    {
+        return m_filename;
     }
 };
 } // namespace pylir::Diag
