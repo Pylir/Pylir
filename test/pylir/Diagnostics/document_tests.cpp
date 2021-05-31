@@ -40,3 +40,12 @@ TEST_CASE("Document BOM detection", "[Document]")
         CHECK(text == U"Text");
     }
 }
+
+TEST_CASE("Document line normalization","[Document]")
+{
+    pylir::Diag::Document document("Windows\r\n"
+                                   "Unix\n"
+                                   "OldMac\r");
+    std::u32string text(document.begin(),  document.end());
+    CHECK(text == U"Windows\nUnix\nOldMac\n");
+}

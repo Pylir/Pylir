@@ -93,6 +93,9 @@ include_directories(SYSTEM 3rdParty)
 add_subdirectory(3rdParty)
 add_subdirectory(src)
 if (PYLIR_BUILD_TESTS)
+
+    include(CTest)
+    enable_testing()
     add_subdirectory(test)
 endif ()
 
