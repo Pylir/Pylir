@@ -200,7 +200,7 @@ class Transcoder<void, Target>
             case Encoding::UTF16BE:
             {
                 std::array<char16_t, 2> temp{};
-                auto sizeAvailable = std::min<std::size_t>(4, m_source.size()) % 2;
+                auto sizeAvailable = std::min<std::size_t>(4, m_source.size()) & ~static_cast<std::size_t>(1);
                 std::memcpy(temp.data(), m_source.data(), sizeAvailable);
                 auto viewSize = sizeAvailable / 2;
                 if (endian::native == endian::big && m_encoding == Encoding::UTF16LE)
@@ -228,18 +228,18 @@ class Transcoder<void, Target>
                 {
                     m_results += toUTF32(view);
                 }
-                m_source.remove_suffix(viewSize - view.size());
+                m_source.remove_prefix((viewSize - view.size()) * 2);
                 break;
             }
             case Encoding::UTF32LE:
             case Encoding::UTF32BE:
                 char32_t value;
                 std::memcpy(&value, m_source.data(), std::min<std::size_t>(4, m_source.size()));
-                if (endian::native == endian::big && m_encoding == Encoding::UTF16LE)
+                if (endian::native == endian::big && m_encoding == Encoding::UTF32LE)
                 {
                     value = swapByteOrder(value);
                 }
-                else if (endian::native == endian::little && m_encoding == Encoding::UTF16BE)
+                else if (endian::native == endian::little && m_encoding == Encoding::UTF32BE)
                 {
                     value = swapByteOrder(value);
                 }
@@ -259,6 +259,7 @@ class Transcoder<void, Target>
                 {
                     m_results += toUTF32(value);
                 }
+                m_source.remove_prefix(4);
                 break;
         }
         return true;

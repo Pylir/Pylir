@@ -2,7 +2,6 @@
 #include "Text.hpp"
 
 #include <llvm/Support/ConvertUTF.h>
-#include <llvm/Support/UnicodeCharRanges.h>
 
 #include <utf8proc/utf8proc.h>
 
@@ -15,14 +14,6 @@ std::optional<pylir::Text::Encoding> pylir::Text::checkForBOM(std::string_view b
     {
         return Encoding::UTF8;
     }
-    if (startsWith(bytes, UTF16BE_BOM))
-    {
-        return Encoding::UTF16BE;
-    }
-    if (startsWith(bytes, UTF16LE_BOM))
-    {
-        return Encoding::UTF16BE;
-    }
     if (startsWith(bytes, UTF32BE_BOM))
     {
         return Encoding::UTF32BE;
@@ -30,6 +21,14 @@ std::optional<pylir::Text::Encoding> pylir::Text::checkForBOM(std::string_view b
     if (startsWith(bytes, UTF32LE_BOM))
     {
         return Encoding::UTF32LE;
+    }
+    if (startsWith(bytes, UTF16BE_BOM))
+    {
+        return Encoding::UTF16BE;
+    }
+    if (startsWith(bytes, UTF16LE_BOM))
+    {
+        return Encoding::UTF16LE;
     }
     return std::nullopt;
 }
