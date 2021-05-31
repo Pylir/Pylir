@@ -4,6 +4,7 @@
 #include <pylir/Support/Util.hpp>
 
 #include <algorithm>
+#include <numeric>
 #include <set>
 #include <unordered_map>
 
@@ -21,34 +22,140 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
         return result;
     }
     auto offset = line.data() - document.getText().data();
-    result += Text::toUTF8String(line.substr(0, labels.front().start - offset));
-    for (auto& iter : labels)
     {
-        fmt::text_style style;
-        if (iter.colour)
+        std::size_t lastEnd = 0;
+        for (auto& iter : labels)
         {
-            style |= fmt::fg(static_cast<fmt::color>(*iter.colour));
-        }
-        if (iter.emphasis)
-        {
-            style |= static_cast<fmt::emphasis>(*iter.emphasis);
-        }
-        // If not pointing at newline
-        if (iter.start - offset != line.size())
-        {
-            result +=
-                fmt::format(style, "{}", Text::toUTF8String(line.substr(iter.start - offset, iter.end - iter.start)));
+            result += Text::toUTF8String(line.substr(lastEnd, iter.start - offset));
+            fmt::text_style style;
+            if (iter.optionalColour)
+            {
+                style |= fmt::fg(static_cast<fmt::color>(*iter.optionalColour));
+            }
+            if (iter.optionalEmphasis)
+            {
+                style |= static_cast<fmt::emphasis>(*iter.optionalEmphasis);
+            }
+            // If not pointing at newline
+            if (iter.start - offset != line.size())
+            {
+                result += fmt::format(style, "{}",
+                                      Text::toUTF8String(line.substr(iter.start - offset, iter.end - iter.start)));
+            }
+            lastEnd = iter.end - offset;
         }
     }
     result += '\n';
 
     result += fmt::format("{1: >{0}} | ", width, "");
-
-    for (auto& iter : labels)
     {
+        std::size_t lastEnd = 0;
+        std::u32string underlines;
+        underlines.reserve(line.size());
+        for (auto& iter : labels)
+        {
+            for (auto codepoint : line.substr(lastEnd, iter.start - offset))
+            {
+                if (Text::isWhitespace(codepoint))
+                {
+                    underlines += codepoint;
+                    continue;
+                }
+                auto consoleWidth = Text::consoleWidth(codepoint);
+                underlines.insert(underlines.end(), consoleWidth, U' ');
+            }
+            lastEnd = iter.end - offset;
+            fmt::text_style style;
+            if (iter.optionalColour)
+            {
+                style = fmt::fg(static_cast<fmt::color>(*iter.optionalColour));
+            }
+            if (iter.start - offset == line.size())
+            {
+                underlines += fmt::format(style, U"^");
+                continue;
+            }
+            auto substr = line.substr(iter.start - offset, iter.end - iter.start);
+            if (substr.size() == 1)
+            {
+                auto consoleWidth = Text::consoleWidth(substr.front());
+                underlines += fmt::format(style, U"{0:^{1}}", U"", consoleWidth);
+                continue;
+            }
+            for (auto codepoint : substr)
+            {
+                auto consoleWidth = Text::consoleWidth(codepoint);
+                underlines += fmt::format(style, U"{0:~{1}}", U"", consoleWidth);
+            }
+        }
+        result += Text::toUTF8String(underlines);
+    }
+    result += '\n';
+
+    {
+        labels.erase(std::remove_if(labels.begin(), labels.end(), [](const Label& label) { return !label.labelText; }),
+                     labels.end());
+        while (!labels.empty())
+        {
+            result += fmt::format("{1: >{0}} | ", width, "");
+            std::size_t lastEnd = 0;
+            std::u32string underlines;
+            underlines.reserve(line.size());
+            for (auto iter = labels.begin(); iter != labels.end();)
+            {
+                fmt::text_style style;
+                if (iter->optionalColour)
+                {
+                    style = fmt::fg(static_cast<fmt::color>(*iter->optionalColour));
+                }
+                auto thisMid = (iter->end - iter->start) / 2 + iter->start - offset;
+                for (auto codepoint : line.substr(lastEnd, thisMid))
+                {
+                    if (Text::isWhitespace(codepoint))
+                    {
+                        underlines += codepoint;
+                        continue;
+                    }
+                    auto consoleWidth = Text::consoleWidth(codepoint);
+                    underlines.insert(underlines.end(), consoleWidth, U' ');
+                }
+                auto text = Text::toUTF32String(*iter->labelText);
+                std::size_t textWidth = std::accumulate(text.begin(), text.end(), (std::size_t)0,
+                                                        [](std::size_t width, char32_t codepoint)
+                                                        { return width + Text::consoleWidth(codepoint); });
+                if (auto next = iter + 1; next != labels.end())
+                {
+                    std::size_t widthTillNext = 0;
+                    auto nextMid = (next->end - iter->start) / 2 + next->start - offset;
+                    for (std::size_t i = thisMid; i < nextMid; i++)
+                    {
+                        widthTillNext += Text::consoleWidth(line[i]);
+                    }
+                    if (textWidth >= widthTillNext)
+                    {
+                        underlines += fmt::format(style, U"|");
+                        underlines.insert(underlines.end(), widthTillNext - 1, U' ');
+                        lastEnd = nextMid;
+                        iter++;
+
+                        continue;
+                    }
+                }
+                underlines += fmt::format(style, U"{}", text);
+                std::size_t widthTillEnd = 0;
+                std::size_t i = thisMid;
+                for (; widthTillEnd < textWidth && i < line.size(); i++)
+                {
+                    widthTillEnd += Text::consoleWidth(line[i]);
+                }
+                lastEnd = i;
+                iter = labels.erase(iter);
+            }
+            result += Text::toUTF8String(underlines);
+            result += '\n';
+        }
     }
 
-    result += '\n';
     return result;
 }
 
@@ -99,7 +206,8 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
             continue;
         }
 
-        auto textLine = (end - start) / 2 + start;
+        auto midPos = (iter.end - iter.start) / 2 + iter.start;
+        auto textLine = document.getLineNumber(midPos);
         {
             auto line = document.getLine(start);
             neededLines.insert(start);
@@ -110,7 +218,7 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
             }
             labeled[start].insert({iter.start,
                                    static_cast<std::size_t>(line.data() + line.size() - document.getText().data()),
-                                   std::move(labelText), iter.colour, iter.emphasis});
+                                   std::move(labelText), iter.optionalColour, iter.optionalEmphasis});
         }
         for (std::size_t i = start + 1; i < end; i++)
         {
@@ -123,7 +231,7 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
             auto line = document.getLine(i);
             labeled[i].insert({static_cast<std::size_t>(line.data() - document.getText().data()),
                                static_cast<std::size_t>(line.data() + line.size() - document.getText().data()),
-                               std::move(labelText), iter.colour, iter.emphasis});
+                               std::move(labelText), iter.optionalColour, iter.optionalEmphasis});
         }
         {
             auto line = document.getLine(end);
@@ -134,7 +242,7 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
                 labelText = iter.labelText;
             }
             labeled[end].insert({static_cast<std::size_t>(line.data() - document.getText().data()), iter.end,
-                                 std::move(labelText), iter.colour, iter.emphasis});
+                                 std::move(labelText), iter.optionalColour, iter.optionalEmphasis});
         }
     }
     auto largestLine = *std::prev(neededLines.end());
@@ -149,6 +257,10 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
     {
         auto& set = labeled[i];
         result += printLine(width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
+    }
+    for (std::size_t i = largestLine + 1; i < largestLine + MARGIN && document.hasLine(i); i++)
+    {
+        result += fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
     }
 
     return result;

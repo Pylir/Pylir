@@ -117,14 +117,19 @@ public:
         return {lineNumber, offset - m_lineStarts[lineNumber - 1] + 1};
     }
 
-    std::u32string_view getLine(std::size_t lineNumber)
+    std::u32string_view getLine(std::size_t lineNumber) const
+    {
+        return std::u32string_view(m_text).substr(m_lineStarts[lineNumber - 1],
+                                                  m_lineStarts[lineNumber] - m_lineStarts[lineNumber - 1] - 1);
+    }
+
+    bool hasLine(std::size_t lineNumber)
     {
         while (lineNumber >= m_lineStarts.size() && m_current != m_transcoder.end())
         {
             m_current++;
         }
-        return std::u32string_view(m_text).substr(m_lineStarts[lineNumber - 1],
-                                                  m_lineStarts[lineNumber] - m_lineStarts[lineNumber - 1] - 1);
+        return m_lineStarts.size() > lineNumber;
     }
 
     tcb::span<const std::size_t> getLineStarts() const

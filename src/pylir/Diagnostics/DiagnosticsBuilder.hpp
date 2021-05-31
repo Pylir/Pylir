@@ -164,8 +164,8 @@ class DiagnosticsBuilder
         std::size_t start;
         std::size_t end;
         std::optional<std::string> labelText;
-        std::optional<colour> colour;
-        std::optional<emphasis> emphasis;
+        std::optional<colour> optionalColour;
+        std::optional<emphasis> optionalEmphasis;
     };
 
     struct Message

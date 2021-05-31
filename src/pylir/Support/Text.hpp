@@ -306,6 +306,8 @@ public:
 
 bool isWhitespace(char32_t codepoint);
 
+std::size_t consoleWidth(char32_t codepoint);
+
 enum class Normalization
 {
     NFD,

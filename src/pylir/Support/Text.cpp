@@ -389,3 +389,8 @@ std::u32string pylir::Text::normalize(std::u32string_view utf32, pylir::Text::No
     }
     return std::u32string(buffer.begin(), buffer.begin() + actuallyWritten);
 }
+
+std::size_t pylir::Text::consoleWidth(char32_t codepoint)
+{
+    return utf8proc_charwidth(codepoint);
+}
