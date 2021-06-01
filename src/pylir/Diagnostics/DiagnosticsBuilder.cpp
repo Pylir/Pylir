@@ -85,12 +85,42 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             for (auto codepoint : substr)
             {
                 auto consoleWidth = Text::consoleWidth(codepoint);
-                underlines += fmt::format(style, U"{0:~{1}}", U"", consoleWidth);
+                underlines += fmt::format(style, U"{0:~^{1}}", U"", consoleWidth);
             }
         }
         result += Text::toUTF8String(underlines);
     }
     result += '\n';
+
+    {
+        result += fmt::format("{1: >{0}} | ", width, "");
+        std::size_t lastEnd = 0;
+        std::u32string underlines;
+        underlines.reserve(line.size());
+        for (auto& iter : labels)
+        {
+            fmt::text_style style;
+            if (iter.optionalColour)
+            {
+                style = fmt::fg(static_cast<fmt::color>(*iter.optionalColour));
+            }
+            auto thisMid = (iter.end - iter.start) / 2 + iter.start - offset;
+            for (auto codepoint : line.substr(lastEnd, thisMid))
+            {
+                if (Text::isWhitespace(codepoint))
+                {
+                    underlines += codepoint;
+                    continue;
+                }
+                auto consoleWidth = Text::consoleWidth(codepoint);
+                underlines.insert(underlines.end(), consoleWidth, U' ');
+            }
+            underlines += fmt::format(style, U"|");
+            lastEnd = thisMid + 1;
+        }
+        result += Text::toUTF8String(underlines);
+        result += '\n';
+    }
 
     {
         labels.erase(std::remove_if(labels.begin(), labels.end(), [](const Label& label) { return !label.labelText; }),

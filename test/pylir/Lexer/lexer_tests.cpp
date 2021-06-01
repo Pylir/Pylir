@@ -1,10 +1,10 @@
 
+#include <catch2/catch.hpp>
+
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Lexer/Lexer.hpp>
 
 #include <iostream>
-
-#include <catch2/catch.hpp>
 
 #define LEXER_EMITS(source, message)                                                   \
     [](std::string str)                                                                \

@@ -1,6 +1,6 @@
-#include <pylir/Diagnostics/Document.hpp>
-
 #include <catch2/catch.hpp>
+
+#include <pylir/Diagnostics/Document.hpp>
 
 TEST_CASE("Document BOM detection", "[Document]")
 {
@@ -41,11 +41,11 @@ TEST_CASE("Document BOM detection", "[Document]")
     }
 }
 
-TEST_CASE("Document line normalization","[Document]")
+TEST_CASE("Document line normalization", "[Document]")
 {
     pylir::Diag::Document document("Windows\r\n"
                                    "Unix\n"
                                    "OldMac\r");
-    std::u32string text(document.begin(),  document.end());
+    std::u32string text(document.begin(), document.end());
     CHECK(text == U"Windows\nUnix\nOldMac\n");
 }
