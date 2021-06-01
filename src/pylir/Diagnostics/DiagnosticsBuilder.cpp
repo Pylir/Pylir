@@ -26,7 +26,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
         std::size_t lastEnd = 0;
         for (auto& iter : labels)
         {
-            result += Text::toUTF8String(line.substr(lastEnd, iter.start - offset));
+            result += Text::toUTF8String(line.substr(lastEnd, iter.start - offset - lastEnd));
             fmt::text_style style;
             if (iter.optionalColour)
             {
@@ -44,6 +44,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             }
             lastEnd = iter.end - offset;
         }
+        result += Text::toUTF8String(line.substr(lastEnd));
     }
     result += '\n';
 
@@ -54,7 +55,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
         underlines.reserve(line.size());
         for (auto& iter : labels)
         {
-            for (auto codepoint : line.substr(lastEnd, iter.start - offset))
+            for (auto codepoint : line.substr(lastEnd, iter.start - offset - lastEnd))
             {
                 if (Text::isWhitespace(codepoint))
                 {
@@ -79,7 +80,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             if (substr.size() == 1)
             {
                 auto consoleWidth = Text::consoleWidth(substr.front());
-                underlines += fmt::format(style, U"{0:^{1}}", U"", consoleWidth);
+                underlines += fmt::format(style, U"{0:^^{1}}", U"", consoleWidth);
                 continue;
             }
             for (auto codepoint : substr)
@@ -105,7 +106,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
                 style = fmt::fg(static_cast<fmt::color>(*iter.optionalColour));
             }
             auto thisMid = (iter.end - iter.start) / 2 + iter.start - offset;
-            for (auto codepoint : line.substr(lastEnd, thisMid))
+            for (auto codepoint : line.substr(lastEnd, thisMid - lastEnd))
             {
                 if (Text::isWhitespace(codepoint))
                 {
@@ -139,7 +140,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
                     style = fmt::fg(static_cast<fmt::color>(*iter->optionalColour));
                 }
                 auto thisMid = (iter->end - iter->start) / 2 + iter->start - offset;
-                for (auto codepoint : line.substr(lastEnd, thisMid))
+                for (auto codepoint : line.substr(lastEnd, thisMid - lastEnd))
                 {
                     if (Text::isWhitespace(codepoint))
                     {
@@ -156,7 +157,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
                 if (auto next = iter + 1; next != labels.end())
                 {
                     std::size_t widthTillNext = 0;
-                    auto nextMid = (next->end - iter->start) / 2 + next->start - offset;
+                    auto nextMid = (next->end - next->start) / 2 + next->start - offset;
                     for (std::size_t i = thisMid; i < nextMid; i++)
                     {
                         widthTillNext += Text::consoleWidth(line[i]);
@@ -210,7 +211,7 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
             colour = fmt::color::cyan;
             break;
     }
-    auto result = fmt::format(fmt::emphasis::bold, "{}:{}:{} ", document.getFilename(), lineNumber, colNumber);
+    auto result = fmt::format(fmt::emphasis::bold, "{}:{}:{}: ", document.getFilename(), lineNumber, colNumber);
     result += fmt::format(fmt::emphasis::bold | fmt::fg(colour), "{}:", severityStr);
     result += fmt::format(fmt::emphasis::bold, " {}\n", message.message);
 
