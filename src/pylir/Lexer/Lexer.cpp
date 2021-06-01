@@ -17,7 +17,6 @@ pylir::Lexer::Lexer(Diag::Document& document, int fieldId,
 
 namespace
 {
-
 #pragma region unicode
 
 constexpr llvm::sys::UnicodeCharRange initialCharacters[] = {
@@ -345,7 +344,7 @@ bool pylir::Lexer::parseNext()
                 auto start = m_current;
                 m_current = std::find_if_not(m_current, m_document->end(),
                                              [&](char32_t value) { return legalIdentifierSet.contains(value); });
-                auto utf32 = std::u32string_view{start.data(), static_cast<std::size_t>(m_current - start)};
+                auto utf32 = std::u32string_view{start, static_cast<std::size_t>(m_current - start)};
                 static std::unordered_map<std::u32string_view, TokenType> keywords = {
                     {U"False", TokenType::FalseKeyword},
                     {U"None", TokenType::NoneKeyword},

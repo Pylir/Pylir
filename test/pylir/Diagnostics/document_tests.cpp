@@ -29,15 +29,13 @@ TEST_CASE("Document BOM detection", "[Document]")
     {
         std::string bytes{"\xFF\xFE\x00\x00\x54\x00\x00\x00\x65\x00\x00\x00\x78\x00\x00\x00\x74\x00\x00\x00", 20};
         pylir::Diag::Document document(bytes);
-        std::u32string text(document.begin(), document.end());
-        CHECK(text == U"Text");
+        CHECK(document.getText() == U"Text");
     }
     SECTION("UTF32BE BOM")
     {
         std::string bytes{"\x00\x00\xFE\xFF\x00\x00\x00\x54\x00\x00\x00\x65\x00\x00\x00\x78\x00\x00\x00\x74", 20};
         pylir::Diag::Document document(bytes);
-        std::u32string text(document.begin(), document.end());
-        CHECK(text == U"Text");
+        CHECK(document.getText() == U"Text");
     }
 }
 
@@ -46,6 +44,5 @@ TEST_CASE("Document line normalization", "[Document]")
     pylir::Diag::Document document("Windows\r\n"
                                    "Unix\n"
                                    "OldMac\r");
-    std::u32string text(document.begin(), document.end());
-    CHECK(text == U"Windows\nUnix\nOldMac\n");
+    CHECK(document.getText() == U"Windows\nUnix\nOldMac\n");
 }

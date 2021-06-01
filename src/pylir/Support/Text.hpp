@@ -168,120 +168,179 @@ class Transcoder<void, Target>
 
     std::string_view m_source;
     Encoding m_encoding;
-    std::basic_string<Target> m_results;
 
-    bool transcodeNext()
+    class Iterator
     {
-        if (m_source.empty())
+        std::string_view m_source;
+        std::array<Target, sizeof(char32_t) / sizeof(Target)> m_data;
+        Encoding m_encoding;
+
+        void transcodeNext()
         {
-            return false;
-        }
-        switch (m_encoding)
-        {
-            case Encoding::UTF8:
-                if constexpr (std::is_same_v<char, Target>)
-                {
-                    auto utf8 = toUTF8(m_source);
-                    std::copy_if(utf8.begin(), utf8.end(), std::back_inserter(m_results),
-                                 [](auto value) -> bool { return value; });
-                }
-                else if constexpr (std::is_same_v<char16_t, Target>)
-                {
-                    auto utf16 = toUTF16(m_source);
-                    std::copy_if(utf16.begin(), utf16.end(), std::back_inserter(m_results),
-                                 [](auto value) -> bool { return value; });
-                }
-                else if constexpr (std::is_same_v<char32_t, Target>)
-                {
-                    m_results += toUTF32(m_source);
-                }
-                break;
-            case Encoding::UTF16LE:
-            case Encoding::UTF16BE:
+            switch (m_encoding)
             {
-                std::array<char16_t, 2> temp{};
-                auto sizeAvailable = std::min<std::size_t>(4, m_source.size()) & ~static_cast<std::size_t>(1);
-                std::memcpy(temp.data(), m_source.data(), sizeAvailable);
-                auto viewSize = sizeAvailable / 2;
-                if (endian::native == endian::big && m_encoding == Encoding::UTF16LE)
+                case Encoding::UTF8:
+                    if constexpr (std::is_same_v<char, Target>)
+                    {
+                        auto utf8 = toUTF8(m_source);
+                        std::copy_if(utf8.begin(), utf8.end(), m_data.begin(),
+                                     [](auto value) -> bool { return value; });
+                    }
+                    else if constexpr (std::is_same_v<char16_t, Target>)
+                    {
+                        auto utf16 = toUTF16(m_source);
+                        std::copy_if(utf16.begin(), utf16.end(), m_data.begin(),
+                                     [](auto value) -> bool { return value; });
+                    }
+                    else if constexpr (std::is_same_v<char32_t, Target>)
+                    {
+                        m_data.front() = toUTF32(m_source);
+                    }
+                    break;
+                case Encoding::UTF16LE:
+                case Encoding::UTF16BE:
                 {
-                    std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(), swapByteOrder<char16_t>);
+                    std::array<char16_t, 2> temp{};
+                    auto sizeAvailable = std::min<std::size_t>(4, m_source.size()) & ~static_cast<std::size_t>(1);
+                    std::memcpy(temp.data(), m_source.data(), sizeAvailable);
+                    auto viewSize = sizeAvailable / 2;
+                    if (endian::native == endian::big && m_encoding == Encoding::UTF16LE)
+                    {
+                        std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(), swapByteOrder<char16_t>);
+                    }
+                    else if (endian::native == endian::little && m_encoding == Encoding::UTF16BE)
+                    {
+                        std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(), swapByteOrder<char16_t>);
+                    }
+                    auto view = std::u16string_view(temp.data(), viewSize);
+                    if constexpr (std::is_same_v<char, Target>)
+                    {
+                        auto utf8 = toUTF8(view);
+                        std::copy_if(utf8.begin(), utf8.end(), m_data.begin(),
+                                     [](auto value) -> bool { return value; });
+                    }
+                    else if constexpr (std::is_same_v<char16_t, Target>)
+                    {
+                        auto utf16 = toUTF16(view);
+                        std::copy_if(utf16.begin(), utf16.end(), m_data.begin(),
+                                     [](auto value) -> bool { return value; });
+                    }
+                    else if constexpr (std::is_same_v<char32_t, Target>)
+                    {
+                        m_data.front() = toUTF32(view);
+                    }
+                    m_source.remove_prefix((viewSize - view.size()) * 2);
+                    break;
                 }
-                else if (endian::native == endian::little && m_encoding == Encoding::UTF16BE)
-                {
-                    std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(), swapByteOrder<char16_t>);
-                }
-                auto view = std::u16string_view(temp.data(), viewSize);
-                if constexpr (std::is_same_v<char, Target>)
-                {
-                    auto utf8 = toUTF8(view);
-                    std::copy_if(utf8.begin(), utf8.end(), std::back_inserter(m_results),
-                                 [](auto value) -> bool { return value; });
-                }
-                else if constexpr (std::is_same_v<char16_t, Target>)
-                {
-                    auto utf16 = toUTF16(view);
-                    std::copy_if(utf16.begin(), utf16.end(), std::back_inserter(m_results),
-                                 [](auto value) -> bool { return value; });
-                }
-                else if constexpr (std::is_same_v<char32_t, Target>)
-                {
-                    m_results += toUTF32(view);
-                }
-                m_source.remove_prefix((viewSize - view.size()) * 2);
-                break;
+                case Encoding::UTF32LE:
+                case Encoding::UTF32BE:
+                    char32_t value;
+                    std::memcpy(&value, m_source.data(), std::min<std::size_t>(4, m_source.size()));
+                    if (endian::native == endian::big && m_encoding == Encoding::UTF32LE)
+                    {
+                        value = swapByteOrder(value);
+                    }
+                    else if (endian::native == endian::little && m_encoding == Encoding::UTF32BE)
+                    {
+                        value = swapByteOrder(value);
+                    }
+                    if constexpr (std::is_same_v<char, Target>)
+                    {
+                        auto utf8 = toUTF8(value);
+                        std::copy_if(utf8.begin(), utf8.end(), m_data.begin(),
+                                     [](auto value) -> bool { return value; });
+                    }
+                    else if constexpr (std::is_same_v<char16_t, Target>)
+                    {
+                        auto utf16 = toUTF16(value);
+                        std::copy_if(utf16.begin(), utf16.end(), m_data.begin(),
+                                     [](auto value) -> bool { return value; });
+                    }
+                    else if constexpr (std::is_same_v<char32_t, Target>)
+                    {
+                        m_data.front() = toUTF32(value);
+                    }
+                    m_source.remove_prefix(4);
+                    break;
             }
-            case Encoding::UTF32LE:
-            case Encoding::UTF32BE:
-                char32_t value;
-                std::memcpy(&value, m_source.data(), std::min<std::size_t>(4, m_source.size()));
-                if (endian::native == endian::big && m_encoding == Encoding::UTF32LE)
-                {
-                    value = swapByteOrder(value);
-                }
-                else if (endian::native == endian::little && m_encoding == Encoding::UTF32BE)
-                {
-                    value = swapByteOrder(value);
-                }
-                if constexpr (std::is_same_v<char, Target>)
-                {
-                    auto utf8 = toUTF8(value);
-                    std::copy_if(utf8.begin(), utf8.end(), std::back_inserter(m_results),
-                                 [](auto value) -> bool { return value; });
-                }
-                else if constexpr (std::is_same_v<char16_t, Target>)
-                {
-                    auto utf16 = toUTF16(value);
-                    std::copy_if(utf16.begin(), utf16.end(), std::back_inserter(m_results),
-                                 [](auto value) -> bool { return value; });
-                }
-                else if constexpr (std::is_same_v<char32_t, Target>)
-                {
-                    m_results += toUTF32(value);
-                }
-                m_source.remove_prefix(4);
-                break;
         }
-        return true;
-    }
+
+    public:
+        using value_type = Target;
+        using reference = const value_type&;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const value_type*;
+        using iterator_category = std::forward_iterator_tag;
+
+        Iterator() = default;
+
+        Iterator(std::string_view source, Encoding encoding) : m_source(source), m_encoding(encoding)
+        {
+            if (!source.empty())
+            {
+                transcodeNext();
+            }
+            else
+            {
+                std::fill(m_data.begin(), m_data.end(), 0);
+            }
+        }
+
+        reference operator*() const
+        {
+            return m_data[0];
+        }
+
+        Iterator& operator++()
+        {
+            m_data.front() = 0;
+            std::copy_backward(m_data.begin() + 1, m_data.end(), m_data.begin());
+            if (!m_data.front() && !m_source.empty())
+            {
+                transcodeNext();
+            }
+            return *this;
+        }
+
+        Iterator operator++(int)
+        {
+            auto copy = *this;
+            operator++();
+            return copy;
+        }
+
+        bool operator==(const Iterator& rhs) const
+        {
+            return m_source.data() == rhs.m_source.data() && m_data == rhs.m_data;
+        }
+
+        bool operator!=(const Iterator& rhs) const
+        {
+            return !(rhs == *this);
+        }
+
+        friend void swap(Iterator& lhs, Iterator& rhs)
+        {
+            std::swap(lhs.m_source, rhs.m_source);
+            std::swap(lhs.m_data, rhs.m_data);
+            std::swap(lhs.m_index, rhs.m_index);
+        }
+    };
 
 public:
-    Transcoder(std::string_view source, Encoding encoding) : m_source(source), m_encoding(encoding)
-    {
-        m_results.reserve(source.size());
-    }
+    Transcoder(std::string_view source, Encoding encoding) : m_source(source), m_encoding(encoding) {}
 
     using value_type = Target;
     using reference = const value_type&;
     using const_reference = reference;
-    using iterator = LazyCacheIterator<Target, Transcoder, &Transcoder::transcodeNext, &Transcoder::m_results>;
+    using iterator = Iterator;
     using const_iterator = iterator;
     using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
 
-    iterator begin()
+    iterator begin() const
     {
-        return iterator(*this, 0);
+        return iterator(m_source, m_encoding);
     }
 
     const_iterator cbegin()
@@ -291,17 +350,12 @@ public:
 
     iterator end()
     {
-        return iterator(*this, -1);
+        return iterator(m_source.substr(m_source.size()), m_encoding);
     }
 
     const_iterator cend()
     {
         return end();
-    }
-
-    std::basic_string_view<Target> getResults() const
-    {
-        return m_results;
     }
 };
 
