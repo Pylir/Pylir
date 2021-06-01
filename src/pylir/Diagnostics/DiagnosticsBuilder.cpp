@@ -288,7 +288,7 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
         auto& set = labeled[i];
         result += printLine(width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
     }
-    for (std::size_t i = largestLine + 1; i < largestLine + MARGIN && document.hasLine(i); i++)
+    for (std::size_t i = largestLine + 1; i < largestLine + MARGIN + 1 && document.hasLine(i); i++)
     {
         result += fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
     }

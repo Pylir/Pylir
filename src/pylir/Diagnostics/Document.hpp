@@ -83,6 +83,10 @@ public:
     [[nodiscard]] std::size_t getLineNumber(std::size_t offset) const
     {
         auto result = std::lower_bound(m_lineStarts.begin(), m_lineStarts.end(), offset);
+        if (result != m_lineStarts.end() && *result == offset)
+        {
+            result++;
+        }
         return result - m_lineStarts.begin();
     }
 
