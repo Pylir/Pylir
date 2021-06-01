@@ -44,7 +44,10 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             }
             lastEnd = iter.end - offset;
         }
-        result += Text::toUTF8String(line.substr(lastEnd));
+        if (lastEnd <= line.size())
+        {
+            result += Text::toUTF8String(line.substr(lastEnd));
+        }
     }
     result += '\n';
 
