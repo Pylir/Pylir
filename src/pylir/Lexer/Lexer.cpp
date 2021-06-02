@@ -327,6 +327,88 @@ bool pylir::Lexer::parseNext()
                 m_current++;
                 break;
             }
+            case U'u':
+            case U'U':
+            {
+                m_current++;
+                if (m_current != m_document->end() && (*m_current == '\'' || *m_current == '"'))
+                {
+                    if (auto opt = parseLiteral(false))
+                    {
+                        return *opt;
+                    }
+                }
+                else
+                {
+                    m_current--;
+                    if (auto opt = parseIdentifier())
+                    {
+                        return *opt;
+                    }
+                }
+                break;
+            }
+            case U'\'':
+            case U'"':
+            {
+                if (auto opt = parseLiteral(false))
+                {
+                    return *opt;
+                }
+                break;
+            }
+            case U'r':
+            case U'R':
+            {
+                if (std::next(m_current) == m_document->end())
+                {
+                    if (auto opt = parseIdentifier())
+                    {
+                        return *opt;
+                    }
+                    break;
+                }
+                switch (*std::next(m_current))
+                {
+                    case U'f':
+                    case U'F':
+                    {
+                        auto maybeLiteral = std::next(m_current, 2);
+                        if (maybeLiteral == m_document->end() || (*maybeLiteral != U'\'' && *maybeLiteral != U'"'))
+                        {
+                            if (auto opt = parseIdentifier())
+                            {
+                                return *opt;
+                            }
+                            break;
+                        }
+                        // TODO: parseFormatString
+                        break;
+                    }
+                    case U'\'':
+                    case U'"':
+                    {
+                        m_current = std::next(m_current);
+                        if (auto opt = parseLiteral(false))
+                        {
+                            return *opt;
+                        }
+                        break;
+                    }
+                    default:
+                        if (auto opt = parseIdentifier())
+                        {
+                            return *opt;
+                        }
+                        break;
+                }
+                break;
+            }
+            case U'f':
+            case U'F':
+            {
+                // TODO:
+            }
             default:
             {
                 if (Text::isWhitespace(*m_current))
@@ -334,66 +416,10 @@ bool pylir::Lexer::parseNext()
                     m_current = std::find_if_not(m_current, m_document->end(), Text::isWhitespace);
                     continue;
                 }
-                static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
-                if (!initialCharacterSet.contains(*m_current))
+                if (auto opt = parseIdentifier())
                 {
-                    // TODO: Unexpected character
-                    return false;
+                    return *opt;
                 }
-                static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-                auto start = m_current;
-                m_current = std::find_if_not(m_current, m_document->end(),
-                                             [&](char32_t value) { return legalIdentifierSet.contains(value); });
-                auto utf32 = std::u32string_view{start, static_cast<std::size_t>(m_current - start)};
-                static std::unordered_map<std::u32string_view, TokenType> keywords = {
-                    {U"False", TokenType::FalseKeyword},
-                    {U"None", TokenType::NoneKeyword},
-                    {U"True", TokenType::TrueKeyword},
-                    {U"and", TokenType::AndKeyword},
-                    {U"as", TokenType::AsKeyword},
-                    {U"assert", TokenType::AssertKeyword},
-                    {U"async", TokenType::AsyncKeyword},
-                    {U"await", TokenType::AwaitKeyword},
-                    {U"break", TokenType::BreakKeyword},
-                    {U"class", TokenType::ClassKeyword},
-                    {U"continue", TokenType::ContinueKeyword},
-                    {U"def", TokenType::DefKeyword},
-                    {U"del", TokenType::DelKeyword},
-                    {U"elif", TokenType::ElifKeyword},
-                    {U"else", TokenType::ElseKeyword},
-                    {U"except", TokenType::ExceptKeyword},
-                    {U"finally", TokenType::FinallyKeyword},
-                    {U"for", TokenType::ForKeyword},
-                    {U"from", TokenType::FromKeyword},
-                    {U"global", TokenType::GlobalKeyword},
-                    {U"if", TokenType::IfKeyword},
-                    {U"import", TokenType::ImportKeyword},
-                    {U"in", TokenType::InKeyword},
-                    {U"is", TokenType::IsKeyword},
-                    {U"lambda", TokenType::LambdaKeyword},
-                    {U"nonlocal", TokenType::NonlocalKeyword},
-                    {U"not", TokenType::NotKeyword},
-                    {U"or", TokenType::OrKeyword},
-                    {U"pass", TokenType::PassKeyword},
-                    {U"raise", TokenType::RaiseKeyword},
-                    {U"return", TokenType::ReturnKeyword},
-                    {U"try", TokenType::TryKeyword},
-                    {U"while", TokenType::WhileKeyword},
-                    {U"with", TokenType::WithKeyword},
-                    {U"yield", TokenType::YieldKeyword},
-                };
-                if (auto result = keywords.find(utf32); result != keywords.end())
-                {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, result->second);
-                    break;
-                }
-
-                auto normalized = Text::normalize(utf32, Text::Normalization::NFKC);
-                [[maybe_unused]] bool ok;
-                auto utf8 = Text::toUTF8String(normalized, &ok);
-                PYLIR_ASSERT(ok);
-                m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Identifier,
-                                      std::move(utf8));
                 break;
             }
         }
@@ -406,12 +432,285 @@ bool pylir::Lexer::parseNext()
     return true;
 }
 
-pylir::Diag::DiagnosticsBuilder pylir::Lexer::createDiagnosticsBuilder(std::size_t location, std::string_view message)
+std::optional<bool> pylir::Lexer::parseIdentifier()
 {
-    return Diag::DiagnosticsBuilder(*m_document, location, message);
+    static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
+    if (!initialCharacterSet.contains(*m_current))
+    {
+        auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_CHARACTER_N,
+                                                Text::toUTF8String({&*m_current, 1}))
+                           .addLabel(m_current - m_document->begin());
+        m_diagCallback(std::move(builder));
+        return false;
+    }
+    static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
+    auto start = m_current;
+    m_current = std::find_if_not(m_current, m_document->end(),
+                                 [&](char32_t value) { return legalIdentifierSet.contains(value); });
+    auto utf32 = std::u32string_view{start, static_cast<std::size_t>(m_current - start)};
+    static std::unordered_map<std::u32string_view, TokenType> keywords = {
+        {U"False", TokenType::FalseKeyword},
+        {U"None", TokenType::NoneKeyword},
+        {U"True", TokenType::TrueKeyword},
+        {U"and", TokenType::AndKeyword},
+        {U"as", TokenType::AsKeyword},
+        {U"assert", TokenType::AssertKeyword},
+        {U"async", TokenType::AsyncKeyword},
+        {U"await", TokenType::AwaitKeyword},
+        {U"break", TokenType::BreakKeyword},
+        {U"class", TokenType::ClassKeyword},
+        {U"continue", TokenType::ContinueKeyword},
+        {U"def", TokenType::DefKeyword},
+        {U"del", TokenType::DelKeyword},
+        {U"elif", TokenType::ElifKeyword},
+        {U"else", TokenType::ElseKeyword},
+        {U"except", TokenType::ExceptKeyword},
+        {U"finally", TokenType::FinallyKeyword},
+        {U"for", TokenType::ForKeyword},
+        {U"from", TokenType::FromKeyword},
+        {U"global", TokenType::GlobalKeyword},
+        {U"if", TokenType::IfKeyword},
+        {U"import", TokenType::ImportKeyword},
+        {U"in", TokenType::InKeyword},
+        {U"is", TokenType::IsKeyword},
+        {U"lambda", TokenType::LambdaKeyword},
+        {U"nonlocal", TokenType::NonlocalKeyword},
+        {U"not", TokenType::NotKeyword},
+        {U"or", TokenType::OrKeyword},
+        {U"pass", TokenType::PassKeyword},
+        {U"raise", TokenType::RaiseKeyword},
+        {U"return", TokenType::ReturnKeyword},
+        {U"try", TokenType::TryKeyword},
+        {U"while", TokenType::WhileKeyword},
+        {U"with", TokenType::WithKeyword},
+        {U"yield", TokenType::YieldKeyword},
+    };
+    if (auto result = keywords.find(utf32); result != keywords.end())
+    {
+        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, result->second);
+        return std::nullopt;
+    }
+
+    auto normalized = Text::normalize(utf32, Text::Normalization::NFKC);
+    [[maybe_unused]] bool ok;
+    auto utf8 = Text::toUTF8String(normalized, &ok);
+    PYLIR_ASSERT(ok);
+    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Identifier,
+                          std::move(utf8));
+    return std::nullopt;
 }
 
 void pylir::Lexer::outputToStderr(pylir::Diag::DiagnosticsBuilder&& diagnosticsBuilder)
 {
     std::cerr << diagnosticsBuilder.emitError();
+}
+
+std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
+{
+    bool longString = false;
+    auto character = *m_current++;
+    if (m_current != m_document->end() && std::next(m_current) != m_document->end())
+    {
+        if (std::array{*m_current, *std::next(m_current)} == std::array{character, character})
+        {
+            longString = true;
+            std::advance(m_current, 2);
+        }
+    }
+
+    auto end = [&]() -> std::optional<bool>
+    {
+        if (!longString)
+        {
+            if (m_current == m_document->end())
+            {
+                auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
+                                   .addLabel(m_current - m_document->begin(), std::string(1, character));
+                m_diagCallback(std::move(builder));
+                return false;
+            }
+            if (*m_current == character)
+            {
+                m_current++;
+                return true;
+            }
+            return std::nullopt;
+        }
+        if (m_current == m_document->end() || std::next(m_current) == m_document->end()
+            || std::next(m_current, 2) == m_document->end())
+        {
+            auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
+                               .addLabel(m_current - m_document->begin(), std::string(3, character));
+            m_diagCallback(std::move(builder));
+            return false;
+        }
+        if (std::array{*m_current, *std::next(m_current), *std::next(m_current, 2)}
+            == std::array{character, character, character})
+        {
+            std::advance(m_current, 3);
+            return true;
+        }
+        return std::nullopt;
+    };
+    std::u32string result;
+    std::optional<bool> success;
+    while (!(success = end()))
+    {
+        switch (*m_current)
+        {
+            case U'\\':
+            {
+                if (raw)
+                {
+                    result += *m_current;
+                    break;
+                }
+                m_current++;
+                if (m_current == m_document->end())
+                {
+                    continue;
+                }
+                switch (*m_current)
+                {
+                    case '\'':
+                    case '"':
+                    case '\\':
+                    case 'a':
+                    case 'b':
+                    case 'f':
+                    case 'r':
+                    case 't':
+                    case 'v':
+                    {
+                        result += m_current;
+                        m_current++;
+                        break;
+                    }
+                    case 'n':
+                    {
+                        m_current++;
+                        result += '\n';
+                        std::size_t count = 0;
+                        while (std::next(m_current, count) != m_document->end() && count != sizeof("ewline") - 1)
+                        {
+                            count++;
+                        }
+                        if (std::u32string_view(std::prev(m_current), count) == U"newline")
+                        {
+                            std::advance(m_current, count);
+                        }
+                        break;
+                    }
+                    case 'x':
+                    {
+                        m_current++;
+                        if (m_current == m_document->end())
+                        {
+                            //TODO deprecation
+                            result += U"\\x";
+                            break;
+                        }
+                        auto isHex = [](char32_t value) {
+                            switch (value)
+                            {
+                                case U'0':
+                                case U'1':
+                                case U'2':
+                                case U'3':
+                                case U'4':
+                                case U'5':
+                                case U'6':
+                                case U'7':
+                                case U'8':
+                                case U'9':
+                                case U'a':
+                                case U'b':
+                                case U'c':
+                                case U'd':
+                                case U'e':
+                                case U'f':
+                                case U'A':
+                                case U'B':
+                                case U'C':
+                                case U'D':
+                                case U'E':
+                                case U'F':
+                                {
+                                    return true;
+                                }
+                                default:break;
+                            }
+                            return false;
+                        };
+                        if (!isHex(*m_current))
+                        {
+                            //TODO deprecation
+                            result += U"\\x";
+                            result += *m_current;
+                            break;
+                        }
+                        m_current++;
+                        if (m_current == m_document->end())
+                        {
+                            //TODO deprecation
+                            result += U"\\x";
+                            result += *std::prev(m_current);
+                            break;
+                        }
+                        break;
+                    }
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                    {
+                        break;
+                    }
+                    case 'u':
+                    case 'U':
+                    {
+                        break;
+                    }
+                    case 'N':
+                    {
+                        break;
+                    }
+                    default:
+                    {
+                        result += '\\';
+                        result += *m_current;
+                        m_current++;
+                        // TODO deprecation warning
+                        break;
+                    }
+                }
+                break;
+            }
+            case U'\n':
+            {
+                if (!raw)
+                {
+                    auto builder =
+                        createDiagnosticsBuilder(m_current - m_document->begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
+                            .addLabel(m_current - m_document->begin(), std::nullopt, Diag::colour::red,
+                                      Diag::emphasis::strikethrough);
+                    m_diagCallback(std::move(builder));
+                    return false;
+                }
+                result += *m_current;
+                break;
+            }
+            default: result += *m_current; break;
+        }
+        m_current++;
+    }
+    if (success)
+    {
+        return *success;
+    }
+    return std::nullopt;
 }

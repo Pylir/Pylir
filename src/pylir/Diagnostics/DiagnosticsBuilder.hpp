@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fmt/format.h>
+
 #include "Document.hpp"
 
 namespace pylir::Diag
@@ -190,8 +192,9 @@ class DiagnosticsBuilder
     std::string emitMessage(const Message& message, Severity severity) const;
 
 public:
-    DiagnosticsBuilder(Document& document, std::size_t location, std::string_view message)
-        : m_messages{Message{&document, location, std::string(message), {}}}
+    template <class... Args>
+    DiagnosticsBuilder(Document& document, std::size_t location, std::string_view message, Args&&... args)
+        : m_messages{Message{&document, location, fmt::format(message,std::forward<Args>(args)...), {}}}
     {
     }
 

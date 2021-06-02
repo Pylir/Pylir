@@ -28,6 +28,10 @@ class Lexer
 
     bool parseNext();
 
+    std::optional<bool> parseIdentifier();
+
+    std::optional<bool> parseLiteral(bool raw);
+
 public:
     using value_type = Token;
     using reference = const Token&;
@@ -66,6 +70,11 @@ public:
         return end();
     }
 
-    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location, std::string_view message);
+    template <class... Args>
+    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location, std::string_view message,
+                                                                    Args&&... args)
+    {
+        return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
+    }
 };
 } // namespace pylir

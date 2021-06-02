@@ -92,6 +92,9 @@ TEST_CASE("Lex line continuation", "[Lexer]")
     LEXER_EMITS("test\n"
                 "\\",
                 pylir::Diag::UNEXPECTED_EOF_WHILE_PARSING);
+    LEXER_EMITS("test\n"
+                "\\a",
+                pylir::Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER);
 }
 
 TEST_CASE("Lex identifiers", "[Lexer]")
