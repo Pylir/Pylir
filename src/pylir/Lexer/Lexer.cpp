@@ -285,6 +285,7 @@ bool pylir::Lexer::parseNext()
     }
     do
     {
+        auto start = m_current;
         switch (*m_current)
         {
             case U'#':
@@ -335,15 +336,20 @@ bool pylir::Lexer::parseNext()
                 {
                     if (auto opt = parseLiteral(false))
                     {
-                        return *opt;
+                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                              TokenType::StringLiteral, std::move(*opt));
+                    }
+                    else
+                    {
+                        return false;
                     }
                 }
                 else
                 {
                     m_current--;
-                    if (auto opt = parseIdentifier())
+                    if (!parseIdentifier())
                     {
-                        return *opt;
+                        return false;
                     }
                 }
                 break;
@@ -353,7 +359,8 @@ bool pylir::Lexer::parseNext()
             {
                 if (auto opt = parseLiteral(false))
                 {
-                    return *opt;
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                          TokenType::StringLiteral, std::move(*opt));
                 }
                 break;
             }
@@ -362,9 +369,9 @@ bool pylir::Lexer::parseNext()
             {
                 if (std::next(m_current) == m_document->end())
                 {
-                    if (auto opt = parseIdentifier())
+                    if (!parseIdentifier())
                     {
-                        return *opt;
+                        return false;
                     }
                     break;
                 }
@@ -376,9 +383,9 @@ bool pylir::Lexer::parseNext()
                         auto maybeLiteral = std::next(m_current, 2);
                         if (maybeLiteral == m_document->end() || (*maybeLiteral != U'\'' && *maybeLiteral != U'"'))
                         {
-                            if (auto opt = parseIdentifier())
+                            if (!parseIdentifier())
                             {
-                                return *opt;
+                                return false;
                             }
                             break;
                         }
@@ -391,14 +398,15 @@ bool pylir::Lexer::parseNext()
                         m_current = std::next(m_current);
                         if (auto opt = parseLiteral(false))
                         {
-                            return *opt;
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                                  TokenType::StringLiteral, std::move(*opt));
                         }
                         break;
                     }
                     default:
-                        if (auto opt = parseIdentifier())
+                        if (!parseIdentifier())
                         {
-                            return *opt;
+                            return false;
                         }
                         break;
                 }
@@ -416,9 +424,9 @@ bool pylir::Lexer::parseNext()
                     m_current = std::find_if_not(m_current, m_document->end(), Text::isWhitespace);
                     continue;
                 }
-                if (auto opt = parseIdentifier())
+                if (!parseIdentifier())
                 {
-                    return *opt;
+                    return false;
                 }
                 break;
             }
@@ -432,7 +440,7 @@ bool pylir::Lexer::parseNext()
     return true;
 }
 
-std::optional<bool> pylir::Lexer::parseIdentifier()
+bool pylir::Lexer::parseIdentifier()
 {
     static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
     if (!initialCharacterSet.contains(*m_current))
@@ -488,7 +496,7 @@ std::optional<bool> pylir::Lexer::parseIdentifier()
     if (auto result = keywords.find(utf32); result != keywords.end())
     {
         m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, result->second);
-        return std::nullopt;
+        return true;
     }
 
     auto normalized = Text::normalize(utf32, Text::Normalization::NFKC);
@@ -497,7 +505,7 @@ std::optional<bool> pylir::Lexer::parseIdentifier()
     PYLIR_ASSERT(ok);
     m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Identifier,
                           std::move(utf8));
-    return std::nullopt;
+    return true;
 }
 
 void pylir::Lexer::outputToStderr(pylir::Diag::DiagnosticsBuilder&& diagnosticsBuilder)
@@ -505,7 +513,74 @@ void pylir::Lexer::outputToStderr(pylir::Diag::DiagnosticsBuilder&& diagnosticsB
     std::cerr << diagnosticsBuilder.emitError();
 }
 
-std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
+namespace
+{
+int fromHex(char32_t value)
+{
+    switch (value)
+    {
+        case U'0': return 0;
+        case U'1': return 1;
+        case U'2': return 2;
+        case U'3': return 3;
+        case U'4': return 4;
+        case U'5': return 5;
+        case U'6': return 6;
+        case U'7': return 7;
+        case U'8': return 8;
+        case U'9': return 9;
+        case U'a': return 10;
+        case U'A': return 10;
+        case U'b': return 11;
+        case U'B': return 11;
+        case U'c': return 12;
+        case U'C': return 12;
+        case U'd': return 13;
+        case U'D': return 13;
+        case U'e': return 14;
+        case U'E': return 14;
+        case U'f': return 15;
+        case U'F': return 15;
+        default: PYLIR_UNREACHABLE;
+    }
+}
+
+bool isHex(char32_t value)
+{
+    switch (value)
+    {
+        case U'0':
+        case U'1':
+        case U'2':
+        case U'3':
+        case U'4':
+        case U'5':
+        case U'6':
+        case U'7':
+        case U'8':
+        case U'9':
+        case U'a':
+        case U'b':
+        case U'c':
+        case U'd':
+        case U'e':
+        case U'f':
+        case U'A':
+        case U'B':
+        case U'C':
+        case U'D':
+        case U'E':
+        case U'F':
+        {
+            return true;
+        }
+        default: break;
+    }
+    return false;
+}
+} // namespace
+
+std::optional<std::string> pylir::Lexer::parseLiteral(bool raw)
 {
     bool longString = false;
     auto character = *m_current++;
@@ -554,6 +629,7 @@ std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
     };
     std::u32string result;
     std::optional<bool> success;
+
     while (!(success = end()))
     {
         switch (*m_current)
@@ -610,38 +686,6 @@ std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
                             result += U"\\x";
                             break;
                         }
-                        auto isHex = [](char32_t value) {
-                            switch (value)
-                            {
-                                case U'0':
-                                case U'1':
-                                case U'2':
-                                case U'3':
-                                case U'4':
-                                case U'5':
-                                case U'6':
-                                case U'7':
-                                case U'8':
-                                case U'9':
-                                case U'a':
-                                case U'b':
-                                case U'c':
-                                case U'd':
-                                case U'e':
-                                case U'f':
-                                case U'A':
-                                case U'B':
-                                case U'C':
-                                case U'D':
-                                case U'E':
-                                case U'F':
-                                {
-                                    return true;
-                                }
-                                default:break;
-                            }
-                            return false;
-                        };
                         if (!isHex(*m_current))
                         {
                             //TODO deprecation
@@ -652,11 +696,22 @@ std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
                         m_current++;
                         if (m_current == m_document->end())
                         {
-                            //TODO deprecation
+                            // TODO deprecation
                             result += U"\\x";
                             result += *std::prev(m_current);
                             break;
                         }
+                        if (!isHex(*m_current))
+                        {
+                            // TODO deprecation
+                            result += U"\\x";
+                            result += *std::prev(m_current);
+                            result += *m_current;
+                            break;
+                        }
+                        char32_t unicode = fromHex(*std::prev(m_current)) * 16 + fromHex(*m_current);
+                        result += unicode;
+                        m_current++;
                         break;
                     }
                     case '0':
@@ -668,6 +723,15 @@ std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
                     case '6':
                     case '7':
                     {
+                        char32_t value = 0;
+                        std::size_t count = 0;
+                        while (count < 3 && m_current != m_document->end() && *m_current >= '0' && *m_current <= '7')
+                        {
+                            value = value * 8 + *m_current - U'0';
+                            m_current++;
+                            count++;
+                        }
+                        result += value;
                         break;
                     }
                     case 'u':
@@ -677,6 +741,39 @@ std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
                     }
                     case 'N':
                     {
+                        m_current++;
+                        if (m_current == m_document->end() || *m_current != '{')
+                        {
+                            // TODO deprecation warning
+                            result += U"\\N";
+                            break;
+                        }
+                        m_current++;
+                        auto closing = std::find(m_current, m_document->end(), U'}');
+                        if (closing == m_document->end())
+                        {
+                            // TODO deprecation warning
+                            result += U"\\N{";
+                            break;
+                        }
+                        auto codepoint = Text::fromName(Text::toUTF8String(
+                            std::u32string_view{m_current, static_cast<std::size_t>(closing - m_current)}));
+                        if (!codepoint)
+                        {
+                            // TODO deprecation warning
+                            result += U"\\N{";
+                            break;
+                        }
+                        closing++;
+                        if (closing == m_document->end() || *closing != '}')
+                        {
+                            // TODO deprecation warning
+                            result += U"\\N{";
+                            break;
+                        }
+                        closing++;
+                        result += *codepoint;
+                        m_current = closing;
                         break;
                     }
                     default:
@@ -699,18 +796,21 @@ std::optional<bool> pylir::Lexer::parseLiteral(bool raw)
                             .addLabel(m_current - m_document->begin(), std::nullopt, Diag::colour::red,
                                       Diag::emphasis::strikethrough);
                     m_diagCallback(std::move(builder));
-                    return false;
+                    return std::nullopt;
                 }
                 result += *m_current;
+                m_current++;
                 break;
             }
-            default: result += *m_current; break;
+            default:
+                result += *m_current;
+                m_current++;
+                break;
         }
-        m_current++;
     }
-    if (success)
+    if (!*success)
     {
-        return *success;
+        return std::nullopt;
     }
-    return std::nullopt;
+    return Text::toUTF8String(result);
 }

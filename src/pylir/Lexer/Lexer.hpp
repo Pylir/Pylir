@@ -28,9 +28,9 @@ class Lexer
 
     bool parseNext();
 
-    std::optional<bool> parseIdentifier();
+    bool parseIdentifier();
 
-    std::optional<bool> parseLiteral(bool raw);
+    std::optional<std::string> parseLiteral(bool raw);
 
 public:
     using value_type = Token;

@@ -363,6 +363,8 @@ bool isWhitespace(char32_t codepoint);
 
 std::size_t consoleWidth(char32_t codepoint);
 
+std::optional<char32_t> fromName(std::string_view utf8name);
+
 enum class Normalization
 {
     NFD,

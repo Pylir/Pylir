@@ -49,6 +49,8 @@ enum class TokenType : std::uint8_t
     WhileKeyword,
     WithKeyword,
     YieldKeyword,
+    StringLiteral,
+    BytesLiteral,
 };
 
 class Token
