@@ -159,6 +159,13 @@ enum class emphasis : uint8_t
     strikethrough = 1 << 3
 };
 
+enum Severity
+{
+    Warning,
+    Error,
+    Note
+};
+
 class DiagnosticsBuilder
 {
     struct Label
@@ -178,13 +185,6 @@ class DiagnosticsBuilder
         std::vector<Label> labels;
     };
     std::vector<Message> m_messages;
-
-    enum Severity
-    {
-        Warning,
-        Error,
-        Note
-    };
 
     static std::string printLine(std::size_t width, std::size_t lineNumber, pylir::Diag::Document& document,
                                  std::vector<Label> labels);
@@ -251,20 +251,22 @@ public:
         return std::move(addNote(document, location, message));
     }
 
-    std::string emitError() const
+    std::string emit(Severity severity) const
     {
         auto begin = m_messages.begin();
-        std::string result = emitMessage(*begin++, Severity::Error);
+        std::string result = emitMessage(*begin++, severity);
         std::for_each(begin, m_messages.end(), [&](auto& message) { result += emitMessage(message, Severity::Note); });
         return result;
     }
 
+    std::string emitError() const
+    {
+        return emit(Severity::Error);
+    }
+
     std::string emitWarning() const
     {
-        auto begin = m_messages.begin();
-        std::string result = emitMessage(*begin++, Severity::Warning);
-        std::for_each(begin, m_messages.end(), [&](auto& message) { result += emitMessage(message, Severity::Note); });
-        return result;
+        return emit(Severity::Warning);
     }
 };
 

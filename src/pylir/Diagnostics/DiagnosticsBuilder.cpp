@@ -213,6 +213,7 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
             severityStr = "note";
             colour = fmt::color::cyan;
             break;
+        default: PYLIR_UNREACHABLE;
     }
     auto result = fmt::format(fmt::emphasis::bold, "{}:{}:{}: ", document.getFilename(), lineNumber, colNumber);
     result += fmt::format(fmt::emphasis::bold | fmt::fg(colour), "{}:", severityStr);
