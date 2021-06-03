@@ -36,5 +36,12 @@ for fields in unicode_text_file(download_unicode_txt_file('NameAliases.txt')):
     codepoint = fields[0]
     unicode_map[name] = int(codepoint, 16)
 
+print("static const char* NAME_DATA[] = {")
 for key, value in unicode_map.items():
-    print(f'{{"{key}",{value}}},', end='')
+    print(f'"{key}",', sep='')
+print("};")
+print("")
+print("static char32_t NAME_CODEPOINT[] = {")
+for key, value in unicode_map.items():
+    print(f'{hex(value)},', sep='')
+print("};")

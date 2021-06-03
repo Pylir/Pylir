@@ -236,13 +236,19 @@ class Transcoder<void, Target>
                 case Encoding::UTF32BE:
                     char32_t value;
                     std::memcpy(&value, m_source.data(), std::min<std::size_t>(4, m_source.size()));
-                    if (endian::native == endian::big && m_encoding == Encoding::UTF32LE)
+                    if constexpr (endian::native == endian::big)
                     {
-                        value = swapByteOrder(value);
+                        if (m_encoding == Encoding::UTF32LE)
+                        {
+                            value = swapByteOrder(value);
+                        }
                     }
-                    else if (endian::native == endian::little && m_encoding == Encoding::UTF32BE)
+                    else if constexpr (endian::native == endian::little)
                     {
-                        value = swapByteOrder(value);
+                        if (m_encoding == Encoding::UTF32BE)
+                        {
+                            value = swapByteOrder(value);
+                        }
                     }
                     if constexpr (std::is_same_v<char, Target>)
                     {
