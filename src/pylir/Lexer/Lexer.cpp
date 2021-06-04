@@ -397,7 +397,7 @@ bool pylir::Lexer::parseNext()
                     case U'"':
                     {
                         m_current = std::next(m_current);
-                        if (auto opt = parseLiteral(false))
+                        if (auto opt = parseLiteral(true))
                         {
                             m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
                                                   TokenType::StringLiteral, std::move(*opt));
@@ -635,6 +635,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                 if (raw)
                 {
                     result += *m_current;
+                    m_current++;
                     break;
                 }
                 m_current++;

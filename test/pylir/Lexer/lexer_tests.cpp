@@ -303,4 +303,36 @@ TEST_CASE("Lex string literals", "[Lexer]")
         LEXER_EMITS("'\\u343'", pylir::Diag::EXPECTED_N_MORE_HEX_CHARACTERS, 1);
         LEXER_EMITS("'\\ud869'", pylir::Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT, 0xd869);
     }
+    SECTION("Raw strings")
+    {
+        SECTION("Immediately before")
+        {
+            pylir::Diag::Document document("r'\\\\\\\"\\a\\b\\f\\n\\r\\t\\v\\newline\\u343\\N'");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE_FALSE(result.empty());
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "\\\\\\\"\\a\\b\\f\\n\\r\\t\\v\\newline\\u343\\N");
+        }
+        SECTION("Not immediately before")
+        {
+            pylir::Diag::Document document("r '\\n'");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE(result.size() >= 2);
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::Identifier);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "r");
+            auto& second = result[1];
+            CHECK(second.getTokenType() == pylir::TokenType::StringLiteral);
+            str = std::get_if<std::string>(&second.getValue());
+            REQUIRE(str);
+            CHECK(*str == "\n");
+        }
+    }
 }
