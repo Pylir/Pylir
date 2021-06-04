@@ -234,4 +234,16 @@ TEST_CASE("Lex string literals", "[Lexer]")
         REQUIRE(str);
         CHECK(*str == "\\'\"\a\b\f\n\r\t\v\n");
     }
+    SECTION("Unicode name")
+    {
+        pylir::Diag::Document document("'\\N{Man in Business Suit Levitating}'");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+        REQUIRE_FALSE(result.empty());
+        auto& first = result[0];
+        CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+        auto* str = std::get_if<std::string>(&first.getValue());
+        REQUIRE(str);
+        CHECK(*str == "\U0001F574");
+    }
 }

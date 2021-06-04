@@ -36809,6 +36809,14 @@ static char32_t NAME_CODEPOINT[] = {
 
 std::optional<char32_t> pylir::Text::fromName(std::string_view utf8name)
 {
+    std::string uppercase = std::string(utf8name);
+    for (auto& iter : uppercase)
+    {
+        if (iter >= 'a' && iter <= 'z')
+        {
+            iter &= ~0x20;
+        }
+    }
     static auto mapping = []
     {
         std::unordered_map<std::string_view, char32_t> result;
@@ -36819,7 +36827,7 @@ std::optional<char32_t> pylir::Text::fromName(std::string_view utf8name)
         }
         return result;
     }();
-    auto result = mapping.find(utf8name);
+    auto result = mapping.find(uppercase);
     if (result == mapping.end())
     {
         return std::nullopt;

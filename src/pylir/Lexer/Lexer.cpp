@@ -774,7 +774,6 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                             result += U"\\N{";
                             break;
                         }
-                        closing++;
                         if (closing == m_document->end() || *closing != '}')
                         {
                             // TODO deprecation warning
