@@ -754,33 +754,34 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                         m_current++;
                         if (m_current == m_document->end() || *m_current != '{')
                         {
-                            // TODO deprecation warning
-                            result += U"\\N";
-                            break;
+                            std::optional<Diag::emphasis> emphasis;
+                            if (m_current != m_document->end())
+                            {
+                                emphasis = Diag::emphasis::strikethrough;
+                            }
+                            auto builder = createDiagnosticsBuilder(m_current - m_document->begin(),
+                                                                    Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N)
+                                               .addLabel(m_current - m_document->begin(), "{", Diag::colour::lime_green,
+                                                         std::move(emphasis));
+                            return tl::unexpected{builder.emitError()};
                         }
                         m_current++;
                         auto closing = std::find(m_current, m_document->end(), U'}');
-                        if (closing == m_document->end())
-                        {
-                            // TODO deprecation warning
-                            result += U"\\N{";
-                            break;
-                        }
-                        auto codepoint = Text::fromName(Text::toUTF8String(
-                            std::u32string_view{m_current, static_cast<std::size_t>(closing - m_current)}));
+                        auto utf8Name = Text::toUTF8String(
+                            std::u32string_view{m_current, static_cast<std::size_t>(closing - m_current)});
+                        auto codepoint = Text::fromName(utf8Name);
                         if (!codepoint)
                         {
-                            // TODO deprecation warning
-                            result += U"\\N{";
-                            break;
+                            auto builder =
+                                createDiagnosticsBuilder(m_current - m_document->begin(),
+                                                         Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
+                                    .addLabel(m_current - m_document->begin(), std::nullopt, Diag::colour::red);
+                            return tl::unexpected{builder.emitError()};
                         }
-                        if (closing == m_document->end() || *closing != '}')
+                        if (closing != m_document->end())
                         {
-                            // TODO deprecation warning
-                            result += U"\\N{";
-                            break;
+                            closing++;
                         }
-                        closing++;
                         result += *codepoint;
                         m_current = closing;
                         break;

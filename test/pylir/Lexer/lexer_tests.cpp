@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+#include <fmt/format.h>
+
 #define LEXER_EMITS(source, message)                                      \
     [](std::string str)                                                   \
     {                                                                     \
@@ -245,6 +247,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "\U0001F574");
+        LEXER_EMITS("'\\N'", fmt::format(pylir::Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N));
+        LEXER_EMITS("'\\N{wdwadwad}'", fmt::format(pylir::Diag::UNICODE_NAME_N_NOT_FOUND, "wdwadwad"));
     }
     SECTION("Hex characters")
     {

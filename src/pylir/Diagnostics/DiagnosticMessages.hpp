@@ -16,4 +16,8 @@ constexpr std::string_view EXPECTED_END_OF_LITERAL = "expected end of literal";
 
 constexpr std::string_view NEWLINE_NOT_ALLOWED_IN_LITERAL = "newline not allowed in literal";
 
+constexpr std::string_view EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N = "expected '{{' after \\N";
+
+constexpr std::string_view UNICODE_NAME_N_NOT_FOUND = "unicode name '{}' not found";
+
 } // namespace pylir::Diag
