@@ -26,6 +26,17 @@ TEST_CASE("Diagnostics labels", "[Diag]")
                                            "     | Label"));
         CHECK_THAT(result, Catch::Contains("filename:1:1:"));
     }
+    SECTION("Without text")
+    {
+        pylir::Diag::Document document("A normal text", "filename");
+        auto result = pylir::Diag::DiagnosticsBuilder(document, 0, "A message").addLabel(0).emitError();
+        CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
+                                           "     | ^\n"));
+        CHECK_THAT(result, !Catch::Contains("   1 | A normal text\n"
+                                            "     | ^\n"
+                                            "     | |\n"));
+        CHECK_THAT(result, Catch::Contains("filename:1:1:"));
+    }
     SECTION("Multiple")
     {
         SECTION("Same line")

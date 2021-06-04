@@ -96,6 +96,13 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
     }
     result += '\n';
 
+    labels.erase(std::remove_if(labels.begin(), labels.end(), [](const Label& label) { return !label.labelText; }),
+                 labels.end());
+    if (labels.empty())
+    {
+        return result;
+    }
+
     {
         result += fmt::format("{1: >{0}} | ", width, "");
         std::size_t lastEnd = 0;
@@ -127,8 +134,6 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
     }
 
     {
-        labels.erase(std::remove_if(labels.begin(), labels.end(), [](const Label& label) { return !label.labelText; }),
-                     labels.end());
         while (!labels.empty())
         {
             result += fmt::format("{1: >{0}} | ", width, "");
