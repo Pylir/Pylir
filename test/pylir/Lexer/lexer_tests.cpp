@@ -6,19 +6,21 @@
 
 #include <iostream>
 
-#define LEXER_EMITS(source, message)                                                                        \
-    [](std::string str)                                                                                     \
-    {                                                                                                       \
-        pylir::Diag::Document document(str);                                                                \
-        pylir::Lexer lexer(document);                                                                       \
-        for (auto& token : lexer)                                                                           \
-        {                                                                                                   \
-            if (token.getTokenType() == pylir::TokenType::SyntaxError)                                      \
-            {                                                                                               \
-                CHECK_THAT(std::get<std::string>(token.getValue()), Catch::Contains(std::string(message))); \
-                return;                                                                                     \
-            }                                                                                               \
-        }                                                                                                   \
+#define LEXER_EMITS(source, message)                                      \
+    [](std::string str)                                                   \
+    {                                                                     \
+        pylir::Diag::Document document(str);                              \
+        pylir::Lexer lexer(document);                                     \
+        for (auto& token : lexer)                                         \
+        {                                                                 \
+            if (token.getTokenType() == pylir::TokenType::SyntaxError)    \
+            {                                                             \
+                auto& error = std::get<std::string>(token.getValue());    \
+                std::cerr << error;                                       \
+                CHECK_THAT(error, Catch::Contains(std::string(message))); \
+                return;                                                   \
+            }                                                             \
+        }                                                                 \
     }(source)
 
 TEST_CASE("Lex comments", "[Lexer]")
@@ -148,4 +150,76 @@ TEST_CASE("Lex keywords", "[Lexer]")
                    pylir::TokenType::OrKeyword,     pylir::TokenType::PassKeyword,     pylir::TokenType::RaiseKeyword,
                    pylir::TokenType::ReturnKeyword, pylir::TokenType::TryKeyword,      pylir::TokenType::WhileKeyword,
                    pylir::TokenType::WithKeyword,   pylir::TokenType::YieldKeyword,    pylir::TokenType::Newline}));
+}
+
+TEST_CASE("Lex string literals", "[Lexer]")
+{
+    SECTION("Normal")
+    {
+        SECTION("Quote")
+        {
+            pylir::Diag::Document document("'a text'");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE_FALSE(result.empty());
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "a text");
+        }
+        SECTION("Double quote")
+        {
+            pylir::Diag::Document document("\"a text\"");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE_FALSE(result.empty());
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "a text");
+        }
+        SECTION("Triple quote")
+        {
+            pylir::Diag::Document document("'''a text'''");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE_FALSE(result.empty());
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "a text");
+        }
+        SECTION("Triple double quote")
+        {
+            pylir::Diag::Document document("\"\"\"a text\"\"\"");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE_FALSE(result.empty());
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "a text");
+        }
+        LEXER_EMITS("'a text", pylir::Diag::EXPECTED_END_OF_LITERAL);
+        LEXER_EMITS("'''a text", pylir::Diag::EXPECTED_END_OF_LITERAL);
+    }
+    SECTION("Newline")
+    {
+        pylir::Diag::Document document("'''\n"
+                                       "a text\n"
+                                       "'''");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+        REQUIRE_FALSE(result.empty());
+        auto& first = result[0];
+        CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+        auto* str = std::get_if<std::string>(&first.getValue());
+        REQUIRE(str);
+        CHECK(*str == "\na text\n");
+        LEXER_EMITS("'a text\n'", pylir::Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL);
+    }
 }

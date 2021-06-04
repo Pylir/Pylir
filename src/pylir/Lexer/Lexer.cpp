@@ -607,6 +607,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
         if (m_current == m_document->end() || std::next(m_current) == m_document->end()
             || std::next(m_current, 2) == m_document->end())
         {
+            for (; m_current != m_document->end(); m_current = std::next(m_current))
+                ;
             auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
                                .addLabel(m_current - m_document->begin(), std::string(3, character));
             return tl::unexpected{builder.emitError()};
@@ -781,7 +783,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
             }
             case U'\n':
             {
-                if (!raw)
+                if (!longString)
                 {
                     auto builder =
                         createDiagnosticsBuilder(m_current - m_document->begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
