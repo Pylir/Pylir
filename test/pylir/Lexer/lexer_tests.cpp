@@ -246,4 +246,28 @@ TEST_CASE("Lex string literals", "[Lexer]")
         REQUIRE(str);
         CHECK(*str == "\U0001F574");
     }
+    SECTION("Hex characters")
+    {
+        pylir::Diag::Document document("'\\xA7'");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+        REQUIRE_FALSE(result.empty());
+        auto& first = result[0];
+        CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+        auto* str = std::get_if<std::string>(&first.getValue());
+        REQUIRE(str);
+        CHECK(*str == "§");
+    }
+    SECTION("Octal characters")
+    {
+        pylir::Diag::Document document("'\\247'");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+        REQUIRE_FALSE(result.empty());
+        auto& first = result[0];
+        CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+        auto* str = std::get_if<std::string>(&first.getValue());
+        REQUIRE(str);
+        CHECK(*str == "§");
+    }
 }
