@@ -12,6 +12,7 @@ namespace pylir
 {
 enum class TokenType : std::uint8_t
 {
+    SyntaxError,
     Newline,
     Identifier,
     FalseKeyword,

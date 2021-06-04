@@ -5,13 +5,15 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 
-#include <iostream>
 #include <iterator>
 #include <unordered_map>
 
 pylir::Lexer::Lexer(Diag::Document& document, int fieldId,
-                    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> diagCallback)
-    : m_fileId(fieldId), m_document(&document), m_current(m_document->begin()), m_diagCallback(std::move(diagCallback))
+                    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback)
+    : m_fileId(fieldId),
+      m_document(&document),
+      m_current(m_document->begin()),
+      m_warningCallback(std::move(warningCallback))
 {
 }
 
@@ -312,8 +314,9 @@ bool pylir::Lexer::parseNext()
                     auto builder =
                         createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
                             .addLabel(m_current - m_document->begin(), "\\n", Diag::colour::lime_green);
-                    m_diagCallback(std::move(builder));
-                    return false;
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(), m_fileId,
+                                          TokenType::SyntaxError, builder.emitError());
+                    return true;
                 }
                 if (*m_current != U'\n')
                 {
@@ -322,8 +325,9 @@ bool pylir::Lexer::parseNext()
                                                  Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
                             .addLabel(m_current - m_document->begin(), "\\n", Diag::colour::lime_green,
                                       Diag::emphasis::strikethrough);
-                    m_diagCallback(std::move(builder));
-                    return false;
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(), m_fileId,
+                                          TokenType::SyntaxError, builder.emitError());
+                    return true;
                 }
                 m_current++;
                 break;
@@ -341,16 +345,14 @@ bool pylir::Lexer::parseNext()
                     }
                     else
                     {
-                        return false;
+                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                              TokenType::SyntaxError, std::move(opt).error());
                     }
                 }
                 else
                 {
                     m_current--;
-                    if (!parseIdentifier())
-                    {
-                        return false;
-                    }
+                    parseIdentifier();
                 }
                 break;
             }
@@ -362,6 +364,11 @@ bool pylir::Lexer::parseNext()
                     m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
                                           TokenType::StringLiteral, std::move(*opt));
                 }
+                else
+                {
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                          TokenType::SyntaxError, std::move(opt).error());
+                }
                 break;
             }
             case U'r':
@@ -369,10 +376,7 @@ bool pylir::Lexer::parseNext()
             {
                 if (std::next(m_current) == m_document->end())
                 {
-                    if (!parseIdentifier())
-                    {
-                        return false;
-                    }
+                    parseIdentifier();
                     break;
                 }
                 switch (*std::next(m_current))
@@ -383,10 +387,7 @@ bool pylir::Lexer::parseNext()
                         auto maybeLiteral = std::next(m_current, 2);
                         if (maybeLiteral == m_document->end() || (*maybeLiteral != U'\'' && *maybeLiteral != U'"'))
                         {
-                            if (!parseIdentifier())
-                            {
-                                return false;
-                            }
+                            parseIdentifier();
                             break;
                         }
                         // TODO: parseFormatString
@@ -401,14 +402,14 @@ bool pylir::Lexer::parseNext()
                             m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
                                                   TokenType::StringLiteral, std::move(*opt));
                         }
-                        break;
-                    }
-                    default:
-                        if (!parseIdentifier())
+                        else
                         {
-                            return false;
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                                  TokenType::SyntaxError, std::move(opt).error());
                         }
                         break;
+                    }
+                    default: parseIdentifier(); break;
                 }
                 break;
             }
@@ -424,10 +425,7 @@ bool pylir::Lexer::parseNext()
                     m_current = std::find_if_not(m_current, m_document->end(), Text::isWhitespace);
                     continue;
                 }
-                if (!parseIdentifier())
-                {
-                    return false;
-                }
+                parseIdentifier();
                 break;
             }
         }
@@ -440,7 +438,7 @@ bool pylir::Lexer::parseNext()
     return true;
 }
 
-bool pylir::Lexer::parseIdentifier()
+void pylir::Lexer::parseIdentifier()
 {
     static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
     if (!initialCharacterSet.contains(*m_current))
@@ -448,8 +446,9 @@ bool pylir::Lexer::parseIdentifier()
         auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_CHARACTER_N,
                                                 Text::toUTF8String({&*m_current, 1}))
                            .addLabel(m_current - m_document->begin());
-        m_diagCallback(std::move(builder));
-        return false;
+        m_tokens.emplace_back(m_current - m_document->begin(), 1, m_fileId, TokenType::SyntaxError,
+                              builder.emitError());
+        return;
     }
     static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
     auto start = m_current;
@@ -496,7 +495,7 @@ bool pylir::Lexer::parseIdentifier()
     if (auto result = keywords.find(utf32); result != keywords.end())
     {
         m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, result->second);
-        return true;
+        return;
     }
 
     auto normalized = Text::normalize(utf32, Text::Normalization::NFKC);
@@ -505,12 +504,7 @@ bool pylir::Lexer::parseIdentifier()
     PYLIR_ASSERT(ok);
     m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Identifier,
                           std::move(utf8));
-    return true;
-}
-
-void pylir::Lexer::outputToStderr(pylir::Diag::DiagnosticsBuilder&& diagnosticsBuilder)
-{
-    std::cerr << diagnosticsBuilder.emitError();
+    return;
 }
 
 namespace
@@ -580,7 +574,7 @@ bool isHex(char32_t value)
 }
 } // namespace
 
-std::optional<std::string> pylir::Lexer::parseLiteral(bool raw)
+tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
 {
     bool longString = false;
     auto character = *m_current++;
@@ -593,7 +587,7 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw)
         }
     }
 
-    auto end = [&]() -> std::optional<bool>
+    auto end = [&]() -> tl::expected<bool, std::string>
     {
         if (!longString)
         {
@@ -601,23 +595,21 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw)
             {
                 auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
                                    .addLabel(m_current - m_document->begin(), std::string(1, character));
-                m_diagCallback(std::move(builder));
-                return false;
+                return tl::unexpected{builder.emitError()};
             }
             if (*m_current == character)
             {
                 m_current++;
                 return true;
             }
-            return std::nullopt;
+            return false;
         }
         if (m_current == m_document->end() || std::next(m_current) == m_document->end()
             || std::next(m_current, 2) == m_document->end())
         {
             auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
                                .addLabel(m_current - m_document->begin(), std::string(3, character));
-            m_diagCallback(std::move(builder));
-            return false;
+            return tl::unexpected{builder.emitError()};
         }
         if (std::array{*m_current, *std::next(m_current), *std::next(m_current, 2)}
             == std::array{character, character, character})
@@ -625,12 +617,12 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw)
             std::advance(m_current, 3);
             return true;
         }
-        return std::nullopt;
+        return false;
     };
     std::u32string result;
-    std::optional<bool> success;
+    tl::expected<bool, std::string> success;
 
-    while (!(success = end()))
+    for (success = end(); success && !*success; success = end())
     {
         switch (*m_current)
         {
@@ -795,8 +787,7 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw)
                         createDiagnosticsBuilder(m_current - m_document->begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
                             .addLabel(m_current - m_document->begin(), std::nullopt, Diag::colour::red,
                                       Diag::emphasis::strikethrough);
-                    m_diagCallback(std::move(builder));
-                    return std::nullopt;
+                    return tl::unexpected{builder.emitError()};
                 }
                 result += *m_current;
                 m_current++;
@@ -808,9 +799,9 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw)
                 break;
         }
     }
-    if (!*success)
+    if (!success)
     {
-        return std::nullopt;
+        return tl::unexpected{std::move(success).error()};
     }
     return Text::toUTF8String(result);
 }

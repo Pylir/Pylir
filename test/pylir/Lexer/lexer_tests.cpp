@@ -6,18 +6,19 @@
 
 #include <iostream>
 
-#define LEXER_EMITS(source, message)                                                   \
-    [](std::string str)                                                                \
-    {                                                                                  \
-        pylir::Diag::Document document(str);                                           \
-        pylir::Lexer lexer(document, 1,                                                \
-                           [](pylir::Diag::DiagnosticsBuilder&& builder)               \
-                           {                                                           \
-                               auto str = builder.emitError();                         \
-                               std::cerr << str << std::flush;                         \
-                               CHECK_THAT(str, Catch::Contains(std::string(message))); \
-                           });                                                         \
-        std::for_each(lexer.begin(), lexer.end(), [](auto&&) {});                      \
+#define LEXER_EMITS(source, message)                                                                        \
+    [](std::string str)                                                                                     \
+    {                                                                                                       \
+        pylir::Diag::Document document(str);                                                                \
+        pylir::Lexer lexer(document);                                                                       \
+        for (auto& token : lexer)                                                                           \
+        {                                                                                                   \
+            if (token.getTokenType() == pylir::TokenType::SyntaxError)                                      \
+            {                                                                                               \
+                CHECK_THAT(std::get<std::string>(token.getValue()), Catch::Contains(std::string(message))); \
+                return;                                                                                     \
+            }                                                                                               \
+        }                                                                                                   \
     }(source)
 
 TEST_CASE("Lex comments", "[Lexer]")

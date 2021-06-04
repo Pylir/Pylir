@@ -12,6 +12,8 @@
 #include <string_view>
 #include <vector>
 
+#include <tl/expected.hpp>
+
 #include "Token.hpp"
 
 namespace pylir
@@ -22,15 +24,13 @@ class Lexer
     std::vector<Token> m_tokens;
     Diag::Document* m_document;
     Diag::Document::iterator m_current;
-    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> m_diagCallback;
-
-    static void outputToStderr(Diag::DiagnosticsBuilder&& diagnosticsBuilder);
+    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> m_warningCallback;
 
     bool parseNext();
 
-    bool parseIdentifier();
+    void parseIdentifier();
 
-    std::optional<std::string> parseLiteral(bool raw);
+    tl::expected<std::string, std::string> parseLiteral(bool raw);
 
 public:
     using value_type = Token;
@@ -41,8 +41,9 @@ public:
     using difference_type = iterator::difference_type;
     using size_type = std::size_t;
 
-    explicit Lexer(Diag::Document& document, int fileId = 0,
-                   std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> diagCallback = outputToStderr);
+    explicit Lexer(
+        Diag::Document& document, int fileId = 0,
+        std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback = [](auto&&) {});
 
     Lexer(const Lexer&) = delete;
     Lexer& operator=(const Lexer&) = delete;
