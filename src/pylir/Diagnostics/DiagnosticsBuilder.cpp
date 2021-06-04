@@ -208,15 +208,15 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
     {
         case Warning:
             severityStr = "warning";
-            colour = fmt::color::magenta;
+            colour = static_cast<fmt::color>(Diag::WARNING_COLOUR);
             break;
         case Error:
             severityStr = "error";
-            colour = fmt::color::red;
+            colour = static_cast<fmt::color>(Diag::ERROR_COLOUR);
             break;
         case Note:
             severityStr = "note";
-            colour = fmt::color::cyan;
+            colour = static_cast<fmt::color>(Diag::NOTE_COLOUR);
             break;
         default: PYLIR_UNREACHABLE;
     }

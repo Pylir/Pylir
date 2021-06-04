@@ -151,6 +151,20 @@ enum class colour : uint32_t
     yellow_green = 0x9ACD32
 };
 
+constexpr auto ERROR_COLOUR = colour::red;
+
+constexpr auto WARNING_COLOUR = colour::magenta;
+
+constexpr auto NOTE_COLOUR = colour::cyan;
+
+constexpr auto INSERT_COLOUR = colour::lime_green;
+
+constexpr auto ERROR_COMPLY = colour::peru;
+
+constexpr auto WARNING_COMPLY = colour::peru;
+
+constexpr auto NOTE_COMPLY = colour::peru;
+
 enum class emphasis : uint8_t
 {
     bold = 1,
@@ -192,16 +206,16 @@ class DiagnosticsBuilder
     std::string emitMessage(const Message& message, Severity severity) const;
 
 public:
-    template <class... Args>
-    DiagnosticsBuilder(Document& document, std::size_t location, std::string_view message, Args&&... args)
-        : m_messages{Message{&document, location, fmt::format(message,std::forward<Args>(args)...), {}}}
+    template <class S, class... Args>
+    DiagnosticsBuilder(Document& document, std::size_t location, const S& message, Args&&... args)
+        : m_messages{Message{&document, location, fmt::format(message, std::forward<Args>(args)...), {}}}
     {
     }
 
-    [[nodiscard]] DiagnosticsBuilder& addLabel(std::size_t start, std::size_t end,
-                                               std::optional<std::string>&& labelText = std::nullopt,
-                                               std::optional<colour>&& colour = std::nullopt,
-                                               std::optional<emphasis>&& emphasis = std::nullopt) &
+    DiagnosticsBuilder& addLabel(std::size_t start, std::size_t end,
+                                 std::optional<std::string>&& labelText = std::nullopt,
+                                 std::optional<colour>&& colour = std::nullopt,
+                                 std::optional<emphasis>&& emphasis = std::nullopt) &
     {
         m_messages.back().labels.push_back({start, end, std::move(labelText), std::move(colour), std::move(emphasis)});
         return *this;
@@ -215,9 +229,9 @@ public:
         return std::move(addLabel(start, end, std::move(labelText), std::move(colour), std::move(emphasis)));
     }
 
-    [[nodiscard]] DiagnosticsBuilder& addLabel(std::size_t start, std::optional<std::string>&& labelText = std::nullopt,
-                                               std::optional<colour>&& colour = std::nullopt,
-                                               std::optional<emphasis>&& emphasis = std::nullopt) &
+    DiagnosticsBuilder& addLabel(std::size_t start, std::optional<std::string>&& labelText = std::nullopt,
+                                 std::optional<colour>&& colour = std::nullopt,
+                                 std::optional<emphasis>&& emphasis = std::nullopt) &
     {
         return addLabel(start, start + 1, std::move(labelText), std::move(colour), std::move(emphasis));
     }
@@ -230,12 +244,12 @@ public:
         return std::move(addLabel(start, start + 1, std::move(labelText), std::move(colour), std::move(emphasis)));
     }
 
-    [[nodiscard]] DiagnosticsBuilder& addNote(std::size_t location, std::string_view message) &
+    DiagnosticsBuilder& addNote(std::size_t location, std::string_view message) &
     {
         return addNote(*m_messages.back().document, location, message);
     }
 
-    [[nodiscard]] DiagnosticsBuilder& addNote(Document& document, std::size_t location, std::string_view message) &
+    DiagnosticsBuilder& addNote(Document& document, std::size_t location, std::string_view message) &
     {
         m_messages.push_back({&document, location, std::string(message), {}});
         return *this;

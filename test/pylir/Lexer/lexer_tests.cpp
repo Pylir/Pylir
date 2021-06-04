@@ -8,21 +8,21 @@
 
 #include <fmt/format.h>
 
-#define LEXER_EMITS(source, message)                                      \
-    [](std::string str)                                                   \
-    {                                                                     \
-        pylir::Diag::Document document(str);                              \
-        pylir::Lexer lexer(document);                                     \
-        for (auto& token : lexer)                                         \
-        {                                                                 \
-            if (token.getTokenType() == pylir::TokenType::SyntaxError)    \
-            {                                                             \
-                auto& error = std::get<std::string>(token.getValue());    \
-                std::cerr << error;                                       \
-                CHECK_THAT(error, Catch::Contains(std::string(message))); \
-                return;                                                   \
-            }                                                             \
-        }                                                                 \
+#define LEXER_EMITS(source, ...)                                              \
+    [](std::string str)                                                       \
+    {                                                                         \
+        pylir::Diag::Document document(str);                                  \
+        pylir::Lexer lexer(document);                                         \
+        for (auto& token : lexer)                                             \
+        {                                                                     \
+            if (token.getTokenType() == pylir::TokenType::SyntaxError)        \
+            {                                                                 \
+                auto& error = std::get<std::string>(token.getValue());        \
+                std::cerr << error;                                           \
+                CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__))); \
+                return;                                                       \
+            }                                                                 \
+        }                                                                     \
     }(source)
 
 TEST_CASE("Lex comments", "[Lexer]")
@@ -247,8 +247,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "\U0001F574");
-        LEXER_EMITS("'\\N'", fmt::format(pylir::Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N));
-        LEXER_EMITS("'\\N{wdwadwad}'", fmt::format(pylir::Diag::UNICODE_NAME_N_NOT_FOUND, "wdwadwad"));
+        LEXER_EMITS("'\\N'", pylir::Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N);
+        LEXER_EMITS("'\\N{wdwadwad}'", pylir::Diag::UNICODE_NAME_N_NOT_FOUND, "wdwadwad");
     }
     SECTION("Hex characters")
     {
@@ -273,5 +273,34 @@ TEST_CASE("Lex string literals", "[Lexer]")
         auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "§");
+    }
+    SECTION("Unicode escape")
+    {
+        SECTION("Small")
+        {
+            pylir::Diag::Document document("'\\u00A7'");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE_FALSE(result.empty());
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "§");
+        }
+        SECTION("Big")
+        {
+            pylir::Diag::Document document("'\\U0001F574'");
+            pylir::Lexer lexer(document);
+            std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+            REQUIRE_FALSE(result.empty());
+            auto& first = result[0];
+            CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+            auto* str = std::get_if<std::string>(&first.getValue());
+            REQUIRE(str);
+            CHECK(*str == "\U0001F574");
+        }
+        LEXER_EMITS("'\\u343'", pylir::Diag::EXPECTED_N_MORE_HEX_CHARACTERS, 1);
+        LEXER_EMITS("'\\ud869'", pylir::Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT, 0xd869);
     }
 }

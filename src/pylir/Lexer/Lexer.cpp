@@ -313,7 +313,7 @@ bool pylir::Lexer::parseNext()
                 {
                     auto builder =
                         createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
-                            .addLabel(m_current - m_document->begin(), "\\n", Diag::colour::lime_green);
+                            .addLabel(m_current - m_document->begin(), "\\n", Diag::INSERT_COLOUR);
                     m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(), m_fileId,
                                           TokenType::SyntaxError, builder.emitError());
                     return true;
@@ -323,7 +323,7 @@ bool pylir::Lexer::parseNext()
                     auto builder =
                         createDiagnosticsBuilder(m_current - m_document->begin(),
                                                  Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
-                            .addLabel(m_current - m_document->begin(), "\\n", Diag::colour::lime_green,
+                            .addLabel(m_current - m_document->begin(), "\\n", Diag::INSERT_COLOUR,
                                       Diag::emphasis::strikethrough);
                     m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(), m_fileId,
                                           TokenType::SyntaxError, builder.emitError());
@@ -593,8 +593,9 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
         {
             if (m_current == m_document->end())
             {
-                auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
-                                   .addLabel(m_current - m_document->begin(), std::string(1, character));
+                auto builder =
+                    createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
+                        .addLabel(m_current - m_document->begin(), std::string(1, character), Diag::ERROR_COLOUR);
                 return tl::unexpected{builder.emitError()};
             }
             if (*m_current == character)
@@ -609,8 +610,9 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
         {
             for (; m_current != m_document->end(); m_current = std::next(m_current))
                 ;
-            auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
-                               .addLabel(m_current - m_document->begin(), std::string(3, character));
+            auto builder =
+                createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
+                    .addLabel(m_current - m_document->begin(), std::string(3, character), Diag::ERROR_COLOUR);
             return tl::unexpected{builder.emitError()};
         }
         if (std::array{*m_current, *std::next(m_current), *std::next(m_current, 2)}
@@ -747,6 +749,43 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                     case 'u':
                     case 'U':
                     {
+                        bool big = *m_current == U'U';
+                        m_current++;
+                        std::size_t size = big ? 8 : 4;
+                        std::size_t count = 0;
+                        char32_t value = 0;
+                        while (count < size && m_current != m_document->end() && isHex(*m_current))
+                        {
+                            value = value * 16 + fromHex(*m_current);
+                            m_current++;
+                            count++;
+                        }
+                        if (count != size)
+                        {
+                            auto builder =
+                                createDiagnosticsBuilder(m_current - m_document->begin() - count,
+                                                         Diag::EXPECTED_N_MORE_HEX_CHARACTERS, size - count)
+                                    .addLabel(m_current - m_document->begin() - count, m_current - m_document->begin(),
+                                              std::nullopt, Diag::ERROR_COLOUR)
+                                    .addLabel(m_current - m_document->begin() - count - 2,
+                                              m_current - m_document->begin() - count, std::nullopt,
+                                              Diag::ERROR_COMPLY);
+                            return tl::unexpected{builder.emitError()};
+                        }
+                        if (!Text::isValidCodepoint(value))
+                        {
+                            auto builder =
+                                createDiagnosticsBuilder(m_current - m_document->begin() - count,
+                                                         Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
+                                                         static_cast<std::uint32_t>(value))
+                                    .addLabel(m_current - m_document->begin() - count, m_current - m_document->begin(),
+                                              std::nullopt, Diag::ERROR_COLOUR)
+                                    .addLabel(m_current - m_document->begin() - count - 2,
+                                              m_current - m_document->begin() - count, std::nullopt,
+                                              Diag::ERROR_COMPLY);
+                            return tl::unexpected{builder.emitError()};
+                        }
+                        result += value;
                         break;
                     }
                     case 'N':
@@ -759,10 +798,13 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                             {
                                 emphasis = Diag::emphasis::strikethrough;
                             }
-                            auto builder = createDiagnosticsBuilder(m_current - m_document->begin(),
-                                                                    Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N)
-                                               .addLabel(m_current - m_document->begin(), "{", Diag::colour::lime_green,
-                                                         std::move(emphasis));
+                            auto builder =
+                                createDiagnosticsBuilder(m_current - m_document->begin(),
+                                                         Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N)
+                                    .addLabel(m_current - m_document->begin(), "{", Diag::INSERT_COLOUR,
+                                              std::move(emphasis))
+                                    .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin(),
+                                              std::nullopt, Diag::ERROR_COMPLY);
                             return tl::unexpected{builder.emitError()};
                         }
                         m_current++;
@@ -775,7 +817,14 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                             auto builder =
                                 createDiagnosticsBuilder(m_current - m_document->begin(),
                                                          Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
-                                    .addLabel(m_current - m_document->begin(), std::nullopt, Diag::colour::red);
+                                    .addLabel(m_current - m_document->begin(), closing - m_document->begin(),
+                                              std::nullopt, Diag::ERROR_COLOUR)
+                                    .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin(),
+                                              std::nullopt, Diag::ERROR_COMPLY);
+                            if (closing != m_document->end())
+                            {
+                                builder.addLabel(closing - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY);
+                            }
                             return tl::unexpected{builder.emitError()};
                         }
                         if (closing != m_document->end())
@@ -803,7 +852,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                 {
                     auto builder =
                         createDiagnosticsBuilder(m_current - m_document->begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
-                            .addLabel(m_current - m_document->begin(), std::nullopt, Diag::colour::red,
+                            .addLabel(m_current - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR,
                                       Diag::emphasis::strikethrough);
                     return tl::unexpected{builder.emitError()};
                 }

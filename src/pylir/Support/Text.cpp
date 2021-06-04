@@ -345,6 +345,11 @@ bool pylir::Text::isWhitespace(char32_t codepoint)
            || properties->bidi_class == UTF8PROC_BIDI_CLASS_B || properties->bidi_class == UTF8PROC_BIDI_CLASS_S;
 }
 
+bool pylir::Text::isValidCodepoint(char32_t codepoint)
+{
+    return utf8proc_codepoint_valid(codepoint);
+}
+
 std::string pylir::Text::normalize(std::string_view utf8, pylir::Text::Normalization normalization)
 {
     [[maybe_unused]] bool ok;
