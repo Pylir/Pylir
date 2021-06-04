@@ -222,4 +222,16 @@ TEST_CASE("Lex string literals", "[Lexer]")
         CHECK(*str == "\na text\n");
         LEXER_EMITS("'a text\n'", pylir::Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL);
     }
+    SECTION("Simple escapes")
+    {
+        pylir::Diag::Document document("'\\\\\\'\\\"\\a\\b\\f\\n\\r\\t\\v\\newline'");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+        REQUIRE_FALSE(result.empty());
+        auto& first = result[0];
+        CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
+        auto* str = std::get_if<std::string>(&first.getValue());
+        REQUIRE(str);
+        CHECK(*str == "\\'\"\a\b\f\n\r\t\v\n");
+    }
 }

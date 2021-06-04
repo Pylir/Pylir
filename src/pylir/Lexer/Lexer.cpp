@@ -645,6 +645,11 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                     case '\'':
                     case '"':
                     case '\\':
+                    {
+                        result += *m_current;
+                        m_current++;
+                        break;
+                    }
                     case 'a':
                     case 'b':
                     case 'f':
@@ -652,7 +657,18 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                     case 't':
                     case 'v':
                     {
-                        result += m_current;
+                        char32_t escape;
+                        switch (*m_current)
+                        {
+                            case 'a': escape = '\a'; break;
+                            case 'b': escape = '\b'; break;
+                            case 'f': escape = '\f'; break;
+                            case 'r': escape = '\r'; break;
+                            case 't': escape = '\t'; break;
+                            case 'v': escape = '\v'; break;
+                            default: PYLIR_UNREACHABLE;
+                        }
+                        result += escape;
                         m_current++;
                         break;
                     }
@@ -665,7 +681,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                         {
                             count++;
                         }
-                        if (std::u32string_view(std::prev(m_current), count) == U"newline")
+                        if (std::u32string_view(std::prev(m_current), count + 1) == U"newline")
                         {
                             std::advance(m_current, count);
                         }
