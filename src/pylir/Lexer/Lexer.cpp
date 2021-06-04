@@ -410,6 +410,35 @@ bool pylir::Lexer::parseNext()
                         }
                         break;
                     }
+                    case 'b':
+                    case 'B':
+                    {
+                        if (std::next(m_current,2) == m_document->end())
+                        {
+                            parseIdentifier();
+                            break;
+                        }
+                        if (*std::next(m_current,2) == '"' || *std::next(m_current,2) == '\'')
+                        {
+                            std::advance(m_current,2);
+                        }
+                        else
+                        {
+                            parseIdentifier();
+                            break;
+                        }
+                        if (auto opt = parseLiteral(true, true))
+                        {
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                                  TokenType::BytesLiteral, std::move(*opt));
+                        }
+                        else
+                        {
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                                  TokenType::SyntaxError, std::move(opt).error());
+                        }
+                        break;
+                    }
                     default: parseIdentifier(); break;
                 }
                 break;
@@ -669,19 +698,22 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
 
     auto diagnoseNonAscii = [&]
     {
-        std::string utf8Bytes = Text::toUTF8(*m_current).data();
-        std::string hexEscape;
-        for (auto iter : utf8Bytes)
-        {
-            hexEscape +=
-                fmt::format(FMT_STRING("\\x{:0^2X}"), static_cast<std::uint32_t>(static_cast<std::uint8_t>(iter)));
-        }
         auto builder = createDiagnosticsBuilder(m_current - m_document->begin(),
                                                 Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS)
-                           .addLabel(m_current - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR)
-                           .addNote(m_current - m_document->begin(), Diag::USE_HEX_OR_OCTAL_ESCAPES_INSTEAD)
-                           .addLabel(m_current - m_document->begin(), hexEscape, Diag::INSERT_COLOUR,
-                                     Diag::emphasis::strikethrough);
+                           .addLabel(m_current - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
+        if (!raw)
+        {
+            std::string utf8Bytes = Text::toUTF8(*m_current).data();
+            std::string hexEscape;
+            for (auto iter : utf8Bytes)
+            {
+                hexEscape +=
+                    fmt::format(FMT_STRING("\\x{:0^2X}"), static_cast<std::uint32_t>(static_cast<std::uint8_t>(iter)));
+            }
+            builder.addNote(m_current - m_document->begin(), Diag::USE_HEX_OR_OCTAL_ESCAPES_INSTEAD)
+                .addLabel(m_current - m_document->begin(), hexEscape, Diag::INSERT_COLOUR,
+                          Diag::emphasis::strikethrough);
+        }
         return tl::unexpected{builder.emitError()};
     };
 
