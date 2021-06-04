@@ -5,6 +5,7 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 
+#include <charconv>
 #include <iterator>
 #include <unordered_map>
 
@@ -338,7 +339,7 @@ bool pylir::Lexer::parseNext()
                 m_current++;
                 if (m_current != m_document->end() && (*m_current == '\'' || *m_current == '"'))
                 {
-                    if (auto opt = parseLiteral(false))
+                    if (auto opt = parseLiteral(false, false))
                     {
                         m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
                                               TokenType::StringLiteral, std::move(*opt));
@@ -359,7 +360,7 @@ bool pylir::Lexer::parseNext()
             case U'\'':
             case U'"':
             {
-                if (auto opt = parseLiteral(false))
+                if (auto opt = parseLiteral(false, false))
                 {
                     m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
                                           TokenType::StringLiteral, std::move(*opt));
@@ -397,7 +398,7 @@ bool pylir::Lexer::parseNext()
                     case U'"':
                     {
                         m_current = std::next(m_current);
-                        if (auto opt = parseLiteral(true))
+                        if (auto opt = parseLiteral(true, false))
                         {
                             m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
                                                   TokenType::StringLiteral, std::move(*opt));
@@ -410,6 +411,46 @@ bool pylir::Lexer::parseNext()
                         break;
                     }
                     default: parseIdentifier(); break;
+                }
+                break;
+            }
+            case U'b':
+            case U'B':
+            {
+                if (std::next(m_current) == m_document->end())
+                {
+                    parseIdentifier();
+                    break;
+                }
+                bool raw = false;
+                if (*std::next(m_current) == 'r' || *std::next(m_current) == 'R')
+                {
+                    if (*std::next(m_current, 2) != '"' && *std::next(m_current, 2) != '\'')
+                    {
+                        parseIdentifier();
+                        break;
+                    }
+                    raw = true;
+                    std::advance(m_current, 2);
+                }
+                else if (*std::next(m_current) == '"' || *std::next(m_current) == '\'')
+                {
+                    m_current++;
+                }
+                else
+                {
+                    parseIdentifier();
+                    break;
+                }
+                if (auto opt = parseLiteral(raw, true))
+                {
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                          TokenType::BytesLiteral, std::move(*opt));
+                }
+                else
+                {
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                                          TokenType::SyntaxError, std::move(opt).error());
                 }
                 break;
             }
@@ -574,7 +615,7 @@ bool isHex(char32_t value)
 }
 } // namespace
 
-tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
+tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
 {
     bool longString = false;
     auto character = *m_current++;
@@ -625,6 +666,24 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
     };
     std::u32string result;
     tl::expected<bool, std::string> success;
+
+    auto diagnoseNonAscii = [&]
+    {
+        std::string utf8Bytes = Text::toUTF8(*m_current).data();
+        std::string hexEscape;
+        for (auto iter : utf8Bytes)
+        {
+            hexEscape +=
+                fmt::format(FMT_STRING("\\x{:0^2X}"), static_cast<std::uint32_t>(static_cast<std::uint8_t>(iter)));
+        }
+        auto builder = createDiagnosticsBuilder(m_current - m_document->begin(),
+                                                Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS)
+                           .addLabel(m_current - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR)
+                           .addNote(m_current - m_document->begin(), Diag::USE_HEX_OR_OCTAL_ESCAPES_INSTEAD)
+                           .addLabel(m_current - m_document->begin(), hexEscape, Diag::INSERT_COLOUR,
+                                     Diag::emphasis::strikethrough);
+        return tl::unexpected{builder.emitError()};
+    };
 
     for (success = end(); success && !*success; success = end())
     {
@@ -750,6 +809,13 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                     case 'u':
                     case 'U':
                     {
+                        if (bytes)
+                        {
+                            result += U"\\";
+                            result += *m_current;
+                            m_current++;
+                            break;
+                        }
                         bool big = *m_current == U'U';
                         m_current++;
                         std::size_t size = big ? 8 : 4;
@@ -791,6 +857,12 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                     }
                     case 'N':
                     {
+                        if (bytes)
+                        {
+                            result += U"\\N";
+                            m_current++;
+                            break;
+                        }
                         m_current++;
                         if (m_current == m_document->end() || *m_current != '{')
                         {
@@ -838,6 +910,10 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                     }
                     default:
                     {
+                        if (bytes && *m_current > 127)
+                        {
+                            return diagnoseNonAscii();
+                        }
                         result += '\\';
                         result += *m_current;
                         m_current++;
@@ -862,6 +938,10 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
                 break;
             }
             default:
+                if (bytes && *m_current > 127)
+                {
+                    return diagnoseNonAscii();
+                }
                 result += *m_current;
                 m_current++;
                 break;
@@ -870,6 +950,11 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw)
     if (!success)
     {
         return tl::unexpected{std::move(success).error()};
+    }
+    if (bytes)
+    {
+        std::string byteConverted(result.begin(), result.end());
+        return byteConverted;
     }
     return Text::toUTF8String(result);
 }

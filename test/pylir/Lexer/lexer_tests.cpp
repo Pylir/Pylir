@@ -23,6 +23,7 @@
                 return;                                                       \
             }                                                                 \
         }                                                                     \
+        FAIL("No error emitted");                                             \
     }(source)
 
 TEST_CASE("Lex comments", "[Lexer]")
@@ -334,5 +335,20 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE(str);
             CHECK(*str == "\n");
         }
+    }
+    SECTION("Byte literals")
+    {
+        pylir::Diag::Document document("b'\\xC2\\xA7'");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::Token> result(lexer.begin(), lexer.end());
+        REQUIRE_FALSE(result.empty());
+        auto& first = result[0];
+        CHECK(first.getTokenType() == pylir::TokenType::BytesLiteral);
+        auto* str = std::get_if<std::string>(&first.getValue());
+        REQUIRE(str);
+        CHECK(*str == "\xC2\xA7");
+        LEXER_EMITS("b'§'", pylir::Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS);
+        LEXER_EMITS("b'§'", pylir::Diag::USE_HEX_OR_OCTAL_ESCAPES_INSTEAD);
+        LEXER_EMITS("b'§'", "\\xC2\\xA7");
     }
 }

@@ -244,25 +244,30 @@ public:
         return std::move(addLabel(start, start + 1, std::move(labelText), std::move(colour), std::move(emphasis)));
     }
 
-    DiagnosticsBuilder& addNote(std::size_t location, std::string_view message) &
+    template <class S, class... Args>
+    DiagnosticsBuilder& addNote(std::size_t location, const S& message, Args&&... args) &
     {
-        return addNote(*m_messages.back().document, location, message);
+        return addNote(*m_messages.back().document, location, fmt::format(message, std::forward<Args>(args)...));
     }
 
-    DiagnosticsBuilder& addNote(Document& document, std::size_t location, std::string_view message) &
+    template <class S, class... Args>
+    DiagnosticsBuilder& addNote(Document& document, std::size_t location, const S& message, Args&&... args) &
     {
-        m_messages.push_back({&document, location, std::string(message), {}});
+        m_messages.push_back({&document, location, fmt::format(message, std::forward<Args>(args)...), {}});
         return *this;
     }
 
-    [[nodiscard]] DiagnosticsBuilder&& addNote(std::size_t location, std::string_view message) &&
+    template <class S, class... Args>
+    [[nodiscard]] DiagnosticsBuilder&& addNote(std::size_t location, const S& message, Args&&... args) &&
     {
-        return std::move(addNote(*m_messages.back().document, location, message));
+        return std::move(addNote(*m_messages.back().document, location, message, std::forward<Args>(args)...));
     }
 
-    [[nodiscard]] DiagnosticsBuilder&& addNote(Document& document, std::size_t location, std::string_view message) &&
+    template <class S, class... Args>
+    [[nodiscard]] DiagnosticsBuilder&& addNote(Document& document, std::size_t location, const S& message,
+                                               Args&&... args) &&
     {
-        return std::move(addNote(document, location, message));
+        return std::move(addNote(document, location, message, std::forward<Args>(args)...));
     }
 
     std::string emit(Severity severity) const

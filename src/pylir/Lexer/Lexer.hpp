@@ -30,7 +30,7 @@ class Lexer
 
     void parseIdentifier();
 
-    tl::expected<std::string, std::string> parseLiteral(bool raw);
+    tl::expected<std::string, std::string> parseLiteral(bool raw, bool bytes);
 
 public:
     using value_type = Token;
