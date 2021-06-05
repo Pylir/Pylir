@@ -52,6 +52,9 @@ enum class TokenType : std::uint8_t
     YieldKeyword,
     StringLiteral,
     BytesLiteral,
+    IntegerLiteral,
+    FloatingPointLiteral,
+    ComplexLiteral
 };
 
 class Token

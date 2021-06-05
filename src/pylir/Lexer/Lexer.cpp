@@ -6,6 +6,7 @@
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 
 #include <charconv>
+#include <functional>
 #include <iterator>
 #include <unordered_map>
 
@@ -487,6 +488,20 @@ bool pylir::Lexer::parseNext()
             case U'F':
             {
                 // TODO:
+            }
+            case U'0':
+            case U'1':
+            case U'2':
+            case U'3':
+            case U'4':
+            case U'5':
+            case U'6':
+            case U'7':
+            case U'8':
+            case U'9':
+            {
+                parseNumber();
+                break;
             }
             default:
             {
@@ -989,4 +1004,41 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
         return byteConverted;
     }
     return Text::toUTF8String(result);
+}
+
+void pylir::Lexer::parseNumber()
+{
+    auto start = m_current;
+    PYLIR_ASSERT(m_current != m_document->end());
+    bool (*allowedDigits)(char32_t) = +[](char32_t value) { return value >= U'0' && value <= U'9'; };
+    if (*m_current == U'0' && std::next(m_current) != m_document->end())
+    {
+        switch (*std::next(m_current))
+        {
+            case U'b':
+            case U'B':
+            {
+                allowedDigits = +[](char32_t value) { return value == U'0' || value == U'1'; };
+                std::advance(m_current, 2);
+                break;
+            }
+            case U'o':
+            case U'O':
+            {
+                allowedDigits = +[](char32_t value) { return value >= U'0' && value <= U'7'; };
+                std::advance(m_current, 2);
+                break;
+            }
+            case U'x':
+            case U'X':
+            {
+                allowedDigits = isHex;
+                std::advance(m_current, 2);
+                break;
+            }
+            default:
+            {
+            }
+        }
+    }
 }

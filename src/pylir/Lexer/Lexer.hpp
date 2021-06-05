@@ -32,6 +32,8 @@ class Lexer
 
     tl::expected<std::string, std::string> parseLiteral(bool raw, bool bytes);
 
+    void parseNumber();
+
 public:
     using value_type = Token;
     using reference = const Token&;
