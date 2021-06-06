@@ -1011,6 +1011,13 @@ void pylir::Lexer::parseNumber()
     auto start = m_current;
     PYLIR_ASSERT(m_current != m_document->end());
     bool (*allowedDigits)(char32_t) = +[](char32_t value) { return value >= U'0' && value <= U'9'; };
+    enum class Kind
+    {
+        Decimal,
+        Binary,
+        Octal,
+        Hex
+    } kind;
     if (*m_current == U'0' && std::next(m_current) != m_document->end())
     {
         switch (*std::next(m_current))
@@ -1020,6 +1027,7 @@ void pylir::Lexer::parseNumber()
             {
                 allowedDigits = +[](char32_t value) { return value == U'0' || value == U'1'; };
                 std::advance(m_current, 2);
+                kind = Kind::Binary;
                 break;
             }
             case U'o':
@@ -1027,6 +1035,7 @@ void pylir::Lexer::parseNumber()
             {
                 allowedDigits = +[](char32_t value) { return value >= U'0' && value <= U'7'; };
                 std::advance(m_current, 2);
+                kind = Kind::Octal;
                 break;
             }
             case U'x':
@@ -1034,11 +1043,20 @@ void pylir::Lexer::parseNumber()
             {
                 allowedDigits = isHex;
                 std::advance(m_current, 2);
+                kind = Kind::Hex;
                 break;
             }
             default:
             {
+                auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::INVALID_NUMBER_PREFIX_N,
+                                                        Text::toUTF8String({m_current, 2}))
+                                   .addLabel(m_current - m_document->begin(), m_current - m_document->begin() + 2,
+                                             std::nullopt, Diag::ERROR_COLOUR);
+                m_tokens.emplace_back(m_current - m_document->begin(), 2, m_fileId, TokenType::SyntaxError,
+                                      builder.emitError());
+                return;
             }
         }
     }
+
 }
