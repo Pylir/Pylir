@@ -367,3 +367,83 @@ TEST_CASE("Lex string literals", "[Lexer]")
         LEXER_EMITS("b'§'", "\\xC2\\xA7");
     }
 }
+
+TEST_CASE("Lex integers", "[Lexer]")
+{
+    SECTION("Decimal")
+    {
+        pylir::Diag::Document document("30");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
+        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        REQUIRE(apInt);
+        CHECK(apInt->getZExtValue() == 30);
+    }
+    SECTION("Binary")
+    {
+        pylir::Diag::Document document("0b10");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
+        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        REQUIRE(apInt);
+        CHECK(apInt->getZExtValue() == 2);
+    }
+    SECTION("Octal")
+    {
+        pylir::Diag::Document document("0o30");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
+        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        REQUIRE(apInt);
+        CHECK(apInt->getZExtValue() == 030);
+    }
+    SECTION("Hex")
+    {
+        pylir::Diag::Document document("0x30");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
+        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        REQUIRE(apInt);
+        CHECK(apInt->getZExtValue() == 0x30);
+    }
+    LEXER_EMITS("0z3", pylir::Diag::INVALID_NUMBER_PREFIX_N, "0z");
+    SECTION("Underline")
+    {
+        pylir::Diag::Document document("0x_3_0");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
+        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        REQUIRE(apInt);
+        CHECK(apInt->getZExtValue() == 0x30);
+        LEXER_EMITS("0x3__0", pylir::Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS);
+    }
+    SECTION("Null")
+    {
+        pylir::Diag::Document document("0000000000000");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
+        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        REQUIRE(apInt);
+        CHECK(apInt->getZExtValue() == 0);
+        LEXER_EMITS("00000000001", pylir::Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED);
+    }
+    LEXER_EMITS("0x3ll", pylir::Diag::INVALID_INTEGER_SUFFIX, "ll");
+}

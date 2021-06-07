@@ -487,7 +487,16 @@ bool pylir::Lexer::parseNext()
             case U'f':
             case U'F':
             {
-                // TODO:
+                if (std::next(m_current) != m_document->end()
+                    && (*std::next(m_current) == '"' || *std::next(m_current) == '\''))
+                {
+
+                }
+                else
+                {
+                    parseIdentifier();
+                }
+                break;
             }
             case U'0':
             case U'1':
@@ -1011,13 +1020,7 @@ void pylir::Lexer::parseNumber()
     auto start = m_current;
     PYLIR_ASSERT(m_current != m_document->end());
     bool (*allowedDigits)(char32_t) = +[](char32_t value) { return value >= U'0' && value <= U'9'; };
-    enum class Kind
-    {
-        Decimal,
-        Binary,
-        Octal,
-        Hex
-    } kind;
+    unsigned radix = 10;
     if (*m_current == U'0' && std::next(m_current) != m_document->end())
     {
         switch (*std::next(m_current))
@@ -1027,7 +1030,7 @@ void pylir::Lexer::parseNumber()
             {
                 allowedDigits = +[](char32_t value) { return value == U'0' || value == U'1'; };
                 std::advance(m_current, 2);
-                kind = Kind::Binary;
+                radix = 2;
                 break;
             }
             case U'o':
@@ -1035,7 +1038,7 @@ void pylir::Lexer::parseNumber()
             {
                 allowedDigits = +[](char32_t value) { return value >= U'0' && value <= U'7'; };
                 std::advance(m_current, 2);
-                kind = Kind::Octal;
+                radix = 8;
                 break;
             }
             case U'x':
@@ -1043,7 +1046,20 @@ void pylir::Lexer::parseNumber()
             {
                 allowedDigits = isHex;
                 std::advance(m_current, 2);
-                kind = Kind::Hex;
+                radix = 16;
+                break;
+            }
+            case U'0':
+            case U'1':
+            case U'2':
+            case U'3':
+            case U'4':
+            case U'5':
+            case U'6':
+            case U'7':
+            case U'8':
+            case U'9':
+            {
                 break;
             }
             default:
@@ -1058,5 +1074,75 @@ void pylir::Lexer::parseNumber()
             }
         }
     }
-
+    auto numberStart = m_current;
+    auto* end = std::find_if_not(m_current, m_document->end(),
+                                 [allowedDigits, previous = 0](char32_t value) mutable
+                                 {
+                                     if (value == U'_')
+                                     {
+                                         if (previous == U'_')
+                                         {
+                                             return false;
+                                         }
+                                         previous = value;
+                                         return true;
+                                     }
+                                     return allowedDigits(previous = value);
+                                 });
+    m_current = end;
+    if (*std::prev(end) == U'_')
+    {
+        auto builder =
+            createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
+                .addLabel(end - 1 - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR)
+                .addLabel(start - m_document->begin(), end - m_document->begin() + 2, std::nullopt, Diag::ERROR_COMPLY);
+        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+                              builder.emitError());
+        return;
+    }
+    llvm::APInt integer;
+    std::string text;
+    for (auto codepoint : std::u32string_view{numberStart, static_cast<std::size_t>(end - numberStart)})
+    {
+        if (codepoint >= U'0' && codepoint <= U'9')
+        {
+            text += codepoint;
+        }
+    }
+    [[maybe_unused]] auto error = llvm::StringRef(text).getAsInteger(radix, integer);
+    PYLIR_ASSERT(!error);
+    if (radix == 10 && !integer.isNullValue() && text.front() == '0')
+    {
+        auto* leadingEnd =
+            std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
+        auto builder =
+            createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
+                .addLabel(leadingEnd - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
+                .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
+                          Diag::ERROR_COLOUR)
+                .addNote(numberStart - m_document->begin(), Diag::REMOVE_LEADING_ZEROS)
+                .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
+                          Diag::NOTE_COMPLY, Diag::emphasis::strikethrough);
+        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+                              builder.emitError());
+        return;
+    }
+    static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
+    auto* suffixEnd =
+        std::find_if_not(end, m_document->end(), [&](char32_t value) { return legalIdentifierSet.contains(value); });
+    m_current = suffixEnd;
+    if (suffixEnd != end)
+    {
+        auto builder =
+            createDiagnosticsBuilder(end - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
+                                     Text::toUTF8String({end, static_cast<std::size_t>(suffixEnd - end)}))
+                .addLabel(start - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
+                .addLabel(end - m_document->begin(), suffixEnd - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR,
+                          Diag::emphasis::strikethrough);
+        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+                              builder.emitError());
+        return;
+    }
+    m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::IntegerLiteral,
+                          std::move(integer));
 }

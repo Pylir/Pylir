@@ -31,4 +31,12 @@ constexpr auto USE_HEX_OR_OCTAL_ESCAPES_INSTEAD = FMT_STRING("use hex or octal e
 
 constexpr auto INVALID_NUMBER_PREFIX_N = FMT_STRING("invalid number prefix '{}'");
 
+constexpr auto UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS = FMT_STRING("underscore only allowed between digits");
+
+constexpr auto NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED = FMT_STRING("number with leading zeros not allowed");
+
+constexpr auto REMOVE_LEADING_ZEROS = FMT_STRING("remove leading zeroes");
+
+constexpr auto INVALID_INTEGER_SUFFIX = FMT_STRING("invalid integer suffix '{}'");
+
 } // namespace pylir::Diag
