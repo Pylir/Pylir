@@ -39,4 +39,6 @@ constexpr auto REMOVE_LEADING_ZEROS = FMT_STRING("remove leading zeroes");
 
 constexpr auto INVALID_INTEGER_SUFFIX = FMT_STRING("invalid integer suffix '{}'");
 
+constexpr auto EXPECTED_DIGITS_FOR_THE_EXPONENT = FMT_STRING("expected digits for the exponent");
+
 } // namespace pylir::Diag

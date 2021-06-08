@@ -490,13 +490,23 @@ bool pylir::Lexer::parseNext()
                 if (std::next(m_current) != m_document->end()
                     && (*std::next(m_current) == '"' || *std::next(m_current) == '\''))
                 {
-
+                    // TODO: Format string
                 }
                 else
                 {
                     parseIdentifier();
                 }
                 break;
+            }
+            case U'.':
+            {
+                if (std::next(m_current) == m_document->end()
+                    || !(*std::next(m_current) >= U'0' && *std::next(m_current) <= U'9'))
+                {
+                    // TODO: Dot token
+                    break;
+                }
+                [[fallthrough]];
             }
             case U'0':
             case U'1':
@@ -1021,6 +1031,7 @@ void pylir::Lexer::parseNumber()
     PYLIR_ASSERT(m_current != m_document->end());
     bool (*allowedDigits)(char32_t) = +[](char32_t value) { return value >= U'0' && value <= U'9'; };
     unsigned radix = 10;
+    bool isFloat = false;
     if (*m_current == U'0' && std::next(m_current) != m_document->end())
     {
         switch (*std::next(m_current))
@@ -1059,6 +1070,9 @@ void pylir::Lexer::parseNumber()
             case U'7':
             case U'8':
             case U'9':
+            case U'e':
+            case U'E':
+            case U'.':
             {
                 break;
             }
@@ -1076,11 +1090,21 @@ void pylir::Lexer::parseNumber()
     }
     auto numberStart = m_current;
     auto* end = std::find_if_not(m_current, m_document->end(),
-                                 [allowedDigits, previous = 0](char32_t value) mutable
+                                 [allowedDigits, previous = U'\0', &isFloat, radix](char32_t value) mutable
                                  {
+                                     if (value == U'.' && radix == 10)
+                                     {
+                                         previous = U'.';
+                                         if (!isFloat)
+                                         {
+                                             isFloat = true;
+                                             return true;
+                                         }
+                                         return false;
+                                     }
                                      if (value == U'_')
                                      {
-                                         if (previous == U'_')
+                                         if (previous == U'_' || previous == U'.')
                                          {
                                              return false;
                                          }
@@ -1100,49 +1124,112 @@ void pylir::Lexer::parseNumber()
                               builder.emitError());
         return;
     }
-    llvm::APInt integer;
     std::string text;
     for (auto codepoint : std::u32string_view{numberStart, static_cast<std::size_t>(end - numberStart)})
     {
-        if (codepoint >= U'0' && codepoint <= U'9')
+        if (codepoint != U'_')
         {
             text += codepoint;
         }
     }
-    [[maybe_unused]] auto error = llvm::StringRef(text).getAsInteger(radix, integer);
-    PYLIR_ASSERT(!error);
-    if (radix == 10 && !integer.isNullValue() && text.front() == '0')
+    auto checkSuffix = [&]
     {
-        auto* leadingEnd =
-            std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
-        auto builder =
-            createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
-                .addLabel(leadingEnd - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
-                .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
-                          Diag::ERROR_COLOUR)
-                .addNote(numberStart - m_document->begin(), Diag::REMOVE_LEADING_ZEROS)
-                .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
-                          Diag::NOTE_COMPLY, Diag::emphasis::strikethrough);
-        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
-                              builder.emitError());
+        static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
+        auto* suffixEnd = std::find_if_not(end, m_document->end(),
+                                           [&](char32_t value) { return legalIdentifierSet.contains(value); });
+        m_current = suffixEnd;
+        if (suffixEnd != end)
+        {
+            auto builder =
+                createDiagnosticsBuilder(end - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
+                                         Text::toUTF8String({end, static_cast<std::size_t>(suffixEnd - end)}))
+                    .addLabel(start - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
+                    .addLabel(end - m_document->begin(), suffixEnd - m_document->begin(), std::nullopt,
+                              Diag::ERROR_COLOUR, Diag::emphasis::strikethrough);
+            m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+                                  builder.emitError());
+            return;
+        }
+    };
+    isFloat = isFloat || (end != m_document->end() && (*end == U'e' || *end == U'E'));
+    if (!isFloat)
+    {
+        llvm::APInt integer;
+        [[maybe_unused]] auto error = llvm::StringRef(text).getAsInteger(radix, integer);
+        PYLIR_ASSERT(!error);
+        if (radix == 10 && !integer.isNullValue() && text.front() == '0')
+        {
+            auto* leadingEnd =
+                std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
+            auto builder =
+                createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
+                    .addLabel(leadingEnd - m_document->begin(), end - m_document->begin(), std::nullopt,
+                              Diag::ERROR_COMPLY)
+                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
+                              Diag::ERROR_COLOUR)
+                    .addNote(numberStart - m_document->begin(), Diag::REMOVE_LEADING_ZEROS)
+                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
+                              Diag::NOTE_COMPLY, Diag::emphasis::strikethrough);
+            m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+                                  builder.emitError());
+            return;
+        }
+        checkSuffix();
+        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::IntegerLiteral,
+                              std::move(integer));
         return;
     }
-    static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-    auto* suffixEnd =
-        std::find_if_not(end, m_document->end(), [&](char32_t value) { return legalIdentifierSet.contains(value); });
-    m_current = suffixEnd;
-    if (suffixEnd != end)
+
+    if (text.front() == '.')
     {
-        auto builder =
-            createDiagnosticsBuilder(end - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
-                                     Text::toUTF8String({end, static_cast<std::size_t>(suffixEnd - end)}))
-                .addLabel(start - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
-                .addLabel(end - m_document->begin(), suffixEnd - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR,
-                          Diag::emphasis::strikethrough);
-        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
-                              builder.emitError());
-        return;
+        text.insert(text.begin(), '0');
     }
-    m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::IntegerLiteral,
-                          std::move(integer));
+    if (end != m_document->end() && (*end == U'e' || *end == U'E'))
+    {
+        text += U'e';
+        end++;
+        if (end != m_document->end() && (*end == U'+' || *end == U'-'))
+        {
+            text += *end;
+            end++;
+        }
+        auto newEnd = std::find_if_not(end, m_document->end(),
+                                       [previous = U'\0', allowedDigits](char32_t value) mutable
+                                       {
+                                           if (value == U'_')
+                                           {
+                                               if (previous == U'_' || previous == U'\0')
+                                               {
+                                                   return false;
+                                               }
+                                               previous = value;
+                                               return true;
+                                           }
+                                           return allowedDigits(previous = value);
+                                       });
+        m_current = newEnd;
+        if (newEnd == end)
+        {
+            auto builder =
+                createDiagnosticsBuilder(end - m_document->begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
+                    .addLabel(start - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
+                    .addLabel(end - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
+            m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+                                  builder.emitError());
+            return;
+        }
+        for (auto codepoint : std::u32string_view{end, static_cast<std::size_t>(newEnd - end)})
+        {
+            if (codepoint != U'_')
+            {
+                text += codepoint;
+            }
+        }
+        end = newEnd;
+    }
+
+    double number;
+    [[maybe_unused]] auto result = std::from_chars(text.data(), text.data() + text.size(), number);
+    PYLIR_ASSERT(result.ec == std::errc());
+    m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::FloatingPointLiteral, number);
 }

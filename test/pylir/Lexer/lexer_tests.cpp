@@ -447,3 +447,92 @@ TEST_CASE("Lex integers", "[Lexer]")
     }
     LEXER_EMITS("0x3ll", pylir::Diag::INVALID_INTEGER_SUFFIX, "ll");
 }
+
+TEST_CASE("Lex floats", "[Lexer]")
+{
+    SECTION("Normal")
+    {
+        pylir::Diag::Document document("3.14");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
+        auto* value = std::get_if<double>(&number.getValue());
+        REQUIRE(value);
+        CHECK(*value == 3.14);
+    }
+    SECTION("Trailing dot")
+    {
+        pylir::Diag::Document document("10.");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
+        auto* value = std::get_if<double>(&number.getValue());
+        REQUIRE(value);
+        CHECK(*value == 10);
+    }
+    SECTION("Leading dot")
+    {
+        pylir::Diag::Document document(".001");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
+        auto* value = std::get_if<double>(&number.getValue());
+        REQUIRE(value);
+        CHECK(*value == .001);
+    }
+    SECTION("Exponent")
+    {
+        pylir::Diag::Document document("1e100");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
+        auto* value = std::get_if<double>(&number.getValue());
+        REQUIRE(value);
+        CHECK(*value == 1e100);
+    }
+    SECTION("Neg exponent")
+    {
+        pylir::Diag::Document document("3.14e-10");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
+        auto* value = std::get_if<double>(&number.getValue());
+        REQUIRE(value);
+        CHECK(*value == 3.14e-10);
+    }
+    SECTION("0")
+    {
+        pylir::Diag::Document document("0e0");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
+        auto* value = std::get_if<double>(&number.getValue());
+        REQUIRE(value);
+        CHECK(*value == 0e0);
+    }
+    SECTION("Underlines")
+    {
+        pylir::Diag::Document document("3.14_15_93");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 2);
+        auto& number = result[0];
+        CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
+        auto* value = std::get_if<double>(&number.getValue());
+        REQUIRE(value);
+        CHECK(*value == 3.141593);
+    }
+    LEXER_EMITS("0e", pylir::Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT);
+}
