@@ -1135,19 +1135,20 @@ void pylir::Lexer::parseNumber()
     auto checkSuffix = [&]
     {
         static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-        auto* suffixEnd = std::find_if_not(end, m_document->end(),
+        auto* suffixEnd = std::find_if_not(m_current, m_document->end(),
                                            [&](char32_t value) { return legalIdentifierSet.contains(value); });
-        m_current = suffixEnd;
-        if (suffixEnd != end)
+        if (suffixEnd != m_current)
         {
-            auto builder =
-                createDiagnosticsBuilder(end - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
-                                         Text::toUTF8String({end, static_cast<std::size_t>(suffixEnd - end)}))
-                    .addLabel(start - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
-                    .addLabel(end - m_document->begin(), suffixEnd - m_document->begin(), std::nullopt,
-                              Diag::ERROR_COLOUR, Diag::emphasis::strikethrough);
-            m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
-                                  builder.emitError());
+            auto builder = createDiagnosticsBuilder(
+                               m_current - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
+                               Text::toUTF8String({m_current, static_cast<std::size_t>(suffixEnd - m_current)}))
+                               .addLabel(start - m_document->begin(), m_current - m_document->begin(), std::nullopt,
+                                         Diag::ERROR_COMPLY)
+                               .addLabel(m_current - m_document->begin(), suffixEnd - m_document->begin(), std::nullopt,
+                                         Diag::ERROR_COLOUR, Diag::emphasis::strikethrough);
+            m_tokens.emplace_back(m_current - m_document->begin(), suffixEnd - m_current, m_fileId,
+                                  TokenType::SyntaxError, builder.emitError());
+            m_current = suffixEnd;
             return;
         }
     };
@@ -1157,6 +1158,14 @@ void pylir::Lexer::parseNumber()
         llvm::APInt integer;
         [[maybe_unused]] auto error = llvm::StringRef(text).getAsInteger(radix, integer);
         PYLIR_ASSERT(!error);
+        if (radix == 10 && m_current != m_document->end() && (*m_current == U'j' || *m_current == U'J'))
+        {
+            m_current++;
+            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::ComplexLiteral,
+                                  integer.roundToDouble());
+            checkSuffix();
+            return;
+        }
         if (radix == 10 && !integer.isNullValue() && text.front() == '0')
         {
             auto* leadingEnd =
@@ -1174,9 +1183,9 @@ void pylir::Lexer::parseNumber()
                                   builder.emitError());
             return;
         }
-        checkSuffix();
         m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::IntegerLiteral,
                               std::move(integer));
+        checkSuffix();
         return;
     }
 
@@ -1231,5 +1240,12 @@ void pylir::Lexer::parseNumber()
     double number;
     [[maybe_unused]] auto result = std::from_chars(text.data(), text.data() + text.size(), number);
     PYLIR_ASSERT(result.ec == std::errc());
-    m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::FloatingPointLiteral, number);
+    auto tokenType = TokenType::FloatingPointLiteral;
+    if (m_current != m_document->end() && (*m_current == U'j' || *m_current == U'J'))
+    {
+        m_current++;
+        tokenType = TokenType::ComplexLiteral;
+    }
+    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, tokenType, number);
+    checkSuffix();
 }
