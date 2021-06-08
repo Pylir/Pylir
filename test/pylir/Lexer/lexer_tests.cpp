@@ -636,3 +636,63 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         CHECK(*value == 3.141593);
     }
 }
+
+TEST_CASE("Lex operators and delimiters", "[Lexer]")
+{
+    pylir::Diag::Document document(
+        "+ - * ** / // % @ << >> & | ^ ~ := < > <= >= == != ( ) [ ] { } , : . ; @ = -> += -= *= /= //= %= @= &= |= ^= >>= <<= **=");
+    pylir::Lexer lexer(document, 1);
+    std::vector<pylir::TokenType> result;
+    std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                   [](const pylir::Token& token) { return token.getTokenType(); });
+    result.pop_back();
+    CHECK_THAT(result, Catch::Equals(std::vector{
+                           pylir::TokenType::Plus,
+                           pylir::TokenType::Minus,
+                           pylir::TokenType::Times,
+                           pylir::TokenType::PowerOf,
+                           pylir::TokenType::Divide,
+                           pylir::TokenType::IntDivide,
+                           pylir::TokenType::Remainder,
+                           pylir::TokenType::AtSign,
+                           pylir::TokenType::ShiftLeft,
+                           pylir::TokenType::ShiftRight,
+                           pylir::TokenType::BitAnd,
+                           pylir::TokenType::BitOr,
+                           pylir::TokenType::BitXor,
+                           pylir::TokenType::BitNegate,
+                           pylir::TokenType::Walrus,
+                           pylir::TokenType::LessThan,
+                           pylir::TokenType::GreaterThan,
+                           pylir::TokenType::LessOrEqual,
+                           pylir::TokenType::GreaterOrEqual,
+                           pylir::TokenType::Equal,
+                           pylir::TokenType::NotEqual,
+                           pylir::TokenType::OpenParentheses,
+                           pylir::TokenType::CloseParentheses,
+                           pylir::TokenType::OpenSquareBracket,
+                           pylir::TokenType::CloseSquareBracket,
+                           pylir::TokenType::OpenBrace,
+                           pylir::TokenType::CloseBrace,
+                           pylir::TokenType::Comma,
+                           pylir::TokenType::Colon,
+                           pylir::TokenType::Dot,
+                           pylir::TokenType::SemiColon,
+                           pylir::TokenType::AtSign,
+                           pylir::TokenType::Assignment,
+                           pylir::TokenType::Arrow,
+                           pylir::TokenType::PlusAssignment,
+                           pylir::TokenType::MinusAssignment,
+                           pylir::TokenType::TimesAssignment,
+                           pylir::TokenType::DivideAssignment,
+                           pylir::TokenType::IntDivideAssignment,
+                           pylir::TokenType::RemainderAssignment,
+                           pylir::TokenType::AtAssignment,
+                           pylir::TokenType::BitAndAssignment,
+                           pylir::TokenType::BitOrAssignment,
+                           pylir::TokenType::BitXorAssignment,
+                           pylir::TokenType::ShiftRightAssignment,
+                           pylir::TokenType::ShiftLeftAssignment,
+                           pylir::TokenType::PowerOfAssignment,
+                       }));
+}

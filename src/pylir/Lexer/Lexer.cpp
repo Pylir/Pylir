@@ -503,7 +503,8 @@ bool pylir::Lexer::parseNext()
                 if (std::next(m_current) == m_document->end()
                     || !(*std::next(m_current) >= U'0' && *std::next(m_current) <= U'9'))
                 {
-                    // TODO: Dot token
+                    m_current++;
+                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::Dot);
                     break;
                 }
                 [[fallthrough]];
@@ -522,6 +523,155 @@ bool pylir::Lexer::parseNext()
                 parseNumber();
                 break;
             }
+            case U'-':
+            {
+                if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                {
+                    std::advance(m_current, 2);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, TokenType::MinusAssignment);
+                }
+                else if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'>')
+                {
+                    std::advance(m_current, 2);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, TokenType::Arrow);
+                }
+                else
+                {
+                    m_current++;
+                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::Minus);
+                }
+                break;
+            }
+            case U'+':
+            case U'%':
+            case U'@':
+            case U'&':
+            case U'|':
+            case U'^':
+            case U':':
+            case U'=':
+            {
+                auto [normal, assignment] = [&]() -> std::pair<TokenType, TokenType>
+                {
+                    switch (*m_current)
+                    {
+                        case U'+': return {TokenType::Plus, TokenType::PlusAssignment};
+                        case U'%': return {TokenType::Remainder, TokenType::RemainderAssignment};
+                        case U'@': return {TokenType::AtSign, TokenType::AtAssignment};
+                        case U'&': return {TokenType::BitAnd, TokenType::BitAndAssignment};
+                        case U'|': return {TokenType::BitOr, TokenType::BitOrAssignment};
+                        case U'^': return {TokenType::BitXor, TokenType::BitXorAssignment};
+                        case U':': return {TokenType::Colon, TokenType::Walrus};
+                        case U'=': return {TokenType::Assignment, TokenType::Equal};
+                        default: PYLIR_UNREACHABLE;
+                    }
+                }();
+                if (std::next(m_current) == m_document->end() || *std::next(m_current) != U'=')
+                {
+                    m_current++;
+                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, normal);
+                }
+                else if (std::next(m_current) != m_document->end())
+                {
+                    std::advance(m_current, 2);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, assignment);
+                }
+                break;
+            }
+            case U'*':
+            case U'/':
+            case U'>':
+            case U'<':
+            {
+                auto [single, singleAss, twice, twiceAss] = [&]() -> std::array<TokenType, 4>
+                {
+                    switch (*m_current)
+                    {
+                        case U'*':
+                            return {TokenType::Times, TokenType::TimesAssignment, TokenType::PowerOf,
+                                    TokenType::PowerOfAssignment};
+                        case U'/':
+                            return {TokenType::Divide, TokenType::DivideAssignment, TokenType::IntDivide,
+                                    TokenType::IntDivideAssignment};
+                        case U'>':
+                            return {TokenType::GreaterThan, TokenType::GreaterOrEqual, TokenType::ShiftRight,
+                                    TokenType::ShiftRightAssignment};
+                        case U'<':
+                            return {TokenType::LessThan, TokenType::LessOrEqual, TokenType::ShiftLeft,
+                                    TokenType::ShiftLeftAssignment};
+                        default: PYLIR_UNREACHABLE;
+                    }
+                }();
+                if (std::next(m_current) != m_document->end() && *std::next(m_current) == *m_current)
+                {
+                    m_current++;
+                    if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                    {
+                        std::advance(m_current, 2);
+                        m_tokens.emplace_back(start - m_document->begin(), 3, m_fileId, twiceAss);
+                    }
+                    else
+                    {
+                        m_current++;
+                        m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, twice);
+                    }
+                }
+                else if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                {
+                    std::advance(m_current, 2);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, singleAss);
+                }
+                else
+                {
+                    m_current++;
+                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, single);
+                }
+                break;
+            }
+            case U'~':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::BitNegate);
+                break;
+            case U'(':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenParentheses);
+                break;
+            case U')':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseParentheses);
+                break;
+            case U'[':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenSquareBracket);
+                break;
+            case U']':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseSquareBracket);
+                break;
+            case U'{':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenBrace);
+                break;
+            case U'}':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseBrace);
+                break;
+            case U',':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::Comma);
+                break;
+            case U';':
+                m_current++;
+                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::SemiColon);
+                break;
+            case U'!':
+                if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                {
+                    std::advance(m_current, 2);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, TokenType::NotEqual);
+                    break;
+                }
+                [[fallthrough]];
             default:
             {
                 if (Text::isWhitespace(*m_current))
