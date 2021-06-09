@@ -73,9 +73,8 @@ public:
         return end();
     }
 
-    template <class S, class... Args>
-    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(std::size_t location, const S& message,
-                                                                    Args&&... args)
+    template <class T, class S, class... Args>
+    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message, Args&&... args)
     {
         return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
     }

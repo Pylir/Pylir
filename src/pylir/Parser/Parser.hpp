@@ -7,6 +7,8 @@
 
 #include <tl/expected.hpp>
 
+#include "Syntax.hpp"
+
 namespace pylir
 {
 class Parser
@@ -15,7 +17,6 @@ class Parser
     Lexer::iterator m_current;
 
 public:
-
     explicit Parser(
         Diag::Document& document, int fileId = 0,
         std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> callBack = [](auto&&) {})
