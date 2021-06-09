@@ -314,6 +314,126 @@ struct LambdaExpression
     Expression expression;
 };
 
+struct StarredItem
+{
+    std::variant<AssignmentExpression, std::pair<Token, OrExpr>> variant;
+};
+
+using StarredList = CommaList<StarredItem>;
+
+struct StarredExpression
+{
+    struct Items
+    {
+        std::vector<std::pair<StarredItem, Token>> leading;
+        std::optional<StarredItem> last;
+    };
+    std::variant<Expression, Items> variant;
+};
+
+struct Target;
+
+using TargetList = CommaList<Target>;
+
+struct CompIf;
+
+struct CompFor
+{
+    std::optional<Token> awaitToken;
+    Token forToken;
+    TargetList targets;
+    Token inToken;
+    OrTest orTest;
+    std::variant<std::monostate, std::unique_ptr<CompFor>, std::unique_ptr<CompIf>> compIter;
+};
+
+struct CompIf
+{
+    Token ifToken;
+    OrTest orTest;
+    std::variant<std::monostate, CompFor, std::unique_ptr<CompIf>> compIter;
+};
+
+struct Comprehension
+{
+    AssignmentExpression assignmentExpression;
+    CompFor compFor;
+};
+
+struct Enclosure
+{
+    struct ParenthForm
+    {
+        Token openParenth;
+        std::optional<StarredExpression> expression;
+        Token closeParenth;
+    };
+
+    struct ListDisplay
+    {
+        Token openSquare;
+        std::variant<std::monostate, StarredList, Comprehension> variant;
+        Token closeSquare;
+    };
+
+    struct SetDisplay
+    {
+        Token openBrace;
+        std::variant<std::monostate, StarredList, Comprehension> variant;
+        Token closeBrace;
+    };
+
+    struct DictDisplay
+    {
+        Token openBrace;
+        struct KeyDatum
+        {
+            struct Key
+            {
+                Expression first;
+                Token colon;
+                Expression second;
+            };
+            struct Datum
+            {
+                Token powerOf;
+                OrExpr orExpr;
+            };
+            std::variant<Key, Datum> variant;
+        };
+        struct DictComprehension
+        {
+            Expression first;
+            Token colon;
+            Expression second;
+            CompFor compFor;
+        };
+        std::variant<CommaList<KeyDatum>, DictComprehension> variant;
+        Token closeBrace;
+    };
+
+    struct GeneratorExpression
+    {
+        Token openParenth;
+        Expression expression;
+        CompFor compFor;
+        Token closeParenth;
+    };
+
+    struct YieldAtom
+    {
+        Token openParenth;
+        struct YieldExpression
+        {
+            Token yieldToken;
+            std::variant<ExpressionList, std::pair<Token, Expression>> variant;
+        };
+        Token closeParenth;
+    };
+
+    std::variant<ParenthForm, ListDisplay, SetDisplay, DictDisplay, GeneratorExpression, YieldAtom> variant;
+};
+
 
 
 } // namespace pylir::Syntax
