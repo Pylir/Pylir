@@ -207,6 +207,9 @@ struct hasLocationProvider<T, std::void_t<decltype(LocationProvider<std::decay_t
 {
 };
 
+template <class T>
+constexpr bool hasLocationProvider_v = hasLocationProvider<T>{};
+
 class DiagnosticsBuilder
 {
     struct Label
@@ -246,7 +249,7 @@ public:
     auto addLabel(const T& start, const U& end, std::optional<std::string>&& labelText = std::nullopt,
                   std::optional<colour>&& colour = std::nullopt,
                   std::optional<emphasis>&& emphasis =
-                      std::nullopt) & -> std::enable_if_t<hasLocationProvider<T>{} && hasLocationProvider<U>{},
+                      std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>,
                                                           DiagnosticsBuilder&>
     {
         m_messages.back().labels.push_back({LocationProvider<std::decay_t<T>>::getPos(start),
@@ -259,7 +262,7 @@ public:
     [[nodiscard]] auto addLabel(const T& start, const U& end, std::optional<std::string>&& labelText = std::nullopt,
                                 std::optional<colour>&& colour = std::nullopt,
                                 std::optional<emphasis>&& emphasis = std::nullopt) && -> std::
-        enable_if_t<hasLocationProvider<T>{} && hasLocationProvider<U>{}, DiagnosticsBuilder&&>
+        enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>, DiagnosticsBuilder&&>
     {
         return std::move(addLabel(start, end, std::move(labelText), std::move(colour), std::move(emphasis)));
     }
@@ -268,7 +271,7 @@ public:
     auto addLabel(const T& pos, std::optional<std::string>&& labelText = std::nullopt,
                   std::optional<colour>&& colour = std::nullopt,
                   std::optional<emphasis>&& emphasis =
-                      std::nullopt) & -> std::enable_if_t<hasLocationProvider<T>{}, DiagnosticsBuilder&>
+                      std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
         auto [start, end] = LocationProvider<std::decay_t<T>>::getRange(pos);
         return addLabel(start, end, std::move(labelText), std::move(colour), std::move(emphasis));
@@ -278,14 +281,14 @@ public:
     [[nodiscard]] auto addLabel(const T& start, std::optional<std::string>&& labelText = std::nullopt,
                                 std::optional<colour>&& colour = std::nullopt,
                                 std::optional<emphasis>&& emphasis =
-                                    std::nullopt) && -> std::enable_if_t<hasLocationProvider<T>{}, DiagnosticsBuilder&&>
+                                    std::nullopt) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
     {
         return std::move(addLabel(start, std::move(labelText), std::move(colour), std::move(emphasis)));
     }
 
     template <class T, class S, class... Args>
     auto addNote(const T& location, const S& message,
-                 Args&&... args) & -> std::enable_if_t<hasLocationProvider<T>{}, DiagnosticsBuilder&>
+                 Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
         return addNote(*m_messages.back().document, LocationProvider<std::decay_t<T>>::getPos(location),
                        fmt::format(message, std::forward<Args>(args)...));
@@ -293,7 +296,7 @@ public:
 
     template <class T, class S, class... Args>
     auto addNote(Document& document, const T& location, const S& message,
-                 Args&&... args) & -> std::enable_if_t<hasLocationProvider<T>{}, DiagnosticsBuilder&>
+                 Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
         m_messages.push_back({&document,
                               LocationProvider<std::decay_t<T>>::getPos(location),
@@ -304,14 +307,14 @@ public:
 
     template <class T, class S, class... Args>
     [[nodiscard]] auto addNote(const T& location, const S& message,
-                               Args&&... args) && -> std::enable_if_t<hasLocationProvider<T>{}, DiagnosticsBuilder&&>
+                               Args&&... args) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
     {
         return std::move(addNote(*m_messages.back().document, location, message, std::forward<Args>(args)...));
     }
 
     template <class T, class S, class... Args>
     [[nodiscard]] auto addNote(Document& document, const T& location, const S& message,
-                               Args&&... args) && -> std::enable_if_t<hasLocationProvider<T>{}, DiagnosticsBuilder&&>
+                               Args&&... args) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
     {
         return std::move(addNote(document, location, message, std::forward<Args>(args)...));
     }

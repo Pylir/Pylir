@@ -8,6 +8,7 @@
 #include <charconv>
 #include <functional>
 #include <iterator>
+#include <locale>
 #include <unordered_map>
 
 pylir::Lexer::Lexer(Diag::Document& document, int fieldId,
@@ -1388,8 +1389,28 @@ void pylir::Lexer::parseNumber()
     }
 
     double number;
+#ifdef __cpp_lib_to_chars
     [[maybe_unused]] auto result = std::from_chars(text.data(), text.data() + text.size(), number);
     PYLIR_ASSERT(result.ec == std::errc());
+#else
+    struct LocalReset
+    {
+        std::locale locale;
+
+        ~LocalReset()
+        {
+            std::locale::global(locale);
+        }
+    };
+    std::optional<LocalReset> reset;
+    if (std::use_facet<std::numpunct<char>>(std::locale()).decimal_point() != '.')
+    {
+        reset = LocalReset{std::locale()};
+        std::locale::global(std::locale::classic());
+    }
+    number = std::stod(std::string{text.begin(), text.begin() + text.size()});
+    reset.reset();
+#endif
     auto tokenType = TokenType::FloatingPointLiteral;
     if (m_current != m_document->end() && (*m_current == U'j' || *m_current == U'J'))
     {

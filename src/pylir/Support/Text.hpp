@@ -204,13 +204,21 @@ class Transcoder<void, Target>
                     auto sizeAvailable = std::min<std::size_t>(4, m_source.size()) & ~static_cast<std::size_t>(1);
                     std::memcpy(temp.data(), m_source.data(), sizeAvailable);
                     auto viewSize = sizeAvailable / 2;
-                    if (endian::native == endian::big && m_encoding == Encoding::UTF16LE)
+                    if constexpr (endian::native == endian::big)
                     {
-                        std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(), swapByteOrder<char16_t>);
+                        if (m_encoding == Encoding::UTF16LE)
+                        {
+                            std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(),
+                                           swapByteOrder<char16_t>);
+                        }
                     }
-                    else if (endian::native == endian::little && m_encoding == Encoding::UTF16BE)
+                    else if constexpr (endian::native == endian::little)
                     {
-                        std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(), swapByteOrder<char16_t>);
+                        if (m_encoding == Encoding::UTF16BE)
+                        {
+                            std::transform(temp.begin(), temp.begin() + viewSize, temp.begin(),
+                                           swapByteOrder<char16_t>);
+                        }
                     }
                     auto view = std::u16string_view(temp.data(), viewSize);
                     if constexpr (std::is_same_v<char, Target>)

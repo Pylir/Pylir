@@ -65,7 +65,7 @@ public:
 
     [[nodiscard]] iterator end()
     {
-        return iterator(*this, -1);
+        return iterator(*this, static_cast<std::size_t>(-1));
     }
 
     [[nodiscard]] const_iterator cend()

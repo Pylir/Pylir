@@ -119,7 +119,7 @@ tl::expected<pylir::Syntax::AttributeRef, std::string> pylir::Parser::parseAttri
     }
     auto primary = parsePrimary();
 
-    primary.and_then(std::bind(&Parser::expect, this, TokenType::Dot))
+    return primary.and_then(std::bind(&Parser::expect, this, TokenType::Dot))
         .and_then(std::bind(&Parser::expect, this, TokenType::Identifier))
         .map(
             [&primary](Lexer::iterator identifier)
@@ -129,4 +129,7 @@ tl::expected<pylir::Syntax::AttributeRef, std::string> pylir::Parser::parseAttri
             });
 }
 
-tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary() {}
+tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary()
+{
+    return tl::unexpected{std::string{}};
+}
