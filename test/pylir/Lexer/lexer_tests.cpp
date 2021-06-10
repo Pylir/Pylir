@@ -345,7 +345,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
-            CHECK(first.getTokenType() == pylir::TokenType::BytesLiteral);
+            CHECK(first.getTokenType() == pylir::TokenType::ByteLiteral);
             auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "\xC2\xA7");
@@ -357,7 +357,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
-            CHECK(first.getTokenType() == pylir::TokenType::BytesLiteral);
+            CHECK(first.getTokenType() == pylir::TokenType::ByteLiteral);
             auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "\\xC2\\xA7");

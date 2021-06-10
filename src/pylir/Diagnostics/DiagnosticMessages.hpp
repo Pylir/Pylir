@@ -41,4 +41,8 @@ constexpr auto INVALID_INTEGER_SUFFIX = FMT_STRING("invalid integer suffix '{}'"
 
 constexpr auto EXPECTED_DIGITS_FOR_THE_EXPONENT = FMT_STRING("expected digits for the exponent");
 
+constexpr auto EXPECTED_N = FMT_STRING("expected {:q^}");
+
+constexpr auto EXPECTED_N_INSTEAD_OF_N = FMT_STRING("expected {:q^} instead of {:q^}");
+
 } // namespace pylir::Diag

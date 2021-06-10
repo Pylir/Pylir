@@ -431,7 +431,7 @@ bool pylir::Lexer::parseNext()
                         if (auto opt = parseLiteral(true, true))
                         {
                             m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                                  TokenType::BytesLiteral, std::move(*opt));
+                                                  TokenType::ByteLiteral, std::move(*opt));
                         }
                         else
                         {
@@ -475,7 +475,7 @@ bool pylir::Lexer::parseNext()
                 if (auto opt = parseLiteral(raw, true))
                 {
                     m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                          TokenType::BytesLiteral, std::move(*opt));
+                                          TokenType::ByteLiteral, std::move(*opt));
                 }
                 else
                 {

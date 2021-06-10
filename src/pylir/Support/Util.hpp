@@ -22,4 +22,21 @@ constexpr T1 roundUpTo(T1 number, T2 multiple)
 
     return number + multiple - remainder;
 }
+
+template <class T>
+auto makeFunc()
+{
+    return [](auto&&... args) noexcept
+    {
+        // TODO: change to () only in C++20
+        if constexpr (std::is_aggregate_v<T>)
+        {
+            return T{std::forward<decltype(args)>(args)...};
+        }
+        else
+        {
+            return T(std::forward<decltype(args)>(args)...);
+        }
+    };
+}
 } // namespace pylir

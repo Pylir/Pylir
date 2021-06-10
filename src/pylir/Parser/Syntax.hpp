@@ -434,6 +434,14 @@ struct Enclosure
     std::variant<ParenthForm, ListDisplay, SetDisplay, DictDisplay, GeneratorExpression, YieldAtom> variant;
 };
 
+//TODO:
+struct Target
+{
+};
 
+//TODO:
+struct ParameterList
+{
+};
 
 } // namespace pylir::Syntax

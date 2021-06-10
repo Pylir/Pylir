@@ -30,7 +30,7 @@ public:
     using value_type = ValueType;
     using pointer = const value_type*;
     using reference = const value_type&;
-    using iterator_category = std::forward_iterator_tag;
+    using iterator_category = std::bidirectional_iterator_tag;
 
     LazyCacheIterator() = default;
 
@@ -47,6 +47,11 @@ public:
         return container()[m_index];
     }
 
+    pointer operator->() const
+    {
+        return &operator*();
+    }
+
     LazyCacheIterator& operator++()
     {
         if (m_index + 1 >= container().size())
@@ -61,6 +66,19 @@ public:
     {
         auto copy = *this;
         operator++();
+        return copy;
+    }
+
+    LazyCacheIterator& operator--()
+    {
+        m_index--;
+        return *this;
+    }
+
+    LazyCacheIterator operator--(int)
+    {
+        auto copy = *this;
+        operator--();
         return copy;
     }
 

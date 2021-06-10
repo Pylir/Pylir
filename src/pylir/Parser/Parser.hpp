@@ -15,13 +15,22 @@ class Parser
 {
     Lexer m_lexer;
     Lexer::iterator m_current;
+    Diag::Document* m_document;
+
+    tl::expected<Lexer::iterator, std::string> expect(TokenType tokenType);
 
 public:
     explicit Parser(
         Diag::Document& document, int fileId = 0,
         std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> callBack = [](auto&&) {})
-        : m_lexer(document, fileId, std::move(callBack)), m_current(m_lexer.begin())
+        : m_lexer(document, fileId, std::move(callBack)), m_current(m_lexer.begin()), m_document(&document)
     {
+    }
+
+    template <class T, class S, class... Args>
+    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message, Args&&... args)
+    {
+        return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
     }
 
     tl::expected<Syntax::Atom, std::string> parseAtom();
