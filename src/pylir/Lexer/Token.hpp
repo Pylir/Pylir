@@ -61,7 +61,7 @@ enum class TokenType : std::uint8_t
     ComplexLiteral,
     Plus,
     Minus,
-    Times,
+    Star,
     PowerOf,
     Divide,
     IntDivide,
@@ -241,7 +241,7 @@ struct fmt::formatter<pylir::TokenType> : formatter<std::string_view>
             case pylir::TokenType::ComplexLiteral: name = "complex literal"; break;
             case pylir::TokenType::Plus: name = quote ? "'+'" : "+"; break;
             case pylir::TokenType::Minus: name = quote ? "'-'" : "-"; break;
-            case pylir::TokenType::Times: name = quote ? "'*'" : "*"; break;
+            case pylir::TokenType::Star: name = quote ? "'*'" : "*"; break;
             case pylir::TokenType::PowerOf: name = quote ? "'**'" : "**"; break;
             case pylir::TokenType::Divide: name = quote ? "'/'" : "/"; break;
             case pylir::TokenType::IntDivide: name = quote ? "'//'" : "//"; break;

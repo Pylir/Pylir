@@ -5,6 +5,7 @@
 #include <pylir/Diagnostics/Document.hpp>
 #include <pylir/Lexer/Lexer.hpp>
 
+#include <tcb/span.hpp>
 #include <tl/expected.hpp>
 
 #include "Syntax.hpp"
@@ -19,30 +20,42 @@ class Parser
 
     tl::expected<Token, std::string> expect(TokenType tokenType);
 
-    template <class Func>
-    auto parseCommaList(Func func)
-        -> tl::expected<Syntax::CommaList<typename std::invoke_result_t<Func>::value_type>, std::string>
+    bool lookaheadEquals(tcb::span<const TokenType> tokens);
+
+    template <class ParseFunc, class CheckFunc>
+    auto parseCommaList(
+        ParseFunc parseFunc, CheckFunc checkFunc,
+        std::optional<typename std::invoke_result_t<ParseFunc>::value_type>&& optionalFirst = std::nullopt)
+        -> tl::expected<Syntax::CommaList<typename std::invoke_result_t<ParseFunc>::value_type>, std::string>
     {
-        using T = typename std::invoke_result_t<Func>::value_type;
-        auto first = func();
-        if (!first)
+        using T = typename std::invoke_result_t<ParseFunc>::value_type;
+        if (!optionalFirst)
         {
-            return tl::unexpected{std::move(first).error()};
+            auto first = parseFunc();
+            if (!first)
+            {
+                return tl::unexpected{std::move(first).error()};
+            }
+            optionalFirst = std::move(*first);
         }
         std::vector<std::pair<Token, std::unique_ptr<T>>> rest;
+        std::optional<Token> last;
         while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
         {
             auto comma = m_current++;
-            // TODO: firstInExpression to support trailing comma
-            auto other = func();
+            if (!checkFunc(m_current->getTokenType()))
+            {
+                last = *comma;
+                break;
+            }
+            auto other = parseFunc();
             if (!other)
             {
                 return tl::unexpected{std::move(other).error()};
             }
             rest.emplace_back(*comma, std::make_unique<T>(*std::move(other)));
         }
-        return Syntax::CommaList<T>{std::make_unique<T>(std::move(*first)), std::move(rest),
-                                    /*TODO*/ std::nullopt};
+        return Syntax::CommaList<T>{std::make_unique<T>(std::move(*optionalFirst)), std::move(rest), std::move(last)};
     }
 
 public:
@@ -62,8 +75,6 @@ public:
     tl::expected<Syntax::Atom, std::string> parseAtom();
 
     tl::expected<Syntax::AttributeRef, std::string> parseAttributeRef(std::unique_ptr<Syntax::Primary>&& primary);
-
-    tl::expected<Syntax::Subscription, std::string> parseSubscription(std::unique_ptr<Syntax::Primary>&& primary);
 
     tl::expected<Syntax::Slicing, std::string> parseSlicing(std::unique_ptr<Syntax::Primary>&& primary);
 
@@ -103,6 +114,8 @@ public:
 
     tl::expected<Syntax::Expression, std::string> parseExpression();
 
+    tl::expected<Syntax::CommaList<Syntax::Expression>, std::string> parseExpressionList();
+
     tl::expected<Syntax::LambdaExpression, std::string> parseLambdaExpression();
 
     tl::expected<Syntax::StarredExpression, std::string> parseStarredExpression();
@@ -111,7 +124,8 @@ public:
 
     tl::expected<Syntax::CompIf, std::string> parseCompIf();
 
-    tl::expected<Syntax::Comprehension, std::string> parseComprehension();
+    tl::expected<Syntax::Comprehension, std::string>
+        parseComprehension(Syntax::AssignmentExpression&& assignmentExpression);
 
     tl::expected<Syntax::Enclosure, std::string> parseEnclosure();
 };

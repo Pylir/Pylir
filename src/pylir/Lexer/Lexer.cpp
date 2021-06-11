@@ -589,7 +589,7 @@ bool pylir::Lexer::parseNext()
                     switch (*m_current)
                     {
                         case U'*':
-                            return {TokenType::Times, TokenType::TimesAssignment, TokenType::PowerOf,
+                            return {TokenType::Star, TokenType::TimesAssignment, TokenType::PowerOf,
                                     TokenType::PowerOfAssignment};
                         case U'/':
                             return {TokenType::Divide, TokenType::DivideAssignment, TokenType::IntDivide,

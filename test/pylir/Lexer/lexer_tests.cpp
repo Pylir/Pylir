@@ -649,7 +649,7 @@ TEST_CASE("Lex operators and delimiters", "[Lexer]")
     CHECK_THAT(result, Catch::Equals(std::vector{
                            pylir::TokenType::Plus,
                            pylir::TokenType::Minus,
-                           pylir::TokenType::Times,
+                           pylir::TokenType::Star,
                            pylir::TokenType::PowerOf,
                            pylir::TokenType::Divide,
                            pylir::TokenType::IntDivide,

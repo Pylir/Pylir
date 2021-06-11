@@ -56,6 +56,7 @@ struct Subscription
 struct Slicing
 {
     std::unique_ptr<Primary> primary;
+    Token openSquareBracket;
     struct ProperSlice
     {
         std::unique_ptr<Expression> optionalLowerBound;
@@ -64,7 +65,8 @@ struct Slicing
         Token secondColon;
         std::unique_ptr<Expression> optionalStride;
     };
-    CommaList<std::variant<ProperSlice, std::unique_ptr<Expression>>> sliceList;
+    CommaList<std::variant<ProperSlice, Expression>> sliceList;
+    Token closeSquareBracket;
 };
 
 struct Comprehension;
@@ -101,10 +103,10 @@ struct Call
         struct Expression
         {
             Token asterisk;
-            std::unique_ptr<Expression> expression;
+            std::unique_ptr<Syntax::Expression> expression;
         };
+        KeywordItem first;
         using Variant = std::variant<KeywordItem, Expression>;
-        Variant first;
         std::vector<std::pair<Token, Variant>> rest;
     };
 
@@ -113,16 +115,16 @@ struct Call
         struct Expression
         {
             Token doubleAsterisk;
-            std::unique_ptr<Expression> expression;
+            std::unique_ptr<Syntax::Expression> expression;
         };
+        Expression first;
         using Variant = std::variant<KeywordItem, Expression>;
-        Variant first;
         std::vector<std::pair<Token, Variant>> rest;
     };
 
     struct ArgumentList
     {
-        PositionalArguments positionalArguments;
+        std::optional<PositionalArguments> positionalArguments;
         std::optional<Token> firstComma;
         std::optional<StarredAndKeywords> starredAndKeywords;
         std::optional<Token> secondComma;
@@ -284,6 +286,8 @@ struct AssignmentExpression
     std::unique_ptr<Expression> expression;
 };
 
+inline bool firstInAssignmentExpression(TokenType tokenType);
+
 struct ConditionalExpression
 {
     OrTest value;
@@ -303,6 +307,29 @@ struct Expression
 {
     std::variant<ConditionalExpression, std::unique_ptr<LambdaExpression>> variant;
 };
+
+inline bool firstInExpression(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::LambdaKeyword:
+        case TokenType::Minus:
+        case TokenType::Plus:
+        case TokenType::BitNegate:
+        case TokenType::AwaitKeyword:
+        case TokenType::StringLiteral:
+        case TokenType::ByteLiteral:
+        case TokenType::IntegerLiteral:
+        case TokenType::FloatingPointLiteral:
+        case TokenType::ComplexLiteral:
+        case TokenType::Identifier:
+        case TokenType::OpenParentheses:
+        case TokenType::OpenSquareBracket:
+        case TokenType::OpenBrace: return true;
+        default: break;
+    }
+    return false;
+}
 
 struct ParameterList;
 
@@ -347,6 +374,17 @@ struct CompFor
     std::variant<std::monostate, std::unique_ptr<CompFor>, std::unique_ptr<CompIf>> compIter;
 };
 
+inline bool firstInCompFor(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::ForKeyword:
+        case TokenType::AsyncKeyword: return true;
+        default: break;
+    }
+    return false;
+}
+
 struct CompIf
 {
     Token ifToken;
@@ -359,6 +397,11 @@ struct Comprehension
     AssignmentExpression assignmentExpression;
     CompFor compFor;
 };
+
+inline bool firstInComprehension(TokenType tokenType)
+{
+    return firstInAssignmentExpression(tokenType);
+}
 
 struct Enclosure
 {
@@ -434,14 +477,19 @@ struct Enclosure
     std::variant<ParenthForm, ListDisplay, SetDisplay, DictDisplay, GeneratorExpression, YieldAtom> variant;
 };
 
-//TODO:
+// TODO:
 struct Target
 {
 };
 
-//TODO:
+// TODO:
 struct ParameterList
 {
 };
+
+bool firstInAssignmentExpression(TokenType tokenType)
+{
+    return firstInExpression(tokenType);
+}
 
 } // namespace pylir::Syntax
