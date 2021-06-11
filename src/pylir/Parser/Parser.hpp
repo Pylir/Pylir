@@ -17,30 +17,32 @@ class Parser
     Lexer::iterator m_current;
     Diag::Document* m_document;
 
-    tl::expected<Lexer::iterator, std::string> expect(TokenType tokenType);
+    tl::expected<Token, std::string> expect(TokenType tokenType);
 
     template <class Func>
     auto parseCommaList(Func func)
+        -> tl::expected<Syntax::CommaList<typename std::invoke_result_t<Func>::value_type>, std::string>
     {
         using T = typename std::invoke_result_t<Func>::value_type;
-        return func().and_then(
-            [&](T&& first) -> tl::expected<Syntax::CommaList<T>, std::string>
+        auto first = func();
+        if (!first)
+        {
+            return tl::unexpected{std::move(first).error()};
+        }
+        std::vector<std::pair<Token, std::unique_ptr<T>>> rest;
+        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+        {
+            auto comma = m_current++;
+            // TODO: firstInExpression to support trailing comma
+            auto other = func();
+            if (!other)
             {
-                std::vector<std::pair<Token, std::unique_ptr<T>>> rest;
-                while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-                {
-                    auto comma = m_current++;
-                    // TODO: firstInExpression to support trailing comma
-                    auto other = func();
-                    if (!other)
-                    {
-                        return tl::unexpected{other.error()};
-                    }
-                    rest.template emplace_back(*comma, std::make_unique<T>(*std::move(other)));
-                }
-                return Syntax::CommaList<T>{std::make_unique<T>(std::move(first)), std::move(rest),
-                                            /*TODO*/ std::nullopt};
-            });
+                return tl::unexpected{std::move(other).error()};
+            }
+            rest.emplace_back(*comma, std::make_unique<T>(*std::move(other)));
+        }
+        return Syntax::CommaList<T>{std::make_unique<T>(std::move(*first)), std::move(rest),
+                                    /*TODO*/ std::nullopt};
     }
 
 public:

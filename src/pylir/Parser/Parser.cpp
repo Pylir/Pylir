@@ -3,40 +3,7 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Support/Util.hpp>
 
-constexpr auto makeTuple = [](auto&&... args) { return std::make_tuple(std::forward<decltype(args)>(args)...); };
-
-constexpr auto tupleAppend = [](auto&& tuple, auto&&... args)
-{
-    return std::tuple_cat(std::forward<decltype(tuple)>(tuple), std::make_tuple(std::forward<decltype(args)>(args)...));
-};
-
-template <class T>
-constexpr auto makeFunc()
-{
-    return [](auto&&... args) noexcept
-    {
-        // TODO: change to () only in C++20
-        if constexpr (std::is_aggregate_v<T>)
-        {
-            return T{std::forward<decltype(args)>(args)...};
-        }
-        else
-        {
-            return T(std::forward<decltype(args)>(args)...);
-        }
-    };
-}
-
-template <class T>
-constexpr auto makeFromTuple()
-{
-    return [](auto&& tuple) noexcept { return std::apply(makeFunc<T>(), std::forward<decltype(tuple)>(tuple)); };
-}
-
-constexpr auto apply = [](auto&& func, auto&& tuple)
-{ return std::apply(std::forward<decltype(func)>(func), std::forward<decltype(tuple)>(tuple)); };
-
-tl::expected<pylir::Lexer::iterator, std::string> pylir::Parser::expect(pylir::TokenType tokenType)
+tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType tokenType)
 {
     if (m_current == m_lexer.end())
     {
@@ -58,7 +25,7 @@ tl::expected<pylir::Lexer::iterator, std::string> pylir::Parser::expect(pylir::T
     }
     else
     {
-        return m_current++;
+        return *m_current++;
     }
 }
 
@@ -91,10 +58,12 @@ tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
         case TokenType::OpenBrace:
         case TokenType::OpenSquareBracket:
         {
-            return parseEnclosure()
-                .map([](Syntax::Enclosure&& enclosure)
-                     { return std::make_unique<Syntax::Enclosure>(std::move(enclosure)); })
-                .map(makeFunc<Syntax::Atom>());
+            auto enclosure = parseEnclosure();
+            if (!enclosure)
+            {
+                return tl::unexpected{std::move(enclosure).error()};
+            }
+            return Syntax::Atom{std::make_unique<Syntax::Enclosure>(std::move(*enclosure))};
         }
         default:
             return tl::unexpected{
@@ -144,39 +113,39 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
 tl::expected<pylir::Syntax::AttributeRef, std::string>
     pylir::Parser::parseAttributeRef(std::unique_ptr<Syntax::Primary>&& primary)
 {
-    /*return expect(TokenType::Dot)
-        .and_then([this](Lexer::iterator dot)
-                  { return expect(TokenType::Identifier).map(pylir::bind_front(makeTuple, dot)); })
-        .map(pylir::bind_front(apply, pylir::bind_front(makeFunc<Syntax::AttributeRef>(), primary)));*/
+    auto dot = expect(TokenType::Dot);
+    if (!dot)
+    {
+        return tl::unexpected{std::move(dot).error()};
+    }
+    auto identifier = expect(TokenType::Identifier);
+    if (!identifier)
+    {
+        return tl::unexpected{std::move(identifier).error()};
+    }
+    return Syntax::AttributeRef{std::move(primary), *std::move(dot), *std::move(identifier)};
 }
 
 tl::expected<pylir::Syntax::Subscription, std::string>
     pylir::Parser::parseSubscription(std::unique_ptr<Syntax::Primary>&& primary)
 {
-    return expect(TokenType::OpenSquareBracket)
-        .and_then(
-            [this](Lexer::iterator openSquareBracket)
-            {
-                return parseCommaList(pylir::bind_front(&Parser::parseExpression, this))
-                    .map(pylir::bind_front(makeTuple, *openSquareBracket));
-            })
-        .and_then(
-            [&](auto&& tuple)
-            {
-                return expect(TokenType::CloseSquareBracket)
-                    .map(&Lexer::iterator::operator*)
-                    .map(pylir::bind_front(tupleAppend, std::move(tuple)))
-                    .map(
-                        [&](auto&& tuple)
-                        {
-                            return std::apply(
-                                [&](auto&&... args) {
-                                    return Syntax::Subscription{std::move(primary),
-                                                                std::forward<decltype(args)>(args)...};
-                                },
-                                std::move(tuple));
-                        });
-            });
+    auto squareBracket = expect(TokenType::OpenSquareBracket);
+    if (!squareBracket)
+    {
+        return tl::unexpected{std::move(squareBracket).error()};
+    }
+    auto list = parseCommaList(pylir::bind_front(&Parser::parseExpression, this));
+    if (!list)
+    {
+        return tl::unexpected{std::move(list).error()};
+    }
+    auto closeSquareBracket = expect(TokenType::CloseSquareBracket);
+    if (!closeSquareBracket)
+    {
+        return tl::unexpected{std::move(closeSquareBracket).error()};
+    }
+    return Syntax::Subscription{std::move(primary), *std::move(squareBracket), std::move(*list),
+                                std::move(*closeSquareBracket)};
 }
 
 tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary()
