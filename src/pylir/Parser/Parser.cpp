@@ -584,3 +584,292 @@ tl::expected<pylir::Syntax::AssignmentExpression, std::string> pylir::Parser::pa
     return Syntax::AssignmentExpression{std::move(prefix),
                                         std::make_unique<Syntax::Expression>(std::move(*expression))};
 }
+
+tl::expected<pylir::Syntax::AwaitExpr, std::string> pylir::Parser::parseAwaitExpr()
+{
+    auto await = expect(TokenType::AwaitKeyword);
+    if (!await)
+    {
+        return tl::unexpected{std::move(await).error()};
+    }
+    auto primary = parsePrimary();
+    if (!primary)
+    {
+        return tl::unexpected{std::move(primary).error()};
+    }
+    return Syntax::AwaitExpr{std::move(*await), std::move(*primary)};
+}
+
+tl::expected<pylir::Syntax::Power, std::string> pylir::Parser::parsePower()
+{
+    std::optional<std::variant<Syntax::AwaitExpr, Syntax::Primary>> variant;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AwaitKeyword)
+    {
+        auto await = parseAwaitExpr();
+        if (!await)
+        {
+            return tl::unexpected{std::move(await).error()};
+        }
+        variant = std::move(*await);
+    }
+    else
+    {
+        auto primary = parsePrimary();
+        if (!primary)
+        {
+            return tl::unexpected{std::move(primary).error()};
+        }
+        variant = std::move(*primary);
+    }
+    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::PowerOf)
+    {
+        return Syntax::Power{std::move(*variant), std::nullopt};
+    }
+    auto powerOf = *m_current++;
+    auto uExpr = parseUExpr();
+    if (!uExpr)
+    {
+        return tl::unexpected{std::move(uExpr).error()};
+    }
+    return Syntax::Power{std::move(*variant),
+                         std::pair{std::move(powerOf), std::make_unique<Syntax::UExpr>(std::move(*uExpr))}};
+}
+
+tl::expected<pylir::Syntax::UExpr, std::string> pylir::Parser::parseUExpr()
+{
+    std::vector<Token> unaries;
+    while (m_current != m_lexer.end()
+           && (m_current->getTokenType() == TokenType::Minus || m_current->getTokenType() == TokenType::Plus
+               || m_current->getTokenType() == TokenType::BitNegate))
+    {
+        unaries.push_back(*m_current++);
+    }
+    auto power = parsePower();
+    if (!power)
+    {
+        return tl::unexpected{std::move(power).error()};
+    }
+    Syntax::UExpr current{std::move(*power)};
+    std::reverse(unaries.begin(), unaries.end());
+    for (Token& token : unaries)
+    {
+        current.variant.emplace<1>(std::move(token), std::make_unique<Syntax::UExpr>(std::move(current)));
+    }
+    return {std::move(current)};
+}
+
+tl::expected<pylir::Syntax::MExpr, std::string> pylir::Parser::parseMExpr()
+{
+    auto first = parseUExpr();
+    if (!first)
+    {
+        return tl::unexpected{std::move(first).error()};
+    }
+    Syntax::MExpr current{std::move(*first)};
+    while (m_current != m_lexer.end()
+           && (m_current->getTokenType() == TokenType::Star || m_current->getTokenType() == TokenType::AtSign
+               || m_current->getTokenType() == TokenType::IntDivide || m_current->getTokenType() == TokenType::Divide
+               || m_current->getTokenType() == TokenType::Remainder))
+    {
+        auto op = *m_current++;
+        if (op.getTokenType() == TokenType::AtSign)
+        {
+            auto rhs = parseMExpr();
+            if (!rhs)
+            {
+                return tl::unexpected{std::move(rhs).error()};
+            }
+            current.variant = Syntax::MExpr::AtBin{std::make_unique<Syntax::MExpr>(std::move(current)), std::move(op),
+                                                   std::make_unique<Syntax::MExpr>(std::move(*rhs))};
+            continue;
+        }
+
+        auto rhs = parseUExpr();
+        if (!rhs)
+        {
+            return tl::unexpected{std::move(rhs).error()};
+        }
+        current.variant =
+            Syntax::MExpr::BinOp{std::make_unique<Syntax::MExpr>(std::move(current)), std::move(op), std::move(*rhs)};
+    }
+    return {std::move(current)};
+}
+
+tl::expected<pylir::Syntax::AExpr, std::string> pylir::Parser::parseAExpr()
+{
+    return parseGenericBinOp<Syntax::AExpr, &Parser::parseMExpr, TokenType::Minus, TokenType::Plus>();
+}
+
+tl::expected<pylir::Syntax::ShiftExpr, std::string> pylir::Parser::parseShiftExpr()
+{
+    return parseGenericBinOp<Syntax::ShiftExpr, &Parser::parseAExpr, TokenType::ShiftLeft, TokenType::ShiftRight>();
+}
+
+tl::expected<pylir::Syntax::AndExpr, std::string> pylir::Parser::parseAndExpr()
+{
+    return parseGenericBinOp<Syntax::AndExpr, &Parser::parseShiftExpr, TokenType::BitAnd>();
+}
+
+tl::expected<pylir::Syntax::XorExpr, std::string> pylir::Parser::parseXorExpr()
+{
+    return parseGenericBinOp<Syntax::XorExpr, &Parser::parseAndExpr, TokenType::BitXor>();
+}
+
+tl::expected<pylir::Syntax::OrExpr, std::string> pylir::Parser::parseOrExpr()
+{
+    return parseGenericBinOp<Syntax::OrExpr, &Parser::parseXorExpr, TokenType::BitOr>();
+}
+
+tl::expected<pylir::Syntax::Comparison, std::string> pylir::Parser::parseComparison()
+{
+    auto first = parseOrExpr();
+    if (!first)
+    {
+        return tl::unexpected{std::move(first).error()};
+    }
+    Syntax::OrExpr current{std::move(*first)};
+    std::vector<std::pair<Syntax::Comparison::Operator, Syntax::OrExpr>> rest;
+    while (m_current != m_lexer.end()
+           && (m_current->getTokenType() == TokenType::LessThan || m_current->getTokenType() == TokenType::LessOrEqual
+               || m_current->getTokenType() == TokenType::GreaterThan
+               || m_current->getTokenType() == TokenType::GreaterOrEqual
+               || m_current->getTokenType() == TokenType::NotEqual || m_current->getTokenType() == TokenType::Equal
+               || m_current->getTokenType() == TokenType::IsKeyword
+               || m_current->getTokenType() == TokenType::NotKeyword
+               || m_current->getTokenType() == TokenType::InKeyword))
+    {
+        auto op = *m_current++;
+        std::optional<Token> second;
+        switch (op.getTokenType())
+        {
+            case TokenType::IsKeyword:
+                if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::NotKeyword)
+                {
+                    second = *m_current++;
+                }
+                break;
+            case TokenType::NotKeyword:
+            {
+                auto in = expect(TokenType::InKeyword);
+                if (!in)
+                {
+                    return tl::unexpected{std::move(in).error()};
+                }
+                second = std::move(*in);
+                break;
+            }
+            default: break;
+        }
+        auto rhs = parseOrExpr();
+        if (!rhs)
+        {
+            return tl::unexpected{std::move(rhs).error()};
+        }
+        rest.emplace_back(Syntax::Comparison::Operator{std::move(op), std::move(second)}, std::move(*rhs));
+    }
+    return Syntax::Comparison{std::move(current), std::move(rest)};
+}
+
+tl::expected<pylir::Syntax::NotTest, std::string> pylir::Parser::parseNotTest()
+{
+    auto end = std::find_if_not(m_current, m_lexer.end(),
+                                [](const Token& token) { return token.getTokenType() == TokenType::NotKeyword; });
+    std::vector<Token> nots(m_current, end);
+    m_current = end;
+    std::reverse(nots.begin(), nots.end());
+    auto comp = parseComparison();
+    if (!comp)
+    {
+        return tl::unexpected{std::move(comp).error()};
+    }
+    Syntax::NotTest current{std::move(*comp)};
+    for (Token& token : nots)
+    {
+        current.variant.emplace<1>(std::move(token), std::make_unique<Syntax::NotTest>(std::move(current)));
+    }
+    return {std::move(current)};
+}
+
+tl::expected<pylir::Syntax::AndTest, std::string> pylir::Parser::parseAndTest()
+{
+    return parseGenericBinOp<Syntax::AndTest, &Parser::parseNotTest, TokenType::AndKeyword>();
+}
+
+tl::expected<pylir::Syntax::OrTest, std::string> pylir::Parser::parseOrTest()
+{
+    return parseGenericBinOp<Syntax::OrTest, &Parser::parseAndTest, TokenType::OrKeyword>();
+}
+
+tl::expected<pylir::Syntax::ConditionalExpression, std::string> pylir::Parser::parseConditionalExpression()
+{
+    auto orTest = parseOrTest();
+    if (!orTest)
+    {
+        return tl::unexpected{std::move(orTest).error()};
+    }
+    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::IfKeyword)
+    {
+        return Syntax::ConditionalExpression{std::move(*orTest), std::nullopt};
+    }
+    auto ifKeyword = *m_current++;
+    auto condition = parseOrTest();
+    if (!condition)
+    {
+        return tl::unexpected{std::move(condition).error()};
+    }
+    auto elseKeyword = expect(TokenType::ElseKeyword);
+    if (!elseKeyword)
+    {
+        return tl::unexpected{std::move(elseKeyword).error()};
+    }
+    auto other = parseExpression();
+    if (!other)
+    {
+        return tl::unexpected{std::move(other).error()};
+    }
+    return Syntax::ConditionalExpression{
+        std::move(*orTest),
+        Syntax::ConditionalExpression::Suffix{std::move(ifKeyword), std::move(*condition), std::move(*elseKeyword),
+                                              std::make_unique<Syntax::Expression>(std::move(*other))}};
+}
+
+tl::expected<pylir::Syntax::Expression, std::string> pylir::Parser::parseExpression()
+{
+    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::LambdaKeyword)
+    {
+        auto conditional = parseConditionalExpression();
+        if (!conditional)
+        {
+            return tl::unexpected{std::move(conditional).error()};
+        }
+        return Syntax::Expression{std::move(*conditional)};
+    }
+
+    auto lambda = parseLambdaExpression();
+    if (!lambda)
+    {
+        return tl::unexpected{std::move(lambda).error()};
+    }
+    return Syntax::Expression{std::make_unique<Syntax::LambdaExpression>(std::move(*lambda))};
+}
+
+tl::expected<pylir::Syntax::LambdaExpression, std::string> pylir::Parser::parseLambdaExpression()
+{
+    auto keyword = expect(TokenType::LambdaKeyword);
+    if (!keyword)
+    {
+        return tl::unexpected{std::move(keyword).error()};
+    }
+    // TODO: Parameter list
+    auto colon = expect(TokenType::Colon);
+    if (!colon)
+    {
+        return tl::unexpected{std::move(colon).error()};
+    }
+    auto expression = parseExpression();
+    if (!expression)
+    {
+        return tl::unexpected{std::move(expression).error()};
+    }
+    return Syntax::LambdaExpression{std::move(*keyword), nullptr, std::move(*colon), std::move(*expression)};
+}

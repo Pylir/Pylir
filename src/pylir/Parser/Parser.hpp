@@ -58,6 +58,29 @@ class Parser
         return Syntax::CommaList<T>{std::make_unique<T>(std::move(*optionalFirst)), std::move(rest), std::move(last)};
     }
 
+    template <class T, auto parseLesser, TokenType... allowed>
+    tl::expected<T, std::string> parseGenericBinOp()
+    {
+        auto first = (this->*parseLesser)();
+        if (!first)
+        {
+            return tl::unexpected{std::move(first).error()};
+        }
+        T current{std::move(*first)};
+        while (m_current != m_lexer.end() && ((m_current->getTokenType() == allowed) || ...))
+        {
+            auto op = *m_current++;
+            auto rhs = (this->*parseLesser)();
+            if (!rhs)
+            {
+                return tl::unexpected{std::move(rhs).error()};
+            }
+            current.variant =
+                typename T::BinOp{std::make_unique<T>(std::move(current)), std::move(op), std::move(*rhs)};
+        }
+        return {std::move(current)};
+    }
+
 public:
     explicit Parser(
         Diag::Document& document, int fileId = 0,

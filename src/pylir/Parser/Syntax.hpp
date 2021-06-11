@@ -189,7 +189,7 @@ struct AExpr
         MExpr rhs;
     };
 
-    std::variant<MExpr, BinOp, BinOp> variant;
+    std::variant<MExpr, BinOp> variant;
 };
 
 struct ShiftExpr
@@ -260,7 +260,7 @@ struct AndTest
 {
     struct BinOp
     {
-        std::unique_ptr<AndExpr> lhs;
+        std::unique_ptr<AndTest> lhs;
         Token andToken;
         NotTest rhs;
     };
@@ -272,7 +272,7 @@ struct OrTest
 {
     struct BinOp
     {
-        std::unique_ptr<OrExpr> lhs;
+        std::unique_ptr<OrTest> lhs;
         Token orToken;
         AndTest rhs;
     };
