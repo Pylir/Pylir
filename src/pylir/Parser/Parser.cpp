@@ -120,12 +120,18 @@ tl::expected<pylir::Syntax::AttributeRef, std::string> pylir::Parser::parseAttri
     auto primary = parsePrimary();
 
     return primary.and_then(std::bind(&Parser::expect, this, TokenType::Dot))
-        .and_then(std::bind(&Parser::expect, this, TokenType::Identifier))
+        .and_then(
+            [this](Lexer::iterator dot) {
+                return expect(TokenType::Identifier)
+                    .map(
+                        [dot](Lexer::iterator identifier) {
+                            return std::pair{dot, identifier};
+                        });
+            })
         .map(
-            [&primary](Lexer::iterator identifier)
-            {
-                return Syntax::AttributeRef{std::make_unique<Syntax::Primary>(std::move(*primary)),
-                                            *std::prev(identifier), *identifier};
+            [&primary](auto pair) {
+                return Syntax::AttributeRef{std::make_unique<Syntax::Primary>(std::move(*primary)), *pair.first,
+                                            *pair.second};
             });
 }
 
