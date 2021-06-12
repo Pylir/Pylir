@@ -346,6 +346,11 @@ struct StarredItem
     std::variant<AssignmentExpression, std::pair<Token, OrExpr>> variant;
 };
 
+inline bool firstInStarredItem(TokenType tokenType)
+{
+    return tokenType == TokenType::Star || firstInAssignmentExpression(tokenType);
+}
+
 using StarredList = CommaList<StarredItem>;
 
 struct StarredExpression
@@ -451,7 +456,7 @@ struct Enclosure
             Expression second;
             CompFor compFor;
         };
-        std::variant<CommaList<KeyDatum>, DictComprehension> variant;
+        std::variant<std::monostate, CommaList<KeyDatum>, DictComprehension> variant;
         Token closeBrace;
     };
 
@@ -466,11 +471,8 @@ struct Enclosure
     struct YieldAtom
     {
         Token openParenth;
-        struct YieldExpression
-        {
-            Token yieldToken;
-            std::variant<ExpressionList, std::pair<Token, Expression>> variant;
-        };
+        Token yieldToken;
+        std::variant<std::monostate, ExpressionList, std::pair<Token, Expression>> variant;
         Token closeParenth;
     };
 

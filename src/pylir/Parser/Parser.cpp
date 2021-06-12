@@ -102,15 +102,325 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
     {
         case TokenType::OpenParentheses:
         {
-            // TODO:
+            auto openParenth = *m_current++;
+            if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses)
+            {
+                auto closeParentheses = expect(TokenType::CloseParentheses);
+                if (!closeParentheses)
+                {
+                    return tl::unexpected{std::move(closeParentheses).error()};
+                }
+                return Syntax::Enclosure{
+                    Syntax::Enclosure::ParenthForm{std::move(openParenth), std::nullopt, std::move(*closeParentheses)}};
+            }
+            if (m_current->getTokenType() == TokenType::YieldKeyword)
+            {
+                auto yield = *m_current++;
+                if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses)
+                {
+                    auto closeParentheses = expect(TokenType::CloseParentheses);
+                    if (!closeParentheses)
+                    {
+                        return tl::unexpected{std::move(closeParentheses).error()};
+                    }
+                    return Syntax::Enclosure{Syntax::Enclosure::YieldAtom{
+                        std::move(openParenth), std::move(yield), std::monostate{}, std::move(*closeParentheses)}};
+                }
+
+                if (m_current->getTokenType() == TokenType::FromKeyword)
+                {
+                    auto from = *m_current++;
+                    auto expression = parseExpression();
+                    if (!expression)
+                    {
+                        return tl::unexpected{std::move(expression).error()};
+                    }
+                    auto closeParentheses = expect(TokenType::CloseParentheses);
+                    if (!closeParentheses)
+                    {
+                        return tl::unexpected{std::move(closeParentheses).error()};
+                    }
+                    return Syntax::Enclosure{Syntax::Enclosure::YieldAtom{
+                        std::move(openParenth), std::move(yield), std::pair{std::move(from), std::move(*expression)},
+                        std::move(*closeParentheses)}};
+                }
+                auto list = parseExpressionList();
+                if (!list)
+                {
+                    return tl::unexpected{std::move(list).error()};
+                }
+                auto closeParentheses = expect(TokenType::CloseParentheses);
+                if (!closeParentheses)
+                {
+                    return tl::unexpected{std::move(closeParentheses).error()};
+                }
+                return Syntax::Enclosure{Syntax::Enclosure::YieldAtom{std::move(openParenth), std::move(yield),
+                                                                      std::move(*list), std::move(*closeParentheses)}};
+            }
+
+            if (Syntax::firstInStarredItem(m_current->getTokenType())
+                && (!Syntax::firstInExpression(m_current->getTokenType())
+                    || lookaheadEquals(std::array{TokenType::Identifier, TokenType::Walrus})))
+            {
+                auto starredExpression = parseStarredExpression();
+                if (!starredExpression)
+                {
+                    return tl::unexpected{std::move(starredExpression).error()};
+                }
+                auto closeParentheses = expect(TokenType::CloseParentheses);
+                if (!closeParentheses)
+                {
+                    return tl::unexpected{std::move(closeParentheses).error()};
+                }
+                return Syntax::Enclosure{Syntax::Enclosure::ParenthForm{
+                    std::move(openParenth), std::move(*starredExpression), std::move(*closeParentheses)}};
+            }
+
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            if (m_current == m_lexer.end() || !Syntax::firstInCompFor(m_current->getTokenType()))
+            {
+                auto starredExpression = parseStarredExpression(Syntax::AssignmentExpression{
+                    std::nullopt, std::make_unique<Syntax::Expression>(std::move(*expression))});
+                if (!starredExpression)
+                {
+                    return tl::unexpected{std::move(starredExpression).error()};
+                }
+                auto closeParentheses = expect(TokenType::CloseParentheses);
+                if (!closeParentheses)
+                {
+                    return tl::unexpected{std::move(closeParentheses).error()};
+                }
+                return Syntax::Enclosure{Syntax::Enclosure::ParenthForm{
+                    std::move(openParenth), std::move(*starredExpression), std::move(*closeParentheses)}};
+            }
+
+            auto compFor = parseCompFor();
+            if (!compFor)
+            {
+                return tl::unexpected{std::move(compFor).error()};
+            }
+            auto closeParentheses = expect(TokenType::CloseParentheses);
+            if (!closeParentheses)
+            {
+                return tl::unexpected{std::move(closeParentheses).error()};
+            }
+            return Syntax::Enclosure{Syntax::Enclosure::GeneratorExpression{
+                std::move(openParenth), std::move(*expression), std::move(*compFor), std::move(*closeParentheses)}};
         }
         case TokenType::OpenBrace:
         {
-            // TODO:
+            auto openBrace = *m_current++;
+            if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseBrace)
+            {
+                auto closeBrace = expect(TokenType::CloseBrace);
+                if (!closeBrace)
+                {
+                    return tl::unexpected{std::move(closeBrace).error()};
+                }
+                return Syntax::Enclosure{
+                    Syntax::Enclosure::DictDisplay{std::move(openBrace), std::monostate{}, std::move(*closeBrace)}};
+            }
+
+            if (m_current->getTokenType() == TokenType::Star
+                || lookaheadEquals(std::array{TokenType::Identifier, TokenType::Walrus}))
+            {
+                auto starredList = parseStarredList();
+                if (!starredList)
+                {
+                    return tl::unexpected{std::move(starredList).error()};
+                }
+                auto closeBrace = expect(TokenType::CloseBrace);
+                if (!closeBrace)
+                {
+                    return tl::unexpected{std::move(closeBrace).error()};
+                }
+                return Syntax::Enclosure{Syntax::Enclosure::SetDisplay{std::move(openBrace), std::move(*starredList),
+                                                                       std::move(*closeBrace)}};
+            }
+
+            std::optional<Syntax::Enclosure::DictDisplay::KeyDatum> keyDatum;
+            if (m_current->getTokenType() != TokenType::PowerOf)
+            {
+                auto expression = parseExpression();
+                if (!expression)
+                {
+                    return tl::unexpected{std::move(expression).error()};
+                }
+                if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Colon)
+                {
+                    // We are 100% in a Set.
+                    if (m_current != m_lexer.end() && Syntax::firstInCompFor(m_current->getTokenType()))
+                    {
+                        auto comprehension = parseComprehension(
+                            {std::nullopt, std::make_unique<Syntax::Expression>(std::move(*expression))});
+                        if (!comprehension)
+                        {
+                            return tl::unexpected{std::move(comprehension).error()};
+                        }
+                        auto closeBrace = expect(TokenType::CloseBrace);
+                        if (!closeBrace)
+                        {
+                            return tl::unexpected{std::move(closeBrace).error()};
+                        }
+                        return Syntax::Enclosure{Syntax::Enclosure::SetDisplay{
+                            std::move(openBrace), std::move(*comprehension), std::move(*closeBrace)}};
+                    }
+                    auto starredList = parseStarredList(Syntax::StarredItem{Syntax::AssignmentExpression{
+                        std::nullopt, std::make_unique<Syntax::Expression>(std::move(*expression))}});
+                    if (!starredList)
+                    {
+                        return tl::unexpected{std::move(starredList).error()};
+                    }
+                    auto closeBrace = expect(TokenType::CloseBrace);
+                    if (!closeBrace)
+                    {
+                        return tl::unexpected{std::move(closeBrace).error()};
+                    }
+                    return Syntax::Enclosure{Syntax::Enclosure::SetDisplay{
+                        std::move(openBrace), std::move(*starredList), std::move(*closeBrace)}};
+                }
+                auto colon = *m_current++;
+                auto secondExpression = parseExpression();
+                if (!secondExpression)
+                {
+                    return tl::unexpected{std::move(secondExpression).error()};
+                }
+                if (m_current != m_lexer.end() && Syntax::firstInCompFor(m_current->getTokenType()))
+                {
+                    auto compFor = parseCompFor();
+                    if (!compFor)
+                    {
+                        return tl::unexpected{std::move(compFor).error()};
+                    }
+                    auto closeBrace = expect(TokenType::CloseBrace);
+                    if (!closeBrace)
+                    {
+                        return tl::unexpected{std::move(closeBrace).error()};
+                    }
+                    return Syntax::Enclosure{Syntax::Enclosure::DictDisplay{
+                        std::move(openBrace),
+                        Syntax::Enclosure::DictDisplay::DictComprehension{std::move(*expression), std::move(colon),
+                                                                          std::move(*secondExpression),
+                                                                          std::move(*compFor)},
+                        std::move(*closeBrace)}};
+                }
+                keyDatum = Syntax::Enclosure::DictDisplay::KeyDatum{Syntax::Enclosure::DictDisplay::KeyDatum::Key{
+                    std::move(*expression), std::move(colon), std::move(*secondExpression)}};
+            }
+
+            auto keyDatumList = parseCommaList(
+                [&]() -> tl::expected<Syntax::Enclosure::DictDisplay::KeyDatum, std::string>
+                {
+                    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::PowerOf)
+                    {
+                        auto powerOf = *m_current++;
+                        auto orExpr = parseOrExpr();
+                        if (!orExpr)
+                        {
+                            return tl::unexpected{std::move(orExpr).error()};
+                        }
+                        return Syntax::Enclosure::DictDisplay::KeyDatum{
+                            Syntax::Enclosure::DictDisplay::KeyDatum::Datum{std::move(powerOf), std::move(*orExpr)}};
+                    }
+                    auto first = parseExpression();
+                    if (!first)
+                    {
+                        return tl::unexpected{std::move(first).error()};
+                    }
+                    auto colon = expect(TokenType::Colon);
+                    if (!colon)
+                    {
+                        return tl::unexpected{std::move(colon).error()};
+                    }
+                    auto second = parseExpression();
+                    if (!second)
+                    {
+                        return tl::unexpected{std::move(second).error()};
+                    }
+                    return Syntax::Enclosure::DictDisplay::KeyDatum{Syntax::Enclosure::DictDisplay::KeyDatum::Key{
+                        std::move(*first), std::move(*colon), std::move(*second)}};
+                },
+                [&](TokenType type) { return Syntax::firstInExpression(type) || type == TokenType::PowerOf; },
+                std::move(keyDatum));
+            if (!keyDatumList)
+            {
+                return tl::unexpected{std::move(keyDatumList).error()};
+            }
+            auto closeBrace = expect(TokenType::CloseBrace);
+            if (!closeBrace)
+            {
+                return tl::unexpected{std::move(closeBrace).error()};
+            }
+            return Syntax::Enclosure{
+                Syntax::Enclosure::DictDisplay{std::move(openBrace), std::move(*keyDatumList), std::move(*closeBrace)}};
         }
         case TokenType::OpenSquareBracket:
         {
-            // TODO:
+            auto openSquareBracket = *m_current++;
+            if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseSquareBracket)
+            {
+                auto closeSquare = expect(TokenType::CloseSquareBracket);
+                if (!closeSquare)
+                {
+                    return tl::unexpected{std::move(closeSquare).error()};
+                }
+                return Syntax::Enclosure{Syntax::Enclosure::ListDisplay{std::move(openSquareBracket), std::monostate{},
+                                                                        std::move(*closeSquare)}};
+            }
+            if (Syntax::firstInStarredItem(m_current->getTokenType())
+                && !Syntax::firstInComprehension(m_current->getTokenType()))
+            {
+                auto starredList = parseStarredList();
+                if (!starredList)
+                {
+                    return tl::unexpected{std::move(starredList).error()};
+                }
+                auto closeSquare = expect(TokenType::CloseSquareBracket);
+                if (!closeSquare)
+                {
+                    return tl::unexpected{std::move(closeSquare).error()};
+                }
+                return Syntax::Enclosure{Syntax::Enclosure::ListDisplay{
+                    std::move(openSquareBracket), std::move(*starredList), std::move(*closeSquare)}};
+            }
+
+            auto assignment = parseAssignmentExpression();
+            if (!assignment)
+            {
+                return tl::unexpected{std::move(assignment).error()};
+            }
+            if (m_current == m_lexer.end() || !Syntax::firstInCompFor(m_current->getTokenType()))
+            {
+                auto starredList = parseStarredList(Syntax::StarredItem{std::move(*assignment)});
+                if (!starredList)
+                {
+                    return tl::unexpected{std::move(starredList).error()};
+                }
+                auto closeSquare = expect(TokenType::CloseSquareBracket);
+                if (!closeSquare)
+                {
+                    return tl::unexpected{std::move(closeSquare).error()};
+                }
+                return Syntax::Enclosure{Syntax::Enclosure::ListDisplay{
+                    std::move(openSquareBracket), std::move(*starredList), std::move(*closeSquare)}};
+            }
+
+            auto comprehension = parseComprehension(std::move(*assignment));
+            if (!comprehension)
+            {
+                return tl::unexpected{std::move(comprehension).error()};
+            }
+            auto closeSquare = expect(TokenType::CloseSquareBracket);
+            if (!closeSquare)
+            {
+                return tl::unexpected{std::move(closeSquare).error()};
+            }
+            return Syntax::Enclosure{Syntax::Enclosure::ListDisplay{
+                std::move(openSquareBracket), std::move(*comprehension), std::move(*closeSquare)}};
         }
         case TokenType::SyntaxError: return tl::unexpected{std::get<std::string>(m_current->getValue())};
         default:
@@ -872,4 +1182,191 @@ tl::expected<pylir::Syntax::LambdaExpression, std::string> pylir::Parser::parseL
         return tl::unexpected{std::move(expression).error()};
     }
     return Syntax::LambdaExpression{std::move(*keyword), nullptr, std::move(*colon), std::move(*expression)};
+}
+
+tl::expected<pylir::Syntax::Comprehension, std::string>
+    pylir::Parser::parseComprehension(Syntax::AssignmentExpression&& assignmentExpression)
+{
+    auto compFor = parseCompFor();
+    if (!compFor)
+    {
+        return tl::unexpected{std::move(compFor).error()};
+    }
+    return Syntax::Comprehension{std::move(assignmentExpression), std::move(*compFor)};
+}
+
+tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
+{
+    std::optional<Token> awaitToken;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AwaitKeyword)
+    {
+        awaitToken = *m_current++;
+    }
+    auto forToken = expect(TokenType::ForKeyword);
+    if (!forToken)
+    {
+        return tl::unexpected{std::move(forToken).error()};
+    }
+    // TODO: target_list
+    auto inToken = expect(TokenType::InKeyword);
+    if (!inToken)
+    {
+        return tl::unexpected{std::move(inToken).error()};
+    }
+    auto orTest = parseOrTest();
+    if (!orTest)
+    {
+        return tl::unexpected{std::move(orTest).error()};
+    }
+    if (m_current == m_lexer.end()
+        || (m_current->getTokenType() != TokenType::ForKeyword && m_current->getTokenType() != TokenType::IfKeyword
+            && m_current->getTokenType() != TokenType::AsyncKeyword))
+    {
+        return Syntax::CompFor{std::move(awaitToken), std::move(*forToken), {},
+                               std::move(*inToken),   std::move(*orTest),   std::monostate{}};
+    }
+    std::variant<std::monostate, std::unique_ptr<Syntax::CompFor>, std::unique_ptr<Syntax::CompIf>> trail;
+    if (m_current->getTokenType() == TokenType::IfKeyword)
+    {
+        auto compIf = parseCompIf();
+        if (!compIf)
+        {
+            return tl::unexpected{std::move(compIf).error()};
+        }
+        trail = std::make_unique<Syntax::CompIf>(std::move(*compIf));
+    }
+    else
+    {
+        auto compFor = parseCompFor();
+        if (!compFor)
+        {
+            return tl::unexpected{std::move(compFor).error()};
+        }
+        trail = std::make_unique<Syntax::CompFor>(std::move(*compFor));
+    }
+    return Syntax::CompFor{std::move(awaitToken), std::move(*forToken), {},
+                           std::move(*inToken),   std::move(*orTest),   std::move(trail)};
+}
+
+tl::expected<pylir::Syntax::CompIf, std::string> pylir::Parser::parseCompIf()
+{
+    auto ifToken = expect(TokenType::IfKeyword);
+    if (!ifToken)
+    {
+        return tl::unexpected{std::move(ifToken).error()};
+    }
+    auto orTest = parseOrTest();
+    if (!orTest)
+    {
+        return tl::unexpected{std::move(orTest).error()};
+    }
+    if (m_current == m_lexer.end()
+        || (m_current->getTokenType() != TokenType::ForKeyword && m_current->getTokenType() != TokenType::IfKeyword
+            && m_current->getTokenType() != TokenType::AsyncKeyword))
+    {
+        return Syntax::CompIf{std::move(*ifToken), std::move(*orTest), std::monostate{}};
+    }
+    std::variant<std::monostate, Syntax::CompFor, std::unique_ptr<Syntax::CompIf>> trail;
+    if (m_current->getTokenType() == TokenType::IfKeyword)
+    {
+        auto compIf = parseCompIf();
+        if (!compIf)
+        {
+            return tl::unexpected{std::move(compIf).error()};
+        }
+        trail = std::make_unique<Syntax::CompIf>(std::move(*compIf));
+    }
+    else
+    {
+        auto compFor = parseCompFor();
+        if (!compFor)
+        {
+            return tl::unexpected{std::move(compFor).error()};
+        }
+        trail = std::move(*compFor);
+    }
+    return Syntax::CompIf{std::move(*ifToken), std::move(*orTest), std::move(trail)};
+}
+
+tl::expected<pylir::Syntax::StarredExpression, std::string>
+    pylir::Parser::parseStarredExpression(std::optional<Syntax::AssignmentExpression>&& firstItem)
+{
+    if (m_current == m_lexer.end()
+        || (m_current->getTokenType() != TokenType::Star
+            && !Syntax::firstInAssignmentExpression(m_current->getTokenType())))
+    {
+        return Syntax::StarredExpression{Syntax::StarredExpression::Items{{}, std::nullopt}};
+    }
+    if (m_current->getTokenType() != TokenType::Star || firstItem)
+    {
+        if (!firstItem)
+        {
+            auto expression = parseAssignmentExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            firstItem = std::move(*expression);
+        }
+        if (!firstItem->identifierAndWalrus
+            && (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma))
+        {
+            return Syntax::StarredExpression{std::move(*firstItem->expression)};
+        }
+    }
+    std::vector<std::pair<Syntax::StarredItem, Token>> leading;
+    if (firstItem)
+    {
+        // It had "identifier :=", hence a starred_item
+        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
+        {
+            return Syntax::StarredExpression{
+                Syntax::StarredExpression::Items{{}, Syntax::StarredItem{std::move(*firstItem)}}};
+        }
+        leading.emplace_back(Syntax::StarredItem{std::move(*firstItem)}, *m_current++);
+    }
+    std::optional<Syntax::StarredItem> last;
+    while (m_current != m_lexer.end() && Syntax::firstInStarredItem(m_current->getTokenType()))
+    {
+        auto item = parseStarredItem();
+        if (!item)
+        {
+            return tl::unexpected{std::move(item).error()};
+        }
+        // If a comma doesn't follow, then it's the last optional trailing starred_item
+        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
+        {
+            last = std::move(*item);
+            break;
+        }
+        leading.emplace_back(std::move(*item), *m_current++);
+    }
+    return Syntax::StarredExpression{Syntax::StarredExpression::Items{std::move(leading), std::move(last)}};
+}
+
+tl::expected<pylir::Syntax::StarredItem, std::string> pylir::Parser::parseStarredItem()
+{
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
+    {
+        auto star = *m_current++;
+        auto expression = parseOrExpr();
+        if (!expression)
+        {
+            return tl::unexpected{std::move(expression).error()};
+        }
+        return Syntax::StarredItem{std::pair{std::move(star), std::move(*expression)}};
+    }
+    auto assignment = parseAssignmentExpression();
+    if (!assignment)
+    {
+        return tl::unexpected{std::move(assignment).error()};
+    }
+    return Syntax::StarredItem{std::move(*assignment)};
+}
+
+tl::expected<pylir::Syntax::StarredList, std::string>
+    pylir::Parser::parseStarredList(std::optional<Syntax::StarredItem>&& firstItem)
+{
+    return parseCommaList(pylir::bind_front(&Parser::parseStarredItem, this), &Syntax::firstInStarredItem,
+                          std::move(firstItem));
 }

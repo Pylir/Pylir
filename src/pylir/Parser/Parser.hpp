@@ -141,7 +141,12 @@ public:
 
     tl::expected<Syntax::LambdaExpression, std::string> parseLambdaExpression();
 
-    tl::expected<Syntax::StarredExpression, std::string> parseStarredExpression();
+    tl::expected<Syntax::StarredExpression, std::string> parseStarredExpression( std::optional<Syntax::AssignmentExpression>&& firstItem = std::nullopt);
+
+    tl::expected<Syntax::StarredItem, std::string> parseStarredItem();
+
+    tl::expected<Syntax::StarredList, std::string>
+        parseStarredList(std::optional<Syntax::StarredItem>&& firstItem = std::nullopt);
 
     tl::expected<Syntax::CompFor, std::string> parseCompFor();
 
