@@ -3,6 +3,8 @@
 
 #include <pylir/Lexer/Token.hpp>
 
+#include <memory>
+#include <optional>
 #include <variant>
 
 namespace pylir::Syntax
