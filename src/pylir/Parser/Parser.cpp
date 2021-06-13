@@ -1,7 +1,8 @@
 #include "Parser.hpp"
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
-#include <pylir/Support/Util.hpp>
+#include <pylir/Support/Functional.hpp>
+#include <pylir/Support/Variant.hpp>
 
 tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType tokenType)
 {
@@ -14,7 +15,7 @@ tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType t
     }
     else if (m_current->getTokenType() == TokenType::SyntaxError)
     {
-        return tl::unexpected{std::get<std::string>(m_current->getValue())};
+        return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
     }
     else if (m_current->getTokenType() != tokenType)
     {
@@ -55,7 +56,7 @@ tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
 
     switch (m_current->getTokenType())
     {
-        case TokenType::SyntaxError: return tl::unexpected{std::get<std::string>(m_current->getValue())};
+        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         case TokenType::Identifier:
         {
             return Syntax::Atom{Syntax::Atom::Identifier{*m_current}};
@@ -422,7 +423,7 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
             return Syntax::Enclosure{Syntax::Enclosure::ListDisplay{
                 std::move(openSquareBracket), std::move(*comprehension), std::move(*closeSquare)}};
         }
-        case TokenType::SyntaxError: return tl::unexpected{std::get<std::string>(m_current->getValue())};
+        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         default:
             return tl::unexpected{
                 createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
@@ -831,7 +832,7 @@ tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary()
                 {
                     Syntax::ExpressionList expressionList;
                     expressionList.firstExpr = std::make_unique<Syntax::Expression>(
-                        std::move(std::get<Syntax::Expression>(*slice->sliceList.firstExpr)));
+                        std::move(pylir::get<Syntax::Expression>(*slice->sliceList.firstExpr)));
                     expressionList.trailingComma = std::move(slice->sliceList.trailingComma);
 
                     expressionList.remainingExpr.reserve(slice->sliceList.remainingExpr.size());
@@ -842,7 +843,7 @@ tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary()
                                    {
                                        return std::pair{std::move(pair.first),
                                                         std::make_unique<Syntax::Expression>(
-                                                            std::move(std::get<Syntax::Expression>(*pair.second)))};
+                                                            std::move(pylir::get<Syntax::Expression>(*pair.second)))};
                                    });
 
                     current = Syntax::Primary{
