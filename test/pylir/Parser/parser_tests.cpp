@@ -69,4 +69,14 @@ TEST_CASE("Parse Enclosure", "[Parser]")
                                                             "|-atom 5\n"
                                                             "`-atom 5"));
     }
+    SECTION("List display")
+    {
+        CHECK_THAT(dumpExpression("[]"), Contains("list display empty"));
+        CHECK_THAT(dumpExpression("[5]"), Contains("list display\n"
+                                                   "`-atom 5"));
+        CHECK_THAT(dumpExpression("[5,3]"), Contains("list display\n"
+                                                     "`-starred list\n"
+                                                     "  |-atom 5\n"
+                                                     "  `-atom 3"));
+    }
 }

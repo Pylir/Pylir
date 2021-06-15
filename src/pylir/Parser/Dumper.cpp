@@ -144,6 +144,18 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             // TODO:
             PYLIR_UNREACHABLE;
         },
+        [&](const Syntax::Enclosure::ListDisplay& listDisplay) -> std::string
+        {
+            if (std::holds_alternative<std::monostate>(listDisplay.variant))
+            {
+                return "list display empty";
+            }
+            std::string result = "list display";
+            result += pylir::match(
+                listDisplay.variant, [](const std::monostate&) -> std::string { PYLIR_UNREACHABLE; },
+                [&](const auto& value) { return addLastChild(dump(value)); });
+            return result;
+        },
         [&](const Syntax::Enclosure::GeneratorExpression& generatorExpression) -> std::string
         {
             std::string result = "generator expression";

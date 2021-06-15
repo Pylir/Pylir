@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include <tcb/span.hpp>
+
 #include "Syntax.hpp"
 
 namespace pylir
@@ -13,6 +15,23 @@ class Dumper
     std::string addMiddleChild(std::string_view middleChildDump);
 
     std::string addLastChild(std::string_view lastChildDump);
+
+    template <class T>
+    std::string dump(const Syntax::CommaList<T>& list, std::string_view name)
+    {
+        if (list.remainingExpr.empty())
+        {
+            return dump(*list.firstExpr);
+        }
+        std::string result = std::string(name);
+        result += addMiddleChild(dump(*list.firstExpr));
+        for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
+        {
+            result += addMiddleChild(dump(*iter.second));
+        }
+        result += addLastChild(dump(*list.remainingExpr.back().second));
+        return result;
+    }
 
 public:
     std::string dump(const Syntax::Atom& atom);
@@ -72,6 +91,16 @@ public:
     std::string dump(const Syntax::CompIf& compIf);
 
     std::string dump(const Syntax::CompFor& compFor);
+
+    std::string dump(const Syntax::StarredList& starredList)
+    {
+        return dump(starredList, "starred list");
+    }
+
+    std::string dump(const Syntax::ExpressionList& expressionList)
+    {
+        return dump(expressionList, "expression list");
+    }
 };
 
 } // namespace pylir
