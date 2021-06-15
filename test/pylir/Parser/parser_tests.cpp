@@ -122,3 +122,9 @@ TEST_CASE("Parse Enclosure", "[Parser]")
                                                          "    `-atom 2"));
     }
 }
+
+TEST_CASE("Parse attribute ref", "[Parser]")
+{
+    CHECK_THAT(dumpExpression("a.b"), Contains("attribute b\n"
+                                               "`-atom a"));
+}

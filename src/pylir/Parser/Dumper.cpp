@@ -251,7 +251,8 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Primary& primary)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AttributeRef& attribute)
 {
-    return std::string();
+    return fmt::format("attribute {}", pylir::get<std::string>(attribute.identifier.getValue()))
+           + addLastChild(dump(*attribute.primary));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Subscription& subscription)
