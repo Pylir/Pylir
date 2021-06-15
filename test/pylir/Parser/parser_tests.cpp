@@ -78,5 +78,24 @@ TEST_CASE("Parse Enclosure", "[Parser]")
                                                      "`-starred list\n"
                                                      "  |-atom 5\n"
                                                      "  `-atom 3"));
+        CHECK_THAT(dumpExpression("[*5,3]"), Contains("list display\n"
+                                                      "`-starred list\n"
+                                                      "  |-starred item\n"
+                                                      "  | `-atom 5\n"
+                                                      "  `-atom 3"));
+    }
+    SECTION("set display")
+    {
+        CHECK_THAT(dumpExpression("{5}"), Contains("set display\n"
+                                                   "`-atom 5"));
+        CHECK_THAT(dumpExpression("{5,3}"), Contains("set display\n"
+                                                     "`-starred list\n"
+                                                     "  |-atom 5\n"
+                                                     "  `-atom 3"));
+        CHECK_THAT(dumpExpression("{*5,3}"), Contains("set display\n"
+                                                      "`-starred list\n"
+                                                      "  |-starred item\n"
+                                                      "  | `-atom 5\n"
+                                                      "  `-atom 3"));
     }
 }

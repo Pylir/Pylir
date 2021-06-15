@@ -144,6 +144,14 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             // TODO:
             PYLIR_UNREACHABLE;
         },
+        [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> std::string
+        {
+            std::string result = "set display";
+            result += pylir::match(
+                setDisplay.variant, [](const std::monostate&) -> std::string { PYLIR_UNREACHABLE; },
+                [&](const auto& value) { return addLastChild(dump(value)); });
+            return result;
+        },
         [&](const Syntax::Enclosure::ListDisplay& listDisplay) -> std::string
         {
             if (std::holds_alternative<std::monostate>(listDisplay.variant))
@@ -386,7 +394,8 @@ std::string pylir::Dumper::dump(const pylir::Syntax::StarredItem& starredItem)
     {
         return dump(*assignment);
     }
-    return std::string();
+    return "starred item"
+           + addLastChild(dump(pylir::get<std::pair<Token, Syntax::OrExpr>>(starredItem.variant).second));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredExpression)

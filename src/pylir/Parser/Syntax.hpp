@@ -429,7 +429,7 @@ struct Enclosure
     struct SetDisplay
     {
         Token openBrace;
-        std::variant<std::monostate, StarredList, Comprehension> variant;
+        std::variant<StarredList, Comprehension> variant;
         Token closeBrace;
     };
 
