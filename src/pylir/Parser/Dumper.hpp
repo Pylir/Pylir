@@ -10,9 +10,9 @@ class Dumper
 {
     std::size_t m_level = 0;
 
-    std::string addMiddleChild(std::string&& middleChildDump);
+    std::string addMiddleChild(std::string_view middleChildDump);
 
-    std::string addLastChild(std::string&& lastChildDump);
+    std::string addLastChild(std::string_view lastChildDump);
 
 public:
     std::string dump(const Syntax::Atom& atom);

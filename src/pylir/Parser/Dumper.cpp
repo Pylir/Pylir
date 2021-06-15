@@ -4,14 +4,60 @@
 
 #include <fmt/format.h>
 
-std::string pylir::Dumper::addLastChild(std::string&& lastChildDump)
+namespace
 {
-    return std::string();
+std::vector<std::string_view> splitLines(std::string_view text)
+{
+    std::vector<std::string_view> result;
+    std::size_t pos = 0;
+    while ((pos = text.find('\n')) != std::string_view::npos)
+    {
+        result.push_back(text.substr(0, pos));
+        text.remove_prefix(pos);
+    }
+    result.push_back(text);
+    return result;
+}
+} // namespace
+
+std::string pylir::Dumper::addLastChild(std::string_view lastChildDump)
+{
+    auto lines = splitLines(lastChildDump);
+    std::string result = "\n";
+    bool first = true;
+    for (auto iter : lines)
+    {
+        if (first)
+        {
+            first = false;
+            result += "`-" + std::string(iter) + "\n";
+        }
+        else
+        {
+            result += "  " + std::string(iter) + "\n";
+        }
+    }
+    return result;
 }
 
-std::string pylir::Dumper::addMiddleChild(std::string&& middleChildDump)
+std::string pylir::Dumper::addMiddleChild(std::string_view middleChildDump)
 {
-    return std::string();
+    auto lines = splitLines(middleChildDump);
+    std::string result = "\n";
+    bool first = true;
+    for (auto iter : lines)
+    {
+        if (first)
+        {
+            first = false;
+            result += "|-" + std::string(iter) + "\n";
+        }
+        else
+        {
+            result += "| " + std::string(iter) + "\n";
+        }
+    }
+    return result;
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
@@ -85,17 +131,31 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
                 },
                 [](std::monostate) -> std::string { PYLIR_UNREACHABLE; });
         },
-        [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> std::string
-        {
-            std::string result = "atom enclosure";
-            result += addLastChild(dump(*enclosure));
-            return result;
-        });
+        [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> std::string { return dump(*enclosure); });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
 {
-    return std::string();
+    return pylir::match(
+        enclosure.variant,
+        [](const auto&) -> std::string
+        {
+            // TODO:
+            PYLIR_UNREACHABLE;
+        },
+        [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> std::string
+        {
+            if (!parenthForm.expression)
+            {
+                return "parenth empty";
+            }
+            else
+            {
+                std::string result = "parenth";
+                result += addLastChild(dump(*parenthForm.expression));
+                return result;
+            }
+        });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Primary& primary)

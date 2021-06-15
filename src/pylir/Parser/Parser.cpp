@@ -56,10 +56,10 @@ tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
 
     switch (m_current->getTokenType())
     {
-        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
+        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>((*m_current++).getValue())};
         case TokenType::Identifier:
         {
-            return Syntax::Atom{Syntax::Atom::Identifier{*m_current}};
+            return Syntax::Atom{Syntax::Atom::Identifier{*m_current++}};
         }
         case TokenType::StringLiteral:
         case TokenType::ByteLiteral:
@@ -67,7 +67,7 @@ tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
         case TokenType::FloatingPointLiteral:
         case TokenType::ComplexLiteral:
         {
-            return Syntax::Atom{Syntax::Atom::Literal{*m_current}};
+            return Syntax::Atom{Syntax::Atom::Literal{*m_current++}};
         }
         case TokenType::OpenParentheses:
         case TokenType::OpenBrace:
@@ -1292,9 +1292,10 @@ tl::expected<pylir::Syntax::CompIf, std::string> pylir::Parser::parseCompIf()
 tl::expected<pylir::Syntax::StarredExpression, std::string>
     pylir::Parser::parseStarredExpression(std::optional<Syntax::AssignmentExpression>&& firstItem)
 {
-    if (m_current == m_lexer.end()
-        || (m_current->getTokenType() != TokenType::Star
-            && !Syntax::firstInAssignmentExpression(m_current->getTokenType())))
+    if ((m_current == m_lexer.end()
+         || (m_current->getTokenType() != TokenType::Star
+             && !Syntax::firstInAssignmentExpression(m_current->getTokenType())))
+        && !firstItem)
     {
         return Syntax::StarredExpression{Syntax::StarredExpression::Items{{}, std::nullopt}};
     }
