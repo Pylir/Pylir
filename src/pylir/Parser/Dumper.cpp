@@ -3,6 +3,7 @@
 #include <pylir/Support/Variant.hpp>
 
 #include <fmt/format.h>
+#include <tcb/span.hpp>
 
 namespace
 {
@@ -13,7 +14,7 @@ std::vector<std::string_view> splitLines(std::string_view text)
     while ((pos = text.find('\n')) != std::string_view::npos)
     {
         result.push_back(text.substr(0, pos));
-        text.remove_prefix(pos);
+        text.remove_prefix(pos + 1);
     }
     result.push_back(text);
     return result;
@@ -23,18 +24,18 @@ std::vector<std::string_view> splitLines(std::string_view text)
 std::string pylir::Dumper::addLastChild(std::string_view lastChildDump)
 {
     auto lines = splitLines(lastChildDump);
-    std::string result = "\n";
+    std::string result;
     bool first = true;
     for (auto iter : lines)
     {
         if (first)
         {
             first = false;
-            result += "`-" + std::string(iter) + "\n";
+            result += "\n`-" + std::string(iter);
         }
         else
         {
-            result += "  " + std::string(iter) + "\n";
+            result += "\n  " + std::string(iter);
         }
     }
     return result;
@@ -43,18 +44,18 @@ std::string pylir::Dumper::addLastChild(std::string_view lastChildDump)
 std::string pylir::Dumper::addMiddleChild(std::string_view middleChildDump)
 {
     auto lines = splitLines(middleChildDump);
-    std::string result = "\n";
+    std::string result;
     bool first = true;
     for (auto iter : lines)
     {
         if (first)
         {
             first = false;
-            result += "|-" + std::string(iter) + "\n";
+            result += "\n|-" + std::string(iter);
         }
         else
         {
-            result += "| " + std::string(iter) + "\n";
+            result += "\n| " + std::string(iter);
         }
     }
     return result;
@@ -142,6 +143,35 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
         {
             // TODO:
             PYLIR_UNREACHABLE;
+        },
+        [&](const Syntax::Enclosure::YieldAtom& yieldAtom) -> std::string
+        {
+            return pylir::match(
+                yieldAtom.variant, [](std::monostate) -> std::string { return "yield empty"; },
+                [&](const std::pair<Token, Syntax::Expression>& expression) -> std::string
+                {
+                    std::string result = "yield from";
+                    result += addLastChild(dump(expression.second));
+                    return result;
+                },
+                [&](const Syntax::ExpressionList& list) -> std::string
+                {
+                    std::string result = "yield list";
+                    if (list.remainingExpr.empty())
+                    {
+                        result += addLastChild(dump(*list.firstExpr));
+                    }
+                    else
+                    {
+                        result += addMiddleChild(dump(*list.firstExpr));
+                        for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
+                        {
+                            result += addMiddleChild(dump(*iter.second));
+                        }
+                        result += addLastChild(dump(*list.remainingExpr.back().second));
+                    }
+                    return result;
+                });
         },
         [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> std::string
         {
@@ -346,7 +376,22 @@ std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredE
     {
         return dump(*expression);
     }
-    return std::string();
+    auto& item = pylir::get<Syntax::StarredExpression::Items>(starredExpression.variant);
+    std::string result = "starred expression";
+    for (auto& iter : tcb::span(item.leading).first(item.leading.size() - 1))
+    {
+        result += addMiddleChild(dump(iter.first));
+    }
+    if (!item.last)
+    {
+        result += addLastChild(dump(item.leading.back().first));
+    }
+    else
+    {
+        result += addMiddleChild(dump(item.leading.back().first));
+        result += addLastChild(dump(*item.last));
+    }
+    return result;
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompIf& compIf)

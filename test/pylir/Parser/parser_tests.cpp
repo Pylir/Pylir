@@ -50,5 +50,23 @@ TEST_CASE("Parse Enclosure", "[Parser]")
         CHECK_THAT(dumpExpression("()"), Contains("parenth empty"));
         CHECK_THAT(dumpExpression("(5)"), Contains("parenth\n"
                                                    "`-atom 5"));
+        CHECK_THAT(dumpExpression("(5,)"), Contains("parenth\n"
+                                                    "`-starred expression\n"
+                                                    "  `-atom 5"));
+        CHECK_THAT(dumpExpression("(5,3)"), Contains("parenth\n"
+                                                     "`-starred expression\n"
+                                                     "  |-atom 5\n"
+                                                     "  `-atom 3"));
+    }
+    SECTION("yield")
+    {
+        CHECK_THAT(dumpExpression("(yield from 5)"), Contains("yield from\n"
+                                                              "`-atom 5"));
+        CHECK_THAT(dumpExpression("(yield)"), Contains("yield empty"));
+        CHECK_THAT(dumpExpression("(yield 5)"), Contains("yield list\n"
+                                                         "`-atom 5"));
+        CHECK_THAT(dumpExpression("(yield 5,5,)"), Contains("yield list\n"
+                                                            "|-atom 5\n"
+                                                            "`-atom 5"));
     }
 }
