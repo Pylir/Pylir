@@ -257,7 +257,8 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AttributeRef& attribute)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Subscription& subscription)
 {
-    return std::string();
+    return "subscription" + addMiddleChild(dump(*subscription.primary))
+           + addLastChild(dump(subscription.expressionList));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Slicing& slicing)

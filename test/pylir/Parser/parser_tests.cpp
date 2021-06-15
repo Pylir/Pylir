@@ -128,3 +128,15 @@ TEST_CASE("Parse attribute ref", "[Parser]")
     CHECK_THAT(dumpExpression("a.b"), Contains("attribute b\n"
                                                "`-atom a"));
 }
+
+TEST_CASE("Parse subscription", "[Parser]")
+{
+    CHECK_THAT(dumpExpression("a[b]"), Contains("subscription\n"
+                                                "|-atom a\n"
+                                                "`-atom b"));
+    CHECK_THAT(dumpExpression("a[b,c]"), Contains("subscription\n"
+                                                  "|-atom a\n"
+                                                  "`-expression list\n"
+                                                  "  |-atom b\n"
+                                                  "  `-atom c"));
+}

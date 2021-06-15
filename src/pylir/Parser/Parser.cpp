@@ -511,7 +511,8 @@ tl::expected<pylir::Syntax::Slicing, std::string>
     {
         return tl::unexpected{std::move(closeSquareBracket).error()};
     }
-    return Syntax::Slicing{std::move(primary), *std::move(squareBracket), {}, std::move(*closeSquareBracket)};
+    return Syntax::Slicing{std::move(primary), *std::move(squareBracket), std::move(*list),
+                           std::move(*closeSquareBracket)};
 }
 
 tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::unique_ptr<Syntax::Primary>&& primary)
