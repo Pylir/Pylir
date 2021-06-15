@@ -1221,7 +1221,7 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
     }
     if (m_current == m_lexer.end()
         || (m_current->getTokenType() != TokenType::ForKeyword && m_current->getTokenType() != TokenType::IfKeyword
-            && m_current->getTokenType() != TokenType::AsyncKeyword))
+            && m_current->getTokenType() != TokenType::AwaitKeyword))
     {
         return Syntax::CompFor{std::move(awaitToken), std::move(*forToken), {},
                                std::move(*inToken),   std::move(*orTest),   std::monostate{}};

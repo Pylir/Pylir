@@ -144,6 +144,13 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             // TODO:
             PYLIR_UNREACHABLE;
         },
+        [&](const Syntax::Enclosure::GeneratorExpression& generatorExpression) -> std::string
+        {
+            std::string result = "generator expression";
+            result += addMiddleChild(dump(generatorExpression.expression));
+            result += addLastChild(dump(generatorExpression.compFor));
+            return result;
+        },
         [&](const Syntax::Enclosure::YieldAtom& yieldAtom) -> std::string
         {
             return pylir::match(
@@ -401,5 +408,23 @@ std::string pylir::Dumper::dump(const pylir::Syntax::CompIf& compIf)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompFor& compFor)
 {
-    return std::string();
+    std::string result;
+    if (compFor.awaitToken)
+    {
+        result = "comp for await";
+    }
+    else
+    {
+        result = "comp for";
+    }
+    // TODO: targets
+    if (std::holds_alternative<std::monostate>(compFor.compIter))
+    {
+        return result + addLastChild(dump(compFor.orTest));
+    }
+    result += addMiddleChild(dump(compFor.orTest));
+    result += addLastChild(pylir::match(
+        compFor.compIter, [&](const auto& ptr) { return dump(*ptr); },
+        [](std::monostate) -> std::string { PYLIR_UNREACHABLE; }));
+    return result;
 }
