@@ -139,10 +139,39 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
 {
     return pylir::match(
         enclosure.variant,
-        [](const auto&) -> std::string
+        [&](const Syntax::Enclosure::DictDisplay& dictDisplay) -> std::string
         {
-            // TODO:
-            PYLIR_UNREACHABLE;
+            if (std::holds_alternative<std::monostate>(dictDisplay.variant))
+            {
+                return "dict display empty";
+            }
+
+            return "dict display"
+                   + addLastChild(pylir::match(
+                       dictDisplay.variant, [](std::monostate) -> std::string { PYLIR_UNREACHABLE; },
+                       [&](const Syntax::Enclosure::DictDisplay::DictComprehension& comprehension) -> std::string
+                       {
+                           return "dict comprehension" + addMiddleChild(dump(comprehension.first))
+                                  + addMiddleChild(dump(comprehension.second)
+                                                   + addLastChild(dump(comprehension.compFor)));
+                       },
+                       [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& commaList) -> std::string
+                       {
+                           return dump(
+                               commaList,
+                               [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum) -> std::string
+                               {
+                                   return pylir::match(
+                                       keyDatum.variant,
+                                       [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Key& key) -> std::string {
+                                           return "key" + addMiddleChild(dump(key.first))
+                                                  + addLastChild(dump(key.second));
+                                       },
+                                       [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Datum& datum) -> std::string
+                                       { return "datum" + addLastChild(dump(datum.orExpr)); });
+                               },
+                               "key datum list");
+                       }));
         },
         [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> std::string
         {

@@ -10,14 +10,12 @@ namespace pylir
 {
 class Dumper
 {
-    std::size_t m_level = 0;
-
     std::string addMiddleChild(std::string_view middleChildDump);
 
     std::string addLastChild(std::string_view lastChildDump);
 
-    template <class T>
-    std::string dump(const Syntax::CommaList<T>& list, std::string_view name)
+    template <class T, class Func>
+    std::string dump(const Syntax::CommaList<T>& list, Func dump, std::string_view name)
     {
         if (list.remainingExpr.empty())
         {
@@ -94,12 +92,14 @@ public:
 
     std::string dump(const Syntax::StarredList& starredList)
     {
-        return dump(starredList, "starred list");
+        return dump(
+            starredList, [&](auto&& value) { return dump(value); }, "starred list");
     }
 
     std::string dump(const Syntax::ExpressionList& expressionList)
     {
-        return dump(expressionList, "expression list");
+        return dump(
+            expressionList, [&](auto&& value) { return dump(value); }, "expression list");
     }
 };
 

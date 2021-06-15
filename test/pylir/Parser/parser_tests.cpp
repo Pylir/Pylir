@@ -98,4 +98,27 @@ TEST_CASE("Parse Enclosure", "[Parser]")
                                                       "  | `-atom 5\n"
                                                       "  `-atom 3"));
     }
+    SECTION("dict display")
+    {
+        CHECK_THAT(dumpExpression("{}"), Contains("dict display empty"));
+        CHECK_THAT(dumpExpression("{5:3}"), Contains("dict display\n"
+                                                     "`-key\n"
+                                                     "  |-atom 5\n"
+                                                     "  `-atom 3"));
+        CHECK_THAT(dumpExpression("{5:3,3:2}"), Contains("dict display\n"
+                                                         "`-key datum list\n"
+                                                         "  |-key\n"
+                                                         "  | |-atom 5\n"
+                                                         "  | `-atom 3\n"
+                                                         "  `-key\n"
+                                                         "    |-atom 3\n"
+                                                         "    `-atom 2"));
+        CHECK_THAT(dumpExpression("{**5,3:2}"), Contains("dict display\n"
+                                                         "`-key datum list\n"
+                                                         "  |-datum\n"
+                                                         "  | `-atom 5\n"
+                                                         "  `-key\n"
+                                                         "    |-atom 3\n"
+                                                         "    `-atom 2"));
+    }
 }
