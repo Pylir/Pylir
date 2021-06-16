@@ -462,14 +462,19 @@ tl::expected<pylir::Syntax::Slicing, std::string>
     auto list = parseCommaList(
         [&]() -> tl::expected<std::variant<Syntax::Slicing::ProperSlice, Syntax::Expression>, std::string>
         {
-            auto first = parseExpression();
-            if (!first)
+            std::unique_ptr<Syntax::Expression> lowerBound;
+            if (m_current->getTokenType() != TokenType::Colon)
             {
-                return tl::unexpected{std::move(first).error()};
-            }
-            if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Colon)
-            {
-                return *std::move(first);
+                auto first = parseExpression();
+                if (!first)
+                {
+                    return tl::unexpected{std::move(first).error()};
+                }
+                if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Colon)
+                {
+                    return *std::move(first);
+                }
+                lowerBound = std::make_unique<Syntax::Expression>(std::move(*first));
             }
             auto firstColon = *m_current++;
             std::unique_ptr<Syntax::Expression> upperBound;
@@ -497,9 +502,8 @@ tl::expected<pylir::Syntax::Slicing, std::string>
                 }
                 stride = std::make_unique<Syntax::Expression>(*std::move(temp));
             }
-            return Syntax::Slicing::ProperSlice{std::make_unique<Syntax::Expression>(std::move(*first)),
-                                                std::move(firstColon), std::move(upperBound), std::move(*secondColumn),
-                                                std::move(stride)};
+            return Syntax::Slicing::ProperSlice{std::move(lowerBound), std::move(firstColon), std::move(upperBound),
+                                                std::move(*secondColumn), std::move(stride)};
         },
         &Syntax::firstInExpression);
     if (!list)

@@ -21,7 +21,7 @@ std::vector<std::string_view> splitLines(std::string_view text)
 }
 } // namespace
 
-std::string pylir::Dumper::addLastChild(std::string_view lastChildDump)
+std::string pylir::Dumper::addLastChild(std::string_view lastChildDump, std::optional<std::string_view>&& label)
 {
     auto lines = splitLines(lastChildDump);
     std::string result;
@@ -31,7 +31,14 @@ std::string pylir::Dumper::addLastChild(std::string_view lastChildDump)
         if (first)
         {
             first = false;
-            result += "\n`-" + std::string(iter);
+            if (label)
+            {
+                result += "\n`-" + std::string(*label) + ": " + std::string(iter);
+            }
+            else
+            {
+                result += "\n`-" + std::string(iter);
+            }
         }
         else
         {
@@ -41,7 +48,7 @@ std::string pylir::Dumper::addLastChild(std::string_view lastChildDump)
     return result;
 }
 
-std::string pylir::Dumper::addMiddleChild(std::string_view middleChildDump)
+std::string pylir::Dumper::addMiddleChild(std::string_view middleChildDump, std::optional<std::string_view>&& label)
 {
     auto lines = splitLines(middleChildDump);
     std::string result;
@@ -51,7 +58,14 @@ std::string pylir::Dumper::addMiddleChild(std::string_view middleChildDump)
         if (first)
         {
             first = false;
-            result += "\n|-" + std::string(iter);
+            if (label)
+            {
+                result += "\n|-" + std::string(*label) + ": " + std::string(iter);
+            }
+            else
+            {
+                result += "\n|-" + std::string(iter);
+            }
         }
         else
         {
@@ -257,13 +271,57 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AttributeRef& attribute)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Subscription& subscription)
 {
-    return "subscription" + addMiddleChild(dump(*subscription.primary))
-           + addLastChild(dump(subscription.expressionList));
+    return "subscription" + addMiddleChild(dump(*subscription.primary), "primary")
+           + addLastChild(dump(subscription.expressionList), "index");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Slicing& slicing)
 {
-    return std::string();
+    std::string result = "slicing";
+    result += addMiddleChild(dump(*slicing.primary), "primary");
+    result += addLastChild(
+        dump(
+            slicing.sliceList,
+            [&](const auto& slice) -> std::string
+            {
+                return pylir::match(
+                    slice,
+                    [&](const Syntax::Slicing::ProperSlice& properSlice) -> std::string
+                    {
+                        std::string result = "proper slice";
+                        if (properSlice.optionalLowerBound)
+                        {
+                            if (!properSlice.optionalUpperBound && !properSlice.optionalStride)
+                            {
+                                return result + addLastChild(dump(*properSlice.optionalLowerBound), "lowerBound");
+                            }
+                            else
+                            {
+                                result += addMiddleChild(dump(*properSlice.optionalLowerBound), "lowerBound");
+                            }
+                        }
+                        if (properSlice.optionalUpperBound)
+                        {
+                            if (!properSlice.optionalStride)
+                            {
+                                return result + addLastChild(dump(*properSlice.optionalUpperBound), "upperBound");
+                            }
+                            else
+                            {
+                                result += addMiddleChild(dump(*properSlice.optionalUpperBound), "upperBound");
+                            }
+                        }
+                        if (properSlice.optionalStride)
+                        {
+                            result += addLastChild(dump(*properSlice.optionalStride), "stride");
+                        }
+                        return result;
+                    },
+                    [&](const Syntax::Expression& expression) { return dump(expression); });
+            },
+            "proper slice list"),
+        "index");
+    return result;
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Comprehension& comprehension)

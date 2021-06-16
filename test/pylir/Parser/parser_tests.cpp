@@ -132,11 +132,41 @@ TEST_CASE("Parse attribute ref", "[Parser]")
 TEST_CASE("Parse subscription", "[Parser]")
 {
     CHECK_THAT(dumpExpression("a[b]"), Contains("subscription\n"
-                                                "|-atom a\n"
-                                                "`-atom b"));
+                                                "|-primary: atom a\n"
+                                                "`-index: atom b"));
     CHECK_THAT(dumpExpression("a[b,c]"), Contains("subscription\n"
-                                                  "|-atom a\n"
-                                                  "`-expression list\n"
+                                                  "|-primary: atom a\n"
+                                                  "`-index: expression list\n"
                                                   "  |-atom b\n"
                                                   "  `-atom c"));
+}
+
+TEST_CASE("Parse slicing", "[Parser]")
+{
+    CHECK_THAT(dumpExpression("a[b::]"), Contains("slicing\n"
+                                                  "|-primary: atom a\n"
+                                                  "`-index: proper slice\n"
+                                                  "  `-lowerBound: atom b"));
+    CHECK_THAT(dumpExpression("a[:c:]"), Contains("slicing\n"
+                                                  "|-primary: atom a\n"
+                                                  "`-index: proper slice\n"
+                                                  "  `-upperBound: atom c"));
+    CHECK_THAT(dumpExpression("a[::c]"), Contains("slicing\n"
+                                                  "|-primary: atom a\n"
+                                                  "`-index: proper slice\n"
+                                                  "  `-stride: atom c"));
+    CHECK_THAT(dumpExpression("a[b:c:d]"), Contains("slicing\n"
+                                                    "|-primary: atom a\n"
+                                                    "`-index: proper slice\n"
+                                                    "  |-lowerBound: atom b\n"
+                                                    "  |-upperBound: atom c\n"
+                                                    "  `-stride: atom d"));
+    CHECK_THAT(dumpExpression("a[b:c:d,3]"), Contains("slicing\n"
+                                                      "|-primary: atom a\n"
+                                                      "`-index: proper slice list\n"
+                                                      "  |-proper slice\n"
+                                                      "  | |-lowerBound: atom b\n"
+                                                      "  | |-upperBound: atom c\n"
+                                                      "  | `-stride: atom d\n"
+                                                      "  `-atom 3"));
 }

@@ -10,9 +10,10 @@ namespace pylir
 {
 class Dumper
 {
-    std::string addMiddleChild(std::string_view middleChildDump);
+    std::string addMiddleChild(std::string_view middleChildDump,
+                               std::optional<std::string_view>&& label = std::nullopt);
 
-    std::string addLastChild(std::string_view lastChildDump);
+    std::string addLastChild(std::string_view lastChildDump, std::optional<std::string_view>&& label = std::nullopt);
 
     template <class T, class Func>
     std::string dump(const Syntax::CommaList<T>& list, Func dump, std::string_view name)
