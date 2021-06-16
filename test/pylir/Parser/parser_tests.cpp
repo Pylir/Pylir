@@ -173,25 +173,36 @@ TEST_CASE("Parse slicing", "[Parser]")
 
 TEST_CASE("Parse calls", "[Parser]")
 {
+    CHECK_THAT(dumpExpression("a()"), Contains("call\n"
+                                               "`-atom a"));
     CHECK_THAT(dumpExpression("a(b)"), Contains("call\n"
+                                                "|-atom a\n"
+                                                "`-positional arguments\n"
+                                                "  `-atom b"));
+    CHECK_THAT(dumpExpression("a(b)"), Contains("call\n"
+                                                "|-atom a\n"
                                                 "`-positional arguments\n"
                                                 "  `-atom b"));
     CHECK_THAT(dumpExpression("a(b,c)"), Contains("call\n"
+                                                  "|-atom a\n"
                                                   "`-positional arguments\n"
                                                   "  |-atom b\n"
                                                   "  `-atom c"));
     CHECK_THAT(dumpExpression("a(b,*c)"), Contains("call\n"
+                                                   "|-atom a\n"
                                                    "`-positional arguments\n"
                                                    "  |-atom b\n"
                                                    "  `-starred\n"
                                                    "    `-atom c"));
     CHECK_THAT(dumpExpression("a(b,c = 3)"), Contains("call\n"
+                                                      "|-atom a\n"
                                                       "|-positional arguments\n"
                                                       "| `-atom b\n"
                                                       "`-starred keywords\n"
                                                       "  `-keyword item c\n"
                                                       "    `-atom 3"));
     CHECK_THAT(dumpExpression("a(b,c = 3,*b)"), Contains("call\n"
+                                                         "|-atom a\n"
                                                          "|-positional arguments\n"
                                                          "| `-atom b\n"
                                                          "`-starred keywords\n"
@@ -200,6 +211,7 @@ TEST_CASE("Parse calls", "[Parser]")
                                                          "  `-starred expression\n"
                                                          "    `-atom b"));
     CHECK_THAT(dumpExpression("a(**b,c = 3)"), Contains("call\n"
+                                                        "|-atom a\n"
                                                         "`-keyword arguments\n"
                                                         "  |-mapped expression\n"
                                                         "  | `-atom b\n"

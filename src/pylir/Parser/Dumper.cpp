@@ -348,6 +348,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
     {
         return result + addLastChild(dump(*call.primary));
     }
+    result += addMiddleChild(dump(*call.primary));
     if (auto* comprehension = std::get_if<std::unique_ptr<Syntax::Comprehension>>(&call.variant))
     {
         return result + addLastChild(dump(**comprehension));
