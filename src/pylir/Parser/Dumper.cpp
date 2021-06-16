@@ -326,7 +326,8 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Slicing& slicing)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Comprehension& comprehension)
 {
-    return std::string();
+    return "comprehension" + addMiddleChild(dump(comprehension.assignmentExpression))
+           + addLastChild(dump(comprehension.compFor));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentExpression& assignmentExpression)
@@ -335,12 +336,150 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentExpression& assig
     {
         return dump(*assignmentExpression.expression);
     }
-    return std::string();
+    return fmt::format("assignment expression to {}",
+                       pylir::get<std::string>(assignmentExpression.identifierAndWalrus->first.getValue()))
+           + addLastChild(dump(*assignmentExpression.expression));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
 {
-    return std::string();
+    std::string result = "call";
+    if (std::holds_alternative<std::monostate>(call.variant))
+    {
+        return result + addLastChild(dump(*call.primary));
+    }
+    if (auto* comprehension = std::get_if<std::unique_ptr<Syntax::Comprehension>>(&call.variant))
+    {
+        return result + addLastChild(dump(**comprehension));
+    }
+    auto& [argument, comma] = pylir::get<std::pair<Syntax::Call::ArgumentList, std::optional<Token>>>(call.variant);
+    if (argument.positionalArguments)
+    {
+        std::string positional = "positional arguments";
+        if (argument.positionalArguments->rest.empty())
+        {
+            positional += addLastChild(pylir::match(
+                argument.positionalArguments->firstItem.variant,
+                [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
+                [&](const Syntax::Call::PositionalItem::Star& star)
+                { return "starred" + addLastChild(dump(*star.expression)); }));
+        }
+        else
+        {
+            positional += addMiddleChild(pylir::match(
+                argument.positionalArguments->firstItem.variant,
+                [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
+                [&](const Syntax::Call::PositionalItem::Star& star)
+                { return "starred" + addLastChild(dump(*star.expression)); }));
+            for (auto& [token, item] :
+                 tcb::span(argument.positionalArguments->rest).first(argument.positionalArguments->rest.size() - 1))
+            {
+                positional += addMiddleChild(pylir::match(
+                    item.variant,
+                    [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
+                    [&](const Syntax::Call::PositionalItem::Star& star)
+                    { return "starred" + addLastChild(dump(*star.expression)); }));
+            }
+            positional += addLastChild(pylir::match(
+                argument.positionalArguments->rest.back().second.variant,
+                [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
+                [&](const Syntax::Call::PositionalItem::Star& star)
+                { return "starred" + addLastChild(dump(*star.expression)); }));
+        }
+        if (!argument.starredAndKeywords && !argument.keywordArguments)
+        {
+            return result + addLastChild(positional);
+        }
+        else
+        {
+            result += addMiddleChild(positional);
+        }
+    }
+    if (argument.starredAndKeywords)
+    {
+        std::string starred = "starred keywords";
+        std::string keyword = fmt::format(
+            "keyword item {}", pylir::get<std::string>(argument.starredAndKeywords->first.identifier.getValue()));
+        keyword += addLastChild(dump(*argument.starredAndKeywords->first.expression));
+        if (argument.starredAndKeywords->rest.empty())
+        {
+            starred += addLastChild(keyword);
+        }
+        else
+        {
+            starred += addMiddleChild(keyword);
+            for (auto& [token, iter] :
+                 tcb::span(argument.starredAndKeywords->rest).first(argument.starredAndKeywords->rest.size() - 1))
+            {
+                starred += addMiddleChild(pylir::match(
+                    iter,
+                    [&](const Syntax::Call::KeywordItem& keywordItem)
+                    {
+                        return fmt::format("keyword item {}",
+                                           pylir::get<std::string>(keywordItem.identifier.getValue()))
+                               + addLastChild(dump(*keywordItem.expression));
+                    },
+                    [&](const Syntax::Call::StarredAndKeywords::Expression& expression)
+                    { return "starred expression" + addLastChild(dump(*expression.expression)); }));
+            }
+            starred += addLastChild(pylir::match(
+                argument.starredAndKeywords->rest.back().second,
+                [&](const Syntax::Call::KeywordItem& keywordItem)
+                {
+                    return fmt::format("keyword item {}", pylir::get<std::string>(keywordItem.identifier.getValue()))
+                           + addLastChild(dump(*keywordItem.expression));
+                },
+                [&](const Syntax::Call::StarredAndKeywords::Expression& expression)
+                { return "starred expression" + addLastChild(dump(*expression.expression)); }));
+        }
+        if (!argument.keywordArguments)
+        {
+            return result + addLastChild(starred);
+        }
+        else
+        {
+            result += addMiddleChild(starred);
+        }
+    }
+    if (argument.keywordArguments)
+    {
+        std::string starred = "keyword arguments";
+        std::string mapped = "mapped expression";
+        mapped += addLastChild(dump(*argument.keywordArguments->first.expression));
+        if (argument.keywordArguments->rest.empty())
+        {
+            starred += addLastChild(mapped);
+        }
+        else
+        {
+            starred += addMiddleChild(mapped);
+            for (auto& [token, iter] :
+                 tcb::span(argument.keywordArguments->rest).first(argument.keywordArguments->rest.size() - 1))
+            {
+                starred += addMiddleChild(pylir::match(
+                    iter,
+                    [&](const Syntax::Call::KeywordItem& keywordItem)
+                    {
+                        return fmt::format("keyword item {}",
+                                           pylir::get<std::string>(keywordItem.identifier.getValue()))
+                               + addLastChild(dump(*keywordItem.expression));
+                    },
+                    [&](const Syntax::Call::KeywordArguments::Expression& expression)
+                    { return "mapped expression" + addLastChild(dump(*expression.expression)); }));
+            }
+            starred += addLastChild(pylir::match(
+                argument.keywordArguments->rest.back().second,
+                [&](const Syntax::Call::KeywordItem& keywordItem)
+                {
+                    return fmt::format("keyword item {}", pylir::get<std::string>(keywordItem.identifier.getValue()))
+                           + addLastChild(dump(*keywordItem.expression));
+                },
+                [&](const Syntax::Call::KeywordArguments::Expression& expression)
+                { return "mapped expression" + addLastChild(dump(*expression.expression)); }));
+        }
+        result += addLastChild(starred);
+    }
+    return result;
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AwaitExpr& awaitExpr)
