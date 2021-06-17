@@ -504,7 +504,9 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Power& power)
     {
         return pylir::match(power.variant, [&](const auto& value) { return dump(value); });
     }
-    return std::string();
+    return std::string("power")
+           + addMiddleChild(pylir::match(power.variant, [&](const auto& value) { return dump(value); }), "base")
+           + addLastChild(dump(*power.rightHand->second), "exponent");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)

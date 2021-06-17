@@ -237,3 +237,15 @@ TEST_CASE("Parse unary expression", "[Parser]")
                                                "`-unary '-'\n"
                                                "  `-atom 5"));
 }
+
+TEST_CASE("Parse power expression", "[Parser]")
+{
+    CHECK_THAT(dumpExpression("2 ** 5"), Contains("power\n"
+                                                  "|-base: atom 2\n"
+                                                  "`-exponent: atom 5"));
+    CHECK_THAT(dumpExpression("await 2 ** 5"), Contains("power\n"
+                                                        "|-base: await expression\n"
+                                                        "| `-atom 2\n"
+                                                        "`-exponent: atom 5"));
+}
+
