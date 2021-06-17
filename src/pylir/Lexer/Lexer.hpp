@@ -25,6 +25,7 @@ class Lexer
     Diag::Document* m_document;
     Diag::Document::iterator m_current;
     std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> m_warningCallback;
+    std::size_t m_depth = 0;
 
     bool parseNext();
 

@@ -288,16 +288,6 @@ TEST_CASE("Parse aexpr", "[Parser]")
                                                  "`-rhs: atom 5"));
 }
 
-TEST_CASE("Parse aexpr", "[Parser]")
-{
-    CHECK_THAT(dumpExpression("2 + 5"), Contains("aexpr '+'\n"
-                                                 "|-lhs: atom 2\n"
-                                                 "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 - 5"), Contains("aexpr '-'\n"
-                                                 "|-lhs: atom 2\n"
-                                                 "`-rhs: atom 5"));
-}
-
 TEST_CASE("Parse shiftExpr", "[Parser]")
 {
     CHECK_THAT(dumpExpression("2 << 5"), Contains("shiftExpr '<<'\n"

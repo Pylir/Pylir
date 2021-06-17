@@ -306,8 +306,12 @@ bool pylir::Lexer::parseNext()
             {
                 auto offset = m_current - m_document->begin();
                 m_current++;
-                m_tokens.emplace_back(offset, 1, m_fileId, TokenType::Newline);
-                break;
+                if (m_depth == 0)
+                {
+                    m_tokens.emplace_back(offset, 1, m_fileId, TokenType::Newline);
+                    break;
+                }
+                continue;
             }
             case U'\\':
             {
@@ -634,26 +638,41 @@ bool pylir::Lexer::parseNext()
                 m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::BitNegate);
                 break;
             case U'(':
+                m_depth++;
                 m_current++;
                 m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenParentheses);
                 break;
             case U')':
+                if (m_depth != 0)
+                {
+                    m_depth--;
+                }
                 m_current++;
                 m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseParentheses);
                 break;
             case U'[':
+                m_depth++;
                 m_current++;
                 m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenSquareBracket);
                 break;
             case U']':
+                if (m_depth != 0)
+                {
+                    m_depth--;
+                }
                 m_current++;
                 m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseSquareBracket);
                 break;
             case U'{':
+                m_depth++;
                 m_current++;
                 m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenBrace);
                 break;
             case U'}':
+                if (m_depth != 0)
+                {
+                    m_depth--;
+                }
                 m_current++;
                 m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseBrace);
                 break;

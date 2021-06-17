@@ -57,31 +57,47 @@ TEST_CASE("Lex comments", "[Lexer]")
 
 TEST_CASE("Lex newlines", "[Lexer]")
 {
-    pylir::Diag::Document document("Windows\r\n"
-                                   "Unix\n"
-                                   "OldMac\r"
-                                   "");
-    pylir::Lexer lexer(document, 1);
-    std::vector result(lexer.begin(), lexer.end());
-    REQUIRE(result.size() == 7);
-    CHECK(result[0].getTokenType() == pylir::TokenType::Identifier);
-    CHECK(result[0].getOffset() == 0);
-    CHECK(result[0].getSize() == 7);
-    CHECK(result[1].getTokenType() == pylir::TokenType::Newline);
-    CHECK(result[1].getOffset() == 7);
-    CHECK(result[1].getSize() == 1);
-    CHECK(result[2].getTokenType() == pylir::TokenType::Identifier);
-    CHECK(result[2].getOffset() == 8);
-    CHECK(result[2].getSize() == 4);
-    CHECK(result[3].getTokenType() == pylir::TokenType::Newline);
-    CHECK(result[3].getOffset() == 12);
-    CHECK(result[3].getSize() == 1);
-    CHECK(result[4].getTokenType() == pylir::TokenType::Identifier);
-    CHECK(result[4].getOffset() == 13);
-    CHECK(result[4].getSize() == 6);
-    CHECK(result[5].getTokenType() == pylir::TokenType::Newline);
-    CHECK(result[5].getOffset() == 19);
-    CHECK(result[5].getSize() == 1);
+    SECTION("Variations")
+    {
+        pylir::Diag::Document document("Windows\r\n"
+                                       "Unix\n"
+                                       "OldMac\r"
+                                       "");
+        pylir::Lexer lexer(document, 1);
+        std::vector result(lexer.begin(), lexer.end());
+        REQUIRE(result.size() == 7);
+        CHECK(result[0].getTokenType() == pylir::TokenType::Identifier);
+        CHECK(result[0].getOffset() == 0);
+        CHECK(result[0].getSize() == 7);
+        CHECK(result[1].getTokenType() == pylir::TokenType::Newline);
+        CHECK(result[1].getOffset() == 7);
+        CHECK(result[1].getSize() == 1);
+        CHECK(result[2].getTokenType() == pylir::TokenType::Identifier);
+        CHECK(result[2].getOffset() == 8);
+        CHECK(result[2].getSize() == 4);
+        CHECK(result[3].getTokenType() == pylir::TokenType::Newline);
+        CHECK(result[3].getOffset() == 12);
+        CHECK(result[3].getSize() == 1);
+        CHECK(result[4].getTokenType() == pylir::TokenType::Identifier);
+        CHECK(result[4].getOffset() == 13);
+        CHECK(result[4].getSize() == 6);
+        CHECK(result[5].getTokenType() == pylir::TokenType::Newline);
+        CHECK(result[5].getOffset() == 19);
+        CHECK(result[5].getSize() == 1);
+    }
+    SECTION("Implicit continuation")
+    {
+        pylir::Diag::Document document("(\n5\n)");
+        pylir::Lexer lexer(document, 1);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const auto& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 4);
+        CHECK(result[0] == pylir::TokenType::OpenParentheses);
+        CHECK(result[1] == pylir::TokenType::IntegerLiteral);
+        CHECK(result[2] == pylir::TokenType::CloseParentheses);
+        CHECK(result[3] == pylir::TokenType::Newline);
+    }
 }
 
 TEST_CASE("Lex line continuation", "[Lexer]")
