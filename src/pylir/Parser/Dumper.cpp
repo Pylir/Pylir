@@ -527,47 +527,27 @@ std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AExpr& aExpr)
 {
-    if (auto* mExpr = std::get_if<Syntax::MExpr>(&aExpr.variant))
-    {
-        return dump(*mExpr);
-    }
-    return std::string();
+    return dumpBinOp(aExpr, "aexpr");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ShiftExpr& shiftExpr)
 {
-    if (auto* aExpr = std::get_if<Syntax::AExpr>(&shiftExpr.variant))
-    {
-        return dump(*aExpr);
-    }
-    return std::string();
+    return dumpBinOp(shiftExpr, "shiftExpr");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AndExpr& andExpr)
 {
-    if (auto* shiftExpr = std::get_if<Syntax::ShiftExpr>(&andExpr.variant))
-    {
-        return dump(*shiftExpr);
-    }
-    return std::string();
+    return dumpBinOp(andExpr, "andExpr");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::XorExpr& xorExpr)
 {
-    if (auto* andExpr = std::get_if<Syntax::AndExpr>(&xorExpr.variant))
-    {
-        return dump(*andExpr);
-    }
-    return std::string();
+    return dumpBinOp(xorExpr, "xorExpr");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::OrExpr& orExpr)
 {
-    if (auto* xorExpr = std::get_if<Syntax::XorExpr>(&orExpr.variant))
-    {
-        return dump(*xorExpr);
-    }
-    return std::string();
+    return dumpBinOp(orExpr, "orExpr");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
@@ -576,34 +556,50 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
     {
         return dump(comparison.left);
     }
-    return std::string();
+    std::string result = "comparison";
+    result += addMiddleChild(dump(comparison.left), "lhs");
+    for (auto& [token, rhs] : tcb::span(comparison.rest).first(comparison.rest.size() - 1))
+    {
+        std::string name;
+        if (token.secondToken)
+        {
+            name = fmt::format("{:q} {:q}", token.firstToken.getTokenType(), token.secondToken->getTokenType());
+        }
+        else
+        {
+            name = fmt::format("{:q}", token.firstToken.getTokenType());
+        }
+        result += addMiddleChild(dump(rhs), name);
+    }
+    std::string name;
+    if (comparison.rest.back().first.secondToken)
+    {
+        name = fmt::format("{:q} {:q}", comparison.rest.back().first.firstToken.getTokenType(),
+                           comparison.rest.back().first.secondToken->getTokenType());
+    }
+    else
+    {
+        name = fmt::format("{:q}", comparison.rest.back().first.firstToken.getTokenType());
+    }
+    result += addLastChild(dump(comparison.rest.back().second), name);
+    return result;
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::NotTest& notTest)
 {
-    if (auto* comparison = std::get_if<Syntax::Comparison>(&notTest.variant))
-    {
-        return dump(*comparison);
-    }
-    return std::string();
+    return pylir::match(
+        notTest.variant, [&](const Syntax::Comparison& comparison) { return dump(comparison); },
+        [&](const auto& pair) { return "notTest" + addLastChild(dump(*pair.second)); });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AndTest& andTest)
 {
-    if (auto* notTest = std::get_if<Syntax::NotTest>(&andTest.variant))
-    {
-        return dump(*notTest);
-    }
-    return std::string();
+    return dumpBinOp(andTest, "andTest");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::OrTest& orTest)
 {
-    if (auto* andTest = std::get_if<Syntax::AndTest>(&orTest.variant))
-    {
-        return dump(*andTest);
-    }
-    return std::string();
+    return dumpBinOp(orTest, "orTest");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ConditionalExpression& conditionalExpression)
@@ -612,12 +608,15 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ConditionalExpression& cond
     {
         return dump(conditionalExpression.value);
     }
-    return std::string();
+    return fmt::format("conditional expression") + addMiddleChild(dump(conditionalExpression.value), "value")
+           + addMiddleChild(dump(conditionalExpression.suffix->test), "condition")
+           + addLastChild(dump(*conditionalExpression.suffix->elseValue), "elseValue");
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::LambdaExpression& lambdaExpression)
 {
-    return std::string();
+    // TODO: parameter list
+    return fmt::format("lambda expression") + addLastChild(dump(lambdaExpression.expression));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Expression& expression)
@@ -663,7 +662,13 @@ std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredE
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompIf& compIf)
 {
-    return std::string();
+    auto result = fmt::format("comp if");
+    return pylir::match(
+        compIf.compIter, [&](std::monostate) { return result + addLastChild(dump(compIf.orTest), "condition"); },
+        [&](const Syntax::CompFor& compFor)
+        { return result + addMiddleChild(dump(compIf.orTest), "condition") + addLastChild(dump(compFor)); },
+        [&](const std::unique_ptr<Syntax::CompIf>& second)
+        { return result + addMiddleChild(dump(compIf.orTest), "condition") + addLastChild(dump(*second)); });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompFor& compFor)

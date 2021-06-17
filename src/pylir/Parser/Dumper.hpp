@@ -1,5 +1,7 @@
 #pragma once
 
+#include <pylir/Support/Variant.hpp>
+
 #include <string>
 
 #include <tcb/span.hpp>
@@ -30,6 +32,19 @@ class Dumper
         }
         result += addLastChild(dump(*list.remainingExpr.back().second));
         return result;
+    }
+
+    template <class ThisClass>
+    std::string dumpBinOp(const ThisClass& thisClass, std::string_view name)
+    {
+        return pylir::match(
+            thisClass.variant, [&](const auto& previous) { return dump(previous); },
+            [&](const typename ThisClass::BinOp& binOp)
+            {
+                auto& [lhs, token, rhs] = binOp;
+                return fmt::format(FMT_STRING("{} {:q}"), name, token.getTokenType())
+                       + addMiddleChild(dump(*lhs), "lhs") + addLastChild(dump(rhs), "rhs");
+            });
     }
 
 public:
