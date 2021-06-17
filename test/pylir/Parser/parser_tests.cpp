@@ -218,3 +218,9 @@ TEST_CASE("Parse calls", "[Parser]")
                                                         "  `-keyword item c\n"
                                                         "    `-atom 3"));
 }
+
+TEST_CASE("Parse await expression", "[Parser]")
+{
+    CHECK_THAT(dumpExpression("await 5"), Contains("await expression\n"
+                                                   "`-atom 5"));
+}

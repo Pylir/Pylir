@@ -485,7 +485,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AwaitExpr& awaitExpr)
 {
-    return std::string();
+    return fmt::format("await expression") + addLastChild(dump(awaitExpr.primary));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::UExpr& uExpr)
