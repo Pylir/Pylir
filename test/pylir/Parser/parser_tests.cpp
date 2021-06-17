@@ -249,3 +249,31 @@ TEST_CASE("Parse power expression", "[Parser]")
                                                         "`-exponent: atom 5"));
 }
 
+TEST_CASE("Parse mexpr", "[Parser]")
+{
+    CHECK_THAT(dumpExpression("2 * 5"), Contains("mexpr '*'\n"
+                                                 "|-lhs: atom 2\n"
+                                                 "`-rhs: atom 5"));
+    CHECK_THAT(dumpExpression("2 @ 5"), Contains("mexpr '@'\n"
+                                                 "|-lhs: atom 2\n"
+                                                 "`-rhs: atom 5"));
+    CHECK_THAT(dumpExpression("2 // 5"), Contains("mexpr '//'\n"
+                                                  "|-lhs: atom 2\n"
+                                                  "`-rhs: atom 5"));
+    CHECK_THAT(dumpExpression("2 / 5"), Contains("mexpr '/'\n"
+                                                 "|-lhs: atom 2\n"
+                                                 "`-rhs: atom 5"));
+    CHECK_THAT(dumpExpression("2 % 5"), Contains("mexpr '%'\n"
+                                                 "|-lhs: atom 2\n"
+                                                 "`-rhs: atom 5"));
+    CHECK_THAT(dumpExpression("2 @ 5 * 3"), Contains("mexpr '@'\n"
+                                                     "|-lhs: atom 2\n"
+                                                     "`-rhs: mexpr '*'\n"
+                                                     "  |-lhs: atom 5\n"
+                                                     "  `-rhs: atom 3"));
+    CHECK_THAT(dumpExpression("2 / 5 * 3"), Contains("mexpr '*'\n"
+                                                     "|-lhs: mexpr '/'\n"
+                                                     "| |-lhs: atom 2\n"
+                                                     "| `-rhs: atom 5\n"
+                                                     "`-rhs: atom 3"));
+}

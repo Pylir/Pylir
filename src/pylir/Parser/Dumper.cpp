@@ -511,11 +511,18 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Power& power)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)
 {
-    if (auto* uExpr = std::get_if<Syntax::UExpr>(&mExpr.variant))
-    {
-        return dump(*uExpr);
-    }
-    return std::string();
+    return pylir::match(
+        mExpr.variant, [&](const Syntax::UExpr& uExpr) { return dump(uExpr); },
+        [&](const Syntax::MExpr::BinOp& binOp)
+        {
+            return fmt::format("mexpr {:q}", binOp.binToken.getTokenType()) + addMiddleChild(dump(*binOp.lhs), "lhs")
+                   + addLastChild(dump(binOp.rhs), "rhs");
+        },
+        [&](const Syntax::MExpr::AtBin& binOp)
+        {
+            return fmt::format("mexpr {:q}", binOp.atToken.getTokenType()) + addMiddleChild(dump(*binOp.lhs), "lhs")
+                   + addLastChild(dump(*binOp.rhs), "rhs");
+        });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AExpr& aExpr)
