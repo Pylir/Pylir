@@ -293,7 +293,7 @@ TEST_CASE("Parse shiftExpr", "[Parser]")
     CHECK_THAT(dumpExpression("2 << 5"), Contains("shiftExpr '<<'\n"
                                                   "|-lhs: atom 2\n"
                                                   "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 << 5"), Contains("shiftExpr '>>'\n"
+    CHECK_THAT(dumpExpression("2 >> 5"), Contains("shiftExpr '>>'\n"
                                                   "|-lhs: atom 2\n"
                                                   "`-rhs: atom 5"));
 }
@@ -321,36 +321,36 @@ TEST_CASE("Parse orExpr", "[Parser]")
 
 TEST_CASE("Parse comparison", "[Parser]")
 {
-    CHECK_THAT(dumpExpression("2 < 5"), Contains("comparison '<'\n"
+    CHECK_THAT(dumpExpression("2 < 5"), Contains("comparison\n"
                                                  "|-lhs: atom 2\n"
-                                                 "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 > 5"), Contains("comparison '>'\n"
+                                                 "`-'<': atom 5"));
+    CHECK_THAT(dumpExpression("2 > 5"), Contains("comparison\n"
                                                  "|-lhs: atom 2\n"
-                                                 "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 <= 5"), Contains("comparison '<='\n"
+                                                 "`-'>': atom 5"));
+    CHECK_THAT(dumpExpression("2 <= 5"), Contains("comparison\n"
                                                   "|-lhs: atom 2\n"
-                                                  "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 >= 5"), Contains("comparison '>='\n"
+                                                  "`-'<=': atom 5"));
+    CHECK_THAT(dumpExpression("2 >= 5"), Contains("comparison\n"
                                                   "|-lhs: atom 2\n"
-                                                  "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 == 5"), Contains("comparison '=='\n"
+                                                  "`-'>=': atom 5"));
+    CHECK_THAT(dumpExpression("2 == 5"), Contains("comparison\n"
                                                   "|-lhs: atom 2\n"
-                                                  "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 != 5"), Contains("comparison '!='\n"
+                                                  "`-'==': atom 5"));
+    CHECK_THAT(dumpExpression("2 != 5"), Contains("comparison\n"
                                                   "|-lhs: atom 2\n"
-                                                  "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 is 5"), Contains("comparison 'is'\n"
+                                                  "`-'!=': atom 5"));
+    CHECK_THAT(dumpExpression("2 is 5"), Contains("comparison\n"
                                                   "|-lhs: atom 2\n"
-                                                  "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 is not 5"), Contains("comparison 'is' 'not'\n"
+                                                  "`-'is': atom 5"));
+    CHECK_THAT(dumpExpression("2 is not 5"), Contains("comparison\n"
                                                       "|-lhs: atom 2\n"
-                                                      "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 in 5"), Contains("comparison 'in'\n"
+                                                      "`-'is' 'not': atom 5"));
+    CHECK_THAT(dumpExpression("2 in 5"), Contains("comparison\n"
                                                   "|-lhs: atom 2\n"
-                                                  "`-rhs: atom 5"));
-    CHECK_THAT(dumpExpression("2 not in 5"), Contains("comparison 'not' 'in'\n"
+                                                  "`-'in': atom 5"));
+    CHECK_THAT(dumpExpression("2 not in 5"), Contains("comparison\n"
                                                       "|-lhs: atom 2\n"
-                                                      "`-rhs: atom 5"));
+                                                      "`-'not' 'in': atom 5"));
 }
 
 TEST_CASE("Parse not test", "[Parser]")
@@ -378,7 +378,7 @@ TEST_CASE("Parse andTest", "[Parser]")
 
 TEST_CASE("Parse conditional", "[Parser]")
 {
-    CHECK_THAT(dumpExpression("2 if 3 else 5"), Contains("conditional\n"
+    CHECK_THAT(dumpExpression("2 if 3 else 5"), Contains("conditional expression\n"
                                                          "|-value: atom 2\n"
                                                          "|-condition: atom 3\n"
                                                          "`-elseValue: atom 5"));
@@ -387,5 +387,5 @@ TEST_CASE("Parse conditional", "[Parser]")
 TEST_CASE("Parse lambda", "[Parser]")
 {
     CHECK_THAT(dumpExpression("lambda: 3"), Contains("lambda expression\n"
-                                                     "`-atom 5"));
+                                                     "`-atom 3"));
 }
