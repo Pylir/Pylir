@@ -224,3 +224,16 @@ TEST_CASE("Parse await expression", "[Parser]")
     CHECK_THAT(dumpExpression("await 5"), Contains("await expression\n"
                                                    "`-atom 5"));
 }
+
+TEST_CASE("Parse unary expression", "[Parser]")
+{
+    CHECK_THAT(dumpExpression("-5"), Contains("unary '-'\n"
+                                              "`-atom 5"));
+    CHECK_THAT(dumpExpression("+5"), Contains("unary '+'\n"
+                                              "`-atom 5"));
+    CHECK_THAT(dumpExpression("~5"), Contains("unary '~'\n"
+                                              "`-atom 5"));
+    CHECK_THAT(dumpExpression("+-5"), Contains("unary '+'\n"
+                                               "`-unary '-'\n"
+                                               "  `-atom 5"));
+}

@@ -494,7 +494,8 @@ std::string pylir::Dumper::dump(const pylir::Syntax::UExpr& uExpr)
     {
         return dump(*power);
     }
-    return std::string();
+    auto& [token, rhs] = pylir::get<std::pair<Token, std::unique_ptr<Syntax::UExpr>>>(uExpr.variant);
+    return fmt::format(FMT_STRING("unary {:q}"), token.getTokenType()) + addLastChild(dump(*rhs));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Power& power)
