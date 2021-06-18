@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <stack>
 #include <string_view>
 #include <vector>
 
@@ -26,6 +27,7 @@ class Lexer
     Diag::Document::iterator m_current;
     std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> m_warningCallback;
     std::size_t m_depth = 0;
+    std::stack<std::size_t> m_indentation{{0}};
 
     bool parseNext();
 
@@ -34,6 +36,8 @@ class Lexer
     tl::expected<std::string, std::string> parseLiteral(bool raw, bool bytes);
 
     void parseNumber();
+
+    void parseIndent();
 
 public:
     using value_type = Token;

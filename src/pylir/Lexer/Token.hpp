@@ -104,7 +104,9 @@ enum class TokenType : std::uint8_t
     BitXorAssignment,
     ShiftRightAssignment,
     ShiftLeftAssignment,
-    PowerOfAssignment
+    PowerOfAssignment,
+    Indent,
+    Dedent
 };
 
 class Token

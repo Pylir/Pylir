@@ -4,6 +4,7 @@
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
+#include <pylir/Support/Util.hpp>
 
 #include <charconv>
 #include <functional>
@@ -309,6 +310,7 @@ bool pylir::Lexer::parseNext()
                 if (m_depth == 0)
                 {
                     m_tokens.emplace_back(offset, 1, m_fileId, TokenType::Newline);
+                    parseIndent();
                     break;
                 }
                 continue;
@@ -337,6 +339,10 @@ bool pylir::Lexer::parseNext()
                     return true;
                 }
                 m_current++;
+                if (m_depth == 0)
+                {
+                    parseIndent();
+                }
                 break;
             }
             case U'u':
@@ -708,6 +714,7 @@ bool pylir::Lexer::parseNext()
     if (m_current == m_document->end())
     {
         m_tokens.emplace_back(m_current - m_document->begin(), 0, m_fileId, TokenType::Newline);
+        parseIndent();
     }
     return true;
 }
@@ -1438,4 +1445,41 @@ void pylir::Lexer::parseNumber()
     }
     m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, tokenType, number);
     checkSuffix();
+}
+
+void pylir::Lexer::parseIndent()
+{
+    auto start = m_current;
+    std::size_t indent = 0;
+    for (; m_current != m_document->end(); m_current++)
+    {
+        if (!Text::isWhitespace(*m_current))
+        {
+            break;
+        }
+        if (*m_current == '\t')
+        {
+            indent = pylir::roundUpTo(indent, 8);
+        }
+        else
+        {
+            indent++;
+        }
+    }
+    if (indent < m_indentation.top())
+    {
+        while (m_indentation.top() < indent)
+        {
+            m_tokens.emplace_back(m_current - m_document->begin(), 0, m_fileId, TokenType::Dedent);
+        }
+        if (m_indentation.top() != indent)
+        {
+            // TODO: Syntax error
+        }
+    }
+    else if (indent > m_indentation.top())
+    {
+        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Indent);
+        m_indentation.push(indent);
+    }
 }
