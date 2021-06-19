@@ -27,7 +27,7 @@ class Lexer
     Diag::Document::iterator m_current;
     std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> m_warningCallback;
     std::size_t m_depth = 0;
-    std::stack<std::size_t> m_indentation{{0}};
+    std::stack<std::pair<std::size_t, std::size_t>> m_indentation{{{0, static_cast<std::size_t>(-1)}}};
 
     bool parseNext();
 

@@ -1466,20 +1466,41 @@ void pylir::Lexer::parseIndent()
             indent++;
         }
     }
-    if (indent < m_indentation.top())
+    if (indent < m_indentation.top().first)
     {
-        while (m_indentation.top() < indent)
+        std::pair<std::size_t, std::size_t> previous;
+        do
         {
-            m_tokens.emplace_back(m_current - m_document->begin(), 0, m_fileId, TokenType::Dedent);
-        }
-        if (m_indentation.top() != indent)
+            m_tokens.emplace_back(start - m_document->begin(), start - m_document->begin(), m_fileId,
+                                  TokenType::Dedent);
+            previous = m_indentation.top();
+            m_indentation.pop();
+        } while (indent < m_indentation.top().first);
+        if (m_indentation.top().first != indent)
         {
-            // TODO: Syntax error
+            auto builder =
+                createDiagnosticsBuilder(m_current - m_document->begin(), Diag::INVALID_INDENTATION_N, indent)
+                    .addLabel(start - m_document->begin(), m_current - m_document->begin(), std::nullopt,
+                              Diag::ERROR_COLOUR);
+            if (previous.first - indent < indent - m_indentation.top().first)
+            {
+                builder.addNote(m_tokens[previous.second], Diag::NEXT_CLOSEST_INDENTATION_N, previous.first)
+                    .addLabel(m_tokens[previous.second], std::nullopt, Diag::NOTE_COLOUR);
+            }
+            else if (m_indentation.top().first != 0)
+            {
+                builder
+                    .addNote(m_tokens[m_indentation.top().second], Diag::NEXT_CLOSEST_INDENTATION_N,
+                             m_indentation.top().first)
+                    .addLabel(m_tokens[m_indentation.top().second], std::nullopt, Diag::NOTE_COLOUR);
+            }
+            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::SyntaxError,
+                                  builder.emitError());
         }
     }
-    else if (indent > m_indentation.top())
+    else if (indent > m_indentation.top().first)
     {
         m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Indent);
-        m_indentation.push(indent);
+        m_indentation.emplace(indent, m_tokens.size() - 1);
     }
 }

@@ -45,4 +45,8 @@ constexpr auto EXPECTED_N = FMT_STRING("expected {:q^}");
 
 constexpr auto EXPECTED_N_INSTEAD_OF_N = FMT_STRING("expected {:q^} instead of {:q^}");
 
+constexpr auto INVALID_INDENTATION_N = FMT_STRING("invalid indentation {}");
+
+constexpr auto NEXT_CLOSEST_INDENTATION_N = FMT_STRING("next closest indent {}");
+
 } // namespace pylir::Diag

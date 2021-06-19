@@ -712,3 +712,93 @@ TEST_CASE("Lex operators and delimiters", "[Lexer]")
                            pylir::TokenType::PowerOfAssignment,
                        }));
 }
+
+TEST_CASE("Lex indentation", "[Lexer]")
+{
+    SECTION("EOF")
+    {
+        pylir::Diag::Document document("foo\n"
+                                       "    bar");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 6);
+        CHECK(result[0] == pylir::TokenType::Identifier);
+        CHECK(result[1] == pylir::TokenType::Newline);
+        CHECK(result[2] == pylir::TokenType::Indent);
+        CHECK(result[3] == pylir::TokenType::Identifier);
+        CHECK(result[4] == pylir::TokenType::Newline);
+        CHECK(result[5] == pylir::TokenType::Dedent);
+    }
+    SECTION("Dedent")
+    {
+        pylir::Diag::Document document("foo\n"
+                                       "    bar\n"
+                                       "foobar");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 8);
+        CHECK(result[0] == pylir::TokenType::Identifier);
+        CHECK(result[1] == pylir::TokenType::Newline);
+        CHECK(result[2] == pylir::TokenType::Indent);
+        CHECK(result[3] == pylir::TokenType::Identifier);
+        CHECK(result[4] == pylir::TokenType::Newline);
+        CHECK(result[5] == pylir::TokenType::Dedent);
+        CHECK(result[6] == pylir::TokenType::Identifier);
+        CHECK(result[7] == pylir::TokenType::Newline);
+    }
+    SECTION("Continuing")
+    {
+        pylir::Diag::Document document("foo\n"
+                                       "    bar\n"
+                                       "    foobar");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 8);
+        CHECK(result[0] == pylir::TokenType::Identifier);
+        CHECK(result[1] == pylir::TokenType::Newline);
+        CHECK(result[2] == pylir::TokenType::Indent);
+        CHECK(result[3] == pylir::TokenType::Identifier);
+        CHECK(result[4] == pylir::TokenType::Newline);
+        CHECK(result[5] == pylir::TokenType::Identifier);
+        CHECK(result[6] == pylir::TokenType::Newline);
+        CHECK(result[7] == pylir::TokenType::Dedent);
+    }
+    SECTION("Tab")
+    {
+        pylir::Diag::Document document("foo\n"
+                                       "    bar\n"
+                                       " \tfoobar\n"
+                                       "        barfoo");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 12);
+        CHECK(result[0] == pylir::TokenType::Identifier);
+        CHECK(result[1] == pylir::TokenType::Newline);
+        CHECK(result[2] == pylir::TokenType::Indent);
+        CHECK(result[3] == pylir::TokenType::Identifier);
+        CHECK(result[4] == pylir::TokenType::Newline);
+        CHECK(result[5] == pylir::TokenType::Indent);
+        CHECK(result[6] == pylir::TokenType::Identifier);
+        CHECK(result[7] == pylir::TokenType::Newline);
+        CHECK(result[8] == pylir::TokenType::Identifier);
+        CHECK(result[9] == pylir::TokenType::Newline);
+        CHECK(result[10] == pylir::TokenType::Dedent);
+        CHECK(result[11] == pylir::TokenType::Dedent);
+    }
+    LEXER_EMITS("foo\n"
+                "    bar\n"
+                "   foobar",
+                pylir::Diag::INVALID_INDENTATION_N, 3);
+    LEXER_EMITS("foo\n"
+                "    bar\n"
+                "   foobar",
+                pylir::Diag::NEXT_CLOSEST_INDENTATION_N, 4);
+}
