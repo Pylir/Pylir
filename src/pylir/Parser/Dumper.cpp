@@ -216,32 +216,33 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
         },
         [&](const Syntax::Enclosure::YieldAtom& yieldAtom) -> std::string
         {
-            return pylir::match(
-                yieldAtom.variant, [](std::monostate) -> std::string { return "yield empty"; },
-                [&](const std::pair<Token, Syntax::Expression>& expression) -> std::string
-                {
-                    std::string result = "yield from";
-                    result += addLastChild(dump(expression.second));
-                    return result;
-                },
-                [&](const Syntax::ExpressionList& list) -> std::string
-                {
-                    std::string result = "yield list";
-                    if (list.remainingExpr.empty())
-                    {
-                        result += addLastChild(dump(*list.firstExpr));
-                    }
-                    else
-                    {
-                        result += addMiddleChild(dump(*list.firstExpr));
-                        for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
-                        {
-                            result += addMiddleChild(dump(*iter.second));
-                        }
-                        result += addLastChild(dump(*list.remainingExpr.back().second));
-                    }
-                    return result;
-                });
+            return "yieldatom"
+                   + addLastChild(pylir::match(
+                       yieldAtom.yieldExpression.variant, [](std::monostate) -> std::string { return "yield empty"; },
+                       [&](const std::pair<Token, Syntax::Expression>& expression) -> std::string
+                       {
+                           std::string result = "yield from";
+                           result += addLastChild(dump(expression.second));
+                           return result;
+                       },
+                       [&](const Syntax::ExpressionList& list) -> std::string
+                       {
+                           std::string result = "yield list";
+                           if (list.remainingExpr.empty())
+                           {
+                               result += addLastChild(dump(*list.firstExpr));
+                           }
+                           else
+                           {
+                               result += addMiddleChild(dump(*list.firstExpr));
+                               for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
+                               {
+                                   result += addMiddleChild(dump(*iter.second));
+                               }
+                               result += addLastChild(dump(*list.remainingExpr.back().second));
+                           }
+                           return result;
+                       }));
         },
         [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> std::string
         {

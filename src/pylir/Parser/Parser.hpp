@@ -95,6 +95,8 @@ public:
         return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
     }
 
+    tl::expected<Syntax::YieldExpression, std::string> parseYieldExpression();
+
     tl::expected<Syntax::Atom, std::string> parseAtom();
 
     tl::expected<Syntax::AttributeRef, std::string> parseAttributeRef(std::unique_ptr<Syntax::Primary>&& primary);

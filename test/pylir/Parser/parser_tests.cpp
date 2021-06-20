@@ -60,14 +60,18 @@ TEST_CASE("Parse Enclosure", "[Parser]")
     }
     SECTION("yield")
     {
-        CHECK_THAT(dumpExpression("(yield from 5)"), Contains("yield from\n"
-                                                              "`-atom 5"));
-        CHECK_THAT(dumpExpression("(yield)"), Contains("yield empty"));
-        CHECK_THAT(dumpExpression("(yield 5)"), Contains("yield list\n"
-                                                         "`-atom 5"));
-        CHECK_THAT(dumpExpression("(yield 5,5,)"), Contains("yield list\n"
-                                                            "|-atom 5\n"
-                                                            "`-atom 5"));
+        CHECK_THAT(dumpExpression("(yield from 5)"), Contains("yieldatom\n"
+                                                              "`-yield from\n"
+                                                              "  `-atom 5"));
+        CHECK_THAT(dumpExpression("(yield)"), Contains("yieldatom\n"
+                                                       "`-yield empty"));
+        CHECK_THAT(dumpExpression("(yield 5)"), Contains("yieldatom\n"
+                                                         "`-yield list\n"
+                                                         "  `-atom 5"));
+        CHECK_THAT(dumpExpression("(yield 5,5,)"), Contains("yieldatom\n"
+                                                            "`-yield list\n"
+                                                            "  |-atom 5\n"
+                                                            "  `-atom 5"));
     }
     SECTION("List display")
     {

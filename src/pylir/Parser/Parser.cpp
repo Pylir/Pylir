@@ -44,6 +44,39 @@ bool pylir::Parser::lookaheadEquals(tcb::span<const TokenType> tokens)
                       [](const Token& token, TokenType tokenType) { return token.getTokenType() == tokenType; });
 }
 
+tl::expected<pylir::Syntax::YieldExpression, std::string> pylir::Parser::parseYieldExpression()
+{
+    auto yield = expect(TokenType::YieldKeyword);
+    if (!yield)
+    {
+        return tl::unexpected{std::move(yield).error()};
+    }
+
+    if (m_current == m_lexer.end()
+        || (m_current->getTokenType() != TokenType::FromKeyword
+            && !Syntax::firstInExpression(m_current->getTokenType())))
+    {
+        return Syntax::YieldExpression{std::move(*yield), std::monostate{}};
+    }
+
+    if (m_current->getTokenType() == TokenType::FromKeyword)
+    {
+        auto from = *m_current++;
+        auto expression = parseExpression();
+        if (!expression)
+        {
+            return tl::unexpected{std::move(expression).error()};
+        }
+        return Syntax::YieldExpression{std::move(*yield), std::pair{std::move(from), std::move(*expression)}};
+    }
+    auto list = parseExpressionList();
+    if (!list)
+    {
+        return tl::unexpected{std::move(list).error()};
+    }
+    return Syntax::YieldExpression{std::move(*yield), std::move(*list)};
+}
+
 tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
 {
     if (m_current == m_lexer.end())
@@ -116,47 +149,18 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
             }
             if (m_current->getTokenType() == TokenType::YieldKeyword)
             {
-                auto yield = *m_current++;
-                if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses)
+                auto yield = parseYieldExpression();
+                if (!yield)
                 {
-                    auto closeParentheses = expect(TokenType::CloseParentheses);
-                    if (!closeParentheses)
-                    {
-                        return tl::unexpected{std::move(closeParentheses).error()};
-                    }
-                    return Syntax::Enclosure{Syntax::Enclosure::YieldAtom{
-                        std::move(openParenth), std::move(yield), std::monostate{}, std::move(*closeParentheses)}};
-                }
-
-                if (m_current->getTokenType() == TokenType::FromKeyword)
-                {
-                    auto from = *m_current++;
-                    auto expression = parseExpression();
-                    if (!expression)
-                    {
-                        return tl::unexpected{std::move(expression).error()};
-                    }
-                    auto closeParentheses = expect(TokenType::CloseParentheses);
-                    if (!closeParentheses)
-                    {
-                        return tl::unexpected{std::move(closeParentheses).error()};
-                    }
-                    return Syntax::Enclosure{Syntax::Enclosure::YieldAtom{
-                        std::move(openParenth), std::move(yield), std::pair{std::move(from), std::move(*expression)},
-                        std::move(*closeParentheses)}};
-                }
-                auto list = parseExpressionList();
-                if (!list)
-                {
-                    return tl::unexpected{std::move(list).error()};
+                    return tl::unexpected{std::move(yield).error()};
                 }
                 auto closeParentheses = expect(TokenType::CloseParentheses);
                 if (!closeParentheses)
                 {
                     return tl::unexpected{std::move(closeParentheses).error()};
                 }
-                return Syntax::Enclosure{Syntax::Enclosure::YieldAtom{std::move(openParenth), std::move(yield),
-                                                                      std::move(*list), std::move(*closeParentheses)}};
+                return Syntax::Enclosure{Syntax::Enclosure::YieldAtom{std::move(openParenth), std::move(*yield),
+                                                                      std::move(*closeParentheses)}};
             }
 
             if (Syntax::firstInStarredItem(m_current->getTokenType())

@@ -23,8 +23,15 @@ using ExpressionList = CommaList<Expression>;
 
 struct Enclosure;
 
+/**
+ * atom      ::=  identifier | literal | enclosure
+ */
 struct Atom
 {
+    /**
+     * literal ::=  stringliteral | bytesliteral
+                    | integer | floatnumber | imagnumber
+     */
     struct Literal
     {
         Token token;
@@ -40,6 +47,9 @@ struct Atom
 
 struct Primary;
 
+/**
+ * attributeref ::=  primary "." identifier
+ */
 struct AttributeRef
 {
     std::unique_ptr<Primary> primary;
@@ -47,6 +57,9 @@ struct AttributeRef
     Token identifier;
 };
 
+/**
+ * subscription ::=  primary "[" expression_list "]"
+ */
 struct Subscription
 {
     std::unique_ptr<Primary> primary;
@@ -55,6 +68,15 @@ struct Subscription
     Token closeSquareBracket;
 };
 
+/**
+ * slicing      ::=  primary "[" slice_list "]"
+   slice_list   ::=  slice_item ("," slice_item)* [","]
+   slice_item   ::=  expression | proper_slice
+   proper_slice ::=  [lower_bound] ":" [upper_bound] [ ":" [stride] ]
+   lower_bound  ::=  expression
+   upper_bound  ::=  expression
+   stride       ::=  expression
+ */
 struct Slicing
 {
     std::unique_ptr<Primary> primary;
@@ -75,6 +97,20 @@ struct Comprehension;
 
 struct AssignmentExpression;
 
+/**
+ * call                 ::=  primary "(" [argument_list [","] | comprehension] ")"
+   argument_list        ::=  positional_arguments ["," starred_and_keywords]
+                            ["," keywords_arguments]
+                          | starred_and_keywords ["," keywords_arguments]
+                          | keywords_arguments
+   positional_arguments ::=  positional_item ("," positional_item)*
+   positional_item      ::=  assignment_expression | "*" expression
+   starred_and_keywords ::=  ("*" expression | keyword_item)
+                          ("," "*" expression | "," keyword_item)*
+   keywords_arguments   ::=  (keyword_item | "**" expression)
+                          ("," keyword_item | "," "**" expression)*
+   keyword_item         ::=  identifier "=" expression
+ */
 struct Call
 {
     struct PositionalItem
@@ -139,11 +175,17 @@ struct Call
     Token closeParentheses;
 };
 
+/**
+ * primary ::=  atom | attributeref | subscription | slicing | call
+ */
 struct Primary
 {
     std::variant<Atom, AttributeRef, Subscription, Slicing, Call> variant;
 };
 
+/**
+ * await_expr ::=  "await" primary
+ */
 struct AwaitExpr
 {
     Token awaitToken;
@@ -152,17 +194,28 @@ struct AwaitExpr
 
 struct UExpr;
 
+/**
+ * power ::=  (await_expr | primary) ["**" u_expr]
+ */
 struct Power
 {
     std::variant<AwaitExpr, Primary> variant;
     std::optional<std::pair<Token, std::unique_ptr<UExpr>>> rightHand;
 };
 
+/**
+ * u_expr ::=  power | "-" u_expr | "+" u_expr | "~" u_expr
+ */
 struct UExpr
 {
     std::variant<Power, std::pair<Token, std::unique_ptr<UExpr>>> variant;
 };
 
+/**
+ * m_expr ::=  u_expr | m_expr "*" u_expr | m_expr "@" m_expr |
+            m_expr "//" u_expr | m_expr "/" u_expr |
+            m_expr "%" u_expr
+ */
 struct MExpr
 {
     struct AtBin
@@ -182,6 +235,9 @@ struct MExpr
     std::variant<UExpr, AtBin, BinOp> variant;
 };
 
+/**
+ * a_expr ::=  m_expr | a_expr "+" m_expr | a_expr "-" m_expr
+ */
 struct AExpr
 {
     struct BinOp
@@ -194,6 +250,9 @@ struct AExpr
     std::variant<MExpr, BinOp> variant;
 };
 
+/**
+ * shift_expr ::=  a_expr | shift_expr ("<<" | ">>") a_expr
+ */
 struct ShiftExpr
 {
     struct BinOp
@@ -206,6 +265,9 @@ struct ShiftExpr
     std::variant<AExpr, BinOp> variant;
 };
 
+/**
+ * and_expr ::=  shift_expr | and_expr "&" shift_expr
+ */
 struct AndExpr
 {
     struct BinOp
@@ -218,6 +280,9 @@ struct AndExpr
     std::variant<ShiftExpr, BinOp> variant;
 };
 
+/**
+ * xor_expr ::=  and_expr | xor_expr "^" and_expr
+ */
 struct XorExpr
 {
     struct BinOp
@@ -230,6 +295,9 @@ struct XorExpr
     std::variant<AndExpr, BinOp> variant;
 };
 
+/**
+ * or_expr  ::=  xor_expr | or_expr "|" xor_expr
+ */
 struct OrExpr
 {
     struct BinOp
@@ -242,6 +310,11 @@ struct OrExpr
     std::variant<XorExpr, BinOp> variant;
 };
 
+/**
+ * comparison    ::=  or_expr (comp_operator or_expr)*
+   comp_operator ::=  "<" | ">" | "==" | ">=" | "<=" | "!="
+                   | "is" ["not"] | ["not"] "in"
+ */
 struct Comparison
 {
     OrExpr left;
@@ -253,11 +326,17 @@ struct Comparison
     std::vector<std::pair<Operator, OrExpr>> rest;
 };
 
+/**
+ * not_test ::=  comparison | "not" not_test
+ */
 struct NotTest
 {
     std::variant<Comparison, std::pair<Token, std::unique_ptr<NotTest>>> variant;
 };
 
+/**
+ * and_test ::=  not_test | and_test "and" not_test
+ */
 struct AndTest
 {
     struct BinOp
@@ -270,6 +349,9 @@ struct AndTest
     std::variant<NotTest, BinOp> variant;
 };
 
+/**
+ * or_test  ::=  and_test | or_test "or" and_test
+ */
 struct OrTest
 {
     struct BinOp
@@ -282,6 +364,9 @@ struct OrTest
     std::variant<AndTest, BinOp> variant;
 };
 
+/**
+ * assignment_expression ::=  [identifier ":="] expression
+ */
 struct AssignmentExpression
 {
     std::optional<std::pair<Token, Token>> identifierAndWalrus;
@@ -290,6 +375,9 @@ struct AssignmentExpression
 
 inline bool firstInAssignmentExpression(TokenType tokenType);
 
+/**
+ * conditional_expression ::=  or_test ["if" or_test "else" expression]
+ */
 struct ConditionalExpression
 {
     OrTest value;
@@ -305,6 +393,9 @@ struct ConditionalExpression
 
 struct LambdaExpression;
 
+/**
+ * expression             ::=  conditional_expression | lambda_expr
+ */
 struct Expression
 {
     std::variant<ConditionalExpression, std::unique_ptr<LambdaExpression>> variant;
@@ -335,6 +426,9 @@ inline bool firstInExpression(TokenType tokenType)
 
 struct ParameterList;
 
+/**
+ * lambda_expr ::=  "lambda" [parameter_list] ":" expression
+ */
 struct LambdaExpression
 {
     Token lambdaToken;
@@ -343,6 +437,9 @@ struct LambdaExpression
     Expression expression;
 };
 
+/**
+ * starred_item       ::=  assignment_expression | "*" or_expr
+ */
 struct StarredItem
 {
     std::variant<AssignmentExpression, std::pair<Token, OrExpr>> variant;
@@ -355,6 +452,9 @@ inline bool firstInStarredItem(TokenType tokenType)
 
 using StarredList = CommaList<StarredItem>;
 
+/**
+ * starred_expression ::=  expression | (starred_item ",")* [starred_item]
+ */
 struct StarredExpression
 {
     struct Items
@@ -371,6 +471,9 @@ using TargetList = CommaList<Target>;
 
 struct CompIf;
 
+/**
+ * comp_for      ::=  ["async"] "for" target_list "in" or_test [comp_iter]
+ */
 struct CompFor
 {
     std::optional<Token> awaitToken;
@@ -392,6 +495,9 @@ inline bool firstInCompFor(TokenType tokenType)
     return false;
 }
 
+/**
+ * comp_if       ::=  "if" or_test [comp_iter]
+ */
 struct CompIf
 {
     Token ifToken;
@@ -399,6 +505,9 @@ struct CompIf
     std::variant<std::monostate, CompFor, std::unique_ptr<CompIf>> compIter;
 };
 
+/**
+ * comprehension ::=  assignment_expression comp_for
+ */
 struct Comprehension
 {
     AssignmentExpression assignmentExpression;
@@ -410,8 +519,24 @@ inline bool firstInComprehension(TokenType tokenType)
     return firstInAssignmentExpression(tokenType);
 }
 
+/**
+ * yield_expression ::=  "yield" [expression_list | "from" expression]
+ */
+struct YieldExpression
+{
+    Token yieldToken;
+    std::variant<std::monostate, ExpressionList, std::pair<Token, Expression>> variant;
+};
+
+/**
+ * enclosure ::=  parenth_form | list_display | dict_display | set_display
+               | generator_expression | yield_atom
+ */
 struct Enclosure
 {
+    /**
+     * parenth_form ::=  "(" [starred_expression] ")"
+     */
     struct ParenthForm
     {
         Token openParenth;
@@ -419,6 +544,9 @@ struct Enclosure
         Token closeParenth;
     };
 
+    /**
+     * list_display ::=  "[" [starred_list | comprehension] "]"
+     */
     struct ListDisplay
     {
         Token openSquare;
@@ -426,6 +554,9 @@ struct Enclosure
         Token closeSquare;
     };
 
+    /**
+     * set_display ::=  "{" (starred_list | comprehension) "}"
+     */
     struct SetDisplay
     {
         Token openBrace;
@@ -433,6 +564,12 @@ struct Enclosure
         Token closeBrace;
     };
 
+    /**
+     * dict_display       ::=  "{" [key_datum_list | dict_comprehension] "}"
+       key_datum_list     ::=  key_datum ("," key_datum)* [","]
+       key_datum          ::=  expression ":" expression | "**" or_expr
+       dict_comprehension ::=  expression ":" expression comp_for
+     */
     struct DictDisplay
     {
         Token openBrace;
@@ -462,6 +599,9 @@ struct Enclosure
         Token closeBrace;
     };
 
+    /**
+     * generator_expression ::=  "(" expression comp_for ")"
+     */
     struct GeneratorExpression
     {
         Token openParenth;
@@ -470,20 +610,297 @@ struct Enclosure
         Token closeParenth;
     };
 
+    /**
+     * yield_atom       ::=  "(" yield_expression ")"
+     */
     struct YieldAtom
     {
         Token openParenth;
-        Token yieldToken;
-        std::variant<std::monostate, ExpressionList, std::pair<Token, Expression>> variant;
+        YieldExpression yieldExpression;
         Token closeParenth;
     };
 
     std::variant<ParenthForm, ListDisplay, SetDisplay, DictDisplay, GeneratorExpression, YieldAtom> variant;
 };
 
-// TODO:
+/**
+ * target          ::=  identifier
+                     | "(" [target_list] ")"
+                     | "[" [target_list] "]"
+                     | attributeref
+                     | subscription
+                     | slicing
+                     | "*" target
+ */
+
 struct Target
 {
+    struct Parenth
+    {
+        Token openParenth;
+        TargetList targetList;
+        Token closeParenth;
+    };
+
+    struct Square
+    {
+        Token openSquare;
+        TargetList targetList;
+        Token closeSquare;
+    };
+
+    std::variant<Token, Parenth, Square, AttributeRef, Subscription, Slicing, std::pair<Token, std::unique_ptr<Target>>>
+        variant;
+};
+
+/**
+ * assignment_stmt ::=  (target_list "=")+ (starred_expression | yield_expression)
+ */
+struct AssignmentStmt
+{
+    std::vector<std::pair<TargetList, Token>> targets;
+    std::variant<StarredExpression, YieldExpression> variant;
+};
+
+/**
+ * augtarget                 ::=  identifier | attributeref | subscription | slicing
+ */
+struct AugTarget
+{
+    std::variant<Token, AttributeRef, Subscription, Slicing> variant;
+};
+
+/**
+ * augmented_assignment_stmt ::=  augtarget augop (expression_list | yield_expression)
+ * augop                     ::=  "+=" | "-=" | "*=" | "@=" | "/=" | "//=" | "%=" | "**="
+                               | ">>=" | "<<=" | "&=" | "^=" | "|="
+ */
+struct AugmentedAssignmentStmt
+{
+    AugTarget augTarget;
+    Token augOp;
+    std::variant<ExpressionList, YieldExpression> variant;
+};
+
+/**
+ * annotated_assignment_stmt ::=  augtarget ":" expression
+                               ["=" (starred_expression | yield_expression)]
+ */
+struct AnnotatedAssignmentSmt
+{
+    AugTarget augTarget;
+    Token colon;
+    Expression expression;
+    std::optional<std::pair<Token, std::variant<ExpressionList, YieldExpression>>> optionalAssignmentStmt;
+};
+
+/**
+ * assert_stmt ::=  "assert" expression ["," expression]
+ */
+struct AssertStmt
+{
+    Token assertKeyword;
+    Expression condition;
+    std::optional<std::pair<Token, Expression>> message;
+};
+
+/**
+ * pass_stmt ::=  "pass"
+ */
+struct PassStmt
+{
+    Token pass;
+};
+
+/**
+ * del_stmt ::=  "del" target_list
+ */
+struct DelStmt
+{
+    Token del;
+    TargetList targetList;
+};
+
+/**
+ * return_stmt ::=  "return" [expression_list]
+ */
+struct ReturnStmt
+{
+    Token returnKeyword;
+    std::optional<ExpressionList> expressions;
+};
+
+/**
+ * yield_stmt ::=  yield_expression
+ */
+struct YieldStmt
+{
+    YieldExpression yieldExpression;
+};
+
+/**
+ * raise_stmt ::=  "raise" [expression ["from" expression]]
+ */
+struct RaiseStmt
+{
+    Token raise;
+    std::optional<std::pair<Expression, std::optional<std::pair<Token, Expression>>>> expressions;
+};
+
+/**
+ * break_stmt ::=  "break"
+ */
+struct BreakStmt
+{
+    Token breakKeyword;
+};
+
+/**
+ * continue_stmt ::=  "continue"
+ */
+struct ContinueStmt
+{
+    Token continueKeyword;
+};
+
+/**
+ * import_stmt     ::=  "import" module ["as" identifier] ("," module ["as" identifier])*
+                     | "from" relative_module "import" identifier ["as" identifier]
+                     ("," identifier ["as" identifier])*
+                     | "from" relative_module "import" "(" identifier ["as" identifier]
+                     ("," identifier ["as" identifier])* [","] ")"
+                     | "from" relative_module "import" "*"
+   module          ::=  (identifier ".")* identifier
+   relative_module ::=  "."* module | "."+
+ */
+struct ImportStmt
+{
+    struct Module
+    {
+        std::vector<std::pair<Token, Token>> leading;
+        Token lastIdentifier;
+    };
+
+    struct RelativeModule
+    {
+        std::vector<Token> dots;
+        std::optional<Module> module;
+    };
+
+    struct ImportAsAs
+    {
+        Token import;
+        Module module;
+        std::optional<std::pair<Token, Token>> name;
+        struct Further
+        {
+            Token comma;
+            Module module;
+            std::optional<std::pair<Token, Token>> name;
+        };
+        std::vector<Further> rest;
+    };
+
+    struct FromImportList
+    {
+        Token from;
+        RelativeModule relativeModule;
+        Token import;
+        std::optional<Token> openParenth;
+        Token identifier;
+        std::optional<std::pair<Token, Token>> name;
+        struct Further
+        {
+            Token comma;
+            Token identifier;
+            std::optional<std::pair<Token, Token>> name;
+        };
+        std::vector<Further> rest;
+        std::optional<Token> comma;
+        std::optional<Token> closeParenth;
+    };
+
+    struct FromImportAll
+    {
+        Token from;
+        RelativeModule relativeModule;
+        Token import;
+        Token star;
+    };
+
+    std::variant<ImportAsAs, FromImportList, FromImportAll> variant;
+};
+
+/**
+ * future_stmt ::=  "from" "__future__" "import" feature ["as" identifier]
+                 ("," feature ["as" identifier])*
+                 | "from" "__future__" "import" "(" feature ["as" identifier]
+                 ("," feature ["as" identifier])* [","] ")"
+   feature     ::=  identifier
+ */
+struct FutureStmt
+{
+    Token from;
+    Token future;
+    Token import;
+    std::optional<Token> openParenth;
+    Token identifier;
+    std::optional<std::pair<Token, Token>> name;
+    struct Further
+    {
+        Token comma;
+        Token identifier;
+        std::optional<std::pair<Token, Token>> name;
+    };
+    std::vector<Further> rest;
+    std::optional<Token> comma;
+    std::optional<Token> closeParenth;
+};
+
+/**
+ * global_stmt ::=  "global" identifier ("," identifier)*
+ */
+struct GlobalStmt
+{
+    Token global;
+    Token identifier;
+    std::vector<std::pair<Token, Token>> rest;
+};
+
+/**
+ * nonlocal_stmt ::=  "nonlocal" identifier ("," identifier)*
+ */
+struct NonLocalStmt
+{
+    Token nonLocal;
+    Token identifier;
+    std::vector<std::pair<Token, Token>> rest;
+};
+
+/**
+ * simple_stmt ::=  expression_stmt
+                 | assert_stmt
+                 | assignment_stmt
+                 | augmented_assignment_stmt
+                 | annotated_assignment_stmt
+                 | pass_stmt
+                 | del_stmt
+                 | return_stmt
+                 | yield_stmt
+                 | raise_stmt
+                 | break_stmt
+                 | continue_stmt
+                 | import_stmt
+                 | future_stmt
+                 | global_stmt
+                 | nonlocal_stmt
+ */
+struct SimpleStmt
+{
+    std::variant<StarredExpression, AssertStmt, AssignmentStmt, AugmentedAssignmentStmt, AnnotatedAssignmentSmt,
+                 PassStmt, DelStmt, ReturnStmt, YieldStmt, RaiseStmt, BreakStmt, ContinueStmt, ImportStmt, FutureStmt,
+                 GlobalStmt, NonLocalStmt>
+        variant;
 };
 
 // TODO:
