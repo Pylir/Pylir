@@ -79,8 +79,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
 {
     return pylir::match(
         atom.variant,
-        [](const Syntax::Atom::Identifier& identifier) -> std::string
-        { return fmt::format("atom {}", pylir::get<std::string>(identifier.token.getValue())); },
+        [](const IdentifierToken& identifier) -> std::string { return fmt::format("atom {}", identifier.getValue()); },
         [](const Syntax::Atom::Literal& literal) -> std::string
         {
             return pylir::match(
@@ -219,7 +218,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             return "yieldatom"
                    + addLastChild(pylir::match(
                        yieldAtom.yieldExpression.variant, [](std::monostate) -> std::string { return "yield empty"; },
-                       [&](const std::pair<Token, Syntax::Expression>& expression) -> std::string
+                       [&](const std::pair<BaseToken, Syntax::Expression>& expression) -> std::string
                        {
                            std::string result = "yield from";
                            result += addLastChild(dump(expression.second));
@@ -266,8 +265,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Primary& primary)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AttributeRef& attribute)
 {
-    return fmt::format("attribute {}", pylir::get<std::string>(attribute.identifier.getValue()))
-           + addLastChild(dump(*attribute.primary));
+    return fmt::format("attribute {}", attribute.identifier.getValue()) + addLastChild(dump(*attribute.primary));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Subscription& subscription)
@@ -337,8 +335,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentExpression& assig
     {
         return dump(*assignmentExpression.expression);
     }
-    return fmt::format("assignment expression to {}",
-                       pylir::get<std::string>(assignmentExpression.identifierAndWalrus->first.getValue()))
+    return fmt::format("assignment expression to {}", assignmentExpression.identifierAndWalrus->first.getValue())
            + addLastChild(dump(*assignmentExpression.expression));
 }
 
@@ -354,7 +351,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
     {
         return result + addLastChild(dump(**comprehension));
     }
-    auto& [argument, comma] = pylir::get<std::pair<Syntax::Call::ArgumentList, std::optional<Token>>>(call.variant);
+    auto& [argument, comma] = pylir::get<std::pair<Syntax::Call::ArgumentList, std::optional<BaseToken>>>(call.variant);
     if (argument.positionalArguments)
     {
         std::string positional = "positional arguments";
@@ -400,8 +397,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
     if (argument.starredAndKeywords)
     {
         std::string starred = "starred keywords";
-        std::string keyword = fmt::format(
-            "keyword item {}", pylir::get<std::string>(argument.starredAndKeywords->first.identifier.getValue()));
+        std::string keyword = fmt::format("keyword item {}", argument.starredAndKeywords->first.identifier.getValue());
         keyword += addLastChild(dump(*argument.starredAndKeywords->first.expression));
         if (argument.starredAndKeywords->rest.empty())
         {
@@ -417,8 +413,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
                     iter,
                     [&](const Syntax::Call::KeywordItem& keywordItem)
                     {
-                        return fmt::format("keyword item {}",
-                                           pylir::get<std::string>(keywordItem.identifier.getValue()))
+                        return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                                + addLastChild(dump(*keywordItem.expression));
                     },
                     [&](const Syntax::Call::StarredAndKeywords::Expression& expression)
@@ -428,7 +423,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
                 argument.starredAndKeywords->rest.back().second,
                 [&](const Syntax::Call::KeywordItem& keywordItem)
                 {
-                    return fmt::format("keyword item {}", pylir::get<std::string>(keywordItem.identifier.getValue()))
+                    return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                            + addLastChild(dump(*keywordItem.expression));
                 },
                 [&](const Syntax::Call::StarredAndKeywords::Expression& expression)
@@ -462,8 +457,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
                     iter,
                     [&](const Syntax::Call::KeywordItem& keywordItem)
                     {
-                        return fmt::format("keyword item {}",
-                                           pylir::get<std::string>(keywordItem.identifier.getValue()))
+                        return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                                + addLastChild(dump(*keywordItem.expression));
                     },
                     [&](const Syntax::Call::KeywordArguments::Expression& expression)
@@ -473,7 +467,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
                 argument.keywordArguments->rest.back().second,
                 [&](const Syntax::Call::KeywordItem& keywordItem)
                 {
-                    return fmt::format("keyword item {}", pylir::get<std::string>(keywordItem.identifier.getValue()))
+                    return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                            + addLastChild(dump(*keywordItem.expression));
                 },
                 [&](const Syntax::Call::KeywordArguments::Expression& expression)
@@ -521,34 +515,34 @@ std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)
         },
         [&](const Syntax::MExpr::AtBin& binOp)
         {
-            return fmt::format("mexpr {:q}", binOp.atToken.getTokenType()) + addMiddleChild(dump(*binOp.lhs), "lhs")
+            return fmt::format("mexpr {:q}", TokenType::AtSign) + addMiddleChild(dump(*binOp.lhs), "lhs")
                    + addLastChild(dump(*binOp.rhs), "rhs");
         });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AExpr& aExpr)
 {
-    return dumpBinOp(aExpr, "aexpr");
+    return dumpBinOp(aExpr, "aexpr", &Token::getTokenType);
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ShiftExpr& shiftExpr)
 {
-    return dumpBinOp(shiftExpr, "shiftExpr");
+    return dumpBinOp(shiftExpr, "shiftExpr", &Token::getTokenType);
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AndExpr& andExpr)
 {
-    return dumpBinOp(andExpr, "andExpr");
+    return dumpBinOp(andExpr, "andExpr", [](auto&&) { return TokenType::BitAnd; });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::XorExpr& xorExpr)
 {
-    return dumpBinOp(xorExpr, "xorExpr");
+    return dumpBinOp(xorExpr, "xorExpr", [](auto&&) { return TokenType::BitXor; });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::OrExpr& orExpr)
 {
-    return dumpBinOp(orExpr, "orExpr");
+    return dumpBinOp(orExpr, "orExpr", [](auto&&) { return TokenType::BitOr; });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
@@ -595,12 +589,12 @@ std::string pylir::Dumper::dump(const pylir::Syntax::NotTest& notTest)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AndTest& andTest)
 {
-    return dumpBinOp(andTest, "andTest");
+    return dumpBinOp(andTest, "andTest", [](auto&&) { return TokenType::AndKeyword; });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::OrTest& orTest)
 {
-    return dumpBinOp(orTest, "orTest");
+    return dumpBinOp(orTest, "orTest", [](auto&&) { return TokenType::OrKeyword; });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ConditionalExpression& conditionalExpression)
@@ -634,7 +628,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::StarredItem& starredItem)
         return dump(*assignment);
     }
     return "starred item"
-           + addLastChild(dump(pylir::get<std::pair<Token, Syntax::OrExpr>>(starredItem.variant).second));
+           + addLastChild(dump(pylir::get<std::pair<BaseToken, Syntax::OrExpr>>(starredItem.variant).second));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredExpression)

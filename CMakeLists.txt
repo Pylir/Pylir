@@ -75,7 +75,7 @@ if (NOT LLVM_ENABLE_RTTI)
 endif ()
 
 if (NOT MSVC)
-    add_compile_options(-pedantic -Wall -Wextra -Wnon-virtual-dtor)
+    add_compile_options(-pedantic -Wall -Wextra -Wnon-virtual-dtor -Wno-assume)
     if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         if (WIN32)
             if (NOT ${CMAKE_CXX_FLAGS} MATCHES ".*[ \t\r\n]-flto[^a-zA-Z_].*")

@@ -92,7 +92,7 @@ tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>((*m_current++).getValue())};
         case TokenType::Identifier:
         {
-            return Syntax::Atom{Syntax::Atom::Identifier{*m_current++}};
+            return Syntax::Atom{IdentifierToken{*m_current++}};
         }
         case TokenType::StringLiteral:
         case TokenType::ByteLiteral:
@@ -452,7 +452,7 @@ tl::expected<pylir::Syntax::AttributeRef, std::string>
     {
         return tl::unexpected{std::move(identifier).error()};
     }
-    return Syntax::AttributeRef{std::move(primary), *std::move(dot), *std::move(identifier)};
+    return Syntax::AttributeRef{std::move(primary), *std::move(dot), IdentifierToken{*std::move(identifier)}};
 }
 
 tl::expected<pylir::Syntax::Slicing, std::string>
@@ -595,7 +595,7 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
             firstItem.variant = Syntax::Call::PositionalItem::Star{
                 std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))};
         }
-        std::vector<std::pair<Token, Syntax::Call::PositionalItem>> rest;
+        std::vector<std::pair<BaseToken, Syntax::Call::PositionalItem>> rest;
         while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
         {
             auto comma = *m_current++;
@@ -658,10 +658,10 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
             {
                 return tl::unexpected{std::move(expression).error()};
             }
-            item = Syntax::Call::KeywordItem{std::move(identifier), std::move(assignment),
+            item = Syntax::Call::KeywordItem{IdentifierToken{std::move(identifier)}, std::move(assignment),
                                              std::make_unique<Syntax::Expression>(std::move(*expression))};
         }
-        std::vector<std::pair<Token, Syntax::Call::StarredAndKeywords::Variant>> rest;
+        std::vector<std::pair<BaseToken, Syntax::Call::StarredAndKeywords::Variant>> rest;
         while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
         {
             auto comma = *m_current++;
@@ -716,7 +716,7 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
                 return tl::unexpected{std::move(expression).error()};
             }
             rest.emplace_back(std::move(comma),
-                              Syntax::Call::KeywordItem{std::move(*identifier), std::move(*assignment),
+                              Syntax::Call::KeywordItem{IdentifierToken{std::move(*identifier)}, std::move(*assignment),
                                                         std::make_unique<Syntax::Expression>(std::move(*expression))});
         }
         starredAndKeywords = Syntax::Call::StarredAndKeywords{std::move(*item), std::move(rest)};
@@ -736,7 +736,7 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
             item = Syntax::Call::KeywordArguments::Expression{
                 std::move(stars), std::make_unique<Syntax::Expression>(std::move(*expression))};
         }
-        std::vector<std::pair<Token, Syntax::Call::KeywordArguments::Variant>> rest;
+        std::vector<std::pair<BaseToken, Syntax::Call::KeywordArguments::Variant>> rest;
         while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
         {
             auto comma = *m_current++;
@@ -777,7 +777,7 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
                 return tl::unexpected{std::move(expression).error()};
             }
             rest.emplace_back(std::move(comma),
-                              Syntax::Call::KeywordItem{std::move(*identifier), std::move(*assignment),
+                              Syntax::Call::KeywordItem{IdentifierToken{std::move(*identifier)}, std::move(*assignment),
                                                         std::make_unique<Syntax::Expression>(std::move(*expression))});
         }
         keywordArguments = Syntax::Call::KeywordArguments{std::move(*item), std::move(rest)};
@@ -888,7 +888,7 @@ tl::expected<pylir::Syntax::CommaList<pylir::Syntax::Expression>, std::string> p
 
 tl::expected<pylir::Syntax::AssignmentExpression, std::string> pylir::Parser::parseAssignmentExpression()
 {
-    std::optional<std::pair<Token, Token>> prefix;
+    std::optional<std::pair<IdentifierToken, BaseToken>> prefix;
     if (m_current != m_lexer.end() && std::next(m_current) != m_lexer.end()
         && std::equal(m_current, std::next(m_current, 2), std::array{TokenType::Identifier, TokenType::Walrus}.begin(),
                       [](const Token& token, TokenType rhs) { return token.getTokenType() == rhs; }))
@@ -1325,7 +1325,7 @@ tl::expected<pylir::Syntax::StarredExpression, std::string>
             return Syntax::StarredExpression{std::move(*firstItem->expression)};
         }
     }
-    std::vector<std::pair<Syntax::StarredItem, Token>> leading;
+    std::vector<std::pair<Syntax::StarredItem, BaseToken>> leading;
     if (firstItem)
     {
         // It had "identifier :=", hence a starred_item

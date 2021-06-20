@@ -34,15 +34,15 @@ class Dumper
         return result;
     }
 
-    template <class ThisClass>
-    std::string dumpBinOp(const ThisClass& thisClass, std::string_view name)
+    template <class ThisClass, class TokenTypeGetter>
+    std::string dumpBinOp(const ThisClass& thisClass, std::string_view name, TokenTypeGetter tokenTypeGetter)
     {
         return pylir::match(
             thisClass.variant, [&](const auto& previous) { return dump(previous); },
             [&](const typename ThisClass::BinOp& binOp)
             {
                 auto& [lhs, token, rhs] = binOp;
-                return fmt::format(FMT_STRING("{} {:q}"), name, token.getTokenType())
+                return fmt::format(FMT_STRING("{} {:q}"), name, std::invoke(tokenTypeGetter, token))
                        + addMiddleChild(dump(*lhs), "lhs") + addLastChild(dump(rhs), "rhs");
             });
     }

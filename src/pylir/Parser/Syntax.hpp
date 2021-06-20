@@ -37,12 +37,7 @@ struct Atom
         Token token;
     };
 
-    struct Identifier
-    {
-        Token token;
-    };
-
-    std::variant<Literal, Identifier, std::unique_ptr<Enclosure>> variant;
+    std::variant<Literal, IdentifierToken, std::unique_ptr<Enclosure>> variant;
 };
 
 struct Primary;
@@ -53,8 +48,8 @@ struct Primary;
 struct AttributeRef
 {
     std::unique_ptr<Primary> primary;
-    Token dot;
-    Token identifier;
+    BaseToken dot;
+    IdentifierToken identifier;
 };
 
 /**
@@ -63,9 +58,9 @@ struct AttributeRef
 struct Subscription
 {
     std::unique_ptr<Primary> primary;
-    Token openSquareBracket;
+    BaseToken openSquareBracket;
     ExpressionList expressionList;
-    Token closeSquareBracket;
+    BaseToken closeSquareBracket;
 };
 
 /**
@@ -80,17 +75,17 @@ struct Subscription
 struct Slicing
 {
     std::unique_ptr<Primary> primary;
-    Token openSquareBracket;
+    BaseToken openSquareBracket;
     struct ProperSlice
     {
         std::unique_ptr<Expression> optionalLowerBound;
-        Token firstColon;
+        BaseToken firstColon;
         std::unique_ptr<Expression> optionalUpperBound;
-        Token secondColon;
+        BaseToken secondColon;
         std::unique_ptr<Expression> optionalStride;
     };
     CommaList<std::variant<ProperSlice, Expression>> sliceList;
-    Token closeSquareBracket;
+    BaseToken closeSquareBracket;
 };
 
 struct Comprehension;
@@ -117,7 +112,7 @@ struct Call
     {
         struct Star
         {
-            Token asterisk;
+            BaseToken asterisk;
             std::unique_ptr<Expression> expression;
         };
         std::variant<std::unique_ptr<AssignmentExpression>, Star> variant;
@@ -126,13 +121,13 @@ struct Call
     struct PositionalArguments
     {
         PositionalItem firstItem;
-        std::vector<std::pair<Token, PositionalItem>> rest;
+        std::vector<std::pair<BaseToken, PositionalItem>> rest;
     };
 
     struct KeywordItem
     {
-        Token identifier;
-        Token assignmentOperator;
+        IdentifierToken identifier;
+        BaseToken assignmentOperator;
         std::unique_ptr<Expression> expression;
     };
 
@@ -140,39 +135,40 @@ struct Call
     {
         struct Expression
         {
-            Token asterisk;
+            BaseToken asterisk;
             std::unique_ptr<Syntax::Expression> expression;
         };
         KeywordItem first;
         using Variant = std::variant<KeywordItem, Expression>;
-        std::vector<std::pair<Token, Variant>> rest;
+        std::vector<std::pair<BaseToken, Variant>> rest;
     };
 
     struct KeywordArguments
     {
         struct Expression
         {
-            Token doubleAsterisk;
+            BaseToken doubleAsterisk;
             std::unique_ptr<Syntax::Expression> expression;
         };
         Expression first;
         using Variant = std::variant<KeywordItem, Expression>;
-        std::vector<std::pair<Token, Variant>> rest;
+        std::vector<std::pair<BaseToken, Variant>> rest;
     };
 
     struct ArgumentList
     {
         std::optional<PositionalArguments> positionalArguments;
-        std::optional<Token> firstComma;
+        std::optional<BaseToken> firstComma;
         std::optional<StarredAndKeywords> starredAndKeywords;
-        std::optional<Token> secondComma;
+        std::optional<BaseToken> secondComma;
         std::optional<KeywordArguments> keywordArguments;
     };
 
     std::unique_ptr<Primary> primary;
-    Token openParentheses;
-    std::variant<std::monostate, std::pair<ArgumentList, std::optional<Token>>, std::unique_ptr<Comprehension>> variant;
-    Token closeParentheses;
+    BaseToken openParentheses;
+    std::variant<std::monostate, std::pair<ArgumentList, std::optional<BaseToken>>, std::unique_ptr<Comprehension>>
+        variant;
+    BaseToken closeParentheses;
 };
 
 /**
@@ -188,7 +184,7 @@ struct Primary
  */
 struct AwaitExpr
 {
-    Token awaitToken;
+    BaseToken awaitToken;
     Primary primary;
 };
 
@@ -200,7 +196,7 @@ struct UExpr;
 struct Power
 {
     std::variant<AwaitExpr, Primary> variant;
-    std::optional<std::pair<Token, std::unique_ptr<UExpr>>> rightHand;
+    std::optional<std::pair<BaseToken, std::unique_ptr<UExpr>>> rightHand;
 };
 
 /**
@@ -221,7 +217,7 @@ struct MExpr
     struct AtBin
     {
         std::unique_ptr<MExpr> lhs;
-        Token atToken;
+        BaseToken atToken;
         std::unique_ptr<MExpr> rhs;
     };
 
@@ -273,7 +269,7 @@ struct AndExpr
     struct BinOp
     {
         std::unique_ptr<AndExpr> lhs;
-        Token bitAndToken;
+        BaseToken bitAndToken;
         ShiftExpr rhs;
     };
 
@@ -288,7 +284,7 @@ struct XorExpr
     struct BinOp
     {
         std::unique_ptr<XorExpr> lhs;
-        Token bitXorToken;
+        BaseToken bitXorToken;
         AndExpr rhs;
     };
 
@@ -303,7 +299,7 @@ struct OrExpr
     struct BinOp
     {
         std::unique_ptr<OrExpr> lhs;
-        Token bitOrToken;
+        BaseToken bitOrToken;
         XorExpr rhs;
     };
 
@@ -331,7 +327,7 @@ struct Comparison
  */
 struct NotTest
 {
-    std::variant<Comparison, std::pair<Token, std::unique_ptr<NotTest>>> variant;
+    std::variant<Comparison, std::pair<BaseToken, std::unique_ptr<NotTest>>> variant;
 };
 
 /**
@@ -342,7 +338,7 @@ struct AndTest
     struct BinOp
     {
         std::unique_ptr<AndTest> lhs;
-        Token andToken;
+        BaseToken andToken;
         NotTest rhs;
     };
 
@@ -357,7 +353,7 @@ struct OrTest
     struct BinOp
     {
         std::unique_ptr<OrTest> lhs;
-        Token orToken;
+        BaseToken orToken;
         AndTest rhs;
     };
 
@@ -369,7 +365,7 @@ struct OrTest
  */
 struct AssignmentExpression
 {
-    std::optional<std::pair<Token, Token>> identifierAndWalrus;
+    std::optional<std::pair<IdentifierToken, BaseToken>> identifierAndWalrus;
     std::unique_ptr<Expression> expression;
 };
 
@@ -383,9 +379,9 @@ struct ConditionalExpression
     OrTest value;
     struct Suffix
     {
-        Token ifToken;
+        BaseToken ifToken;
         OrTest test;
-        Token elseToken;
+        BaseToken elseToken;
         std::unique_ptr<Expression> elseValue;
     };
     std::optional<Suffix> suffix;
@@ -431,9 +427,9 @@ struct ParameterList;
  */
 struct LambdaExpression
 {
-    Token lambdaToken;
+    BaseToken lambdaToken;
     std::unique_ptr<ParameterList> parameterList;
-    Token colonToken;
+    BaseToken colonToken;
     Expression expression;
 };
 
@@ -442,7 +438,7 @@ struct LambdaExpression
  */
 struct StarredItem
 {
-    std::variant<AssignmentExpression, std::pair<Token, OrExpr>> variant;
+    std::variant<AssignmentExpression, std::pair<BaseToken, OrExpr>> variant;
 };
 
 inline bool firstInStarredItem(TokenType tokenType)
@@ -459,7 +455,7 @@ struct StarredExpression
 {
     struct Items
     {
-        std::vector<std::pair<StarredItem, Token>> leading;
+        std::vector<std::pair<StarredItem, BaseToken>> leading;
         std::optional<StarredItem> last;
     };
     std::variant<Expression, Items> variant;
@@ -476,10 +472,10 @@ struct CompIf;
  */
 struct CompFor
 {
-    std::optional<Token> awaitToken;
-    Token forToken;
+    std::optional<BaseToken> awaitToken;
+    BaseToken forToken;
     TargetList targets;
-    Token inToken;
+    BaseToken inToken;
     OrTest orTest;
     std::variant<std::monostate, std::unique_ptr<CompFor>, std::unique_ptr<CompIf>> compIter;
 };
@@ -500,7 +496,7 @@ inline bool firstInCompFor(TokenType tokenType)
  */
 struct CompIf
 {
-    Token ifToken;
+    BaseToken ifToken;
     OrTest orTest;
     std::variant<std::monostate, CompFor, std::unique_ptr<CompIf>> compIter;
 };
@@ -524,8 +520,8 @@ inline bool firstInComprehension(TokenType tokenType)
  */
 struct YieldExpression
 {
-    Token yieldToken;
-    std::variant<std::monostate, ExpressionList, std::pair<Token, Expression>> variant;
+    BaseToken yieldToken;
+    std::variant<std::monostate, ExpressionList, std::pair<BaseToken, Expression>> variant;
 };
 
 /**
@@ -539,9 +535,9 @@ struct Enclosure
      */
     struct ParenthForm
     {
-        Token openParenth;
+        BaseToken openParenth;
         std::optional<StarredExpression> expression;
-        Token closeParenth;
+        BaseToken closeParenth;
     };
 
     /**
@@ -549,9 +545,9 @@ struct Enclosure
      */
     struct ListDisplay
     {
-        Token openSquare;
+        BaseToken openSquare;
         std::variant<std::monostate, StarredList, Comprehension> variant;
-        Token closeSquare;
+        BaseToken closeSquare;
     };
 
     /**
@@ -559,9 +555,9 @@ struct Enclosure
      */
     struct SetDisplay
     {
-        Token openBrace;
+        BaseToken openBrace;
         std::variant<StarredList, Comprehension> variant;
-        Token closeBrace;
+        BaseToken closeBrace;
     };
 
     /**
@@ -572,18 +568,18 @@ struct Enclosure
      */
     struct DictDisplay
     {
-        Token openBrace;
+        BaseToken openBrace;
         struct KeyDatum
         {
             struct Key
             {
                 Expression first;
-                Token colon;
+                BaseToken colon;
                 Expression second;
             };
             struct Datum
             {
-                Token powerOf;
+                BaseToken powerOf;
                 OrExpr orExpr;
             };
             std::variant<Key, Datum> variant;
@@ -591,12 +587,12 @@ struct Enclosure
         struct DictComprehension
         {
             Expression first;
-            Token colon;
+            BaseToken colon;
             Expression second;
             CompFor compFor;
         };
         std::variant<std::monostate, CommaList<KeyDatum>, DictComprehension> variant;
-        Token closeBrace;
+        BaseToken closeBrace;
     };
 
     /**
@@ -604,10 +600,10 @@ struct Enclosure
      */
     struct GeneratorExpression
     {
-        Token openParenth;
+        BaseToken openParenth;
         Expression expression;
         CompFor compFor;
-        Token closeParenth;
+        BaseToken closeParenth;
     };
 
     /**
@@ -615,9 +611,9 @@ struct Enclosure
      */
     struct YieldAtom
     {
-        Token openParenth;
+        BaseToken openParenth;
         YieldExpression yieldExpression;
-        Token closeParenth;
+        BaseToken closeParenth;
     };
 
     std::variant<ParenthForm, ListDisplay, SetDisplay, DictDisplay, GeneratorExpression, YieldAtom> variant;
@@ -637,19 +633,20 @@ struct Target
 {
     struct Parenth
     {
-        Token openParenth;
+        BaseToken openParenth;
         TargetList targetList;
-        Token closeParenth;
+        BaseToken closeParenth;
     };
 
     struct Square
     {
-        Token openSquare;
+        BaseToken openSquare;
         TargetList targetList;
-        Token closeSquare;
+        BaseToken closeSquare;
     };
 
-    std::variant<Token, Parenth, Square, AttributeRef, Subscription, Slicing, std::pair<Token, std::unique_ptr<Target>>>
+    std::variant<IdentifierToken, Parenth, Square, AttributeRef, Subscription, Slicing,
+                 std::pair<BaseToken, std::unique_ptr<Target>>>
         variant;
 };
 
@@ -658,7 +655,7 @@ struct Target
  */
 struct AssignmentStmt
 {
-    std::vector<std::pair<TargetList, Token>> targets;
+    std::vector<std::pair<TargetList, BaseToken>> targets;
     std::variant<StarredExpression, YieldExpression> variant;
 };
 
@@ -667,7 +664,7 @@ struct AssignmentStmt
  */
 struct AugTarget
 {
-    std::variant<Token, AttributeRef, Subscription, Slicing> variant;
+    std::variant<IdentifierToken, AttributeRef, Subscription, Slicing> variant;
 };
 
 /**
@@ -689,9 +686,9 @@ struct AugmentedAssignmentStmt
 struct AnnotatedAssignmentSmt
 {
     AugTarget augTarget;
-    Token colon;
+    BaseToken colon;
     Expression expression;
-    std::optional<std::pair<Token, std::variant<ExpressionList, YieldExpression>>> optionalAssignmentStmt;
+    std::optional<std::pair<BaseToken, std::variant<ExpressionList, YieldExpression>>> optionalAssignmentStmt;
 };
 
 /**
@@ -699,9 +696,9 @@ struct AnnotatedAssignmentSmt
  */
 struct AssertStmt
 {
-    Token assertKeyword;
+    BaseToken assertKeyword;
     Expression condition;
-    std::optional<std::pair<Token, Expression>> message;
+    std::optional<std::pair<BaseToken, Expression>> message;
 };
 
 /**
@@ -709,7 +706,7 @@ struct AssertStmt
  */
 struct PassStmt
 {
-    Token pass;
+    BaseToken pass;
 };
 
 /**
@@ -717,7 +714,7 @@ struct PassStmt
  */
 struct DelStmt
 {
-    Token del;
+    BaseToken del;
     TargetList targetList;
 };
 
@@ -726,7 +723,7 @@ struct DelStmt
  */
 struct ReturnStmt
 {
-    Token returnKeyword;
+    BaseToken returnKeyword;
     std::optional<ExpressionList> expressions;
 };
 
@@ -743,8 +740,8 @@ struct YieldStmt
  */
 struct RaiseStmt
 {
-    Token raise;
-    std::optional<std::pair<Expression, std::optional<std::pair<Token, Expression>>>> expressions;
+    BaseToken raise;
+    std::optional<std::pair<Expression, std::optional<std::pair<BaseToken, Expression>>>> expressions;
 };
 
 /**
@@ -752,7 +749,7 @@ struct RaiseStmt
  */
 struct BreakStmt
 {
-    Token breakKeyword;
+    BaseToken breakKeyword;
 };
 
 /**
@@ -760,7 +757,7 @@ struct BreakStmt
  */
 struct ContinueStmt
 {
-    Token continueKeyword;
+    BaseToken continueKeyword;
 };
 
 /**
@@ -777,55 +774,55 @@ struct ImportStmt
 {
     struct Module
     {
-        std::vector<std::pair<Token, Token>> leading;
-        Token lastIdentifier;
+        std::vector<std::pair<IdentifierToken, BaseToken>> leading;
+        IdentifierToken lastIdentifier;
     };
 
     struct RelativeModule
     {
-        std::vector<Token> dots;
+        std::vector<BaseToken> dots;
         std::optional<Module> module;
     };
 
     struct ImportAsAs
     {
-        Token import;
+        BaseToken import;
         Module module;
-        std::optional<std::pair<Token, Token>> name;
+        std::optional<std::pair<BaseToken, IdentifierToken>> name;
         struct Further
         {
-            Token comma;
+            BaseToken comma;
             Module module;
-            std::optional<std::pair<Token, Token>> name;
+            std::optional<std::pair<BaseToken, IdentifierToken>> name;
         };
         std::vector<Further> rest;
     };
 
     struct FromImportList
     {
-        Token from;
+        BaseToken from;
         RelativeModule relativeModule;
-        Token import;
-        std::optional<Token> openParenth;
-        Token identifier;
-        std::optional<std::pair<Token, Token>> name;
+        BaseToken import;
+        std::optional<BaseToken> openParenth;
+        IdentifierToken identifier;
+        std::optional<std::pair<BaseToken, IdentifierToken>> name;
         struct Further
         {
-            Token comma;
-            Token identifier;
-            std::optional<std::pair<Token, Token>> name;
+            BaseToken comma;
+            IdentifierToken identifier;
+            std::optional<std::pair<BaseToken, IdentifierToken>> name;
         };
         std::vector<Further> rest;
-        std::optional<Token> comma;
-        std::optional<Token> closeParenth;
+        std::optional<BaseToken> comma;
+        std::optional<BaseToken> closeParenth;
     };
 
     struct FromImportAll
     {
-        Token from;
+        BaseToken from;
         RelativeModule relativeModule;
-        Token import;
-        Token star;
+        BaseToken import;
+        BaseToken star;
     };
 
     std::variant<ImportAsAs, FromImportList, FromImportAll> variant;
@@ -840,21 +837,21 @@ struct ImportStmt
  */
 struct FutureStmt
 {
-    Token from;
-    Token future;
-    Token import;
-    std::optional<Token> openParenth;
-    Token identifier;
-    std::optional<std::pair<Token, Token>> name;
+    BaseToken from;
+    BaseToken future;
+    BaseToken import;
+    std::optional<BaseToken> openParenth;
+    IdentifierToken identifier;
+    std::optional<std::pair<BaseToken, IdentifierToken>> name;
     struct Further
     {
-        Token comma;
-        Token identifier;
-        std::optional<std::pair<Token, Token>> name;
+        BaseToken comma;
+        IdentifierToken identifier;
+        std::optional<std::pair<BaseToken, IdentifierToken>> name;
     };
     std::vector<Further> rest;
-    std::optional<Token> comma;
-    std::optional<Token> closeParenth;
+    std::optional<BaseToken> comma;
+    std::optional<BaseToken> closeParenth;
 };
 
 /**
@@ -862,9 +859,9 @@ struct FutureStmt
  */
 struct GlobalStmt
 {
-    Token global;
-    Token identifier;
-    std::vector<std::pair<Token, Token>> rest;
+    BaseToken global;
+    IdentifierToken identifier;
+    std::vector<std::pair<BaseToken, IdentifierToken>> rest;
 };
 
 /**
@@ -872,9 +869,9 @@ struct GlobalStmt
  */
 struct NonLocalStmt
 {
-    Token nonLocal;
-    Token identifier;
-    std::vector<std::pair<Token, Token>> rest;
+    BaseToken nonLocal;
+    IdentifierToken identifier;
+    std::vector<std::pair<BaseToken, IdentifierToken>> rest;
 };
 
 /**

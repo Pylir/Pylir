@@ -4,6 +4,7 @@
 #include <llvm/ADT/APInt.h>
 
 #include <pylir/Support/Macros.hpp>
+#include <pylir/Support/Variant.hpp>
 
 #include <cstdint>
 #include <string>
@@ -109,24 +110,14 @@ enum class TokenType : std::uint8_t
     Dedent
 };
 
-class Token
+class BaseToken
 {
     int m_offset;
     int m_size;
     int m_fileId;
-    TokenType m_tokenType;
 
 public:
-    using Variant = std::variant<std::monostate, std::string, llvm::APInt, double>;
-
-private:
-    Variant m_value;
-
-public:
-    Token(int offset, int size, int fileId, TokenType tokenType, Variant value = {})
-        : m_offset(offset), m_size(size), m_fileId(fileId), m_tokenType(tokenType), m_value(std::move(value))
-    {
-    }
+    BaseToken(int offset, int size, int fileId) : m_offset(offset), m_size(size), m_fileId(fileId) {}
 
     [[nodiscard]] int getOffset() const
     {
@@ -142,6 +133,23 @@ public:
     {
         return m_fileId;
     }
+};
+
+class Token : public BaseToken
+{
+    TokenType m_tokenType;
+
+public:
+    using Variant = std::variant<std::monostate, std::string, llvm::APInt, double>;
+
+private:
+    Variant m_value;
+
+public:
+    Token(int offset, int size, int fileId, TokenType tokenType, Variant value = {})
+        : BaseToken(offset, size, fileId), m_tokenType(tokenType), m_value(std::move(value))
+    {
+    }
 
     [[nodiscard]] TokenType getTokenType() const
     {
@@ -154,20 +162,48 @@ public:
     }
 };
 
+class IdentifierToken : public BaseToken
+{
+    std::string m_value;
+
+public:
+    explicit IdentifierToken(const Token& token)
+        : BaseToken(token.getOffset(), token.getSize(), token.getFileId()),
+          m_value(pylir::get<std::string>(token.getValue()))
+    {
+    }
+
+    explicit IdentifierToken(Token&& token)
+        : BaseToken(token.getOffset(), token.getSize(), token.getFileId()),
+          m_value(pylir::get<std::string>(std::move(token).getValue()))
+    {
+    }
+
+    [[nodiscard]] TokenType getTokenType() const
+    {
+        return TokenType::Identifier;
+    }
+
+    [[nodiscard]] std::string_view getValue() const
+    {
+        return m_value;
+    }
+};
+
 namespace Diag
 {
 template <class T, class>
 struct LocationProvider;
 
-template <>
-struct LocationProvider<Token, void>
+template <class T>
+struct LocationProvider<T, std::enable_if_t<std::is_base_of_v<BaseToken, T>>>
 {
-    static std::size_t getPos(const Token& value) noexcept
+    static std::size_t getPos(const BaseToken& value) noexcept
     {
         return value.getOffset();
     }
 
-    static std::pair<std::size_t, std::size_t> getRange(const Token& value) noexcept
+    static std::pair<std::size_t, std::size_t> getRange(const BaseToken& value) noexcept
     {
         return {value.getOffset(), value.getOffset() + value.getSize()};
     }
