@@ -627,6 +627,10 @@ struct Enclosure
                      | subscription
                      | slicing
                      | "*" target
+
+    Undocumented, but CPython seems to only allows "*" target once. Any further stars as prefix are rejected
+    This makes target a strict subset of starred_expression
+
  */
 
 struct Target
@@ -634,14 +638,14 @@ struct Target
     struct Parenth
     {
         BaseToken openParenth;
-        TargetList targetList;
+        std::optional<TargetList> targetList;
         BaseToken closeParenth;
     };
 
     struct Square
     {
         BaseToken openSquare;
-        TargetList targetList;
+        std::optional<TargetList> targetList;
         BaseToken closeSquare;
     };
 
@@ -649,6 +653,24 @@ struct Target
                  std::pair<BaseToken, std::unique_ptr<Target>>>
         variant;
 };
+
+inline bool firstInTarget(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::OpenParentheses:
+        case TokenType::OpenSquareBracket:
+        case TokenType::OpenBrace:
+        case TokenType::Identifier:
+        case TokenType::Star:
+        case TokenType::StringLiteral:
+        case TokenType::ByteLiteral:
+        case TokenType::IntegerLiteral:
+        case TokenType::FloatingPointLiteral:
+        case TokenType::ComplexLiteral: return true;
+        default: return false;
+    }
+}
 
 /**
  * assignment_stmt ::=  (target_list "=")+ (starred_expression | yield_expression)

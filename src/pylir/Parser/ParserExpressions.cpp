@@ -827,42 +827,12 @@ tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary()
             }
             case TokenType::OpenSquareBracket:
             {
-                // The grammar for a slice list that has 0 proper slices, and the one for subscription are identical
-                auto slice = parseSlicing(std::make_unique<Syntax::Primary>(std::move(current)));
-                if (!slice)
+                auto newCurrent = parseSlicingOrSubscription(std::make_unique<Syntax::Primary>(std::move(current)));
+                if (!newCurrent)
                 {
-                    return tl::unexpected{std::move(slice).error()};
+                    return tl::unexpected{std::move(newCurrent).error()};
                 }
-                // If there are no proper slices, then it's a Subscript and we'll convert
-                if (std::holds_alternative<Syntax::Expression>(*slice->sliceList.firstExpr)
-                    && std::all_of(slice->sliceList.remainingExpr.begin(), slice->sliceList.remainingExpr.end(),
-                                   [](auto&& variant)
-                                   { return std::holds_alternative<Syntax::Expression>(*variant.second); }))
-                {
-                    Syntax::ExpressionList expressionList;
-                    expressionList.firstExpr = std::make_unique<Syntax::Expression>(
-                        std::move(pylir::get<Syntax::Expression>(*slice->sliceList.firstExpr)));
-                    expressionList.trailingComma = std::move(slice->sliceList.trailingComma);
-
-                    expressionList.remainingExpr.reserve(slice->sliceList.remainingExpr.size());
-                    std::transform(std::move_iterator(slice->sliceList.remainingExpr.begin()),
-                                   std::move_iterator(slice->sliceList.remainingExpr.end()),
-                                   std::back_inserter(expressionList.remainingExpr),
-                                   [](auto&& pair)
-                                   {
-                                       return std::pair{std::move(pair.first),
-                                                        std::make_unique<Syntax::Expression>(
-                                                            std::move(pylir::get<Syntax::Expression>(*pair.second)))};
-                                   });
-
-                    current = Syntax::Primary{
-                        Syntax::Subscription{std::move(slice->primary), std::move(slice->openSquareBracket),
-                                             std::move(expressionList), std::move(slice->closeSquareBracket)}};
-                }
-                else
-                {
-                    current = Syntax::Primary{std::move(*slice)};
-                }
+                current = std::move(*newCurrent);
                 break;
             }
             case TokenType::OpenParentheses:
@@ -1217,7 +1187,11 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
     {
         return tl::unexpected{std::move(forToken).error()};
     }
-    // TODO: target_list
+    auto targetList = parseTargetList();
+    if (!targetList)
+    {
+        return tl::unexpected{std::move(targetList).error()};
+    }
     auto inToken = expect(TokenType::InKeyword);
     if (!inToken)
     {
@@ -1232,7 +1206,7 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
         || (m_current->getTokenType() != TokenType::ForKeyword && m_current->getTokenType() != TokenType::IfKeyword
             && m_current->getTokenType() != TokenType::AwaitKeyword))
     {
-        return Syntax::CompFor{std::move(awaitToken), std::move(*forToken), {},
+        return Syntax::CompFor{std::move(awaitToken), std::move(*forToken), std::move(*targetList),
                                std::move(*inToken),   std::move(*orTest),   std::monostate{}};
     }
     std::variant<std::monostate, std::unique_ptr<Syntax::CompFor>, std::unique_ptr<Syntax::CompIf>> trail;
@@ -1254,7 +1228,7 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
         }
         trail = std::make_unique<Syntax::CompFor>(std::move(*compFor));
     }
-    return Syntax::CompFor{std::move(awaitToken), std::move(*forToken), {},
+    return Syntax::CompFor{std::move(awaitToken), std::move(*forToken), std::move(*targetList),
                            std::move(*inToken),   std::move(*orTest),   std::move(trail)};
 }
 
@@ -1380,4 +1354,39 @@ tl::expected<pylir::Syntax::StarredList, std::string>
 {
     return parseCommaList(pylir::bind_front(&Parser::parseStarredItem, this), &Syntax::firstInStarredItem,
                           std::move(firstItem));
+}
+
+tl::expected<pylir::Syntax::Primary, std::string>
+    pylir::Parser::parseSlicingOrSubscription(std::unique_ptr<Syntax::Primary>&& primary)
+{
+    // The grammar for a slice list that has 0 proper slices, and the one for subscription are identical
+    auto slice = parseSlicing(std::move(primary));
+    if (!slice)
+    {
+        return tl::unexpected{std::move(slice).error()};
+    }
+    // If there are no proper slices, then it's a Subscript and we'll convert
+    if (std::holds_alternative<Syntax::Expression>(*slice->sliceList.firstExpr)
+        && std::all_of(slice->sliceList.remainingExpr.begin(), slice->sliceList.remainingExpr.end(),
+                       [](auto&& variant) { return std::holds_alternative<Syntax::Expression>(*variant.second); }))
+    {
+        Syntax::ExpressionList expressionList;
+        expressionList.firstExpr = std::make_unique<Syntax::Expression>(
+            std::move(pylir::get<Syntax::Expression>(*slice->sliceList.firstExpr)));
+        expressionList.trailingComma = std::move(slice->sliceList.trailingComma);
+
+        expressionList.remainingExpr.reserve(slice->sliceList.remainingExpr.size());
+        std::transform(std::move_iterator(slice->sliceList.remainingExpr.begin()),
+                       std::move_iterator(slice->sliceList.remainingExpr.end()),
+                       std::back_inserter(expressionList.remainingExpr),
+                       [](auto&& pair)
+                       {
+                           return std::pair{std::move(pair.first), std::make_unique<Syntax::Expression>(std::move(
+                                                                       pylir::get<Syntax::Expression>(*pair.second)))};
+                       });
+
+        return Syntax::Primary{Syntax::Subscription{std::move(slice->primary), std::move(slice->openSquareBracket),
+                                                    std::move(expressionList), std::move(slice->closeSquareBracket)}};
+    }
+    return Syntax::Primary{std::move(*slice)};
 }

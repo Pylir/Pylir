@@ -81,6 +81,10 @@ class Parser
         return {std::move(current)};
     }
 
+    tl::expected<Syntax::AugTarget, std::string> convertToAug(Syntax::StarredExpression&& starredExpression);
+
+    tl::expected<Syntax::TargetList, std::string> convertToTargetList(Syntax::StarredExpression&& starredExpression);
+
 public:
     explicit Parser(
         Diag::Document& document, int fileId = 0,
@@ -106,6 +110,8 @@ public:
     tl::expected<Syntax::Call, std::string> parseCall(std::unique_ptr<Syntax::Primary>&& primary);
 
     tl::expected<Syntax::Primary, std::string> parsePrimary();
+
+    tl::expected<Syntax::Primary, std::string> parseSlicingOrSubscription(std::unique_ptr<Syntax::Primary>&& primary);
 
     tl::expected<Syntax::AwaitExpr, std::string> parseAwaitExpr();
 
@@ -158,5 +164,27 @@ public:
         parseComprehension(Syntax::AssignmentExpression&& assignmentExpression);
 
     tl::expected<Syntax::Enclosure, std::string> parseEnclosure();
+
+    tl::expected<Syntax::Target, std::string> parseTarget();
+
+    tl::expected<Syntax::TargetList, std::string>
+        parseTargetList(std::optional<Syntax::Target>&& firstItem = std::nullopt);
+
+    tl::expected<Syntax::AssignmentStmt, std::string>
+        parseAssignmentStmt(std::optional<Syntax::Target>&& firstItem = std::nullopt);
+
+    tl::expected<Syntax::AugTarget, std::string> parseAugTarget();
+
+    tl::expected<Syntax::AugmentedAssignmentStmt, std::string> parseAugmentedAssignmentStmt();
+
+    tl::expected<Syntax::AnnotatedAssignmentSmt, std::string> parseAnnotatedAssignmentStmt();
+
+    tl::expected<Syntax::AssertStmt, std::string> parseAssertStmt();
+
+    tl::expected<Syntax::ImportStmt, std::string> parseImportSmt();
+
+    tl::expected<Syntax::FutureStmt, std::string> parseFutureSmt();
+
+    tl::expected<Syntax::SimpleStmt, std::string> parseSimpleSmt();
 };
 } // namespace pylir
