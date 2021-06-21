@@ -314,6 +314,63 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                     Syntax::GlobalStmt{keyword, IdentifierToken{std::move(*identifier)}, std::move(rest)}};
             }
         }
+        case TokenType::FromKeyword:
+        case TokenType::ImportKeyword:
+        {
+            auto import = parseImportSmt();
+            if (!import)
+            {
+                return tl::unexpected{std::move(import).error()};
+            }
+            if (auto* fromImportAs = std::get_if<Syntax::ImportStmt::FromImportList>(&import->variant);
+                fromImportAs && fromImportAs->relativeModule.dots.empty() && fromImportAs->relativeModule.module
+                && fromImportAs->relativeModule.module->leading.empty()
+                && fromImportAs->relativeModule.module->lastIdentifier.getValue() == "__future__")
+            {
+                auto check = [&](const IdentifierToken& identifierToken) -> tl::expected<void, std::string>
+                {
+#define HANDLE_FEATURE(x)                 \
+    if (identifierToken.getValue() == #x) \
+    {                                     \
+        return {};                        \
+    }
+#define HANDLE_REQUIRED_FEATURE(x)        \
+    if (identifierToken.getValue() == #x) \
+    {                                     \
+        m_##x = true;                     \
+        return {};                        \
+    }
+#include "Features.def"
+                    return tl::unexpected{
+                        createDiagnosticsBuilder(identifierToken, Diag::UNKNOWN_FEATURE_N, identifierToken.getValue())
+                            .addLabel(identifierToken, std::nullopt, Diag::ERROR_COLOUR)
+                            .emitError()};
+                };
+                if (auto result = check(fromImportAs->identifier); !result)
+                {
+                    return tl::unexpected{std::move(result).error()};
+                }
+                for (auto& iter : fromImportAs->rest)
+                {
+                    if (auto result = check(iter.identifier); !result)
+                    {
+                        return tl::unexpected{std::move(result).error()};
+                    }
+                }
+                return Syntax::SimpleStmt{Syntax::FutureStmt{
+                    fromImportAs->from,
+                    fromImportAs->relativeModule.module->lastIdentifier,
+                    fromImportAs->import,
+                    fromImportAs->openParenth,
+                    std::move(fromImportAs->identifier),
+                    std::move(fromImportAs->name),
+                    std::move(fromImportAs->rest),
+                    fromImportAs->comma,
+                    fromImportAs->closeParenth,
+                }};
+            }
+            return Syntax::SimpleStmt{std::move(*import)};
+        }
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         default:
             // Starred expression is a super set of both `target` and `augtarget`.
@@ -955,4 +1012,189 @@ tl::expected<pylir::Syntax::TargetList, std::string>
 {
     Visitor<Syntax::TargetList> visitor{*this, assignOp};
     return visitor.visit(std::move(starredExpression));
+}
+
+tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportSmt()
+{
+    auto parseModule = [&]() -> tl::expected<Syntax::ImportStmt::Module, std::string>
+    {
+        std::vector<std::pair<IdentifierToken, BaseToken>> leading;
+        do
+        {
+            auto identifier = expect(TokenType::Identifier);
+            if (!identifier)
+            {
+                return tl::unexpected{std::move(identifier).error()};
+            }
+            if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Dot)
+            {
+                return Syntax::ImportStmt::Module{std::move(leading), IdentifierToken{std::move(*identifier)}};
+            }
+            leading.emplace_back(IdentifierToken{std::move(*identifier)}, *m_current++);
+        } while (true);
+    };
+
+    auto parseRelativeModule = [&]() -> tl::expected<Syntax::ImportStmt::RelativeModule, std::string>
+    {
+        std::vector<BaseToken> dots;
+        for (; m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Dot; m_current++)
+        {
+            dots.emplace_back(*m_current);
+        }
+        if (!dots.empty() && (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Identifier))
+        {
+            return Syntax::ImportStmt::RelativeModule{std::move(dots), std::nullopt};
+        }
+        auto module = parseModule();
+        if (!module)
+        {
+            return tl::unexpected{std::move(module).error()};
+        }
+        return Syntax::ImportStmt::RelativeModule{std::move(dots), std::move(*module)};
+    };
+    if (m_current == m_lexer.end())
+    {
+        return tl::unexpected{
+            createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N,
+                                     fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword))
+                .addLabel(m_document->getText().size(), std::nullopt, Diag::ERROR_COLOUR)
+                .emitError()};
+    }
+    switch (m_current->getTokenType())
+    {
+        case TokenType::ImportKeyword:
+        {
+            auto import = *m_current++;
+            auto module = parseModule();
+            if (!module)
+            {
+                return tl::unexpected{std::move(module).error()};
+            }
+            std::optional<std::pair<BaseToken, IdentifierToken>> name;
+            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+            {
+                auto as = *m_current++;
+                auto identifier = expect(TokenType::Identifier);
+                if (!identifier)
+                {
+                    return tl::unexpected{std::move(identifier).error()};
+                }
+                name.emplace(as, IdentifierToken{std::move(*identifier)});
+            }
+            std::vector<Syntax::ImportStmt::ImportAsAs::Further> rest;
+            while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+            {
+                auto comma = *m_current++;
+                auto nextModule = parseModule();
+                if (!nextModule)
+                {
+                    return tl::unexpected{std::move(nextModule).error()};
+                }
+                std::optional<std::pair<BaseToken, IdentifierToken>> nextName;
+                if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+                {
+                    auto as = *m_current++;
+                    auto identifier = expect(TokenType::Identifier);
+                    if (!identifier)
+                    {
+                        return tl::unexpected{std::move(identifier).error()};
+                    }
+                    nextName.emplace(as, IdentifierToken{std::move(*identifier)});
+                }
+                rest.push_back({comma, std::move(*nextModule), std::move(nextName)});
+            }
+            return Syntax::ImportStmt{
+                Syntax::ImportStmt::ImportAsAs{import, std::move(*module), std::move(name), std::move(rest)}};
+        }
+        case TokenType::FromKeyword:
+        {
+            auto from = *m_current++;
+            auto relative = parseRelativeModule();
+            if (!relative)
+            {
+                return tl::unexpected{std::move(relative).error()};
+            }
+            auto import = expect(TokenType::ImportKeyword);
+            if (!import)
+            {
+                return tl::unexpected{std::move(import).error()};
+            }
+            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
+            {
+                auto star = *m_current++;
+                return Syntax::ImportStmt{Syntax::ImportStmt::FromImportAll{from, std::move(*relative), *import, star}};
+            }
+            std::optional<BaseToken> openParenth;
+            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::OpenParentheses)
+            {
+                openParenth = *m_current++;
+            }
+            auto identifier = expect(TokenType::Identifier);
+            if (!identifier)
+            {
+                return tl::unexpected{std::move(identifier).error()};
+            }
+            std::optional<std::pair<BaseToken, IdentifierToken>> name;
+            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+            {
+                auto as = *m_current++;
+                auto identifier = expect(TokenType::Identifier);
+                if (!identifier)
+                {
+                    return tl::unexpected{std::move(identifier).error()};
+                }
+                name.emplace(as, IdentifierToken{std::move(*identifier)});
+            }
+            std::vector<Syntax::ImportStmt::FromImportList::Further> rest;
+            std::optional<BaseToken> trailingComma;
+            while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+            {
+                auto comma = *m_current++;
+                if (openParenth
+                    && (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses))
+                {
+                    trailingComma = comma;
+                    break;
+                }
+                auto imported = expect(TokenType::Identifier);
+                if (!imported)
+                {
+                    return tl::unexpected{std::move(imported).error()};
+                }
+                std::optional<std::pair<BaseToken, IdentifierToken>> nextName;
+                if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+                {
+                    auto as = *m_current++;
+                    auto identifier = expect(TokenType::Identifier);
+                    if (!identifier)
+                    {
+                        return tl::unexpected{std::move(identifier).error()};
+                    }
+                    nextName.emplace(as, IdentifierToken{std::move(*identifier)});
+                }
+                rest.push_back({comma, IdentifierToken{std::move(*imported)}, std::move(nextName)});
+            }
+            std::optional<BaseToken> closeParentheses;
+            if (openParenth)
+            {
+                auto close = expect(TokenType::CloseParentheses);
+                if (!close)
+                {
+                    return tl::unexpected{std::move(close).error()};
+                }
+                closeParentheses = *close;
+            }
+            return Syntax::ImportStmt{Syntax::ImportStmt::FromImportList{
+                from, std::move(*relative), *import, std::move(openParenth), IdentifierToken{std::move(*identifier)},
+                std::move(name), std::move(rest), trailingComma, closeParentheses}};
+        }
+        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
+        default:
+            return tl::unexpected{
+                createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
+                                         fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword),
+                                         m_current->getTokenType())
+                    .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
+                    .emitError()};
+    }
 }

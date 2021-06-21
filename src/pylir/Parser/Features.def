@@ -1,0 +1,20 @@
+#ifndef HANDLE_FEATURE
+#error HANDLE_FEATURE must be defined
+#endif
+
+#ifndef HANDLE_REQUIRED_FEATURE
+#define HANDLE_REQUIRED_FEATURE(x) HANDLE_FEATURE(x)
+#endif
+
+HANDLE_FEATURE(absolute_import)
+HANDLE_FEATURE(division)
+HANDLE_FEATURE(generators)
+HANDLE_FEATURE(generator_stop)
+HANDLE_FEATURE(unicode_literals)
+HANDLE_FEATURE(print_function)
+HANDLE_FEATURE(nested_scopes)
+HANDLE_FEATURE(with_statement)
+HANDLE_REQUIRED_FEATURE(annotations)
+
+#undef HANDLE_FEATURE
+#undef HANDLE_REQUIRED_FEATURE

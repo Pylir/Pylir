@@ -865,13 +865,7 @@ struct FutureStmt
     std::optional<BaseToken> openParenth;
     IdentifierToken identifier;
     std::optional<std::pair<BaseToken, IdentifierToken>> name;
-    struct Further
-    {
-        BaseToken comma;
-        IdentifierToken identifier;
-        std::optional<std::pair<BaseToken, IdentifierToken>> name;
-    };
-    std::vector<Further> rest;
+    std::vector<Syntax::ImportStmt::FromImportList::Further> rest;
     std::optional<BaseToken> comma;
     std::optional<BaseToken> closeParenth;
 };

@@ -16,6 +16,10 @@ class Parser
 {
     Lexer m_lexer;
     Lexer::iterator m_current;
+
+#define HANDLE_FEATURE(x)
+#define HANDLE_REQUIRED_FEATURE(x) bool m_##x : 1;
+#include "Features.def"
     Diag::Document* m_document;
 
     tl::expected<Token, std::string> expect(TokenType tokenType);
@@ -91,7 +95,12 @@ public:
     explicit Parser(
         Diag::Document& document, int fileId = 0,
         std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> callBack = [](auto&&) {})
-        : m_lexer(document, fileId, std::move(callBack)), m_current(m_lexer.begin()), m_document(&document)
+        : m_lexer(document, fileId, std::move(callBack)),
+          m_current(m_lexer.begin()),
+#define HANDLE_FEATURE(x)
+#define HANDLE_REQUIRED_FEATURE(x) m_##x{true},
+#include "Features.def"
+          m_document(&document)
     {
     }
 
@@ -177,15 +186,9 @@ public:
 
     tl::expected<Syntax::AugTarget, std::string> parseAugTarget();
 
-    tl::expected<Syntax::AugmentedAssignmentStmt, std::string> parseAugmentedAssignmentStmt();
-
-    tl::expected<Syntax::AnnotatedAssignmentSmt, std::string> parseAnnotatedAssignmentStmt();
-
     tl::expected<Syntax::AssertStmt, std::string> parseAssertStmt();
 
     tl::expected<Syntax::ImportStmt, std::string> parseImportSmt();
-
-    tl::expected<Syntax::FutureStmt, std::string> parseFutureSmt();
 
     tl::expected<Syntax::SimpleStmt, std::string> parseSimpleSmt();
 };

@@ -53,4 +53,6 @@ constexpr auto NEXT_CLOSEST_INDENTATION_N = FMT_STRING("next closest indent {}")
 
 constexpr auto CANNOT_ASSIGN_TO_N = FMT_STRING("cannot assign to {}");
 
+constexpr auto UNKNOWN_FEATURE_N = FMT_STRING("unknown feature '{}'");
+
 } // namespace pylir::Diag
