@@ -198,11 +198,6 @@ struct LocationProvider;
 template <class T>
 struct LocationProvider<T, std::enable_if_t<std::is_base_of_v<BaseToken, T>>>
 {
-    static std::size_t getPos(const BaseToken& value) noexcept
-    {
-        return value.getOffset();
-    }
-
     static std::pair<std::size_t, std::size_t> getRange(const BaseToken& value) noexcept
     {
         return {value.getOffset(), value.getOffset() + value.getSize()};

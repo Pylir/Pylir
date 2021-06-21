@@ -43,10 +43,14 @@ constexpr auto EXPECTED_DIGITS_FOR_THE_EXPONENT = FMT_STRING("expected digits fo
 
 constexpr auto EXPECTED_N = FMT_STRING("expected {:q^}");
 
+constexpr auto EXPECTED_N_BEFORE_N = FMT_STRING("expected {:q^} before {:q^}");
+
 constexpr auto EXPECTED_N_INSTEAD_OF_N = FMT_STRING("expected {:q^} instead of {:q^}");
 
 constexpr auto INVALID_INDENTATION_N = FMT_STRING("invalid indentation {}");
 
 constexpr auto NEXT_CLOSEST_INDENTATION_N = FMT_STRING("next closest indent {}");
+
+constexpr auto CANNOT_ASSIGN_TO_N = FMT_STRING("cannot assign to {}");
 
 } // namespace pylir::Diag

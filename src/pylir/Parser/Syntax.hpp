@@ -15,8 +15,8 @@ template <class T>
 struct CommaList
 {
     std::unique_ptr<T> firstExpr;
-    std::vector<std::pair<Token, std::unique_ptr<T>>> remainingExpr;
-    std::optional<Token> trailingComma;
+    std::vector<std::pair<BaseToken, std::unique_ptr<T>>> remainingExpr;
+    std::optional<BaseToken> trailingComma;
 };
 
 using ExpressionList = CommaList<Expression>;
@@ -710,7 +710,7 @@ struct AnnotatedAssignmentSmt
     AugTarget augTarget;
     BaseToken colon;
     Expression expression;
-    std::optional<std::pair<BaseToken, std::variant<ExpressionList, YieldExpression>>> optionalAssignmentStmt;
+    std::optional<std::pair<BaseToken, std::variant<StarredExpression, YieldExpression>>> optionalAssignmentStmt;
 };
 
 /**
@@ -933,3 +933,15 @@ bool firstInAssignmentExpression(TokenType tokenType)
 }
 
 } // namespace pylir::Syntax
+
+namespace pylir::Diag
+{
+template <class T, class>
+struct LocationProvider;
+
+template <>
+struct LocationProvider<Syntax::Enclosure, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Enclosure& value) noexcept;
+};
+} // namespace pylir::Diag

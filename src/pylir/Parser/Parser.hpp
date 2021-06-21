@@ -38,8 +38,8 @@ class Parser
             }
             optionalFirst = std::move(*first);
         }
-        std::vector<std::pair<Token, std::unique_ptr<T>>> rest;
-        std::optional<Token> last;
+        std::vector<std::pair<BaseToken, std::unique_ptr<T>>> rest;
+        std::optional<BaseToken> last;
         while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
         {
             auto comma = m_current++;
@@ -81,9 +81,11 @@ class Parser
         return {std::move(current)};
     }
 
-    tl::expected<Syntax::AugTarget, std::string> convertToAug(Syntax::StarredExpression&& starredExpression);
+    tl::expected<Syntax::AugTarget, std::string> convertToAug(Syntax::StarredExpression&& starredExpression,
+                                                              const BaseToken& assignOp);
 
-    tl::expected<Syntax::TargetList, std::string> convertToTargetList(Syntax::StarredExpression&& starredExpression);
+    tl::expected<Syntax::TargetList, std::string> convertToTargetList(Syntax::StarredExpression&& starredExpression,
+                                                                      const BaseToken& assignOp);
 
 public:
     explicit Parser(
@@ -171,7 +173,7 @@ public:
         parseTargetList(std::optional<Syntax::Target>&& firstItem = std::nullopt);
 
     tl::expected<Syntax::AssignmentStmt, std::string>
-        parseAssignmentStmt(std::optional<Syntax::Target>&& firstItem = std::nullopt);
+        parseAssignmentStmt(std::optional<Syntax::TargetList>&& firstItem = std::nullopt);
 
     tl::expected<Syntax::AugTarget, std::string> parseAugTarget();
 

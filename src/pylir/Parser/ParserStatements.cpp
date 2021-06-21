@@ -104,17 +104,30 @@ tl::expected<pylir::Syntax::TargetList, std::string>
 }
 
 tl::expected<pylir::Syntax::AssignmentStmt, std::string>
-    pylir::Parser::parseAssignmentStmt(std::optional<Syntax::Target>&& firstItem)
+    pylir::Parser::parseAssignmentStmt(std::optional<Syntax::TargetList>&& firstItem)
 {
     std::vector<std::pair<Syntax::TargetList, BaseToken>> targets;
+    bool hadFirst = firstItem.has_value();
+    if (firstItem)
+    {
+        auto assignment = expect(TokenType::Assignment);
+        if (!assignment)
+        {
+            return tl::unexpected{std::move(assignment).error()};
+        }
+        targets.emplace_back(std::move(*firstItem), std::move(*assignment));
+    }
     do
     {
-        auto targetList = parseTargetList(std::move(firstItem));
+        if (hadFirst && (m_current == m_lexer.end() || !Syntax::firstInTarget(m_current->getTokenType())))
+        {
+            break;
+        }
+        auto targetList = parseTargetList();
         if (!targetList)
         {
             return tl::unexpected{std::move(targetList).error()};
         }
-        firstItem.reset();
         auto assignment = expect(TokenType::Assignment);
         if (!assignment)
         {
@@ -317,10 +330,20 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
 
             switch (m_current->getTokenType())
             {
-                case TokenType::Comma: // A target list can have a trailing comma,
                 case TokenType::Assignment:
                 {
                     // If an assignment follows, check whether the starred expression could be a target list
+                    auto targetList = convertToTargetList(std::move(*starredExpression), *m_current);
+                    if (!targetList)
+                    {
+                        return tl::unexpected{std::move(targetList).error()};
+                    }
+                    auto assignmentStmt = parseAssignmentStmt(std::move(*targetList));
+                    if (!assignmentStmt)
+                    {
+                        return tl::unexpected{std::move(assignmentStmt).error()};
+                    }
+                    return Syntax::SimpleStmt{std::move(*assignmentStmt)};
                 }
                 case TokenType::PlusAssignment:
                 case TokenType::Colon:
@@ -338,6 +361,63 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                 case TokenType::BitOrAssignment:
                 {
                     // needs to be an augtarget then
+                    auto augTarget = convertToAug(std::move(*starredExpression), *m_current);
+                    if (!augTarget)
+                    {
+                        return tl::unexpected{std::move(augTarget).error()};
+                    }
+                    if (m_current->getTokenType() == TokenType::Colon)
+                    {
+                        auto colon = *m_current++;
+                        auto expression = parseExpression();
+                        if (!expression)
+                        {
+                            return tl::unexpected{std::move(expression).error()};
+                        }
+                        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Assignment)
+                        {
+                            return Syntax::SimpleStmt{Syntax::AnnotatedAssignmentSmt{
+                                std::move(*augTarget), colon, std::move(*expression), std::nullopt}};
+                        }
+                        auto assignment = *m_current++;
+                        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
+                        {
+                            auto yield = parseYieldExpression();
+                            if (!yield)
+                            {
+                                return tl::unexpected{std::move(yield).error()};
+                            }
+                            return Syntax::SimpleStmt{
+                                Syntax::AnnotatedAssignmentSmt{std::move(*augTarget), colon, std::move(*expression),
+                                                               std::pair{assignment, std::move(*yield)}}};
+                        }
+                        auto starred = parseStarredExpression();
+                        if (!starred)
+                        {
+                            return tl::unexpected{std::move(starred).error()};
+                        }
+                        return Syntax::SimpleStmt{
+                            Syntax::AnnotatedAssignmentSmt{std::move(*augTarget), colon, std::move(*expression),
+                                                           std::pair{assignment, std::move(*starred)}}};
+                    }
+                    auto augOp = *m_current++;
+                    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
+                    {
+                        auto yield = parseYieldExpression();
+                        if (!yield)
+                        {
+                            return tl::unexpected{std::move(yield).error()};
+                        }
+                        return Syntax::SimpleStmt{
+                            Syntax::AugmentedAssignmentStmt{std::move(*augTarget), augOp, std::move(*yield)}};
+                    }
+                    auto expressionList = parseExpressionList();
+                    if (!expressionList)
+                    {
+                        return tl::unexpected{std::move(expressionList).error()};
+                    }
+                    return Syntax::SimpleStmt{
+                        Syntax::AugmentedAssignmentStmt{std::move(*augTarget), augOp, std::move(*expressionList)}};
                 }
                 default: return Syntax::SimpleStmt{std::move(*starredExpression)};
             }
@@ -370,70 +450,509 @@ tl::expected<pylir::Syntax::AssertStmt, std::string> pylir::Parser::parseAssertS
                               std::pair{std::move(comma), std::move(*message)}};
 }
 
-tl::expected<pylir::Syntax::AugTarget, std::string>
-    pylir::Parser::convertToAug(Syntax::StarredExpression&& starredExpression)
+namespace
 {
-    struct Visitor
+using namespace pylir;
+
+template <class T>
+struct Visitor
+{
+    Parser& parser;
+    const BaseToken& assignOp;
+
+    template <class... Args>
+    T construct(Args&&... args)
     {
-        using Ret = tl::expected<pylir::Syntax::AugTarget, std::string>;
-
-        Ret visit(Syntax::OrTest&& expression) {}
-
-        Ret visit(Syntax::ConditionalExpression&& expression)
+        if constexpr (std::is_same_v<T, Syntax::AugTarget>)
         {
-            if (expression.suffix)
-            {
-                // TODO: Error
-            }
-            return visit(std::move(expression.value));
+            return T{std::forward<Args>(args)...};
         }
-
-        Ret visit(Syntax::Expression&& expression)
+        else if constexpr (std::is_same_v<T, Syntax::TargetList>)
         {
-            return pylir::match(
-                std::move(expression.variant),
-                [&](Syntax::ConditionalExpression&& conditionalExpression)
-                { return visit(std::move(conditionalExpression)); },
-                [&](std::unique_ptr<Syntax::LambdaExpression>&& lambdaExpression) -> Ret
+            Syntax::Target target{std::forward<Args>(args)...};
+            return Syntax::TargetList{std::make_unique<Syntax::Target>(std::move(target)), {}, std::nullopt};
+        }
+    }
+
+    using Ret = tl::expected<T, std::string>;
+
+    template <class ThisClass, class Getter>
+    auto visitBinaryOp(ThisClass&& thisClass, Getter getter)
+        -> std::enable_if_t<!std::is_lvalue_reference_v<ThisClass>, Ret>
+    {
+        return pylir::match(
+            std::move(thisClass.variant),
+            [&](typename ThisClass::BinOp&& binOp) -> Ret
+            {
+                auto& [lhs, token, rhs] = binOp;
+                return tl::unexpected{
+                    parser
+                        .createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_N,
+                                                  fmt::format("result of operator {:q}", std::invoke(getter, token)))
+                        .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            },
+            [&](auto&& other) -> std::enable_if_t<!std::is_lvalue_reference_v<decltype(other)>, Ret> {
+                return visit(std::move(other));
+            });
+    }
+
+    template <class Thing = T>
+    auto visit(Syntax::StarredItem&& expression) -> std::enable_if_t<std::is_same_v<Thing, Syntax::TargetList>, Ret>
+    {
+        return pylir::match(
+            std::move(expression.variant),
+            [&](Syntax::AssignmentExpression&& assignmentExpression) { return visit(std::move(assignmentExpression)); },
+            [&](std::pair<BaseToken, Syntax::OrExpr>&& pair) -> Ret
+            {
+                auto target = visit(std::move(pair.second));
+                if (!target)
                 {
-                    // TODO: Error
-                });
-        }
+                    return target;
+                }
+                return construct(std::pair{pair.first, std::move(target->firstExpr)});
+            });
+    }
 
-        Ret visit(Syntax::AssignmentExpression&& assignmentExpression)
-        {
-            if (assignmentExpression.identifierAndWalrus)
+    template <class Thing = T>
+    auto visit(Syntax::Enclosure&& expression) -> std::enable_if_t<std::is_same_v<T, Thing>, Ret>
+    {
+        return pylir::match(
+            std::move(expression.variant),
+            [&](Syntax::Enclosure::ParenthForm&& parenthForm) -> Ret
             {
-                // TODO: Error
-            }
-            return visit(std::move(*assignmentExpression.expression));
-        }
+                if (!parenthForm.expression)
+                {
+                    return construct(
+                        Syntax::Target::Parenth{parenthForm.openParenth, std::nullopt, parenthForm.closeParenth});
+                }
+                auto list = visit(std::move(*parenthForm.expression));
+                if (!list)
+                {
+                    return list;
+                }
+                return construct(
+                    Syntax::Target::Parenth{parenthForm.openParenth, std::move(*list), parenthForm.closeParenth});
+            },
+            [&](Syntax::Enclosure::DictDisplay&&) -> Ret
+            {
+                return tl::unexpected{
+                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
+                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            },
+            [&](Syntax::Enclosure::SetDisplay&&) -> Ret
+            {
+                return tl::unexpected{
+                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
+                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            },
+            [&](Syntax::Enclosure::ListDisplay&& listDisplay) -> Ret
+            {
+                return pylir::match(
+                    std::move(listDisplay.variant),
+                    [&](std::monostate) -> Ret {
+                        return construct(
+                            Syntax::Target::Square{listDisplay.openSquare, std::nullopt, listDisplay.closeSquare});
+                    },
+                    [&](Syntax::Comprehension&&) -> Ret
+                    {
+                        return tl::unexpected{
+                            parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
+                                .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                .emitError()};
+                    },
+                    [&](Syntax::StarredList&& starredList) -> Ret
+                    {
+                        Syntax::TargetList targetList{};
+                        auto first = visit(std::move(*starredList.firstExpr));
+                        if (!first)
+                        {
+                            return first;
+                        }
+                        targetList.firstExpr = std::move(first->firstExpr);
+                        for (auto& [comma, item] : starredList.remainingExpr)
+                        {
+                            auto other = visit(std::move(*item));
+                            if (!other)
+                            {
+                                return other;
+                            }
+                            targetList.remainingExpr.emplace_back(comma, std::move(other->firstExpr));
+                        }
+                        targetList.trailingComma = starredList.trailingComma;
+                        return targetList;
+                    });
+            },
+            [&](Syntax::Enclosure::YieldAtom&&) -> Ret
+            {
+                return tl::unexpected{
+                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
+                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            },
+            [&](Syntax::Enclosure::GeneratorExpression&&) -> Ret
+            {
+                return tl::unexpected{
+                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
+                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            });
+    }
 
-        Ret visit(Syntax::StarredExpression&& starredExpression)
+    Ret visit(Syntax::Atom&& expression)
+    {
+        return pylir::match(
+            std::move(expression.variant),
+            [&](IdentifierToken&& identifierToken) -> Ret { return construct(std::move(identifierToken)); },
+            [&](Syntax::Atom::Literal&& literal) -> Ret
+            {
+                return tl::unexpected{
+                    parser.createDiagnosticsBuilder(literal.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
+                        .addLabel(literal.token, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            },
+            [&](std::unique_ptr<Syntax::Enclosure>&& enclosure) -> Ret
+            {
+                if constexpr (std::is_same_v<Syntax::AugTarget, T>)
+                {
+                    return tl::unexpected{
+                        parser.createDiagnosticsBuilder(*enclosure, Diag::CANNOT_ASSIGN_TO_N, "enclosure")
+                            .addLabel(*enclosure, std::nullopt, Diag::ERROR_COLOUR)
+                            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                            .emitError()};
+                }
+                else
+                {
+                    return visit(std::move(*enclosure));
+                }
+            });
+    }
+
+    Ret visit(Syntax::Primary&& expression)
+    {
+        return pylir::match(
+            std::move(expression.variant), [&](Syntax::Atom&& atom) { return visit(std::move(atom)); },
+            [&](Syntax::Call&& call) -> Ret
+            {
+                return tl::unexpected{
+                    parser.createDiagnosticsBuilder(call.openParentheses, Diag::CANNOT_ASSIGN_TO_N, "result of call")
+                        .addLabel(call.openParentheses, call.closeParentheses, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            },
+            [&](auto&& value) -> std::enable_if_t<std::is_rvalue_reference_v<decltype(value)>, Ret> {
+                return construct(std::move(value));
+            });
+    }
+
+    Ret visit(Syntax::AwaitExpr&& expression)
+    {
+        return tl::unexpected{
+            parser
+                .createDiagnosticsBuilder(expression.awaitToken, Diag::CANNOT_ASSIGN_TO_N, "result of await expression")
+                .addLabel(expression.awaitToken, std::nullopt, Diag::ERROR_COLOUR)
+                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                .emitError()};
+    }
+
+    Ret visit(Syntax::Power&& expression)
+    {
+        if (expression.rightHand)
         {
-            return pylir::match(
-                std::move(starredExpression.variant),
-                [&](Syntax::Expression&& expression) { return visit(std::move(expression)); },
-                [&](Syntax::StarredExpression::Items&& items) -> Ret
+            return tl::unexpected{
+                parser
+                    .createDiagnosticsBuilder(expression.rightHand->first, Diag::CANNOT_ASSIGN_TO_N,
+                                              fmt::format("result of operator {:q}", TokenType::PowerOf))
+                    .addLabel(expression.rightHand->first, std::nullopt, Diag::ERROR_COLOUR)
+                    .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                    .emitError()};
+        }
+        return pylir::match(std::move(expression.variant), [&](auto&& value) { return visit(std::move(value)); });
+    }
+
+    Ret visit(Syntax::UExpr&& expression)
+    {
+        return pylir::match(
+            std::move(expression.variant), [&](Syntax::Power&& power) { return visit(std::move(power)); },
+            [&](std::pair<Token, std::unique_ptr<Syntax::UExpr>>&& pair) -> Ret
+            {
+                return tl::unexpected{parser
+                                          .createDiagnosticsBuilder(
+                                              pair.first, Diag::CANNOT_ASSIGN_TO_N,
+                                              fmt::format("result of unary operator {:q}", pair.first.getTokenType()))
+                                          .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
+                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                          .emitError()};
+            });
+    }
+
+    Ret visit(Syntax::MExpr&& expression)
+    {
+        return pylir::match(
+            std::move(expression.variant),
+            [&](auto&& binOp) -> std::enable_if_t<std::is_rvalue_reference_v<decltype(binOp)>, Ret>
+            {
+                auto& [lhs, token, rhs] = binOp;
+                TokenType tokenType;
+                if constexpr (std::is_same_v<Token, std::decay_t<decltype(token)>>)
+                {
+                    tokenType = token.getTokenType();
+                }
+                else
+                {
+                    tokenType = TokenType::AtSign;
+                }
+                return tl::unexpected{parser
+                                          .createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_N,
+                                                                    fmt::format("result of operator {:q}", tokenType))
+                                          .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
+                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                          .emitError()};
+            },
+            [&](Syntax::UExpr&& other) { return visit(std::move(other)); });
+    }
+
+    Ret visit(Syntax::AExpr&& expression)
+    {
+        return visitBinaryOp(std::move(expression), &Token::getTokenType);
+    }
+
+    Ret visit(Syntax::ShiftExpr&& expression)
+    {
+        return visitBinaryOp(std::move(expression), &Token::getTokenType);
+    }
+
+    Ret visit(Syntax::AndExpr&& expression)
+    {
+        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::BitAnd; });
+    }
+
+    Ret visit(Syntax::XorExpr&& expression)
+    {
+        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::BitXor; });
+    }
+
+    Ret visit(Syntax::OrExpr&& expression)
+    {
+        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::BitOr; });
+    }
+
+    Ret visit(Syntax::Comparison&& expression)
+    {
+        if (!expression.rest.empty())
+        {
+            auto builder = parser.createDiagnosticsBuilder(expression.rest.front().first.firstToken,
+                                                           Diag::CANNOT_ASSIGN_TO_N, "result of comparison");
+            for (auto& [pair, other] : expression.rest)
+            {
+                if (pair.secondToken)
+                {
+                    builder.addLabel(pair.firstToken, *pair.secondToken, std::nullopt, Diag::ERROR_COLOUR);
+                }
+                else
+                {
+                    builder.addLabel(pair.firstToken, std::nullopt, Diag::ERROR_COLOUR);
+                }
+            }
+            return tl::unexpected{builder.addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY).emitError()};
+        }
+        return visit(std::move(expression.left));
+    }
+
+    Ret visit(Syntax::NotTest&& expression)
+    {
+        return pylir::match(
+            std::move(expression.variant),
+            [&](Syntax::Comparison&& comparison) { return visit(std::move(comparison)); },
+            [&](std::pair<BaseToken, std::unique_ptr<Syntax::NotTest>>&& pair) -> Ret
+            {
+                return tl::unexpected{
+                    parser
+                        .createDiagnosticsBuilder(pair.first, Diag::CANNOT_ASSIGN_TO_N,
+                                                  fmt::format("result of operator {:q}", TokenType::NotKeyword))
+                        .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
+            });
+    }
+
+    Ret visit(Syntax::AndTest&& expression)
+    {
+        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType ::AndKeyword; });
+    }
+
+    Ret visit(Syntax::OrTest&& expression)
+    {
+        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::OrKeyword; });
+    }
+
+    Ret visit(Syntax::ConditionalExpression&& expression)
+    {
+        if (expression.suffix)
+        {
+            return tl::unexpected{parser
+                                      .createDiagnosticsBuilder(expression.suffix->ifToken, Diag::CANNOT_ASSIGN_TO_N,
+                                                                "result of conditional expression")
+                                      .addLabel(expression.suffix->ifToken,
+                                                /*TODO: expression.suffix->elseValue,  */ std::nullopt,
+                                                Diag::ERROR_COLOUR)
+                                      .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                      .emitError()};
+        }
+        return visit(std::move(expression.value));
+    }
+
+    Ret visit(Syntax::Expression&& expression)
+    {
+        return pylir::match(
+            std::move(expression.variant),
+            [&](Syntax::ConditionalExpression&& conditionalExpression)
+            { return visit(std::move(conditionalExpression)); },
+            [&](std::unique_ptr<Syntax::LambdaExpression>&& lambdaExpression) -> Ret
+            {
+                // TODO: use LambdaExpression as location provider
+                return tl::unexpected{parser
+                                          .createDiagnosticsBuilder(lambdaExpression->lambdaToken,
+                                                                    Diag::CANNOT_ASSIGN_TO_N,
+                                                                    "result of lambda expression")
+                                          .addLabel(lambdaExpression->lambdaToken, std::nullopt, Diag::ERROR_COLOUR)
+                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                          .emitError()};
+            });
+    }
+
+    Ret visit(Syntax::AssignmentExpression&& assignmentExpression)
+    {
+        if (assignmentExpression.identifierAndWalrus)
+        {
+            return tl::unexpected{
+                parser
+                    .createDiagnosticsBuilder(assignmentExpression.identifierAndWalrus->second,
+                                              Diag::CANNOT_ASSIGN_TO_N,
+                                              fmt::format("result of operator {:q}", TokenType::Walrus))
+                    .addLabel(assignmentExpression.identifierAndWalrus->second, std::nullopt, Diag::ERROR_COLOUR)
+                    .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                    .emitError()};
+        }
+        return visit(std::move(*assignmentExpression.expression));
+    }
+
+    Ret visit(Syntax::StarredExpression&& starredExpression)
+    {
+        return pylir::match(
+            std::move(starredExpression.variant),
+            [&](Syntax::Expression&& expression) { return visit(std::move(expression)); },
+            [&](Syntax::StarredExpression::Items&& items) -> Ret
+            {
+                if constexpr (std::is_same_v<Syntax::AugTarget, T>)
                 {
                     if (!items.leading.empty())
                     {
-                        // TODO: Error
+                        // TODO: Better loc
+                        return tl::unexpected{
+                            parser
+                                .createDiagnosticsBuilder(items.leading.front().second, Diag::CANNOT_ASSIGN_TO_N,
+                                                          "multiple value")
+                                .addLabel(items.leading.front().second, std::nullopt, Diag::ERROR_COLOUR)
+                                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                .emitError()};
                     }
                     if (!items.last)
                     {
-                        // TODO: Error
+                        return tl::unexpected{parser
+                                                  .createDiagnosticsBuilder(assignOp, Diag::EXPECTED_N_BEFORE_N,
+                                                                            "identifier", "assignment")
+                                                  .addLabel(assignOp, std::nullopt, Diag::ERROR_COLOUR)
+                                                  .emitError()};
                     }
                     return pylir::match(
                         std::move(items.last->variant),
                         [&](Syntax::AssignmentExpression&& assignmentExpression)
                         { return visit(std::move(assignmentExpression)); },
-                        [&](std::pair<BaseToken, Syntax::OrExpr>&&) -> Ret
+                        [&](std::pair<BaseToken, Syntax::OrExpr>&& pair) -> Ret
                         {
-                            // TODO: Error
+                            return tl::unexpected{
+                                parser.createDiagnosticsBuilder(assignOp, Diag::CANNOT_ASSIGN_TO_N, "starred item")
+                                    .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
+                                    .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                    .emitError()};
                         });
-                });
-        }
-    } visitor;
+                }
+                else
+                {
+                    if (items.leading.empty() && !items.last)
+                    {
+                        return tl::unexpected{parser
+                                                  .createDiagnosticsBuilder(assignOp, Diag::EXPECTED_N_BEFORE_N,
+                                                                            "identifier", "assignment")
+                                                  .addLabel(assignOp, std::nullopt, Diag::ERROR_COLOUR)
+                                                  .emitError()};
+                    }
+                    Syntax::TargetList targetList{};
+                    std::optional<BaseToken> comma;
+                    for (auto& iter : items.leading)
+                    {
+                        auto target = visit(std::move(iter.first));
+                        if (!target)
+                        {
+                            return target;
+                        }
+                        if (!targetList.firstExpr)
+                        {
+                            targetList.firstExpr = std::move(target->firstExpr);
+                        }
+                        else
+                        {
+                            targetList.remainingExpr.emplace_back(*comma, std::move(target->firstExpr));
+                        }
+                        comma = iter.second;
+                    }
+                    if (!items.last)
+                    {
+                        targetList.trailingComma = comma;
+                    }
+                    else
+                    {
+                        auto target = visit(std::move(*items.last));
+                        if (!target)
+                        {
+                            return target;
+                        }
+                        if (!targetList.firstExpr)
+                        {
+                            targetList.firstExpr = std::move(target->firstExpr);
+                        }
+                        else
+                        {
+                            targetList.remainingExpr.emplace_back(*comma, std::move(target->firstExpr));
+                        }
+                    }
+                    return targetList;
+                }
+            });
+    }
+};
+} // namespace
+
+tl::expected<pylir::Syntax::AugTarget, std::string>
+    pylir::Parser::convertToAug(Syntax::StarredExpression&& starredExpression, const BaseToken& assignOp)
+{
+    Visitor<Syntax::AugTarget> visitor{*this, assignOp};
+    return visitor.visit(std::move(starredExpression));
+}
+
+tl::expected<pylir::Syntax::TargetList, std::string>
+    pylir::Parser::convertToTargetList(Syntax::StarredExpression&& starredExpression, const BaseToken& assignOp)
+{
+    Visitor<Syntax::TargetList> visitor{*this, assignOp};
     return visitor.visit(std::move(starredExpression));
 }

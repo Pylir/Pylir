@@ -726,7 +726,7 @@ void pylir::Lexer::parseIdentifier()
     {
         auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_CHARACTER_N,
                                                 Text::toUTF8String({&*m_current, 1}))
-                           .addLabel(m_current - m_document->begin());
+                           .addLabel(m_current - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
         m_tokens.emplace_back(m_current - m_document->begin(), 1, m_fileId, TokenType::SyntaxError,
                               builder.emitError());
         return;
@@ -1075,10 +1075,10 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                             auto builder =
                                 createDiagnosticsBuilder(m_current - m_document->begin() - count,
                                                          Diag::EXPECTED_N_MORE_HEX_CHARACTERS, size - count)
-                                    .addLabel(m_current - m_document->begin() - count, m_current - m_document->begin(),
-                                              std::nullopt, Diag::ERROR_COLOUR)
+                                    .addLabel(m_current - m_document->begin() - count,
+                                              m_current - m_document->begin() - 1, std::nullopt, Diag::ERROR_COLOUR)
                                     .addLabel(m_current - m_document->begin() - count - 2,
-                                              m_current - m_document->begin() - count, std::nullopt,
+                                              m_current - m_document->begin() - count - 1, std::nullopt,
                                               Diag::ERROR_COMPLY);
                             return tl::unexpected{builder.emitError()};
                         }
@@ -1088,10 +1088,10 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                                 createDiagnosticsBuilder(m_current - m_document->begin() - count,
                                                          Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
                                                          static_cast<std::uint32_t>(value))
-                                    .addLabel(m_current - m_document->begin() - count, m_current - m_document->begin(),
+                                    .addLabel(m_current - m_document->begin() - count, m_current - m_document->begin() - 1,
                                               std::nullopt, Diag::ERROR_COLOUR)
                                     .addLabel(m_current - m_document->begin() - count - 2,
-                                              m_current - m_document->begin() - count, std::nullopt,
+                                              m_current - m_document->begin() - count - 1, std::nullopt,
                                               Diag::ERROR_COMPLY);
                             return tl::unexpected{builder.emitError()};
                         }
@@ -1119,7 +1119,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                                                          Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N)
                                     .addLabel(m_current - m_document->begin(), "{", Diag::INSERT_COLOUR,
                                               std::move(emphasis))
-                                    .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin(),
+                                    .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin() - 1,
                                               std::nullopt, Diag::ERROR_COMPLY);
                             return tl::unexpected{builder.emitError()};
                         }
@@ -1133,9 +1133,9 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                             auto builder =
                                 createDiagnosticsBuilder(m_current - m_document->begin(),
                                                          Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
-                                    .addLabel(m_current - m_document->begin(), closing - m_document->begin(),
+                                    .addLabel(m_current - m_document->begin(), closing - m_document->begin() - 1,
                                               std::nullopt, Diag::ERROR_COLOUR)
-                                    .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin(),
+                                    .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin() - 1,
                                               std::nullopt, Diag::ERROR_COMPLY);
                             if (closing != m_document->end())
                             {
@@ -1257,7 +1257,7 @@ void pylir::Lexer::parseNumber()
             {
                 auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::INVALID_NUMBER_PREFIX_N,
                                                         Text::toUTF8String({m_current, 2}))
-                                   .addLabel(m_current - m_document->begin(), m_current - m_document->begin() + 2,
+                                   .addLabel(m_current - m_document->begin(), m_current - m_document->begin() + 1,
                                              std::nullopt, Diag::ERROR_COLOUR);
                 m_tokens.emplace_back(m_current - m_document->begin(), 2, m_fileId, TokenType::SyntaxError,
                                       builder.emitError());
@@ -1296,7 +1296,7 @@ void pylir::Lexer::parseNumber()
         auto builder =
             createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
                 .addLabel(end - 1 - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR)
-                .addLabel(start - m_document->begin(), end - m_document->begin() - 2, std::nullopt, Diag::ERROR_COMPLY);
+                .addLabel(start - m_document->begin(), end - m_document->begin() - 3, std::nullopt, Diag::ERROR_COMPLY);
         m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
                               builder.emitError());
         return;
@@ -1319,10 +1319,10 @@ void pylir::Lexer::parseNumber()
             auto builder = createDiagnosticsBuilder(
                                m_current - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
                                Text::toUTF8String({m_current, static_cast<std::size_t>(suffixEnd - m_current)}))
-                               .addLabel(start - m_document->begin(), m_current - m_document->begin(), std::nullopt,
+                               .addLabel(start - m_document->begin(), m_current - m_document->begin() - 1, std::nullopt,
                                          Diag::ERROR_COMPLY)
-                               .addLabel(m_current - m_document->begin(), suffixEnd - m_document->begin(), std::nullopt,
-                                         Diag::ERROR_COLOUR, Diag::emphasis::strikethrough);
+                               .addLabel(m_current - m_document->begin(), suffixEnd - m_document->begin() - 1,
+                                         std::nullopt, Diag::ERROR_COLOUR, Diag::emphasis::strikethrough);
             m_tokens.emplace_back(m_current - m_document->begin(), suffixEnd - m_current, m_fileId,
                                   TokenType::SyntaxError, builder.emitError());
             m_current = suffixEnd;
@@ -1349,12 +1349,12 @@ void pylir::Lexer::parseNumber()
                 std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
             auto builder =
                 createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
-                    .addLabel(leadingEnd - m_document->begin(), end - m_document->begin(), std::nullopt,
+                    .addLabel(leadingEnd - m_document->begin(), end - m_document->begin() - 1, std::nullopt,
                               Diag::ERROR_COMPLY)
-                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
+                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin() - 1, std::nullopt,
                               Diag::ERROR_COLOUR)
                     .addNote(numberStart - m_document->begin(), Diag::REMOVE_LEADING_ZEROS)
-                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin(), std::nullopt,
+                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin() - 1, std::nullopt,
                               Diag::NOTE_COMPLY, Diag::emphasis::strikethrough);
             m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
                                   builder.emitError());
@@ -1396,10 +1396,10 @@ void pylir::Lexer::parseNumber()
         m_current = newEnd;
         if (newEnd == end)
         {
-            auto builder =
-                createDiagnosticsBuilder(end - m_document->begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
-                    .addLabel(start - m_document->begin(), end - m_document->begin(), std::nullopt, Diag::ERROR_COMPLY)
-                    .addLabel(end - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
+            auto builder = createDiagnosticsBuilder(end - m_document->begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
+                               .addLabel(start - m_document->begin(), end - m_document->begin() - 1, std::nullopt,
+                                         Diag::ERROR_COMPLY)
+                               .addLabel(end - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
             m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
                                   builder.emitError());
             return;
@@ -1480,7 +1480,7 @@ void pylir::Lexer::parseIndent()
         {
             auto builder =
                 createDiagnosticsBuilder(m_current - m_document->begin(), Diag::INVALID_INDENTATION_N, indent)
-                    .addLabel(start - m_document->begin(), m_current - m_document->begin(), std::nullopt,
+                    .addLabel(start - m_document->begin(), m_current - m_document->begin() - 1, std::nullopt,
                               Diag::ERROR_COLOUR);
             if (previous.first - indent < indent - m_indentation.top().first)
             {

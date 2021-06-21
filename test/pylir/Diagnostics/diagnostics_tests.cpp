@@ -9,7 +9,7 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     SECTION("Simple")
     {
         pylir::Diag::Document document("A normal text", "filename");
-        auto result = pylir::Diag::DiagnosticsBuilder(document, 2, "A message").addLabel(2, 8, "Label").emitError();
+        auto result = pylir::Diag::DiagnosticsBuilder(document, 2, "A message").addLabel(2, 7, "Label").emitError();
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     |   ~~~~~~\n"
                                            "     |      |\n"
@@ -43,7 +43,7 @@ TEST_CASE("Diagnostics labels", "[Diag]")
         {
             pylir::Diag::Document document("A normal text", "filename");
             auto result = pylir::Diag::DiagnosticsBuilder(document, 0, "A message")
-                              .addLabel(2, 8, "Label")
+                              .addLabel(2, 7, "Label")
                               .addLabel(0, "kek")
                               .emitError();
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
@@ -56,7 +56,7 @@ TEST_CASE("Diagnostics labels", "[Diag]")
         {
             pylir::Diag::Document document("A normal text", "filename");
             auto result = pylir::Diag::DiagnosticsBuilder(document, 0, "A message")
-                              .addLabel(2, 8, "Label")
+                              .addLabel(2, 7, "Label")
                               .addLabel(0, "other")
                               .emitError();
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
