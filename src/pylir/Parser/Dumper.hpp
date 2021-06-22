@@ -52,6 +52,8 @@ public:
 
     std::string dump(const Syntax::Enclosure& enclosure);
 
+    std::string dump(const Syntax::YieldExpression& yieldExpression);
+
     std::string dump(const Syntax::Primary& primary);
 
     std::string dump(const Syntax::AttributeRef& attribute);
@@ -117,6 +119,48 @@ public:
         return dump(
             expressionList, [&](auto&& value) { return dump(value); }, "expression list");
     }
+
+    std::string dump(const Syntax::Target& square);
+
+    std::string dump(const Syntax::TargetList& targetList)
+    {
+        return dump(
+            targetList, [&](auto&& value) { return dump(value); }, "target list");
+    }
+
+    std::string dump(const Syntax::SimpleStmt& simpleStmt);
+
+    std::string dump(const Syntax::AssertStmt& assertStmt);
+
+    std::string dump(const Syntax::AssignmentStmt& assignmentStmt);
+
+    std::string dump(const Syntax::AugTarget& augTarget);
+
+    std::string dump(const Syntax::AugmentedAssignmentStmt& augmentedAssignmentStmt);
+
+    std::string dump(const Syntax::AnnotatedAssignmentSmt& annotatedAssignmentSmt);
+
+    std::string dump(const Syntax::PassStmt& passStmt);
+
+    std::string dump(const Syntax::DelStmt& delStmt);
+
+    std::string dump(const Syntax::ReturnStmt& returnStmt);
+
+    std::string dump(const Syntax::YieldStmt& yieldStmt);
+
+    std::string dump(const Syntax::RaiseStmt& raiseStmt);
+
+    std::string dump(const Syntax::BreakStmt& breakStmt);
+
+    std::string dump(const Syntax::ContinueStmt& continueStmt);
+
+    std::string dump(const Syntax::ImportStmt& importStmt);
+
+    std::string dump(const Syntax::FutureStmt& futureStmt);
+
+    std::string dump(const Syntax::GlobalStmt& globalStmt);
+
+    std::string dump(const Syntax::NonLocalStmt& nonLocalStmt);
 };
 
 } // namespace pylir

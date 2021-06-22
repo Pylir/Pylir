@@ -214,35 +214,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             return result;
         },
         [&](const Syntax::Enclosure::YieldAtom& yieldAtom) -> std::string
-        {
-            return "yieldatom"
-                   + addLastChild(pylir::match(
-                       yieldAtom.yieldExpression.variant, [](std::monostate) -> std::string { return "yield empty"; },
-                       [&](const std::pair<BaseToken, Syntax::Expression>& expression) -> std::string
-                       {
-                           std::string result = "yield from";
-                           result += addLastChild(dump(expression.second));
-                           return result;
-                       },
-                       [&](const Syntax::ExpressionList& list) -> std::string
-                       {
-                           std::string result = "yield list";
-                           if (list.remainingExpr.empty())
-                           {
-                               result += addLastChild(dump(*list.firstExpr));
-                           }
-                           else
-                           {
-                               result += addMiddleChild(dump(*list.firstExpr));
-                               for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
-                               {
-                                   result += addMiddleChild(dump(*iter.second));
-                               }
-                               result += addLastChild(dump(*list.remainingExpr.back().second));
-                           }
-                           return result;
-                       }));
-        },
+        { return "yieldatom" + addLastChild(dump(yieldAtom.yieldExpression)); },
         [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> std::string
         {
             if (!parenthForm.expression)
@@ -677,7 +649,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::CompFor& compFor)
     {
         result = "comp for";
     }
-    // TODO: targets
+    result += addMiddleChild(dump(compFor.targets));
     if (std::holds_alternative<std::monostate>(compFor.compIter))
     {
         return result + addLastChild(dump(compFor.orTest));
@@ -686,5 +658,332 @@ std::string pylir::Dumper::dump(const pylir::Syntax::CompFor& compFor)
     result += addLastChild(pylir::match(
         compFor.compIter, [&](const auto& ptr) { return dump(*ptr); },
         [](std::monostate) -> std::string { PYLIR_UNREACHABLE; }));
+    return result;
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::Target& target)
+{
+    return pylir::match(
+        target.variant,
+        [&](const IdentifierToken& identifierToken) { return fmt::format("target {}", identifierToken.getValue()); },
+        [&](const Syntax::Target::Parenth& parenth) -> std::string
+        {
+            if (!parenth.targetList)
+            {
+                return "target parenth empty";
+            }
+            return "target parenth" + addLastChild(dump(*parenth.targetList));
+        },
+        [&](const Syntax::Target::Square& square) -> std::string
+        {
+            if (!square.targetList)
+            {
+                return "target square empty";
+            }
+            return "target square" + addLastChild(dump(*square.targetList));
+        },
+        [&](const std::pair<BaseToken, std::unique_ptr<Syntax::Target>>& pair)
+        { return "target starred" + addLastChild(dump(*pair.second)); },
+        [&](const auto& value) { return dump(value); });
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::SimpleStmt& simpleStmt)
+{
+    return pylir::match(simpleStmt.variant, [&](auto&& value) { return dump(value); });
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::AssertStmt& assertStmt)
+{
+    std::string result = "assert statement";
+    if (!assertStmt.message)
+    {
+        return result + addLastChild(dump(assertStmt.condition), "condition");
+    }
+    result += addMiddleChild(dump(assertStmt.condition), "condition");
+    return result + addLastChild(dump(assertStmt.message->second), "message");
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::PassStmt&)
+{
+    return "pass statement";
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::DelStmt& delStmt)
+{
+    return "del statement" + addLastChild(dump(delStmt.targetList));
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::ReturnStmt& returnStmt)
+{
+    if (!returnStmt.expressions)
+    {
+        return "return statement";
+    }
+    return "return statement" + addLastChild(dump(*returnStmt.expressions));
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::YieldStmt& yieldStmt)
+{
+    return dump(yieldStmt.yieldExpression);
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::RaiseStmt& raiseStmt)
+{
+    if (!raiseStmt.expressions)
+    {
+        return "raise statement";
+    }
+    if (!raiseStmt.expressions->second)
+    {
+        return "raise statement" + addLastChild(dump(raiseStmt.expressions->first), "exception");
+    }
+    return "raise statement" + addMiddleChild(dump(raiseStmt.expressions->first), "exception")
+           + addLastChild(dump(raiseStmt.expressions->second->second), "expression");
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::BreakStmt&)
+{
+    return "break statement";
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::ContinueStmt&)
+{
+    return "continue statement";
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::GlobalStmt& globalStmt)
+{
+    std::vector<std::string_view> identifiers{globalStmt.identifier.getValue()};
+    std::transform(globalStmt.rest.begin(), globalStmt.rest.end(), std::back_inserter(identifiers),
+                   [](const auto& pair) { return pair.second.getValue(); });
+    return fmt::format(FMT_STRING("global {}"), globalStmt.identifier.getValue(), fmt::join(identifiers, ", "));
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::NonLocalStmt& nonLocalStmt)
+{
+    std::vector<std::string_view> identifiers{nonLocalStmt.identifier.getValue()};
+    std::transform(nonLocalStmt.rest.begin(), nonLocalStmt.rest.end(), std::back_inserter(identifiers),
+                   [](const auto& pair) { return pair.second.getValue(); });
+    return fmt::format(FMT_STRING("nonlocal {}"), nonLocalStmt.identifier.getValue(), fmt::join(identifiers, ", "));
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
+{
+    auto dumpModule = [&](const Syntax::ImportStmt::Module& module)
+    {
+        std::vector<std::string_view> identifiers;
+        std::transform(module.leading.begin(), module.leading.end(), std::back_inserter(identifiers),
+                       [](const auto& pair) { return pair.first.getValue(); });
+        identifiers.push_back(module.lastIdentifier.getValue());
+        return fmt::format(FMT_STRING("module {}"), fmt::join(identifiers, "."));
+    };
+
+    auto dumpRelativeModule = [&](const Syntax::ImportStmt::RelativeModule& module)
+    {
+        auto dots = std::string(module.dots.size(), '.');
+        if (!module.module)
+        {
+            return "relative module " + dots;
+        }
+        return "relative module " + dots + addLastChild(dumpModule(*module.module));
+    };
+
+    return pylir::match(
+        importStmt.variant,
+        [&](const Syntax::ImportStmt::ImportAsAs& importAsAs)
+        {
+            std::string result = "import";
+            if (!importAsAs.name && importAsAs.rest.empty())
+            {
+                return result + addLastChild(dumpModule(importAsAs.module));
+            }
+            result += addMiddleChild(dumpModule(importAsAs.module));
+            if (importAsAs.name && importAsAs.rest.empty())
+            {
+                return result + addLastChild(fmt::format("as {}", importAsAs.name->second.getValue()));
+            }
+            else
+            {
+                result += addMiddleChild(fmt::format("as {}", importAsAs.name->second.getValue()));
+            }
+            for (auto& further : tcb::span(importAsAs.rest).first(importAsAs.rest.size() - 1))
+            {
+                result += addMiddleChild(dumpModule(further.module));
+                if (further.name)
+                {
+                    result += addMiddleChild(fmt::format("as {}", further.name->second.getValue()));
+                }
+            }
+            if (!importAsAs.rest.back().name)
+            {
+                return result + addLastChild(dumpModule(importAsAs.rest.back().module));
+            }
+            result += addMiddleChild(dumpModule(importAsAs.rest.back().module));
+            return result + addLastChild(fmt::format("as {}", importAsAs.rest.back().name->second.getValue()));
+        },
+        [&](const Syntax::ImportStmt::FromImportAll& importAll)
+        { return "import all" + addLastChild(dumpRelativeModule(importAll.relativeModule)); },
+        [&](const Syntax::ImportStmt::FromImportList& importList)
+        {
+            std::string result = "import list";
+            result += addMiddleChild(dumpRelativeModule(importList.relativeModule));
+            if (importList.rest.empty())
+            {
+                if (importList.name)
+                {
+                    return result
+                           + addLastChild(fmt::format("{} as {}", importList.identifier.getValue(),
+                                                      importList.identifier.getValue()));
+                }
+                return result + addLastChild(importList.identifier.getValue());
+            }
+            if (importList.name)
+            {
+                result += addMiddleChild(
+                    fmt::format("{} as {}", importList.identifier.getValue(), importList.identifier.getValue()));
+            }
+            else
+            {
+                result += addMiddleChild(importList.identifier.getValue());
+            }
+            for (auto& further : tcb::span(importList.rest).first(importList.rest.size() - 1))
+            {
+                if (further.name)
+                {
+                    result += addMiddleChild(
+                        fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
+                }
+                else
+                {
+                    result += addMiddleChild(further.identifier.getValue());
+                }
+            }
+            if (importList.rest.back().name)
+            {
+                result += addLastChild(fmt::format("{} as {}", importList.rest.back().identifier.getValue(),
+                                                   importList.rest.back().name->second.getValue()));
+            }
+            else
+            {
+                result += addLastChild(importList.rest.back().identifier.getValue());
+            }
+            return result;
+        });
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::FutureStmt& futureStmt)
+{
+    std::string result = "future list";
+    if (futureStmt.rest.empty())
+    {
+        if (futureStmt.name)
+        {
+            return result
+                   + addLastChild(
+                       fmt::format("{} as {}", futureStmt.identifier.getValue(), futureStmt.identifier.getValue()));
+        }
+        return result + addLastChild(futureStmt.identifier.getValue());
+    }
+    if (futureStmt.name)
+    {
+        result +=
+            addMiddleChild(fmt::format("{} as {}", futureStmt.identifier.getValue(), futureStmt.identifier.getValue()));
+    }
+    else
+    {
+        result += addMiddleChild(futureStmt.identifier.getValue());
+    }
+    for (auto& further : tcb::span(futureStmt.rest).first(futureStmt.rest.size() - 1))
+    {
+        if (further.name)
+        {
+            result +=
+                addMiddleChild(fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
+        }
+        else
+        {
+            result += addMiddleChild(further.identifier.getValue());
+        }
+    }
+    if (futureStmt.rest.back().name)
+    {
+        result += addLastChild(fmt::format("{} as {}", futureStmt.rest.back().identifier.getValue(),
+                                           futureStmt.rest.back().name->second.getValue()));
+    }
+    else
+    {
+        result += addLastChild(futureStmt.rest.back().identifier.getValue());
+    }
+    return result;
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentStmt& assignmentStmt)
+{
+    std::string result = "assignment statement";
+    for (auto& iter : assignmentStmt.targets)
+    {
+        result += addMiddleChild(dump(iter.first));
+    }
+    return result + addLastChild(pylir::match(assignmentStmt.variant, [&](auto&& value) { return dump(value); }));
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::YieldExpression& yieldExpression)
+{
+    return pylir::match(
+        yieldExpression.variant, [](std::monostate) -> std::string { return "yield empty"; },
+        [&](const std::pair<BaseToken, Syntax::Expression>& expression) -> std::string
+        {
+            std::string result = "yield from";
+            result += addLastChild(dump(expression.second));
+            return result;
+        },
+        [&](const Syntax::ExpressionList& list) -> std::string
+        {
+            std::string result = "yield list";
+            if (list.remainingExpr.empty())
+            {
+                result += addLastChild(dump(*list.firstExpr));
+            }
+            else
+            {
+                result += addMiddleChild(dump(*list.firstExpr));
+                for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
+                {
+                    result += addMiddleChild(dump(*iter.second));
+                }
+                result += addLastChild(dump(*list.remainingExpr.back().second));
+            }
+            return result;
+        });
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::AugmentedAssignmentStmt& augmentedAssignmentStmt)
+{
+    std::string result = fmt::format("augmented assignment {:q}", augmentedAssignmentStmt.augOp.getTokenType());
+    result += addMiddleChild(dump(augmentedAssignmentStmt.augTarget));
+    result +=
+        addLastChild(pylir::match(augmentedAssignmentStmt.variant, [&](const auto& value) { return dump(value); }));
+    return result;
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::AugTarget& augTarget)
+{
+    return pylir::match(
+        augTarget.variant,
+        [&](const IdentifierToken& identifierToken) { return "augtarget " + std::string(identifierToken.getValue()); },
+        [&](const auto& value) { return dump(value); });
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::AnnotatedAssignmentSmt& annotatedAssignmentSmt)
+{
+    std::string result = "annotated assignment";
+    result += addMiddleChild(dump(annotatedAssignmentSmt.augTarget));
+    if (!annotatedAssignmentSmt.optionalAssignmentStmt)
+    {
+        return result + addLastChild(dump(annotatedAssignmentSmt.expression));
+    }
+    result += addMiddleChild(dump(annotatedAssignmentSmt.expression));
+    result += addLastChild(pylir::match(annotatedAssignmentSmt.optionalAssignmentStmt->second,
+                                        [&](const auto& value) { return dump(value); }));
     return result;
 }

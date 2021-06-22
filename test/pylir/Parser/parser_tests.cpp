@@ -17,6 +17,20 @@
         return dumper.dump(*assignment);                      \
     }()
 
+#define dumpStatement(source)                                 \
+    []() -> std::string                                       \
+    {                                                         \
+        pylir::Diag::Document document(source);               \
+        pylir::Parser parser(document);                       \
+        auto simpleStmt = parser.parseSimpleStmt(); \
+        if (!simpleStmt)                                      \
+        {                                                     \
+            FAIL(simpleStmt.error());                         \
+        }                                                     \
+        pylir::Dumper dumper;                                 \
+        return dumper.dump(*simpleStmt);                      \
+    }()
+
 using namespace Catch::Matchers;
 
 TEST_CASE("Parse atom", "[Parser]")
