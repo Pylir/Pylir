@@ -11,7 +11,7 @@ namespace pylir::Syntax
 {
 struct Expression;
 
-template <class T>
+template <class T, TokenType tokenType = TokenType::Comma>
 struct CommaList
 {
     std::unique_ptr<T> firstExpr;
@@ -916,9 +916,255 @@ struct SimpleStmt
         variant;
 };
 
-// TODO:
+using StmtList = CommaList<SimpleStmt, TokenType::SemiColon>;
+
+struct Suite;
+
+/**
+ * if_stmt ::=  "if" assignment_expression ":" suite
+             ("elif" assignment_expression ":" suite)*
+             ["else" ":" suite]
+ */
+struct IfStmt
+{
+    BaseToken ifKeyword;
+    AssignmentExpression condition;
+    BaseToken colon;
+    std::unique_ptr<Suite> suite;
+    struct Elif
+    {
+        BaseToken elif;
+        AssignmentExpression condition;
+        BaseToken colon;
+        std::unique_ptr<Suite> suite;
+    };
+    std::vector<Elif> elifs;
+    struct Else
+    {
+        BaseToken elseKeyowrd;
+        BaseToken colon;
+        std::unique_ptr<Suite> suite;
+    };
+    std::optional<Else> elseSection;
+};
+
+/**
+ * while_stmt ::=  "while" assignment_expression ":" suite
+                ["else" ":" suite]
+ */
+struct WhileStmt
+{
+    BaseToken whileKeyword;
+    AssignmentExpression condition;
+    BaseToken colon;
+    std::unique_ptr<Suite> suite;
+    std::optional<IfStmt::Else> elseSection;
+};
+
+/**
+ * for_stmt ::=  "for" target_list "in" expression_list ":" suite
+              ["else" ":" suite]
+ */
+struct ForStmt
+{
+    BaseToken forKeyword;
+    TargetList targetList;
+    BaseToken inKeyword;
+    ExpressionList expressionList;
+    BaseToken colon;
+    std::unique_ptr<Suite> suite;
+    std::optional<IfStmt::Else> elseSection;
+};
+
+/**
+ * try_stmt  ::=  try1_stmt | try2_stmt
+   try1_stmt ::=  "try" ":" suite
+                  ("except" [expression ["as" identifier]] ":" suite)+
+                  ["else" ":" suite]
+                  ["finally" ":" suite]
+   try2_stmt ::=  "try" ":" suite
+                  "finally" ":" suite
+ */
+struct TryStmt
+{
+    BaseToken tryKeyword;
+    BaseToken colon;
+    std::unique_ptr<Suite> suite;
+    struct Except
+    {
+        BaseToken exceptKeyword;
+        std::optional<std::pair<Expression, std::optional<std::pair<BaseToken, IdentifierToken>>>> expression;
+        BaseToken colon;
+        std::unique_ptr<Suite> suite;
+    };
+    std::vector<Except> excepts;
+    std::optional<IfStmt::Else> elseSection;
+    struct Finally
+    {
+        BaseToken finally;
+        BaseToken colon;
+        std::unique_ptr<Suite> suite;
+    };
+    std::optional<Finally> finally;
+};
+
+/**
+ * with_stmt ::=  "with" with_item ("," with_item)* ":" suite
+   with_item ::=  expression ["as" target]
+ */
+struct WithStmt
+{
+    BaseToken withKeyword;
+    struct WithItem
+    {
+        Expression expression;
+        std::optional<std::pair<BaseToken, Target>> target;
+    };
+    WithItem first;
+    std::vector<std::pair<BaseToken, WithItem>> rest;
+    BaseToken colon;
+    std::unique_ptr<Suite> suite;
+};
+
+/**
+ * parameter_list            ::=  defparameter ("," defparameter)* "," "/" ["," [parameter_list_no_posonly]]
+                                     | parameter_list_no_posonly
+    parameter_list_no_posonly ::=  defparameter ("," defparameter)* ["," [parameter_list_starargs]]
+                                   | parameter_list_starargs
+    parameter_list_starargs   ::=  "*" [parameter] ("," defparameter)* ["," ["**" parameter [","]]]
+                                   | "**" parameter [","]
+    parameter                 ::=  identifier [":" expression]
+    defparameter              ::=  parameter ["=" expression]
+ */
 struct ParameterList
 {
+    struct Parameter
+    {
+        IdentifierToken identifier;
+        std::optional<std::pair<BaseToken, Expression>> type;
+    };
+
+    struct DefParameter
+    {
+        Parameter parameter;
+        std::optional<std::pair<BaseToken, Expression>> defaultArg;
+    };
+
+    struct ParameterListStarArgs
+    {
+        struct DoubleStar
+        {
+            BaseToken doubleStar;
+            Parameter parameter;
+            std::optional<BaseToken> comma;
+        };
+
+        struct Star
+        {
+            BaseToken star;
+            std::optional<Parameter> parameter;
+            std::vector<std::pair<BaseToken, DefParameter>> defParameters;
+            struct Further
+            {
+                BaseToken comma;
+                std::optional<DoubleStar> doubleStar;
+            };
+            std::optional<Further> further;
+        };
+        std::variant<Star, DoubleStar> variant;
+    };
+
+    struct ParameterListNoPosOnly
+    {
+        struct DefParams
+        {
+            DefParameter first;
+            std::vector<std::pair<BaseToken, DefParameter>> rest;
+            std::optional<std::pair<BaseToken, std::optional<ParameterListStarArgs>>> suffix;
+        };
+        std::variant<DefParams, ParameterListStarArgs> variant;
+    };
+
+    struct ParameterListPosOnly
+    {
+        DefParameter first;
+        std::vector<std::pair<BaseToken, DefParameter>> rest;
+        BaseToken comma;
+        BaseToken slash;
+        std::optional<std::pair<BaseToken, std::optional<ParameterListNoPosOnly>>> suffix;
+    };
+    std::variant<ParameterListPosOnly, ParameterListNoPosOnly> variant;
+};
+
+/**
+ * decorator                 ::=  "@" assignment_expression NEWLINE
+ */
+struct Decorator
+{
+    BaseToken atSign;
+    AssignmentExpression assignmentExpression;
+    BaseToken newline;
+};
+
+/**
+ * funcdef                   ::=  [decorators] "def" funcname "(" [parameter_list] ")"
+                               ["->" expression] ":" suite
+   funcname                  ::=  identifier
+
+   async_funcdef ::=  [decorators] "async" "def" funcname "(" [parameter_list] ")"
+                   ["->" expression] ":" suite
+ */
+struct FuncDef
+{
+    std::vector<Decorator> decorators;
+    std::optional<BaseToken> async;
+    BaseToken def;
+    IdentifierToken funcName;
+    BaseToken openParenth;
+    std::optional<ParameterList> parameterList;
+    BaseToken closeParenth;
+    std::optional<std::pair<BaseToken, Expression>> suffix;
+    BaseToken colon;
+    std::unique_ptr<Suite> suite;
+};
+
+/**
+ * classdef    ::=  [decorators] "class" classname [inheritance] ":" suite
+    inheritance ::=  "(" [argument_list] ")"
+    classname   ::=  identifier
+ */
+struct ClassDef
+{
+    std::vector<Decorator> decorators;
+    BaseToken classKeyword;
+    IdentifierToken className;
+    struct Inheritance
+    {
+        BaseToken openParenth;
+        // TODO: Argument list
+        BaseToken closeParenth;
+    };
+    std::optional<Inheritance> inheritance;
+    BaseToken colon;
+    std::unique_ptr<Suite> suite;
+};
+
+/**
+ * async_for_stmt ::=  "async" for_stmt
+ */
+struct AsyncForStmt
+{
+    BaseToken async;
+    ForStmt forStmt;
+};
+
+/**
+ * async_with_stmt ::=  "async" with_stmt
+ */
+struct AsyncWithStmt
+{
+    BaseToken async;
+    WithStmt withStmt;
 };
 
 bool firstInAssignmentExpression(TokenType tokenType)
