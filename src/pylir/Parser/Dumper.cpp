@@ -323,7 +323,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
     {
         return result + addLastChild(dump(**comprehension));
     }
-    auto& [argument, comma] = pylir::get<std::pair<Syntax::Call::ArgumentList, std::optional<BaseToken>>>(call.variant);
+    auto& [argument, comma] = pylir::get<std::pair<Syntax::ArgumentList, std::optional<BaseToken>>>(call.variant);
     if (argument.positionalArguments)
     {
         std::string positional = "positional arguments";
@@ -332,7 +332,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
             positional += addLastChild(pylir::match(
                 argument.positionalArguments->firstItem.variant,
                 [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                [&](const Syntax::Call::PositionalItem::Star& star)
+                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
                 { return "starred" + addLastChild(dump(*star.expression)); }));
         }
         else
@@ -340,7 +340,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
             positional += addMiddleChild(pylir::match(
                 argument.positionalArguments->firstItem.variant,
                 [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                [&](const Syntax::Call::PositionalItem::Star& star)
+                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
                 { return "starred" + addLastChild(dump(*star.expression)); }));
             for (auto& [token, item] :
                  tcb::span(argument.positionalArguments->rest).first(argument.positionalArguments->rest.size() - 1))
@@ -348,13 +348,13 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
                 positional += addMiddleChild(pylir::match(
                     item.variant,
                     [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                    [&](const Syntax::Call::PositionalItem::Star& star)
+                    [&](const Syntax::ArgumentList::PositionalItem::Star& star)
                     { return "starred" + addLastChild(dump(*star.expression)); }));
             }
             positional += addLastChild(pylir::match(
                 argument.positionalArguments->rest.back().second.variant,
                 [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                [&](const Syntax::Call::PositionalItem::Star& star)
+                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
                 { return "starred" + addLastChild(dump(*star.expression)); }));
         }
         if (!argument.starredAndKeywords && !argument.keywordArguments)
@@ -383,22 +383,22 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
             {
                 starred += addMiddleChild(pylir::match(
                     iter,
-                    [&](const Syntax::Call::KeywordItem& keywordItem)
+                    [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
                     {
                         return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                                + addLastChild(dump(*keywordItem.expression));
                     },
-                    [&](const Syntax::Call::StarredAndKeywords::Expression& expression)
+                    [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
                     { return "starred expression" + addLastChild(dump(*expression.expression)); }));
             }
             starred += addLastChild(pylir::match(
                 argument.starredAndKeywords->rest.back().second,
-                [&](const Syntax::Call::KeywordItem& keywordItem)
+                [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
                 {
                     return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                            + addLastChild(dump(*keywordItem.expression));
                 },
-                [&](const Syntax::Call::StarredAndKeywords::Expression& expression)
+                [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
                 { return "starred expression" + addLastChild(dump(*expression.expression)); }));
         }
         if (!argument.keywordArguments)
@@ -427,22 +427,22 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
             {
                 starred += addMiddleChild(pylir::match(
                     iter,
-                    [&](const Syntax::Call::KeywordItem& keywordItem)
+                    [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
                     {
                         return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                                + addLastChild(dump(*keywordItem.expression));
                     },
-                    [&](const Syntax::Call::KeywordArguments::Expression& expression)
+                    [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
                     { return "mapped expression" + addLastChild(dump(*expression.expression)); }));
             }
             starred += addLastChild(pylir::match(
                 argument.keywordArguments->rest.back().second,
-                [&](const Syntax::Call::KeywordItem& keywordItem)
+                [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
                 {
                     return fmt::format("keyword item {}", keywordItem.identifier.getValue())
                            + addLastChild(dump(*keywordItem.expression));
                 },
-                [&](const Syntax::Call::KeywordArguments::Expression& expression)
+                [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
                 { return "mapped expression" + addLastChild(dump(*expression.expression)); }));
         }
         result += addLastChild(starred);

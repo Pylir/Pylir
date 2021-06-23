@@ -93,8 +93,7 @@ struct Comprehension;
 struct AssignmentExpression;
 
 /**
- * call                 ::=  primary "(" [argument_list [","] | comprehension] ")"
-   argument_list        ::=  positional_arguments ["," starred_and_keywords]
+ *argument_list        ::=  positional_arguments ["," starred_and_keywords]
                             ["," keywords_arguments]
                           | starred_and_keywords ["," keywords_arguments]
                           | keywords_arguments
@@ -106,7 +105,7 @@ struct AssignmentExpression;
                           ("," keyword_item | "," "**" expression)*
    keyword_item         ::=  identifier "=" expression
  */
-struct Call
+struct ArgumentList
 {
     struct PositionalItem
     {
@@ -155,15 +154,18 @@ struct Call
         std::vector<std::pair<BaseToken, Variant>> rest;
     };
 
-    struct ArgumentList
-    {
-        std::optional<PositionalArguments> positionalArguments;
-        std::optional<BaseToken> firstComma;
-        std::optional<StarredAndKeywords> starredAndKeywords;
-        std::optional<BaseToken> secondComma;
-        std::optional<KeywordArguments> keywordArguments;
-    };
+    std::optional<PositionalArguments> positionalArguments;
+    std::optional<BaseToken> firstComma;
+    std::optional<StarredAndKeywords> starredAndKeywords;
+    std::optional<BaseToken> secondComma;
+    std::optional<KeywordArguments> keywordArguments;
+};
 
+/**
+ * call                 ::=  primary "(" [argument_list [","] | comprehension] ")"
+ */
+struct Call
+{
     std::unique_ptr<Primary> primary;
     BaseToken openParentheses;
     std::variant<std::monostate, std::pair<ArgumentList, std::optional<BaseToken>>, std::unique_ptr<Comprehension>>
@@ -1141,7 +1143,7 @@ struct ClassDef
     struct Inheritance
     {
         BaseToken openParenth;
-        // TODO: Argument list
+        ArgumentList argumentList;
         BaseToken closeParenth;
     };
     std::optional<Inheritance> inheritance;
