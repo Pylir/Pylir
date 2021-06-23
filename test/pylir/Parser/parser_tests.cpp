@@ -407,3 +407,77 @@ TEST_CASE("Parse lambda", "[Parser]")
     CHECK_THAT(dumpExpression("lambda: 3"), Contains("lambda expression\n"
                                                      "`-atom 3"));
 }
+
+TEST_CASE("Parse assignment statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("a = 3"), Contains("assignment statement\n"
+                                                "|-target a\n"
+                                                "`-atom 3"));
+}
+
+TEST_CASE("Parse augmented assignment statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("a += 3"), Contains("augmented assignment '+='\n"
+                                                 "|-augtarget a\n"
+                                                 "`-atom 3"));
+}
+
+TEST_CASE("Parse annotated assignment", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("a:b"), Contains("annotated assignment\n"
+                                              "|-augtarget a\n"
+                                              "`-atom b"));
+    CHECK_THAT(dumpStatement("a:b = 3"), Contains("annotated assignment\n"
+                                                  "|-augtarget a\n"
+                                                  "|-atom b\n"
+                                                  "`-atom 3"));
+}
+
+TEST_CASE("Parse assert statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("assert 5"), Contains("assert statement\n"
+                                                   "`-condition: atom 5"));
+    CHECK_THAT(dumpStatement("assert 5,3"), Contains("assert statement\n"
+                                                     "|-condition: atom 5\n"
+                                                     "`-message: atom 3"));
+}
+
+TEST_CASE("Parse single word statements", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("pass"), Contains("pass statement"));
+    CHECK_THAT(dumpStatement("continue"), Contains("continue statement"));
+    CHECK_THAT(dumpStatement("break"), Contains("break statement"));
+}
+
+TEST_CASE("Parse del statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("del a"), Contains("del statement\n"
+                                                "`-target a"));
+}
+
+TEST_CASE("Parse return statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("return"), Contains("return statement"));
+    CHECK_THAT(dumpStatement("return 5"), Contains("return statement\n"
+                                                   "`-atom 5"));
+}
+
+TEST_CASE("Parse raise statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("raise"), Contains("raise statement"));
+    CHECK_THAT(dumpStatement("raise 5"), Contains("raise statement\n"
+                                                  "`-exception: atom 5"));
+    CHECK_THAT(dumpStatement("raise 5 from 3"), Contains("raise statement\n"
+                                                         "|-exception: atom 5\n"
+                                                         "`-expression: atom 3"));
+}
+
+TEST_CASE("Parse global statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("global a,b,c"), Contains("global a, b, c"));
+}
+
+TEST_CASE("Parse nonlocal statement", "[Parser]")
+{
+    CHECK_THAT(dumpStatement("nonlocal a,b,c"), Contains("nonlocal a, b, c"));
+}

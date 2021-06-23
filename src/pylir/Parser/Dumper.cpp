@@ -756,7 +756,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::GlobalStmt& globalStmt)
     std::vector<std::string_view> identifiers{globalStmt.identifier.getValue()};
     std::transform(globalStmt.rest.begin(), globalStmt.rest.end(), std::back_inserter(identifiers),
                    [](const auto& pair) { return pair.second.getValue(); });
-    return fmt::format(FMT_STRING("global {}"), globalStmt.identifier.getValue(), fmt::join(identifiers, ", "));
+    return fmt::format(FMT_STRING("global {}"), fmt::join(identifiers, ", "));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::NonLocalStmt& nonLocalStmt)
@@ -764,7 +764,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::NonLocalStmt& nonLocalStmt)
     std::vector<std::string_view> identifiers{nonLocalStmt.identifier.getValue()};
     std::transform(nonLocalStmt.rest.begin(), nonLocalStmt.rest.end(), std::back_inserter(identifiers),
                    [](const auto& pair) { return pair.second.getValue(); });
-    return fmt::format(FMT_STRING("nonlocal {}"), nonLocalStmt.identifier.getValue(), fmt::join(identifiers, ", "));
+    return fmt::format(FMT_STRING("nonlocal {}"), fmt::join(identifiers, ", "));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)

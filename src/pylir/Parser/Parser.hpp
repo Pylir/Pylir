@@ -188,8 +188,8 @@ public:
 
     tl::expected<Syntax::AssertStmt, std::string> parseAssertStmt();
 
-    tl::expected<Syntax::ImportStmt, std::string> parseImportSmt();
+    tl::expected<Syntax::ImportStmt, std::string> parseImportStmt();
 
-    tl::expected<Syntax::SimpleStmt, std::string> parseSimpleSmt();
+    tl::expected<Syntax::SimpleStmt, std::string> parseSimpleStmt();
 };
 } // namespace pylir

@@ -117,24 +117,35 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
         }
         targets.emplace_back(std::move(*firstItem), std::move(*assignment));
     }
+    std::optional<Syntax::StarredExpression> leftOverStarredExpression;
     do
     {
         if (hadFirst && (m_current == m_lexer.end() || !Syntax::firstInTarget(m_current->getTokenType())))
         {
             break;
         }
-        auto targetList = parseTargetList();
+        auto starredExpression = parseStarredExpression();
+        if (!starredExpression)
+        {
+            return tl::unexpected{std::move(starredExpression).error()};
+        }
+        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Assignment)
+        {
+            leftOverStarredExpression = std::move(*starredExpression);
+            break;
+        }
+        auto assignment = *m_current++;
+        auto targetList = convertToTargetList(std::move(*starredExpression), assignment);
         if (!targetList)
         {
             return tl::unexpected{std::move(targetList).error()};
         }
-        auto assignment = expect(TokenType::Assignment);
-        if (!assignment)
-        {
-            return tl::unexpected{std::move(assignment).error()};
-        }
-        targets.emplace_back(std::move(*targetList), std::move(*assignment));
+        targets.emplace_back(std::move(*targetList), assignment);
     } while (m_current != m_lexer.end() && Syntax::firstInTarget(m_current->getTokenType()));
+    if (leftOverStarredExpression)
+    {
+        return Syntax::AssignmentStmt{std::move(targets), std::move(*leftOverStarredExpression)};
+    }
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
     {
         auto yieldExpr = parseYieldExpression();
@@ -203,7 +214,7 @@ tl::expected<pylir::Syntax::AugTarget, std::string> pylir::Parser::parseAugTarge
         [](IdentifierToken&& identifier) -> Syntax::AugTarget { return {std::move(identifier)}; });
 }
 
-tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleSmt()
+tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleStmt()
 {
     if (m_current == m_lexer.end())
     {
@@ -317,7 +328,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
         case TokenType::FromKeyword:
         case TokenType::ImportKeyword:
         {
-            auto import = parseImportSmt();
+            auto import = parseImportStmt();
             if (!import)
             {
                 return tl::unexpected{std::move(import).error()};
@@ -493,7 +504,7 @@ tl::expected<pylir::Syntax::AssertStmt, std::string> pylir::Parser::parseAssertS
     {
         return tl::unexpected{std::move(expression).error()};
     }
-    if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::Comma)
+    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
     {
         return Syntax::AssertStmt{std::move(*assertKeyword), std::move(*expression), std::nullopt};
     }
@@ -1014,7 +1025,7 @@ tl::expected<pylir::Syntax::TargetList, std::string>
     return visitor.visit(std::move(starredExpression));
 }
 
-tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportSmt()
+tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
 {
     auto parseModule = [&]() -> tl::expected<Syntax::ImportStmt::Module, std::string>
     {
