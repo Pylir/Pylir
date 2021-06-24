@@ -29,7 +29,8 @@ class Parser
     template <class ParseFunc, class CheckFunc>
     auto parseCommaList(
         ParseFunc parseFunc, CheckFunc checkFunc,
-        std::optional<typename std::invoke_result_t<ParseFunc>::value_type>&& optionalFirst = std::nullopt)
+        std::optional<typename std::invoke_result_t<ParseFunc>::value_type>&& optionalFirst = std::nullopt,
+        TokenType tokenType = TokenType::Comma)
         -> tl::expected<Syntax::CommaList<typename std::invoke_result_t<ParseFunc>::value_type>, std::string>
     {
         using T = typename std::invoke_result_t<ParseFunc>::value_type;
@@ -44,7 +45,7 @@ class Parser
         }
         std::vector<std::pair<BaseToken, std::unique_ptr<T>>> rest;
         std::optional<BaseToken> last;
-        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+        while (m_current != m_lexer.end() && m_current->getTokenType() == tokenType)
         {
             auto comma = m_current++;
             if (!checkFunc(m_current->getTokenType()))

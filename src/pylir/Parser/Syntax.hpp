@@ -11,7 +11,7 @@ namespace pylir::Syntax
 {
 struct Expression;
 
-template <class T, TokenType tokenType = TokenType::Comma>
+template <class T>
 struct CommaList
 {
     std::unique_ptr<T> firstExpr;
@@ -918,7 +918,7 @@ struct SimpleStmt
         variant;
 };
 
-using StmtList = CommaList<SimpleStmt, TokenType::SemiColon>;
+using StmtList = CommaList<SimpleStmt>;
 
 struct Suite;
 
@@ -1167,6 +1167,44 @@ struct AsyncWithStmt
 {
     BaseToken async;
     WithStmt withStmt;
+};
+
+struct CompoundStmt
+{
+    std::variant<IfStmt, WhileStmt, ForStmt, TryStmt, WithStmt, FuncDef, ClassDef, AsyncForStmt, AsyncWithStmt> variant;
+};
+
+struct Statement
+{
+    struct SingleLine
+    {
+        StmtList stmtList;
+        BaseToken newline;
+    };
+    std::variant<SingleLine, CompoundStmt> variant;
+};
+
+struct Suite
+{
+    struct SingleLine
+    {
+        StmtList stmtList;
+        BaseToken newline;
+    };
+
+    struct MultiLine
+    {
+        BaseToken newline;
+        BaseToken indent;
+        std::vector<Statement> statements;
+        BaseToken dedent;
+    };
+    std::variant<SingleLine, MultiLine> variant;
+};
+
+struct FileInput
+{
+    std::vector<std::variant<BaseToken, Statement>> input;
 };
 
 bool firstInAssignmentExpression(TokenType tokenType)
