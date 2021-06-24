@@ -729,6 +729,7 @@ void pylir::Lexer::parseIdentifier()
                            .addLabel(m_current - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
         m_tokens.emplace_back(m_current - m_document->begin(), 1, m_fileId, TokenType::SyntaxError,
                               builder.emitError());
+        m_current++;
         return;
     }
     static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
@@ -1261,6 +1262,7 @@ void pylir::Lexer::parseNumber()
                                              std::nullopt, Diag::ERROR_COLOUR);
                 m_tokens.emplace_back(m_current - m_document->begin(), 2, m_fileId, TokenType::SyntaxError,
                                       builder.emitError());
+                std::advance(m_current, 2);
                 return;
             }
         }
@@ -1296,7 +1298,7 @@ void pylir::Lexer::parseNumber()
         auto builder =
             createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
                 .addLabel(end - 1 - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR)
-                .addLabel(start - m_document->begin(), end - m_document->begin() - 3, std::nullopt, Diag::ERROR_COMPLY);
+                .addLabel(start - m_document->begin(), end - m_document->begin() - 2, std::nullopt, Diag::ERROR_COMPLY);
         m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
                               builder.emitError());
         return;

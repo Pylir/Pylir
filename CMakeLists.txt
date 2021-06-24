@@ -4,9 +4,10 @@ project(Pylir)
 set(CMAKE_CXX_STANDARD 17)
 
 option(PYLIR_BUILD_TESTS "Build tests" ON)
+option(PYLIR_FUZZER "Build fuzzers" OFF)
 option(PYLIR_COVERAGE "Compile with coverage" OFF)
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND MSVC AND (PYLIR_COVERAGE OR PYLIR_SANITIZER))
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND MSVC AND (PYLIR_COVERAGE OR PYLIR_SANITIZER OR PYLIR_FUZZER))
     execute_process(
             COMMAND ${CMAKE_CXX_COMPILER} /clang:-print-libgcc-file-name /clang:--rtlib=compiler-rt
             OUTPUT_VARIABLE clang_compiler_rt_file
@@ -102,6 +103,21 @@ if (PYLIR_BUILD_TESTS)
     include(CTest)
     enable_testing()
     add_subdirectory(test)
+endif ()
+
+if (PYLIR_FUZZER)
+    add_compile_definitions(CLD_IN_FUZZER)
+    if (WIN32)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer-no-link,address -fno-sanitize-recover=all")
+        link_libraries(clang_rt.asan.lib)
+        link_libraries(clang_rt.asan_cxx.lib)
+        link_libraries(clang_rt.asan-preinit.lib)
+        link_libraries(clang_rt.fuzzer.lib)
+    else ()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize=fuzzer-no-link,undefined,address -fno-sanitize-recover=all")
+    endif ()
+
+    add_subdirectory(fuzzer)
 endif ()
 
 add_executable(Pylir main.cpp)

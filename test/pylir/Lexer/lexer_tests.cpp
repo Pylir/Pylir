@@ -802,3 +802,27 @@ TEST_CASE("Lex indentation", "[Lexer]")
                 "   foobar",
                 pylir::Diag::NEXT_CLOSEST_INDENTATION_N, 4);
 }
+
+namespace
+{
+void lex(std::string_view source)
+{
+    pylir::Diag::Document document(std::string{source});
+    pylir::Lexer lexer(document);
+    std::for_each(lexer.begin(), lexer.end(),
+                  [](const pylir::Token& token)
+                  {
+                      if (token.getTokenType() == pylir::TokenType::SyntaxError)
+                      {
+                          std::cerr << pylir::get<std::string>(token.getValue());
+                      }
+                  });
+}
+} // namespace
+
+TEST_CASE("Lexer fuzzer discoveries", "[Lexer]")
+{
+    lex("2_\x87");
+    lex("0Y");
+    lex("\xFF\xfe\xff");
+}

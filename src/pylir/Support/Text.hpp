@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <functional>
 #include <optional>
@@ -202,8 +203,12 @@ class Transcoder<void, Target>
                 {
                     std::array<char16_t, 2> temp{};
                     auto sizeAvailable = std::min<std::size_t>(4, m_source.size()) & ~static_cast<std::size_t>(1);
+                    if (sizeAvailable == 0)
+                    {
+                        sizeAvailable = m_source.size();
+                    }
                     std::memcpy(temp.data(), m_source.data(), sizeAvailable);
-                    auto viewSize = sizeAvailable / 2;
+                    auto viewSize = (std::size_t)std::ceil(sizeAvailable / 2.0);
                     if constexpr (endian::native == endian::big)
                     {
                         if (m_encoding == Encoding::UTF16LE)
@@ -237,7 +242,7 @@ class Transcoder<void, Target>
                     {
                         m_data.front() = toUTF32(view);
                     }
-                    m_source.remove_prefix((viewSize - view.size()) * 2);
+                    m_source.remove_prefix(std::min<std::size_t>(m_source.size(), (viewSize - view.size()) * 2));
                     break;
                 }
                 case Encoding::UTF32LE:
@@ -274,7 +279,7 @@ class Transcoder<void, Target>
                     {
                         m_data.front() = toUTF32(value);
                     }
-                    m_source.remove_prefix(4);
+                    m_source.remove_prefix(std::min<std::size_t>(4, m_source.size()));
                     break;
             }
         }
