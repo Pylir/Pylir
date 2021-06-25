@@ -192,5 +192,38 @@ public:
     tl::expected<Syntax::ImportStmt, std::string> parseImportStmt();
 
     tl::expected<Syntax::SimpleStmt, std::string> parseSimpleStmt();
+
+    tl::expected<Syntax::FileInput, std::string> parseFileInput();
+
+    tl::expected<Syntax::Statement, std::string> parseStatement();
+
+    tl::expected<Syntax::StmtList, std::string> parseStmtList();
+
+    tl::expected<Syntax::CompoundStmt, std::string> parseCompoundStmt();
+
+    tl::expected<Syntax::Suite, std::string> parseSuite();
+
+    tl::expected<Syntax::IfStmt::Else, std::string> parseElse();
+
+    tl::expected<Syntax::IfStmt, std::string> parseIfStmt();
+
+    tl::expected<Syntax::WhileStmt, std::string> parseWhileStmt();
+
+    tl::expected<Syntax::ForStmt, std::string> parseForStmt();
+
+    tl::expected<Syntax::TryStmt, std::string> parseTryStmt();
+
+    tl::expected<Syntax::WithStmt, std::string> parseWithStmt();
+
+    tl::expected<Syntax::ParameterList, std::string> parseParameterList();
+
+    tl::expected<Syntax::FuncDef, std::string> parseFuncDef(std::vector<Syntax::Decorator>&& decorators,
+                                                            std::optional<BaseToken>&& asyncKeyword);
+
+    tl::expected<Syntax::ClassDef, std::string> parseClassDef(std::vector<Syntax::Decorator>&& decorators);
+
+    tl::expected<Syntax::AsyncWithStmt, std::string> parseAsyncWithStmt();
+
+    tl::expected<Syntax::AsyncForStmt, std::string> parseAsyncForStmt();
 };
 } // namespace pylir

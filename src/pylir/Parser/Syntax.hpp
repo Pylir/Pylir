@@ -918,6 +918,30 @@ struct SimpleStmt
         variant;
 };
 
+inline bool firstInSimpleStmt(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::AssertKeyword:
+        case TokenType::PassKeyword:
+        case TokenType::DelKeyword:
+        case TokenType::ReturnKeyword:
+        case TokenType::YieldKeyword:
+        case TokenType::RaiseKeyword:
+        case TokenType::BreakKeyword:
+        case TokenType::ContinueKeyword:
+        case TokenType::ImportKeyword:
+        case TokenType::FromKeyword:
+        case TokenType::GlobalKeyword:
+        case TokenType::NonlocalKeyword:
+        case TokenType::Star: return true;
+        default: return firstInAssignmentExpression(tokenType);
+    }
+}
+
+/**
+ * stmt_list     ::=  simple_stmt (";" simple_stmt)* [";"]
+ */
 using StmtList = CommaList<SimpleStmt>;
 
 struct Suite;
@@ -1169,11 +1193,43 @@ struct AsyncWithStmt
     WithStmt withStmt;
 };
 
+/**
+ * compound_stmt ::=  if_stmt
+                   | while_stmt
+                   | for_stmt
+                   | try_stmt
+                   | with_stmt
+                   | funcdef
+                   | classdef
+                   | async_with_stmt
+                   | async_for_stmt
+                   | async_funcdef
+ */
 struct CompoundStmt
 {
     std::variant<IfStmt, WhileStmt, ForStmt, TryStmt, WithStmt, FuncDef, ClassDef, AsyncForStmt, AsyncWithStmt> variant;
 };
 
+inline bool firstInCompoundStmt(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::IfKeyword:
+        case TokenType::WhileKeyword:
+        case TokenType::ForKeyword:
+        case TokenType::TryKeyword:
+        case TokenType::WithKeyword:
+        case TokenType::AtSign:
+        case TokenType::AsyncKeyword:
+        case TokenType::DefKeyword:
+        case TokenType::ClassKeyword: return true;
+        default: return false;
+    }
+}
+
+/**
+ * statement     ::=  stmt_list NEWLINE | compound_stmt
+ */
 struct Statement
 {
     struct SingleLine
@@ -1184,6 +1240,9 @@ struct Statement
     std::variant<SingleLine, CompoundStmt> variant;
 };
 
+/**
+ * suite         ::=  stmt_list NEWLINE | NEWLINE INDENT statement+ DEDENT
+ */
 struct Suite
 {
     struct SingleLine
@@ -1202,6 +1261,9 @@ struct Suite
     std::variant<SingleLine, MultiLine> variant;
 };
 
+/**
+ * file_input ::=  (NEWLINE | statement)*
+ */
 struct FileInput
 {
     std::vector<std::variant<BaseToken, Statement>> input;
