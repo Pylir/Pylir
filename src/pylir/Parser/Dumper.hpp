@@ -10,12 +10,71 @@
 
 namespace pylir
 {
+class Dumper;
+
+namespace detail
+{
+template <class T, class U = Dumper, class = void>
+struct CanDump : std::false_type
+{
+};
+
+template <class T, class U>
+struct CanDump<T, U, std::void_t<decltype(std::declval<U>().dump(std::declval<T>()))>> : std::true_type
+{
+};
+} // namespace detail
+
 class Dumper
 {
-    std::string addMiddleChild(std::string_view middleChildDump,
-                               std::optional<std::string_view>&& label = std::nullopt);
+    class Builder
+    {
+        Dumper* m_dumper;
+        std::string m_title;
+        std::vector<std::pair<std::string, std::optional<std::string>>> m_children;
 
-    std::string addLastChild(std::string_view lastChildDump, std::optional<std::string_view>&& label = std::nullopt);
+        static std::string addMiddleChild(std::string_view middleChildDump,
+                                          std::optional<std::string_view>&& label = std::nullopt);
+
+        static std::string addLastChild(std::string_view lastChildDump,
+                                        std::optional<std::string_view>&& label = std::nullopt);
+
+    public:
+        template <class S, class... Args>
+        Builder(Dumper* dumper, const S& s, Args&&... args)
+            : m_dumper(dumper), m_title(fmt::format(s, std::forward<Args>(args)...))
+        {
+        }
+
+        Builder& add(std::string_view view, std::optional<std::string_view>&& label = std::nullopt)
+        {
+            m_children.emplace_back(view, label);
+            return *this;
+        }
+
+        template <class C, std::enable_if_t<detail::CanDump<C>{}>* = nullptr>
+        Builder& add(const C& object, std::optional<std::string_view>&& label = std::nullopt)
+        {
+            m_children.emplace_back(m_dumper->dump(object), label);
+            return *this;
+        }
+
+        Builder& add(const Builder& other, std::optional<std::string_view>&& label = std::nullopt)
+        {
+            m_children.emplace_back(other.emit(), label);
+            return *this;
+        }
+
+        std::string emit() const;
+    };
+
+    template <class S, class... Args>
+    Builder createBuilder(const S& s, Args&&... args)
+    {
+        return Builder(this, s, std::forward<Args>(args)...);
+    }
+
+    friend class Builder;
 
     template <class T, class Func>
     std::string dump(const Syntax::CommaList<T>& list, Func dump, std::string_view name)
@@ -24,14 +83,13 @@ class Dumper
         {
             return dump(*list.firstExpr);
         }
-        std::string result = std::string(name);
-        result += addMiddleChild(dump(*list.firstExpr));
-        for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
+        auto builder = createBuilder("{}", name);
+        builder.add(dump(*list.firstExpr));
+        for (auto& iter : list.remainingExpr)
         {
-            result += addMiddleChild(dump(*iter.second));
+            builder.add(dump(*iter.second));
         }
-        result += addLastChild(dump(*list.remainingExpr.back().second));
-        return result;
+        return builder.emit();
     }
 
     template <class ThisClass, class TokenTypeGetter>
@@ -42,8 +100,10 @@ class Dumper
             [&](const std::unique_ptr<typename ThisClass::BinOp>& binOp)
             {
                 auto& [lhs, token, rhs] = *binOp;
-                return fmt::format(FMT_STRING("{} {:q}"), name, std::invoke(tokenTypeGetter, token))
-                       + addMiddleChild(dump(*lhs), "lhs") + addLastChild(dump(rhs), "rhs");
+                return createBuilder(FMT_STRING("{} {:q}"), name, std::invoke(tokenTypeGetter, token))
+                    .add(*lhs, "lhs")
+                    .add(rhs, "rhs")
+                    .emit();
             });
     }
 
@@ -65,6 +125,8 @@ public:
     std::string dump(const Syntax::Comprehension& comprehension);
 
     std::string dump(const Syntax::AssignmentExpression& assignmentExpression);
+
+    std::string dump(const Syntax::ArgumentList& argumentList);
 
     std::string dump(const Syntax::Call& call);
 

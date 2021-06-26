@@ -21,7 +21,8 @@ std::vector<std::string_view> splitLines(std::string_view text)
 }
 } // namespace
 
-std::string pylir::Dumper::addLastChild(std::string_view lastChildDump, std::optional<std::string_view>&& label)
+std::string pylir::Dumper::Builder::addLastChild(std::string_view lastChildDump,
+                                                 std::optional<std::string_view>&& label)
 {
     auto lines = splitLines(lastChildDump);
     std::string result;
@@ -48,7 +49,8 @@ std::string pylir::Dumper::addLastChild(std::string_view lastChildDump, std::opt
     return result;
 }
 
-std::string pylir::Dumper::addMiddleChild(std::string_view middleChildDump, std::optional<std::string_view>&& label)
+std::string pylir::Dumper::Builder::addMiddleChild(std::string_view middleChildDump,
+                                                   std::optional<std::string_view>&& label)
 {
     auto lines = splitLines(middleChildDump);
     std::string result;
@@ -73,6 +75,20 @@ std::string pylir::Dumper::addMiddleChild(std::string_view middleChildDump, std:
         }
     }
     return result;
+}
+
+std::string pylir::Dumper::Builder::emit() const
+{
+    if (m_children.empty())
+    {
+        return m_title;
+    }
+    auto result = m_title;
+    for (auto& iter : tcb::span(m_children).first(m_children.size() - 1))
+    {
+        result += addMiddleChild(iter.first, iter.second);
+    }
+    return result + addLastChild(m_children.back().first, m_children.back().second);
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
@@ -159,40 +175,39 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
                 return "dict display empty";
             }
 
-            return "dict display"
-                   + addLastChild(pylir::match(
-                       dictDisplay.variant, [](std::monostate) -> std::string { PYLIR_UNREACHABLE; },
-                       [&](const Syntax::Enclosure::DictDisplay::DictComprehension& comprehension) -> std::string
-                       {
-                           return "dict comprehension" + addMiddleChild(dump(comprehension.first))
-                                  + addMiddleChild(dump(comprehension.second)
-                                                   + addLastChild(dump(comprehension.compFor)));
-                       },
-                       [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& commaList) -> std::string
-                       {
-                           return dump(
-                               commaList,
-                               [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum) -> std::string
-                               {
-                                   return pylir::match(
-                                       keyDatum.variant,
-                                       [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Key& key) -> std::string {
-                                           return "key" + addMiddleChild(dump(key.first))
-                                                  + addLastChild(dump(key.second));
-                                       },
-                                       [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Datum& datum) -> std::string
-                                       { return "datum" + addLastChild(dump(datum.orExpr)); });
-                               },
-                               "key datum list");
-                       }));
+            return createBuilder("dict display")
+                .add(pylir::match(
+                    dictDisplay.variant, [](std::monostate) -> std::string { PYLIR_UNREACHABLE; },
+                    [&](const Syntax::Enclosure::DictDisplay::DictComprehension& comprehension) -> std::string
+                    {
+                        return createBuilder("dict comprehension")
+                            .add(comprehension.first)
+                            .add(comprehension.second)
+                            .add(comprehension.compFor)
+                            .emit();
+                    },
+                    [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& commaList) -> std::string
+                    {
+                        return dump(
+                            commaList,
+                            [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum) -> std::string
+                            {
+                                return pylir::match(
+                                    keyDatum.variant,
+                                    [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Key& key) -> std::string
+                                    { return createBuilder("key").add(key.first).add(key.second).emit(); },
+                                    [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Datum& datum) -> std::string
+                                    { return createBuilder("datum").add(datum.orExpr).emit(); });
+                            },
+                            "key datum list");
+                    }))
+                .emit();
         },
         [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> std::string
         {
-            std::string result = "set display";
-            result += pylir::match(
-                setDisplay.variant, [](const std::monostate&) -> std::string { PYLIR_UNREACHABLE; },
-                [&](const auto& value) { return addLastChild(dump(value)); });
-            return result;
+            auto result = createBuilder("set display");
+            pylir::match(setDisplay.variant, [&](const auto& value) { result.add(value); });
+            return result.emit();
         },
         [&](const Syntax::Enclosure::ListDisplay& listDisplay) -> std::string
         {
@@ -200,21 +215,21 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             {
                 return "list display empty";
             }
-            std::string result = "list display";
-            result += pylir::match(
-                listDisplay.variant, [](const std::monostate&) -> std::string { PYLIR_UNREACHABLE; },
-                [&](const auto& value) { return addLastChild(dump(value)); });
-            return result;
+            auto result = createBuilder("list display");
+            pylir::match(
+                listDisplay.variant, [](const std::monostate&) { PYLIR_UNREACHABLE; },
+                [&](const auto& value) { result.add(value); });
+            return result.emit();
         },
         [&](const Syntax::Enclosure::GeneratorExpression& generatorExpression) -> std::string
         {
-            std::string result = "generator expression";
-            result += addMiddleChild(dump(generatorExpression.expression));
-            result += addLastChild(dump(generatorExpression.compFor));
-            return result;
+            return createBuilder("generator expression")
+                .add(generatorExpression.expression)
+                .add(generatorExpression.compFor)
+                .emit();
         },
         [&](const Syntax::Enclosure::YieldAtom& yieldAtom) -> std::string
-        { return "yieldatom" + addLastChild(dump(yieldAtom.yieldExpression)); },
+        { return createBuilder("yieldatom").add(yieldAtom.yieldExpression).emit(); },
         [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> std::string
         {
             if (!parenthForm.expression)
@@ -223,9 +238,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             }
             else
             {
-                std::string result = "parenth";
-                result += addLastChild(dump(*parenthForm.expression));
-                return result;
+                return createBuilder("parenth").add(*parenthForm.expression).emit();
             }
         });
 }
@@ -237,68 +250,54 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Primary& primary)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AttributeRef& attribute)
 {
-    return fmt::format("attribute {}", attribute.identifier.getValue()) + addLastChild(dump(*attribute.primary));
+    return createBuilder("attribute {}", attribute.identifier.getValue()).add(*attribute.primary).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Subscription& subscription)
 {
-    return "subscription" + addMiddleChild(dump(*subscription.primary), "primary")
-           + addLastChild(dump(subscription.expressionList), "index");
+    return createBuilder("subscription")
+        .add(*subscription.primary, "primary")
+        .add(subscription.expressionList, "index")
+        .emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Slicing& slicing)
 {
-    std::string result = "slicing";
-    result += addMiddleChild(dump(*slicing.primary), "primary");
-    result += addLastChild(
-        dump(
-            slicing.sliceList,
-            [&](const auto& slice) -> std::string
-            {
-                return pylir::match(
-                    slice,
-                    [&](const Syntax::Slicing::ProperSlice& properSlice) -> std::string
-                    {
-                        std::string result = "proper slice";
-                        if (properSlice.optionalLowerBound)
-                        {
-                            if (!properSlice.optionalUpperBound && !properSlice.optionalStride)
-                            {
-                                return result + addLastChild(dump(*properSlice.optionalLowerBound), "lowerBound");
-                            }
-                            else
-                            {
-                                result += addMiddleChild(dump(*properSlice.optionalLowerBound), "lowerBound");
-                            }
-                        }
-                        if (properSlice.optionalUpperBound)
-                        {
-                            if (!properSlice.optionalStride)
-                            {
-                                return result + addLastChild(dump(*properSlice.optionalUpperBound), "upperBound");
-                            }
-                            else
-                            {
-                                result += addMiddleChild(dump(*properSlice.optionalUpperBound), "upperBound");
-                            }
-                        }
-                        if (properSlice.optionalStride)
-                        {
-                            result += addLastChild(dump(*properSlice.optionalStride), "stride");
-                        }
-                        return result;
-                    },
-                    [&](const Syntax::Expression& expression) { return dump(expression); });
-            },
-            "proper slice list"),
-        "index");
-    return result;
+    return createBuilder("slicing")
+        .add(*slicing.primary, "primary")
+        .add(dump(
+                 slicing.sliceList,
+                 [&](const auto& slice) -> std::string
+                 {
+                     return pylir::match(
+                         slice,
+                         [&](const Syntax::Slicing::ProperSlice& properSlice) -> std::string
+                         {
+                             auto builder = createBuilder("proper slice");
+                             if (properSlice.optionalLowerBound)
+                             {
+                                 builder.add(*properSlice.optionalLowerBound, "lowerBound");
+                             }
+                             if (properSlice.optionalUpperBound)
+                             {
+                                 builder.add(*properSlice.optionalUpperBound, "upperBound");
+                             }
+                             if (properSlice.optionalStride)
+                             {
+                                 builder.add(*properSlice.optionalStride, "stride");
+                             }
+                             return builder.emit();
+                         },
+                         [&](const Syntax::Expression& expression) { return dump(expression); });
+                 },
+                 "proper slice list"),
+             "index")
+        .emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Comprehension& comprehension)
 {
-    return "comprehension" + addMiddleChild(dump(comprehension.assignmentExpression))
-           + addLastChild(dump(comprehension.compFor));
+    return createBuilder("comprehension").add(comprehension.assignmentExpression).add(comprehension.compFor).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentExpression& assignmentExpression)
@@ -307,152 +306,93 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentExpression& assig
     {
         return dump(*assignmentExpression.expression);
     }
-    return fmt::format("assignment expression to {}", assignmentExpression.identifierAndWalrus->first.getValue())
-           + addLastChild(dump(*assignmentExpression.expression));
+    return createBuilder("assignment expression to {}", assignmentExpression.identifierAndWalrus->first.getValue())
+        .add(*assignmentExpression.expression)
+        .emit();
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::ArgumentList& argument)
+{
+    auto builder = createBuilder("argument list");
+    if (argument.positionalArguments)
+    {
+        auto positional =
+            createBuilder("positional arguments")
+                .add(pylir::match(
+                    argument.positionalArguments->firstItem.variant,
+                    [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
+                    [&](const Syntax::ArgumentList::PositionalItem::Star& star)
+                    { return createBuilder("starred").add(*star.expression).emit(); }));
+        for (auto& [token, item] : argument.positionalArguments->rest)
+        {
+            positional.add(pylir::match(
+                item.variant, [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
+                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
+                { return createBuilder("starred").add(*star.expression).emit(); }));
+        }
+        builder.add(positional);
+    }
+    if (argument.starredAndKeywords)
+    {
+        auto starred = createBuilder("starred keywords");
+        auto keyword = createBuilder("keyword item {}", argument.starredAndKeywords->first.identifier.getValue())
+                           .add(*argument.starredAndKeywords->first.expression);
+        starred.add(keyword);
+        for (auto& [token, iter] : argument.starredAndKeywords->rest)
+        {
+            starred.add(pylir::match(
+                iter,
+                [&](const Syntax::ArgumentList::KeywordItem& keywordItem) {
+                    return createBuilder("keyword item {}", keywordItem.identifier.getValue())
+                        .add(*keywordItem.expression)
+                        .emit();
+                },
+                [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
+                { return createBuilder("starred expression").add(*expression.expression).emit(); }));
+        }
+        builder.add(starred);
+    }
+    if (argument.keywordArguments)
+    {
+        auto starred = createBuilder("keyword arguments");
+        auto mapped = createBuilder("mapped expression").add(*argument.keywordArguments->first.expression);
+        starred.add(mapped);
+        for (auto& [token, iter] : argument.keywordArguments->rest)
+        {
+            starred.add(pylir::match(
+                iter,
+                [&](const Syntax::ArgumentList::KeywordItem& keywordItem) {
+                    return createBuilder("keyword item {}", keywordItem.identifier.getValue())
+                        .add(*keywordItem.expression)
+                        .emit();
+                },
+                [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
+                { return createBuilder("mapped expression").add(*expression.expression).emit(); }));
+        }
+        builder.add(starred);
+    }
+    return builder.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
 {
-    std::string result = "call";
+    auto builder = createBuilder("call");
+    builder.add(*call.primary);
     if (std::holds_alternative<std::monostate>(call.variant))
     {
-        return result + addLastChild(dump(*call.primary));
+        return builder.emit();
     }
-    result += addMiddleChild(dump(*call.primary));
     if (auto* comprehension = std::get_if<std::unique_ptr<Syntax::Comprehension>>(&call.variant))
     {
-        return result + addLastChild(dump(**comprehension));
+        return builder.add(**comprehension).emit();
     }
     auto& [argument, comma] = pylir::get<std::pair<Syntax::ArgumentList, std::optional<BaseToken>>>(call.variant);
-    if (argument.positionalArguments)
-    {
-        std::string positional = "positional arguments";
-        if (argument.positionalArguments->rest.empty())
-        {
-            positional += addLastChild(pylir::match(
-                argument.positionalArguments->firstItem.variant,
-                [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                { return "starred" + addLastChild(dump(*star.expression)); }));
-        }
-        else
-        {
-            positional += addMiddleChild(pylir::match(
-                argument.positionalArguments->firstItem.variant,
-                [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                { return "starred" + addLastChild(dump(*star.expression)); }));
-            for (auto& [token, item] :
-                 tcb::span(argument.positionalArguments->rest).first(argument.positionalArguments->rest.size() - 1))
-            {
-                positional += addMiddleChild(pylir::match(
-                    item.variant,
-                    [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                    [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                    { return "starred" + addLastChild(dump(*star.expression)); }));
-            }
-            positional += addLastChild(pylir::match(
-                argument.positionalArguments->rest.back().second.variant,
-                [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                { return "starred" + addLastChild(dump(*star.expression)); }));
-        }
-        if (!argument.starredAndKeywords && !argument.keywordArguments)
-        {
-            return result + addLastChild(positional);
-        }
-        else
-        {
-            result += addMiddleChild(positional);
-        }
-    }
-    if (argument.starredAndKeywords)
-    {
-        std::string starred = "starred keywords";
-        std::string keyword = fmt::format("keyword item {}", argument.starredAndKeywords->first.identifier.getValue());
-        keyword += addLastChild(dump(*argument.starredAndKeywords->first.expression));
-        if (argument.starredAndKeywords->rest.empty())
-        {
-            starred += addLastChild(keyword);
-        }
-        else
-        {
-            starred += addMiddleChild(keyword);
-            for (auto& [token, iter] :
-                 tcb::span(argument.starredAndKeywords->rest).first(argument.starredAndKeywords->rest.size() - 1))
-            {
-                starred += addMiddleChild(pylir::match(
-                    iter,
-                    [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
-                    {
-                        return fmt::format("keyword item {}", keywordItem.identifier.getValue())
-                               + addLastChild(dump(*keywordItem.expression));
-                    },
-                    [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
-                    { return "starred expression" + addLastChild(dump(*expression.expression)); }));
-            }
-            starred += addLastChild(pylir::match(
-                argument.starredAndKeywords->rest.back().second,
-                [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
-                {
-                    return fmt::format("keyword item {}", keywordItem.identifier.getValue())
-                           + addLastChild(dump(*keywordItem.expression));
-                },
-                [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
-                { return "starred expression" + addLastChild(dump(*expression.expression)); }));
-        }
-        if (!argument.keywordArguments)
-        {
-            return result + addLastChild(starred);
-        }
-        else
-        {
-            result += addMiddleChild(starred);
-        }
-    }
-    if (argument.keywordArguments)
-    {
-        std::string starred = "keyword arguments";
-        std::string mapped = "mapped expression";
-        mapped += addLastChild(dump(*argument.keywordArguments->first.expression));
-        if (argument.keywordArguments->rest.empty())
-        {
-            starred += addLastChild(mapped);
-        }
-        else
-        {
-            starred += addMiddleChild(mapped);
-            for (auto& [token, iter] :
-                 tcb::span(argument.keywordArguments->rest).first(argument.keywordArguments->rest.size() - 1))
-            {
-                starred += addMiddleChild(pylir::match(
-                    iter,
-                    [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
-                    {
-                        return fmt::format("keyword item {}", keywordItem.identifier.getValue())
-                               + addLastChild(dump(*keywordItem.expression));
-                    },
-                    [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
-                    { return "mapped expression" + addLastChild(dump(*expression.expression)); }));
-            }
-            starred += addLastChild(pylir::match(
-                argument.keywordArguments->rest.back().second,
-                [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
-                {
-                    return fmt::format("keyword item {}", keywordItem.identifier.getValue())
-                           + addLastChild(dump(*keywordItem.expression));
-                },
-                [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
-                { return "mapped expression" + addLastChild(dump(*expression.expression)); }));
-        }
-        result += addLastChild(starred);
-    }
-    return result;
+    return builder.add(argument).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AwaitExpr& awaitExpr)
 {
-    return fmt::format("await expression") + addLastChild(dump(awaitExpr.primary));
+    return createBuilder("await expression").add(awaitExpr.primary).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::UExpr& uExpr)
@@ -462,7 +402,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::UExpr& uExpr)
         return dump(*power);
     }
     auto& [token, rhs] = pylir::get<std::pair<Token, std::unique_ptr<Syntax::UExpr>>>(uExpr.variant);
-    return fmt::format(FMT_STRING("unary {:q}"), token.getTokenType()) + addLastChild(dump(*rhs));
+    return createBuilder(FMT_STRING("unary {:q}"), token.getTokenType()).add(*rhs).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Power& power)
@@ -471,9 +411,10 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Power& power)
     {
         return pylir::match(power.variant, [&](const auto& value) { return dump(value); });
     }
-    return std::string("power")
-           + addMiddleChild(pylir::match(power.variant, [&](const auto& value) { return dump(value); }), "base")
-           + addLastChild(dump(*power.rightHand->second), "exponent");
+    return createBuilder("power")
+        .add(pylir::match(power.variant, [&](const auto& value) { return dump(value); }), "base")
+        .add(*power.rightHand->second, "exponent")
+        .emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)
@@ -482,13 +423,16 @@ std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)
         mExpr.variant, [&](const Syntax::UExpr& uExpr) { return dump(uExpr); },
         [&](const std::unique_ptr<Syntax::MExpr::BinOp>& binOp)
         {
-            return fmt::format("mexpr {:q}", binOp->binToken.getTokenType()) + addMiddleChild(dump(*binOp->lhs), "lhs")
-                   + addLastChild(dump(binOp->rhs), "rhs");
+            return createBuilder("mexpr {:q}", binOp->binToken.getTokenType())
+                .add(*binOp->lhs, "lhs")
+                .add(binOp->rhs, "rhs")
+                .emit();
         },
-        [&](const std::unique_ptr<Syntax::MExpr::AtBin>& binOp)
-        {
-            return fmt::format("mexpr {:q}", TokenType::AtSign) + addMiddleChild(dump(*binOp->lhs), "lhs")
-                   + addLastChild(dump(*binOp->rhs), "rhs");
+        [&](const std::unique_ptr<Syntax::MExpr::AtBin>& binOp) {
+            return createBuilder("mexpr {:q}", TokenType::AtSign)
+                .add(*binOp->lhs, "lhs")
+                .add(*binOp->rhs, "rhs")
+                .emit();
         });
 }
 
@@ -523,9 +467,9 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
     {
         return dump(comparison.left);
     }
-    std::string result = "comparison";
-    result += addMiddleChild(dump(comparison.left), "lhs");
-    for (auto& [token, rhs] : tcb::span(comparison.rest).first(comparison.rest.size() - 1))
+    auto result = createBuilder("comparison");
+    result.add(comparison.left, "lhs");
+    for (auto& [token, rhs] : comparison.rest)
     {
         std::string name;
         if (token.secondToken)
@@ -536,27 +480,16 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
         {
             name = fmt::format("{:q}", token.firstToken.getTokenType());
         }
-        result += addMiddleChild(dump(rhs), name);
+        result.add(rhs, name);
     }
-    std::string name;
-    if (comparison.rest.back().first.secondToken)
-    {
-        name = fmt::format("{:q} {:q}", comparison.rest.back().first.firstToken.getTokenType(),
-                           comparison.rest.back().first.secondToken->getTokenType());
-    }
-    else
-    {
-        name = fmt::format("{:q}", comparison.rest.back().first.firstToken.getTokenType());
-    }
-    result += addLastChild(dump(comparison.rest.back().second), name);
-    return result;
+    return result.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::NotTest& notTest)
 {
     return pylir::match(
         notTest.variant, [&](const Syntax::Comparison& comparison) { return dump(comparison); },
-        [&](const auto& pair) { return "notTest" + addLastChild(dump(*pair.second)); });
+        [&](const auto& pair) { return createBuilder("notTest").add(*pair.second).emit(); });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AndTest& andTest)
@@ -575,15 +508,17 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ConditionalExpression& cond
     {
         return dump(conditionalExpression.value);
     }
-    return fmt::format("conditional expression") + addMiddleChild(dump(conditionalExpression.value), "value")
-           + addMiddleChild(dump(*conditionalExpression.suffix->test), "condition")
-           + addLastChild(dump(*conditionalExpression.suffix->elseValue), "elseValue");
+    return createBuilder("conditional expression")
+        .add(conditionalExpression.value, "value")
+        .add(*conditionalExpression.suffix->test, "condition")
+        .add(*conditionalExpression.suffix->elseValue, "elseValue")
+        .emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::LambdaExpression& lambdaExpression)
 {
     // TODO: parameter list
-    return fmt::format("lambda expression") + addLastChild(dump(lambdaExpression.expression));
+    return createBuilder("lambda expression").add(lambdaExpression.expression).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Expression& expression)
@@ -599,8 +534,9 @@ std::string pylir::Dumper::dump(const pylir::Syntax::StarredItem& starredItem)
     {
         return dump(*assignment);
     }
-    return "starred item"
-           + addLastChild(dump(pylir::get<std::pair<BaseToken, Syntax::OrExpr>>(starredItem.variant).second));
+    return createBuilder("starred item")
+        .add(pylir::get<std::pair<BaseToken, Syntax::OrExpr>>(starredItem.variant).second)
+        .emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredExpression)
@@ -610,55 +546,49 @@ std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredE
         return dump(*expression);
     }
     auto& item = pylir::get<Syntax::StarredExpression::Items>(starredExpression.variant);
-    std::string result = "starred expression";
-    for (auto& iter : tcb::span(item.leading).first(item.leading.size() - 1))
+    auto result = createBuilder("starred expression");
+    for (auto& iter : item.leading)
     {
-        result += addMiddleChild(dump(iter.first));
+        result.add(iter.first);
     }
-    if (!item.last)
+    if (item.last)
     {
-        result += addLastChild(dump(item.leading.back().first));
+        result.add(*item.last);
     }
-    else
-    {
-        result += addMiddleChild(dump(item.leading.back().first));
-        result += addLastChild(dump(*item.last));
-    }
-    return result;
+    return result.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompIf& compIf)
 {
-    auto result = fmt::format("comp if");
+    auto result = createBuilder("comp if");
     return pylir::match(
-        compIf.compIter, [&](std::monostate) { return result + addLastChild(dump(compIf.orTest), "condition"); },
-        [&](const Syntax::CompFor& compFor)
-        { return result + addMiddleChild(dump(compIf.orTest), "condition") + addLastChild(dump(compFor)); },
+        compIf.compIter, [&](std::monostate) { return result.add(compIf.orTest, "condition").emit(); },
+        [&](const Syntax::CompFor& compFor) { return result.add(compIf.orTest, "condition").add(compFor).emit(); },
         [&](const std::unique_ptr<Syntax::CompIf>& second)
-        { return result + addMiddleChild(dump(compIf.orTest), "condition") + addLastChild(dump(*second)); });
+        { return result.add(compIf.orTest, "condition").add(*second).emit(); });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompFor& compFor)
 {
-    std::string result;
+    std::string title;
     if (compFor.awaitToken)
     {
-        result = "comp for await";
+        title = "comp for await";
     }
     else
     {
-        result = "comp for";
+        title = "comp for";
     }
-    result += addMiddleChild(dump(compFor.targets));
+    auto builder = createBuilder("{}", title).add(compFor.targets);
     if (std::holds_alternative<std::monostate>(compFor.compIter))
     {
-        return result + addLastChild(dump(compFor.orTest));
+        return builder.add(compFor.orTest).emit();
     }
-    result += addMiddleChild(dump(compFor.orTest));
-    result += addLastChild(pylir::match(
+    builder.add(compFor.orTest);
+    builder.add(pylir::match(
         compFor.compIter, [&](const auto& ptr) { return dump(*ptr); },
         [](std::monostate) -> std::string { PYLIR_UNREACHABLE; }));
-    return result;
+    return builder.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Target& target)
@@ -672,7 +602,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Target& target)
             {
                 return "target parenth empty";
             }
-            return "target parenth" + addLastChild(dump(*parenth.targetList));
+            return createBuilder("target parenth").add(*parenth.targetList).emit();
         },
         [&](const Syntax::Target::Square& square) -> std::string
         {
@@ -680,10 +610,10 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Target& target)
             {
                 return "target square empty";
             }
-            return "target square" + addLastChild(dump(*square.targetList));
+            return createBuilder("target square").add(*square.targetList).emit();
         },
         [&](const std::pair<BaseToken, std::unique_ptr<Syntax::Target>>& pair)
-        { return "target starred" + addLastChild(dump(*pair.second)); },
+        { return createBuilder("target starred").add(*pair.second).emit(); },
         [&](const auto& value) { return dump(value); });
 }
 
@@ -694,13 +624,12 @@ std::string pylir::Dumper::dump(const pylir::Syntax::SimpleStmt& simpleStmt)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AssertStmt& assertStmt)
 {
-    std::string result = "assert statement";
-    if (!assertStmt.message)
+    auto result = createBuilder("assert statement").add(assertStmt.condition, "condition");
+    if (assertStmt.message)
     {
-        return result + addLastChild(dump(assertStmt.condition), "condition");
+        result.add(assertStmt.message->second, "message");
     }
-    result += addMiddleChild(dump(assertStmt.condition), "condition");
-    return result + addLastChild(dump(assertStmt.message->second), "message");
+    return result.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::PassStmt&)
@@ -710,7 +639,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::PassStmt&)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::DelStmt& delStmt)
 {
-    return "del statement" + addLastChild(dump(delStmt.targetList));
+    return createBuilder("del statement").add(delStmt.targetList).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ReturnStmt& returnStmt)
@@ -719,7 +648,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ReturnStmt& returnStmt)
     {
         return "return statement";
     }
-    return "return statement" + addLastChild(dump(*returnStmt.expressions));
+    return createBuilder("return statement").add(*returnStmt.expressions).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::YieldStmt& yieldStmt)
@@ -729,16 +658,16 @@ std::string pylir::Dumper::dump(const pylir::Syntax::YieldStmt& yieldStmt)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::RaiseStmt& raiseStmt)
 {
-    if (!raiseStmt.expressions)
+    auto builder = createBuilder("raise statement");
+    if (raiseStmt.expressions)
     {
-        return "raise statement";
+        builder.add(raiseStmt.expressions->first, "exception");
+        if (raiseStmt.expressions->second)
+        {
+            builder.add(raiseStmt.expressions->second->second, "expression");
+        }
     }
-    if (!raiseStmt.expressions->second)
-    {
-        return "raise statement" + addLastChild(dump(raiseStmt.expressions->first), "exception");
-    }
-    return "raise statement" + addMiddleChild(dump(raiseStmt.expressions->first), "exception")
-           + addLastChild(dump(raiseStmt.expressions->second->second), "expression");
+    return builder.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::BreakStmt&)
@@ -781,150 +710,96 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
     auto dumpRelativeModule = [&](const Syntax::ImportStmt::RelativeModule& module)
     {
         auto dots = std::string(module.dots.size(), '.');
+        auto builder = createBuilder("relative module {}", dots);
         if (!module.module)
         {
-            return "relative module " + dots;
+            builder.add(dumpModule(*module.module));
         }
-        return "relative module " + dots + addLastChild(dumpModule(*module.module));
+        return builder.emit();
     };
 
     return pylir::match(
         importStmt.variant,
         [&](const Syntax::ImportStmt::ImportAsAs& importAsAs)
         {
-            std::string result = "import";
-            if (!importAsAs.name && importAsAs.rest.empty())
+            auto result = createBuilder("import");
+            result.add(dumpModule(importAsAs.module));
+            if (importAsAs.name)
             {
-                return result + addLastChild(dumpModule(importAsAs.module));
+                result.add(fmt::format("as {}", importAsAs.name->second.getValue()));
             }
-            result += addMiddleChild(dumpModule(importAsAs.module));
-            if (importAsAs.name && importAsAs.rest.empty())
+            for (auto& further : importAsAs.rest)
             {
-                return result + addLastChild(fmt::format("as {}", importAsAs.name->second.getValue()));
-            }
-            else
-            {
-                result += addMiddleChild(fmt::format("as {}", importAsAs.name->second.getValue()));
-            }
-            for (auto& further : tcb::span(importAsAs.rest).first(importAsAs.rest.size() - 1))
-            {
-                result += addMiddleChild(dumpModule(further.module));
+                result.add(dumpModule(further.module));
                 if (further.name)
                 {
-                    result += addMiddleChild(fmt::format("as {}", further.name->second.getValue()));
+                    result.add(fmt::format("as {}", further.name->second.getValue()));
                 }
             }
-            if (!importAsAs.rest.back().name)
-            {
-                return result + addLastChild(dumpModule(importAsAs.rest.back().module));
-            }
-            result += addMiddleChild(dumpModule(importAsAs.rest.back().module));
-            return result + addLastChild(fmt::format("as {}", importAsAs.rest.back().name->second.getValue()));
+            return result.emit();
         },
         [&](const Syntax::ImportStmt::FromImportAll& importAll)
-        { return "import all" + addLastChild(dumpRelativeModule(importAll.relativeModule)); },
+        { return createBuilder("import all").add(dumpRelativeModule(importAll.relativeModule)).emit(); },
         [&](const Syntax::ImportStmt::FromImportList& importList)
         {
-            std::string result = "import list";
-            result += addMiddleChild(dumpRelativeModule(importList.relativeModule));
-            if (importList.rest.empty())
-            {
-                if (importList.name)
-                {
-                    return result
-                           + addLastChild(fmt::format("{} as {}", importList.identifier.getValue(),
-                                                      importList.identifier.getValue()));
-                }
-                return result + addLastChild(importList.identifier.getValue());
-            }
+            auto result = createBuilder("import list");
+            result.add(dumpRelativeModule(importList.relativeModule));
             if (importList.name)
             {
-                result += addMiddleChild(
-                    fmt::format("{} as {}", importList.identifier.getValue(), importList.identifier.getValue()));
+                result.add(fmt::format("{} as {}", importList.identifier.getValue(), importList.identifier.getValue()));
             }
             else
             {
-                result += addMiddleChild(importList.identifier.getValue());
+                result.add(importList.identifier.getValue());
             }
-            for (auto& further : tcb::span(importList.rest).first(importList.rest.size() - 1))
+            for (auto& further : importList.rest)
             {
                 if (further.name)
                 {
-                    result += addMiddleChild(
-                        fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
+                    result.add(fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
                 }
                 else
                 {
-                    result += addMiddleChild(further.identifier.getValue());
+                    result.add(further.identifier.getValue());
                 }
             }
-            if (importList.rest.back().name)
-            {
-                result += addLastChild(fmt::format("{} as {}", importList.rest.back().identifier.getValue(),
-                                                   importList.rest.back().name->second.getValue()));
-            }
-            else
-            {
-                result += addLastChild(importList.rest.back().identifier.getValue());
-            }
-            return result;
+            return result.emit();
         });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::FutureStmt& futureStmt)
 {
-    std::string result = "future list";
-    if (futureStmt.rest.empty())
-    {
-        if (futureStmt.name)
-        {
-            return result
-                   + addLastChild(
-                       fmt::format("{} as {}", futureStmt.identifier.getValue(), futureStmt.identifier.getValue()));
-        }
-        return result + addLastChild(futureStmt.identifier.getValue());
-    }
+    auto result = createBuilder("future list");
     if (futureStmt.name)
     {
-        result +=
-            addMiddleChild(fmt::format("{} as {}", futureStmt.identifier.getValue(), futureStmt.identifier.getValue()));
+        result.add(fmt::format("{} as {}", futureStmt.identifier.getValue(), futureStmt.identifier.getValue()));
     }
     else
     {
-        result += addMiddleChild(futureStmt.identifier.getValue());
+        result.add(futureStmt.identifier.getValue());
     }
-    for (auto& further : tcb::span(futureStmt.rest).first(futureStmt.rest.size() - 1))
+    for (auto& further : futureStmt.rest)
     {
         if (further.name)
         {
-            result +=
-                addMiddleChild(fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
+            result.add(fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
         }
         else
         {
-            result += addMiddleChild(further.identifier.getValue());
+            result.add(further.identifier.getValue());
         }
     }
-    if (futureStmt.rest.back().name)
-    {
-        result += addLastChild(fmt::format("{} as {}", futureStmt.rest.back().identifier.getValue(),
-                                           futureStmt.rest.back().name->second.getValue()));
-    }
-    else
-    {
-        result += addLastChild(futureStmt.rest.back().identifier.getValue());
-    }
-    return result;
+    return result.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentStmt& assignmentStmt)
 {
-    std::string result = "assignment statement";
+    auto result = createBuilder("assignment statement");
     for (auto& iter : assignmentStmt.targets)
     {
-        result += addMiddleChild(dump(iter.first));
+        result.add(iter.first);
     }
-    return result + addLastChild(pylir::match(assignmentStmt.variant, [&](auto&& value) { return dump(value); }));
+    return result.add(pylir::match(assignmentStmt.variant, [&](auto&& value) { return dump(value); })).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::YieldExpression& yieldExpression)
@@ -932,38 +807,24 @@ std::string pylir::Dumper::dump(const pylir::Syntax::YieldExpression& yieldExpre
     return pylir::match(
         yieldExpression.variant, [](std::monostate) -> std::string { return "yield empty"; },
         [&](const std::pair<BaseToken, Syntax::Expression>& expression) -> std::string
-        {
-            std::string result = "yield from";
-            result += addLastChild(dump(expression.second));
-            return result;
-        },
+        { return createBuilder("yield from").add(expression.second).emit(); },
         [&](const Syntax::ExpressionList& list) -> std::string
         {
-            std::string result = "yield list";
-            if (list.remainingExpr.empty())
+            auto result = createBuilder("yield list").add(*list.firstExpr);
+            for (auto& iter : list.remainingExpr)
             {
-                result += addLastChild(dump(*list.firstExpr));
+                result.add(*iter.second);
             }
-            else
-            {
-                result += addMiddleChild(dump(*list.firstExpr));
-                for (auto& iter : tcb::span(list.remainingExpr).first(list.remainingExpr.size() - 1))
-                {
-                    result += addMiddleChild(dump(*iter.second));
-                }
-                result += addLastChild(dump(*list.remainingExpr.back().second));
-            }
-            return result;
+            return result.emit();
         });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AugmentedAssignmentStmt& augmentedAssignmentStmt)
 {
-    std::string result = fmt::format("augmented assignment {:q}", augmentedAssignmentStmt.augOp.getTokenType());
-    result += addMiddleChild(dump(augmentedAssignmentStmt.augTarget));
-    result +=
-        addLastChild(pylir::match(augmentedAssignmentStmt.variant, [&](const auto& value) { return dump(value); }));
-    return result;
+    return createBuilder("augmented assignment {:q}", augmentedAssignmentStmt.augOp.getTokenType())
+        .add(augmentedAssignmentStmt.augTarget)
+        .add(pylir::match(augmentedAssignmentStmt.variant, [&](const auto& value) { return dump(value); }))
+        .emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AugTarget& augTarget)
@@ -976,14 +837,13 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AugTarget& augTarget)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AnnotatedAssignmentSmt& annotatedAssignmentSmt)
 {
-    std::string result = "annotated assignment";
-    result += addMiddleChild(dump(annotatedAssignmentSmt.augTarget));
-    if (!annotatedAssignmentSmt.optionalAssignmentStmt)
+    auto result = createBuilder("annotated assignment")
+                      .add(annotatedAssignmentSmt.augTarget)
+                      .add(annotatedAssignmentSmt.expression);
+    if (annotatedAssignmentSmt.optionalAssignmentStmt)
     {
-        return result + addLastChild(dump(annotatedAssignmentSmt.expression));
+        result.add(pylir::match(annotatedAssignmentSmt.optionalAssignmentStmt->second,
+                                [&](const auto& value) { return dump(value); }));
     }
-    result += addMiddleChild(dump(annotatedAssignmentSmt.expression));
-    result += addLastChild(pylir::match(annotatedAssignmentSmt.optionalAssignmentStmt->second,
-                                        [&](const auto& value) { return dump(value); }));
-    return result;
+    return result.emit();
 }
