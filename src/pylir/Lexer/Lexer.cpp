@@ -339,11 +339,7 @@ bool pylir::Lexer::parseNext()
                     return true;
                 }
                 m_current++;
-                if (m_depth == 0)
-                {
-                    parseIndent();
-                }
-                break;
+                continue;
             }
             case U'u':
             case U'U':
@@ -404,7 +400,7 @@ bool pylir::Lexer::parseNext()
                             break;
                         }
                         // TODO: parseFormatString
-                        break;
+                        std::abort();
                     }
                     case U'\'':
                     case U'"':
@@ -501,7 +497,7 @@ bool pylir::Lexer::parseNext()
                 if (std::next(m_current) != m_document->end()
                     && (*std::next(m_current) == '"' || *std::next(m_current) == '\''))
                 {
-                    // TODO: Format string
+                    std::abort();
                 }
                 else
                 {
@@ -1254,17 +1250,7 @@ void pylir::Lexer::parseNumber()
             {
                 break;
             }
-            default:
-            {
-                auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::INVALID_NUMBER_PREFIX_N,
-                                                        Text::toUTF8String({m_current, 2}))
-                                   .addLabel(m_current - m_document->begin(), m_current - m_document->begin() + 1,
-                                             std::nullopt, Diag::ERROR_COLOUR);
-                m_tokens.emplace_back(m_current - m_document->begin(), 2, m_fileId, TokenType::SyntaxError,
-                                      builder.emitError());
-                std::advance(m_current, 2);
-                return;
-            }
+            default: break;
         }
     }
     auto numberStart = m_current;
@@ -1453,19 +1439,13 @@ void pylir::Lexer::parseIndent()
 {
     auto start = m_current;
     std::size_t indent = 0;
-    for (; m_current != m_document->end(); m_current++)
+    for (; m_current != m_document->end() && Text::isWhitespace(*m_current); m_current++)
     {
-        if (!Text::isWhitespace(*m_current))
+        switch (*m_current)
         {
-            break;
-        }
-        if (*m_current == '\t')
-        {
-            indent = pylir::roundUpTo(indent, 8);
-        }
-        else
-        {
-            indent++;
+            case U'\n': return;
+            case U'\t': indent = pylir::roundUpTo(indent, 8); break;
+            default: indent++;
         }
     }
     if (indent < m_indentation.top().first)

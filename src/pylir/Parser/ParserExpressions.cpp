@@ -99,6 +99,9 @@ tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
         case TokenType::IntegerLiteral:
         case TokenType::FloatingPointLiteral:
         case TokenType::ComplexLiteral:
+        case TokenType::TrueKeyword:
+        case TokenType::FalseKeyword:
+        case TokenType::NoneKeyword:
         {
             return Syntax::Atom{Syntax::Atom::Literal{*m_current++}};
         }

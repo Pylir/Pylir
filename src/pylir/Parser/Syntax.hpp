@@ -31,6 +31,7 @@ struct Atom
     /**
      * literal ::=  stringliteral | bytesliteral
                     | integer | floatnumber | imagnumber
+                    | None | True | False
      */
     struct Literal
     {
@@ -414,6 +415,9 @@ inline bool firstInExpression(TokenType tokenType)
         case TokenType::FloatingPointLiteral:
         case TokenType::ComplexLiteral:
         case TokenType::Identifier:
+        case TokenType::TrueKeyword:
+        case TokenType::FalseKeyword:
+        case TokenType::NoneKeyword:
         case TokenType::OpenParentheses:
         case TokenType::OpenSquareBracket:
         case TokenType::OpenBrace: return true;

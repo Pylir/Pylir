@@ -232,9 +232,9 @@ struct fmt::formatter<pylir::TokenType> : formatter<std::string_view>
             case pylir::TokenType::SyntaxError: PYLIR_UNREACHABLE;
             case pylir::TokenType::Newline: name = "newline"; break;
             case pylir::TokenType::Identifier: name = "identifier"; break;
-            case pylir::TokenType::FalseKeyword: name = quote ? "'false'" : "false"; break;
-            case pylir::TokenType::NoneKeyword: name = quote ? "'none'" : "none"; break;
-            case pylir::TokenType::TrueKeyword: name = quote ? "'true'" : "true"; break;
+            case pylir::TokenType::FalseKeyword: name = quote ? "'False'" : "False"; break;
+            case pylir::TokenType::NoneKeyword: name = quote ? "'None'" : "None"; break;
+            case pylir::TokenType::TrueKeyword: name = quote ? "'True'" : "True"; break;
             case pylir::TokenType::AndKeyword: name = quote ? "'and'" : "and"; break;
             case pylir::TokenType::AsKeyword: name = quote ? "'as'" : "as"; break;
             case pylir::TokenType::AssertKeyword: name = quote ? "'assert'" : "assert"; break;
@@ -318,7 +318,8 @@ struct fmt::formatter<pylir::TokenType> : formatter<std::string_view>
             case pylir::TokenType::ShiftRightAssignment: name = quote ? "'>>='" : ">>="; break;
             case pylir::TokenType::ShiftLeftAssignment: name = quote ? "'<<='" : "<<="; break;
             case pylir::TokenType::PowerOfAssignment: name = quote ? "'**='" : "**="; break;
-            default: PYLIR_UNREACHABLE;
+            case pylir::TokenType::Indent: name = "indent"; break;
+            case pylir::TokenType::Dedent: name = "dedent"; break;
         }
         return formatter<std::string_view>::format(name, ctx);
     }

@@ -434,7 +434,6 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(apInt);
         CHECK(apInt->getZExtValue() == 0x30);
     }
-    LEXER_EMITS("0z3", pylir::Diag::INVALID_NUMBER_PREFIX_N, "0z");
     SECTION("Underline")
     {
         pylir::Diag::Document document("0x_3_0");
