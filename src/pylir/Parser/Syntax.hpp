@@ -1167,7 +1167,7 @@ struct ClassDef
     struct Inheritance
     {
         BaseToken openParenth;
-        ArgumentList argumentList;
+        std::optional<ArgumentList> argumentList;
         BaseToken closeParenth;
     };
     std::optional<Inheritance> inheritance;

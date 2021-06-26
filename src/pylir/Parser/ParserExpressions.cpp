@@ -523,6 +523,223 @@ tl::expected<pylir::Syntax::Slicing, std::string>
                            std::move(*closeSquareBracket)};
 }
 
+tl::expected<pylir::Syntax::ArgumentList, std::string>
+    pylir::Parser::parseArgumentList(std::optional<Syntax::AssignmentExpression>&& firstAssignment)
+{
+    std::optional<Token> firstComma;
+
+    // If we had an assignment expression or the first token is a Star we are parsing positional arguments
+    std::optional<Syntax::ArgumentList::PositionalArguments> positionalArguments;
+    if (firstAssignment || m_current->getTokenType() == TokenType::Star)
+    {
+        Syntax::ArgumentList::PositionalItem firstItem;
+        if (firstAssignment)
+        {
+            firstItem.variant = std::make_unique<Syntax::AssignmentExpression>(std::move(*firstAssignment));
+        }
+        else
+        {
+            PYLIR_ASSERT(m_current->getTokenType() == TokenType::Star);
+            auto star = *m_current++;
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            firstItem.variant = Syntax::ArgumentList::PositionalItem::Star{
+                std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))};
+        }
+        std::vector<std::pair<BaseToken, Syntax::ArgumentList::PositionalItem>> rest;
+        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+        {
+            auto next = std::next(m_current);
+            if (next == m_lexer.end())
+            {
+                break;
+            }
+            // If after the comma is **, then are going to parse keyword arguments
+            // If after the comma is "identifier =" then we are going to parse starred_and_keywords
+            // In both cases it's the end of the positional arguments and the firstComma has been consumed already
+            if ((next->getTokenType() == TokenType::PowerOf)
+                || lookaheadEquals(std::array{TokenType::Comma, TokenType::Identifier, TokenType::Assignment}))
+            {
+                firstComma = *m_current++;
+                break;
+            }
+
+            if (next->getTokenType() == TokenType::Star)
+            {
+                auto comma = *m_current++;
+                auto star = *m_current++;
+                auto expression = parseExpression();
+                if (!expression)
+                {
+                    return tl::unexpected{std::move(expression).error()};
+                }
+                rest.emplace_back(std::move(comma),
+                                  Syntax::ArgumentList::PositionalItem{Syntax::ArgumentList::PositionalItem::Star{
+                                      std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))}});
+                continue;
+            }
+
+            if (!Syntax::firstInAssignmentExpression(next->getTokenType()))
+            {
+                break;
+            }
+
+            auto comma = *m_current++;
+            auto assignment = parseAssignmentExpression();
+            if (!assignment)
+            {
+                return tl::unexpected{std::move(assignment).error()};
+            }
+            rest.emplace_back(std::move(comma),
+                              Syntax::ArgumentList::PositionalItem{
+                                  std::make_unique<Syntax::AssignmentExpression>(std::move(*assignment))});
+        }
+        positionalArguments = Syntax::ArgumentList::PositionalArguments{std::move(firstItem), std::move(rest)};
+    }
+
+    std::optional<Token> secondComma;
+
+    // We wouldn't have left the positional arguments if it was a star, as positional arguments accept those too
+    // so we only land here if "identifier =" is spotted
+    std::optional<Syntax::ArgumentList::StarredAndKeywords> starredAndKeywords;
+    if (lookaheadEquals(std::array{TokenType::Identifier, TokenType::Assignment}))
+    {
+        std::optional<Syntax::ArgumentList::KeywordItem> item;
+        {
+            auto identifier = *m_current++;
+            auto assignment = *m_current++;
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            item = Syntax::ArgumentList::KeywordItem{IdentifierToken{std::move(identifier)}, std::move(assignment),
+                                                     std::make_unique<Syntax::Expression>(std::move(*expression))};
+        }
+        std::vector<std::pair<BaseToken, Syntax::ArgumentList::StarredAndKeywords::Variant>> rest;
+        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+        {
+            auto next = std::next(m_current);
+            if (next == m_lexer.end())
+            {
+                break;
+            }
+            // If there's a ** then keyword arguments have started and we need to bail
+            if (next->getTokenType() == TokenType::PowerOf)
+            {
+                auto comma = *m_current++;
+                if (!firstComma)
+                {
+                    firstComma = std::move(comma);
+                }
+                else
+                {
+                    secondComma = std::move(comma);
+                }
+                break;
+            }
+
+            if (next->getTokenType() != TokenType::Star && next->getTokenType() != TokenType::Identifier)
+            {
+                break;
+            }
+
+            auto comma = *m_current++;
+            if (m_current->getTokenType() == TokenType::Star)
+            {
+                auto star = *m_current++;
+                auto expression = parseExpression();
+                if (!expression)
+                {
+                    return tl::unexpected{std::move(expression).error()};
+                }
+                rest.emplace_back(std::move(comma),
+                                  Syntax::ArgumentList::StarredAndKeywords::Expression{
+                                      std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))});
+                continue;
+            }
+
+            auto identifier = *m_current++;
+            auto assignment = expect(TokenType::Assignment);
+            if (!assignment)
+            {
+                return tl::unexpected{std::move(assignment).error()};
+            }
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            rest.emplace_back(std::move(comma), Syntax::ArgumentList::KeywordItem{
+                                                    IdentifierToken{std::move(identifier)}, std::move(*assignment),
+                                                    std::make_unique<Syntax::Expression>(std::move(*expression))});
+        }
+        starredAndKeywords = Syntax::ArgumentList::StarredAndKeywords{std::move(*item), std::move(rest)};
+    }
+
+    std::optional<Syntax::ArgumentList::KeywordArguments> keywordArguments;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::PowerOf)
+    {
+        std::optional<Syntax::ArgumentList::KeywordArguments::Expression> item;
+        {
+            auto stars = *m_current++;
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            item = Syntax::ArgumentList::KeywordArguments::Expression{
+                std::move(stars), std::make_unique<Syntax::Expression>(std::move(*expression))};
+        }
+        std::vector<std::pair<BaseToken, Syntax::ArgumentList::KeywordArguments::Variant>> rest;
+        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+        {
+            auto next = std::next(m_current);
+            if (next == m_lexer.end()
+                || (next->getTokenType() != TokenType::PowerOf && next->getTokenType() != TokenType::Identifier))
+            {
+                break;
+            }
+
+            auto comma = *m_current++;
+            if (m_current->getTokenType() == TokenType::PowerOf)
+            {
+                auto star = *m_current++;
+                auto expression = parseExpression();
+                if (!expression)
+                {
+                    return tl::unexpected{std::move(expression).error()};
+                }
+                rest.emplace_back(std::move(comma),
+                                  Syntax::ArgumentList::KeywordArguments::Expression{
+                                      std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))});
+                continue;
+            }
+
+            auto identifier = *m_current++;
+            auto assignment = expect(TokenType::Assignment);
+            if (!assignment)
+            {
+                return tl::unexpected{std::move(assignment).error()};
+            }
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            rest.emplace_back(std::move(comma), Syntax::ArgumentList::KeywordItem{
+                                                    IdentifierToken{std::move(identifier)}, std::move(*assignment),
+                                                    std::make_unique<Syntax::Expression>(std::move(*expression))});
+        }
+        keywordArguments = Syntax::ArgumentList::KeywordArguments{std::move(*item), std::move(rest)};
+    }
+    return Syntax::ArgumentList{std::move(positionalArguments), std::move(firstComma), std::move(starredAndKeywords),
+                                std::move(secondComma), std::move(keywordArguments)};
+}
+
 tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::unique_ptr<Syntax::Primary>&& primary)
 {
     auto openParenth = expect(TokenType::OpenParentheses);
@@ -570,217 +787,15 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
         firstAssignment = std::move(*assignment);
     }
 
+    auto argumentList = parseArgumentList(std::move(firstAssignment));
+    if (!argumentList)
+    {
+        return tl::unexpected{std::move(argumentList).error()};
+    }
     std::optional<Token> trailingComma;
-
-    std::optional<Token> firstComma;
-
-    // If we had an assignment expression or the first token is a Star we are parsing positional arguments
-    std::optional<Syntax::ArgumentList::PositionalArguments> positionalArguments;
-    if (firstAssignment || m_current->getTokenType() == TokenType::Star)
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
     {
-        Syntax::ArgumentList::PositionalItem firstItem;
-        if (firstAssignment)
-        {
-            firstItem.variant = std::make_unique<Syntax::AssignmentExpression>(std::move(*firstAssignment));
-        }
-        else
-        {
-            PYLIR_ASSERT(m_current->getTokenType() == TokenType::Star);
-            auto star = *m_current++;
-            auto expression = parseExpression();
-            if (!expression)
-            {
-                return tl::unexpected{std::move(expression).error()};
-            }
-            firstItem.variant = Syntax::ArgumentList::PositionalItem::Star{
-                std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))};
-        }
-        std::vector<std::pair<BaseToken, Syntax::ArgumentList::PositionalItem>> rest;
-        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-        {
-            auto comma = *m_current++;
-            // If after the comma is **, then are going to parse keyword arguments
-            // If after the comma is "identifier =" then we are going to parse starred_and_keywords
-            // In both cases it's the end of the positional arguments and the firstComma has been consumed already
-            if ((m_current != m_lexer.end() && m_current->getTokenType() == TokenType::PowerOf)
-                || lookaheadEquals(std::array{TokenType::Identifier, TokenType::Assignment}))
-            {
-                firstComma = std::move(comma);
-                break;
-            }
-
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
-            {
-                auto star = *m_current++;
-                auto expression = parseExpression();
-                if (!expression)
-                {
-                    return tl::unexpected{std::move(expression).error()};
-                }
-                rest.emplace_back(std::move(comma),
-                                  Syntax::ArgumentList::PositionalItem{Syntax::ArgumentList::PositionalItem::Star{
-                                      std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))}});
-                continue;
-            }
-
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::CloseParentheses)
-            {
-                // We are the end of the call expression and there was a trailing comma
-                trailingComma = std::move(comma);
-                break;
-            }
-
-            auto assignment = parseAssignmentExpression();
-            if (!assignment)
-            {
-                return tl::unexpected{std::move(assignment).error()};
-            }
-            rest.emplace_back(std::move(comma),
-                              Syntax::ArgumentList::PositionalItem{
-                                  std::make_unique<Syntax::AssignmentExpression>(std::move(*assignment))});
-        }
-        positionalArguments = Syntax::ArgumentList::PositionalArguments{std::move(firstItem), std::move(rest)};
-    }
-
-    std::optional<Token> secondComma;
-
-    // We wouldn't have left the positional arguments if it was a star, as positional arguments accept those too
-    // so we only land here if "identifier =" is spotted
-    std::optional<Syntax::ArgumentList::StarredAndKeywords> starredAndKeywords;
-    if (lookaheadEquals(std::array{TokenType::Identifier, TokenType::Assignment}))
-    {
-        std::optional<Syntax::ArgumentList::KeywordItem> item;
-        {
-            auto identifier = *m_current++;
-            auto assignment = *m_current++;
-            auto expression = parseExpression();
-            if (!expression)
-            {
-                return tl::unexpected{std::move(expression).error()};
-            }
-            item = Syntax::ArgumentList::KeywordItem{IdentifierToken{std::move(identifier)}, std::move(assignment),
-                                                     std::make_unique<Syntax::Expression>(std::move(*expression))};
-        }
-        std::vector<std::pair<BaseToken, Syntax::ArgumentList::StarredAndKeywords::Variant>> rest;
-        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-        {
-            auto comma = *m_current++;
-            // If there's a ** then keyword arguments have started and we need to bail
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::PowerOf)
-            {
-                if (!firstComma)
-                {
-                    firstComma = std::move(comma);
-                }
-                else
-                {
-                    secondComma = std::move(comma);
-                }
-                break;
-            }
-
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::CloseParentheses)
-            {
-                // We are the end of the call expression and there was a trailing comma
-                trailingComma = std::move(comma);
-                break;
-            }
-
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
-            {
-                auto star = *m_current++;
-                auto expression = parseExpression();
-                if (!expression)
-                {
-                    return tl::unexpected{std::move(expression).error()};
-                }
-                rest.emplace_back(std::move(comma),
-                                  Syntax::ArgumentList::StarredAndKeywords::Expression{
-                                      std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))});
-                continue;
-            }
-
-            auto identifier = expect(TokenType::Identifier);
-            if (!identifier)
-            {
-                return tl::unexpected{std::move(identifier).error()};
-            }
-            auto assignment = expect(TokenType::Assignment);
-            if (!assignment)
-            {
-                return tl::unexpected{std::move(assignment).error()};
-            }
-            auto expression = parseExpression();
-            if (!expression)
-            {
-                return tl::unexpected{std::move(expression).error()};
-            }
-            rest.emplace_back(std::move(comma), Syntax::ArgumentList::KeywordItem{
-                                                    IdentifierToken{std::move(*identifier)}, std::move(*assignment),
-                                                    std::make_unique<Syntax::Expression>(std::move(*expression))});
-        }
-        starredAndKeywords = Syntax::ArgumentList::StarredAndKeywords{std::move(*item), std::move(rest)};
-    }
-
-    std::optional<Syntax::ArgumentList::KeywordArguments> keywordArguments;
-    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::PowerOf)
-    {
-        std::optional<Syntax::ArgumentList::KeywordArguments::Expression> item;
-        {
-            auto stars = *m_current++;
-            auto expression = parseExpression();
-            if (!expression)
-            {
-                return tl::unexpected{std::move(expression).error()};
-            }
-            item = Syntax::ArgumentList::KeywordArguments::Expression{
-                std::move(stars), std::make_unique<Syntax::Expression>(std::move(*expression))};
-        }
-        std::vector<std::pair<BaseToken, Syntax::ArgumentList::KeywordArguments::Variant>> rest;
-        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-        {
-            auto comma = *m_current++;
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::CloseParentheses)
-            {
-                // We are the end of the call expression and there was a trailing comma
-                trailingComma = std::move(comma);
-                break;
-            }
-
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::PowerOf)
-            {
-                auto star = *m_current++;
-                auto expression = parseExpression();
-                if (!expression)
-                {
-                    return tl::unexpected{std::move(expression).error()};
-                }
-                rest.emplace_back(std::move(comma),
-                                  Syntax::ArgumentList::KeywordArguments::Expression{
-                                      std::move(star), std::make_unique<Syntax::Expression>(std::move(*expression))});
-                continue;
-            }
-
-            auto identifier = expect(TokenType::Identifier);
-            if (!identifier)
-            {
-                return tl::unexpected{std::move(identifier).error()};
-            }
-            auto assignment = expect(TokenType::Assignment);
-            if (!assignment)
-            {
-                return tl::unexpected{std::move(assignment).error()};
-            }
-            auto expression = parseExpression();
-            if (!expression)
-            {
-                return tl::unexpected{std::move(expression).error()};
-            }
-            rest.emplace_back(std::move(comma), Syntax::ArgumentList::KeywordItem{
-                                                    IdentifierToken{std::move(*identifier)}, std::move(*assignment),
-                                                    std::make_unique<Syntax::Expression>(std::move(*expression))});
-        }
-        keywordArguments = Syntax::ArgumentList::KeywordArguments{std::move(*item), std::move(rest)};
+        trailingComma = *m_current++;
     }
 
     auto closeParenth = expect(TokenType::CloseParentheses);
@@ -789,11 +804,7 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
         return tl::unexpected{std::move(closeParenth).error()};
     }
     return Syntax::Call{std::move(primary), std::move(*openParenth),
-                        std::pair{Syntax::ArgumentList{std::move(positionalArguments), std::move(firstComma),
-                                                       std::move(starredAndKeywords), std::move(secondComma),
-                                                       std::move(keywordArguments)},
-                                  std::move(trailingComma)},
-                        std::move(*closeParenth)};
+                        std::pair{std::move(*argumentList), std::move(trailingComma)}, std::move(*closeParenth)};
 }
 
 tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary()
@@ -1150,7 +1161,16 @@ tl::expected<pylir::Syntax::LambdaExpression, std::string> pylir::Parser::parseL
     {
         return tl::unexpected{std::move(keyword).error()};
     }
-    // TODO: Parameter list
+    std::unique_ptr<Syntax::ParameterList> parameterList;
+    if (m_current != m_lexer.end() && m_current->getTokenType() != TokenType::Colon)
+    {
+        auto parsedParameterList = parseParameterList();
+        if (!parsedParameterList)
+        {
+            return tl::unexpected{std::move(parsedParameterList).error()};
+        }
+        parameterList = std::make_unique<Syntax::ParameterList>(std::move(*parsedParameterList));
+    }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
@@ -1161,7 +1181,8 @@ tl::expected<pylir::Syntax::LambdaExpression, std::string> pylir::Parser::parseL
     {
         return tl::unexpected{std::move(expression).error()};
     }
-    return Syntax::LambdaExpression{std::move(*keyword), nullptr, std::move(*colon), std::move(*expression)};
+    return Syntax::LambdaExpression{std::move(*keyword), std::move(parameterList), std::move(*colon),
+                                    std::move(*expression)};
 }
 
 tl::expected<pylir::Syntax::Comprehension, std::string>

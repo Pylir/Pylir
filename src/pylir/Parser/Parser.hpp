@@ -119,6 +119,9 @@ public:
 
     tl::expected<Syntax::Slicing, std::string> parseSlicing(std::unique_ptr<Syntax::Primary>&& primary);
 
+    tl::expected<Syntax::ArgumentList, std::string>
+        parseArgumentList(std::optional<Syntax::AssignmentExpression>&& firstAssignment = std::nullopt);
+
     tl::expected<Syntax::Call, std::string> parseCall(std::unique_ptr<Syntax::Primary>&& primary);
 
     tl::expected<Syntax::Primary, std::string> parsePrimary();
@@ -221,9 +224,5 @@ public:
                                                             std::optional<BaseToken>&& asyncKeyword);
 
     tl::expected<Syntax::ClassDef, std::string> parseClassDef(std::vector<Syntax::Decorator>&& decorators);
-
-    tl::expected<Syntax::AsyncWithStmt, std::string> parseAsyncWithStmt();
-
-    tl::expected<Syntax::AsyncForStmt, std::string> parseAsyncForStmt();
 };
 } // namespace pylir

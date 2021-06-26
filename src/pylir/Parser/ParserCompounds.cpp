@@ -411,5 +411,584 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
 
 tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
 {
+    auto tryKeyword = expect(TokenType::TryKeyword);
+    if (!tryKeyword)
+    {
+        return tl::unexpected{std::move(tryKeyword).error()};
+    }
+    auto colon = expect(TokenType::Colon);
+    if (!colon)
+    {
+        return tl::unexpected{std::move(colon).error()};
+    }
+    auto suite = parseSuite();
+    if (!suite)
+    {
+        return tl::unexpected{std::move(suite).error()};
+    }
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::FinallyKeyword)
+    {
+        auto finallyKeyword = *m_current++;
+        auto finallyColon = expect(TokenType::Colon);
+        if (!finallyColon)
+        {
+            return tl::unexpected{std::move(finallyColon).error()};
+        }
+        auto finallySuite = parseSuite();
+        if (!finallySuite)
+        {
+            return tl::unexpected{std::move(finallySuite).error()};
+        }
+        return Syntax::TryStmt{*tryKeyword,
+                               *colon,
+                               std::make_unique<Syntax::Suite>(std::move(*suite)),
+                               {},
+                               std::nullopt,
+                               Syntax::TryStmt::Finally{finallyKeyword, *finallyColon,
+                                                        std::make_unique<Syntax::Suite>(std::move(*finallySuite))}};
+    }
 
+    std::vector<Syntax::TryStmt::Except> exceptSections;
+    do
+    {
+        auto exceptKeyword = expect(TokenType::ExceptKeyword);
+        if (!exceptKeyword)
+        {
+            return tl::unexpected{std::move(exceptKeyword).error()};
+        }
+        if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::Colon)
+        {
+            auto exceptColon = expect(TokenType::Colon);
+            if (!exceptColon)
+            {
+                return tl::unexpected{std::move(exceptColon).error()};
+            }
+            auto exceptSuite = parseSuite();
+            if (!exceptSuite)
+            {
+                return tl::unexpected{std::move(exceptSuite).error()};
+            }
+            exceptSections.push_back(
+                {*exceptKeyword, std::nullopt, *exceptColon, std::make_unique<Syntax::Suite>(std::move(*exceptSuite))});
+            continue;
+        }
+        auto expression = parseExpression();
+        if (!expression)
+        {
+            return tl::unexpected{std::move(expression).error()};
+        }
+        std::optional<std::pair<BaseToken, IdentifierToken>> name;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+        {
+            auto asKeyword = *m_current++;
+            auto id = expect(TokenType::Identifier);
+            if (!id)
+            {
+                return tl::unexpected{std::move(id).error()};
+            }
+            name.emplace(asKeyword, IdentifierToken{*id});
+        }
+        auto exceptColon = expect(TokenType::Colon);
+        if (!exceptColon)
+        {
+            return tl::unexpected{std::move(exceptColon).error()};
+        }
+        auto exceptSuite = parseSuite();
+        if (!exceptSuite)
+        {
+            return tl::unexpected{std::move(exceptSuite).error()};
+        }
+        exceptSections.push_back({*exceptKeyword, std::pair{std::move(*expression), std::move(name)}, *exceptColon,
+                                  std::make_unique<Syntax::Suite>(std::move(*exceptSuite))});
+    } while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::ExceptKeyword);
+
+    std::optional<Syntax::IfStmt::Else> elseSection;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::ElseKeyword)
+    {
+        auto parsedElse = parseElse();
+        if (!parsedElse)
+        {
+            return tl::unexpected{std::move(parsedElse).error()};
+        }
+        elseSection = std::move(*parsedElse);
+    }
+
+    std::optional<Syntax::TryStmt::Finally> finally;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::FinallyKeyword)
+    {
+        auto finallyKeyword = *m_current++;
+        auto finallyColon = expect(TokenType::Colon);
+        if (!finallyColon)
+        {
+            return tl::unexpected{std::move(finallyColon).error()};
+        }
+        auto finallySuite = parseSuite();
+        if (!finallySuite)
+        {
+            return tl::unexpected{std::move(finallySuite).error()};
+        }
+        finally = Syntax::TryStmt::Finally{finallyKeyword, *finallyColon,
+                                           std::make_unique<Syntax::Suite>(std::move(*finallySuite))};
+    }
+    return Syntax::TryStmt{*tryKeyword,
+                           *colon,
+                           std::make_unique<Syntax::Suite>(std::move(*suite)),
+                           std::move(exceptSections),
+                           std::move(elseSection),
+                           std::move(finally)};
+}
+
+tl::expected<pylir::Syntax::WithStmt, std::string> pylir::Parser::parseWithStmt()
+{
+    auto withKeyword = expect(TokenType::WithKeyword);
+    if (!withKeyword)
+    {
+        return tl::unexpected{std::move(withKeyword).error()};
+    }
+    std::optional<Syntax::WithStmt::WithItem> firstItem;
+    {
+        auto expression = parseExpression();
+        if (!expression)
+        {
+            return tl::unexpected{std::move(expression).error()};
+        }
+        std::optional<std::pair<BaseToken, Syntax::Target>> name;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+        {
+            auto asKeyword = *m_current++;
+            auto target = parseTarget();
+            if (!target)
+            {
+                return tl::unexpected{std::move(target).error()};
+            }
+            name.emplace(asKeyword, std::move(*target));
+        }
+        firstItem = Syntax::WithStmt::WithItem{std::move(*expression), std::move(name)};
+    }
+
+    std::vector<std::pair<BaseToken, Syntax::WithStmt::WithItem>> withItems;
+    while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+    {
+        auto comma = *m_current++;
+        auto expression = parseExpression();
+        if (!expression)
+        {
+            return tl::unexpected{std::move(expression).error()};
+        }
+        std::optional<std::pair<BaseToken, Syntax::Target>> name;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+        {
+            auto asKeyword = *m_current++;
+            auto target = parseTarget();
+            if (!target)
+            {
+                return tl::unexpected{std::move(target).error()};
+            }
+            name.emplace(asKeyword, std::move(*target));
+        }
+        withItems.emplace_back(comma, Syntax::WithStmt::WithItem{std::move(*expression), std::move(name)});
+    }
+
+    auto colon = expect(TokenType::Colon);
+    if (!colon)
+    {
+        return tl::unexpected{std::move(colon).error()};
+    }
+    auto suite = parseSuite();
+    if (!suite)
+    {
+        return tl::unexpected{std::move(suite).error()};
+    }
+    return Syntax::WithStmt{*withKeyword, std::move(*firstItem), std::move(withItems), *colon,
+                            std::make_unique<Syntax::Suite>(std::move(*suite))};
+}
+
+tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
+{
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Newline)
+    {
+        auto newline = *m_current++;
+        auto indent = expect(TokenType::Indent);
+        if (!indent)
+        {
+            return tl::unexpected{std::move(indent).error()};
+        }
+        std::vector<Syntax::Statement> statements;
+        do
+        {
+            auto statement = parseStatement();
+            if (!statement)
+            {
+                return tl::unexpected{std::move(statement).error()};
+            }
+            statements.push_back(std::move(*statement));
+        } while (m_current != m_lexer.end() && m_current->getTokenType() != TokenType::Dedent);
+        auto dedent = expect(TokenType::Dedent);
+        if (!dedent)
+        {
+            return tl::unexpected{std::move(dedent).error()};
+        }
+        return Syntax::Suite{Syntax::Suite::MultiLine{newline, *indent, std::move(statements), *dedent}};
+    }
+
+    auto statementList = parseStmtList();
+    if (!statementList)
+    {
+        return tl::unexpected{std::move(statementList).error()};
+    }
+    auto newline = expect(TokenType::Newline);
+    if (!newline)
+    {
+        return tl::unexpected{std::move(newline).error()};
+    }
+    return Syntax::Suite{Syntax::Suite::SingleLine{std::move(*statementList), *newline}};
+}
+
+tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parseParameterList()
+{
+    auto parseParameter = [&]() -> tl::expected<Syntax::ParameterList::Parameter, std::string>
+    {
+        auto identifier = expect(TokenType::Identifier);
+        if (!identifier)
+        {
+            return tl::unexpected{std::move(identifier).error()};
+        }
+        std::optional<std::pair<BaseToken, Syntax::Expression>> annotation;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Colon)
+        {
+            auto colon = *m_current++;
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            annotation = std::pair{colon, std::move(*expression)};
+        }
+        return Syntax::ParameterList::Parameter{IdentifierToken{*identifier}, std::move(annotation)};
+    };
+
+    auto parseDefParameter = [&]() -> tl::expected<Syntax::ParameterList::DefParameter, std::string>
+    {
+        auto parameter = parseParameter();
+        if (!parameter)
+        {
+            return tl::unexpected{std::move(parameter).error()};
+        }
+        std::optional<std::pair<BaseToken, Syntax::Expression>> defaultArg;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Assignment)
+        {
+            auto assignment = *m_current++;
+            auto expression = parseExpression();
+            if (!expression)
+            {
+                return tl::unexpected{std::move(expression).error()};
+            }
+            defaultArg = std::pair{assignment, std::move(*expression)};
+        }
+        return Syntax::ParameterList::DefParameter{std::move(*parameter), std::move(defaultArg)};
+    };
+
+    auto parseParameterListStarArgs = [&]() -> tl::expected<Syntax::ParameterList::ParameterListStarArgs, std::string>
+    {
+        PYLIR_ASSERT(m_current != m_lexer.end());
+        if (m_current->getTokenType() == TokenType::PowerOf)
+        {
+            auto doubleStar = *m_current++;
+            auto parameter = parseParameter();
+            if (!parameter)
+            {
+                return tl::unexpected{std::move(parameter).error()};
+            }
+            std::optional<BaseToken> comma;
+            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+            {
+                comma = *m_current++;
+            }
+            return Syntax::ParameterList::ParameterListStarArgs{
+                Syntax::ParameterList::ParameterListStarArgs::DoubleStar{doubleStar, std::move(*parameter), comma}};
+        }
+        PYLIR_ASSERT(m_current->getTokenType() == TokenType::Star);
+        auto star = *m_current++;
+        std::optional<Syntax::ParameterList::Parameter> parameter;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Identifier)
+        {
+            auto parsedParameter = parseParameter();
+            if (!parsedParameter)
+            {
+                return tl::unexpected{std::move(parsedParameter).error()};
+            }
+            parameter = std::move(*parsedParameter);
+        }
+        std::vector<std::pair<BaseToken, Syntax::ParameterList::DefParameter>> defParameters;
+        while (lookaheadEquals(std::array{TokenType::Comma, TokenType::Identifier}))
+        {
+            auto comma = *m_current++;
+            auto defParameter = parseDefParameter();
+            if (!defParameter)
+            {
+                return tl::unexpected{std::move(defParameter).error()};
+            }
+            defParameters.emplace_back(comma, std::move(*defParameter));
+        }
+        if (!lookaheadEquals(std::array{TokenType::Comma, TokenType::PowerOf}))
+        {
+            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+            {
+                return Syntax::ParameterList::ParameterListStarArgs{Syntax::ParameterList::ParameterListStarArgs::Star{
+                    star, std::move(parameter), std::move(defParameters),
+                    Syntax::ParameterList::ParameterListStarArgs::Star::Further{*m_current++, std::nullopt}}};
+            }
+            return Syntax::ParameterList::ParameterListStarArgs{Syntax::ParameterList::ParameterListStarArgs::Star{
+                star, std::move(parameter), std::move(defParameters), std::nullopt}};
+        }
+        auto comma = *m_current++;
+        auto powerOf = *m_current++;
+        auto expandParameter = parseParameter();
+        if (!expandParameter)
+        {
+            return tl::unexpected{std::move(expandParameter).error()};
+        }
+        std::optional<BaseToken> trailingComma;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+        {
+            trailingComma = *m_current++;
+        }
+        return Syntax::ParameterList::ParameterListStarArgs{Syntax::ParameterList::ParameterListStarArgs::Star{
+            star, std::move(parameter), std::move(defParameters),
+            Syntax::ParameterList::ParameterListStarArgs::Star::Further{
+                comma, Syntax::ParameterList::ParameterListStarArgs::DoubleStar{powerOf, std::move(*expandParameter),
+                                                                                trailingComma}}}};
+    };
+
+    auto parseParameterListNoPosOnlyPrefix =
+        [&]() -> tl::expected<Syntax::ParameterList::ParameterListNoPosOnly, std::string>
+    {
+        if (m_current != m_lexer.end()
+            && (m_current->getTokenType() == TokenType::Star || m_current->getTokenType() == TokenType::PowerOf))
+        {
+            auto starArgs = parseParameterListStarArgs();
+            if (!starArgs)
+            {
+                return tl::unexpected{std::move(starArgs).error()};
+            }
+            return Syntax::ParameterList::ParameterListNoPosOnly{std::move(*starArgs)};
+        }
+
+        auto first = parseDefParameter();
+        if (!first)
+        {
+            return tl::unexpected{std::move(first).error()};
+        }
+        std::vector<std::pair<BaseToken, Syntax::ParameterList::DefParameter>> defParameters;
+        while (lookaheadEquals(std::array{TokenType::Comma, TokenType::Identifier}))
+        {
+            auto comma = *m_current++;
+            auto defParameter = parseDefParameter();
+            if (!defParameter)
+            {
+                return tl::unexpected{std::move(defParameter).error()};
+            }
+            defParameters.emplace_back(comma, std::move(*defParameter));
+        }
+        return Syntax::ParameterList::ParameterListNoPosOnly{Syntax::ParameterList::ParameterListNoPosOnly::DefParams{
+            std::move(*first), std::move(defParameters), std::nullopt}};
+    };
+
+    auto prefix = parseParameterListNoPosOnlyPrefix();
+    if (!prefix)
+    {
+        return tl::unexpected{std::move(prefix).error()};
+    }
+    if (std::holds_alternative<Syntax::ParameterList::ParameterListStarArgs>(prefix->variant))
+    {
+        return Syntax::ParameterList{std::move(*prefix)};
+    }
+    auto& defParams = pylir::get<Syntax::ParameterList::ParameterListNoPosOnly::DefParams>(prefix->variant);
+
+    if (!lookaheadEquals(std::array{TokenType::Comma, TokenType::Divide}))
+    {
+        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
+        {
+            return Syntax::ParameterList{std::move(*prefix)};
+        }
+        auto comma = *m_current++;
+        std::optional<Syntax::ParameterList::ParameterListStarArgs> starArgs;
+        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
+        {
+            auto parsedStarArgs = parseParameterListStarArgs();
+            if (!parsedStarArgs)
+            {
+                return tl::unexpected{std::move(parsedStarArgs).error()};
+            }
+            starArgs = std::move(*parsedStarArgs);
+        }
+        defParams.suffix = std::pair{comma, std::move(starArgs)};
+        return Syntax::ParameterList{std::move(*prefix)};
+    }
+
+    auto comma = *m_current++;
+    auto slash = *m_current++;
+    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
+    {
+        return Syntax::ParameterList{Syntax::ParameterList::ParameterListPosOnly{
+            std::move(defParams.first), std::move(defParams.rest), comma, slash, std::nullopt}};
+    }
+    auto suffixComma = *m_current++;
+    if (m_current == m_lexer.end()
+        || (m_current->getTokenType() != TokenType::Identifier && m_current->getTokenType() != TokenType::Star
+            && m_current->getTokenType() != TokenType::PowerOf))
+    {
+        return Syntax::ParameterList{Syntax::ParameterList::ParameterListPosOnly{
+            std::move(defParams.first), std::move(defParams.rest), comma, slash, std::pair{suffixComma, std::nullopt}}};
+    }
+    auto secondNoPosOnly = parseParameterListNoPosOnlyPrefix();
+    if (!secondNoPosOnly)
+    {
+        return tl::unexpected{std::move(secondNoPosOnly).error()};
+    }
+    if (std::holds_alternative<Syntax::ParameterList::ParameterListStarArgs>(secondNoPosOnly->variant))
+    {
+        return Syntax::ParameterList{
+            Syntax::ParameterList::ParameterListPosOnly{std::move(defParams.first), std::move(defParams.rest), comma,
+                                                        slash, std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
+    }
+
+    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
+    {
+        return Syntax::ParameterList{
+            Syntax::ParameterList::ParameterListPosOnly{std::move(defParams.first), std::move(defParams.rest), comma,
+                                                        slash, std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
+    }
+    auto& secondDefParams =
+        pylir::get<Syntax::ParameterList::ParameterListNoPosOnly::DefParams>(secondNoPosOnly->variant);
+
+    auto trailingComma = *m_current++;
+    std::optional<Syntax::ParameterList::ParameterListStarArgs> starArgs;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
+    {
+        auto parsedStarArgs = parseParameterListStarArgs();
+        if (!parsedStarArgs)
+        {
+            return tl::unexpected{std::move(parsedStarArgs).error()};
+        }
+        starArgs = std::move(*parsedStarArgs);
+    }
+    secondDefParams.suffix = std::pair{trailingComma, std::move(starArgs)};
+    return Syntax::ParameterList{
+        Syntax::ParameterList::ParameterListPosOnly{std::move(defParams.first), std::move(defParams.rest), comma, slash,
+                                                    std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
+}
+
+tl::expected<pylir::Syntax::FuncDef, std::string>
+    pylir::Parser::parseFuncDef(std::vector<Syntax::Decorator>&& decorators, std::optional<BaseToken>&& asyncKeyword)
+{
+    auto defKeyword = expect(TokenType::DefKeyword);
+    if (!defKeyword)
+    {
+        return tl::unexpected{std::move(defKeyword).error()};
+    }
+    auto funcName = expect(TokenType::Identifier);
+    if (!funcName)
+    {
+        return tl::unexpected{std::move(funcName).error()};
+    }
+    auto openParenth = expect(TokenType::OpenParentheses);
+    if (!openParenth)
+    {
+        return tl::unexpected{std::move(openParenth).error()};
+    }
+    std::optional<Syntax::ParameterList> parameterList;
+    if (m_current != m_lexer.end() && m_current->getTokenType() != TokenType::CloseParentheses)
+    {
+        auto parsedParameterList = parseParameterList();
+        if (!parsedParameterList)
+        {
+            return tl::unexpected{std::move(parsedParameterList).error()};
+        }
+        parameterList = std::move(*parsedParameterList);
+    }
+    auto closeParenth = expect(TokenType::CloseParentheses);
+    if (!closeParenth)
+    {
+        return tl::unexpected{std::move(closeParenth).error()};
+    }
+    std::optional<std::pair<BaseToken, Syntax::Expression>> suffix;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Arrow)
+    {
+        auto arrow = *m_current++;
+        auto expression = parseExpression();
+        if (!expression)
+        {
+            return tl::unexpected{std::move(expression).error()};
+        }
+        suffix = std::pair{arrow, std::move(*expression)};
+    }
+    auto colon = expect(TokenType::Colon);
+    if (!colon)
+    {
+        return tl::unexpected{std::move(colon).error()};
+    }
+    auto suite = parseSuite();
+    if (!suite)
+    {
+        return tl::unexpected{std::move(suite).error()};
+    }
+    return Syntax::FuncDef{std::move(decorators),
+                           asyncKeyword,
+                           *defKeyword,
+                           IdentifierToken{std::move(*funcName)},
+                           *openParenth,
+                           std::move(parameterList),
+                           *closeParenth,
+                           std::move(suffix),
+                           *colon,
+                           std::make_unique<Syntax::Suite>(std::move(*suite))};
+}
+
+tl::expected<pylir::Syntax::ClassDef, std::string>
+    pylir::Parser::parseClassDef(std::vector<Syntax::Decorator>&& decorators)
+{
+    auto classKeyword = expect(TokenType::ClassKeyword);
+    if (!classKeyword)
+    {
+        return tl::unexpected{std::move(classKeyword).error()};
+    }
+    auto className = expect(TokenType::Identifier);
+    if (!className)
+    {
+        return tl::unexpected{std::move(className).error()};
+    }
+    std::optional<Syntax::ClassDef::Inheritance> inheritance;
+    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::OpenParentheses)
+    {
+        auto open = *m_current++;
+        std::optional<Syntax::ArgumentList> argumentList;
+        if (m_current != m_lexer.end() && m_current->getTokenType() != TokenType::CloseParentheses)
+        {
+            auto parsedArgumentList = parseArgumentList();
+            if (!parsedArgumentList)
+            {
+                return tl::unexpected{std::move(parsedArgumentList).error()};
+            }
+            argumentList = std::move(*parsedArgumentList);
+        }
+        auto close = expect(TokenType::CloseParentheses);
+        if (!close)
+        {
+            return tl::unexpected{std::move(close).error()};
+        }
+        inheritance = Syntax::ClassDef::Inheritance{open, std::move(argumentList), *close};
+    }
+    auto colon = expect(TokenType::Colon);
+    if (!colon)
+    {
+        return tl::unexpected{std::move(colon).error()};
+    }
+    auto suite = parseSuite();
+    if (!suite)
+    {
+        return tl::unexpected{std::move(suite).error()};
+    }
+    return Syntax::ClassDef{std::move(decorators),  *classKeyword, IdentifierToken{std::move(*className)},
+                            std::move(inheritance), *colon,        std::make_unique<Syntax::Suite>(std::move(*suite))};
 }
