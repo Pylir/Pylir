@@ -480,15 +480,15 @@ std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)
 {
     return pylir::match(
         mExpr.variant, [&](const Syntax::UExpr& uExpr) { return dump(uExpr); },
-        [&](const Syntax::MExpr::BinOp& binOp)
+        [&](const std::unique_ptr<Syntax::MExpr::BinOp>& binOp)
         {
-            return fmt::format("mexpr {:q}", binOp.binToken.getTokenType()) + addMiddleChild(dump(*binOp.lhs), "lhs")
-                   + addLastChild(dump(binOp.rhs), "rhs");
+            return fmt::format("mexpr {:q}", binOp->binToken.getTokenType()) + addMiddleChild(dump(*binOp->lhs), "lhs")
+                   + addLastChild(dump(binOp->rhs), "rhs");
         },
-        [&](const Syntax::MExpr::AtBin& binOp)
+        [&](const std::unique_ptr<Syntax::MExpr::AtBin>& binOp)
         {
-            return fmt::format("mexpr {:q}", TokenType::AtSign) + addMiddleChild(dump(*binOp.lhs), "lhs")
-                   + addLastChild(dump(*binOp.rhs), "rhs");
+            return fmt::format("mexpr {:q}", TokenType::AtSign) + addMiddleChild(dump(*binOp->lhs), "lhs")
+                   + addLastChild(dump(*binOp->rhs), "rhs");
         });
 }
 
@@ -576,7 +576,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ConditionalExpression& cond
         return dump(conditionalExpression.value);
     }
     return fmt::format("conditional expression") + addMiddleChild(dump(conditionalExpression.value), "value")
-           + addMiddleChild(dump(conditionalExpression.suffix->test), "condition")
+           + addMiddleChild(dump(*conditionalExpression.suffix->test), "condition")
            + addLastChild(dump(*conditionalExpression.suffix->elseValue), "elseValue");
 }
 

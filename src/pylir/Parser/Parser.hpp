@@ -80,8 +80,8 @@ class Parser
             {
                 return tl::unexpected{std::move(rhs).error()};
             }
-            current.variant =
-                typename T::BinOp{std::make_unique<T>(std::move(current)), std::move(op), std::move(*rhs)};
+            current.variant = std::make_unique<typename T::BinOp>(
+                typename T::BinOp{std::make_unique<T>(std::move(current)), std::move(op), std::move(*rhs)});
         }
         return {std::move(current)};
     }

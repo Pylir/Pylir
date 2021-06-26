@@ -39,9 +39,9 @@ class Dumper
     {
         return pylir::match(
             thisClass.variant, [&](const auto& previous) { return dump(previous); },
-            [&](const typename ThisClass::BinOp& binOp)
+            [&](const std::unique_ptr<typename ThisClass::BinOp>& binOp)
             {
-                auto& [lhs, token, rhs] = binOp;
+                auto& [lhs, token, rhs] = *binOp;
                 return fmt::format(FMT_STRING("{} {:q}"), name, std::invoke(tokenTypeGetter, token))
                        + addMiddleChild(dump(*lhs), "lhs") + addLastChild(dump(rhs), "rhs");
             });

@@ -550,9 +550,9 @@ struct Visitor
     {
         return pylir::match(
             std::move(thisClass.variant),
-            [&](typename ThisClass::BinOp&& binOp) -> Ret
+            [&](std::unique_ptr<typename ThisClass::BinOp>&& binOp) -> Ret
             {
-                auto& [lhs, token, rhs] = binOp;
+                auto& [lhs, token, rhs] = *binOp;
                 return tl::unexpected{
                     parser
                         .createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_N,
@@ -769,7 +769,7 @@ struct Visitor
             std::move(expression.variant),
             [&](auto&& binOp) -> std::enable_if_t<std::is_rvalue_reference_v<decltype(binOp)>, Ret>
             {
-                auto& [lhs, token, rhs] = binOp;
+                auto& [lhs, token, rhs] = *binOp;
                 TokenType tokenType;
                 if constexpr (std::is_same_v<Token, std::decay_t<decltype(token)>>)
                 {

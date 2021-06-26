@@ -231,7 +231,7 @@ struct MExpr
         UExpr rhs;
     };
 
-    std::variant<UExpr, AtBin, BinOp> variant;
+    std::variant<UExpr, std::unique_ptr<AtBin>, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -246,7 +246,7 @@ struct AExpr
         MExpr rhs;
     };
 
-    std::variant<MExpr, BinOp> variant;
+    std::variant<MExpr, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -261,7 +261,7 @@ struct ShiftExpr
         AExpr rhs;
     };
 
-    std::variant<AExpr, BinOp> variant;
+    std::variant<AExpr, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -276,7 +276,7 @@ struct AndExpr
         ShiftExpr rhs;
     };
 
-    std::variant<ShiftExpr, BinOp> variant;
+    std::variant<ShiftExpr, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -291,7 +291,7 @@ struct XorExpr
         AndExpr rhs;
     };
 
-    std::variant<AndExpr, BinOp> variant;
+    std::variant<AndExpr, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -306,7 +306,7 @@ struct OrExpr
         XorExpr rhs;
     };
 
-    std::variant<XorExpr, BinOp> variant;
+    std::variant<XorExpr, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -345,7 +345,7 @@ struct AndTest
         NotTest rhs;
     };
 
-    std::variant<NotTest, BinOp> variant;
+    std::variant<NotTest, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -360,7 +360,7 @@ struct OrTest
         AndTest rhs;
     };
 
-    std::variant<AndTest, BinOp> variant;
+    std::variant<AndTest, std::unique_ptr<BinOp>> variant;
 };
 
 /**
@@ -383,7 +383,7 @@ struct ConditionalExpression
     struct Suffix
     {
         BaseToken ifToken;
-        OrTest test;
+        std::unique_ptr<OrTest> test;
         BaseToken elseToken;
         std::unique_ptr<Expression> elseValue;
     };
@@ -462,7 +462,7 @@ struct StarredExpression
     struct Items
     {
         std::vector<std::pair<StarredItem, BaseToken>> leading;
-        std::optional<StarredItem> last;
+        std::unique_ptr<StarredItem> last;
     };
     std::variant<Expression, Items> variant;
 };

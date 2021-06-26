@@ -983,8 +983,9 @@ tl::expected<pylir::Syntax::MExpr, std::string> pylir::Parser::parseMExpr()
             {
                 return tl::unexpected{std::move(rhs).error()};
             }
-            current.variant = Syntax::MExpr::AtBin{std::make_unique<Syntax::MExpr>(std::move(current)), std::move(op),
-                                                   std::make_unique<Syntax::MExpr>(std::move(*rhs))};
+            current.variant = std::make_unique<Syntax::MExpr::AtBin>(
+                Syntax::MExpr::AtBin{std::make_unique<Syntax::MExpr>(std::move(current)), std::move(op),
+                                     std::make_unique<Syntax::MExpr>(std::move(*rhs))});
             continue;
         }
 
@@ -993,8 +994,8 @@ tl::expected<pylir::Syntax::MExpr, std::string> pylir::Parser::parseMExpr()
         {
             return tl::unexpected{std::move(rhs).error()};
         }
-        current.variant =
-            Syntax::MExpr::BinOp{std::make_unique<Syntax::MExpr>(std::move(current)), std::move(op), std::move(*rhs)};
+        current.variant = std::make_unique<Syntax::MExpr::BinOp>(
+            Syntax::MExpr::BinOp{std::make_unique<Syntax::MExpr>(std::move(current)), std::move(op), std::move(*rhs)});
     }
     return {std::move(current)};
 }
@@ -1132,9 +1133,9 @@ tl::expected<pylir::Syntax::ConditionalExpression, std::string> pylir::Parser::p
         return tl::unexpected{std::move(other).error()};
     }
     return Syntax::ConditionalExpression{
-        std::move(*orTest),
-        Syntax::ConditionalExpression::Suffix{std::move(ifKeyword), std::move(*condition), std::move(*elseKeyword),
-                                              std::make_unique<Syntax::Expression>(std::move(*other))}};
+        std::move(*orTest), Syntax::ConditionalExpression::Suffix{
+                                std::move(ifKeyword), std::make_unique<Syntax::OrTest>(std::move(*condition)),
+                                std::move(*elseKeyword), std::make_unique<Syntax::Expression>(std::move(*other))}};
 }
 
 tl::expected<pylir::Syntax::Expression, std::string> pylir::Parser::parseExpression()
@@ -1304,7 +1305,7 @@ tl::expected<pylir::Syntax::StarredExpression, std::string>
              && !Syntax::firstInAssignmentExpression(m_current->getTokenType())))
         && !firstItem)
     {
-        return Syntax::StarredExpression{Syntax::StarredExpression::Items{{}, std::nullopt}};
+        return Syntax::StarredExpression{Syntax::StarredExpression::Items{{}, nullptr}};
     }
     if (m_current->getTokenType() != TokenType::Star || firstItem)
     {
@@ -1329,12 +1330,12 @@ tl::expected<pylir::Syntax::StarredExpression, std::string>
         // It had "identifier :=", hence a starred_item
         if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
         {
-            return Syntax::StarredExpression{
-                Syntax::StarredExpression::Items{{}, Syntax::StarredItem{std::move(*firstItem)}}};
+            return Syntax::StarredExpression{Syntax::StarredExpression::Items{
+                {}, std::make_unique<Syntax::StarredItem>(Syntax::StarredItem{std::move(*firstItem)})}};
         }
         leading.emplace_back(Syntax::StarredItem{std::move(*firstItem)}, *m_current++);
     }
-    std::optional<Syntax::StarredItem> last;
+    std::unique_ptr<Syntax::StarredItem> last;
     while (m_current != m_lexer.end() && Syntax::firstInStarredItem(m_current->getTokenType()))
     {
         auto item = parseStarredItem();
@@ -1345,7 +1346,7 @@ tl::expected<pylir::Syntax::StarredExpression, std::string>
         // If a comma doesn't follow, then it's the last optional trailing starred_item
         if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
         {
-            last = std::move(*item);
+            last = std::make_unique<Syntax::StarredItem>(std::move(*item));
             break;
         }
         leading.emplace_back(std::move(*item), *m_current++);
