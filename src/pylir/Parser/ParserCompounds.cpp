@@ -688,7 +688,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
         return Syntax::ParameterList::DefParameter{std::move(*parameter), std::move(defaultArg)};
     };
 
-    auto parseParameterListStarArgs = [&]() -> tl::expected<Syntax::ParameterList::ParameterListStarArgs, std::string>
+    auto parseParameterListStarArgs = [&]() -> tl::expected<Syntax::ParameterList::StarArgs, std::string>
     {
         PYLIR_ASSERT(m_current != m_lexer.end());
         if (m_current->getTokenType() == TokenType::PowerOf)
@@ -704,8 +704,8 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
             {
                 comma = *m_current++;
             }
-            return Syntax::ParameterList::ParameterListStarArgs{
-                Syntax::ParameterList::ParameterListStarArgs::DoubleStar{doubleStar, std::move(*parameter), comma}};
+            return Syntax::ParameterList::StarArgs{
+                Syntax::ParameterList::StarArgs::DoubleStar{doubleStar, std::move(*parameter), comma}};
         }
         PYLIR_ASSERT(m_current->getTokenType() == TokenType::Star);
         auto star = *m_current++;
@@ -734,11 +734,11 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
         {
             if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
             {
-                return Syntax::ParameterList::ParameterListStarArgs{Syntax::ParameterList::ParameterListStarArgs::Star{
+                return Syntax::ParameterList::StarArgs{Syntax::ParameterList::StarArgs::Star{
                     star, std::move(parameter), std::move(defParameters),
-                    Syntax::ParameterList::ParameterListStarArgs::Star::Further{*m_current++, std::nullopt}}};
+                    Syntax::ParameterList::StarArgs::Star::Further{*m_current++, std::nullopt}}};
             }
-            return Syntax::ParameterList::ParameterListStarArgs{Syntax::ParameterList::ParameterListStarArgs::Star{
+            return Syntax::ParameterList::StarArgs{Syntax::ParameterList::StarArgs::Star{
                 star, std::move(parameter), std::move(defParameters), std::nullopt}};
         }
         auto comma = *m_current++;
@@ -753,15 +753,14 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
         {
             trailingComma = *m_current++;
         }
-        return Syntax::ParameterList::ParameterListStarArgs{Syntax::ParameterList::ParameterListStarArgs::Star{
+        return Syntax::ParameterList::StarArgs{Syntax::ParameterList::StarArgs::Star{
             star, std::move(parameter), std::move(defParameters),
-            Syntax::ParameterList::ParameterListStarArgs::Star::Further{
-                comma, Syntax::ParameterList::ParameterListStarArgs::DoubleStar{powerOf, std::move(*expandParameter),
-                                                                                trailingComma}}}};
+            Syntax::ParameterList::StarArgs::Star::Further{
+                comma,
+                Syntax::ParameterList::StarArgs::DoubleStar{powerOf, std::move(*expandParameter), trailingComma}}}};
     };
 
-    auto parseParameterListNoPosOnlyPrefix =
-        [&]() -> tl::expected<Syntax::ParameterList::ParameterListNoPosOnly, std::string>
+    auto parseParameterListNoPosOnlyPrefix = [&]() -> tl::expected<Syntax::ParameterList::NoPosOnly, std::string>
     {
         if (m_current != m_lexer.end()
             && (m_current->getTokenType() == TokenType::Star || m_current->getTokenType() == TokenType::PowerOf))
@@ -771,7 +770,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
             {
                 return tl::unexpected{std::move(starArgs).error()};
             }
-            return Syntax::ParameterList::ParameterListNoPosOnly{std::move(*starArgs)};
+            return Syntax::ParameterList::NoPosOnly{std::move(*starArgs)};
         }
 
         auto first = parseDefParameter();
@@ -790,8 +789,8 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
             }
             defParameters.emplace_back(comma, std::move(*defParameter));
         }
-        return Syntax::ParameterList::ParameterListNoPosOnly{Syntax::ParameterList::ParameterListNoPosOnly::DefParams{
-            std::move(*first), std::move(defParameters), std::nullopt}};
+        return Syntax::ParameterList::NoPosOnly{
+            Syntax::ParameterList::NoPosOnly::DefParams{std::move(*first), std::move(defParameters), std::nullopt}};
     };
 
     auto prefix = parseParameterListNoPosOnlyPrefix();
@@ -799,11 +798,11 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
     {
         return tl::unexpected{std::move(prefix).error()};
     }
-    if (std::holds_alternative<Syntax::ParameterList::ParameterListStarArgs>(prefix->variant))
+    if (std::holds_alternative<Syntax::ParameterList::StarArgs>(prefix->variant))
     {
         return Syntax::ParameterList{std::move(*prefix)};
     }
-    auto& defParams = pylir::get<Syntax::ParameterList::ParameterListNoPosOnly::DefParams>(prefix->variant);
+    auto& defParams = pylir::get<Syntax::ParameterList::NoPosOnly::DefParams>(prefix->variant);
 
     if (!lookaheadEquals(std::array{TokenType::Comma, TokenType::Divide}))
     {
@@ -812,7 +811,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
             return Syntax::ParameterList{std::move(*prefix)};
         }
         auto comma = *m_current++;
-        std::optional<Syntax::ParameterList::ParameterListStarArgs> starArgs;
+        std::optional<Syntax::ParameterList::StarArgs> starArgs;
         if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
         {
             auto parsedStarArgs = parseParameterListStarArgs();
@@ -830,7 +829,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
     auto slash = *m_current++;
     if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
     {
-        return Syntax::ParameterList{Syntax::ParameterList::ParameterListPosOnly{
+        return Syntax::ParameterList{Syntax::ParameterList::PosOnly{
             std::move(defParams.first), std::move(defParams.rest), comma, slash, std::nullopt}};
     }
     auto suffixComma = *m_current++;
@@ -838,7 +837,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
         || (m_current->getTokenType() != TokenType::Identifier && m_current->getTokenType() != TokenType::Star
             && m_current->getTokenType() != TokenType::PowerOf))
     {
-        return Syntax::ParameterList{Syntax::ParameterList::ParameterListPosOnly{
+        return Syntax::ParameterList{Syntax::ParameterList::PosOnly{
             std::move(defParams.first), std::move(defParams.rest), comma, slash, std::pair{suffixComma, std::nullopt}}};
     }
     auto secondNoPosOnly = parseParameterListNoPosOnlyPrefix();
@@ -846,24 +845,23 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
     {
         return tl::unexpected{std::move(secondNoPosOnly).error()};
     }
-    if (std::holds_alternative<Syntax::ParameterList::ParameterListStarArgs>(secondNoPosOnly->variant))
+    if (std::holds_alternative<Syntax::ParameterList::StarArgs>(secondNoPosOnly->variant))
     {
         return Syntax::ParameterList{
-            Syntax::ParameterList::ParameterListPosOnly{std::move(defParams.first), std::move(defParams.rest), comma,
-                                                        slash, std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
+            Syntax::ParameterList::PosOnly{std::move(defParams.first), std::move(defParams.rest), comma, slash,
+                                           std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
     }
 
     if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
     {
         return Syntax::ParameterList{
-            Syntax::ParameterList::ParameterListPosOnly{std::move(defParams.first), std::move(defParams.rest), comma,
-                                                        slash, std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
+            Syntax::ParameterList::PosOnly{std::move(defParams.first), std::move(defParams.rest), comma, slash,
+                                           std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
     }
-    auto& secondDefParams =
-        pylir::get<Syntax::ParameterList::ParameterListNoPosOnly::DefParams>(secondNoPosOnly->variant);
+    auto& secondDefParams = pylir::get<Syntax::ParameterList::NoPosOnly::DefParams>(secondNoPosOnly->variant);
 
     auto trailingComma = *m_current++;
-    std::optional<Syntax::ParameterList::ParameterListStarArgs> starArgs;
+    std::optional<Syntax::ParameterList::StarArgs> starArgs;
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
     {
         auto parsedStarArgs = parseParameterListStarArgs();
@@ -874,9 +872,9 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
         starArgs = std::move(*parsedStarArgs);
     }
     secondDefParams.suffix = std::pair{trailingComma, std::move(starArgs)};
-    return Syntax::ParameterList{
-        Syntax::ParameterList::ParameterListPosOnly{std::move(defParams.first), std::move(defParams.rest), comma, slash,
-                                                    std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
+    return Syntax::ParameterList{Syntax::ParameterList::PosOnly{std::move(defParams.first), std::move(defParams.rest),
+                                                                comma, slash,
+                                                                std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
 }
 
 tl::expected<pylir::Syntax::FuncDef, std::string>

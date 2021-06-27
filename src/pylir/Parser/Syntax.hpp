@@ -1080,7 +1080,7 @@ struct ParameterList
         std::optional<std::pair<BaseToken, Expression>> defaultArg;
     };
 
-    struct ParameterListStarArgs
+    struct StarArgs
     {
         struct DoubleStar
         {
@@ -1104,26 +1104,26 @@ struct ParameterList
         std::variant<Star, DoubleStar> variant;
     };
 
-    struct ParameterListNoPosOnly
+    struct NoPosOnly
     {
         struct DefParams
         {
             DefParameter first;
             std::vector<std::pair<BaseToken, DefParameter>> rest;
-            std::optional<std::pair<BaseToken, std::optional<ParameterListStarArgs>>> suffix;
+            std::optional<std::pair<BaseToken, std::optional<StarArgs>>> suffix;
         };
-        std::variant<DefParams, ParameterListStarArgs> variant;
+        std::variant<DefParams, StarArgs> variant;
     };
 
-    struct ParameterListPosOnly
+    struct PosOnly
     {
         DefParameter first;
         std::vector<std::pair<BaseToken, DefParameter>> rest;
         BaseToken comma;
         BaseToken slash;
-        std::optional<std::pair<BaseToken, std::optional<ParameterListNoPosOnly>>> suffix;
+        std::optional<std::pair<BaseToken, std::optional<NoPosOnly>>> suffix;
     };
-    std::variant<ParameterListPosOnly, ParameterListNoPosOnly> variant;
+    std::variant<PosOnly, NoPosOnly> variant;
 };
 
 /**

@@ -1,4 +1,5 @@
 #include <pylir/Parser/Parser.hpp>
+#include <pylir/Parser/Dumper.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -31,5 +32,6 @@ int main(int argc, char** argv)
         std::cerr << tree.error();
         return -1;
     }
-    // TODO: Dump
+    pylir::Dumper dumper;
+    std::cout << dumper.dump(*tree);
 }

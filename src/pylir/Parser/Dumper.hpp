@@ -223,6 +223,38 @@ public:
     std::string dump(const Syntax::GlobalStmt& globalStmt);
 
     std::string dump(const Syntax::NonLocalStmt& nonLocalStmt);
+
+    std::string dump(const Syntax::StmtList& stmtList);
+
+    std::string dump(const Syntax::IfStmt& ifStmt);
+
+    std::string dump(const Syntax::WhileStmt& whileStmt);
+
+    std::string dump(const Syntax::ForStmt& forStmt);
+
+    std::string dump(const Syntax::TryStmt& tryStmt);
+
+    std::string dump(const Syntax::WithStmt& withStmt);
+
+    std::string dump(const Syntax::ParameterList& parameterList);
+
+    std::string dump(const Syntax::Decorator& decorator);
+
+    std::string dump(const Syntax::FuncDef& funcDef);
+
+    std::string dump(const Syntax::ClassDef& classDef);
+
+    std::string dump(const Syntax::AsyncForStmt& asyncForStmt);
+
+    std::string dump(const Syntax::AsyncWithStmt& asyncWithStmt);
+
+    std::string dump(const Syntax::CompoundStmt& compoundStmt);
+
+    std::string dump(const Syntax::Statement& statement);
+
+    std::string dump(const Syntax::Suite& suite);
+
+    std::string dump(const Syntax::FileInput& fileInput);
 };
 
 } // namespace pylir
