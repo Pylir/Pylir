@@ -10,10 +10,14 @@ def Pylir_Dialect : Dialect {
     let description = [{
         TODO
     }];
-    let cppNamespace = "::pylir::dialect";
+    let cppNamespace = "::pylir::Dialect";
 }
 
 class Pylir_Op<string mneomic, list<OpTrait> traits = []> :
     Op<Pylir_Dialect, mneomic, traits>;
+
+class Pylir_Type<string name,string baseCppClass = "::mlir::Type"> : TypeDef<Pylir_Dialect, name,baseCppClass>;
+
+
 
 #endif

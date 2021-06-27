@@ -2,7 +2,7 @@
 
 #include "PylirOps.hpp"
 
-void pylir::dialect::PylirDialect::initialize()
+void pylir::Dialect::PylirDialect::initialize()
 {
     addOperations<
 #define GET_OP_LIST
