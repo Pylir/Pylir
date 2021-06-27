@@ -553,13 +553,12 @@ struct Visitor
             [&](std::unique_ptr<typename ThisClass::BinOp>&& binOp) -> Ret
             {
                 auto& [lhs, token, rhs] = *binOp;
-                return tl::unexpected{
-                    parser
-                        .createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_N,
-                                                  fmt::format("result of operator {:q}", std::invoke(getter, token)))
-                        .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
+                return tl::unexpected{parser
+                                          .createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
+                                                                    std::invoke(getter, token))
+                                          .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
+                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                          .emitError()};
             },
             [&](auto&& other) -> std::enable_if_t<!std::is_lvalue_reference_v<decltype(other)>, Ret> {
                 return visit(std::move(other));
@@ -654,7 +653,8 @@ struct Visitor
                             targetList.remainingExpr.emplace_back(comma, std::move(other->firstExpr));
                         }
                         targetList.trailingComma = starredList.trailingComma;
-                        return targetList;
+                        return construct(Syntax::Target::Square{listDisplay.openSquare, std::move(targetList),
+                                                                listDisplay.closeSquare});
                     });
             },
             [&](Syntax::Enclosure::YieldAtom&&) -> Ret
@@ -712,8 +712,8 @@ struct Visitor
             [&](Syntax::Call&& call) -> Ret
             {
                 return tl::unexpected{
-                    parser.createDiagnosticsBuilder(call.openParentheses, Diag::CANNOT_ASSIGN_TO_N, "result of call")
-                        .addLabel(call.openParentheses, call.closeParentheses, std::nullopt, Diag::ERROR_COLOUR)
+                    parser.createDiagnosticsBuilder(call.openParentheses, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
+                        .addLabel(call.openParentheses, call, std::nullopt, Diag::ERROR_COLOUR)
                         .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
                         .emitError()};
             },
@@ -726,7 +726,7 @@ struct Visitor
     {
         return tl::unexpected{
             parser
-                .createDiagnosticsBuilder(expression.awaitToken, Diag::CANNOT_ASSIGN_TO_N, "result of await expression")
+                .createDiagnosticsBuilder(expression.awaitToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "await expression")
                 .addLabel(expression.awaitToken, std::nullopt, Diag::ERROR_COLOUR)
                 .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
                 .emitError()};
@@ -736,13 +736,13 @@ struct Visitor
     {
         if (expression.rightHand)
         {
-            return tl::unexpected{
-                parser
-                    .createDiagnosticsBuilder(expression.rightHand->first, Diag::CANNOT_ASSIGN_TO_N,
-                                              fmt::format("result of operator {:q}", TokenType::PowerOf))
-                    .addLabel(expression.rightHand->first, std::nullopt, Diag::ERROR_COLOUR)
-                    .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                    .emitError()};
+            return tl::unexpected{parser
+                                      .createDiagnosticsBuilder(expression.rightHand->first,
+                                                                Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
+                                                                TokenType::PowerOf)
+                                      .addLabel(expression.rightHand->first, std::nullopt, Diag::ERROR_COLOUR)
+                                      .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                      .emitError()};
         }
         return pylir::match(std::move(expression.variant), [&](auto&& value) { return visit(std::move(value)); });
     }
@@ -753,13 +753,13 @@ struct Visitor
             std::move(expression.variant), [&](Syntax::Power&& power) { return visit(std::move(power)); },
             [&](std::pair<Token, std::unique_ptr<Syntax::UExpr>>&& pair) -> Ret
             {
-                return tl::unexpected{parser
-                                          .createDiagnosticsBuilder(
-                                              pair.first, Diag::CANNOT_ASSIGN_TO_N,
-                                              fmt::format("result of unary operator {:q}", pair.first.getTokenType()))
-                                          .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
-                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                          .emitError()};
+                return tl::unexpected{
+                    parser
+                        .createDiagnosticsBuilder(pair.first, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
+                                                  fmt::format("unary operator {:q}", pair.first.getTokenType()))
+                        .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
             });
     }
 
@@ -779,12 +779,11 @@ struct Visitor
                 {
                     tokenType = TokenType::AtSign;
                 }
-                return tl::unexpected{parser
-                                          .createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_N,
-                                                                    fmt::format("result of operator {:q}", tokenType))
-                                          .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
-                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                          .emitError()};
+                return tl::unexpected{
+                    parser.createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, tokenType)
+                        .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
+                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                        .emitError()};
             },
             [&](Syntax::UExpr&& other) { return visit(std::move(other)); });
     }
@@ -819,7 +818,7 @@ struct Visitor
         if (!expression.rest.empty())
         {
             auto builder = parser.createDiagnosticsBuilder(expression.rest.front().first.firstToken,
-                                                           Diag::CANNOT_ASSIGN_TO_N, "result of comparison");
+                                                           Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "comparison");
             for (auto& [pair, other] : expression.rest)
             {
                 if (pair.secondToken)
@@ -843,13 +842,13 @@ struct Visitor
             [&](Syntax::Comparison&& comparison) { return visit(std::move(comparison)); },
             [&](std::pair<BaseToken, std::unique_ptr<Syntax::NotTest>>&& pair) -> Ret
             {
-                return tl::unexpected{
-                    parser
-                        .createDiagnosticsBuilder(pair.first, Diag::CANNOT_ASSIGN_TO_N,
-                                                  fmt::format("result of operator {:q}", TokenType::NotKeyword))
-                        .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
+                return tl::unexpected{parser
+                                          .createDiagnosticsBuilder(pair.first,
+                                                                    Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
+                                                                    TokenType::NotKeyword)
+                                          .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
+                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                                          .emitError()};
             });
     }
 
@@ -868,10 +867,10 @@ struct Visitor
         if (expression.suffix)
         {
             return tl::unexpected{parser
-                                      .createDiagnosticsBuilder(expression.suffix->ifToken, Diag::CANNOT_ASSIGN_TO_N,
-                                                                "result of conditional expression")
-                                      .addLabel(expression.suffix->ifToken,
-                                                /*TODO: expression.suffix->elseValue,  */ std::nullopt,
+                                      .createDiagnosticsBuilder(expression.suffix->ifToken,
+                                                                Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
+                                                                "conditional expression")
+                                      .addLabel(expression.suffix->ifToken, *expression.suffix->elseValue, std::nullopt,
                                                 Diag::ERROR_COLOUR)
                                       .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
                                       .emitError()};
@@ -887,12 +886,11 @@ struct Visitor
             { return visit(std::move(conditionalExpression)); },
             [&](std::unique_ptr<Syntax::LambdaExpression>&& lambdaExpression) -> Ret
             {
-                // TODO: use LambdaExpression as location provider
                 return tl::unexpected{parser
-                                          .createDiagnosticsBuilder(lambdaExpression->lambdaToken,
-                                                                    Diag::CANNOT_ASSIGN_TO_N,
-                                                                    "result of lambda expression")
-                                          .addLabel(lambdaExpression->lambdaToken, std::nullopt, Diag::ERROR_COLOUR)
+                                          .createDiagnosticsBuilder(*lambdaExpression,
+                                                                    Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
+                                                                    "lambda expression")
+                                          .addLabel(*lambdaExpression, std::nullopt, Diag::ERROR_COLOUR)
                                           .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
                                           .emitError()};
             });
@@ -905,8 +903,7 @@ struct Visitor
             return tl::unexpected{
                 parser
                     .createDiagnosticsBuilder(assignmentExpression.identifierAndWalrus->second,
-                                              Diag::CANNOT_ASSIGN_TO_N,
-                                              fmt::format("result of operator {:q}", TokenType::Walrus))
+                                              Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
                     .addLabel(assignmentExpression.identifierAndWalrus->second, std::nullopt, Diag::ERROR_COLOUR)
                     .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
                     .emitError()};
@@ -925,12 +922,12 @@ struct Visitor
                 {
                     if (!items.leading.empty())
                     {
-                        // TODO: Better loc
+                        auto& last = items.last ? *items.last : items.leading.back().first;
                         return tl::unexpected{
                             parser
-                                .createDiagnosticsBuilder(items.leading.front().second, Diag::CANNOT_ASSIGN_TO_N,
-                                                          "multiple value")
-                                .addLabel(items.leading.front().second, std::nullopt, Diag::ERROR_COLOUR)
+                                .createDiagnosticsBuilder(items.leading.front().first, Diag::CANNOT_ASSIGN_TO_N,
+                                                          "multiple values")
+                                .addLabel(items.leading.front().first, last, std::nullopt, Diag::ERROR_COLOUR)
                                 .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
                                 .emitError()};
                     }

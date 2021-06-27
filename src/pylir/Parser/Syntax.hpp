@@ -1290,4 +1290,150 @@ struct LocationProvider<Syntax::Enclosure, void>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::Enclosure& value) noexcept;
 };
+
+template <>
+struct LocationProvider<Syntax::LambdaExpression, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::LambdaExpression& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Expression, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Expression& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::ConditionalExpression, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ConditionalExpression& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::OrTest, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::OrTest& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::AndTest, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AndTest& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::NotTest, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::NotTest& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Comparison, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Comparison& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::OrExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::OrExpr& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::XorExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::XorExpr& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::AndExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AndExpr& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::ShiftExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ShiftExpr& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::AExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AExpr& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::MExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::MExpr& binOp) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::UExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::UExpr& power) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Power, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Power& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::AwaitExpr, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AwaitExpr& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Primary, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Primary& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Call, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Call& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Slicing, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Slicing& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Subscription, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Subscription& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::AttributeRef, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AttributeRef& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Atom, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Atom& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::StarredItem, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredItem& starredItem) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::AssignmentExpression, void>
+{
+    static std::pair<std::size_t, std::size_t>
+        getRange(const Syntax::AssignmentExpression& assignmentExpression) noexcept;
+};
+
 } // namespace pylir::Diag

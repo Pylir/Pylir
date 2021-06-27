@@ -182,7 +182,7 @@ public:
             expressionList, [&](auto&& value) { return dump(value); }, "expression list");
     }
 
-    std::string dump(const Syntax::Target& square);
+    std::string dump(const Syntax::Target& target);
 
     std::string dump(const Syntax::TargetList& targetList)
     {

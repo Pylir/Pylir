@@ -192,6 +192,12 @@ struct LocationProvider<T, std::enable_if_t<std::is_integral_v<T>>>
     }
 };
 
+constexpr auto range = [](const auto& value)
+{
+    using T = std::decay_t<decltype(value)>;
+    return LocationProvider<T>::getRange(value);
+};
+
 template <class T, class = void>
 struct hasLocationProvider : std::false_type
 {
@@ -233,10 +239,7 @@ class DiagnosticsBuilder
 public:
     template <class T, class S, class... Args>
     DiagnosticsBuilder(Document& document, const T& location, const S& message, Args&&... args)
-        : m_messages{Message{&document,
-                             LocationProvider<std::decay_t<T>>::getRange(location).first,
-                             fmt::format(message, std::forward<Args>(args)...),
-                             {}}}
+        : m_messages{Message{&document, range(location).first, fmt::format(message, std::forward<Args>(args)...), {}}}
     {
     }
 
@@ -247,9 +250,8 @@ public:
                       std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>,
                                                           DiagnosticsBuilder&>
     {
-        m_messages.back().labels.push_back({LocationProvider<std::decay_t<T>>::getRange(start).first,
-                                            LocationProvider<std::decay_t<U>>::getRange(end).second,
-                                            std::move(labelText), std::move(colour), std::move(emphasis)});
+        m_messages.back().labels.push_back(
+            {range(start).first, range(end).second, std::move(labelText), std::move(colour), std::move(emphasis)});
         return *this;
     }
 
@@ -268,7 +270,7 @@ public:
                   std::optional<emphasis>&& emphasis =
                       std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        auto [start, end] = LocationProvider<std::decay_t<T>>::getRange(pos);
+        auto [start, end] = range(pos);
         m_messages.back().labels.push_back({start, end, std::move(labelText), std::move(colour), std::move(emphasis)});
         return *this;
     }
@@ -286,7 +288,7 @@ public:
     auto addNote(const T& location, const S& message,
                  Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        return addNote(*m_messages.back().document, LocationProvider<std::decay_t<T>>::getRange(location).first,
+        return addNote(*m_messages.back().document, range(location).first,
                        fmt::format(message, std::forward<Args>(args)...));
     }
 
@@ -294,10 +296,7 @@ public:
     auto addNote(Document& document, const T& location, const S& message,
                  Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        m_messages.push_back({&document,
-                              LocationProvider<std::decay_t<T>>::getRange(location).first,
-                              fmt::format(message, std::forward<Args>(args)...),
-                              {}});
+        m_messages.push_back({&document, range(location).first, fmt::format(message, std::forward<Args>(args)...), {}});
         return *this;
     }
 
