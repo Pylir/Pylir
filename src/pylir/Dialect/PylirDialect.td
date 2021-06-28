@@ -49,8 +49,10 @@ def Pylir_Dict : Pylir_Type<"PylirDict"> {
 
 def Pylir_Variant : Pylir_Type<"PylirVariant"> {
     let mnemonic = "pylir.variant";
-    let parameters = (ins ArrayRefParameter<"mlir::Type", "alternatives">
+    let parameters = (ins ArrayRefParameter<"::mlir::Type", "alternatives">
                           : $types);
+    let parser = ?;
+    let printer = ?;
 }
 
 #endif
