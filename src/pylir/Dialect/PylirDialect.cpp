@@ -8,4 +8,8 @@ void pylir::Dialect::PylirDialect::initialize()
 #define GET_OP_LIST
 #include "pylir/Dialect/PylirOps.cpp.inc"
         >();
+    addTypes<
+#define GET_TYPEDEF_LIST
+#include "pylir/Dialect/PylirOpsTypes.h.inc"
+        >();
 }
