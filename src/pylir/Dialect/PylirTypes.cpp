@@ -45,3 +45,13 @@ void pylir::Dialect::PylirVariantType::print(::mlir::DialectAsmPrinter& printer)
     llvm::interleaveComma(getTypes(), printer);
     printer << ">";
 }
+
+mlir::LogicalResult pylir::Dialect::PylirVariantType::verifyConstructionInvariants(::mlir::Location loc,
+                                                                                   ::llvm::ArrayRef<::mlir::Type> types)
+{
+    if (types.empty())
+    {
+        return mlir::emitError(loc, "variant must contain at least one type");
+    }
+    return mlir::success();
+}

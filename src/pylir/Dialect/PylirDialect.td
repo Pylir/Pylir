@@ -53,6 +53,7 @@ def Pylir_Variant : Pylir_Type<"PylirVariant"> {
                           : $types);
     let parser = ?;
     let printer = ?;
+    let genVerifyInvariantsDecl = 1;
 }
 
 #endif
