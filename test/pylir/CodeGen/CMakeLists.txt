@@ -1,0 +1,3 @@
+
+add_executable(codegen_test_runner test_runner.cpp)
+target_link_libraries(codegen_test_runner CodeGen)
