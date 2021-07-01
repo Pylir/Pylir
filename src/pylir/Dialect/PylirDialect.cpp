@@ -1,9 +1,15 @@
 #include "PylirDialect.hpp"
 
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
+#include <mlir/IR/Matchers.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Support/Functional.hpp>
+#include <pylir/Support/Macros.hpp>
+
+#include "PylirAttributes.hpp"
 #include "PylirOps.hpp"
 #include "PylirTypes.hpp"
 
@@ -18,8 +24,9 @@ void pylir::Dialect::PylirDialect::initialize()
         >();
     addTypes<
 #define GET_TYPEDEF_LIST
-#include "pylir/Dialect/PylirOpsTypes.h.inc"
+#include "pylir/Dialect/PylirOpsTypes.cpp.inc"
         >();
+    addAttributes<NoneAttr, BoolAttr, FloatAttr, IntegerAttr, StringAttr>();
 }
 
 mlir::Type pylir::Dialect::PylirDialect::parseType(::mlir::DialectAsmParser& parser) const
@@ -37,7 +44,91 @@ void pylir::Dialect::PylirDialect::printType(::mlir::Type type, ::mlir::DialectA
     generatedTypePrinter(type, os);
 }
 
-mlir::Type pylir::Dialect::PylirVariantType::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser)
+mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmParser& parser, mlir::Type) const
+{
+    llvm::StringRef ref;
+    if (parser.parseKeyword(&ref))
+    {
+        return {};
+    }
+    if (ref == "none")
+    {
+        return NoneAttr::get(getContext());
+    }
+    if (ref == "float")
+    {
+        double value;
+        if (parser.parseLess() || parser.parseFloat(value) || parser.parseGreater())
+        {
+            return {};
+        }
+        return FloatAttr::get(getContext(), value);
+    }
+    if (ref == "bool")
+    {
+        if (parser.parseLess())
+        {
+            return {};
+        }
+        llvm::StringRef boolValue;
+        if (parser.parseKeyword(&boolValue))
+        {
+            return {};
+        }
+        if (boolValue != "true" && boolValue != "false")
+        {
+            return {};
+        }
+        if (parser.parseGreater())
+        {
+            return {};
+        }
+        return BoolAttr::get(getContext(), boolValue == "true");
+    }
+    if (ref == "integer")
+    {
+        llvm::StringRef value;
+        if (parser.parseLess() || parser.parseOptionalString(&value) || parser.parseGreater())
+        {
+            return {};
+        }
+        llvm::APInt integer;
+        if (value.getAsInteger(10, integer))
+        {
+            return {};
+        }
+        return IntegerAttr::get(getContext(), std::move(integer));
+    }
+    if (ref == "string")
+    {
+        llvm::StringRef value;
+        if (parser.parseLess() || parser.parseOptionalString(&value) || parser.parseGreater())
+        {
+            return {};
+        }
+        return StringAttr::get(getContext(), value.str());
+    }
+    return {};
+}
+
+void pylir::Dialect::PylirDialect::printAttribute(mlir::Attribute attribute, mlir::DialectAsmPrinter& printer) const
+{
+    llvm::TypeSwitch<mlir::Attribute>(attribute)
+        .Case<NoneAttr>([&](NoneAttr) { printer << "none"; })
+        .Case<FloatAttr>([&](FloatAttr attr) { printer << "float<" << attr.getValue() << ">"; })
+        .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool<" << (attr.getValue() ? "true" : "false") << ">"; })
+        .Case<IntegerAttr>([&](IntegerAttr attr)
+                           { printer << "integer<\"" << attr.getValue().toString(10, false) << "\">"; })
+        .Case<StringAttr>([&](StringAttr attr) { printer << "string<\"" << attr.getValue() << "\">"; });
+}
+
+mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
+                                                                   ::mlir::Type type, ::mlir::Location loc)
+{
+    return builder.create<ConstantOp>(loc, type, value);
+}
+
+mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser)
 {
     if (parser.parseLess())
     {
@@ -65,22 +156,46 @@ mlir::Type pylir::Dialect::PylirVariantType::parse(::mlir::MLIRContext* context,
     {
         return {};
     }
-    return PylirVariantType::get(context, containedTypes);
+    return VariantType::get(context, containedTypes);
 }
 
-void pylir::Dialect::PylirVariantType::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Dialect::VariantType::print(::mlir::DialectAsmPrinter& printer) const
 {
     printer << "tuple<";
     llvm::interleaveComma(getTypes(), printer);
     printer << ">";
 }
 
-mlir::LogicalResult pylir::Dialect::PylirVariantType::verifyConstructionInvariants(::mlir::Location loc,
-                                                                                   ::llvm::ArrayRef<::mlir::Type> types)
+mlir::LogicalResult pylir::Dialect::VariantType::verifyConstructionInvariants(::mlir::Location loc,
+                                                                              ::llvm::ArrayRef<::mlir::Type> types)
 {
     if (types.empty())
     {
         return mlir::emitError(loc, "variant must contain at least one type");
     }
     return mlir::success();
+}
+
+mlir::OpFoldResult pylir::Dialect::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
+{
+    return value();
+}
+
+mlir::OpFoldResult pylir::Dialect::MulOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 2);
+    if (auto lhs = operands[0].dyn_cast_or_null<IntegerAttr>())
+    {
+        if (lhs.getValue() == 0)
+        {
+            return IntegerAttr::get(getContext(), llvm::APInt(1, 0));
+        }
+        if (auto rhs = operands[1].dyn_cast_or_null<IntegerAttr>())
+        {
+            auto maxSize = std::max(lhs.getValue().getBitWidth(), rhs.getValue().getBitWidth());
+            return IntegerAttr::get(getContext(),
+                                    lhs.getValue().sextOrSelf(maxSize) * rhs.getValue().sextOrSelf(maxSize));
+        }
+    }
+    return nullptr;
 }

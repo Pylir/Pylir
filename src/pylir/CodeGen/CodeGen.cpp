@@ -1,11 +1,18 @@
 #include "CodeGen.hpp"
 
+#include <pylir/Dialect/PylirAttributes.hpp>
 #include <pylir/Dialect/PylirDialect.hpp>
 #include <pylir/Dialect/PylirOps.hpp>
+#include <pylir/Dialect/PylirTypes.hpp>
 
-pylir::CodeGen::CodeGen(mlir::MLIRContext* context) : m_builder(context)
+pylir::CodeGen::CodeGen(mlir::MLIRContext* context)
+    : m_builder(
+        [&]
+        {
+            context->loadDialect<pylir::Dialect::PylirDialect>();
+            return context;
+        }())
 {
-    context->loadDialect<pylir::Dialect::PylirDialect>();
 }
 
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
@@ -13,6 +20,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     m_module = mlir::ModuleOp::create(m_builder.getUnknownLoc());
     auto initFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
                                          mlir::FunctionType::get(m_builder.getContext(), {}, {}));
+    m_module.push_back(initFunc);
     m_builder.setInsertionPointToStart(initFunc.addEntryBlock());
     for (auto& iter : fileInput.input)
     {
@@ -194,11 +202,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
 {
     return pylir::match(
         mExpr.variant, [&](const Syntax::UExpr& uExpr) { return visit(uExpr); },
-        [&](const auto&) -> mlir::Value
+        [&](const std::unique_ptr<Syntax::MExpr::BinOp>& binOp) -> mlir::Value
         {
-            // TODO
-            PYLIR_UNREACHABLE;
-        });
+            auto lhs = visit(*binOp->lhs);
+            auto rhs = visit(binOp->rhs);
+            return m_builder.createOrFold<pylir::Dialect::MulOp>(
+                m_builder.getUnknownLoc(), m_builder.getType<pylir::Dialect::UnknownType>(), lhs, rhs);
+        },
+        [&](const std::unique_ptr<Syntax::MExpr::AtBin>& atBin) -> mlir::Value { PYLIR_UNREACHABLE; });
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::UExpr& uExpr)
@@ -243,24 +254,46 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
 {
     return pylir::match(
         atom.variant,
-        [&](const Syntax::Atom::Literal& literal) -> mlir::Value {
+        [&](const Syntax::Atom::Literal& literal) -> mlir::Value
+        {
             switch (literal.token.getTokenType())
             {
                 case TokenType::IntegerLiteral:
                 {
-
+                    return m_builder.create<pylir::Dialect::ConstantOp>(
+                        m_builder.getUnknownLoc(),
+                        Dialect::IntegerAttr::get(m_builder.getContext(),
+                                                  pylir::get<llvm::APInt>(literal.token.getValue())));
                 }
                 case TokenType::FloatingPointLiteral:
                 {
-
+                    return m_builder.create<pylir::Dialect::ConstantOp>(
+                        m_builder.getUnknownLoc(),
+                        Dialect::FloatAttr::get(m_builder.getContext(), pylir::get<double>(literal.token.getValue())));
                 }
                 case TokenType::ComplexLiteral:
                 {
-
+                    // TODO:
+                    PYLIR_UNREACHABLE;
                 }
                 case TokenType::StringLiteral:
+                    return m_builder.create<pylir::Dialect::ConstantOp>(
+                        m_builder.getUnknownLoc(),
+                        Dialect::StringAttr::get(m_builder.getContext(),
+                                                 pylir::get<std::string>(literal.token.getValue())));
                 case TokenType::ByteLiteral:
-                default:PYLIR_UNREACHABLE;
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                case TokenType::TrueKeyword:
+                    return m_builder.create<pylir::Dialect::ConstantOp>(
+                        m_builder.getUnknownLoc(), Dialect::BoolAttr::get(m_builder.getContext(), true));
+                case TokenType::FalseKeyword:
+                    return m_builder.create<pylir::Dialect::ConstantOp>(
+                        m_builder.getUnknownLoc(), Dialect::BoolAttr::get(m_builder.getContext(), false));
+                case TokenType::NoneKeyword:
+                    return m_builder.create<pylir::Dialect::ConstantOp>(m_builder.getUnknownLoc(),
+                                                                        Dialect::NoneAttr::get(m_builder.getContext()));
+                default: PYLIR_UNREACHABLE;
             }
         },
         [&](const IdentifierToken& identifierToken) -> mlir::Value {
