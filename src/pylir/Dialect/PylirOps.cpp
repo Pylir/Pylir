@@ -4,7 +4,12 @@
 
 #include "PylirDialect.hpp"
 
-//TODO: Remove in MLIR 13
+mlir::OpFoldResult pylir::Dialect::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
+{
+    return value();
+}
+
+// TODO: Remove in MLIR 13
 using namespace mlir;
 #define GET_OP_CLASSES
 #include "pylir/Dialect/PylirOps.cpp.inc"

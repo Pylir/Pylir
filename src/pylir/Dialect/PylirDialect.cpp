@@ -2,12 +2,10 @@
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
-#include <mlir/IR/Matchers.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Support/Functional.hpp>
-#include <pylir/Support/Macros.hpp>
 
 #include "PylirAttributes.hpp"
 #include "PylirOps.hpp"
@@ -161,7 +159,7 @@ mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext* context, ::ml
 
 void pylir::Dialect::VariantType::print(::mlir::DialectAsmPrinter& printer) const
 {
-    printer << "tuple<";
+    printer << "variant<";
     llvm::interleaveComma(getTypes(), printer);
     printer << ">";
 }
@@ -174,28 +172,4 @@ mlir::LogicalResult pylir::Dialect::VariantType::verifyConstructionInvariants(::
         return mlir::emitError(loc, "variant must contain at least one type");
     }
     return mlir::success();
-}
-
-mlir::OpFoldResult pylir::Dialect::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
-{
-    return value();
-}
-
-mlir::OpFoldResult pylir::Dialect::MulOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 2);
-    if (auto lhs = operands[0].dyn_cast_or_null<IntegerAttr>())
-    {
-        if (lhs.getValue() == 0)
-        {
-            return IntegerAttr::get(getContext(), llvm::APInt(1, 0));
-        }
-        if (auto rhs = operands[1].dyn_cast_or_null<IntegerAttr>())
-        {
-            auto maxSize = std::max(lhs.getValue().getBitWidth(), rhs.getValue().getBitWidth());
-            return IntegerAttr::get(getContext(),
-                                    lhs.getValue().sextOrSelf(maxSize) * rhs.getValue().sextOrSelf(maxSize));
-        }
-    }
-    return nullptr;
 }

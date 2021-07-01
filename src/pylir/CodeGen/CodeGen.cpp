@@ -206,8 +206,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
         {
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
-            return m_builder.createOrFold<pylir::Dialect::MulOp>(
-                m_builder.getUnknownLoc(), m_builder.getType<pylir::Dialect::UnknownType>(), lhs, rhs);
+
         },
         [&](const std::unique_ptr<Syntax::MExpr::AtBin>& atBin) -> mlir::Value { PYLIR_UNREACHABLE; });
 }
