@@ -7,6 +7,8 @@
 
 #include <pylir/Support/Functional.hpp>
 
+#include <unordered_set>
+
 #include "PylirAttributes.hpp"
 #include "PylirOps.hpp"
 #include "PylirTypes.hpp"
@@ -56,7 +58,7 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (ref == "float")
     {
         double value;
-        if (parser.parseLess() || parser.parseFloat(value) || parser.parseGreater())
+        if (parser.parseFloat(value))
         {
             return {};
         }
@@ -64,10 +66,6 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     }
     if (ref == "bool")
     {
-        if (parser.parseLess())
-        {
-            return {};
-        }
         llvm::StringRef boolValue;
         if (parser.parseKeyword(&boolValue))
         {
@@ -77,16 +75,12 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
         {
             return {};
         }
-        if (parser.parseGreater())
-        {
-            return {};
-        }
         return BoolAttr::get(getContext(), boolValue == "true");
     }
     if (ref == "integer")
     {
         llvm::StringRef value;
-        if (parser.parseLess() || parser.parseOptionalString(&value) || parser.parseGreater())
+        if (parser.parseOptionalString(&value))
         {
             return {};
         }
@@ -100,7 +94,7 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (ref == "string")
     {
         llvm::StringRef value;
-        if (parser.parseLess() || parser.parseOptionalString(&value) || parser.parseGreater())
+        if (parser.parseOptionalString(&value))
         {
             return {};
         }
@@ -113,11 +107,11 @@ void pylir::Dialect::PylirDialect::printAttribute(mlir::Attribute attribute, mli
 {
     llvm::TypeSwitch<mlir::Attribute>(attribute)
         .Case<NoneAttr>([&](NoneAttr) { printer << "none"; })
-        .Case<FloatAttr>([&](FloatAttr attr) { printer << "float<" << attr.getValue() << ">"; })
-        .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool<" << (attr.getValue() ? "true" : "false") << ">"; })
+        .Case<FloatAttr>([&](FloatAttr attr) { printer << "float " << attr.getValue(); })
+        .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool " << (attr.getValue() ? "true" : "false"); })
         .Case<IntegerAttr>([&](IntegerAttr attr)
-                           { printer << "integer<\"" << attr.getValue().toString(10, false) << "\">"; })
-        .Case<StringAttr>([&](StringAttr attr) { printer << "string<\"" << attr.getValue() << "\">"; });
+                           { printer << "integer \"" << attr.getValue().toString(10, false) << "\""; })
+        .Case<StringAttr>([&](StringAttr attr) { printer << "string \"" << attr.getValue() << "\""; });
 }
 
 mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
@@ -170,6 +164,18 @@ mlir::LogicalResult pylir::Dialect::VariantType::verifyConstructionInvariants(::
     if (types.empty())
     {
         return mlir::emitError(loc, "variant must contain at least one type");
+    }
+    struct MLIRHash
+    {
+        std::size_t operator()(mlir::Type type) const noexcept
+        {
+            return mlir::hash_value(type);
+        }
+    };
+    std::unordered_set<mlir::Type, MLIRHash> set(types.begin(), types.end());
+    if (set.size() != types.size())
+    {
+        return mlir::emitError(loc, "variant contains duplicate type");
     }
     return mlir::success();
 }

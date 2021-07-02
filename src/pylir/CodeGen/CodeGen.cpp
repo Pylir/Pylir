@@ -5,13 +5,14 @@
 #include <pylir/Dialect/PylirOps.hpp>
 #include <pylir/Dialect/PylirTypes.hpp>
 
-pylir::CodeGen::CodeGen(mlir::MLIRContext* context)
+pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
         [&]
         {
             context->loadDialect<pylir::Dialect::PylirDialect>();
             return context;
-        }())
+        }()),
+      m_document(&document)
 {
 }
 
@@ -206,7 +207,38 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
         {
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
-
+            arithmeticConversion(lhs, rhs);
+            if (lhs.getType().isa<Dialect::IntegerType>() && rhs.getType().isa<Dialect::IntegerType>())
+            {
+                switch (binOp->binToken.getTokenType())
+                {
+                    case TokenType::Star:
+                        return m_builder.createOrFold<Dialect::IMulOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    case TokenType::Divide:
+                        return m_builder.createOrFold<Dialect::IDivOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    case TokenType::IntDivide:
+                        return m_builder.createOrFold<Dialect::IFloorDivOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    case TokenType::Remainder:
+                        return m_builder.createOrFold<Dialect::IModOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    default: PYLIR_UNREACHABLE;
+                }
+            }
+            else if (lhs.getType().isa<Dialect::FloatType>() && rhs.getType().isa<Dialect::FloatType>())
+            {
+                switch (binOp->binToken.getTokenType())
+                {
+                    case TokenType::Star:
+                        return m_builder.createOrFold<Dialect::FMulOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    case TokenType::Divide:
+                        return m_builder.createOrFold<Dialect::FDivOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    case TokenType::IntDivide:
+                        return m_builder.createOrFold<Dialect::FFloorDivOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    case TokenType::Remainder:
+                        return m_builder.createOrFold<Dialect::FModOp>(getLoc(mExpr, binOp->binToken), lhs, rhs);
+                    default: PYLIR_UNREACHABLE;
+                }
+            }
+            PYLIR_UNREACHABLE;
         },
         [&](const std::unique_ptr<Syntax::MExpr::AtBin>& atBin) -> mlir::Value { PYLIR_UNREACHABLE; });
 }
@@ -260,14 +292,14 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 case TokenType::IntegerLiteral:
                 {
                     return m_builder.create<pylir::Dialect::ConstantOp>(
-                        m_builder.getUnknownLoc(),
+                        getLoc(atom, literal.token),
                         Dialect::IntegerAttr::get(m_builder.getContext(),
                                                   pylir::get<llvm::APInt>(literal.token.getValue())));
                 }
                 case TokenType::FloatingPointLiteral:
                 {
                     return m_builder.create<pylir::Dialect::ConstantOp>(
-                        m_builder.getUnknownLoc(),
+                        getLoc(atom, literal.token),
                         Dialect::FloatAttr::get(m_builder.getContext(), pylir::get<double>(literal.token.getValue())));
                 }
                 case TokenType::ComplexLiteral:
@@ -277,7 +309,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 }
                 case TokenType::StringLiteral:
                     return m_builder.create<pylir::Dialect::ConstantOp>(
-                        m_builder.getUnknownLoc(),
+                        getLoc(atom, literal.token),
                         Dialect::StringAttr::get(m_builder.getContext(),
                                                  pylir::get<std::string>(literal.token.getValue())));
                 case TokenType::ByteLiteral:
@@ -285,12 +317,12 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     PYLIR_UNREACHABLE;
                 case TokenType::TrueKeyword:
                     return m_builder.create<pylir::Dialect::ConstantOp>(
-                        m_builder.getUnknownLoc(), Dialect::BoolAttr::get(m_builder.getContext(), true));
+                        getLoc(atom, literal.token), Dialect::BoolAttr::get(m_builder.getContext(), true));
                 case TokenType::FalseKeyword:
                     return m_builder.create<pylir::Dialect::ConstantOp>(
-                        m_builder.getUnknownLoc(), Dialect::BoolAttr::get(m_builder.getContext(), false));
+                        getLoc(atom, literal.token), Dialect::BoolAttr::get(m_builder.getContext(), false));
                 case TokenType::NoneKeyword:
-                    return m_builder.create<pylir::Dialect::ConstantOp>(m_builder.getUnknownLoc(),
+                    return m_builder.create<pylir::Dialect::ConstantOp>(getLoc(atom, literal.token),
                                                                         Dialect::NoneAttr::get(m_builder.getContext()));
                 default: PYLIR_UNREACHABLE;
             }
@@ -303,4 +335,21 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
             // TODO
             PYLIR_UNREACHABLE;
         });
+}
+
+void pylir::CodeGen::arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs)
+{
+    // TODO complex
+    if (lhs.getType().isa<Dialect::FloatType>() || rhs.getType().isa<Dialect::FloatType>())
+    {
+        if (lhs.getType().isa<Dialect::IntegerType>())
+        {
+            lhs = m_builder.createOrFold<Dialect::ItoF>(m_builder.getUnknownLoc(), lhs);
+        }
+        if (rhs.getType().isa<Dialect::IntegerType>())
+        {
+            rhs = m_builder.createOrFold<Dialect::ItoF>(m_builder.getUnknownLoc(), rhs);
+        }
+        return;
+    }
 }

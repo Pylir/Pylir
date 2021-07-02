@@ -45,6 +45,6 @@ int main(int argc, char** argv)
         return -1;
     }
     mlir::MLIRContext context;
-    auto module = pylir::codegen(&context, *tree);
+    auto module = pylir::codegen(&context, *tree, document);
     module.print(llvm::outs());
 }

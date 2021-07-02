@@ -3,6 +3,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 
+#include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Parser/Syntax.hpp>
 
 namespace pylir
@@ -11,9 +12,20 @@ class CodeGen
 {
     mlir::OpBuilder m_builder;
     mlir::ModuleOp m_module;
+    Diag::Document* m_document;
+
+    void arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs);
+
+    template <class AST, class FallBackLocation>
+    mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
+    {
+        auto [line, col] = m_document->getLineCol(Diag::range(fallBackLocation).first);
+        return mlir::OpaqueLoc::get(
+            &astObject, m_builder.getFileLineColLoc(m_builder.getIdentifier(m_document->getFilename()), line, col));
+    }
 
 public:
-    CodeGen(mlir::MLIRContext* context);
+    CodeGen(mlir::MLIRContext* context, Diag::Document& document);
 
     mlir::ModuleOp visit(const Syntax::FileInput& fileInput);
 
@@ -62,9 +74,9 @@ public:
     mlir::Value visit(const Syntax::Atom& atom);
 };
 
-inline mlir::ModuleOp codegen(mlir::MLIRContext* context, const Syntax::FileInput& input)
+inline mlir::ModuleOp codegen(mlir::MLIRContext* context, const Syntax::FileInput& input, Diag::Document& document)
 {
-    CodeGen codegen{context};
+    CodeGen codegen{context, document};
     return codegen.visit(input);
 }
 
