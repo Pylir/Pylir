@@ -23,14 +23,9 @@ mlir::OpFoldResult pylir::Dialect::IAddOp::fold(::llvm::ArrayRef<::mlir::Attribu
         return Dialect::IntegerAttr::get(getContext(),
                                          lhs.getValue().sextOrSelf(newSize) + rhs.getValue().sextOrSelf(newSize));
     }
-    if (lhs || rhs)
+    if (rhs && rhs.getValue() == 0)
     {
-        auto integer = lhs ? lhs : rhs;
-        auto other = lhs ? getOperand(1) : getOperand(0);
-        if (integer.getValue() == 0)
-        {
-            return other;
-        }
+        return getOperand(0);
     }
     return nullptr;
 }
@@ -68,17 +63,15 @@ mlir::OpFoldResult pylir::Dialect::IMulOp::fold(::llvm::ArrayRef<::mlir::Attribu
         return Dialect::IntegerAttr::get(getContext(),
                                          lhs.getValue().sextOrSelf(newSize) * rhs.getValue().sextOrSelf(newSize));
     }
-    if (lhs || rhs)
+    if (rhs)
     {
-        auto integer = lhs ? lhs : rhs;
-        auto other = lhs ? getOperand(1) : getOperand(0);
-        if (integer.getValue() == 0)
+        if (rhs.getValue() == 0)
         {
-            return integer;
+            return rhs;
         }
-        if (integer.getValue() == 1)
+        if (rhs.getValue() == 1)
         {
-            return other;
+            return getOperand(0);
         }
     }
     return nullptr;
@@ -190,10 +183,9 @@ mlir::OpFoldResult pylir::Dialect::IShrOp::fold(::llvm::ArrayRef<::mlir::Attribu
     auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
     if (lhs && rhs && !rhs.getValue().isNegative())
     {
-        auto newSize = lhs.getValue().getBitWidth() + rhs.getValue();
-        return Dialect::IntegerAttr::get(
-            getContext(),
-            lhs.getValue().sextOrSelf(newSize.getZExtValue()).ashr(rhs.getValue().zextOrSelf(newSize.getZExtValue())));
+        auto newSize = std::max(lhs.getValue().getBitWidth(), rhs.getValue().getBitWidth());
+        return Dialect::IntegerAttr::get(getContext(),
+                                         lhs.getValue().sextOrSelf(newSize).ashr(rhs.getValue().zextOrSelf(newSize)));
     }
     if (rhs && rhs.getValue() == 0)
     {
@@ -202,6 +194,75 @@ mlir::OpFoldResult pylir::Dialect::IShrOp::fold(::llvm::ArrayRef<::mlir::Attribu
     if (lhs && lhs.getValue() == 0)
     {
         return lhs;
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::IAndOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 2);
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
+    if (lhs && rhs)
+    {
+        auto newSize = std::max(lhs.getValue().getBitWidth(), rhs.getValue().getBitWidth());
+        return Dialect::IntegerAttr::get(getContext(),
+                                         lhs.getValue().sextOrSelf(newSize) & rhs.getValue().zextOrSelf(newSize));
+    }
+    if (rhs)
+    {
+        if (rhs.getValue() == 0)
+        {
+            return rhs;
+        }
+        if (rhs.getValue().isAllOnesValue())
+        {
+            return getOperand(0);
+        }
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::IXorOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 2);
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
+    if (lhs && rhs)
+    {
+        auto newSize = std::max(lhs.getValue().getBitWidth(), rhs.getValue().getBitWidth());
+        return Dialect::IntegerAttr::get(getContext(),
+                                         lhs.getValue().sextOrSelf(newSize) ^ rhs.getValue().zextOrSelf(newSize));
+    }
+    if (rhs && rhs.getValue() == 0)
+    {
+        return getOperand(0);
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::IOrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 2);
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
+    if (lhs && rhs)
+    {
+        auto newSize = std::max(lhs.getValue().getBitWidth(), rhs.getValue().getBitWidth());
+        return Dialect::IntegerAttr::get(getContext(),
+                                         lhs.getValue().sextOrSelf(newSize) | rhs.getValue().zextOrSelf(newSize));
+    }
+
+    if (rhs)
+    {
+        if (rhs.getValue() == 0)
+        {
+            return getOperand(0);
+        }
+        else if (rhs.getValue().isAllOnesValue())
+        {
+            return rhs;
+        }
     }
     return nullptr;
 }
@@ -225,14 +286,9 @@ mlir::OpFoldResult pylir::Dialect::FAddOp::fold(::llvm::ArrayRef<::mlir::Attribu
     {
         return Dialect::FloatAttr::get(getContext(), lhs.getValue() + rhs.getValue());
     }
-    if (lhs || rhs)
+    if (rhs && rhs.getValue() == 0)
     {
-        auto constant = lhs ? lhs : rhs;
-        auto other = lhs ? getOperand(1) : getOperand(0);
-        if (constant.getValue() == 0)
-        {
-            return other;
-        }
+        return getOperand(0);
     }
     return nullptr;
 }
@@ -266,17 +322,15 @@ mlir::OpFoldResult pylir::Dialect::FMulOp::fold(::llvm::ArrayRef<::mlir::Attribu
     {
         return Dialect::FloatAttr::get(getContext(), lhs.getValue() * rhs.getValue());
     }
-    if (lhs || rhs)
+    if (rhs)
     {
-        auto constant = lhs ? lhs : rhs;
-        auto other = lhs ? getOperand(1) : getOperand(0);
-        if (constant.getValue() == 0)
+        if (rhs.getValue() == 0)
         {
-            return constant;
+            return rhs;
         }
-        if (constant.getValue() == 1)
+        if (rhs.getValue() == 1)
         {
-            return other;
+            return getOperand(0);
         }
     }
     return nullptr;

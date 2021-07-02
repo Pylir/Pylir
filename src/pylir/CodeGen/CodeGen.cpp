@@ -148,8 +148,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::OrExpr& orExpr)
 {
     return pylir::match(
         orExpr.variant, [&](const Syntax::XorExpr& xorExpr) { return visit(xorExpr); },
-        [&](const auto&) -> mlir::Value
+        [&](const std::unique_ptr<Syntax::OrExpr::BinOp>& binOp) -> mlir::Value
         {
+            auto lhs = visit(*binOp->lhs);
+            auto rhs = visit(binOp->rhs);
+            if (lhs.getType().isa<Dialect::IntegerType>() && rhs.getType().isa<Dialect::IntegerType>())
+            {
+                return m_builder.createOrFold<Dialect::IOrOp>(getLoc(orExpr, binOp->bitOrToken), lhs, rhs);
+            }
             // TODO
             PYLIR_UNREACHABLE;
         });
@@ -159,8 +165,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::XorExpr& xorExpr)
 {
     return pylir::match(
         xorExpr.variant, [&](const Syntax::AndExpr& andExpr) { return visit(andExpr); },
-        [&](const auto&) -> mlir::Value
+        [&](const std::unique_ptr<Syntax::XorExpr::BinOp>& binOp) -> mlir::Value
         {
+            auto lhs = visit(*binOp->lhs);
+            auto rhs = visit(binOp->rhs);
+            if (lhs.getType().isa<Dialect::IntegerType>() && rhs.getType().isa<Dialect::IntegerType>())
+            {
+                return m_builder.createOrFold<Dialect::IXorOp>(getLoc(xorExpr, binOp->bitXorToken), lhs, rhs);
+            }
             // TODO
             PYLIR_UNREACHABLE;
         });
@@ -170,8 +182,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AndExpr& andExpr)
 {
     return pylir::match(
         andExpr.variant, [&](const Syntax::ShiftExpr& shiftExpr) { return visit(shiftExpr); },
-        [&](const auto&) -> mlir::Value
+        [&](const std::unique_ptr<Syntax::AndExpr::BinOp>& binOp) -> mlir::Value
         {
+            auto lhs = visit(*binOp->lhs);
+            auto rhs = visit(binOp->rhs);
+            if (lhs.getType().isa<Dialect::IntegerType>() && rhs.getType().isa<Dialect::IntegerType>())
+            {
+                return m_builder.createOrFold<Dialect::IAndOp>(getLoc(andExpr, binOp->bitAndToken), lhs, rhs);
+            }
             // TODO
             PYLIR_UNREACHABLE;
         });
@@ -409,8 +427,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 default: PYLIR_UNREACHABLE;
             }
         },
-        [&](const IdentifierToken& identifierToken) -> mlir::Value {
-
+        [&](const IdentifierToken& identifierToken) -> mlir::Value
+        {
+            // TODO
+            PYLIR_UNREACHABLE;
         },
         [](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value
         {
