@@ -32,20 +32,21 @@ class Pylir_BinOp<string name, list<OpTrait> traits = []> : Pylir_Op<name,traits
         }];
 }
 
-class Pylir_IBinOp<string name, list<OpTrait> traits = []> : Pylir_BinOp<name,traits> {
+class Pylir_IBinOp<string name, list<OpTrait> traits = []>
+    : Pylir_BinOp<name,!listconcat(traits,[NoSideEffect])> {
     let arguments = (ins Pylir_Integer:$lhs, Pylir_Integer:$rhs);
     let results = (outs Pylir_Integer:$result);
 }
 
-def Pylir_IAddOp : Pylir_IBinOp<"iadd", [SameOperandsAndResultType,NoSideEffect,Commutative]> {
+def Pylir_IAddOp : Pylir_IBinOp<"iadd", [SameOperandsAndResultType, Commutative]> {
     let hasFolder = 1;
 }
 
-def Pylir_ISubOp : Pylir_IBinOp<"isub", [SameOperandsAndResultType,NoSideEffect]> {
+def Pylir_ISubOp : Pylir_IBinOp<"isub", [SameOperandsAndResultType]> {
     let hasFolder = 1;
 }
 
-def Pylir_IMulOp : Pylir_IBinOp<"imul", [SameOperandsAndResultType,NoSideEffect,Commutative]> {
+def Pylir_IMulOp : Pylir_IBinOp<"imul", [SameOperandsAndResultType, Commutative]> {
     let hasFolder = 1;
 }
 
@@ -59,11 +60,31 @@ def Pylir_IDivOp : Pylir_IBinOp<"itruediv"> {
     let hasFolder = 1;
 }
 
-def Pylir_IFloorDivOp : Pylir_BinOp<"ifloordiv", [SameOperandsAndResultType, NoSideEffect]> {
+def Pylir_IFloorDivOp : Pylir_BinOp<"ifloordiv", [SameOperandsAndResultType]> {
     let hasFolder = 1;
 }
 
-def Pylir_IModOp : Pylir_BinOp<"imod", [SameOperandsAndResultType, NoSideEffect]> {
+def Pylir_IModOp : Pylir_BinOp<"imod", [SameOperandsAndResultType]> {
+    let hasFolder = 1;
+}
+
+def Pylir_INegOp : Pylir_Op<"ineg",[SameOperandsAndResultType]> {
+
+    let arguments = (ins Pylir_Integer:$input);
+    let results = (outs Pylir_Integer:$result);
+
+    let assemblyFormat = [{
+        $input `:` type($input) `->` type($result) attr-dict
+    }];
+
+    let hasFolder = 1;
+}
+
+def Pylir_IShlOp : Pylir_BinOp<"ishl",[SameOperandsAndResultType]> {
+    let hasFolder = 1;
+}
+
+def Pylir_IShrOp : Pylir_BinOp<"ishr",[SameOperandsAndResultType]> {
     let hasFolder = 1;
 }
 
@@ -73,7 +94,7 @@ class Pylir_FBinOp<string name, list<OpTrait> traits = []> :
     let results = (outs Pylir_Float:$result);
 }
 
-def Pylir_FAddOp : Pylir_FBinOp<"fadd"> {
+def Pylir_FAddOp : Pylir_FBinOp<"fadd", [Commutative]> {
     let hasFolder = 1;
 }
 
@@ -81,7 +102,7 @@ def Pylir_FSubOp : Pylir_FBinOp<"fsub"> {
     let hasFolder = 1;
 }
 
-def Pylir_FMulOp : Pylir_FBinOp<"fmul"> {
+def Pylir_FMulOp : Pylir_FBinOp<"fmul", [Commutative]> {
     let hasFolder = 1;
 }
 

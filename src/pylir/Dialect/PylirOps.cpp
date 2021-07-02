@@ -148,6 +148,64 @@ mlir::OpFoldResult pylir::Dialect::IModOp::fold(::llvm::ArrayRef<::mlir::Attribu
     return nullptr;
 }
 
+mlir::OpFoldResult pylir::Dialect::INegOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 1);
+    if (auto input = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>())
+    {
+        auto value = input.getValue();
+        value.flipAllBits();
+        return Dialect::IntegerAttr::get(getContext(), std::move(value));
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::IShlOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 2);
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
+    if (lhs && rhs && !rhs.getValue().isNegative())
+    {
+        auto newSize = lhs.getValue().getBitWidth() + rhs.getValue();
+        return Dialect::IntegerAttr::get(
+            getContext(),
+            lhs.getValue().sextOrSelf(newSize.getZExtValue()).shl(rhs.getValue().zextOrSelf(newSize.getZExtValue())));
+    }
+    if (rhs && rhs.getValue() == 0)
+    {
+        return getOperand(0);
+    }
+    if (lhs && lhs.getValue() == 0)
+    {
+        return lhs;
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::IShrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 2);
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
+    if (lhs && rhs && !rhs.getValue().isNegative())
+    {
+        auto newSize = lhs.getValue().getBitWidth() + rhs.getValue();
+        return Dialect::IntegerAttr::get(
+            getContext(),
+            lhs.getValue().sextOrSelf(newSize.getZExtValue()).ashr(rhs.getValue().zextOrSelf(newSize.getZExtValue())));
+    }
+    if (rhs && rhs.getValue() == 0)
+    {
+        return getOperand(0);
+    }
+    if (lhs && lhs.getValue() == 0)
+    {
+        return lhs;
+    }
+    return nullptr;
+}
+
 mlir::OpFoldResult pylir::Dialect::ItoF::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
