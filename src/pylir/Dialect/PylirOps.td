@@ -182,4 +182,13 @@ def Pylir_BtoI : Pylir_Cast<"btoi"> {
             [{ build($_builder, $_state, IntegerType::get($_state.getContext()), value); }]>];
 }
 
+def Pylir_BtoI1 : Pylir_Cast<"btoI1"> {
+    let arguments = (ins Pylir_Bool:$input);
+    let results = (outs I1:$result);
+
+    let builders = [
+                OpBuilderDAG<(ins "mlir::Value":$value),
+                [{ build($_builder, $_state, ::mlir::IntegerType::get($_state.getContext(),1), value); }]>];
+}
+
 #endif

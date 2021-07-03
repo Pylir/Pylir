@@ -528,6 +528,25 @@ bool pylir::Dialect::BtoI::areCastCompatible(mlir::TypeRange inputs, mlir::TypeR
     return inputs[0].isa<BoolType>() && outputs[0].isa<IntegerType>();
 }
 
+mlir::OpFoldResult pylir::Dialect::BtoI1::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 1);
+    if (auto input = operands[0].dyn_cast_or_null<Dialect::BoolAttr>())
+    {
+        return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1), input.getValue());
+    }
+    return nullptr;
+}
+
+bool pylir::Dialect::BtoI1::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return inputs[0].isa<BoolType>() && outputs[0].isInteger(1);
+}
+
 #include <pylir/Dialect/PylirOpsEnums.cpp.inc>
 
 // TODO: Remove in MLIR 13

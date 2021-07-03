@@ -1,15 +1,17 @@
 #include "CodeGen.hpp"
 
+#include <mlir/Dialect/SCF/SCF.h>
+
 #include <pylir/Dialect/PylirAttributes.hpp>
 #include <pylir/Dialect/PylirDialect.hpp>
 #include <pylir/Dialect/PylirOps.hpp>
-#include <pylir/Dialect/PylirTypes.hpp>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
         [&]
         {
             context->loadDialect<pylir::Dialect::PylirDialect>();
+            context->loadDialect<mlir::scf::SCFDialect>();
             return context;
         }()),
       m_document(&document)
@@ -97,8 +99,35 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     {
         return visit(expression.value);
     }
-    // TODO
-    PYLIR_UNREACHABLE;
+    auto condition =
+        m_builder.createOrFold<Dialect::BtoI1>(m_builder.getUnknownLoc(), toBool(visit(*expression.suffix->test)));
+    mlir::Value thenValue;
+    mlir::Value elseValue;
+
+    auto tmpIfOp = m_builder.create<mlir::scf::IfOp>(
+        getLoc(expression, expression.suffix->ifToken), condition,
+        [&](mlir::OpBuilder&, mlir::Location) { thenValue = visit(expression.value); },
+        [&](mlir::OpBuilder&, mlir::Location) { elseValue = visit(*expression.suffix->elseValue); });
+    mlir::Type resultType;
+    if (thenValue.getType() == elseValue.getType())
+    {
+        resultType = thenValue.getType();
+    }
+    else
+    {
+        // TODO
+        PYLIR_UNREACHABLE;
+    }
+    auto ifOp = m_builder.create<mlir::scf::IfOp>(tmpIfOp->mlir::Operation::getLoc(), resultType, condition, true);
+    ifOp.thenRegion().takeBody(tmpIfOp.thenRegion());
+    ifOp.elseRegion().takeBody(tmpIfOp.elseRegion());
+    tmpIfOp->mlir::Operation::erase();
+    auto guard = mlir::OpBuilder::InsertionGuard{m_builder};
+    m_builder.setInsertionPointToEnd(&ifOp.thenRegion().back());
+    m_builder.create<mlir::scf::YieldOp>(m_builder.getUnknownLoc(), thenValue);
+    m_builder.setInsertionPointToEnd(&ifOp.elseRegion().back());
+    m_builder.create<mlir::scf::YieldOp>(m_builder.getUnknownLoc(), elseValue);
+    return ifOp.results()[0];
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
