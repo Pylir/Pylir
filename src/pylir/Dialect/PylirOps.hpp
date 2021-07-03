@@ -5,7 +5,9 @@
 #include <mlir/Interfaces/CastInterfaces.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
+#include <pylir/Dialect/PylirOpsEnums.h.inc>
+
 #include "PylirTypes.hpp"
 
 #define GET_OP_CLASSES
-#include "pylir/Dialect/PylirOps.h.inc"
+#include <pylir/Dialect/PylirOps.h.inc>

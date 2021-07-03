@@ -16,6 +16,10 @@ class CodeGen
 
     void arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs);
 
+    void ensureInt(mlir::Value& value);
+
+    mlir::Value toBool(mlir::Value value);
+
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
     {

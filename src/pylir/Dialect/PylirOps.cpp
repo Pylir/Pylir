@@ -1,11 +1,11 @@
 #include "PylirOps.hpp"
 
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/OpImplementation.h>
 
 #include <pylir/Support/Macros.hpp>
 
 #include "PylirAttributes.hpp"
-#include "PylirDialect.hpp"
 
 mlir::OpFoldResult pylir::Dialect::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
@@ -267,14 +267,37 @@ mlir::OpFoldResult pylir::Dialect::IOrOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return nullptr;
 }
 
-mlir::OpFoldResult pylir::Dialect::ItoF::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Dialect::ICmpOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    PYLIR_ASSERT(operands.size() == 1);
-    if (auto input = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>())
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
+    if (!lhs || !rhs)
     {
-        return Dialect::FloatAttr::get(getContext(), input.getValue().roundToDouble());
+        return nullptr;
     }
-    return nullptr;
+    auto equalSize = std::max(lhs.getValue().getBitWidth(), rhs.getValue().getBitWidth());
+    switch (predicate())
+    {
+        case CmpPredicate::EQ:
+            return Dialect::BoolAttr::get(getContext(),
+                                          lhs.getValue().sextOrSelf(equalSize) == rhs.getValue().sextOrSelf(equalSize));
+        case CmpPredicate::NE:
+            return Dialect::BoolAttr::get(getContext(),
+                                          lhs.getValue().sextOrSelf(equalSize) != rhs.getValue().sextOrSelf(equalSize));
+        case CmpPredicate::LT:
+            return Dialect::BoolAttr::get(
+                getContext(), lhs.getValue().sextOrSelf(equalSize).slt(rhs.getValue().sextOrSelf(equalSize)));
+        case CmpPredicate::LE:
+            return Dialect::BoolAttr::get(
+                getContext(), lhs.getValue().sextOrSelf(equalSize).sle(rhs.getValue().sextOrSelf(equalSize)));
+        case CmpPredicate::GT:
+            return Dialect::BoolAttr::get(
+                getContext(), lhs.getValue().sextOrSelf(equalSize).sgt(rhs.getValue().sextOrSelf(equalSize)));
+        case CmpPredicate::GE:
+            return Dialect::BoolAttr::get(
+                getContext(), lhs.getValue().sextOrSelf(equalSize).sge(rhs.getValue().sextOrSelf(equalSize)));
+        default: PYLIR_UNREACHABLE;
+    }
 }
 
 mlir::OpFoldResult pylir::Dialect::FAddOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -384,7 +407,130 @@ mlir::OpFoldResult pylir::Dialect::FModOp::fold(::llvm::ArrayRef<::mlir::Attribu
     return nullptr;
 }
 
+mlir::OpFoldResult pylir::Dialect::FCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
+    if (!lhs || !rhs)
+    {
+        return nullptr;
+    }
+    switch (predicate())
+    {
+        case CmpPredicate::EQ: return Dialect::BoolAttr::get(getContext(), lhs.getValue() == rhs.getValue());
+        case CmpPredicate::NE: return Dialect::BoolAttr::get(getContext(), lhs.getValue() != rhs.getValue());
+        case CmpPredicate::LT: return Dialect::BoolAttr::get(getContext(), lhs.getValue() < rhs.getValue());
+        case CmpPredicate::LE: return Dialect::BoolAttr::get(getContext(), lhs.getValue() <= rhs.getValue());
+        case CmpPredicate::GT: return Dialect::BoolAttr::get(getContext(), lhs.getValue() > rhs.getValue());
+        case CmpPredicate::GE: return Dialect::BoolAttr::get(getContext(), lhs.getValue() >= rhs.getValue());
+        default: PYLIR_UNREACHABLE;
+    }
+}
+
+mlir::OpFoldResult pylir::Dialect::BAndOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::BoolAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::BoolAttr>();
+    if (lhs && rhs)
+    {
+        return Dialect::BoolAttr::get(getContext(), lhs.getValue() && rhs.getValue());
+    }
+    if (rhs)
+    {
+        if (rhs.getValue())
+        {
+            return getOperand(0);
+        }
+        return rhs;
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::BXorOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::BoolAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::BoolAttr>();
+    if (lhs && rhs)
+    {
+        return Dialect::BoolAttr::get(getContext(), lhs.getValue() ^ rhs.getValue());
+    }
+    if (rhs && !rhs.getValue())
+    {
+        return getOperand(0);
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::BOrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0].dyn_cast_or_null<Dialect::BoolAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<Dialect::BoolAttr>();
+    if (lhs && rhs)
+    {
+        return Dialect::BoolAttr::get(getContext(), lhs.getValue() || rhs.getValue());
+    }
+    if (rhs)
+    {
+        if (rhs.getValue())
+        {
+            return rhs;
+        }
+        return getOperand(0);
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::BNegOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 1);
+    if (auto input = operands[0].dyn_cast_or_null<Dialect::BoolAttr>())
+    {
+        return Dialect::BoolAttr::get(getContext(), !input.getValue());
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::ItoF::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 1);
+    if (auto input = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>())
+    {
+        return Dialect::FloatAttr::get(getContext(), input.getValue().roundToDouble());
+    }
+    return nullptr;
+}
+
+bool pylir::Dialect::ItoF::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return inputs[0].isa<IntegerType>() && outputs[0].isa<FloatType>();
+}
+
+mlir::OpFoldResult pylir::Dialect::BtoI::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 1);
+    if (auto input = operands[0].dyn_cast_or_null<Dialect::BoolAttr>())
+    {
+        return Dialect::IntegerAttr::get(getContext(), llvm::APInt(2, input.getValue()));
+    }
+    return nullptr;
+}
+
+bool pylir::Dialect::BtoI::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return inputs[0].isa<BoolType>() && outputs[0].isa<IntegerType>();
+}
+
+#include <pylir/Dialect/PylirOpsEnums.cpp.inc>
+
 // TODO: Remove in MLIR 13
 using namespace mlir;
 #define GET_OP_CLASSES
-#include "pylir/Dialect/PylirOps.cpp.inc"
+#include <pylir/Dialect/PylirOps.cpp.inc>

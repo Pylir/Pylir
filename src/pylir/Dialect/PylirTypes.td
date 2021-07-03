@@ -4,8 +4,8 @@
 
 include "PylirBase.td"
 
-class Pylir_Type<string name,string baseCppClass = "::mlir::Type"> :
-    TypeDef<Pylir_Dialect, name,baseCppClass>;
+class Pylir_Type<string name, string baseCppClass = "::mlir::Type"> :
+    TypeDef<Pylir_Dialect, name, baseCppClass>;
 
 def Pylir_Unknown : Pylir_Type<"Unknown"> {
     let mnemonic = "unknown";
