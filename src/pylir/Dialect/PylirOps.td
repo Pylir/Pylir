@@ -160,11 +160,11 @@ def Pylir_BNegOp : Pylir_Op<"bneg",[SameOperandsAndResultType, Involution]> {
 class Pylir_Cast<string name, list<OpTrait> traits = []>
     : Pylir_Op<name,!listconcat(traits,[NoSideEffect, DeclareOpInterfaceMethods<CastOpInterface>])> {
     let assemblyFormat = [{
-          $input `:` type($input) }] # "`" # name # "`" # [{ type($result) attr-dict
+          $input `:` type($input) `->` type($result) attr-dict
         }];
 }
 
-def Pylir_ItoF : Pylir_Cast<"itof"> {
+def Pylir_ItoFOp : Pylir_Cast<"itof"> {
     let arguments = (ins Pylir_Integer:$input);
     let results = (outs Pylir_Float:$result);
 
@@ -173,7 +173,7 @@ def Pylir_ItoF : Pylir_Cast<"itof"> {
             [{ build($_builder, $_state, FloatType::get($_state.getContext()), value); }]>];
 }
 
-def Pylir_BtoI : Pylir_Cast<"btoi"> {
+def Pylir_BtoIOp : Pylir_Cast<"btoi"> {
     let arguments = (ins Pylir_Bool:$input);
     let results = (outs Pylir_Float:$result);
 
@@ -182,13 +182,20 @@ def Pylir_BtoI : Pylir_Cast<"btoi"> {
             [{ build($_builder, $_state, IntegerType::get($_state.getContext()), value); }]>];
 }
 
-def Pylir_BtoI1 : Pylir_Cast<"btoI1"> {
+def Pylir_BtoI1Op : Pylir_Cast<"btoI1"> {
     let arguments = (ins Pylir_Bool:$input);
     let results = (outs I1:$result);
 
     let builders = [
                 OpBuilderDAG<(ins "mlir::Value":$value),
                 [{ build($_builder, $_state, ::mlir::IntegerType::get($_state.getContext(),1), value); }]>];
+
+    let hasFolder = 0;
+}
+
+def Pylir_ToVariantOp : Pylir_Cast<"toVariant"> {
+    let arguments = (ins AnyType:$input);
+    let results = (outs Pylir_Variant:$result);
 }
 
 #endif

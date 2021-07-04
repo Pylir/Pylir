@@ -76,6 +76,8 @@ public:
     mlir::Value visit(const Syntax::Primary& primary);
 
     mlir::Value visit(const Syntax::Atom& atom);
+
+    mlir::Value visit(const Syntax::Enclosure& enclosure);
 };
 
 inline mlir::ModuleOp codegen(mlir::MLIRContext* context, const Syntax::FileInput& input, Diag::Document& document)

@@ -54,6 +54,16 @@ def Pylir_Variant : Pylir_Type<"Variant"> {
     let parser = ?;
     let printer = ?;
     let genVerifyInvariantsDecl = 1;
+
+    let builders = [
+        TypeBuilder<(ins "llvm::ArrayRef<mlir::Type>":$elementTypes), [{
+          return Base::get($_ctxt, detail::variantUnion(elementTypes));
+        }], [{
+          return Base::getChecked($_loc,  detail::variantUnion(elementTypes));
+        }]>
+      ];
+
+    let skipDefaultBuilders = 1;
 }
 
 #endif

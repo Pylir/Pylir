@@ -100,7 +100,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
         return visit(expression.value);
     }
     auto condition =
-        m_builder.createOrFold<Dialect::BtoI1>(m_builder.getUnknownLoc(), toBool(visit(*expression.suffix->test)));
+        m_builder.createOrFold<Dialect::BtoI1Op>(m_builder.getUnknownLoc(), toBool(visit(*expression.suffix->test)));
     mlir::Value thenValue;
     mlir::Value elseValue;
 
@@ -109,14 +109,15 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
         [&](mlir::OpBuilder&, mlir::Location) { thenValue = visit(expression.value); },
         [&](mlir::OpBuilder&, mlir::Location) { elseValue = visit(*expression.suffix->elseValue); });
     mlir::Type resultType;
+    bool variant = true;
     if (thenValue.getType() == elseValue.getType())
     {
         resultType = thenValue.getType();
+        variant = false;
     }
     else
     {
-        // TODO
-        PYLIR_UNREACHABLE;
+        resultType = Dialect::VariantType::get(m_builder.getContext(), {thenValue.getType(), elseValue.getType()});
     }
     auto ifOp = m_builder.create<mlir::scf::IfOp>(tmpIfOp->mlir::Operation::getLoc(), resultType, condition, true);
     ifOp.thenRegion().takeBody(tmpIfOp.thenRegion());
@@ -124,8 +125,16 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     tmpIfOp->mlir::Operation::erase();
     auto guard = mlir::OpBuilder::InsertionGuard{m_builder};
     m_builder.setInsertionPointToEnd(&ifOp.thenRegion().back());
+    if (variant)
+    {
+        thenValue = m_builder.create<Dialect::ToVariantOp>(m_builder.getUnknownLoc(), resultType, thenValue);
+    }
     m_builder.create<mlir::scf::YieldOp>(m_builder.getUnknownLoc(), thenValue);
     m_builder.setInsertionPointToEnd(&ifOp.elseRegion().back());
+    if (variant)
+    {
+        elseValue = m_builder.create<Dialect::ToVariantOp>(m_builder.getUnknownLoc(), resultType, elseValue);
+    }
     m_builder.create<mlir::scf::YieldOp>(m_builder.getUnknownLoc(), elseValue);
     return ifOp.results()[0];
 }
@@ -574,11 +583,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
             // TODO
             PYLIR_UNREACHABLE;
         },
-        [](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value
-        {
-            // TODO
-            PYLIR_UNREACHABLE;
-        });
+        [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
 }
 
 void pylir::CodeGen::arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs)
@@ -589,12 +594,12 @@ void pylir::CodeGen::arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs)
         if (Dialect::isIntegerLike(lhs.getType()))
         {
             ensureInt(lhs);
-            lhs = m_builder.createOrFold<Dialect::ItoF>(m_builder.getUnknownLoc(), lhs);
+            lhs = m_builder.createOrFold<Dialect::ItoFOp>(m_builder.getUnknownLoc(), lhs);
         }
         if (Dialect::isIntegerLike(rhs.getType()))
         {
             ensureInt(rhs);
-            rhs = m_builder.createOrFold<Dialect::ItoF>(m_builder.getUnknownLoc(), rhs);
+            rhs = m_builder.createOrFold<Dialect::ItoFOp>(m_builder.getUnknownLoc(), rhs);
         }
         return;
     }
@@ -609,7 +614,7 @@ void pylir::CodeGen::ensureInt(mlir::Value& value)
 {
     if (value.getType().isa<Dialect::BoolType>())
     {
-        value = m_builder.createOrFold<Dialect::BtoI>(m_builder.getUnknownLoc(), value);
+        value = m_builder.createOrFold<Dialect::BtoIOp>(m_builder.getUnknownLoc(), value);
     }
 }
 
@@ -635,4 +640,24 @@ mlir::Value pylir::CodeGen::toBool(mlir::Value value)
     }
     // TODO
     PYLIR_UNREACHABLE;
+}
+
+mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
+{
+    return pylir::match(
+        enclosure.variant,
+        [&](const Syntax::Enclosure::ParenthForm& parenthForm)
+        {
+            if (parenthForm.expression)
+            {
+                return visit(*parenthForm.expression);
+            }
+            // TODO
+            PYLIR_UNREACHABLE;
+        },
+        [&](const auto&) -> mlir::Value
+        {
+            // TODO
+            PYLIR_UNREACHABLE;
+        });
 }

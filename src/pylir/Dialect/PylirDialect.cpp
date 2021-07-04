@@ -3,15 +3,13 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
 
+#include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Support/Functional.hpp>
 
-#include <unordered_set>
-
 #include "PylirAttributes.hpp"
 #include "PylirOps.hpp"
-#include "PylirTypes.hpp"
 
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Dialect/PylirOpsTypes.cpp.inc"
@@ -120,6 +118,23 @@ mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBui
     return builder.create<ConstantOp>(loc, type, value);
 }
 
+std::vector<mlir::Type> pylir::Dialect::detail::variantUnion(llvm::ArrayRef<mlir::Type> types)
+{
+    llvm::DenseSet<mlir::Type> unique;
+    for (auto& iter : types)
+    {
+        if (auto variant = iter.dyn_cast_or_null<Dialect::VariantType>())
+        {
+            unique.insert(variant.getTypes().begin(), variant.getTypes().end());
+        }
+        else
+        {
+            unique.insert(iter);
+        }
+    }
+    return {unique.begin(), unique.end()};
+}
+
 mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser)
 {
     if (parser.parseLess())
@@ -165,14 +180,7 @@ mlir::LogicalResult pylir::Dialect::VariantType::verifyConstructionInvariants(::
     {
         return mlir::emitError(loc, "variant must contain at least one type");
     }
-    struct MLIRHash
-    {
-        std::size_t operator()(mlir::Type type) const noexcept
-        {
-            return mlir::hash_value(type);
-        }
-    };
-    std::unordered_set<mlir::Type, MLIRHash> set(types.begin(), types.end());
+    llvm::DenseSet<mlir::Type> set(types.begin(), types.end());
     if (set.size() != types.size())
     {
         return mlir::emitError(loc, "variant contains duplicate type");

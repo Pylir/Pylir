@@ -2,6 +2,13 @@
 
 #include <mlir/IR/Types.h>
 
+#include <vector>
+
+namespace pylir::Dialect::detail
+{
+std::vector<mlir::Type> variantUnion(llvm::ArrayRef<mlir::Type> types);
+}
+
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Dialect/PylirOpsTypes.h.inc"
 

@@ -490,7 +490,7 @@ mlir::OpFoldResult pylir::Dialect::BNegOp::fold(llvm::ArrayRef<mlir::Attribute> 
     return nullptr;
 }
 
-mlir::OpFoldResult pylir::Dialect::ItoF::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Dialect::ItoFOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
     if (auto input = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>())
@@ -500,7 +500,7 @@ mlir::OpFoldResult pylir::Dialect::ItoF::fold(::llvm::ArrayRef<::mlir::Attribute
     return nullptr;
 }
 
-bool pylir::Dialect::ItoF::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+bool pylir::Dialect::ItoFOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
 {
     if (inputs.size() != 1 && outputs.size() != 1)
     {
@@ -509,7 +509,7 @@ bool pylir::Dialect::ItoF::areCastCompatible(mlir::TypeRange inputs, mlir::TypeR
     return inputs[0].isa<IntegerType>() && outputs[0].isa<FloatType>();
 }
 
-mlir::OpFoldResult pylir::Dialect::BtoI::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Dialect::BtoIOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
     if (auto input = operands[0].dyn_cast_or_null<Dialect::BoolAttr>())
@@ -519,7 +519,7 @@ mlir::OpFoldResult pylir::Dialect::BtoI::fold(::llvm::ArrayRef<::mlir::Attribute
     return nullptr;
 }
 
-bool pylir::Dialect::BtoI::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+bool pylir::Dialect::BtoIOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
 {
     if (inputs.size() != 1 && outputs.size() != 1)
     {
@@ -528,23 +528,31 @@ bool pylir::Dialect::BtoI::areCastCompatible(mlir::TypeRange inputs, mlir::TypeR
     return inputs[0].isa<BoolType>() && outputs[0].isa<IntegerType>();
 }
 
-mlir::OpFoldResult pylir::Dialect::BtoI1::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 1);
-    if (auto input = operands[0].dyn_cast_or_null<Dialect::BoolAttr>())
-    {
-        return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1), input.getValue());
-    }
-    return nullptr;
-}
-
-bool pylir::Dialect::BtoI1::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+bool pylir::Dialect::BtoI1Op::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
 {
     if (inputs.size() != 1 && outputs.size() != 1)
     {
         return false;
     }
     return inputs[0].isa<BoolType>() && outputs[0].isInteger(1);
+}
+
+mlir::OpFoldResult pylir::Dialect::ToVariantOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (getOperand().getType() == getResult().getType())
+    {
+        return getOperand();
+    }
+    return nullptr;
+}
+
+bool pylir::Dialect::ToVariantOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return outputs[0].isa<VariantType>();
 }
 
 #include <pylir/Dialect/PylirOpsEnums.cpp.inc>
