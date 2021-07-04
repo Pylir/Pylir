@@ -56,7 +56,7 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (ref == "float")
     {
         double value;
-        if (parser.parseFloat(value))
+        if (parser.parseLess() || parser.parseFloat(value) || parser.parseGreater())
         {
             return {};
         }
@@ -65,12 +65,18 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (ref == "bool")
     {
         llvm::StringRef boolValue;
-        if (parser.parseKeyword(&boolValue))
+        if (parser.parseLess())
+        {
+            return {};
+        }
+        auto loc = parser.getCurrentLocation();
+        if (parser.parseKeyword(&boolValue) || parser.parseGreater())
         {
             return {};
         }
         if (boolValue != "true" && boolValue != "false")
         {
+            parser.emitError(loc, "Expected 'true' or 'false'");
             return {};
         }
         return BoolAttr::get(getContext(), boolValue == "true");
@@ -78,13 +84,24 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (ref == "integer")
     {
         llvm::StringRef value;
+        if (parser.parseLess())
+        {
+            return {};
+        }
+        auto loc = parser.getCurrentLocation();
         if (parser.parseOptionalString(&value))
+        {
+            parser.emitError(loc, "Expected string literal");
+            return {};
+        }
+        if (parser.parseGreater())
         {
             return {};
         }
         llvm::APInt integer;
         if (value.getAsInteger(10, integer))
         {
+            parser.emitError(loc, "Expected valid integer in string literal");
             return {};
         }
         return IntegerAttr::get(getContext(), std::move(integer));
@@ -92,7 +109,17 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (ref == "string")
     {
         llvm::StringRef value;
+        if (parser.parseLess())
+        {
+            return {};
+        }
+        auto loc = parser.getCurrentLocation();
         if (parser.parseOptionalString(&value))
+        {
+            parser.emitError(loc, "Expected string literal");
+            return {};
+        }
+        if (parser.parseGreater())
         {
             return {};
         }
@@ -105,11 +132,11 @@ void pylir::Dialect::PylirDialect::printAttribute(mlir::Attribute attribute, mli
 {
     llvm::TypeSwitch<mlir::Attribute>(attribute)
         .Case<NoneAttr>([&](NoneAttr) { printer << "none"; })
-        .Case<FloatAttr>([&](FloatAttr attr) { printer << "float " << attr.getValue(); })
-        .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool " << (attr.getValue() ? "true" : "false"); })
+        .Case<FloatAttr>([&](FloatAttr attr) { printer << "float<" << attr.getValue() << ">"; })
+        .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool<" << (attr.getValue() ? "true" : "false") << ">"; })
         .Case<IntegerAttr>([&](IntegerAttr attr)
-                           { printer << "integer \"" << attr.getValue().toString(10, false) << "\""; })
-        .Case<StringAttr>([&](StringAttr attr) { printer << "string \"" << attr.getValue() << "\""; });
+                           { printer << "integer<\"" << attr.getValue().toString(10, false) << "\">"; })
+        .Case<StringAttr>([&](StringAttr attr) { printer << "string<\"" << attr.getValue() << "\">"; });
 }
 
 mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,

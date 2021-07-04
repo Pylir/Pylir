@@ -20,7 +20,15 @@ struct ValueAttrStorage : public mlir::AttributeStorage
 
     bool operator==(KeyTy key) const
     {
-        return key.first == value && key.second == getType();
+        if constexpr (std::is_same_v<llvm::APInt, T>)
+        {
+            auto maxSize = std::max(key.first.getBitWidth(), value.getBitWidth());
+            return key.first.sextOrSelf(maxSize) == value.sextOrSelf(maxSize);
+        }
+        else
+        {
+            return key.first == value && key.second == getType();
+        }
     }
 
     static llvm::hash_code hashKey(KeyTy key)
@@ -33,12 +41,40 @@ struct ValueAttrStorage : public mlir::AttributeStorage
         return new (allocator.allocate<ValueAttrStorage>()) ValueAttrStorage(value.first, value.second);
     }
 };
+
+struct TypeStorage : public mlir::AttributeStorage
+{
+    TypeStorage(mlir::Type type) : mlir::AttributeStorage(type) {}
+
+    using KeyTy = mlir::Type;
+
+    bool operator==(KeyTy key) const
+    {
+        return getType() == key;
+    }
+
+    static llvm::hash_code hashKey(KeyTy key)
+    {
+        return mlir::hash_value(key);
+    }
+
+    static TypeStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
+    {
+        return new (allocator.allocate<TypeStorage>()) TypeStorage(value);
+    }
+};
+
 } // namespace detail
 
-class NoneAttr : public mlir::Attribute::AttrBase<NoneAttr, mlir::Attribute, mlir::AttributeStorage>
+class NoneAttr : public mlir::Attribute::AttrBase<NoneAttr, mlir::Attribute, detail::TypeStorage>
 {
 public:
     using Base::Base;
+
+    static NoneAttr get(mlir::MLIRContext* context)
+    {
+        return Base::get(context, NoneType::get(context));
+    }
 };
 
 class BoolAttr : public mlir::Attribute::AttrBase<BoolAttr, mlir::Attribute, detail::ValueAttrStorage<bool>>
