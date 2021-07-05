@@ -11,6 +11,45 @@ class Pylir_Op<string mneomic, list<OpTrait> traits = []> :
     let hasFolder = 1;
 }
 
+def Pylir_AllocaOp : Pylir_Op<"alloca"> {
+    let hasFolder = 0;
+
+    let results = (outs Res<Pylir_Handle, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$handle);
+
+    let assemblyFormat = [{
+         `->` type($handle) attr-dict
+    }];
+
+    let builders = [
+            OpBuilderDAG<(ins),
+            [{ build($_builder, $_state, ::pylir::Dialect::HandleType::get($_state.getContext())); }]>];
+}
+
+def Pylir_LoadOp : Pylir_Op<"load"> {
+    let hasFolder = 0;
+
+    let arguments = (ins Arg<Pylir_Handle, "", [MemRead]>:$handle);
+    let results = (outs Pylir_Unknown:$result);
+
+    let assemblyFormat = [{
+        $handle `->` type($result) attr-dict
+    }];
+
+    let builders = [
+                OpBuilderDAG<(ins "mlir::Value":$handle),
+                [{ build($_builder, $_state, ::pylir::Dialect::UnknownType::get($_state.getContext()), handle); }]>];
+}
+
+def Pylir_StoreOp : Pylir_Op<"store"> {
+    let hasFolder = 0;
+
+    let arguments = (ins AnyPythonType:$value, Arg<Pylir_Handle, "", [MemWrite]>:$handle);
+
+    let assemblyFormat = [{
+           $value `:` type($value) `,` $handle attr-dict
+    }];
+}
+
 def Pylir_ConstantOp : Pylir_Op<"constant",[ConstantLike, NoSideEffect]> {
     let arguments = (ins AnyAttr:$value);
     let results = (outs AnyType:$result);

@@ -27,6 +27,10 @@ def Pylir_None : Pylir_Type<"None"> {
     let mnemonic = "none";
 }
 
+def Pylir_NotImplemented : Pylir_Type<"NotImplemented"> {
+    let mnemonic = "notImplemented";
+}
+
 def Pylir_String : Pylir_Type<"String"> {
     let mnemonic = "str";
 }
@@ -64,6 +68,16 @@ def Pylir_Variant : Pylir_Type<"Variant"> {
       ];
 
     let skipDefaultBuilders = 1;
+}
+
+def AnyPythonType
+: AnyTypeOf<[Pylir_Unknown, Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_None,
+             Pylir_NotImplemented, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple,
+             Pylir_Dict, Pylir_Variant]>;
+
+
+def Pylir_Handle : Pylir_Type<"Handle"> {
+    let mnemonic = "handle";
 }
 
 #endif

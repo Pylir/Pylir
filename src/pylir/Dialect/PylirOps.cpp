@@ -537,7 +537,7 @@ bool pylir::Dialect::BtoI1Op::areCastCompatible(mlir::TypeRange inputs, mlir::Ty
     return inputs[0].isa<BoolType>() && outputs[0].isInteger(1);
 }
 
-mlir::OpFoldResult pylir::Dialect::ToVariantOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Dialect::ToVariantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
     if (getOperand().getType() == getResult().getType())
     {
