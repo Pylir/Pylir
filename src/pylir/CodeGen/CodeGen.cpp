@@ -1,6 +1,8 @@
 #include "CodeGen.hpp"
 
 #include <mlir/Dialect/SCF/SCF.h>
+#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/IR/Block.h>
 
 #include <pylir/Dialect/PylirAttributes.hpp>
 #include <pylir/Dialect/PylirDialect.hpp>
@@ -12,6 +14,7 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
         {
             context->loadDialect<pylir::Dialect::PylirDialect>();
             context->loadDialect<mlir::scf::SCFDialect>();
+            context->loadDialect<mlir::StandardOpsDialect>();
             return context;
         }()),
       m_document(&document)
@@ -31,6 +34,10 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         {
             visit(*statement);
         }
+    }
+    if (m_builder.getBlock() && m_builder.getBlock()->back().isKnownNonTerminator())
+    {
+        m_builder.create<mlir::ReturnOp>(m_builder.getUnknownLoc());
     }
     return m_module;
 }
