@@ -3,6 +3,9 @@
 
 #include <mlir/IR/BuiltinAttributes.h>
 
+#include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/DenseSet.h>
+
 #include "PylirTypes.hpp"
 
 namespace pylir::Dialect
@@ -33,7 +36,7 @@ struct ValueAttrStorage : public mlir::AttributeStorage
 
     static llvm::hash_code hashKey(KeyTy key)
     {
-        return llvm::hash_combine(key.first, key.second);
+        return llvm::hash_value(key);
     }
 
     static ValueAttrStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
@@ -61,6 +64,84 @@ struct TypeStorage : public mlir::AttributeStorage
     static TypeStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
     {
         return new (allocator.allocate<TypeStorage>()) TypeStorage(value);
+    }
+};
+
+struct StringAttrStorage : public mlir::AttributeStorage
+{
+    llvm::StringRef value;
+
+    StringAttrStorage(llvm::StringRef value, mlir::Type type) : mlir::AttributeStorage(type), value(value) {}
+
+    using KeyTy = std::pair<llvm::StringRef, mlir::Type>;
+
+    bool operator==(KeyTy key) const
+    {
+        return key.first == value && key.second == getType();
+    }
+
+    static llvm::hash_code hashKey(KeyTy key)
+    {
+        return llvm::hash_value(key);
+    }
+
+    static StringAttrStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
+    {
+        value.first = allocator.copyInto(value.first);
+        return new (allocator.allocate<StringAttrStorage>()) StringAttrStorage(value.first, value.second);
+    }
+};
+
+struct ListStorage : public mlir::AttributeStorage
+{
+    llvm::ArrayRef<mlir::Attribute> value;
+
+    ListStorage(llvm::ArrayRef<mlir::Attribute> value, mlir::Type type) : mlir::AttributeStorage(type), value(value) {}
+
+    using KeyTy = std::pair<llvm::ArrayRef<mlir::Attribute>, mlir::Type>;
+
+    bool operator==(KeyTy key) const
+    {
+        return key.first == value && key.second == getType();
+    }
+
+    static llvm::hash_code hashKey(KeyTy key)
+    {
+        return llvm::hash_value(key);
+    }
+
+    static ListStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
+    {
+        value.first = allocator.copyInto(value.first);
+        return new (allocator.allocate<ListStorage>()) ListStorage(value.first, value.second);
+    }
+};
+
+struct DictStorage : public mlir::AttributeStorage
+{
+    llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value;
+
+    DictStorage(llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value, mlir::Type type)
+        : mlir::AttributeStorage(type), value(value)
+    {
+    }
+
+    using KeyTy = std::pair<llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>>, mlir::Type>;
+
+    bool operator==(KeyTy key) const
+    {
+        return key.first == value && key.second == getType();
+    }
+
+    static llvm::hash_code hashKey(KeyTy key)
+    {
+        return llvm::hash_value(key);
+    }
+
+    static DictStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
+    {
+        value.first = allocator.copyInto(value.first);
+        return new (allocator.allocate<DictStorage>()) DictStorage(value.first, value.second);
     }
 };
 
@@ -126,17 +207,66 @@ public:
     }
 };
 
-class StringAttr : public mlir::Attribute::AttrBase<StringAttr, mlir::Attribute, detail::ValueAttrStorage<std::string>>
+class StringAttr : public mlir::Attribute::AttrBase<StringAttr, mlir::Attribute, detail::StringAttrStorage>
 {
 public:
     using Base::Base;
 
-    static StringAttr get(mlir::MLIRContext* context, std::string value)
+    static StringAttr get(mlir::MLIRContext* context, llvm::StringRef value)
     {
-        return Base::get(context, std::move(value), StringType::get(context));
+        return Base::get(context, value, StringType::get(context));
     }
 
     llvm::StringRef getValue()
+    {
+        return getImpl()->value;
+    }
+};
+
+class ListAttr : public mlir::Attribute::AttrBase<ListAttr, mlir::Attribute, detail::ListStorage>
+{
+public:
+    using Base::Base;
+
+    static ListAttr get(mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value)
+    {
+        return Base::get(context, value, ListType::get(context));
+    }
+
+    llvm::ArrayRef<mlir::Attribute> getValue()
+    {
+        return getImpl()->value;
+    }
+};
+
+class SetAttr : public mlir::Attribute::AttrBase<SetAttr, mlir::Attribute, detail::ListStorage>
+{
+public:
+    using Base::Base;
+
+    static SetAttr get(mlir::MLIRContext* context, llvm::DenseSet<mlir::Attribute> value)
+    {
+        return Base::get(context, std::vector<mlir::Attribute>{value.begin(), value.end()}, SetType::get(context));
+    }
+
+    llvm::ArrayRef<mlir::Attribute> getValue()
+    {
+        return getImpl()->value;
+    }
+};
+
+class DictAttr : public mlir::Attribute::AttrBase<DictAttr, mlir::Attribute, detail::DictStorage>
+{
+public:
+    using Base::Base;
+
+    static DictAttr get(mlir::MLIRContext* context, llvm::DenseMap<mlir::Attribute, mlir::Attribute> value)
+    {
+        return Base::get(context, std::vector<std::pair<mlir::Attribute, mlir::Attribute>>{value.begin(), value.end()},
+                         SetType::get(context));
+    }
+
+    llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> getValue()
     {
         return getImpl()->value;
     }

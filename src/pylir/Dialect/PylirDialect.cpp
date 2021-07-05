@@ -125,6 +125,96 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
         }
         return StringAttr::get(getContext(), value.str());
     }
+    if (ref == "list")
+    {
+        if (parser.parseLess() || parser.parseLSquare())
+        {
+            return {};
+        }
+        std::vector<mlir::Attribute> attributes;
+        {
+            mlir::Attribute attribute;
+            if (parser.parseAttribute(attribute))
+            {
+                return {};
+            }
+            attributes.push_back(attribute);
+        }
+        while (!parser.parseOptionalComma())
+        {
+            mlir::Attribute attribute;
+            if (parser.parseAttribute(attribute))
+            {
+                return {};
+            }
+            attributes.push_back(attribute);
+        }
+        if (parser.parseRSquare() || parser.parseGreater())
+        {
+            return {};
+        }
+        return ListAttr::get(getContext(), attributes);
+    }
+    if (ref == "set")
+    {
+        if (parser.parseLess() || parser.parseLBrace())
+        {
+            return {};
+        }
+        llvm::DenseSet<mlir::Attribute> attributes;
+        {
+            mlir::Attribute attribute;
+            if (parser.parseAttribute(attribute))
+            {
+                return {};
+            }
+            attributes.insert(attribute);
+        }
+        while (!parser.parseOptionalComma())
+        {
+            mlir::Attribute attribute;
+            if (parser.parseAttribute(attribute))
+            {
+                return {};
+            }
+            attributes.insert(attribute);
+        }
+        if (parser.parseRBrace() || parser.parseGreater())
+        {
+            return {};
+        }
+        return SetAttr::get(getContext(), attributes);
+    }
+    if (ref == "dict")
+    {
+        if (parser.parseLess() || parser.parseLBrace())
+        {
+            return {};
+        }
+        llvm::DenseMap<mlir::Attribute, mlir::Attribute> attributes;
+        {
+            mlir::Attribute key, value;
+            if (parser.parseAttribute(key) || parser.parseColon() || parser.parseAttribute(value))
+            {
+                return {};
+            }
+            attributes.insert({key, value});
+        }
+        while (!parser.parseOptionalComma())
+        {
+            mlir::Attribute key, value;
+            if (parser.parseAttribute(key) || parser.parseColon() || parser.parseAttribute(value))
+            {
+                return {};
+            }
+            attributes.insert({key, value});
+        }
+        if (parser.parseRBrace() || parser.parseGreater())
+        {
+            return {};
+        }
+        return DictAttr::get(getContext(), attributes);
+    }
     return {};
 }
 
@@ -136,7 +226,29 @@ void pylir::Dialect::PylirDialect::printAttribute(mlir::Attribute attribute, mli
         .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool<" << (attr.getValue() ? "true" : "false") << ">"; })
         .Case<IntegerAttr>([&](IntegerAttr attr)
                            { printer << "integer<\"" << attr.getValue().toString(10, false) << "\">"; })
-        .Case<StringAttr>([&](StringAttr attr) { printer << "string<\"" << attr.getValue() << "\">"; });
+        .Case<StringAttr>([&](StringAttr attr) { printer << "string<\"" << attr.getValue() << "\">"; })
+        .Case<ListAttr>(
+            [&](ListAttr attr)
+            {
+                printer << "list<[";
+                llvm::interleaveComma(attr.getValue(), printer);
+                printer << "]>";
+            })
+        .Case<SetAttr>(
+            [&](SetAttr attr)
+            {
+                printer << "set<{";
+                llvm::interleaveComma(attr.getValue(), printer);
+                printer << "}>";
+            })
+        .Case<DictAttr>(
+            [&](DictAttr attr)
+            {
+                printer << "dict<{";
+                llvm::interleaveComma(attr.getValue(), printer,
+                                      [&](const auto& pair) { printer << pair.first << " : " << pair.second; });
+                printer << "}>";
+            });
 }
 
 mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
@@ -200,7 +312,7 @@ void pylir::Dialect::VariantType::print(::mlir::DialectAsmPrinter& printer) cons
     printer << ">";
 }
 
-mlir::Type pylir::Dialect::FixedTupleType::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser)
+mlir::Type pylir::Dialect::FixedTupleType::parse(::mlir::MLIRContext*, ::mlir::DialectAsmParser& parser)
 {
     if (parser.parseLess())
     {
