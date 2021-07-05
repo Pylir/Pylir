@@ -5,10 +5,45 @@
 include "PylirTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
+include "mlir/IR/SymbolInterfaces.td"
 
 class Pylir_Op<string mneomic, list<OpTrait> traits = []> :
     Op<Pylir_Dialect, mneomic, traits> {
     let hasFolder = 1;
+}
+
+def Pylir_GlobalOp : Pylir_Op<"global", [Symbol]> {
+    let hasFolder = 0;
+
+    let arguments = (ins
+        SymbolNameAttr:$sym_name,
+        TypeAttr:$type
+    );
+
+    let assemblyFormat = [{
+             $sym_name `->` $type attr-dict
+        }];
+
+    let extraClassDeclaration = [{
+        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, mlir::Type type);
+
+        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name);
+    }];
+}
+
+def Pylir_HandleOfOp : Pylir_Op<"handleof"> {
+    let arguments = (ins FlatSymbolRefAttr:$globalName);
+    let results = (outs Pylir_Handle:$handle);
+
+    let hasFolder = 0;
+
+    let assemblyFormat = [{
+        $globalName attr-dict
+    }];
+
+    let builders = [
+                OpBuilderDAG<(ins "::mlir::FlatSymbolRefAttr":$globalName),
+                [{ build($_builder, $_state, ::pylir::Dialect::HandleType::get($_state.getContext()),globalName); }]>];
 }
 
 def Pylir_AllocaOp : Pylir_Op<"alloca"> {

@@ -6,13 +6,22 @@
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Parser/Syntax.hpp>
 
+#include <unordered_map>
+
 namespace pylir
 {
 class CodeGen
 {
     mlir::OpBuilder m_builder;
     mlir::ModuleOp m_module;
+    mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
+    std::vector<std::unordered_map<std::string_view, mlir::Operation*>> m_scope{1};
+
+    std::unordered_map<std::string_view, mlir::Operation*>& getCurrentScope()
+    {
+        return m_scope.back();
+    }
 
     void arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs);
 
@@ -28,6 +37,10 @@ class CodeGen
             &astObject, m_builder.getFileLineColLoc(m_builder.getIdentifier(m_document->getFilename()), line, col));
     }
 
+    void assignTarget(const Syntax::TargetList& targetList, mlir::Value value);
+
+    void assignTarget(const Syntax::Target& target, mlir::Value value);
+
 public:
     CodeGen(mlir::MLIRContext* context, Diag::Document& document);
 
@@ -41,7 +54,11 @@ public:
 
     void visit(const Syntax::SimpleStmt& simpleStmt);
 
+    void visit(const Syntax::AssignmentStmt& assignmentStmt);
+
     mlir::Value visit(const Syntax::StarredExpression& starredExpression);
+
+    mlir::Value visit(const Syntax::YieldExpression& yieldExpression);
 
     mlir::Value visit(const Syntax::Expression& expression);
 

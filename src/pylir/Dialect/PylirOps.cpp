@@ -555,6 +555,18 @@ bool pylir::Dialect::ToVariantOp::areCastCompatible(mlir::TypeRange inputs, mlir
     return outputs[0].isa<VariantType>();
 }
 
+pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name)
+{
+    return create(location, name, UnknownType::get(location.getContext()));
+}
+
+pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name,
+                                                          mlir::Type type)
+{
+    mlir::OpBuilder builder(location.getContext());
+    return builder.create<GlobalOp>(location, name, mlir::TypeAttr::get(type));
+}
+
 #include <pylir/Dialect/PylirOpsEnums.cpp.inc>
 
 // TODO: Remove in MLIR 13

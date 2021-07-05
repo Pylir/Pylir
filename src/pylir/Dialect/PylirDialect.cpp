@@ -190,12 +190,50 @@ mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext* context, ::ml
     {
         return {};
     }
-    return VariantType::get(context, containedTypes);
+    return VariantType::get(containedTypes);
 }
 
 void pylir::Dialect::VariantType::print(::mlir::DialectAsmPrinter& printer) const
 {
-    printer << "variant<";
+    printer << getMnemonic() << "<";
+    llvm::interleaveComma(getTypes(), printer);
+    printer << ">";
+}
+
+mlir::Type pylir::Dialect::FixedTupleType::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser)
+{
+    if (parser.parseLess())
+    {
+        return {};
+    }
+    llvm::SmallVector<mlir::Type> containedTypes;
+    {
+        Type containedType;
+        if (parser.parseType(containedType))
+        {
+            return {};
+        }
+        containedTypes.push_back(std::move(containedType));
+    }
+    while (!parser.parseOptionalComma())
+    {
+        Type containedType;
+        if (parser.parseType(containedType))
+        {
+            return {};
+        }
+        containedTypes.push_back(std::move(containedType));
+    }
+    if (parser.parseGreater())
+    {
+        return {};
+    }
+    return FixedTupleType::get(containedTypes);
+}
+
+void pylir::Dialect::FixedTupleType::print(::mlir::DialectAsmPrinter& printer) const
+{
+    printer << getMnemonic() << "<";
     llvm::interleaveComma(getTypes(), printer);
     printer << ">";
 }

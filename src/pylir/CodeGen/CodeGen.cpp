@@ -24,8 +24,8 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_module = mlir::ModuleOp::create(m_builder.getUnknownLoc());
-    auto initFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
-                                         mlir::FunctionType::get(m_builder.getContext(), {}, {}));
+    auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
+                                                         mlir::FunctionType::get(m_builder.getContext(), {}, {}));
     m_module.push_back(initFunc);
     m_builder.setInsertionPointToStart(initFunc.addEntryBlock());
     for (auto& iter : fileInput.input)
@@ -73,7 +73,95 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO
             PYLIR_UNREACHABLE;
         },
-        [&](const Syntax::StarredExpression& expression) { visit(expression); });
+        [&](const Syntax::StarredExpression& expression) { visit(expression); },
+        [&](const Syntax::AssignmentStmt& statement) { visit(statement); });
+}
+
+void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value value)
+{
+    pylir::match(
+        target.variant,
+        [&](const IdentifierToken& identifierToken)
+        {
+            auto location = getLoc(identifierToken, identifierToken);
+            auto result = getCurrentScope().find(identifierToken.getValue());
+            if (result != getCurrentScope().end())
+            {
+                mlir::Value handle;
+                if (auto alloca = llvm::dyn_cast<mlir::AllocaOp>(result->second))
+                {
+                    handle = alloca;
+                }
+                else
+                {
+                    auto global = llvm::cast<Dialect::GlobalOp>(result->second);
+                    handle = m_builder.create<Dialect::HandleOfOp>(
+                        location, mlir::FlatSymbolRefAttr::get(global.sym_name(), global.getContext()));
+                }
+                m_builder.create<Dialect::StoreOp>(location, value, handle);
+                return;
+            }
+            if (m_scope.size() == 1)
+            {
+                // We are in the global scope
+                auto op = Dialect::GlobalOp::create(location, identifierToken.getValue());
+                getCurrentScope().insert({identifierToken.getValue(), op});
+                m_module.push_back(op);
+                auto handle = m_builder.create<Dialect::HandleOfOp>(
+                    location, mlir::FlatSymbolRefAttr::get(op.sym_name(), op.getContext()));
+                m_builder.create<Dialect::StoreOp>(location, value, handle);
+                return;
+            }
+
+            auto alloca = m_builder.create<Dialect::AllocaOp>(location);
+            m_builder.create<Dialect::StoreOp>(location, value, alloca);
+            getCurrentScope().insert({identifierToken.getValue(), alloca});
+        },
+        [&](const Syntax::Target::Parenth& parenth)
+        {
+            if (parenth.targetList)
+            {
+                assignTarget(*parenth.targetList, value);
+                return;
+            }
+            // TODO
+            PYLIR_UNREACHABLE;
+        },
+        [&](const Syntax::Target::Square& square)
+        {
+            if (square.targetList)
+            {
+                assignTarget(*square.targetList, value);
+                return;
+            }
+            // TODO
+            PYLIR_UNREACHABLE;
+        },
+        [&](const auto&)
+        {
+            // TODO
+            PYLIR_UNREACHABLE;
+        });
+}
+
+void pylir::CodeGen::assignTarget(const Syntax::TargetList& targetList, mlir::Value value)
+{
+    if (targetList.remainingExpr.empty() && !targetList.trailingComma)
+    {
+        assignTarget(*targetList.firstExpr, value);
+        return;
+    }
+    // TODO
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
+{
+    auto rhs = pylir::match(assignmentStmt.variant, [&](const auto& value) { return visit(value); });
+    for (auto& [list, token] : assignmentStmt.targets)
+    {
+        assignTarget(list, rhs);
+    }
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpression)
@@ -87,6 +175,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
         },
         [&](const Syntax::Expression& expression) { return visit(expression); });
 }
+
+mlir::Value pylir::CodeGen::visit(const Syntax::YieldExpression& yieldExpression) {}
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Expression& expression)
 {
@@ -124,7 +214,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     }
     else
     {
-        resultType = Dialect::VariantType::get(m_builder.getContext(), {thenValue.getType(), elseValue.getType()});
+        resultType = Dialect::VariantType::get({thenValue.getType(), elseValue.getType()});
     }
     auto ifOp = m_builder.create<mlir::scf::IfOp>(tmpIfOp->mlir::Operation::getLoc(), resultType, condition, true);
     ifOp.thenRegion().takeBody(tmpIfOp.thenRegion());
@@ -587,8 +677,25 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
         },
         [&](const IdentifierToken& identifierToken) -> mlir::Value
         {
-            // TODO
-            PYLIR_UNREACHABLE;
+            auto loc = getLoc(identifierToken, identifierToken);
+            auto result = getCurrentScope().find(identifierToken.getValue());
+            if (result == getCurrentScope().end())
+            {
+                // TODO
+                PYLIR_UNREACHABLE;
+            }
+            mlir::Value handle;
+            if (auto alloca = llvm::dyn_cast<Dialect::AllocaOp>(result->second))
+            {
+                handle = alloca;
+            }
+            else
+            {
+                auto global = llvm::cast<Dialect::GlobalOp>(result->second);
+                handle = m_builder.create<Dialect::HandleOfOp>(
+                    loc, mlir::FlatSymbolRefAttr::get(global.sym_name(), global.getContext()));
+            }
+            return m_builder.create<Dialect::LoadOp>(loc, handle);
         },
         [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
 }

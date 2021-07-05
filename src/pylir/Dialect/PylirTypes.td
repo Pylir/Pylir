@@ -47,6 +47,24 @@ def Pylir_Tuple : Pylir_Type<"Tuple"> {
     let mnemonic = "tuple";
 }
 
+def Pylir_FixedTuple : Pylir_Type<"FixedTuple"> {
+
+    let mnemonic = "fixedtuple";
+    let parameters = (ins ArrayRefParameter<"::mlir::Type", "elements">: $types);
+    let parser = ?;
+    let printer = ?;
+
+    let builders = [
+            TypeBuilderWithInferredContext<(ins "llvm::ArrayRef<mlir::Type>":$elementTypes), [{
+              return Base::get(elementTypes[0].getContext(), elementTypes);
+            }], [{
+              return Base::getChecked($_loc, elementTypes);
+            }]>
+          ];
+
+    let skipDefaultBuilders = 1;
+}
+
 def Pylir_Dict : Pylir_Type<"Dict"> {
     let mnemonic = "dict";
 }
@@ -60,8 +78,8 @@ def Pylir_Variant : Pylir_Type<"Variant"> {
     let genVerifyInvariantsDecl = 1;
 
     let builders = [
-        TypeBuilder<(ins "llvm::ArrayRef<mlir::Type>":$elementTypes), [{
-          return Base::get($_ctxt, detail::variantUnion(elementTypes));
+        TypeBuilderWithInferredContext<(ins "llvm::ArrayRef<mlir::Type>":$elementTypes), [{
+          return Base::get(elementTypes[0].getContext(), detail::variantUnion(elementTypes));
         }], [{
           return Base::getChecked($_loc,  detail::variantUnion(elementTypes));
         }]>
