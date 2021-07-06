@@ -191,14 +191,18 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
         {
             return {};
         }
-        llvm::DenseMap<mlir::Attribute, mlir::Attribute> attributes;
+        llvm::DenseMap<mlir::Attribute, mlir::Attribute> map;
+        std::vector<std::pair<mlir::Attribute, mlir::Attribute>> values;
         {
             mlir::Attribute key, value;
             if (parser.parseAttribute(key) || parser.parseColon() || parser.parseAttribute(value))
             {
                 return {};
             }
-            attributes.insert({key, value});
+            if (map.insert({key, value}).second)
+            {
+                values.emplace_back(key, value);
+            }
         }
         while (!parser.parseOptionalComma())
         {
@@ -207,13 +211,16 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
             {
                 return {};
             }
-            attributes.insert({key, value});
+            if (map.insert({key, value}).second)
+            {
+                values.emplace_back(key, value);
+            }
         }
         if (parser.parseRBrace() || parser.parseGreater())
         {
             return {};
         }
-        return DictAttr::get(getContext(), attributes);
+        return DictAttr::getAlreadySorted(getContext(), values);
     }
     return {};
 }

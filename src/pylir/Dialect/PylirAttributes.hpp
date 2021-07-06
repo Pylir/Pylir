@@ -260,10 +260,24 @@ class DictAttr : public mlir::Attribute::AttrBase<DictAttr, mlir::Attribute, det
 public:
     using Base::Base;
 
-    static DictAttr get(mlir::MLIRContext* context, llvm::DenseMap<mlir::Attribute, mlir::Attribute> value)
+    static DictAttr get(mlir::MLIRContext* context, llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
     {
-        return Base::get(context, std::vector<std::pair<mlir::Attribute, mlir::Attribute>>{value.begin(), value.end()},
-                         SetType::get(context));
+        llvm::DenseMap<mlir::Attribute, mlir::Attribute> map;
+        std::vector<std::pair<mlir::Attribute, mlir::Attribute>> values;
+        for (auto& iter : value)
+        {
+            if (map.insert(iter).second)
+            {
+                values.push_back(iter);
+            }
+        }
+        return Base::get(context, values, SetType::get(context));
+    }
+
+    static DictAttr getAlreadySorted(mlir::MLIRContext* context,
+                                     llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
+    {
+        return Base::get(context, value, SetType::get(context));
     }
 
     llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> getValue()
