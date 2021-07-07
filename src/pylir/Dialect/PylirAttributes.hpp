@@ -266,25 +266,6 @@ public:
     }
 };
 
-class FixedTupleAttr : public mlir::Attribute::AttrBase<FixedTupleAttr, mlir::Attribute, detail::ListStorage>
-{
-public:
-    using Base::Base;
-
-    static FixedTupleAttr get(mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value)
-    {
-        std::vector<mlir::Type> types;
-        std::transform(value.begin(), value.end(), std::back_inserter(types),
-                       [](mlir::Attribute attr) { return attr.getType(); });
-        return Base::get(context, value, FixedTupleType::get(types));
-    }
-
-    llvm::ArrayRef<mlir::Attribute> getValue()
-    {
-        return getImpl()->value;
-    }
-};
-
 class SetAttr : public mlir::Attribute::AttrBase<SetAttr, mlir::Attribute, detail::ListStorage>
 {
 public:

@@ -319,44 +319,6 @@ void pylir::Dialect::VariantType::print(::mlir::DialectAsmPrinter& printer) cons
     printer << ">";
 }
 
-mlir::Type pylir::Dialect::FixedTupleType::parse(::mlir::MLIRContext*, ::mlir::DialectAsmParser& parser)
-{
-    if (parser.parseLess())
-    {
-        return {};
-    }
-    llvm::SmallVector<mlir::Type> containedTypes;
-    {
-        Type containedType;
-        if (parser.parseType(containedType))
-        {
-            return {};
-        }
-        containedTypes.push_back(std::move(containedType));
-    }
-    while (!parser.parseOptionalComma())
-    {
-        Type containedType;
-        if (parser.parseType(containedType))
-        {
-            return {};
-        }
-        containedTypes.push_back(std::move(containedType));
-    }
-    if (parser.parseGreater())
-    {
-        return {};
-    }
-    return FixedTupleType::get(containedTypes);
-}
-
-void pylir::Dialect::FixedTupleType::print(::mlir::DialectAsmPrinter& printer) const
-{
-    printer << getMnemonic() << "<";
-    llvm::interleaveComma(getTypes(), printer);
-    printer << ">";
-}
-
 mlir::LogicalResult pylir::Dialect::VariantType::verifyConstructionInvariants(::mlir::Location loc,
                                                                               ::llvm::ArrayRef<::mlir::Type> types)
 {

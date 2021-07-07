@@ -237,20 +237,6 @@ def Pylir_ToVariantOp : Pylir_Cast<"toVariant"> {
     let results = (outs Pylir_Variant:$result);
 }
 
-def Pylir_MakeFixedTuple : Pylir_Op<"makeFixedTuple", [NoSideEffect, DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-    let arguments = (ins Variadic<AnyPythonType>:$input);
-    let results = (outs Pylir_FixedTuple:$result);
-
-    let assemblyFormat = [{
-              $input `:` type($input) `->` type($result) attr-dict
-            }];
-}
-
-def Pylir_FixedToTuple : Pylir_Cast<"fixedToTuple"> {
-    let arguments = (ins Pylir_FixedTuple:$input);
-    let results = (outs Pylir_Tuple:$result);
-}
-
 def Pylir_MakeList : Pylir_Op<"makeList", [NoSideEffect]> {
     let arguments = (ins Variadic<AnyPythonType>:$input);
     let results = (outs Pylir_List:$result);
@@ -261,7 +247,7 @@ def Pylir_MakeList : Pylir_Op<"makeList", [NoSideEffect]> {
 }
 
 def Pylir_TupleToList : Pylir_Cast<"tupleToList"> {
-    let arguments = (ins AnyPythonTuple:$input);
+    let arguments = (ins Pylir_Tuple:$input);
     let results = (outs Pylir_List:$result);
 }
 
