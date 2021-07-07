@@ -270,6 +270,41 @@ def Pylir_ListToTuple : Pylir_Cast<"listToTuple"> {
     let results = (outs Pylir_Tuple:$result);
 }
 
+def Pylir_TypeOf : Pylir_Op<"typeOf", [NoSideEffect]> {
+    let arguments = (ins AnyPythonType:$input);
+    let results = (outs Pylir_Unknown:$result);
 
+    let assemblyFormat = [{
+                  $input `:` type($input) attr-dict
+                }];
+
+    let hasFolder = 0;
+}
+
+def Pylir_GetAttr : Pylir_Op<"getAttr", [NoSideEffect]> {
+    let arguments = (ins AnyPythonType:$input, StrAttr:$member);
+    let results = (outs AnyPythonType:$result);
+
+    let assemblyFormat = [{
+                      $member `from` $input `:` type($input) `->` type($result) attr-dict
+                    }];
+
+    let hasFolder = 0;
+
+    let builders = [
+            OpBuilderDAG<(ins "mlir::Value":$value, "mlir::StringAttr":$member),
+            [{ build($_builder, $_state, ::pylir::Dialect::UnknownType::get($_state.getContext()), value, member); }]>];
+}
+
+def Pylir_Identity : Pylir_Op<"id", [NoSideEffect]> {
+    let arguments = (ins AnyPythonType:$input);
+    let results = (outs Pylir_Integer:$result);
+
+    let assemblyFormat = [{
+                      $input `:` type($input) attr-dict
+                    }];
+
+    let hasFolder = 0;
+}
 
 #endif

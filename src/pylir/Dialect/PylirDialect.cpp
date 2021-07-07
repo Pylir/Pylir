@@ -281,7 +281,7 @@ std::vector<mlir::Type> pylir::Dialect::detail::variantUnion(llvm::ArrayRef<mlir
     return {unique.begin(), unique.end()};
 }
 
-mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser)
+mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext* , ::mlir::DialectAsmParser& parser)
 {
     if (parser.parseLess())
     {
