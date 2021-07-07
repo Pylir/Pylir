@@ -18,5 +18,5 @@ add_mlir_dialect_library(PylirDialect
         DEPENDS
         MLIRPylirOpsIncGen
 
-        LINK_LIBS PUBLIC MLIRIR Support
+        LINK_LIBS PUBLIC MLIRIR Support MLIRInferTypeOpInterface
         )

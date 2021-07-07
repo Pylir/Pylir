@@ -5,6 +5,7 @@
 include "PylirTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class Pylir_Op<string mneomic, list<OpTrait> traits = []> :
@@ -40,10 +41,6 @@ def Pylir_HandleOfOp : Pylir_Op<"handleof"> {
     let assemblyFormat = [{
         $globalName attr-dict
     }];
-
-    let builders = [
-                OpBuilderDAG<(ins "::mlir::FlatSymbolRefAttr":$globalName),
-                [{ build($_builder, $_state, ::pylir::Dialect::HandleType::get($_state.getContext()),globalName); }]>];
 }
 
 def Pylir_AllocaOp : Pylir_Op<"alloca"> {
@@ -54,10 +51,6 @@ def Pylir_AllocaOp : Pylir_Op<"alloca"> {
     let assemblyFormat = [{
          `->` type($handle) attr-dict
     }];
-
-    let builders = [
-            OpBuilderDAG<(ins),
-            [{ build($_builder, $_state, ::pylir::Dialect::HandleType::get($_state.getContext())); }]>];
 }
 
 def Pylir_LoadOp : Pylir_Op<"load"> {
@@ -69,10 +62,6 @@ def Pylir_LoadOp : Pylir_Op<"load"> {
     let assemblyFormat = [{
         $handle `->` type($result) attr-dict
     }];
-
-    let builders = [
-                OpBuilderDAG<(ins "mlir::Value":$handle),
-                [{ build($_builder, $_state, ::pylir::Dialect::UnknownType::get($_state.getContext()), handle); }]>];
 }
 
 def Pylir_StoreOp : Pylir_Op<"store"> {
@@ -121,10 +110,6 @@ def Pylir_IMulOp : Pylir_IBinOp<"imul", [Commutative]>;
 
 def Pylir_IDivOp : Pylir_BinOp<"itruediv", [SameTypeOperands]> {
     let results = (outs Pylir_Float:$result);
-
-    let builders = [
-                OpBuilderDAG<(ins "mlir::Value":$lhs,"mlir::Value":$rhs),
-                [{ build($_builder, $_state, FloatType::get($_state.getContext()), lhs, rhs); }]>];
 }
 
 def Pylir_IFloorDivOp : Pylir_IBinOp<"ifloordiv">;
@@ -171,10 +156,6 @@ def Pylir_ICmpOp : Pylir_Op<"icmp",[SameTypeOperands, NoSideEffect]> {
     let assemblyFormat = "$predicate $lhs `:` type($lhs) `,` $rhs `:` type($rhs) attr-dict";
 
     let hasFolder = 1;
-
-    let builders = [
-                    OpBuilderDAG<(ins "::pylir::Dialect::CmpPredicate":$predicate,"mlir::Value":$lhs,"mlir::Value":$rhs),
-                    [{ build($_builder, $_state, BoolType::get($_state.getContext()), predicate, lhs, rhs); }]>];
 }
 
 class Pylir_FBinOp<string name, list<OpTrait> traits = []> :
@@ -202,10 +183,6 @@ def Pylir_FCmpOp : Pylir_Op<"fcmp",[SameTypeOperands, NoSideEffect]> {
     let assemblyFormat = "$predicate $lhs `:` type($lhs) `,` $rhs `:` type($rhs) attr-dict";
 
     let hasFolder = 1;
-
-    let builders = [
-                    OpBuilderDAG<(ins "::pylir::Dialect::CmpPredicate":$predicate,"mlir::Value":$lhs,"mlir::Value":$rhs),
-                    [{ build($_builder, $_state, BoolType::get($_state.getContext()), predicate, lhs, rhs); }]>];
 }
 
 class Pylir_BBinOp<string name, list<OpTrait> traits = []> :
@@ -241,35 +218,58 @@ class Pylir_Cast<string name, list<OpTrait> traits = []>
 def Pylir_ItoFOp : Pylir_Cast<"itof"> {
     let arguments = (ins Pylir_Integer:$input);
     let results = (outs Pylir_Float:$result);
-
-    let builders = [
-            OpBuilderDAG<(ins "mlir::Value":$value),
-            [{ build($_builder, $_state, FloatType::get($_state.getContext()), value); }]>];
 }
 
 def Pylir_BtoIOp : Pylir_Cast<"btoi"> {
     let arguments = (ins Pylir_Bool:$input);
     let results = (outs Pylir_Float:$result);
-
-    let builders = [
-            OpBuilderDAG<(ins "mlir::Value":$value),
-            [{ build($_builder, $_state, IntegerType::get($_state.getContext()), value); }]>];
 }
 
 def Pylir_BtoI1Op : Pylir_Cast<"btoI1"> {
     let arguments = (ins Pylir_Bool:$input);
     let results = (outs I1:$result);
 
-    let builders = [
-                OpBuilderDAG<(ins "mlir::Value":$value),
-                [{ build($_builder, $_state, ::mlir::IntegerType::get($_state.getContext(),1), value); }]>];
-
     let hasFolder = 0;
 }
 
 def Pylir_ToVariantOp : Pylir_Cast<"toVariant"> {
-    let arguments = (ins AnyType:$input);
+    let arguments = (ins AnyPythonType:$input);
     let results = (outs Pylir_Variant:$result);
 }
+
+def Pylir_MakeFixedTuple : Pylir_Op<"makeFixedTuple", [NoSideEffect, DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+    let arguments = (ins Variadic<AnyPythonType>:$input);
+    let results = (outs Pylir_FixedTuple:$result);
+
+    let assemblyFormat = [{
+              $input `:` type($input) `->` type($result) attr-dict
+            }];
+}
+
+def Pylir_FixedToTuple : Pylir_Cast<"fixedToTuple"> {
+    let arguments = (ins Pylir_FixedTuple:$input);
+    let results = (outs Pylir_Tuple:$result);
+}
+
+def Pylir_MakeList : Pylir_Op<"makeList", [NoSideEffect]> {
+    let arguments = (ins Variadic<AnyPythonType>:$input);
+    let results = (outs Pylir_List:$result);
+
+    let assemblyFormat = [{
+              $input `:` type($input) `->` type($result) attr-dict
+            }];
+}
+
+def Pylir_TupleToList : Pylir_Cast<"tupleToList"> {
+    let arguments = (ins AnyPythonTuple:$input);
+    let results = (outs Pylir_List:$result);
+}
+
+def Pylir_ListToTuple : Pylir_Cast<"listToTuple"> {
+    let arguments = (ins Pylir_List:$input);
+    let results = (outs Pylir_Tuple:$result);
+}
+
+
 
 #endif

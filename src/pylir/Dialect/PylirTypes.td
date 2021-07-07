@@ -88,6 +88,8 @@ def Pylir_Variant : Pylir_Type<"Variant"> {
     let skipDefaultBuilders = 1;
 }
 
+def AnyPythonTuple : AnyTypeOf<[Pylir_Tuple,Pylir_FixedTuple]>;
+
 def AnyPythonType
 : AnyTypeOf<[Pylir_Unknown, Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_None,
              Pylir_NotImplemented, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple,

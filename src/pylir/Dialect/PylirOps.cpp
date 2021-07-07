@@ -552,7 +552,11 @@ bool pylir::Dialect::ToVariantOp::areCastCompatible(mlir::TypeRange inputs, mlir
     {
         return false;
     }
-    return outputs[0].isa<VariantType>();
+    if (auto variantType = outputs[0].dyn_cast<VariantType>())
+    {
+        return std::count(variantType.getTypes().begin(), variantType.getTypes().end(), inputs[0]) > 0;
+    }
+    return false;
 }
 
 pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name)
@@ -565,6 +569,95 @@ pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location locatio
 {
     mlir::OpBuilder builder(location.getContext());
     return builder.create<GlobalOp>(location, name, mlir::TypeAttr::get(type));
+}
+
+mlir::OpFoldResult pylir::Dialect::MakeFixedTuple::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (std::all_of(operands.begin(), operands.end(),
+                    [](mlir::Attribute attr) -> bool { return static_cast<bool>(attr); }))
+    {
+        return pylir::Dialect::FixedTupleAttr::get(getContext(), operands);
+    }
+    return nullptr;
+}
+
+mlir::LogicalResult pylir::Dialect::MakeFixedTuple::inferReturnTypes(
+    ::mlir::MLIRContext*, ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange operands, ::mlir::DictionaryAttr,
+    ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    std::vector<mlir::Type> types;
+    std::transform(operands.begin(), operands.end(), std::back_inserter(types),
+                   [](mlir::Value value) { return value.getType(); });
+    inferredReturnTypes.push_back(FixedTupleType::get(types));
+    return mlir::success();
+}
+
+mlir::OpFoldResult pylir::Dialect::FixedToTuple::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (auto attr = operands[0].dyn_cast_or_null<FixedTupleAttr>())
+    {
+        return TupleAttr::get(getContext(), attr.getValue());
+    }
+    return nullptr;
+}
+
+bool pylir::Dialect::FixedToTuple::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return inputs[0].isa<FixedTupleType>() && outputs[0].isa<TupleType>();
+}
+
+mlir::OpFoldResult pylir::Dialect::MakeList::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
+    {
+        return ListAttr::get(getContext(), operands);
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Dialect::TupleToList::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    PYLIR_ASSERT(operands.size() == 1);
+    if (auto tuple = operands[0].dyn_cast_or_null<TupleAttr>())
+    {
+        return ListAttr::get(getContext(), tuple.getValue());
+    }
+    if (auto tuple = operands[0].dyn_cast_or_null<FixedTupleAttr>())
+    {
+        return ListAttr::get(getContext(), tuple.getValue());
+    }
+    return nullptr;
+}
+
+bool pylir::Dialect::TupleToList::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return inputs[0].isa<FixedTupleType, TupleType>() && outputs[0].isa<ListType>();
+}
+
+mlir::OpFoldResult pylir::Dialect::ListToTuple::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (auto list = operands[0].dyn_cast_or_null<ListAttr>())
+    {
+        return TupleAttr::get(getContext(), list.getValue());
+    }
+    return nullptr;
+}
+
+bool pylir::Dialect::ListToTuple::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return outputs[0].isa<TupleType>() && inputs[0].isa<ListType>();
 }
 
 #include <pylir/Dialect/PylirOpsEnums.cpp.inc>
