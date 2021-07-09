@@ -1,7 +1,6 @@
 #include "CodeGen.hpp"
 
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
-#include <mlir/IR/Block.h>
 
 #include <pylir/Dialect/PylirAttributes.hpp>
 #include <pylir/Dialect/PylirDialect.hpp>
@@ -174,7 +173,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
         [&](const Syntax::Expression& expression) { return visit(expression); });
 }
 
-mlir::Value pylir::CodeGen::visit(const Syntax::YieldExpression& yieldExpression) {}
+mlir::Value pylir::CodeGen::visit(const Syntax::YieldExpression& yieldExpression)
+{
+    return {};
+}
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Expression& expression)
 {

@@ -304,14 +304,22 @@ def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
     let hasFolder = 0;
 }
 
-def Pylir_CallOp : Pylir_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]>
-{
+def Pylir_CallOp : Pylir_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
     let arguments = (ins AnyPythonType:$callee, Variadic<AnyPythonType>:$operands);
     let results = (outs AnyPythonType:$result);
 
     let assemblyFormat = "$callee `:` type($callee)  `(` $operands `)` `->` functional-type($operands, results) attr-dict";
 
     let hasFolder = 0;
+}
+
+def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
+    let hasFolder = 0;
+
+    let arguments = (ins AnyPythonType:$exception);
+    let results = (outs);
+
+    let assemblyFormat = "$exception `:` type($exception) attr-dict";
 }
 
 #endif
