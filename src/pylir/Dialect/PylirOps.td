@@ -5,6 +5,7 @@
 include "PylirTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
@@ -32,7 +33,7 @@ def Pylir_GlobalOp : Pylir_Op<"global", [Symbol]> {
     }];
 }
 
-def Pylir_HandleOfOp : Pylir_Op<"handleof"> {
+def Pylir_HandleOfOp : Pylir_Op<"handleof",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$globalName);
     let results = (outs Pylir_Handle:$handle);
 
@@ -57,7 +58,7 @@ def Pylir_LoadOp : Pylir_Op<"load"> {
     let hasFolder = 0;
 
     let arguments = (ins Arg<Pylir_Handle, "", [MemRead]>:$handle);
-    let results = (outs Pylir_Unknown:$result);
+    let results = (outs AnyPythonType:$result);
 
     let assemblyFormat = [{
         $handle `->` type($result) attr-dict
@@ -237,7 +238,7 @@ def Pylir_ToVariantOp : Pylir_Cast<"toVariant"> {
     let results = (outs Pylir_Variant:$result);
 }
 
-def Pylir_MakeList : Pylir_Op<"makeList", [NoSideEffect]> {
+def Pylir_MakeListOp : Pylir_Op<"makeList", [NoSideEffect]> {
     let arguments = (ins Variadic<AnyPythonType>:$input);
     let results = (outs Pylir_List:$result);
 
@@ -246,28 +247,37 @@ def Pylir_MakeList : Pylir_Op<"makeList", [NoSideEffect]> {
             }];
 }
 
-def Pylir_TupleToList : Pylir_Cast<"tupleToList"> {
+def Pylir_MakeTupleOp : Pylir_Op<"makeTuple", [NoSideEffect]> {
+    let arguments = (ins Variadic<AnyPythonType>:$input);
+    let results = (outs Pylir_Tuple:$result);
+
+    let assemblyFormat = [{
+              $input `:` type($input) `->` type($result) attr-dict
+            }];
+}
+
+def Pylir_TupleToListOp : Pylir_Cast<"tupleToList"> {
     let arguments = (ins Pylir_Tuple:$input);
     let results = (outs Pylir_List:$result);
 }
 
-def Pylir_ListToTuple : Pylir_Cast<"listToTuple"> {
+def Pylir_ListToTupleOp : Pylir_Cast<"listToTuple"> {
     let arguments = (ins Pylir_List:$input);
     let results = (outs Pylir_Tuple:$result);
 }
 
-def Pylir_TypeOf : Pylir_Op<"typeOf", [NoSideEffect]> {
+def Pylir_TypeOfOp : Pylir_Op<"typeOf", [NoSideEffect]> {
     let arguments = (ins AnyPythonType:$input);
-    let results = (outs Pylir_Unknown:$result);
+    let results = (outs AnyPythonType:$result);
 
     let assemblyFormat = [{
-                  $input `:` type($input) attr-dict
+                  $input `:` type($input) `->` type($result) attr-dict
                 }];
 
     let hasFolder = 0;
 }
 
-def Pylir_GetAttr : Pylir_Op<"getAttr", [NoSideEffect]> {
+def Pylir_GetAttrOp : Pylir_Op<"getAttr", [NoSideEffect]> {
     let arguments = (ins AnyPythonType:$input, StrAttr:$member);
     let results = (outs AnyPythonType:$result);
 
@@ -282,13 +292,24 @@ def Pylir_GetAttr : Pylir_Op<"getAttr", [NoSideEffect]> {
             [{ build($_builder, $_state, ::pylir::Dialect::UnknownType::get($_state.getContext()), value, member); }]>];
 }
 
-def Pylir_Identity : Pylir_Op<"id", [NoSideEffect]> {
+def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
     let arguments = (ins AnyPythonType:$input);
     let results = (outs Pylir_Integer:$result);
 
     let assemblyFormat = [{
                       $input `:` type($input) attr-dict
                     }];
+
+    let hasFolder = 0;
+    let hasFolder = 0;
+}
+
+def Pylir_CallOp : Pylir_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]>
+{
+    let arguments = (ins AnyPythonType:$callee, Variadic<AnyPythonType>:$operands);
+    let results = (outs AnyPythonType:$result);
+
+    let assemblyFormat = "$callee `:` type($callee)  `(` $operands `)` `->` functional-type($operands, results) attr-dict";
 
     let hasFolder = 0;
 }

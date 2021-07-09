@@ -24,7 +24,8 @@ void pylir::Dialect::PylirDialect::initialize()
 #define GET_TYPEDEF_LIST
 #include "pylir/Dialect/PylirOpsTypes.cpp.inc"
         >();
-    addAttributes<NoneAttr, BoolAttr, FloatAttr, IntegerAttr, StringAttr>();
+    addAttributes<NoneAttr, BoolAttr, FloatAttr, IntegerAttr, StringAttr, ListAttr, TupleAttr, SetAttr, DictAttr,
+                  NotImplementedAttr>();
 }
 
 mlir::Type pylir::Dialect::PylirDialect::parseType(::mlir::DialectAsmParser& parser) const
@@ -52,6 +53,10 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (ref == "none")
     {
         return NoneAttr::get(getContext());
+    }
+    if (ref == "notImplemented")
+    {
+        return NotImplementedAttr::get(getContext());
     }
     if (ref == "float")
     {
@@ -229,6 +234,7 @@ void pylir::Dialect::PylirDialect::printAttribute(mlir::Attribute attribute, mli
 {
     llvm::TypeSwitch<mlir::Attribute>(attribute)
         .Case<NoneAttr>([&](NoneAttr) { printer << "none"; })
+        .Case<NotImplementedAttr>([&](NotImplementedAttr) { printer << "notImplemented"; })
         .Case<FloatAttr>([&](FloatAttr attr) { printer << "float<" << attr.getValue() << ">"; })
         .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool<" << (attr.getValue() ? "true" : "false") << ">"; })
         .Case<IntegerAttr>([&](IntegerAttr attr)

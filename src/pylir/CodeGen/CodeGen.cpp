@@ -1,6 +1,5 @@
 #include "CodeGen.hpp"
 
-#include <mlir/Dialect/SCF/SCF.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/IR/Block.h>
 
@@ -13,7 +12,6 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
         [&]
         {
             context->loadDialect<pylir::Dialect::PylirDialect>();
-            context->loadDialect<mlir::scf::SCFDialect>();
             context->loadDialect<mlir::StandardOpsDialect>();
             return context;
         }()),
@@ -196,44 +194,32 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     {
         return visit(expression.value);
     }
-    auto condition =
-        m_builder.create<Dialect::BtoI1Op>(m_builder.getUnknownLoc(), toBool(visit(*expression.suffix->test)));
-    mlir::Value thenValue;
-    mlir::Value elseValue;
+    auto loc = getLoc(expression, expression.suffix->ifToken);
 
-    auto tmpIfOp = m_builder.create<mlir::scf::IfOp>(
-        getLoc(expression, expression.suffix->ifToken), condition,
-        [&](mlir::OpBuilder&, mlir::Location) { thenValue = visit(expression.value); },
-        [&](mlir::OpBuilder&, mlir::Location) { elseValue = visit(*expression.suffix->elseValue); });
-    mlir::Type resultType;
-    bool variant = true;
-    if (thenValue.getType() == elseValue.getType())
-    {
-        resultType = thenValue.getType();
-        variant = false;
-    }
-    else
-    {
-        resultType = Dialect::VariantType::get({thenValue.getType(), elseValue.getType()});
-    }
-    auto ifOp = m_builder.create<mlir::scf::IfOp>(tmpIfOp->mlir::Operation::getLoc(), resultType, condition, true);
-    ifOp.thenRegion().takeBody(tmpIfOp.thenRegion());
-    ifOp.elseRegion().takeBody(tmpIfOp.elseRegion());
-    tmpIfOp->mlir::Operation::erase();
-    auto guard = mlir::OpBuilder::InsertionGuard{m_builder};
-    m_builder.setInsertionPointToEnd(&ifOp.thenRegion().back());
-    if (variant)
-    {
-        thenValue = m_builder.create<Dialect::ToVariantOp>(m_builder.getUnknownLoc(), resultType, thenValue);
-    }
-    m_builder.create<mlir::scf::YieldOp>(m_builder.getUnknownLoc(), thenValue);
-    m_builder.setInsertionPointToEnd(&ifOp.elseRegion().back());
-    if (variant)
-    {
-        elseValue = m_builder.create<Dialect::ToVariantOp>(m_builder.getUnknownLoc(), resultType, elseValue);
-    }
-    m_builder.create<mlir::scf::YieldOp>(m_builder.getUnknownLoc(), elseValue);
-    return ifOp.results()[0];
+    auto result = m_builder.create<Dialect::AllocaOp>(loc);
+
+    mlir::Block* thenBlock = new mlir::Block;
+    mlir::Block* elseBlock = new mlir::Block;
+    mlir::Block* continueBlock = new mlir::Block;
+
+    m_builder.create<mlir::CondBranchOp>(
+        loc, m_builder.create<Dialect::BtoI1Op>(loc, toBool(visit(*expression.suffix->test))), thenBlock, elseBlock);
+
+    m_currentFunc.getCallableRegion()->push_back(thenBlock);
+    m_builder.setInsertionPointToStart(thenBlock);
+    auto thenValue = visit(expression.value);
+    m_builder.create<Dialect::StoreOp>(loc, thenValue, result);
+    m_builder.create<mlir::BranchOp>(loc, continueBlock);
+
+    m_currentFunc.getCallableRegion()->push_back(elseBlock);
+    m_builder.setInsertionPointToStart(elseBlock);
+    auto elseValue = visit(*expression.suffix->elseValue);
+    m_builder.create<Dialect::StoreOp>(loc, elseValue, result);
+    m_builder.create<mlir::BranchOp>(loc, continueBlock);
+
+    m_currentFunc.getCallableRegion()->push_back(continueBlock);
+    m_builder.setInsertionPointToStart(continueBlock);
+    return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), result);
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
@@ -493,21 +479,12 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AExpr& aExpr)
                     default: PYLIR_UNREACHABLE;
                 }
             }
-            auto lhsType = m_builder.create<Dialect::TypeOf>(loc, lhs);
-            auto addFunc = m_builder.create<Dialect::GetAttr>(loc, lhsType, m_builder.getStringAttr("__attr__"));
-            auto id = m_builder.create<Dialect::Identity>(loc, addFunc);
-            auto noneConstant =
-                m_builder.create<Dialect::ConstantOp>(loc, Dialect::NoneAttr::get(m_builder.getContext()));
-            auto noneId = m_builder.create<Dialect::Identity>(loc, noneConstant);
-            auto notImplementedConstant =
-                m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
-            auto notImplementedId = m_builder.create<Dialect::Identity>(loc, notImplementedConstant);
-            auto notNone = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::NE, id, noneId);
-            auto notNotImplemented =
-                m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::NE, id, notImplementedId);
-            auto condition = m_builder.create<Dialect::BAndOp>(loc, notNone, notNotImplemented);
-            //TODO
-            PYLIR_UNREACHABLE;
+            switch (binOp->binToken.getTokenType())
+            {
+                case TokenType::Plus: return binOpWithFallback(loc, lhs, rhs, "__add__", "__radd__");
+                case TokenType::Minus: return binOpWithFallback(loc, lhs, rhs, "__sub__", "__rsub__");
+                default: PYLIR_UNREACHABLE;
+            }
         });
 }
 
@@ -705,7 +682,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 handle = m_builder.create<Dialect::HandleOfOp>(
                     loc, mlir::FlatSymbolRefAttr::get(global.sym_name(), global.getContext()));
             }
-            return m_builder.create<Dialect::LoadOp>(loc, handle);
+            return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), handle);
         },
         [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
 }
@@ -784,4 +761,95 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
             // TODO
             PYLIR_UNREACHABLE;
         });
+}
+
+mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
+                                              std::string_view opName, std::string_view fallback)
+{
+    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), lhs);
+    auto addFunc = m_builder.create<Dialect::GetAttrOp>(loc, lhsType, m_builder.getStringAttr(opName));
+    auto id = m_builder.create<Dialect::IdOp>(loc, addFunc);
+    auto noneConstant = m_builder.create<Dialect::ConstantOp>(loc, Dialect::NoneAttr::get(m_builder.getContext()));
+    auto noneId = m_builder.create<Dialect::IdOp>(loc, noneConstant);
+
+    auto notNone = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::NE, id, noneId);
+    auto b1 = m_builder.create<Dialect::BtoI1Op>(loc, notNone);
+    auto result = m_builder.create<Dialect::AllocaOp>(loc);
+
+    auto* foundBlock = new mlir::Block;
+    auto* notFoundBlock = new mlir::Block;
+    auto* endBlock = new mlir::Block;
+
+    m_builder.create<mlir::CondBranchOp>(loc, b1, foundBlock, notFoundBlock);
+
+    {
+        m_currentFunc.getCallableRegion()->push_back(foundBlock);
+        m_builder.setInsertionPointToStart(foundBlock);
+        auto posArgs = m_builder.create<Dialect::MakeTupleOp>(loc, m_builder.getType<Dialect::TupleType>(),
+                                                              mlir::ValueRange{lhs, rhs});
+        auto emptyDict = m_builder.create<Dialect::ConstantOp>(loc, Dialect::DictAttr::get(m_builder.getContext(), {}));
+        auto call = m_builder.create<Dialect::CallOp>(loc, m_builder.getType<Dialect::UnknownType>(), addFunc,
+                                                      mlir::ValueRange{posArgs, emptyDict});
+        auto notImplementedConstant =
+            m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
+        auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
+        id = m_builder.create<Dialect::IdOp>(loc, call);
+        auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
+        auto continueBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
+        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, isNotImplemented),
+                                             notFoundBlock, continueBlock);
+        m_builder.setInsertionPointToStart(continueBlock);
+        m_builder.create<Dialect::StoreOp>(loc, call, result);
+        m_builder.create<mlir::BranchOp>(loc, endBlock);
+    }
+
+    {
+        m_currentFunc.getCallableRegion()->push_back(notFoundBlock);
+        m_builder.setInsertionPointToStart(notFoundBlock);
+        auto rhsType = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), rhs);
+        auto tryRBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
+        auto* raiseBlock = new mlir::Block;
+
+        auto rhsTypeId = m_builder.create<Dialect::IdOp>(loc, rhsType);
+        auto lhsTypeId = m_builder.create<Dialect::IdOp>(loc, lhsType);
+        auto typeEqual = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, rhsTypeId, lhsTypeId);
+        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, typeEqual), raiseBlock,
+                                             tryRBlock);
+
+        m_builder.setInsertionPointToStart(tryRBlock);
+        addFunc = m_builder.create<Dialect::GetAttrOp>(loc, rhsType, m_builder.getStringAttr(fallback));
+        id = m_builder.create<Dialect::IdOp>(loc, addFunc);
+        notNone = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::NE, id, noneId);
+        auto continueBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
+        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, notNone), continueBlock,
+                                             raiseBlock);
+
+        m_builder.setInsertionPointToStart(continueBlock);
+        auto posArgs = m_builder.create<Dialect::MakeTupleOp>(loc, m_builder.getType<Dialect::TupleType>(),
+                                                              mlir::ValueRange{rhs, lhs});
+        auto emptyDict = m_builder.create<Dialect::ConstantOp>(loc, Dialect::DictAttr::get(m_builder.getContext(), {}));
+        auto call = m_builder.create<Dialect::CallOp>(loc, m_builder.getType<Dialect::UnknownType>(), addFunc,
+                                                      mlir::ValueRange{posArgs, emptyDict});
+        auto notImplementedConstant =
+            m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
+        auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
+        id = m_builder.create<Dialect::IdOp>(loc, call);
+        auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
+        auto storeBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
+        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, isNotImplemented), raiseBlock,
+                                             storeBlock);
+
+        m_builder.setInsertionPointToStart(storeBlock);
+        m_builder.create<Dialect::StoreOp>(loc, call, result);
+        m_builder.create<mlir::BranchOp>(loc, endBlock);
+
+        m_currentFunc.getCallableRegion()->push_back(raiseBlock);
+        m_builder.setInsertionPointToStart(raiseBlock);
+        // TODO raise terminator
+        m_builder.create<mlir::ReturnOp>(loc);
+    }
+
+    m_currentFunc.getCallableRegion()->push_back(endBlock);
+    m_builder.setInsertionPointToStart(endBlock);
+    return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), result);
 }

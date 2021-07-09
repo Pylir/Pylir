@@ -571,7 +571,7 @@ pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location locatio
     return builder.create<GlobalOp>(location, name, mlir::TypeAttr::get(type));
 }
 
-mlir::OpFoldResult pylir::Dialect::MakeList::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Dialect::MakeListOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
     {
@@ -579,8 +579,16 @@ mlir::OpFoldResult pylir::Dialect::MakeList::fold(::llvm::ArrayRef<::mlir::Attri
     }
     return nullptr;
 }
+mlir::OpFoldResult pylir::Dialect::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
+    {
+        return TupleAttr::get(getContext(), operands);
+    }
+    return nullptr;
+}
 
-mlir::OpFoldResult pylir::Dialect::TupleToList::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Dialect::TupleToListOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
     if (auto tuple = operands[0].dyn_cast_or_null<TupleAttr>())
@@ -590,7 +598,7 @@ mlir::OpFoldResult pylir::Dialect::TupleToList::fold(::llvm::ArrayRef<::mlir::At
     return nullptr;
 }
 
-bool pylir::Dialect::TupleToList::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+bool pylir::Dialect::TupleToListOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
 {
     if (inputs.size() != 1 && outputs.size() != 1)
     {
@@ -599,7 +607,7 @@ bool pylir::Dialect::TupleToList::areCastCompatible(mlir::TypeRange inputs, mlir
     return inputs[0].isa<TupleType>() && outputs[0].isa<ListType>();
 }
 
-mlir::OpFoldResult pylir::Dialect::ListToTuple::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Dialect::ListToTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (auto list = operands[0].dyn_cast_or_null<ListAttr>())
     {
@@ -608,13 +616,29 @@ mlir::OpFoldResult pylir::Dialect::ListToTuple::fold(::llvm::ArrayRef<::mlir::At
     return nullptr;
 }
 
-bool pylir::Dialect::ListToTuple::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+bool pylir::Dialect::ListToTupleOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
 {
     if (inputs.size() != 1 && outputs.size() != 1)
     {
         return false;
     }
     return outputs[0].isa<TupleType>() && inputs[0].isa<ListType>();
+}
+
+mlir::CallInterfaceCallable pylir::Dialect::CallOp::getCallableForCallee()
+{
+    return callee();
+}
+
+mlir::Operation::operand_range pylir::Dialect::CallOp::getArgOperands()
+{
+    return operands();
+}
+
+mlir::LogicalResult pylir::Dialect::HandleOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    auto result = symbolTable.lookupNearestSymbolFrom<Dialect::GlobalOp>(*this,globalNameAttr());
+    return mlir::success(result != nullptr);
 }
 
 #include <pylir/Dialect/PylirOpsEnums.cpp.inc>

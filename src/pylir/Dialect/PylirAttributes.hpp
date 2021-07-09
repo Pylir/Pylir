@@ -298,13 +298,13 @@ public:
                 values.push_back(iter);
             }
         }
-        return Base::get(context, values, SetType::get(context));
+        return Base::get(context, values, DictType::get(context));
     }
 
     static DictAttr getAlreadySorted(mlir::MLIRContext* context,
                                      llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
     {
-        return Base::get(context, value, SetType::get(context));
+        return Base::get(context, value, DictType::get(context));
     }
 
     llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> getValue()
