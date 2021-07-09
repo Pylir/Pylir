@@ -11,6 +11,7 @@
 
 #include <pylir/Dialect/PylirOpsEnums.h.inc>
 
+#include "PylirAttributes.hpp"
 #include "PylirTypes.hpp"
 
 // TODO PLEASE PLEASE PLEASE REMOVE IN MLIR 13

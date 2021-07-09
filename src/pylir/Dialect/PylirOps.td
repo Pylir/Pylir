@@ -14,22 +14,24 @@ class Pylir_Op<string mneomic, list<OpTrait> traits = []> :
     let hasFolder = 1;
 }
 
-def Pylir_GlobalOp : Pylir_Op<"global", [Symbol]> {
+def Pylir_GlobalOp : Pylir_Op<"global", [Symbol, NoSideEffect]> {
     let hasFolder = 0;
 
     let arguments = (ins
         SymbolNameAttr:$sym_name,
-        TypeAttr:$type
+        TypeAttr:$type,
+        UnitAttr:$constant,
+        OptionalAttr<Pylir_DictAttr>:$dict
     );
 
     let assemblyFormat = [{
-             $sym_name `->` $type attr-dict
+             (`constant` $constant^)? $sym_name `->` $type attr-dict
         }];
 
     let extraClassDeclaration = [{
-        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, mlir::Type type);
+        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, mlir::Type type, bool constant = false, ::pylir::Dialect::DictAttr initializer = {});
 
-        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name);
+        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, bool constant = false, ::pylir::Dialect::DictAttr initializer = {});
     }];
 }
 

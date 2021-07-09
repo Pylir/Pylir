@@ -80,4 +80,10 @@ def Pylir_Handle : Pylir_Type<"Handle"> {
     let mnemonic = "handle";
 }
 
+def Pylir_DictAttr : Attr<CPred<"$_self.isa<::pylir::Dialect::DictAttr>()">,"dict attribute"> {
+    let storageType = [{ ::pylir::Dialect::DictAttr }];
+    let returnType = [{ ::llvm::ArrayRef<std::pair<mlir::Attribute,mlir::Attribute>> }];
+    let valueType = Pylir_Dict;
+}
+
 #endif
