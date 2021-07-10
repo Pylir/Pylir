@@ -70,6 +70,14 @@ def Pylir_Variant : Pylir_Type<"Variant"> {
     let skipDefaultBuilders = 1;
 }
 
+def Pylir_SlotObject : Pylir_Type<"SlotObject"> {
+    let mnemonic = "slotobject";
+    let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute,mlir::Attribute>","slots">:$slots);
+
+    let parser = ?;
+    let printer = ?;
+}
+
 def AnyPythonType
 : AnyTypeOf<[Pylir_Unknown, Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_None,
              Pylir_NotImplemented, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple,
