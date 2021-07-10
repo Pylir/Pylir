@@ -78,6 +78,9 @@ def Pylir_SlotObject : Pylir_Type<"SlotObject"> {
     let printer = ?;
 }
 
+def AnySequenceType
+: AnyTypeOf<[Pylir_String, Pylir_Tuple, Pylir_List]>;
+
 def AnyPythonType
 : AnyTypeOf<[Pylir_Unknown, Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_None,
              Pylir_NotImplemented, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple,

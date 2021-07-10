@@ -639,8 +639,32 @@ mlir::Operation::operand_range pylir::Dialect::CallOp::getArgOperands()
 
 mlir::LogicalResult pylir::Dialect::HandleOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    auto result = symbolTable.lookupNearestSymbolFrom<Dialect::GlobalOp>(*this,globalNameAttr());
+    auto result = symbolTable.lookupNearestSymbolFrom<Dialect::GlobalOp>(*this, globalNameAttr());
     return mlir::success(result != nullptr);
+}
+
+mlir::OpFoldResult pylir::Dialect::GetItemOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
+{
+    auto integer = operands[0].dyn_cast_or_null<pylir::Dialect::IntegerAttr>();
+    if (!integer)
+    {
+        return nullptr;
+    }
+    if (auto list = operands[1].dyn_cast_or_null<ListAttr>())
+    {
+        return list.getValue()[integer.getValue().getZExtValue()];
+    }
+    if (auto tuple = operands[1].dyn_cast_or_null<TupleAttr>())
+    {
+        return tuple.getValue()[integer.getValue().getZExtValue()];
+    }
+    if (auto string = operands[1].dyn_cast_or_null<StringAttr>())
+    {
+        //TODO probably needs to be a codepoint
+        auto character = string.getValue()[integer.getValue().getZExtValue()];
+        return StringAttr::get(getContext(), llvm::StringRef(&character, 1));
+    }
+    return nullptr;
 }
 
 #include <pylir/Dialect/PylirOpsEnums.cpp.inc>

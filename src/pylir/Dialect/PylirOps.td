@@ -324,4 +324,13 @@ def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
     let assemblyFormat = "$exception `:` type($exception) attr-dict";
 }
 
+def Pylir_GetItemOp : Pylir_Op<"getItem>",[NoSideEffect]> {
+    let arguments = (ins AnySequenceType:$sequence,Pylir_Integer:$index);
+    let results = (outs AnyPythonType:$result);
+
+    let assemblyFormat = [{
+                          $sequence `:` type($sequence) `[` $index `]` `->` type($result) attr-dict
+                        }];
+}
+
 #endif
