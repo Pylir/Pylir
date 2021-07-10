@@ -287,8 +287,8 @@ def Pylir_TypeOfOp : Pylir_Op<"typeOf", [NoSideEffect]> {
     let hasFolder = 0;
 }
 
-def Pylir_GetAttrOp : Pylir_Op<"getAttr", [NoSideEffect]> {
-    let arguments = (ins AnyPythonType:$input, StrAttr:$member);
+def Pylir_GetAttrOp : Pylir_Op<"getAttr"> {
+    let arguments = (ins Arg<AnyPythonType,"",[MemRead]>:$input, StrAttr:$member);
     let results = (outs AnyPythonType:$result);
 
     let assemblyFormat = [{
@@ -332,8 +332,8 @@ def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
     let assemblyFormat = "$exception `:` type($exception) attr-dict";
 }
 
-def Pylir_GetItemOp : Pylir_Op<"getItem>",[NoSideEffect]> {
-    let arguments = (ins AnySequenceType:$sequence,Pylir_Integer:$index);
+def Pylir_GetItemOp : Pylir_Op<"getItem>"> {
+    let arguments = (ins Arg<AnySequenceType, "",[MemRead]>:$sequence,Pylir_Integer:$index);
     let results = (outs AnyPythonType:$result);
 
     let assemblyFormat = [{
