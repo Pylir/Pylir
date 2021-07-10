@@ -21,17 +21,25 @@ def Pylir_GlobalOp : Pylir_Op<"global", [Symbol, NoSideEffect]> {
         SymbolNameAttr:$sym_name,
         TypeAttr:$type,
         UnitAttr:$constant,
-        OptionalAttr<Pylir_DictAttr>:$dict
+        OptionalAttr<AnyAttr>:$initializer
     );
 
     let assemblyFormat = [{
-             (`constant` $constant^)? $sym_name `->` $type attr-dict
+             (`constant` $constant^)? $sym_name `->` $type attr-dict (`=` $initializer^)?
         }];
 
     let extraClassDeclaration = [{
-        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, mlir::Type type, bool constant = false, ::pylir::Dialect::DictAttr initializer = {});
+        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, mlir::Type type, bool constant = false, mlir::Attribute initializer = {});
 
-        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, bool constant = false, ::pylir::Dialect::DictAttr initializer = {});
+        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, bool constant = false, mlir::Attribute initializer = {});
+    }];
+
+    let verifier = [{
+        if (constant() && type().isa<::pylir::Dialect::UnknownType>())
+        {
+            emitOpError("constant must not have an unknown type");
+        }
+        return ::mlir::success();
     }];
 }
 

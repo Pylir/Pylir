@@ -560,14 +560,13 @@ bool pylir::Dialect::ToVariantOp::areCastCompatible(mlir::TypeRange inputs, mlir
 }
 
 pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name, bool constant,
-                                                          ::pylir::Dialect::DictAttr initializer)
+                                                          mlir::Attribute initializer)
 {
     return create(location, name, UnknownType::get(location.getContext()), constant, initializer);
 }
 
 pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name,
-                                                          mlir::Type type, bool constant,
-                                                          ::pylir::Dialect::DictAttr initializer)
+                                                          mlir::Type type, bool constant, mlir::Attribute initializer)
 {
     mlir::OpBuilder builder(location.getContext());
     return builder.create<GlobalOp>(location, name, mlir::TypeAttr::get(type), constant, initializer);
