@@ -78,23 +78,21 @@ def Pylir_SlotObject : Pylir_Type<"SlotObject"> {
     let printer = ?;
 }
 
+def Pylir_Function : Pylir_Type<"Function"> {
+    let mnemonic = "function";
+}
+
 def AnySequenceType
 : AnyTypeOf<[Pylir_String, Pylir_Tuple, Pylir_List]>;
 
 def AnyPythonType
 : AnyTypeOf<[Pylir_Unknown, Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_None,
              Pylir_NotImplemented, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple,
-             Pylir_Dict, Pylir_Variant]>;
+             Pylir_Dict, Pylir_Variant, Pylir_Function, Pylir_SlotObject]>;
 
 
 def Pylir_Handle : Pylir_Type<"Handle"> {
     let mnemonic = "handle";
-}
-
-def Pylir_DictAttr : Attr<CPred<"$_self.isa<::pylir::Dialect::DictAttr>()">,"dict attribute"> {
-    let storageType = [{ ::pylir::Dialect::DictAttr }];
-    let returnType = [{ ::llvm::ArrayRef<std::pair<mlir::Attribute,mlir::Attribute>> }];
-    let valueType = Pylir_Dict;
 }
 
 #endif

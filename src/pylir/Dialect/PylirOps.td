@@ -311,7 +311,6 @@ def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
                     }];
 
     let hasFolder = 0;
-    let hasFolder = 0;
 }
 
 def Pylir_CallOp : Pylir_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
@@ -339,6 +338,13 @@ def Pylir_GetItemOp : Pylir_Op<"getItem>"> {
     let assemblyFormat = [{
                           $sequence `:` type($sequence) `[` $index `]` `->` type($result) attr-dict
                         }];
+}
+
+def Pylir_ReinterpretOp : Pylir_Cast<"reinterpret"> {
+    let arguments = (ins AnyPythonType:$input);
+    let results = (outs AnyPythonType:$result);
+
+    let hasFolder = 0; // Will be folded through the CastInterface anyways
 }
 
 #endif

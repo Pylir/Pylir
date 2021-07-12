@@ -659,11 +659,20 @@ mlir::OpFoldResult pylir::Dialect::GetItemOp::fold(llvm::ArrayRef<mlir::Attribut
     }
     if (auto string = operands[1].dyn_cast_or_null<StringAttr>())
     {
-        //TODO probably needs to be a codepoint
+        // TODO probably needs to be a codepoint
         auto character = string.getValue()[integer.getValue().getZExtValue()];
         return StringAttr::get(getContext(), llvm::StringRef(&character, 1));
     }
     return nullptr;
+}
+
+bool pylir::Dialect::ReinterpretOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 && outputs.size() != 1)
+    {
+        return false;
+    }
+    return (inputs[0].isa<UnknownType>() && !outputs[0].isa<UnknownType>()) || inputs[0] == outputs[0];
 }
 
 #include <pylir/Dialect/PylirOpsEnums.cpp.inc>
