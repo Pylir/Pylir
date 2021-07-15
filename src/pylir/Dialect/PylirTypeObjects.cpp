@@ -77,6 +77,39 @@ pylir::Dialect::GlobalOp pylir::Dialect::getFunctionTypeObject(mlir::ModuleOp& m
         });
 }
 
+pylir::Dialect::GlobalOp pylir::Dialect::getLongTypeObject(ModuleOp& module)
+{
+    constexpr std::string_view name = "$pylir_long_type";
+    return getType(
+        KnownTypeObjectType::get(
+            mlir::FlatSymbolRefAttr::get(getTypeTypeObject(module).sym_name(), module.getContext())),
+        module, name,
+        [&]()
+        {
+            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(
+                Dialect::StringAttr::get(module.getContext(), "__mul__"),
+                genFunction(module, "$pylir_long_type__mul__",
+                            [&](mlir::OpBuilder& builder, mlir::Value, mlir::Value args, mlir::Value dict)
+                            {
+                                // TODO check args
+                                auto zero = builder.create<Dialect::ConstantOp>(
+                                    builder.getUnknownLoc(),
+                                    Dialect::IntegerAttr::get(builder.getContext(), llvm::APInt(2, 0)));
+                                auto first = builder.create<Dialect::GetItemOp>(
+                                    builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(), args, zero);
+                                auto one = builder.create<Dialect::ConstantOp>(
+                                    builder.getUnknownLoc(),
+                                    Dialect::IntegerAttr::get(builder.getContext(), llvm::APInt(2, 1)));
+                                auto second = builder.create<Dialect::GetItemOp>(
+                                    builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(), args, one);
+                                auto result = builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), first, second);
+                                return result;
+                            }));
+            return dict;
+        });
+}
+
 mlir::FunctionType pylir::Dialect::getCCFuncType(mlir::MLIRContext* context)
 {
     return mlir::FunctionType::get(context,
