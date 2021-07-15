@@ -5,6 +5,7 @@
 #include <pylir/Dialect/PylirAttributes.hpp>
 #include <pylir/Dialect/PylirDialect.hpp>
 #include <pylir/Dialect/PylirOps.hpp>
+#include <pylir/Dialect/PylirTypeObjects.hpp>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
@@ -794,8 +795,8 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
         auto posArgs = m_builder.create<Dialect::MakeTupleOp>(loc, m_builder.getType<Dialect::TupleType>(),
                                                               mlir::ValueRange{lhs, rhs});
         auto emptyDict = m_builder.create<Dialect::ConstantOp>(loc, Dialect::DictAttr::get(m_builder.getContext(), {}));
-        auto call = m_builder.create<Dialect::CallOp>(loc, m_builder.getType<Dialect::UnknownType>(), addFunc,
-                                                      mlir::ValueRange{posArgs, emptyDict});
+
+        auto call = assureCallable(loc, addFunc, posArgs, emptyDict);
         auto notImplementedConstant =
             m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
@@ -834,8 +835,7 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
         auto posArgs = m_builder.create<Dialect::MakeTupleOp>(loc, m_builder.getType<Dialect::TupleType>(),
                                                               mlir::ValueRange{rhs, lhs});
         auto emptyDict = m_builder.create<Dialect::ConstantOp>(loc, Dialect::DictAttr::get(m_builder.getContext(), {}));
-        auto call = m_builder.create<Dialect::CallOp>(loc, m_builder.getType<Dialect::UnknownType>(), addFunc,
-                                                      mlir::ValueRange{posArgs, emptyDict});
+        auto call = assureCallable(loc, addFunc, posArgs, emptyDict);
         auto notImplementedConstant =
             m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
@@ -858,4 +858,35 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
     m_currentFunc.getCallableRegion()->push_back(endBlock);
     m_builder.setInsertionPointToStart(endBlock);
     return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), result);
+}
+
+mlir::Value pylir::CodeGen::assureCallable(mlir::Location loc, mlir::Value callable, mlir::Value args, mlir::Value dict)
+{
+    auto type = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), callable);
+    auto thisTypeId = m_builder.create<Dialect::IdOp>(loc, type);
+    auto handle = m_builder.create<Dialect::HandleOfOp>(loc, Dialect::getFunctionTypeObject(m_module).sym_name());
+    auto loaded = m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), handle);
+    auto functionTypeId = m_builder.create<Dialect::IdOp>(loc, loaded);
+    auto eq = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, thisTypeId, functionTypeId);
+    mlir::Block* callPath = new mlir::Block;
+    mlir::Block* raisePath = new mlir::Block;
+    mlir::Block* continuePath = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, eq), callPath, raisePath);
+
+    m_currentFunc.push_back(raisePath);
+    m_builder.setInsertionPointToStart(raisePath);
+    // TODO RAISE
+    m_builder.create<mlir::ReturnOp>(loc);
+
+    m_currentFunc.push_back(callPath);
+    m_builder.setInsertionPointToStart(callPath);
+    auto reinterpret =
+        m_builder.create<Dialect::ReinterpretOp>(loc, m_builder.getType<Dialect::FunctionType>(), callable);
+    auto result = m_builder.create<Dialect::CallOp>(loc, m_builder.getType<Dialect::UnknownType>(),
+                                                    mlir::ValueRange{reinterpret, reinterpret, args, dict});
+    m_builder.create<mlir::BranchOp>(loc, continuePath);
+    m_currentFunc.push_back(continuePath);
+    m_builder.setInsertionPointToStart(continuePath);
+
+    return result;
 }

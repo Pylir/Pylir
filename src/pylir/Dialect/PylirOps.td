@@ -314,7 +314,7 @@ def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
 }
 
 def Pylir_CallOp : Pylir_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
-    let arguments = (ins AnyPythonType:$callee, Variadic<AnyPythonType>:$operands);
+    let arguments = (ins Pylir_Function:$callee, Variadic<AnyPythonType>:$operands);
     let results = (outs AnyPythonType:$result);
 
     let assemblyFormat = "$callee `:` type($callee)  `(` $operands `)` `->` functional-type($operands, results) attr-dict";

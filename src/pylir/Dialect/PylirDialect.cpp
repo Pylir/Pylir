@@ -350,10 +350,11 @@ mlir::Type pylir::Dialect::SlotObjectType::parse(::mlir::MLIRContext* context, :
     {
         return SlotObjectType::get(context, {});
     }
-    std::vector<std::pair<mlir::Attribute, mlir::Attribute>> vector;
+    std::vector<std::pair<mlir::Attribute, mlir::Type>> vector;
     {
-        mlir::Attribute key, value;
-        if (parser.parseAttribute(key) || parser.parseColon() || parser.parseAttribute(value))
+        mlir::Attribute key;
+        mlir::Type value;
+        if (parser.parseAttribute(key) || parser.parseColon() || parser.parseType(value))
         {
             return {};
         }
@@ -361,8 +362,9 @@ mlir::Type pylir::Dialect::SlotObjectType::parse(::mlir::MLIRContext* context, :
     }
     while (!parser.parseComma())
     {
-        mlir::Attribute key, value;
-        if (parser.parseAttribute(key) || parser.parseColon() || parser.parseAttribute(value))
+        mlir::Attribute key;
+        mlir::Type value;
+        if (parser.parseAttribute(key) || parser.parseColon() || parser.parseType(value))
         {
             return {};
         }
@@ -381,4 +383,19 @@ void pylir::Dialect::SlotObjectType::print(::mlir::DialectAsmPrinter& printer) c
     llvm::interleaveComma(getSlots(), printer,
                           [&](const auto& pair) { printer << pair.first << " : " << pair.second; });
     printer << "}";
+}
+
+mlir::Type pylir::Dialect::KnownTypeObjectType::parse(::mlir::MLIRContext*, ::mlir::DialectAsmParser& parser)
+{
+    mlir::FlatSymbolRefAttr attribute;
+    if (parser.parseLess() || parser.parseAttribute(attribute) || parser.parseGreater())
+    {
+        return {};
+    }
+    return KnownTypeObjectType::get(attribute);
+}
+
+void pylir::Dialect::KnownTypeObjectType::print(::mlir::DialectAsmPrinter& printer) const
+{
+    printer << getMnemonic() << '<' << getType() << '>';
 }

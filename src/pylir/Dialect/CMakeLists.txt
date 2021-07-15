@@ -14,9 +14,10 @@ add_mlir_dialect_library(PylirDialect
         PylirDialect.cpp
         PylirOps.cpp
         PylirAttributes.cpp
+        PylirTypeObjects.cpp
 
         DEPENDS
         MLIRPylirOpsIncGen
 
-        LINK_LIBS PUBLIC MLIRIR Support MLIRInferTypeOpInterface
+        LINK_LIBS PUBLIC MLIRIR Support MLIRInferTypeOpInterface MLIRStandard
         )

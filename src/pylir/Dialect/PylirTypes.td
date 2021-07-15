@@ -72,7 +72,7 @@ def Pylir_Variant : Pylir_Type<"Variant"> {
 
 def Pylir_SlotObject : Pylir_Type<"SlotObject"> {
     let mnemonic = "slotobject";
-    let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute,mlir::Attribute>","slots">:$slots);
+    let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Type>","slots">:$slots);
 
     let parser = ?;
     let printer = ?;
@@ -80,6 +80,24 @@ def Pylir_SlotObject : Pylir_Type<"SlotObject"> {
 
 def Pylir_Function : Pylir_Type<"Function"> {
     let mnemonic = "function";
+}
+
+def Pylir_KnownTypeObject : Pylir_Type<"KnownTypeObject"> {
+    let mnemonic = "object";
+    let parameters = (ins "::mlir::FlatSymbolRefAttr":$type);
+
+    let parser = ?;
+    let printer = ?;
+
+    let builders = [
+            TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$type), [{
+              return Base::get(type.getContext(), type);
+            }], [{
+              return Base::getChecked($_loc, type);
+            }]>
+          ];
+
+        let skipDefaultBuilders = 1;
 }
 
 def AnySequenceType

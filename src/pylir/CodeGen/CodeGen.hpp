@@ -32,6 +32,8 @@ class CodeGen
     mlir::Value binOpWithFallback(mlir::Location loc, mlir::Value lhs, mlir::Value rhs, std::string_view opName,
                                   std::string_view fallBack);
 
+    mlir::Value assureCallable(mlir::Location loc, mlir::Value callable, mlir::Value args, mlir::Value dict);
+
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
     {
