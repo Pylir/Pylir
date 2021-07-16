@@ -11,7 +11,7 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
-#include <pylir/Dialect/PylirOpsEnums.h.inc>
+#include <pylir/Optimizer/Dialect/PylirOpsEnums.h.inc>
 
 #include "PylirAttributes.hpp"
 #include "PylirTypes.hpp"
@@ -20,4 +20,4 @@
 using namespace mlir;
 
 #define GET_OP_CLASSES
-#include <pylir/Dialect/PylirOps.h.inc>
+#include <pylir/Optimizer/Dialect/PylirOps.h.inc>

@@ -675,9 +675,9 @@ bool pylir::Dialect::ReinterpretOp::areCastCompatible(mlir::TypeRange inputs, ml
     return (inputs[0].isa<UnknownType>() && !outputs[0].isa<UnknownType>()) || inputs[0] == outputs[0];
 }
 
-#include <pylir/Dialect/PylirOpsEnums.cpp.inc>
+#include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
 
 // TODO: Remove in MLIR 13
 using namespace mlir;
 #define GET_OP_CLASSES
-#include <pylir/Dialect/PylirOps.cpp.inc>
+#include <pylir/Optimizer/Dialect/PylirOps.cpp.inc>

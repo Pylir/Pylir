@@ -12,17 +12,17 @@
 #include "PylirOps.hpp"
 
 #define GET_TYPEDEF_CLASSES
-#include "pylir/Dialect/PylirOpsTypes.cpp.inc"
+#include "pylir/Optimizer/Dialect/PylirOpsTypes.cpp.inc"
 
 void pylir::Dialect::PylirDialect::initialize()
 {
     addOperations<
 #define GET_OP_LIST
-#include "pylir/Dialect/PylirOps.cpp.inc"
+#include "pylir/Optimizer/Dialect/PylirOps.cpp.inc"
         >();
     addTypes<
 #define GET_TYPEDEF_LIST
-#include "pylir/Dialect/PylirOpsTypes.cpp.inc"
+#include "pylir/Optimizer/Dialect/PylirOpsTypes.cpp.inc"
         >();
     addAttributes<NoneAttr, BoolAttr, FloatAttr, IntegerAttr, StringAttr, ListAttr, TupleAttr, SetAttr, DictAttr,
                   NotImplementedAttr>();
@@ -287,7 +287,7 @@ std::vector<mlir::Type> pylir::Dialect::detail::variantUnion(llvm::ArrayRef<mlir
     return {unique.begin(), unique.end()};
 }
 
-mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext* , ::mlir::DialectAsmParser& parser)
+mlir::Type pylir::Dialect::VariantType::parse(::mlir::MLIRContext*, ::mlir::DialectAsmParser& parser)
 {
     if (parser.parseLess())
     {

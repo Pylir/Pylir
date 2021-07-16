@@ -10,7 +10,7 @@ std::vector<mlir::Type> variantUnion(llvm::ArrayRef<mlir::Type> types);
 }
 
 #define GET_TYPEDEF_CLASSES
-#include "pylir/Dialect/PylirOpsTypes.h.inc"
+#include "pylir/Optimizer/Dialect/PylirOpsTypes.h.inc"
 
 namespace pylir::Dialect
 {

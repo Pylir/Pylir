@@ -2,10 +2,10 @@
 
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
-#include <pylir/Dialect/PylirAttributes.hpp>
-#include <pylir/Dialect/PylirDialect.hpp>
-#include <pylir/Dialect/PylirOps.hpp>
-#include <pylir/Dialect/PylirTypeObjects.hpp>
+#include <pylir/Optimizer/Dialect/PylirAttributes.hpp>
+#include <pylir/Optimizer/Dialect/PylirDialect.hpp>
+#include <pylir/Optimizer/Dialect/PylirOps.hpp>
+#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(

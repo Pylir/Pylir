@@ -6,7 +6,7 @@
 #include <mlir/InitAllPasses.h>
 #include <mlir/Support/MlirOptMain.h>
 
-#include <pylir/Dialect/PylirDialect.hpp>
+#include <pylir/Optimizer/Dialect/PylirDialect.hpp>
 
 int main(int argc, char** argv)
 {
