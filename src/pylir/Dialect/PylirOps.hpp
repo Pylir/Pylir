@@ -4,6 +4,7 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/OpDefinition.h>
+#include <mlir/IR/OpImplementation.h>
 #include <mlir/IR/SymbolTable.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Interfaces/CastInterfaces.h>

@@ -774,20 +774,16 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
                                               std::string_view opName, std::string_view fallback)
 {
     auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), lhs);
-    auto addFunc = m_builder.create<Dialect::GetAttrOp>(loc, lhsType, m_builder.getStringAttr(opName));
-    auto id = m_builder.create<Dialect::IdOp>(loc, addFunc);
-    auto noneConstant = m_builder.create<Dialect::ConstantOp>(loc, Dialect::NoneAttr::get(m_builder.getContext()));
-    auto noneId = m_builder.create<Dialect::IdOp>(loc, noneConstant);
-
-    auto notNone = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::NE, id, noneId);
-    auto b1 = m_builder.create<Dialect::BtoI1Op>(loc, notNone);
+    auto attr = m_builder.create<Dialect::GetAttrOp>(loc, lhsType, m_builder.getStringAttr(opName));
+    auto addFunc = attr.getResult(0);
+    auto wasFound = attr.getResult(1);
     auto result = m_builder.create<Dialect::AllocaOp>(loc);
 
     auto* foundBlock = new mlir::Block;
     auto* notFoundBlock = new mlir::Block;
     auto* endBlock = new mlir::Block;
 
-    m_builder.create<mlir::CondBranchOp>(loc, b1, foundBlock, notFoundBlock);
+    m_builder.create<mlir::CondBranchOp>(loc, wasFound, foundBlock, notFoundBlock);
 
     {
         m_currentFunc.getCallableRegion()->push_back(foundBlock);
@@ -800,7 +796,7 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
         auto notImplementedConstant =
             m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
-        id = m_builder.create<Dialect::IdOp>(loc, call);
+        auto id = m_builder.create<Dialect::IdOp>(loc, call);
         auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
         auto continueBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
         m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, isNotImplemented),
@@ -824,12 +820,11 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
                                              tryRBlock);
 
         m_builder.setInsertionPointToStart(tryRBlock);
-        addFunc = m_builder.create<Dialect::GetAttrOp>(loc, rhsType, m_builder.getStringAttr(fallback));
-        id = m_builder.create<Dialect::IdOp>(loc, addFunc);
-        notNone = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::NE, id, noneId);
+        attr = m_builder.create<Dialect::GetAttrOp>(loc, rhsType, m_builder.getStringAttr(fallback));
+        addFunc = attr.getResult(0);
+        wasFound = attr.getResult(1);
         auto continueBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
-        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, notNone), continueBlock,
-                                             raiseBlock);
+        m_builder.create<mlir::CondBranchOp>(loc, wasFound, continueBlock, raiseBlock);
 
         m_builder.setInsertionPointToStart(continueBlock);
         auto posArgs = m_builder.create<Dialect::MakeTupleOp>(loc, m_builder.getType<Dialect::TupleType>(),
@@ -839,7 +834,7 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
         auto notImplementedConstant =
             m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
-        id = m_builder.create<Dialect::IdOp>(loc, call);
+        auto id = m_builder.create<Dialect::IdOp>(loc, call);
         auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
         auto storeBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
         m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, isNotImplemented), raiseBlock,

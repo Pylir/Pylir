@@ -289,7 +289,7 @@ def Pylir_TypeOfOp : Pylir_Op<"typeOf", [NoSideEffect]> {
 
 def Pylir_GetAttrOp : Pylir_Op<"getAttr"> {
     let arguments = (ins Arg<AnyPythonType,"",[MemRead]>:$input, StrAttr:$member);
-    let results = (outs AnyPythonType:$result);
+    let results = (outs AnyPythonType:$result, I1:$found);
 
     let assemblyFormat = [{
                       $member `from` $input `:` type($input) `->` type($result) attr-dict
@@ -299,7 +299,7 @@ def Pylir_GetAttrOp : Pylir_Op<"getAttr"> {
 
     let builders = [
             OpBuilderDAG<(ins "mlir::Value":$value, "mlir::StringAttr":$member),
-            [{ build($_builder, $_state, ::pylir::Dialect::UnknownType::get($_state.getContext()), value, member); }]>];
+            [{ build($_builder, $_state, ::pylir::Dialect::UnknownType::get($_state.getContext()),$_builder.getI1Type(), value, member); }]>];
 }
 
 def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
