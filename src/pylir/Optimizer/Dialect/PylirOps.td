@@ -2,7 +2,7 @@
 #ifndef PYLIR_OPS_TABLEGEN
 #define PYLIR_OPS_TABLEGEN
 
-include "PylirTypes.td"
+include "pylir/Optimizer/Dialect/PylirTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"

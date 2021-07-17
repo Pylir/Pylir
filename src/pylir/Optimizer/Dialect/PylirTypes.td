@@ -2,7 +2,7 @@
 #ifndef PYLIR_TYPES_TABLEGEN
 #define PYLIR_TYPES_TABLEGEN
 
-include "PylirBase.td"
+include "pylir/Optimizer/Dialect/PylirBase.td"
 
 class Pylir_Type<string name, string baseCppClass = "::mlir::Type"> :
     TypeDef<Pylir_Dialect, name, baseCppClass>;

@@ -7,11 +7,14 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <pylir/Optimizer/Dialect/PylirDialect.hpp>
+#include <pylir/Optimizer/Dialect/PylirOps.hpp>
 
 #include "PassDetail.hpp"
 
 namespace
 {
+#include <pylir/Optimizer/Conversion/PylirToLLVMPatterns.h.inc>
+
 struct ConvertPylirToLLVMPass : public pylir::Dialect::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -23,6 +26,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     auto module = getOperation();
 
     mlir::OwningRewritePatternList patterns;
+    populateWithGenerated(&getContext(), patterns);
 
     mlir::ConversionTarget target(getContext());
     target.addLegalDialect<mlir::LLVM::LLVMDialect, mlir::StandardOpsDialect>();
