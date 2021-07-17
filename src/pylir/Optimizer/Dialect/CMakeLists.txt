@@ -7,8 +7,8 @@ mlir_tablegen(PylirOpsTypes.cpp.inc -gen-typedef-defs)
 mlir_tablegen(PylirOpsDialect.h.inc -gen-dialect-decls -dialect=pylir)
 mlir_tablegen(PylirOpsEnums.h.inc -gen-enum-decls)
 mlir_tablegen(PylirOpsEnums.cpp.inc -gen-enum-defs)
-add_public_tablegen_target(MLIRPylirOpsIncGen)
-add_dependencies(mlir-headers MLIRPylirOpsIncGen)
+add_public_tablegen_target(PylirOpsIncGen)
+add_dependencies(mlir-headers PylirOpsIncGen)
 
 add_mlir_dialect_library(PylirDialect
         PylirDialect.cpp
@@ -17,7 +17,7 @@ add_mlir_dialect_library(PylirDialect
         PylirTypeObjects.cpp
 
         DEPENDS
-        MLIRPylirOpsIncGen
+        PylirOpsIncGen
 
         LINK_LIBS PUBLIC MLIRIR Support MLIRInferTypeOpInterface MLIRStandard
         )
