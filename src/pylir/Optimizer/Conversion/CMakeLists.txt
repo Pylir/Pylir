@@ -14,4 +14,4 @@ add_mlir_conversion_library(PylirToLLVM
         PylirConversionPassIncGen
         PylirToLLVMPatternsIncGen
 
-        LINK_LIBS PUBLIC PylirDialect MLIRLLVMIR)
+        LINK_LIBS PUBLIC PylirDialect MLIRLLVMIR MLIRPass MLIRTransforms MLIRStandardToLLVM)

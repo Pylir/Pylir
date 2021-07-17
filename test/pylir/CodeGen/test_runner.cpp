@@ -1,4 +1,7 @@
+#include <mlir/Pass/PassManager.h>
+
 #include <pylir/CodeGen/CodeGen.hpp>
+#include <pylir/Optimizer/Conversion/PylirToLLVM.hpp>
 #include <pylir/Parser/Parser.hpp>
 
 #include <fstream>
@@ -46,6 +49,8 @@ int main(int argc, char** argv)
     }
     mlir::MLIRContext context;
     auto module = pylir::codegen(&context, *tree, document);
-    module.print(llvm::outs());
-    return mlir::failed(module.verify());
+    mlir::PassManager manager(&context);
+    manager.enableVerifier();
+    manager.addPass(pylir::Dialect::createConvertPylirToLLVMPass());
+    return mlir::failed(manager.run(module));
 }

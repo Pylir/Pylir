@@ -1,6 +1,7 @@
 
 #include "PylirToLLVM.hpp"
 
+#include <mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/IR/PatternMatch.h>
@@ -26,11 +27,14 @@ void ConvertPylirToLLVMPass::runOnOperation()
     auto module = getOperation();
 
     mlir::OwningRewritePatternList patterns;
+    mlir::LLVMTypeConverter converter(&getContext());
     populateWithGenerated(&getContext(), patterns);
+    mlir::populateStdToLLVMConversionPatterns(converter, patterns);
 
     mlir::ConversionTarget target(getContext());
-    target.addLegalDialect<mlir::LLVM::LLVMDialect, mlir::StandardOpsDialect>();
-    target.addIllegalDialect<pylir::Dialect::PylirDialect>();
+    target.addLegalDialect<mlir::LLVM::LLVMDialect>();
+    target.addIllegalDialect<pylir::Dialect::PylirDialect, mlir::StandardOpsDialect>();
+    target.addLegalOp<mlir::ModuleOp, mlir::ModuleTerminatorOp>();
     if (mlir::failed(mlir::applyFullConversion(module, target, std::move(patterns))))
     {
         signalPassFailure();
