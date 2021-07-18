@@ -22,6 +22,9 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_module = mlir::ModuleOp::create(m_builder.getUnknownLoc());
+    Dialect::getTypeTypeObject(m_module);
+    Dialect::getFunctionTypeObject(m_module);
+    Dialect::getLongTypeObject(m_module);
     auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
                                                          mlir::FunctionType::get(m_builder.getContext(), {}, {}));
     m_module.push_back(initFunc);

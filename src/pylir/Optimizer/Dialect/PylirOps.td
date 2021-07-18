@@ -35,9 +35,16 @@ def Pylir_GlobalOp : Pylir_Op<"global", [Symbol, NoSideEffect]> {
     }];
 
     let verifier = [{
-        if (constant() && type().isa<::pylir::Dialect::UnknownType>())
+        if (constant())
         {
-            emitOpError("constant must not have an unknown type");
+            if (type().isa<::pylir::Dialect::UnknownType>())
+            {
+                emitOpError("constant must not have an unknown type");
+            }
+            if (!initializer())
+            {
+                emitOpError("constant must have an initializer");
+            }
         }
         return ::mlir::success();
     }];
@@ -331,7 +338,7 @@ def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
     let assemblyFormat = "$exception `:` type($exception) attr-dict";
 }
 
-def Pylir_GetItemOp : Pylir_Op<"getItem>"> {
+def Pylir_GetItemOp : Pylir_Op<"getItem"> {
     let arguments = (ins Arg<AnySequenceType, "",[MemRead]>:$sequence,Pylir_Integer:$index);
     let results = (outs AnyPythonType:$result);
 
