@@ -7,6 +7,7 @@
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Transforms/DialectConversion.h>
 
+#include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Dialect/PylirDialect.hpp>
@@ -92,6 +93,7 @@ struct GlobalOpConversion : SingleOpMatcher<GlobalOpConversion, pylir::Dialect::
     void rewrite(mlir::Operation* op, pylir::Dialect::GlobalOp::Adaptor adaptor,
                  mlir::ConversionPatternRewriter& rewriter) const
     {
+        auto exit = llvm::make_scope_exit([&] { rewriter.eraseOp(op); });
         mlir::Type resultType;
         if (!adaptor.constant())
         {
@@ -109,11 +111,57 @@ struct GlobalOpConversion : SingleOpMatcher<GlobalOpConversion, pylir::Dialect::
         }
         auto newOp = rewriter.create<mlir::LLVM::GlobalOp>(op->getLoc(), resultType, false, linkage,
                                                            adaptor.sym_name().getValue(), mlir::Attribute{});
+        {
+            mlir::OpBuilder::InsertionGuard guard(rewriter);
+            auto* block = new mlir::Block;
+            newOp.getInitializerRegion().push_back(block);
+            rewriter.setInsertionPointToStart(block);
+            auto undef = rewriter.create<mlir::LLVM::UndefOp>(op->getLoc(), newOp.getType());
+            rewriter.create<mlir::LLVM::ReturnOp>(op->getLoc(), mlir::ValueRange{undef});
+        }
         if (!adaptor.initializer())
         {
-            rewriter.eraseOp(op);
             return;
         }
+
+        mlir::LLVM::LLVMFuncOp ctor;
+
+        {
+            mlir::OpBuilder::InsertionGuard guard(rewriter);
+            ctor = rewriter.create<mlir::LLVM::LLVMFuncOp>(
+                op->getLoc(), (adaptor.sym_name().getValue() + ".ctor").str(),
+                mlir::LLVM::LLVMFunctionType::get(rewriter.getType<mlir::LLVM::LLVMVoidType>(), {}),
+                op->hasAttr("linkonce") ? mlir::LLVM::Linkage::Linkonce : mlir::LLVM::Linkage::Internal);
+            rewriter.setInsertionPointToStart(ctor.addEntryBlock());
+            auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), newOp);
+            // TODO: init
+        }
+        auto literal = mlir::LLVM::LLVMStructType::getLiteral(
+            rewriter.getContext(), {rewriter.getI32Type(), mlir::LLVM::LLVMPointerType::get(ctor.getType()),
+                                    mlir::LLVM::LLVMPointerType::get(rewriter.getIntegerType(8))});
+        auto append = rewriter.create<mlir::LLVM::GlobalOp>(op->getLoc(), mlir::LLVM::LLVMArrayType::get(literal, 1),
+                                                            false, mlir::LLVM::Linkage::Appending, "llvm.global_ctors",
+                                                            mlir::Attribute{});
+
+        mlir::OpBuilder::InsertionGuard guard(rewriter);
+        auto* block = new mlir::Block;
+        append.getInitializerRegion().push_back(block);
+        rewriter.setInsertionPointToStart(block);
+        mlir::Value emptyStruct = rewriter.create<mlir::LLVM::UndefOp>(op->getLoc(), literal);
+        auto priority = rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(),
+                                                                rewriter.getI32IntegerAttr(65535));
+        emptyStruct = rewriter.create<mlir::LLVM::InsertValueOp>(op->getLoc(), emptyStruct, priority,
+                                                                 rewriter.getIndexArrayAttr({0}));
+        auto constructorAddress = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), ctor);
+        emptyStruct = rewriter.create<mlir::LLVM::InsertValueOp>(op->getLoc(), emptyStruct, constructorAddress,
+                                                                 rewriter.getIndexArrayAttr({1}));
+        auto dataAddress = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), newOp);
+        emptyStruct = rewriter.create<mlir::LLVM::InsertValueOp>(op->getLoc(), emptyStruct, dataAddress,
+                                                                 rewriter.getIndexArrayAttr({2}));
+        auto emptyArray = rewriter.create<mlir::LLVM::UndefOp>(op->getLoc(), append.getType());
+        rewriter.create<mlir::LLVM::ReturnOp>(
+            op->getLoc(), mlir::ValueRange{rewriter.create<mlir::LLVM::InsertValueOp>(
+                              op->getLoc(), emptyArray, emptyStruct, rewriter.getIndexArrayAttr({0}))});
     }
 };
 } // namespace
