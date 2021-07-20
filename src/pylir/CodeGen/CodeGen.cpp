@@ -862,9 +862,8 @@ mlir::Value pylir::CodeGen::assureCallable(mlir::Location loc, mlir::Value calla
 {
     auto type = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), callable);
     auto thisTypeId = m_builder.create<Dialect::IdOp>(loc, type);
-    auto handle = m_builder.create<Dialect::HandleOfOp>(loc, Dialect::getFunctionTypeObject(m_module).sym_name());
-    auto loaded = m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), handle);
-    auto functionTypeId = m_builder.create<Dialect::IdOp>(loc, loaded);
+    auto data = m_builder.create<Dialect::DataOfOp>(loc, Dialect::getFunctionTypeObject(m_module));
+    auto functionTypeId = m_builder.create<Dialect::IdOp>(loc, data);
     auto eq = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, thisTypeId, functionTypeId);
     mlir::Block* callPath = new mlir::Block;
     mlir::Block* raisePath = new mlir::Block;
@@ -880,11 +879,12 @@ mlir::Value pylir::CodeGen::assureCallable(mlir::Location loc, mlir::Value calla
     m_builder.setInsertionPointToStart(callPath);
     auto reinterpret =
         m_builder.create<Dialect::ReinterpretOp>(loc, m_builder.getType<Dialect::FunctionType>(), callable);
-    auto result = m_builder.create<Dialect::CallOp>(loc, m_builder.getType<Dialect::UnknownType>(),
-                                                    mlir::ValueRange{reinterpret, reinterpret, args, dict});
+    auto fp = m_builder.create<Dialect::GetFunctionPointerOp>(loc, Dialect::getCCFuncType(m_builder.getContext()),
+                                                              reinterpret);
+    auto result = m_builder.create<mlir::CallIndirectOp>(loc, fp, mlir::ValueRange{reinterpret, args, dict});
     m_builder.create<mlir::BranchOp>(loc, continuePath);
     m_currentFunc.push_back(continuePath);
     m_builder.setInsertionPointToStart(continuePath);
 
-    return result;
+    return result.getResult(0);
 }

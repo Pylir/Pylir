@@ -7,16 +7,16 @@
 namespace
 {
 template <class F>
-pylir::Dialect::GlobalOp getType(mlir::Type type, mlir::ModuleOp& module, std::string_view name, F fillDict)
+pylir::Dialect::ConstantGlobalOp getType(mlir::Type type, mlir::ModuleOp& module, std::string_view name, F fillDict)
 {
     static_assert(std::is_invocable_r_v<std::vector<std::pair<mlir::Attribute, mlir::Attribute>>, F>);
     auto symbolTable = mlir::SymbolTable(module);
-    if (auto symbol = symbolTable.lookup<pylir::Dialect::GlobalOp>(name))
+    if (auto symbol = symbolTable.lookup<pylir::Dialect::ConstantGlobalOp>(name))
     {
         return symbol;
     }
-    auto globalOp = pylir::Dialect::GlobalOp::create(mlir::UnknownLoc::get(module.getContext()), name, type, true);
-    globalOp->setAttr("linkonce", mlir::UnitAttr::get(module.getContext()));
+    auto globalOp =
+        pylir::Dialect::ConstantGlobalOp::create(mlir::UnknownLoc::get(module.getContext()), name, type, {});
     symbolTable.insert(globalOp);
     // Insert first, then generate initializer to stop recursion
     auto dict = fillDict();
@@ -39,7 +39,7 @@ mlir::FlatSymbolRefAttr genFunction(mlir::ModuleOp& module, std::string_view nam
 }
 } // namespace
 
-pylir::Dialect::GlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleOp& module)
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleOp& module)
 {
     return getType(KnownTypeObjectType::get(mlir::FlatSymbolRefAttr::get(typeTypeObjectName, module.getContext())),
                    module, typeTypeObjectName,
@@ -51,7 +51,7 @@ pylir::Dialect::GlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleOp& modul
                    });
 }
 
-pylir::Dialect::GlobalOp pylir::Dialect::getFunctionTypeObject(mlir::ModuleOp& module)
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::ModuleOp& module)
 {
     return getType(
         KnownTypeObjectType::get(
@@ -67,17 +67,17 @@ pylir::Dialect::GlobalOp pylir::Dialect::getFunctionTypeObject(mlir::ModuleOp& m
                             {
                                 auto casted = builder.create<Dialect::ReinterpretOp>(
                                     builder.getUnknownLoc(), builder.getType<Dialect::FunctionType>(), self);
-                                auto result = builder.create<Dialect::CallOp>(builder.getUnknownLoc(),
-                                                                              builder.getType<UnknownType>(), casted,
-                                                                              mlir::ValueRange{casted, args, dict});
-                                builder.create<mlir::ReturnOp>(builder.getUnknownLoc(),
-                                                               static_cast<mlir::Value>(result));
+                                auto fpPointer = builder.create<Dialect::GetFunctionPointerOp>(
+                                    builder.getUnknownLoc(), Dialect::getCCFuncType(builder.getContext()), casted);
+                                auto result = builder.create<mlir::CallIndirectOp>(
+                                    builder.getUnknownLoc(), fpPointer, mlir::ValueRange{casted, args, dict});
+                                builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), result.getResult(0));
                             }));
             return dict;
         });
 }
 
-pylir::Dialect::GlobalOp pylir::Dialect::getLongTypeObject(ModuleOp& module)
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(ModuleOp& module)
 {
     return getType(
         KnownTypeObjectType::get(

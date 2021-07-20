@@ -559,17 +559,17 @@ bool pylir::Dialect::ToVariantOp::areCastCompatible(mlir::TypeRange inputs, mlir
     return false;
 }
 
-pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name, bool constant,
-                                                          mlir::Attribute initializer)
-{
-    return create(location, name, UnknownType::get(location.getContext()), constant, initializer);
-}
-
-pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name,
-                                                          mlir::Type type, bool constant, mlir::Attribute initializer)
+pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name)
 {
     mlir::OpBuilder builder(location.getContext());
-    return builder.create<GlobalOp>(location, name, mlir::TypeAttr::get(type), constant, initializer);
+    return builder.create<GlobalOp>(location, name);
+}
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::ConstantGlobalOp::create(mlir::Location location, llvm::StringRef name,
+                                                                          mlir::Type type, mlir::Attribute initializer)
+{
+    mlir::OpBuilder builder(location.getContext());
+    return builder.create<ConstantGlobalOp>(location, name, mlir::TypeAttr::get(type), initializer);
 }
 
 mlir::OpFoldResult pylir::Dialect::MakeListOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -580,6 +580,7 @@ mlir::OpFoldResult pylir::Dialect::MakeListOp::fold(::llvm::ArrayRef<::mlir::Att
     }
     return nullptr;
 }
+
 mlir::OpFoldResult pylir::Dialect::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
@@ -626,19 +627,15 @@ bool pylir::Dialect::ListToTupleOp::areCastCompatible(mlir::TypeRange inputs, ml
     return outputs[0].isa<TupleType>() && inputs[0].isa<ListType>();
 }
 
-mlir::CallInterfaceCallable pylir::Dialect::CallOp::getCallableForCallee()
-{
-    return callee();
-}
-
-mlir::Operation::operand_range pylir::Dialect::CallOp::getArgOperands()
-{
-    return operands();
-}
-
 mlir::LogicalResult pylir::Dialect::HandleOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     auto result = symbolTable.lookupNearestSymbolFrom<Dialect::GlobalOp>(*this, globalNameAttr());
+    return mlir::success(result != nullptr);
+}
+
+mlir::LogicalResult pylir::Dialect::DataOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    auto result = symbolTable.lookupNearestSymbolFrom<Dialect::ConstantGlobalOp>(*this, globalNameAttr());
     return mlir::success(result != nullptr);
 }
 
@@ -672,7 +669,7 @@ bool pylir::Dialect::ReinterpretOp::areCastCompatible(mlir::TypeRange inputs, ml
     {
         return false;
     }
-    return (inputs[0].isa<UnknownType>() && !outputs[0].isa<UnknownType>()) || inputs[0] == outputs[0];
+    return inputs[0].isa<UnknownType>() || outputs[0].isa<UnknownType>();
 }
 
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>

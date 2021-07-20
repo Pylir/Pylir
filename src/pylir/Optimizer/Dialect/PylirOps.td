@@ -18,36 +18,57 @@ def Pylir_GlobalOp : Pylir_Op<"global", [Symbol, NoSideEffect]> {
     let hasFolder = 0;
 
     let arguments = (ins
-        SymbolNameAttr:$sym_name,
-        TypeAttr:$type,
-        UnitAttr:$constant,
-        OptionalAttr<AnyAttr>:$initializer
+        SymbolNameAttr:$sym_name
     );
 
     let assemblyFormat = [{
-             (`constant` $constant^)? $sym_name `->` $type attr-dict (`=` $initializer^)?
+            $sym_name attr-dict
         }];
 
     let extraClassDeclaration = [{
-        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, mlir::Type type, bool constant = false, mlir::Attribute initializer = {});
+        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name);
+    }];
+}
 
-        static GlobalOp create(::mlir::Location location, ::llvm::StringRef name, bool constant = false, mlir::Attribute initializer = {});
+def Pylir_ConstantGlobalOp : Pylir_Op<"constantGlobal", [Symbol, NoSideEffect]> {
+    let hasFolder = 0;
+
+    let arguments = (ins
+        SymbolNameAttr:$sym_name,
+        TypeAttr:$type,
+        AnyAttr:$initializer
+    );
+
+    let assemblyFormat = [{
+        $sym_name `->` $type attr-dict `=` $initializer
+    }];
+
+    let extraClassDeclaration = [{
+        static ConstantGlobalOp create(::mlir::Location location, ::llvm::StringRef name, mlir::Type type, mlir::Attribute initializer);
     }];
 
     let verifier = [{
-        if (constant())
+        if (type().isa<::pylir::Dialect::UnknownType>())
         {
-            if (type().isa<::pylir::Dialect::UnknownType>())
-            {
-                emitOpError("constant must not have an unknown type");
-            }
-            if (!initializer())
-            {
-                emitOpError("constant must have an initializer");
-            }
+            emitOpError("constant must not have an unknown type");
         }
         return ::mlir::success();
     }];
+}
+
+def Pylir_DataOfOp : Pylir_Op<"",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let arguments = (ins FlatSymbolRefAttr:$globalName);
+    let results = (outs AnyPythonType:$data);
+
+    let hasFolder = 0;
+
+    let assemblyFormat = [{
+        $globalName `->` type($data) attr-dict
+    }];
+
+    let builders = [
+        OpBuilderDAG<(ins "pylir::Dialect::ConstantGlobalOp":$value),
+        [{ build($_builder, $_state, value.type(), value.sym_name()); }]>];
 }
 
 def Pylir_HandleOfOp : Pylir_Op<"handleof",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
@@ -320,15 +341,6 @@ def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
     let hasFolder = 0;
 }
 
-def Pylir_CallOp : Pylir_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
-    let arguments = (ins Pylir_Function:$callee, Variadic<AnyPythonType>:$operands);
-    let results = (outs AnyPythonType:$result);
-
-    let assemblyFormat = "$callee `:` type($callee)  `(` $operands `)` `->` functional-type($operands, results) attr-dict";
-
-    let hasFolder = 0;
-}
-
 def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
     let hasFolder = 0;
 
@@ -345,6 +357,13 @@ def Pylir_GetItemOp : Pylir_Op<"getItem"> {
     let assemblyFormat = [{
                           $sequence `:` type($sequence) `[` $index `]` `->` type($result) attr-dict
                         }];
+}
+
+def Pylir_GetFunctionPointerOp : Pylir_Op<"getFunctionPointer", [NoSideEffect]> {
+    let arguments = (ins Pylir_Function:$input);
+    let results = (outs FunctionType:$result);
+
+    let hasFolder = 0;
 }
 
 def Pylir_ReinterpretOp : Pylir_Cast<"reinterpret"> {
