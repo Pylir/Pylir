@@ -56,7 +56,7 @@ def Pylir_ConstantGlobalOp : Pylir_Op<"constantGlobal", [Symbol, NoSideEffect]> 
     }];
 }
 
-def Pylir_DataOfOp : Pylir_Op<"",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def Pylir_DataOfOp : Pylir_Op<"dataOf",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$globalName);
     let results = (outs AnyPythonType:$data);
 
@@ -71,7 +71,7 @@ def Pylir_DataOfOp : Pylir_Op<"",[NoSideEffect, DeclareOpInterfaceMethods<Symbol
         [{ build($_builder, $_state, value.type(), value.sym_name()); }]>];
 }
 
-def Pylir_HandleOfOp : Pylir_Op<"handleof",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def Pylir_HandleOfOp : Pylir_Op<"handleOf",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$globalName);
     let results = (outs Pylir_Handle:$handle);
 
