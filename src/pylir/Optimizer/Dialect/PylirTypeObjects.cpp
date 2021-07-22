@@ -7,7 +7,7 @@
 namespace
 {
 template <class F>
-pylir::Dialect::ConstantGlobalOp getType(mlir::Type type, mlir::ModuleOp& module, std::string_view name, F fillDict)
+pylir::Dialect::ConstantGlobalOp getConstant(mlir::Type type, mlir::ModuleOp& module, std::string_view name, F fillDict)
 {
     static_assert(std::is_invocable_r_v<std::vector<std::pair<mlir::Attribute, mlir::Attribute>>, F>);
     auto symbolTable = mlir::SymbolTable(module);
@@ -41,19 +41,19 @@ mlir::FlatSymbolRefAttr genFunction(mlir::ModuleOp& module, std::string_view nam
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleOp& module)
 {
-    return getType(KnownTypeObjectType::get(mlir::FlatSymbolRefAttr::get(typeTypeObjectName, module.getContext())),
-                   module, typeTypeObjectName,
-                   [&]()
-                   {
-                       std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+    return getConstant(KnownTypeObjectType::get(mlir::FlatSymbolRefAttr::get(typeTypeObjectName, module.getContext())),
+                       module, typeTypeObjectName,
+                       [&]()
+                       {
+                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
 
-                       return dict;
-                   });
+                           return dict;
+                       });
 }
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::ModuleOp& module)
 {
-    return getType(
+    return getConstant(
         KnownTypeObjectType::get(
             mlir::FlatSymbolRefAttr::get(getTypeTypeObject(module).sym_name(), module.getContext())),
         module, functionTypeObjectName,
@@ -79,7 +79,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(ModuleOp& module)
 {
-    return getType(
+    return getConstant(
         KnownTypeObjectType::get(
             mlir::FlatSymbolRefAttr::get(getTypeTypeObject(module).sym_name(), module.getContext())),
         module, longTypeObjectName,
@@ -108,6 +108,58 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(ModuleOp& mod
                             }));
             return dict;
         });
+}
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneTypeObject(mlir::ModuleOp& module)
+{
+    return getConstant(KnownTypeObjectType::get(
+                           mlir::FlatSymbolRefAttr::get(getTypeTypeObject(module).sym_name(), module.getContext())),
+                       module, noneTypeObjectName,
+                       [&]()
+                       {
+                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+
+                           return dict;
+                       });
+}
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneObject(mlir::ModuleOp& module)
+{
+    return getConstant(KnownTypeObjectType::get(
+                           mlir::FlatSymbolRefAttr::get(getNoneTypeObject(module).sym_name(), module.getContext())),
+                       module, noneTypeObjectName,
+                       [&]()
+                       {
+                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+
+                           return dict;
+                       });
+}
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedTypeObject(mlir::ModuleOp& module)
+{
+    return getConstant(KnownTypeObjectType::get(
+                           mlir::FlatSymbolRefAttr::get(getTypeTypeObject(module).sym_name(), module.getContext())),
+                       module, notImplementedTypeObjectName,
+                       [&]()
+                       {
+                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+
+                           return dict;
+                       });
+}
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::ModuleOp& module)
+{
+    return getConstant(KnownTypeObjectType::get(mlir::FlatSymbolRefAttr::get(
+                           getNotImplementedTypeObject(module).sym_name(), module.getContext())),
+                       module, noneTypeObjectName,
+                       [&]()
+                       {
+                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+
+                           return dict;
+                       });
 }
 
 mlir::FunctionType pylir::Dialect::getCCFuncType(mlir::MLIRContext* context)

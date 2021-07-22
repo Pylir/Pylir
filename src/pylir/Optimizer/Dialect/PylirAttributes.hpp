@@ -147,28 +147,6 @@ struct DictStorage : public mlir::AttributeStorage
 
 } // namespace detail
 
-class NoneAttr : public mlir::Attribute::AttrBase<NoneAttr, mlir::Attribute, detail::TypeStorage>
-{
-public:
-    using Base::Base;
-
-    static NoneAttr get(mlir::MLIRContext* context)
-    {
-        return Base::get(context, NoneType::get(context));
-    }
-};
-
-class NotImplementedAttr : public mlir::Attribute::AttrBase<NotImplementedAttr, mlir::Attribute, detail::TypeStorage>
-{
-public:
-    using Base::Base;
-
-    static NotImplementedAttr get(mlir::MLIRContext* context)
-    {
-        return Base::get(context, NotImplementedType::get(context));
-    }
-};
-
 class BoolAttr : public mlir::Attribute::AttrBase<BoolAttr, mlir::Attribute, detail::ValueAttrStorage<bool>>
 {
 public:

@@ -54,10 +54,11 @@ Pros of this approach:
 
 Cons of this approach:
 
-* One has to do quite a few special cases when accessing `__dict__` as well as when setting a special method. Everytime
-  I now set an attribute, which might also be on the type object, I am forced to check whether the attribute
-  is `__call__` , and if it is, switch `tp_call` to a generic version using dictionary lookup. Same for all other
-  special methods
+* ~~One has to do quite a few special cases when accessing `__dict__` as well as when setting a special method.
+  Everytime I now set an attribute, which might also be on the type object, I am forced to check whether the attribute
+  is `__call__` , and if it is,~~ I'd have to use a descriptor for both `__dict__` as well as the mapped value in it for
+  `__call__`. Its `__set__` method must then switch `tp_call` to a generic version using dictionary lookup if
+  reassigned. Same for all other special methods.
 
 ### Dictionary lookup
 

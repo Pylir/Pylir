@@ -667,8 +667,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     return m_builder.create<pylir::Dialect::ConstantOp>(
                         getLoc(atom, literal.token), Dialect::BoolAttr::get(m_builder.getContext(), false));
                 case TokenType::NoneKeyword:
-                    return m_builder.create<pylir::Dialect::ConstantOp>(getLoc(atom, literal.token),
-                                                                        Dialect::NoneAttr::get(m_builder.getContext()));
+                    return m_builder.create<pylir::Dialect::DataOfOp>(getLoc(atom, literal.token),
+                                                                      Dialect::getNoneObject(m_module));
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -797,7 +797,7 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
 
         auto call = assureCallable(loc, addFunc, posArgs, emptyDict);
         auto notImplementedConstant =
-            m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
+            m_builder.create<Dialect::DataOfOp>(loc, Dialect::getNotImplementedObject(m_module));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
         auto id = m_builder.create<Dialect::IdOp>(loc, call);
         auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
@@ -835,7 +835,7 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
         auto emptyDict = m_builder.create<Dialect::ConstantOp>(loc, Dialect::DictAttr::get(m_builder.getContext(), {}));
         auto call = assureCallable(loc, addFunc, posArgs, emptyDict);
         auto notImplementedConstant =
-            m_builder.create<Dialect::ConstantOp>(loc, Dialect::NotImplementedAttr::get(m_builder.getContext()));
+            m_builder.create<Dialect::DataOfOp>(loc, Dialect::getNotImplementedObject(m_module));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
         auto id = m_builder.create<Dialect::IdOp>(loc, call);
         auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
