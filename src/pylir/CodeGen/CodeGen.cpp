@@ -776,7 +776,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
 mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
                                               std::string_view opName, std::string_view fallback)
 {
-    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), lhs);
+    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhs);
     auto attr = m_builder.create<Dialect::GetAttrOp>(loc, lhsType, m_builder.getStringAttr(opName));
     auto addFunc = attr.getResult(0);
     auto wasFound = attr.getResult(1);
@@ -812,7 +812,7 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
     {
         m_currentFunc.getCallableRegion()->push_back(notFoundBlock);
         m_builder.setInsertionPointToStart(notFoundBlock);
-        auto rhsType = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), rhs);
+        auto rhsType = m_builder.create<Dialect::TypeOfOp>(loc, rhs);
         auto tryRBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
         auto* raiseBlock = new mlir::Block;
 
@@ -860,7 +860,7 @@ mlir::Value pylir::CodeGen::binOpWithFallback(mlir::Location loc, mlir::Value lh
 
 mlir::Value pylir::CodeGen::assureCallable(mlir::Location loc, mlir::Value callable, mlir::Value args, mlir::Value dict)
 {
-    auto type = m_builder.create<Dialect::TypeOfOp>(loc, m_builder.getType<Dialect::UnknownType>(), callable);
+    auto type = m_builder.create<Dialect::TypeOfOp>(loc, callable);
     auto thisTypeId = m_builder.create<Dialect::IdOp>(loc, type);
     auto data = m_builder.create<Dialect::DataOfOp>(loc, Dialect::getFunctionTypeObject(m_module));
     auto functionTypeId = m_builder.create<Dialect::IdOp>(loc, data);

@@ -89,8 +89,18 @@ def Pylir_KnownTypeObject : Pylir_Type<"KnownTypeObject"> {
             }]>
           ];
 
-        let skipDefaultBuilders = 1;
+    let skipDefaultBuilders = 1;
 }
+
+class Pylir_KnownTypeObjectCheck<string typeObjectNameVariable> : TypeConstraint<
+    And<[
+        CPred<"$_self.isa<::pylir::Dialect::KnownTypeObjectType>()">,
+        CPred<"$_self.cast<::pylir::Dialect::KnownTypeObjectType>().getType().getValue() =="
+        "::llvm::StringRef{::pylir::Dialect::" # typeObjectNameVariable # "}">
+        ]>
+>;
+
+def Pylir_TypeObject : Pylir_KnownTypeObjectCheck<"typeTypeObjectName">;
 
 def AnySequenceType
 : AnyTypeOf<[Pylir_String, Pylir_Tuple, Pylir_List]>;

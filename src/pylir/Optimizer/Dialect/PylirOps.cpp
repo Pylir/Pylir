@@ -673,6 +673,7 @@ bool pylir::Dialect::ReinterpretOp::areCastCompatible(mlir::TypeRange inputs, ml
 }
 
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
+#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 
 // TODO: Remove in MLIR 13
 using namespace mlir;

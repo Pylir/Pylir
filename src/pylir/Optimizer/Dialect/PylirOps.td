@@ -306,14 +306,20 @@ def Pylir_ListToTupleOp : Pylir_Cast<"listToTuple"> {
 
 def Pylir_TypeOfOp : Pylir_Op<"typeOf", [NoSideEffect]> {
     let arguments = (ins AnyPythonType:$input);
-    let results = (outs AnyPythonType:$result);
+    let results = (outs Pylir_TypeObject:$result);
 
     let assemblyFormat = [{
                   $input `:` type($input) `->` type($result) attr-dict
                 }];
 
     let hasFolder = 0;
+
+    let builders = [
+                OpBuilderDAG<(ins "mlir::Value":$value),
+                [{ build($_builder, $_state, ::pylir::Dialect::KnownTypeObjectType::get(::mlir::FlatSymbolRefAttr::get(::pylir::Dialect::typeTypeObjectName, $_state.getContext())), value); }]>];
 }
+
+
 
 def Pylir_GetAttrOp : Pylir_Op<"getAttr"> {
     let arguments = (ins Arg<AnyPythonType,"",[MemRead]>:$input, StrAttr:$member);

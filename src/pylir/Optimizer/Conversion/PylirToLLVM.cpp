@@ -33,20 +33,6 @@ mlir::Type getPyObject(mlir::MLIRContext* context)
     return pyObject;
 }
 
-mlir::Type getPyBaseObject(mlir::MLIRContext* context)
-{
-    auto pyBaseObject = mlir::LLVM::LLVMStructType::getIdentified(context, "PyBaseObject");
-    if (pyBaseObject.getBody().empty())
-    {
-        std::vector<mlir::Type> types;
-        types.emplace_back(getPyObject(context)); // base
-        types.emplace_back(
-            mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(context, 8))); // opaque pointer to the dict for now
-        pyBaseObject.setBody(types, false);
-    }
-    return pyBaseObject;
-}
-
 mlir::Type getPyTupleObject(mlir::MLIRContext* context)
 {
     auto pyTupleObject = mlir::LLVM::LLVMStructType::getIdentified(context, "PyTupleObject");
@@ -81,7 +67,7 @@ mlir::Type getPyFunctionObject(mlir::MLIRContext* context)
     if (pyFunctionObject.getBody().empty())
     {
         std::vector<mlir::Type> types;
-        types.emplace_back(getPyBaseObject(context)); // base
+        types.emplace_back(getPyObject(context)); // base
         auto pyObject = getPyObject(context);
         types.emplace_back(mlir::LLVM::LLVMPointerType::get(
             mlir::LLVM::LLVMFunctionType::get(pyObject, {pyObject, pyObject, pyObject})));
@@ -102,6 +88,12 @@ mlir::Type getPyLongObject(mlir::MLIRContext* context)
         pyLongObject.setBody(types, false);
     }
     return pyLongObject;
+}
+
+mlir::Type getTypeFromTypeObject(pylir::Dialect::ConstantGlobalOp constant)
+{
+    //TODO:
+    return {};
 }
 
 mlir::LLVM::LLVMFuncOp declareFunc(mlir::LLVM::LLVMFunctionType functionType, std::string_view name,
@@ -171,7 +163,8 @@ struct ConstantOpConversion : SingleOpMatcher<ConstantOpConversion, pylir::Diale
                 {
                     // TODO larger than index using a pylir private function
                     auto constant = rewriter.create<mlir::LLVM::ConstantOp>(
-                        op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(value.getValue().getSExtValue()));
+                        op->getLoc(), rewriter.getI64Type(),
+                        rewriter.getI64IntegerAttr(value.getValue().getSExtValue()));
 
                     rewriter.replaceOp(op, {PyLong_FromSize_t(rewriter, op->getLoc(), constant,
                                                               op->getParentOfType<mlir::ModuleOp>())});
@@ -232,26 +225,26 @@ struct ConstantGlobalOpConversion : SingleOpMatcher<ConstantGlobalOpConversion, 
                 op->getLoc(), (adaptor.sym_name().getValue() + ".ctor").str(),
                 mlir::LLVM::LLVMFunctionType::get(rewriter.getType<mlir::LLVM::LLVMVoidType>(), {}), newOp.linkage());
             rewriter.setInsertionPointToStart(ctor.addEntryBlock());
-            auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), newOp);
-            auto zero =
-                rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(0));
+            mlir::Value address = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), newOp);
+            address = rewriter.create<mlir::LLVM::BitcastOp>(
+                op->getLoc(), mlir::LLVM::LLVMPointerType::get(getPyObject(rewriter.getContext())), address);
+            auto zero = rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(),
+                                                                rewriter.getI64IntegerAttr(0));
             auto typePointer = rewriter.create<mlir::LLVM::GEPOp>(
                 op->getLoc(),
                 mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getPyObject(rewriter.getContext()))),
                 address, mlir::ValueRange{zero, zero, zero});
 
-            
-
             mlir::Value typeObject = rewriter.create<mlir::LLVM::AddressOfOp>(
-                op->getLoc(), mlir::LLVM::LLVMPointerType::get(getPyBaseObject(rewriter.getContext())),
+                op->getLoc(), adaptor.type().getValue(),
                 adaptor.type().getValue().cast<pylir::Dialect::KnownTypeObjectType>().getType());
             typeObject = rewriter.create<mlir::LLVM::GEPOp>(
                 op->getLoc(), mlir::LLVM::LLVMPointerType::get(getPyObject(rewriter.getContext())), typeObject,
                 mlir::ValueRange{zero, zero});
             rewriter.create<mlir::LLVM::StoreOp>(op->getLoc(), typePointer, typeObject);
             // TODO init
-            auto one =
-                rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(1));
+            auto one = rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(),
+                                                               rewriter.getI64IntegerAttr(1));
             auto dict = rewriter.create<mlir::LLVM::GEPOp>(
                 op->getLoc(),
                 mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(rewriter.getIntegerType(8))), address,
@@ -260,6 +253,7 @@ struct ConstantGlobalOpConversion : SingleOpMatcher<ConstantGlobalOpConversion, 
             auto null = rewriter.create<mlir::LLVM::NullOp>(
                 op->getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getIntegerType(8)));
             rewriter.create<mlir::LLVM::StoreOp>(op->getLoc(), null, dict);
+            rewriter.create<mlir::LLVM::ReturnOp>(op->getLoc(), mlir::ValueRange{});
         }
 
         ctors.emplace_back(ctor, newOp);
@@ -314,9 +308,9 @@ struct GetFunctionPointerConversion
                  mlir::ConversionPatternRewriter& rewriter) const
     {
         auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(0));
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(0));
         auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(1));
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(1));
         auto fpP = rewriter.create<mlir::LLVM::GEPOp>(
             op->getLoc(), mlir::LLVM::LLVMPointerType::get(typeConverter->convertType(op->getResultTypes()[0])),
             adaptor.input(), mlir::ValueRange{zero, one});
@@ -458,7 +452,7 @@ struct TypeOfConversion : SingleOpMatcher<TypeOfConversion, pylir::Dialect::Type
                 op->getLoc(), mlir::LLVM::LLVMPointerType::get(getPyObject(rewriter.getContext())), input);
         }
         auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(0));
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(0));
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
             op->getLoc(), mlir::LLVM::LLVMPointerType::get(typeConverter->convertType(op->getResultTypes()[0])), input,
             mlir::ValueRange{zero, zero});
@@ -481,10 +475,10 @@ struct GetAttrConversion : SingleOpMatcher<GetAttrConversion, pylir::Dialect::Ge
             input = rewriter.create<mlir::LLVM::BitcastOp>(
                 op->getLoc(), typeConverter->convertType(rewriter.getType<pylir::Dialect::UnknownType>()), input);
         }
-        mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
         mlir::LLVM::GlobalOp stringOp;
         auto moduleOp = op->getParentOfType<mlir::ModuleOp>();
         {
+            mlir::OpBuilder::InsertionGuard insertionGuard{rewriter};
             auto str = adaptor.member().getValue();
             rewriter.setInsertionPoint(moduleOp.getBody()->getTerminator());
             std::string name = ".str";
@@ -507,11 +501,11 @@ struct GetAttrConversion : SingleOpMatcher<GetAttrConversion, pylir::Dialect::Ge
         auto i8Star = mlir::LLVM::LLVMPointerType::get(rewriter.getIntegerType(8));
         auto func = declareFunc(mlir::LLVM::LLVMFunctionType::get(ptr, {ptr, i8Star, rewriter.getI64Type()}),
                                 "pylir_get_attr", moduleOp);
-        auto size = rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(),
-                                                            rewriter.getIndexAttr(adaptor.member().getValue().size()));
+        auto size = rewriter.create<mlir::LLVM::ConstantOp>(
+            op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(adaptor.member().getValue().size()));
         auto str = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), stringOp);
         auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(0));
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(0));
         auto call = rewriter.create<mlir::LLVM::CallOp>(
             op->getLoc(), func,
             mlir::ValueRange{
@@ -534,7 +528,7 @@ struct AllocaConversion : SingleOpMatcher<AllocaConversion, pylir::Dialect::Allo
                  mlir::ConversionPatternRewriter& rewriter) const
     {
         auto size =
-            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(1));
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(1));
         rewriter.replaceOpWithNewOp<mlir::LLVM::AllocaOp>(
             op, typeConverter->convertType(rewriter.getType<pylir::Dialect::HandleType>()), size, 8);
     }
@@ -610,16 +604,16 @@ struct MakeTupleConversion : SingleOpMatcher<MakeTupleConversion, pylir::Dialect
         auto pyObjectStar = mlir::LLVM::LLVMPointerType::get(getPyObject(rewriter.getContext()));
         auto arrayType = mlir::LLVM::LLVMArrayType::get(pyObjectStar, adaptor.input().size());
         auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(1));
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(1));
         auto alloca =
             rewriter.create<mlir::LLVM::AllocaOp>(op->getLoc(), mlir::LLVM::LLVMPointerType::get(arrayType), one, 8);
         auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getIndexAttr(0));
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(), rewriter.getI64IntegerAttr(0));
         auto pyObjectStarStar = mlir::LLVM::LLVMPointerType::get(pyObjectStar);
         for (auto iter = adaptor.input().begin(); iter != adaptor.input().end(); iter++)
         {
             auto constant = rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(),
-                                                                    rewriter.getIndexAttr(iter.getIndex()));
+                                                                    rewriter.getI64IntegerAttr(iter.getIndex()));
             auto gep = rewriter.create<mlir::LLVM::GEPOp>(op->getLoc(), pyObjectStarStar, alloca,
                                                           mlir::ValueRange{zero, constant});
             rewriter.create<mlir::LLVM::StoreOp>(op->getLoc(), *iter, gep);
@@ -629,7 +623,7 @@ struct MakeTupleConversion : SingleOpMatcher<MakeTupleConversion, pylir::Dialect
                                               {pyObjectStarStar, rewriter.getI64Type()}),
             "pylir_make_tuple", op->getParentOfType<mlir::ModuleOp>());
         auto size = rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI64Type(),
-                                                            rewriter.getIndexAttr(adaptor.input().size()));
+                                                            rewriter.getI64IntegerAttr(adaptor.input().size()));
         rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(
             op, func,
             mlir::ValueRange{rewriter.create<mlir::LLVM::GEPOp>(op->getLoc(), pyObjectStarStar, alloca,
@@ -658,6 +652,18 @@ void ConvertPylirToLLVMPass::runOnOperation()
 {
     auto module = getOperation();
 
+    llvm::DenseMap<llvm::StringRef, mlir::Type> knownObjectTypes;
+    for (auto op : module.getOps<pylir::Dialect::ConstantGlobalOp>())
+    {
+        // Type objects are ones that are of type `pylir.object<@__builtins__.type>`
+        if (auto type = op.type().dyn_cast_or_null<pylir::Dialect::KnownTypeObjectType>();
+            !type || type.getType().getValue() != llvm::StringRef{pylir::Dialect::typeTypeObjectName})
+        {
+            continue;
+        }
+        knownObjectTypes.insert({op.sym_name(), getTypeFromTypeObject(op)});
+    }
+
     mlir::OwningRewritePatternList patterns;
     mlir::LLVMTypeConverter converter(&getContext());
 
@@ -666,15 +672,14 @@ void ConvertPylirToLLVMPass::runOnOperation()
             return mlir::LLVM::LLVMPointerType::get(getPyObject(type.getContext()));
         });
     converter.addConversion(
-        [](pylir::Dialect::KnownTypeObjectType type) -> llvm::Optional<mlir::Type>
+        [&](pylir::Dialect::KnownTypeObjectType type) -> llvm::Optional<mlir::Type>
         {
             auto value = type.getType().getValue();
-            if (value == llvm::StringRef{pylir::Dialect::noneTypeObjectName}
-                || value == llvm::StringRef{pylir::Dialect::notImplementedTypeObjectName})
+            if (auto result = knownObjectTypes.find(value); result != knownObjectTypes.end())
             {
-                return mlir::LLVM::LLVMPointerType::get(getPyObject(type.getContext()));
+                return result->second;
             }
-            return mlir::LLVM::LLVMPointerType::get(getPyBaseObject(type.getContext()));
+            return mlir::LLVM::LLVMPointerType::get(getPyObject(type.getContext()));
         });
     converter.addConversion(
         [](pylir::Dialect::FunctionType type) -> llvm::Optional<mlir::Type> {
