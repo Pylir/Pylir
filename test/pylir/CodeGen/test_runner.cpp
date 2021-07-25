@@ -49,10 +49,10 @@ int main(int argc, char** argv)
     }
     mlir::MLIRContext context;
     auto module = pylir::codegen(&context, *tree, document);
-    module.verify();
     module.print(llvm::outs());
-    mlir::PassManager manager(&context);
-    manager.enableVerifier();
-    manager.addPass(pylir::Dialect::createConvertPylirToLLVMPass());
-    return mlir::failed(manager.run(module));
+    return mlir::failed(module.verify());
+    //    mlir::PassManager manager(&context);
+    //    manager.enableVerifier();
+    //    manager.addPass(pylir::Dialect::createConvertPylirToLLVMPass());
+    //    return mlir::failed(manager.run(module));
 }

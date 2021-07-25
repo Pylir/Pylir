@@ -672,6 +672,102 @@ bool pylir::Dialect::ReinterpretOp::areCastCompatible(mlir::TypeRange inputs, ml
     return inputs[0].isa<UnknownType>() || outputs[0].isa<UnknownType>();
 }
 
+mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRContext* context,
+                                                                  TypeSlotPredicate predicate)
+{
+    switch (predicate)
+    {
+        case TypeSlotPredicate::DictPtr: return mlir::IndexType::get(context);
+        case TypeSlotPredicate::Call:
+        case TypeSlotPredicate::New:
+        case TypeSlotPredicate::Init:
+            return mlir::FunctionType::get(
+                context, {UnknownType::get(context), Dialect::TupleType::get(context), Dialect::DictType::get(context)},
+                {UnknownType::get(context)});
+        case TypeSlotPredicate::Add:
+        case TypeSlotPredicate::Subtract:
+        case TypeSlotPredicate::Multiply:
+        case TypeSlotPredicate::Remainder:
+        case TypeSlotPredicate::Divmod:
+        case TypeSlotPredicate::LShift:
+        case TypeSlotPredicate::RShift:
+        case TypeSlotPredicate::And:
+        case TypeSlotPredicate::Xor:
+        case TypeSlotPredicate::Or:
+        case TypeSlotPredicate::InPlaceAdd:
+        case TypeSlotPredicate::InPlaceSubtract:
+        case TypeSlotPredicate::InPlaceMultiply:
+        case TypeSlotPredicate::InPlaceRemainder:
+        case TypeSlotPredicate::InPlaceLShift:
+        case TypeSlotPredicate::InPlaceRShift:
+        case TypeSlotPredicate::InPlaceAnd:
+        case TypeSlotPredicate::InPlaceXor:
+        case TypeSlotPredicate::InPlaceOr:
+        case TypeSlotPredicate::FloorDivide:
+        case TypeSlotPredicate::TrueDivide:
+        case TypeSlotPredicate::InPlaceTrueDivide:
+        case TypeSlotPredicate::InPlaceFloorDivide:
+        case TypeSlotPredicate::MatrixMultiply:
+        case TypeSlotPredicate::InPlaceMatrixMultiply:
+        case TypeSlotPredicate::GetItem:
+        case TypeSlotPredicate::Missing:
+        case TypeSlotPredicate::DelItem:
+        case TypeSlotPredicate::Contains:
+        case TypeSlotPredicate::GetAttr:
+        case TypeSlotPredicate::Eq:
+        case TypeSlotPredicate::Ne:
+        case TypeSlotPredicate::Lt:
+        case TypeSlotPredicate::Gt:
+        case TypeSlotPredicate::Le:
+        case TypeSlotPredicate::Ge:
+            return mlir::FunctionType::get(context, {UnknownType::get(context), UnknownType::get(context)},
+                                           {UnknownType::get(context)});
+        case TypeSlotPredicate::Power:
+        case TypeSlotPredicate::InPlacePower:
+        case TypeSlotPredicate::SetItem:
+        case TypeSlotPredicate::SetAttr:
+        case TypeSlotPredicate::DescrGet:
+        case TypeSlotPredicate::DescrSet:
+            return mlir::FunctionType::get(
+                context, {UnknownType::get(context), UnknownType::get(context), UnknownType::get(context)},
+                {UnknownType::get(context)});
+        case TypeSlotPredicate::Negative:
+        case TypeSlotPredicate::Positive:
+        case TypeSlotPredicate::Absolute:
+        case TypeSlotPredicate::Bool:
+        case TypeSlotPredicate::Invert:
+        case TypeSlotPredicate::Int:
+        case TypeSlotPredicate::Float:
+        case TypeSlotPredicate::Index:
+        case TypeSlotPredicate::Length:
+        case TypeSlotPredicate::Iter:
+        case TypeSlotPredicate::Hash:
+        case TypeSlotPredicate::Str:
+        case TypeSlotPredicate::Repr:
+        case TypeSlotPredicate::IterNext:
+        case TypeSlotPredicate::Del:
+            return mlir::FunctionType::get(context, {UnknownType::get(context)}, {UnknownType::get(context)});
+        case TypeSlotPredicate::Dict: return Dialect::DictType::get(context);
+        case TypeSlotPredicate::Bases: return Dialect::TupleType::get(context);
+    }
+    PYLIR_UNREACHABLE;
+}
+
+mlir::LogicalResult pylir::Dialect::GetTypeSlotOp::inferReturnTypes(
+    ::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange operands,
+    ::mlir::DictionaryAttr attributes, ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    Adaptor adaptor(operands, attributes);
+    auto pred = symbolizeTypeSlotPredicate(adaptor.predicate().getInt());
+    if (!pred)
+    {
+        return mlir::failure();
+    }
+    inferredReturnTypes.push_back(returnTypeFromPredicate(context, *pred));
+    inferredReturnTypes.push_back(mlir::IntegerType::get(context, 1));
+    return mlir::success();
+}
+
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
 #include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 

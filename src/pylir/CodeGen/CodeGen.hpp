@@ -4,6 +4,7 @@
 #include <mlir/IR/BuiltinOps.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
+#include <pylir/Optimizer/Dialect/PylirOps.hpp>
 #include <pylir/Parser/Syntax.hpp>
 
 #include <unordered_map>
@@ -29,8 +30,8 @@ class CodeGen
 
     mlir::Value toBool(mlir::Value value);
 
-    mlir::Value binOpWithFallback(mlir::Location loc, mlir::Value lhs, mlir::Value rhs, std::string_view opName,
-                                  std::string_view fallBack);
+    mlir::Value genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs, Dialect::TypeSlotPredicate operation,
+                         std::string_view fallback);
 
     mlir::Value assureCallable(mlir::Location loc, mlir::Value callable, mlir::Value args, mlir::Value dict);
 
