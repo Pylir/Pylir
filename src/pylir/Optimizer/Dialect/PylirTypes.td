@@ -7,10 +7,6 @@ include "pylir/Optimizer/Dialect/PylirBase.td"
 class Pylir_Type<string name, string baseCppClass = "::mlir::Type"> :
     TypeDef<Pylir_Dialect, name, baseCppClass>;
 
-def Pylir_Unknown : Pylir_Type<"Unknown"> {
-    let mnemonic = "unknown";
-}
-
 def Pylir_Bool : Pylir_Type<"Bool"> {
     let mnemonic = "bool";
 }
@@ -43,38 +39,11 @@ def Pylir_Dict : Pylir_Type<"Dict"> {
     let mnemonic = "dict";
 }
 
-def Pylir_Variant : Pylir_Type<"Variant"> {
-    let mnemonic = "variant";
-    let parameters = (ins ArrayRefParameter<"::mlir::Type", "alternatives">
-                          : $types);
-    let parser = ?;
-    let printer = ?;
-    let genVerifyInvariantsDecl = 1;
-
-    let builders = [
-        TypeBuilderWithInferredContext<(ins "llvm::ArrayRef<mlir::Type>":$elementTypes), [{
-          return Base::get(elementTypes[0].getContext(), detail::variantUnion(elementTypes));
-        }], [{
-          return Base::getChecked($_loc,  detail::variantUnion(elementTypes));
-        }]>
-      ];
-
-    let skipDefaultBuilders = 1;
-}
-
-def Pylir_SlotObject : Pylir_Type<"SlotObject"> {
-    let mnemonic = "slotobject";
-    let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Type>","slots">:$slots);
-
-    let parser = ?;
-    let printer = ?;
-}
-
 def Pylir_Function : Pylir_Type<"Function"> {
     let mnemonic = "function";
 }
 
-def Pylir_KnownTypeObject : Pylir_Type<"KnownTypeObject"> {
+def Pylir_Object : Pylir_Type<"Object"> {
     let mnemonic = "object";
     let parameters = (ins "::mlir::FlatSymbolRefAttr":$type);
 
@@ -82,6 +51,11 @@ def Pylir_KnownTypeObject : Pylir_Type<"KnownTypeObject"> {
     let printer = ?;
 
     let builders = [
+            TypeBuilder<(ins ), [{
+                  return Base::get($_ctxt, ::mlir::FlatSymbolRefAttr{});
+                }], [{
+                  return Base::getChecked($_loc, type);
+                }]>,
             TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$type), [{
               return Base::get(type.getContext(), type);
             }], [{
@@ -92,24 +66,46 @@ def Pylir_KnownTypeObject : Pylir_Type<"KnownTypeObject"> {
     let skipDefaultBuilders = 1;
 }
 
-class Pylir_KnownTypeObjectCheck<string typeObjectNameVariable> : TypeConstraint<
+def Pylir_KnownTypeObject : TypeConstraint<
     And<[
-        CPred<"$_self.isa<::pylir::Dialect::KnownTypeObjectType>()">,
-        CPred<"$_self.cast<::pylir::Dialect::KnownTypeObjectType>().getType().getValue() =="
-        "::llvm::StringRef{::pylir::Dialect::" # typeObjectNameVariable # "}">
-        ]>
+        CPred<"$_self.isa<::pylir::Dialect::ObjectType>()">,
+        CPred<"$_self.cast<::pylir::Dialect::ObjectType>().getType()">
+    ]>,
+    "",
+    "::pylir::Dialect::ObjectType"
 >;
+
+def Pylir_KnownTypeObjectAttr : Attr<
+    And<[
+        TypeAttr.predicate,
+        SubstLeaves<"$_self", "$_self.cast<mlir::TypeAttr>().getValue()", Pylir_KnownTypeObject.predicate>
+    ]>
+> {
+    let storageType = TypeAttr.storageType;
+    let returnType = "::pylir::Dialect::ObjectType";
+    let valueType = NoneType;
+    let constBuilderCall = "::mlir::TypeAttr::get($0)";
+    let convertFromStorage = "$_self.getValue().cast<::pylir::Dialect::ObjectType>()";
+}
+
+class Pylir_KnownTypeObjectCheck<string typeObjectNameVariable> : Type<
+    And<[
+        Pylir_KnownTypeObject.predicate,
+        CPred<"$_self.cast<::pylir::Dialect::ObjectType>().getType().getValue() =="
+        "::llvm::StringRef{::pylir::Dialect::" # typeObjectNameVariable # "}">
+        ]>,"","::pylir::Dialect::ObjectType"
+> {
+    let builderCall = "::pylir::Dialect::ObjectType::get($_builder.getSymbolRefAttr(::pylir::Dialect::" # typeObjectNameVariable # "))";
+}
 
 def Pylir_TypeObject : Pylir_KnownTypeObjectCheck<"typeTypeObjectName">;
 
 def AnySequenceType
 : AnyTypeOf<[Pylir_String, Pylir_Tuple, Pylir_List]>;
 
-def AnyPythonType
-: AnyTypeOf<[Pylir_Unknown, Pylir_Bool, Pylir_Float, Pylir_Integer,
-             Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple,
-             Pylir_Dict, Pylir_Variant, Pylir_Function, Pylir_SlotObject]>;
-
+def AnyValueType
+: AnyTypeOf<[Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple, Pylir_Dict,
+             Pylir_Function]>;
 
 def Pylir_Handle : Pylir_Type<"Handle"> {
     let mnemonic = "handle";

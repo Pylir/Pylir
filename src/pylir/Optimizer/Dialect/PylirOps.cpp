@@ -537,28 +537,6 @@ bool pylir::Dialect::BtoI1Op::areCastCompatible(mlir::TypeRange inputs, mlir::Ty
     return inputs[0].isa<BoolType>() && outputs[0].isInteger(1);
 }
 
-mlir::OpFoldResult pylir::Dialect::ToVariantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
-{
-    if (getOperand().getType() == getResult().getType())
-    {
-        return getOperand();
-    }
-    return nullptr;
-}
-
-bool pylir::Dialect::ToVariantOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
-{
-    if (inputs.size() != 1 && outputs.size() != 1)
-    {
-        return false;
-    }
-    if (auto variantType = outputs[0].dyn_cast<VariantType>())
-    {
-        return std::count(variantType.getTypes().begin(), variantType.getTypes().end(), inputs[0]) > 0;
-    }
-    return false;
-}
-
 pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name)
 {
     mlir::OpBuilder builder(location.getContext());
@@ -566,10 +544,10 @@ pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location locatio
 }
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::ConstantGlobalOp::create(mlir::Location location, llvm::StringRef name,
-                                                                          mlir::Type type, mlir::Attribute initializer)
+                                                                          ObjectType type, mlir::Attribute initializer)
 {
     mlir::OpBuilder builder(location.getContext());
-    return builder.create<ConstantGlobalOp>(location, name, mlir::TypeAttr::get(type), initializer);
+    return builder.create<ConstantGlobalOp>(location, name, type, initializer);
 }
 
 mlir::OpFoldResult pylir::Dialect::MakeListOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -669,7 +647,7 @@ bool pylir::Dialect::ReinterpretOp::areCastCompatible(mlir::TypeRange inputs, ml
     {
         return false;
     }
-    return inputs[0].isa<UnknownType>() || outputs[0].isa<UnknownType>();
+    return inputs[0].isa<ObjectType>() || outputs[0].isa<ObjectType>();
 }
 
 mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRContext* context,
@@ -682,8 +660,8 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::New:
         case TypeSlotPredicate::Init:
             return mlir::FunctionType::get(
-                context, {UnknownType::get(context), Dialect::TupleType::get(context), Dialect::DictType::get(context)},
-                {UnknownType::get(context)});
+                context, {ObjectType::get(context), Dialect::TupleType::get(context), Dialect::DictType::get(context)},
+                {ObjectType::get(context)});
         case TypeSlotPredicate::Add:
         case TypeSlotPredicate::Subtract:
         case TypeSlotPredicate::Multiply:
@@ -720,8 +698,8 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::Gt:
         case TypeSlotPredicate::Le:
         case TypeSlotPredicate::Ge:
-            return mlir::FunctionType::get(context, {UnknownType::get(context), UnknownType::get(context)},
-                                           {UnknownType::get(context)});
+            return mlir::FunctionType::get(context, {ObjectType::get(context), ObjectType::get(context)},
+                                           {ObjectType::get(context)});
         case TypeSlotPredicate::Power:
         case TypeSlotPredicate::InPlacePower:
         case TypeSlotPredicate::SetItem:
@@ -729,8 +707,8 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::DescrGet:
         case TypeSlotPredicate::DescrSet:
             return mlir::FunctionType::get(
-                context, {UnknownType::get(context), UnknownType::get(context), UnknownType::get(context)},
-                {UnknownType::get(context)});
+                context, {ObjectType::get(context), ObjectType::get(context), ObjectType::get(context)},
+                {ObjectType::get(context)});
         case TypeSlotPredicate::Negative:
         case TypeSlotPredicate::Positive:
         case TypeSlotPredicate::Absolute:
@@ -746,7 +724,7 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::Repr:
         case TypeSlotPredicate::IterNext:
         case TypeSlotPredicate::Del:
-            return mlir::FunctionType::get(context, {UnknownType::get(context)}, {UnknownType::get(context)});
+            return mlir::FunctionType::get(context, {ObjectType::get(context)}, {ObjectType::get(context)});
         case TypeSlotPredicate::Dict: return Dialect::DictType::get(context);
         case TypeSlotPredicate::Bases: return Dialect::TupleType::get(context);
     }
