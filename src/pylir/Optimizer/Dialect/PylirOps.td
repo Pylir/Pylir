@@ -185,56 +185,6 @@ def Pylir_ICmpOp : Pylir_Op<"icmp",[SameTypeOperands, NoSideEffect]> {
     let hasFolder = 1;
 }
 
-class Pylir_FBinOp<string name, list<OpTrait> traits = []> :
-    Pylir_BinOp<name,!listconcat(traits,[SameOperandsAndResultType, NoSideEffect])> {
-    let arguments = (ins Pylir_Float:$lhs, Pylir_Float:$rhs);
-    let results = (outs Pylir_Float:$result);
-}
-
-def Pylir_FAddOp : Pylir_FBinOp<"fadd", [Commutative]>;
-
-def Pylir_FSubOp : Pylir_FBinOp<"fsub">;
-
-def Pylir_FMulOp : Pylir_FBinOp<"fmul", [Commutative]>;
-
-def Pylir_FDivOp : Pylir_FBinOp<"ftruediv">;
-
-def Pylir_FFloorDivOp : Pylir_FBinOp<"ffloordiv">;
-
-def Pylir_FModOp : Pylir_FBinOp<"fmod">;
-
-def Pylir_FCmpOp : Pylir_Op<"fcmp",[SameTypeOperands, NoSideEffect]> {
-    let arguments = (ins Pylir_CmpPredicateAttr:$predicate, Pylir_Float:$lhs, Pylir_Float:$rhs);
-    let results = (outs Pylir_Bool:$result);
-
-    let assemblyFormat = "$predicate $lhs `:` type($lhs) `,` $rhs `:` type($rhs) attr-dict";
-
-    let hasFolder = 1;
-}
-
-class Pylir_BBinOp<string name, list<OpTrait> traits = []> :
-    Pylir_BinOp<name,!listconcat(traits,[SameOperandsAndResultType, NoSideEffect])> {
-
-    let arguments = (ins Pylir_Bool:$lhs, Pylir_Bool:$rhs);
-    let results = (outs Pylir_Bool:$result);
-}
-
-def Pylir_BAndOp : Pylir_BBinOp<"band", [Commutative]>;
-
-def Pylir_BXorOp : Pylir_BBinOp<"bxor", [Commutative]>;
-
-def Pylir_BOrOp : Pylir_BBinOp<"bor", [Commutative]>;
-
-def Pylir_BNegOp : Pylir_Op<"bneg",[SameOperandsAndResultType, Involution]> {
-
-    let arguments = (ins Pylir_Bool:$input);
-    let results = (outs Pylir_Bool:$result);
-
-    let assemblyFormat = [{
-        $input `:` type($input) `->` type($result) attr-dict
-    }];
-}
-
 class Pylir_Cast<string name, list<OpTrait> traits = []>
     : Pylir_Op<name,!listconcat(traits,[NoSideEffect, DeclareOpInterfaceMethods<CastOpInterface>])> {
     let assemblyFormat = [{
@@ -242,21 +192,19 @@ class Pylir_Cast<string name, list<OpTrait> traits = []>
         }];
 }
 
-def Pylir_ItoFOp : Pylir_Cast<"itof"> {
+def Pylir_ItoFOp : Pylir_Cast<"iTof"> {
     let arguments = (ins Pylir_Integer:$input);
     let results = (outs Pylir_Float:$result);
 }
 
-def Pylir_BtoIOp : Pylir_Cast<"btoi"> {
-    let arguments = (ins Pylir_Bool:$input);
-    let results = (outs Pylir_Float:$result);
+def Pylir_ItoIndexOp : Pylir_Cast<"iToIndex"> {
+    let arguments = (ins Pylir_Integer:$input);
+    let results = (outs Index:$result);
 }
 
-def Pylir_BtoI1Op : Pylir_Cast<"btoI1"> {
+def Pylir_BtoIOp : Pylir_Cast<"bToi"> {
     let arguments = (ins Pylir_Bool:$input);
-    let results = (outs I1:$result);
-
-    let hasFolder = 0;
+    let results = (outs Pylir_Integer:$result);
 }
 
 def Pylir_MakeListOp : Pylir_Op<"makeList", [NoSideEffect]> {
@@ -383,7 +331,7 @@ def Pylir_TypeSlotPredicateAttr : I32EnumAttr<"TypeSlotPredicate","",[
 }
 
 def Pylir_GetTypeSlotOp : Pylir_Op<"getTypeSlot",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-    let arguments = (ins Pylir_TypeSlotPredicateAttr:$predicate,Pylir_TypeObject:$input);
+    let arguments = (ins Pylir_TypeSlotPredicateAttr:$predicate,Arg<Pylir_TypeObject,"",[MemRead]>:$input);
     let results = (outs AnyType:$result, I1:$found);
 
     let assemblyFormat = "$predicate `from` $input `:` type($input) `->` type($result) attr-dict";
@@ -397,7 +345,7 @@ def Pylir_GetTypeSlotOp : Pylir_Op<"getTypeSlot",[DeclareOpInterfaceMethods<Infe
 
 def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
     let arguments = (ins Pylir_Object:$input);
-    let results = (outs Pylir_Integer:$result);
+    let results = (outs Index:$result);
 
     let assemblyFormat = [{
                       $input `:` type($input) attr-dict
@@ -435,11 +383,26 @@ def Pylir_GetFunctionPointerOp : Pylir_Op<"getFunctionPointer", [NoSideEffect]> 
     }];
 }
 
-def Pylir_ReinterpretOp : Pylir_Cast<"reinterpret"> {
-    let arguments = (ins Pylir_Object:$input);
+def Pylir_BoxOp : Pylir_Cast<"box"> {
+    let arguments = (ins AnyValueType:$input);
     let results = (outs Pylir_Object:$result);
 
-    let hasFolder = 0; // Will be folded through the CastInterface anyways
+    let assemblyFormat = [{
+        $input `:` type($input) `->` type($result) attr-dict
+    }];
+
+    let hasFolder = 0;
+}
+
+def Pylir_UnboxOp : Pylir_Cast<"unbox"> {
+    let arguments = (ins Pylir_Object:$input);
+    let results = (outs AnyValueType:$result);
+
+    let assemblyFormat = [{
+        $input `:` type($input) `->` type($result) attr-dict
+    }];
+
+    let hasFolder = 0;
 }
 
 #endif

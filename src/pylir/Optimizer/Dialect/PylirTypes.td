@@ -7,14 +7,6 @@ include "pylir/Optimizer/Dialect/PylirBase.td"
 class Pylir_Type<string name, string baseCppClass = "::mlir::Type"> :
     TypeDef<Pylir_Dialect, name, baseCppClass>;
 
-def Pylir_Bool : Pylir_Type<"Bool"> {
-    let mnemonic = "bool";
-}
-
-def Pylir_Float : Pylir_Type<"Float"> {
-    let mnemonic = "float";
-}
-
 def Pylir_Integer : Pylir_Type<"Integer"> {
     let mnemonic = "int";
 }
@@ -47,23 +39,53 @@ def Pylir_Object : Pylir_Type<"Object"> {
     let mnemonic = "object";
     let parameters = (ins "::mlir::FlatSymbolRefAttr":$type);
 
-    let parser = ?;
-    let printer = ?;
+    let parser = [{
+        if ($_parser.parseOptionalLess())
+        {
+            return {};
+        }
+        mlir::FlatSymbolRefAttr attribute;
+        if ($_parser.parseAttribute(attribute) || $_parser.parseGreater())
+        {
+            return {};
+        }
+        return get(attribute);
+    }];
+
+    let printer = [{
+        $_printer << getMnemonic();
+        if (!getType())
+        {
+            return;
+        }
+        $_printer << '<' << getType() << '>';
+    }];
 
     let builders = [
             TypeBuilder<(ins ), [{
-                  return Base::get($_ctxt, ::mlir::FlatSymbolRefAttr{});
+                  return Base::get($_ctxt);
                 }], [{
-                  return Base::getChecked($_loc, type);
+                  return Base::getChecked($_loc);
                 }]>,
             TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$type), [{
-              return Base::get(type.getContext(), type);
+              auto ret = Base::get(type.getContext());
+              ret.setKnownType(type);
+              return ret;
             }], [{
-              return Base::getChecked($_loc, type);
+              auto ret = Base::getChecked($_loc);
+              ret.setKnownType(type);
+              return ret;
             }]>
           ];
 
     let skipDefaultBuilders = 1;
+    let genStorageClass = 0;
+
+    let extraClassDeclaration = [{
+        void setKnownType(mlir::FlatSymbolRefAttr type);
+
+        void clearType();
+    }];
 }
 
 def Pylir_KnownTypeObject : TypeConstraint<
@@ -100,12 +122,14 @@ class Pylir_KnownTypeObjectCheck<string typeObjectNameVariable> : Type<
 
 def Pylir_TypeObject : Pylir_KnownTypeObjectCheck<"typeTypeObjectName">;
 
-def AnySequenceType
-: AnyTypeOf<[Pylir_String, Pylir_Tuple, Pylir_List]>;
+def Pylir_Bool : TypeAlias<I1>;
 
-def AnyValueType
-: AnyTypeOf<[Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple, Pylir_Dict,
-             Pylir_Function]>;
+def Pylir_Float : TypeAlias<F64>;
+
+def AnySequenceType : AnyTypeOf<[Pylir_String, Pylir_Tuple, Pylir_List]>;
+
+def AnyValueType : AnyTypeOf<[Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_String, Pylir_List, Pylir_Set, Pylir_Tuple,
+                              Pylir_Dict, Pylir_Function]>;
 
 def Pylir_Handle : Pylir_Type<"Handle"> {
     let mnemonic = "handle";

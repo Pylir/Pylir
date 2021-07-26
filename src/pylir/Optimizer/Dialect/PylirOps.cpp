@@ -84,11 +84,12 @@ mlir::OpFoldResult pylir::Dialect::IDivOp::fold(::llvm::ArrayRef<::mlir::Attribu
     auto rhs = operands[1].dyn_cast_or_null<Dialect::IntegerAttr>();
     if (lhs && rhs)
     {
-        return Dialect::FloatAttr::get(getContext(), lhs.getValue().roundToDouble() / rhs.getValue().roundToDouble());
+        return mlir::FloatAttr::get(mlir::Float64Type::get(getContext()),
+                                    lhs.getValue().roundToDouble() / rhs.getValue().roundToDouble());
     }
     if (getOperand(0) == getOperand(1))
     {
-        return Dialect::FloatAttr::get(getContext(), 1);
+        return mlir::FloatAttr::get(mlir::Float64Type::get(getContext()), 1);
     }
     return nullptr;
 }
@@ -279,215 +280,25 @@ mlir::OpFoldResult pylir::Dialect::ICmpOp::fold(::llvm::ArrayRef<::mlir::Attribu
     switch (predicate())
     {
         case CmpPredicate::EQ:
-            return Dialect::BoolAttr::get(getContext(),
-                                          lhs.getValue().sextOrSelf(equalSize) == rhs.getValue().sextOrSelf(equalSize));
+            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize) == rhs.getValue().sextOrSelf(equalSize),
+                                       getContext());
         case CmpPredicate::NE:
-            return Dialect::BoolAttr::get(getContext(),
-                                          lhs.getValue().sextOrSelf(equalSize) != rhs.getValue().sextOrSelf(equalSize));
+            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize) != rhs.getValue().sextOrSelf(equalSize),
+                                       getContext());
         case CmpPredicate::LT:
-            return Dialect::BoolAttr::get(
-                getContext(), lhs.getValue().sextOrSelf(equalSize).slt(rhs.getValue().sextOrSelf(equalSize)));
+            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).slt(rhs.getValue().sextOrSelf(equalSize)),
+                                       getContext());
         case CmpPredicate::LE:
-            return Dialect::BoolAttr::get(
-                getContext(), lhs.getValue().sextOrSelf(equalSize).sle(rhs.getValue().sextOrSelf(equalSize)));
+            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).sle(rhs.getValue().sextOrSelf(equalSize)),
+                                       getContext());
         case CmpPredicate::GT:
-            return Dialect::BoolAttr::get(
-                getContext(), lhs.getValue().sextOrSelf(equalSize).sgt(rhs.getValue().sextOrSelf(equalSize)));
+            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).sgt(rhs.getValue().sextOrSelf(equalSize)),
+                                       getContext());
         case CmpPredicate::GE:
-            return Dialect::BoolAttr::get(
-                getContext(), lhs.getValue().sextOrSelf(equalSize).sge(rhs.getValue().sextOrSelf(equalSize)));
-        default: PYLIR_UNREACHABLE;
+            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).sge(rhs.getValue().sextOrSelf(equalSize)),
+                                       getContext());
     }
-}
-
-mlir::OpFoldResult pylir::Dialect::FAddOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 2);
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::FloatAttr::get(getContext(), lhs.getValue() + rhs.getValue());
-    }
-    if (rhs && rhs.getValue() == 0)
-    {
-        return getOperand(0);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::FSubOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 2);
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::FloatAttr::get(getContext(), lhs.getValue() - rhs.getValue());
-    }
-    if (rhs && rhs.getValue() == 0)
-    {
-        return getOperand(0);
-    }
-    if (getOperand(0) == getOperand(1))
-    {
-        return Dialect::FloatAttr::get(getContext(), 0);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::FMulOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 2);
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::FloatAttr::get(getContext(), lhs.getValue() * rhs.getValue());
-    }
-    if (rhs)
-    {
-        if (rhs.getValue() == 0)
-        {
-            return rhs;
-        }
-        if (rhs.getValue() == 1)
-        {
-            return getOperand(0);
-        }
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::FDivOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 2);
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::FloatAttr::get(getContext(), lhs.getValue() / rhs.getValue());
-    }
-    if (getOperand(0) == getOperand(1))
-    {
-        return Dialect::FloatAttr::get(getContext(), 1);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::FFloorDivOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 2);
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::FloatAttr::get(getContext(), std::floor(lhs.getValue() / rhs.getValue()));
-    }
-    if (getOperand(0) == getOperand(1))
-    {
-        return Dialect::FloatAttr::get(getContext(), 1);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::FModOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 2);
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::FloatAttr::get(getContext(), std::fmod(lhs.getValue(), rhs.getValue()));
-    }
-    if (getOperand(0) == getOperand(1))
-    {
-        return Dialect::FloatAttr::get(getContext(), 0);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::FCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::FloatAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::FloatAttr>();
-    if (!lhs || !rhs)
-    {
-        return nullptr;
-    }
-    switch (predicate())
-    {
-        case CmpPredicate::EQ: return Dialect::BoolAttr::get(getContext(), lhs.getValue() == rhs.getValue());
-        case CmpPredicate::NE: return Dialect::BoolAttr::get(getContext(), lhs.getValue() != rhs.getValue());
-        case CmpPredicate::LT: return Dialect::BoolAttr::get(getContext(), lhs.getValue() < rhs.getValue());
-        case CmpPredicate::LE: return Dialect::BoolAttr::get(getContext(), lhs.getValue() <= rhs.getValue());
-        case CmpPredicate::GT: return Dialect::BoolAttr::get(getContext(), lhs.getValue() > rhs.getValue());
-        case CmpPredicate::GE: return Dialect::BoolAttr::get(getContext(), lhs.getValue() >= rhs.getValue());
-        default: PYLIR_UNREACHABLE;
-    }
-}
-
-mlir::OpFoldResult pylir::Dialect::BAndOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::BoolAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::BoolAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::BoolAttr::get(getContext(), lhs.getValue() && rhs.getValue());
-    }
-    if (rhs)
-    {
-        if (rhs.getValue())
-        {
-            return getOperand(0);
-        }
-        return rhs;
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::BXorOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::BoolAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::BoolAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::BoolAttr::get(getContext(), lhs.getValue() ^ rhs.getValue());
-    }
-    if (rhs && !rhs.getValue())
-    {
-        return getOperand(0);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::BOrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    auto lhs = operands[0].dyn_cast_or_null<Dialect::BoolAttr>();
-    auto rhs = operands[1].dyn_cast_or_null<Dialect::BoolAttr>();
-    if (lhs && rhs)
-    {
-        return Dialect::BoolAttr::get(getContext(), lhs.getValue() || rhs.getValue());
-    }
-    if (rhs)
-    {
-        if (rhs.getValue())
-        {
-            return rhs;
-        }
-        return getOperand(0);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::BNegOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 1);
-    if (auto input = operands[0].dyn_cast_or_null<Dialect::BoolAttr>())
-    {
-        return Dialect::BoolAttr::get(getContext(), !input.getValue());
-    }
-    return nullptr;
+    PYLIR_UNREACHABLE;
 }
 
 mlir::OpFoldResult pylir::Dialect::ItoFOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -495,7 +306,7 @@ mlir::OpFoldResult pylir::Dialect::ItoFOp::fold(::llvm::ArrayRef<::mlir::Attribu
     PYLIR_ASSERT(operands.size() == 1);
     if (auto input = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>())
     {
-        return Dialect::FloatAttr::get(getContext(), input.getValue().roundToDouble());
+        return mlir::FloatAttr::get(mlir::Float64Type::get(getContext()), input.getValue().roundToDouble());
     }
     return nullptr;
 }
@@ -512,7 +323,7 @@ bool pylir::Dialect::ItoFOp::areCastCompatible(mlir::TypeRange inputs, mlir::Typ
 mlir::OpFoldResult pylir::Dialect::BtoIOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
-    if (auto input = operands[0].dyn_cast_or_null<Dialect::BoolAttr>())
+    if (auto input = operands[0].dyn_cast_or_null<mlir::BoolAttr>())
     {
         return Dialect::IntegerAttr::get(getContext(), llvm::APInt(2, input.getValue()));
     }
@@ -525,16 +336,7 @@ bool pylir::Dialect::BtoIOp::areCastCompatible(mlir::TypeRange inputs, mlir::Typ
     {
         return false;
     }
-    return inputs[0].isa<BoolType>() && outputs[0].isa<IntegerType>();
-}
-
-bool pylir::Dialect::BtoI1Op::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
-{
-    if (inputs.size() != 1 && outputs.size() != 1)
-    {
-        return false;
-    }
-    return inputs[0].isa<BoolType>() && outputs[0].isInteger(1);
+    return inputs[0].isSignlessInteger(1) && outputs[0].isa<IntegerType>();
 }
 
 pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name)
@@ -554,7 +356,7 @@ mlir::OpFoldResult pylir::Dialect::MakeListOp::fold(::llvm::ArrayRef<::mlir::Att
 {
     if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
     {
-        return ListAttr::get(getContext(), operands);
+        return mlir::ArrayAttr::get(operands, getContext());
     }
     return nullptr;
 }
@@ -563,7 +365,7 @@ mlir::OpFoldResult pylir::Dialect::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::At
 {
     if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
     {
-        return TupleAttr::get(getContext(), operands);
+        return mlir::ArrayAttr::get(operands, getContext());
     }
     return nullptr;
 }
@@ -571,9 +373,9 @@ mlir::OpFoldResult pylir::Dialect::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::At
 mlir::OpFoldResult pylir::Dialect::TupleToListOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
-    if (auto tuple = operands[0].dyn_cast_or_null<TupleAttr>())
+    if (auto tuple = operands[0].dyn_cast_or_null<mlir::ArrayAttr>())
     {
-        return ListAttr::get(getContext(), tuple.getValue());
+        return tuple;
     }
     return nullptr;
 }
@@ -589,9 +391,9 @@ bool pylir::Dialect::TupleToListOp::areCastCompatible(mlir::TypeRange inputs, ml
 
 mlir::OpFoldResult pylir::Dialect::ListToTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto list = operands[0].dyn_cast_or_null<ListAttr>())
+    if (auto list = operands[0].dyn_cast_or_null<mlir::ArrayAttr>())
     {
-        return TupleAttr::get(getContext(), list.getValue());
+        return list;
     }
     return nullptr;
 }
@@ -624,30 +426,17 @@ mlir::OpFoldResult pylir::Dialect::GetItemOp::fold(llvm::ArrayRef<mlir::Attribut
     {
         return nullptr;
     }
-    if (auto list = operands[1].dyn_cast_or_null<ListAttr>())
+    if (auto list = operands[1].dyn_cast_or_null<mlir::ArrayAttr>())
     {
         return list.getValue()[integer.getValue().getZExtValue()];
-    }
-    if (auto tuple = operands[1].dyn_cast_or_null<TupleAttr>())
-    {
-        return tuple.getValue()[integer.getValue().getZExtValue()];
     }
     if (auto string = operands[1].dyn_cast_or_null<StringAttr>())
     {
         // TODO probably needs to be a codepoint
         auto character = string.getValue()[integer.getValue().getZExtValue()];
-        return StringAttr::get(getContext(), llvm::StringRef(&character, 1));
+        return mlir::StringAttr::get(llvm::StringRef(&character, 1), getContext());
     }
     return nullptr;
-}
-
-bool pylir::Dialect::ReinterpretOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
-{
-    if (inputs.size() != 1 && outputs.size() != 1)
-    {
-        return false;
-    }
-    return inputs[0].isa<ObjectType>() || outputs[0].isa<ObjectType>();
 }
 
 mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRContext* context,
@@ -745,6 +534,25 @@ mlir::LogicalResult pylir::Dialect::GetTypeSlotOp::inferReturnTypes(
     inferredReturnTypes.push_back(mlir::IntegerType::get(context, 1));
     return mlir::success();
 }
+
+bool pylir::Dialect::BoxOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 || outputs.size() != 1)
+    {
+        return false;
+    }
+    return outputs[0].isa<ObjectType>() && !inputs[0].isa<ObjectType>();
+}
+
+bool pylir::Dialect::UnboxOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 || outputs.size() != 1)
+    {
+        return false;
+    }
+    return !outputs[0].isa<ObjectType>() && inputs[0].isa<ObjectType>();
+}
+
 
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
 #include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>

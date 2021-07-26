@@ -8,11 +8,36 @@
 
 #include <pylir/Support/Functional.hpp>
 
-#include "PylirAttributes.hpp"
 #include "PylirOps.hpp"
 
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Optimizer/Dialect/PylirOpsTypes.cpp.inc"
+
+namespace pylir::Dialect::detail
+{
+struct ObjectTypeStorage : public mlir::TypeStorage
+{
+    using KeyTy = std::tuple<>;
+
+    mlir::FlatSymbolRefAttr type;
+
+    bool operator==(const KeyTy&) const
+    {
+        return true;
+    }
+
+    static ObjectTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy&)
+    {
+        return new (allocator.allocate<ObjectTypeStorage>()) ObjectTypeStorage();
+    }
+
+    mlir::LogicalResult mutate(mlir::TypeStorageAllocator&, mlir::FlatSymbolRefAttr newType)
+    {
+        type = newType;
+        return success();
+    }
+};
+} // namespace pylir::Dialect::detail
 
 void pylir::Dialect::PylirDialect::initialize()
 {
@@ -24,7 +49,7 @@ void pylir::Dialect::PylirDialect::initialize()
 #define GET_TYPEDEF_LIST
 #include "pylir/Optimizer/Dialect/PylirOpsTypes.cpp.inc"
         >();
-    addAttributes<BoolAttr, FloatAttr, IntegerAttr, StringAttr, ListAttr, TupleAttr, SetAttr, DictAttr>();
+    addAttributes<IntegerAttr, StringAttr, SetAttr, DictAttr>();
 }
 
 mlir::Type pylir::Dialect::PylirDialect::parseType(::mlir::DialectAsmParser& parser) const
@@ -48,34 +73,6 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
     if (parser.parseKeyword(&ref))
     {
         return {};
-    }
-    if (ref == "float")
-    {
-        double value;
-        if (parser.parseLess() || parser.parseFloat(value) || parser.parseGreater())
-        {
-            return {};
-        }
-        return FloatAttr::get(getContext(), value);
-    }
-    if (ref == "bool")
-    {
-        llvm::StringRef boolValue;
-        if (parser.parseLess())
-        {
-            return {};
-        }
-        auto loc = parser.getCurrentLocation();
-        if (parser.parseKeyword(&boolValue) || parser.parseGreater())
-        {
-            return {};
-        }
-        if (boolValue != "true" && boolValue != "false")
-        {
-            parser.emitError(loc, "Expected 'true' or 'false'");
-            return {};
-        }
-        return BoolAttr::get(getContext(), boolValue == "true");
     }
     if (ref == "integer")
     {
@@ -101,55 +98,6 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
             return {};
         }
         return IntegerAttr::get(getContext(), std::move(integer));
-    }
-    if (ref == "string")
-    {
-        llvm::StringRef value;
-        if (parser.parseLess())
-        {
-            return {};
-        }
-        auto loc = parser.getCurrentLocation();
-        if (parser.parseOptionalString(&value))
-        {
-            parser.emitError(loc, "Expected string literal");
-            return {};
-        }
-        if (parser.parseGreater())
-        {
-            return {};
-        }
-        return StringAttr::get(getContext(), value.str());
-    }
-    if (ref == "list")
-    {
-        if (parser.parseLess() || parser.parseLSquare())
-        {
-            return {};
-        }
-        std::vector<mlir::Attribute> attributes;
-        {
-            mlir::Attribute attribute;
-            if (parser.parseAttribute(attribute))
-            {
-                return {};
-            }
-            attributes.push_back(attribute);
-        }
-        while (!parser.parseOptionalComma())
-        {
-            mlir::Attribute attribute;
-            if (parser.parseAttribute(attribute))
-            {
-                return {};
-            }
-            attributes.push_back(attribute);
-        }
-        if (parser.parseRSquare() || parser.parseGreater())
-        {
-            return {};
-        }
-        return ListAttr::get(getContext(), attributes);
     }
     if (ref == "set")
     {
@@ -224,18 +172,8 @@ mlir::Attribute pylir::Dialect::PylirDialect::parseAttribute(mlir::DialectAsmPar
 void pylir::Dialect::PylirDialect::printAttribute(mlir::Attribute attribute, mlir::DialectAsmPrinter& printer) const
 {
     llvm::TypeSwitch<mlir::Attribute>(attribute)
-        .Case<FloatAttr>([&](FloatAttr attr) { printer << "float<" << attr.getValue() << ">"; })
-        .Case<BoolAttr>([&](BoolAttr attr) { printer << "bool<" << (attr.getValue() ? "true" : "false") << ">"; })
         .Case<IntegerAttr>([&](IntegerAttr attr)
                            { printer << "integer<\"" << attr.getValue().toString(10, false) << "\">"; })
-        .Case<StringAttr>([&](StringAttr attr) { printer << "string<\"" << attr.getValue() << "\">"; })
-        .Case<ListAttr>(
-            [&](ListAttr attr)
-            {
-                printer << "list<[";
-                llvm::interleaveComma(attr.getValue(), printer);
-                printer << "]>";
-            })
         .Case<SetAttr>(
             [&](SetAttr attr)
             {
@@ -257,4 +195,17 @@ mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBui
                                                                    ::mlir::Type type, ::mlir::Location loc)
 {
     return builder.create<ConstantOp>(loc, type, value);
+}
+
+void pylir::Dialect::ObjectType::setKnownType(mlir::FlatSymbolRefAttr type)
+{
+    PYLIR_ASSERT(type);
+    auto result = Base::mutate(type);
+    PYLIR_ASSERT(mlir::succeeded(result));
+}
+
+void pylir::Dialect::ObjectType::clearType()
+{
+    auto result = Base::mutate(mlir::FlatSymbolRefAttr{});
+    PYLIR_ASSERT(mlir::succeeded(result));
 }

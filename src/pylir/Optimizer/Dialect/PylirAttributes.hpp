@@ -12,83 +12,22 @@ namespace pylir::Dialect
 {
 namespace detail
 {
-template <class T>
-struct ValueAttrStorage : public mlir::AttributeStorage
+struct IntegerStorage : public mlir::AttributeStorage
 {
-    T value;
+    llvm::APInt value;
 
-    ValueAttrStorage(T value, mlir::Type type) : mlir::AttributeStorage(type), value(value) {}
+    IntegerStorage(llvm::APInt value) : value(value) {}
 
-    using KeyTy = std::pair<T, mlir::Type>;
+    using KeyTy = llvm::APInt;
 
     bool operator==(KeyTy key) const
     {
-        if constexpr (std::is_same_v<llvm::APInt, T>)
-        {
-            auto maxSize = std::max(key.first.getBitWidth(), value.getBitWidth());
-            return key.first.sextOrSelf(maxSize) == value.sextOrSelf(maxSize);
-        }
-        else
-        {
-            return key.first == value && key.second == getType();
-        }
+        return key == value;
     }
 
-    static llvm::hash_code hashKey(KeyTy key)
+    static IntegerStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
     {
-        return llvm::hash_value(key);
-    }
-
-    static ValueAttrStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
-    {
-        return new (allocator.allocate<ValueAttrStorage>()) ValueAttrStorage(value.first, value.second);
-    }
-};
-
-struct TypeStorage : public mlir::AttributeStorage
-{
-    TypeStorage(mlir::Type type) : mlir::AttributeStorage(type) {}
-
-    using KeyTy = mlir::Type;
-
-    bool operator==(KeyTy key) const
-    {
-        return getType() == key;
-    }
-
-    static llvm::hash_code hashKey(KeyTy key)
-    {
-        return mlir::hash_value(key);
-    }
-
-    static TypeStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
-    {
-        return new (allocator.allocate<TypeStorage>()) TypeStorage(value);
-    }
-};
-
-struct StringAttrStorage : public mlir::AttributeStorage
-{
-    llvm::StringRef value;
-
-    StringAttrStorage(llvm::StringRef value, mlir::Type type) : mlir::AttributeStorage(type), value(value) {}
-
-    using KeyTy = std::pair<llvm::StringRef, mlir::Type>;
-
-    bool operator==(KeyTy key) const
-    {
-        return key.first == value && key.second == getType();
-    }
-
-    static llvm::hash_code hashKey(KeyTy key)
-    {
-        return llvm::hash_value(key);
-    }
-
-    static StringAttrStorage* construct(mlir::AttributeStorageAllocator& allocator, KeyTy value)
-    {
-        value.first = allocator.copyInto(value.first);
-        return new (allocator.allocate<StringAttrStorage>()) StringAttrStorage(value.first, value.second);
+        return new (allocator.allocate<IntegerStorage>()) IntegerStorage(value);
     }
 };
 
@@ -147,98 +86,17 @@ struct DictStorage : public mlir::AttributeStorage
 
 } // namespace detail
 
-class BoolAttr : public mlir::Attribute::AttrBase<BoolAttr, mlir::Attribute, detail::ValueAttrStorage<bool>>
-{
-public:
-    using Base::Base;
-
-    static BoolAttr get(mlir::MLIRContext* context, bool value)
-    {
-        return Base::get(context, value, BoolType::get(context));
-    }
-
-    bool getValue()
-    {
-        return getImpl()->value;
-    }
-};
-
-class FloatAttr : public mlir::Attribute::AttrBase<FloatAttr, mlir::Attribute, detail::ValueAttrStorage<llvm::APFloat>>
-{
-public:
-    using Base::Base;
-
-    static FloatAttr get(mlir::MLIRContext* context, double value)
-    {
-        return Base::get(context, value, FloatType::get(context));
-    }
-
-    double getValue()
-    {
-        return getImpl()->value.convertToDouble();
-    }
-};
-
-class IntegerAttr
-    : public mlir::Attribute::AttrBase<IntegerAttr, mlir::Attribute, detail::ValueAttrStorage<llvm::APInt>>
+class IntegerAttr : public mlir::Attribute::AttrBase<IntegerAttr, mlir::Attribute, detail::IntegerStorage>
 {
 public:
     using Base::Base;
 
     static IntegerAttr get(mlir::MLIRContext* context, const llvm::APInt& value)
     {
-        return Base::get(context, value, IntegerType::get(context));
+        return Base::get(context, value);
     }
 
     const llvm::APInt& getValue()
-    {
-        return getImpl()->value;
-    }
-};
-
-class StringAttr : public mlir::Attribute::AttrBase<StringAttr, mlir::Attribute, detail::StringAttrStorage>
-{
-public:
-    using Base::Base;
-
-    static StringAttr get(mlir::MLIRContext* context, llvm::StringRef value)
-    {
-        return Base::get(context, value, StringType::get(context));
-    }
-
-    llvm::StringRef getValue()
-    {
-        return getImpl()->value;
-    }
-};
-
-class ListAttr : public mlir::Attribute::AttrBase<ListAttr, mlir::Attribute, detail::ListStorage>
-{
-public:
-    using Base::Base;
-
-    static ListAttr get(mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value)
-    {
-        return Base::get(context, value, ListType::get(context));
-    }
-
-    llvm::ArrayRef<mlir::Attribute> getValue()
-    {
-        return getImpl()->value;
-    }
-};
-
-class TupleAttr : public mlir::Attribute::AttrBase<TupleAttr, mlir::Attribute, detail::ListStorage>
-{
-public:
-    using Base::Base;
-
-    static TupleAttr get(mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value)
-    {
-        return Base::get(context, value, TupleType::get(context));
-    }
-
-    llvm::ArrayRef<mlir::Attribute> getValue()
     {
         return getImpl()->value;
     }
