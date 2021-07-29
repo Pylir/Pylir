@@ -280,23 +280,23 @@ mlir::OpFoldResult pylir::Dialect::ICmpOp::fold(::llvm::ArrayRef<::mlir::Attribu
     switch (predicate())
     {
         case CmpPredicate::EQ:
-            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize) == rhs.getValue().sextOrSelf(equalSize),
-                                       getContext());
+            return mlir::BoolAttr::get(getContext(),
+                                       lhs.getValue().sextOrSelf(equalSize) == rhs.getValue().sextOrSelf(equalSize));
         case CmpPredicate::NE:
-            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize) != rhs.getValue().sextOrSelf(equalSize),
-                                       getContext());
+            return mlir::BoolAttr::get(getContext(),
+                                       lhs.getValue().sextOrSelf(equalSize) != rhs.getValue().sextOrSelf(equalSize));
         case CmpPredicate::LT:
-            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).slt(rhs.getValue().sextOrSelf(equalSize)),
-                                       getContext());
+            return mlir::BoolAttr::get(getContext(),
+                                       lhs.getValue().sextOrSelf(equalSize).slt(rhs.getValue().sextOrSelf(equalSize)));
         case CmpPredicate::LE:
-            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).sle(rhs.getValue().sextOrSelf(equalSize)),
-                                       getContext());
+            return mlir::BoolAttr::get(getContext(),
+                                       lhs.getValue().sextOrSelf(equalSize).sle(rhs.getValue().sextOrSelf(equalSize)));
         case CmpPredicate::GT:
-            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).sgt(rhs.getValue().sextOrSelf(equalSize)),
-                                       getContext());
+            return mlir::BoolAttr::get(getContext(),
+                                       lhs.getValue().sextOrSelf(equalSize).sgt(rhs.getValue().sextOrSelf(equalSize)));
         case CmpPredicate::GE:
-            return mlir::BoolAttr::get(lhs.getValue().sextOrSelf(equalSize).sge(rhs.getValue().sextOrSelf(equalSize)),
-                                       getContext());
+            return mlir::BoolAttr::get(getContext(),
+                                       lhs.getValue().sextOrSelf(equalSize).sge(rhs.getValue().sextOrSelf(equalSize)));
     }
     PYLIR_UNREACHABLE;
 }
@@ -317,7 +317,7 @@ bool pylir::Dialect::ItoFOp::areCastCompatible(mlir::TypeRange inputs, mlir::Typ
     {
         return false;
     }
-    return inputs[0].isa<IntegerType>() && outputs[0].isa<FloatType>();
+    return inputs[0].isa<IntegerType>() && outputs[0].isa<mlir::FloatType>();
 }
 
 mlir::OpFoldResult pylir::Dialect::BtoIOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -356,7 +356,7 @@ mlir::OpFoldResult pylir::Dialect::MakeListOp::fold(::llvm::ArrayRef<::mlir::Att
 {
     if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
     {
-        return mlir::ArrayAttr::get(operands, getContext());
+        return mlir::ArrayAttr::get(getContext(), operands);
     }
     return nullptr;
 }
@@ -365,7 +365,7 @@ mlir::OpFoldResult pylir::Dialect::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::At
 {
     if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
     {
-        return mlir::ArrayAttr::get(operands, getContext());
+        return mlir::ArrayAttr::get(getContext(), operands);
     }
     return nullptr;
 }
@@ -430,11 +430,11 @@ mlir::OpFoldResult pylir::Dialect::GetItemOp::fold(llvm::ArrayRef<mlir::Attribut
     {
         return list.getValue()[integer.getValue().getZExtValue()];
     }
-    if (auto string = operands[1].dyn_cast_or_null<StringAttr>())
+    if (auto string = operands[1].dyn_cast_or_null<mlir::StringAttr>())
     {
         // TODO probably needs to be a codepoint
         auto character = string.getValue()[integer.getValue().getZExtValue()];
-        return mlir::StringAttr::get(llvm::StringRef(&character, 1), getContext());
+        return mlir::StringAttr::get(getContext(), llvm::StringRef(&character, 1));
     }
     return nullptr;
 }
@@ -557,7 +557,8 @@ bool pylir::Dialect::UnboxOp::areCastCompatible(mlir::TypeRange inputs, mlir::Ty
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
 #include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 
-// TODO: Remove in MLIR 13
+// TODO: Remove in MLIR 14
 using namespace mlir;
+
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/Dialect/PylirOps.cpp.inc>

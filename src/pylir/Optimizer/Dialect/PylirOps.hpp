@@ -16,8 +16,5 @@
 #include "PylirAttributes.hpp"
 #include "PylirTypes.hpp"
 
-// TODO PLEASE PLEASE PLEASE REMOVE IN MLIR 13
-using namespace mlir;
-
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/Dialect/PylirOps.h.inc>

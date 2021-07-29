@@ -4,8 +4,8 @@
 
 include "pylir/Optimizer/Dialect/PylirBase.td"
 
-class Pylir_Type<string name, string baseCppClass = "::mlir::Type"> :
-    TypeDef<Pylir_Dialect, name, baseCppClass>;
+class Pylir_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type"> :
+    TypeDef<Pylir_Dialect, name, traits, baseCppClass>;
 
 def Pylir_Integer : Pylir_Type<"Integer"> {
     let mnemonic = "int";
@@ -42,7 +42,7 @@ def Pylir_Object : Pylir_Type<"Object"> {
     let parser = [{
         if ($_parser.parseOptionalLess())
         {
-            return {};
+            return get($_ctxt);
         }
         mlir::FlatSymbolRefAttr attribute;
         if ($_parser.parseAttribute(attribute) || $_parser.parseGreater())
@@ -64,15 +64,9 @@ def Pylir_Object : Pylir_Type<"Object"> {
     let builders = [
             TypeBuilder<(ins ), [{
                   return Base::get($_ctxt);
-                }], [{
-                  return Base::getChecked($_loc);
                 }]>,
             TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$type), [{
               auto ret = Base::get(type.getContext());
-              ret.setKnownType(type);
-              return ret;
-            }], [{
-              auto ret = Base::getChecked($_loc);
               ret.setKnownType(type);
               return ret;
             }]>

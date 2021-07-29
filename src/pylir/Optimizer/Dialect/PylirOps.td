@@ -3,6 +3,7 @@
 #define PYLIR_OPS_TABLEGEN
 
 include "pylir/Optimizer/Dialect/PylirTypes.td"
+include "pylir/Optimizer/Dialect/PylirAttributes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -59,7 +60,7 @@ def Pylir_DataOfOp : Pylir_Op<"dataOf",[NoSideEffect, DeclareOpInterfaceMethods<
     }];
 
     let builders = [
-        OpBuilderDAG<(ins "pylir::Dialect::ConstantGlobalOp":$value),
+        OpBuilder<(ins "pylir::Dialect::ConstantGlobalOp":$value),
         [{ build($_builder, $_state, value.type(), value.sym_name()); }]>];
 }
 
