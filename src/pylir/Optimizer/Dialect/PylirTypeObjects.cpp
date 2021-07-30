@@ -59,27 +59,24 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__call__"),
-                              genFunction(module,
-                                          pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(
-                                              module.getContext(), TypeSlotPredicate::Call)
-                                              .cast<mlir::FunctionType>(),
-                                          "pylir_function_type__call__",
-                                          [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
-                                          {
-                                              mlir::Value self = funcOp.getArgument(0);
-                                              mlir::Value args = funcOp.getArgument(1);
-                                              mlir::Value dict = funcOp.getArgument(2);
-                                              /*
-                        auto casted = builder.create<Dialect::ReinterpretOp>(
-                            builder.getUnknownLoc(), builder.getType<Dialect::FunctionType>(), self);
-                        auto fpPointer = builder.create<Dialect::GetFunctionPointerOp>(
-                            builder.getUnknownLoc(), Dialect::getCCFuncType(builder.getContext()), casted);
-                        auto result = builder.create<mlir::CallIndirectOp>(builder.getUnknownLoc(), fpPointer,
+            dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__call__"),
+                genFunction(
+                    module,
+                    pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(), TypeSlotPredicate::Call)
+                        .cast<mlir::FunctionType>(),
+                    "pylir_function_type__call__",
+                    [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
+                    {
+                        mlir::Value self = funcOp.getArgument(0);
+                        mlir::Value args = funcOp.getArgument(1);
+                        mlir::Value dict = funcOp.getArgument(2);
+                        auto unboxed = builder.create<Dialect::UnboxOp>(builder.getUnknownLoc(),
+                                                                        getCCFuncType(builder.getContext()), self);
+                        auto result = builder.create<mlir::CallIndirectOp>(builder.getUnknownLoc(), unboxed,
                                                                            mlir::ValueRange{self, args, dict});
                         builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), result.getResult(0));
-                         */
-                                          }));
+                    }));
             return dict;
         });
 }
@@ -92,27 +89,29 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(mlir::ModuleO
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mul__"),
-                              genFunction(module,
-                                          pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(
-                                              module.getContext(), TypeSlotPredicate::Multiply)
-                                              .cast<mlir::FunctionType>(),
-                                          "pylir_long_type__mul__",
-                                          [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
-                                          {
-                                              /*
-                                              auto first = builder.create<Dialect::ReinterpretOp>(
-                                                  builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(),
-                                              funcOp.getArgument(0)); auto second =
-                                              builder.create<Dialect::ReinterpretOp>( builder.getUnknownLoc(),
-                                              builder.getType<Dialect::IntegerType>(), funcOp.getArgument(1)); auto
-                                              result = builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), first,
-                                              second); builder.create<ReturnOp>(builder.getUnknownLoc(),
-                                                                       mlir::ValueRange{builder.create<Dialect::ReinterpretOp>(
-                                                                           builder.getUnknownLoc(),
-                                              builder.getType<ObjectType>(), result)});
-                                                                           */
-                                          }));
+            dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__mul__"),
+                genFunction(module,
+                            pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
+                                                                                   TypeSlotPredicate::Multiply)
+                                .cast<mlir::FunctionType>(),
+                            "pylir_long_type__mul__",
+                            [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
+                            {
+                                auto lhs = funcOp.getArgument(0);
+                                auto rhs = funcOp.getArgument(1);
+                                // TODO type check
+                                auto lhsValue = builder.create<Dialect::UnboxOp>(
+                                    builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(), lhs);
+                                auto rhsValue = builder.create<Dialect::UnboxOp>(
+                                    builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(), rhs);
+                                auto result =
+                                    builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), lhsValue, rhsValue);
+                                builder.create<mlir::ReturnOp>(
+                                    builder.getUnknownLoc(),
+                                    mlir::ValueRange{builder.create<Dialect::BoxOp>(
+                                        builder.getUnknownLoc(), builder.getType<ObjectType>(), result)});
+                            }));
             return dict;
         });
 }
@@ -171,9 +170,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::M
 
 mlir::FunctionType pylir::Dialect::getCCFuncType(mlir::MLIRContext* context)
 {
-    return mlir::FunctionType::get(context,
-                                   {/*self*/ pylir::Dialect::ObjectType::get(context),
-                                    /*arg*/ pylir::Dialect::TupleType::get(context),
-                                    /*kwd*/ pylir::Dialect::DictType::get(context)},
-                                   {pylir::Dialect::ObjectType::get(context)});
+    auto ref = mlir::MemRefType::get({}, ObjectType::get(context));
+    return mlir::FunctionType::get(
+        context, {ref, Dialect::TupleType::get(context), mlir::MemRefType::get({}, Dialect::DictType::get(context))},
+        {ref});
 }

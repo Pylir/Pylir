@@ -3,6 +3,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/OpImplementation.h>
 
+#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 #include <pylir/Support/Macros.hpp>
 
 #include "PylirAttributes.hpp"
@@ -339,12 +340,6 @@ bool pylir::Dialect::BtoIOp::areCastCompatible(mlir::TypeRange inputs, mlir::Typ
     return inputs[0].isSignlessInteger(1) && outputs[0].isa<IntegerType>();
 }
 
-pylir::Dialect::GlobalOp pylir::Dialect::GlobalOp::create(mlir::Location location, llvm::StringRef name)
-{
-    mlir::OpBuilder builder(location.getContext());
-    return builder.create<GlobalOp>(location, name);
-}
-
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::ConstantGlobalOp::create(mlir::Location location, llvm::StringRef name,
                                                                           ObjectType type, mlir::Attribute initializer)
 {
@@ -407,50 +402,22 @@ bool pylir::Dialect::ListToTupleOp::areCastCompatible(mlir::TypeRange inputs, ml
     return outputs[0].isa<TupleType>() && inputs[0].isa<ListType>();
 }
 
-mlir::LogicalResult pylir::Dialect::HandleOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
-{
-    auto result = symbolTable.lookupNearestSymbolFrom<Dialect::GlobalOp>(*this, globalNameAttr());
-    return mlir::success(result != nullptr);
-}
-
 mlir::LogicalResult pylir::Dialect::DataOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     auto result = symbolTable.lookupNearestSymbolFrom<Dialect::ConstantGlobalOp>(*this, globalNameAttr());
     return mlir::success(result != nullptr);
 }
 
-mlir::OpFoldResult pylir::Dialect::GetItemOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
-{
-    auto integer = operands[0].dyn_cast_or_null<pylir::Dialect::IntegerAttr>();
-    if (!integer)
-    {
-        return nullptr;
-    }
-    if (auto list = operands[1].dyn_cast_or_null<mlir::ArrayAttr>())
-    {
-        return list.getValue()[integer.getValue().getZExtValue()];
-    }
-    if (auto string = operands[1].dyn_cast_or_null<mlir::StringAttr>())
-    {
-        // TODO probably needs to be a codepoint
-        auto character = string.getValue()[integer.getValue().getZExtValue()];
-        return mlir::StringAttr::get(getContext(), llvm::StringRef(&character, 1));
-    }
-    return nullptr;
-}
-
 mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRContext* context,
                                                                   TypeSlotPredicate predicate)
 {
+    auto ref = mlir::MemRefType::get({}, ObjectType::get(context));
     switch (predicate)
     {
         case TypeSlotPredicate::DictPtr: return mlir::IndexType::get(context);
         case TypeSlotPredicate::Call:
         case TypeSlotPredicate::New:
-        case TypeSlotPredicate::Init:
-            return mlir::FunctionType::get(
-                context, {ObjectType::get(context), Dialect::TupleType::get(context), Dialect::DictType::get(context)},
-                {ObjectType::get(context)});
+        case TypeSlotPredicate::Init: return getCCFuncType(context);
         case TypeSlotPredicate::Add:
         case TypeSlotPredicate::Subtract:
         case TypeSlotPredicate::Multiply:
@@ -486,18 +453,13 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::Lt:
         case TypeSlotPredicate::Gt:
         case TypeSlotPredicate::Le:
-        case TypeSlotPredicate::Ge:
-            return mlir::FunctionType::get(context, {ObjectType::get(context), ObjectType::get(context)},
-                                           {ObjectType::get(context)});
+        case TypeSlotPredicate::Ge: return mlir::FunctionType::get(context, {ref, ref}, {ref});
         case TypeSlotPredicate::Power:
         case TypeSlotPredicate::InPlacePower:
         case TypeSlotPredicate::SetItem:
         case TypeSlotPredicate::SetAttr:
         case TypeSlotPredicate::DescrGet:
-        case TypeSlotPredicate::DescrSet:
-            return mlir::FunctionType::get(
-                context, {ObjectType::get(context), ObjectType::get(context), ObjectType::get(context)},
-                {ObjectType::get(context)});
+        case TypeSlotPredicate::DescrSet: return mlir::FunctionType::get(context, {ref, ref, ref}, {ref});
         case TypeSlotPredicate::Negative:
         case TypeSlotPredicate::Positive:
         case TypeSlotPredicate::Absolute:
@@ -512,9 +474,8 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::Str:
         case TypeSlotPredicate::Repr:
         case TypeSlotPredicate::IterNext:
-        case TypeSlotPredicate::Del:
-            return mlir::FunctionType::get(context, {ObjectType::get(context)}, {ObjectType::get(context)});
-        case TypeSlotPredicate::Dict: return Dialect::DictType::get(context);
+        case TypeSlotPredicate::Del: return mlir::FunctionType::get(context, {ref}, {ref});
+        case TypeSlotPredicate::Dict: return mlir::MemRefType::get({}, Dialect::DictType::get(context));
         case TypeSlotPredicate::Bases: return Dialect::TupleType::get(context);
     }
     PYLIR_UNREACHABLE;
@@ -553,9 +514,24 @@ bool pylir::Dialect::UnboxOp::areCastCompatible(mlir::TypeRange inputs, mlir::Ty
     return !outputs[0].isa<ObjectType>() && inputs[0].isa<ObjectType>();
 }
 
+mlir::OpFoldResult pylir::Dialect::GetStringItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto string = operands[0].dyn_cast_or_null<mlir::StringAttr>();
+    auto index = operands[1].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!string && !index)
+    {
+        return nullptr;
+    }
+    if (index.getValue().getZExtValue() >= string.getValue().size())
+    {
+        // TOOD: Maybe a poison value would make sense for such cases here
+        return nullptr;
+    }
+    // TODO: Check specific semantics in python, cause I probs need to find the i-th codepoint
+    return mlir::StringAttr::get(getContext(), llvm::Twine{string.getValue()[index.getValue().getZExtValue()]});
+}
 
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
-#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 
 // TODO: Remove in MLIR 14
 using namespace mlir;

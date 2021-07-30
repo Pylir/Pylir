@@ -118,3 +118,29 @@ pylir::Dialect::DictAttr
 {
     return Base::get(context, value);
 }
+
+void pylir::Dialect::ObjectType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                          llvm::function_ref<void(mlir::Type)>) const
+{
+    if (getType())
+    {
+        walkAttrsFn(getType());
+    }
+}
+
+void pylir::Dialect::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                       llvm::function_ref<void(mlir::Type)>) const
+{
+    std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
+}
+
+void pylir::Dialect::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                        llvm::function_ref<void(mlir::Type)>) const
+{
+    std::for_each(getValue().begin(), getValue().end(),
+                  [&](const auto& pair)
+                  {
+                      walkAttrsFn(pair.first);
+                      walkAttrsFn(pair.second);
+                  });
+}

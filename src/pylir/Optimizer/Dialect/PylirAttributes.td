@@ -26,7 +26,7 @@ def Pylir_IntegerAttr : Pylir_Attr<"Integer"> {
     }];
 }
 
-def Pylir_SetAttr : Pylir_Attr<"Set"> {
+def Pylir_SetAttr : Pylir_Attr<"Set", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
     let mnemonic = "set";
 
     let parameters = (ins ArrayRefParameter<"mlir::Attribute", "">:$value);
@@ -77,7 +77,7 @@ def Pylir_SetAttr : Pylir_Attr<"Set"> {
 }
 
 
-def Pylir_DictAttr : Pylir_Attr<"Dict"> {
+def Pylir_DictAttr : Pylir_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
     let mnemonic = "dict";
 
     let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>", "">:$value);
