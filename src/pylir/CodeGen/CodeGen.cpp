@@ -1,5 +1,6 @@
 #include "CodeGen.hpp"
 
+#include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
 #include <pylir/Optimizer/Dialect/PylirAttributes.hpp>
@@ -12,9 +13,11 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
         {
             context->loadDialect<pylir::Dialect::PylirDialect>();
             context->loadDialect<mlir::StandardOpsDialect>();
+            context->loadDialect<mlir::memref::MemRefDialect>();
             return context;
         }()),
-      m_document(&document)
+      m_document(&document),
+      m_refRefObject(mlir::MemRefType::get({}, mlir::MemRefType::get({}, m_builder.getType<Dialect::ObjectType>())))
 {
 }
 
@@ -35,7 +38,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
             visit(*statement);
         }
     }
-    if (m_builder.getBlock() && m_builder.getBlock()->back().isKnownNonTerminator())
+    if (m_builder.getBlock() && !m_builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>())
     {
         m_builder.create<mlir::ReturnOp>(m_builder.getUnknownLoc());
     }
@@ -88,33 +91,39 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
             if (result != getCurrentScope().end())
             {
                 mlir::Value handle;
-                if (auto alloca = llvm::dyn_cast<mlir::AllocaOp>(result->second))
+                if (auto alloca = llvm::dyn_cast<mlir::memref::AllocaOp>(result->second))
                 {
                     handle = alloca;
                 }
                 else
                 {
-                    auto global = llvm::cast<Dialect::GlobalOp>(result->second);
-                    handle = m_builder.create<Dialect::HandleOfOp>(
-                        location, mlir::FlatSymbolRefAttr::get(global.sym_name(), global.getContext()));
+                    auto global = llvm::cast<mlir::memref::GlobalOp>(result->second);
+                    handle = m_builder.create<mlir::memref::GetGlobalOp>(location, m_refRefObject,
+                                                                         m_builder.getSymbolRefAttr(global));
                 }
-                m_builder.create<Dialect::StoreOp>(location, value, handle);
+                m_builder.create<mlir::memref::StoreOp>(location, value, handle);
                 return;
             }
             if (m_scope.size() == 1)
             {
                 // We are in the global scope
-                auto op = Dialect::GlobalOp::create(location, identifierToken.getValue());
+                mlir::memref::GlobalOp op;
+                {
+                    mlir::OpBuilder::InsertionGuard guard{m_builder};
+                    m_builder.setInsertionPointToEnd(m_module.getBody());
+                    op = m_builder.create<mlir::memref::GlobalOp>(location, identifierToken.getValue(),
+                                                                  mlir::StringAttr{}, m_refRefObject,
+                                                                  m_builder.getUnitAttr(), false);
+                }
                 getCurrentScope().insert({identifierToken.getValue(), op});
-                m_module.push_back(op);
-                auto handle = m_builder.create<Dialect::HandleOfOp>(
-                    location, mlir::FlatSymbolRefAttr::get(op.sym_name(), op.getContext()));
-                m_builder.create<Dialect::StoreOp>(location, value, handle);
+                auto handle =
+                    m_builder.create<mlir::memref::GetGlobalOp>(location, op.type(), m_builder.getSymbolRefAttr(op));
+                m_builder.create<mlir::memref::StoreOp>(location, value, handle);
                 return;
             }
 
-            auto alloca = m_builder.create<Dialect::AllocaOp>(location);
-            m_builder.create<Dialect::StoreOp>(location, value, alloca);
+            auto alloca = m_builder.create<mlir::memref::AllocaOp>(location, m_refRefObject);
+            m_builder.create<mlir::memref::StoreOp>(location, value, alloca);
             getCurrentScope().insert({identifierToken.getValue(), alloca});
         },
         [&](const Syntax::Target::Parenth& parenth)
@@ -201,30 +210,33 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     }
     auto loc = getLoc(expression, expression.suffix->ifToken);
 
-    auto result = m_builder.create<Dialect::AllocaOp>(loc);
-
-    mlir::Block* thenBlock = new mlir::Block;
-    mlir::Block* elseBlock = new mlir::Block;
-    mlir::Block* continueBlock = new mlir::Block;
-
-    m_builder.create<mlir::CondBranchOp>(
-        loc, m_builder.create<Dialect::BtoI1Op>(loc, toBool(visit(*expression.suffix->test))), thenBlock, elseBlock);
-
-    m_currentFunc.getCallableRegion()->push_back(thenBlock);
-    m_builder.setInsertionPointToStart(thenBlock);
-    auto thenValue = visit(expression.value);
-    m_builder.create<Dialect::StoreOp>(loc, thenValue, result);
-    m_builder.create<mlir::BranchOp>(loc, continueBlock);
-
-    m_currentFunc.getCallableRegion()->push_back(elseBlock);
-    m_builder.setInsertionPointToStart(elseBlock);
-    auto elseValue = visit(*expression.suffix->elseValue);
-    m_builder.create<Dialect::StoreOp>(loc, elseValue, result);
-    m_builder.create<mlir::BranchOp>(loc, continueBlock);
-
-    m_currentFunc.getCallableRegion()->push_back(continueBlock);
-    m_builder.setInsertionPointToStart(continueBlock);
-    return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), result);
+    //    auto result = m_builder.create<Dialect::AllocaOp>(loc);
+    //
+    //    mlir::Block* thenBlock = new mlir::Block;
+    //    mlir::Block* elseBlock = new mlir::Block;
+    //    mlir::Block* continueBlock = new mlir::Block;
+    //
+    //    m_builder.create<mlir::CondBranchOp>(
+    //        loc, m_builder.create<Dialect::BtoI1Op>(loc, toBool(visit(*expression.suffix->test))), thenBlock,
+    //        elseBlock);
+    //
+    //    m_currentFunc.getCallableRegion()->push_back(thenBlock);
+    //    m_builder.setInsertionPointToStart(thenBlock);
+    //    auto thenValue = visit(expression.value);
+    //    m_builder.create<Dialect::StoreOp>(loc, thenValue, result);
+    //    m_builder.create<mlir::BranchOp>(loc, continueBlock);
+    //
+    //    m_currentFunc.getCallableRegion()->push_back(elseBlock);
+    //    m_builder.setInsertionPointToStart(elseBlock);
+    //    auto elseValue = visit(*expression.suffix->elseValue);
+    //    m_builder.create<Dialect::StoreOp>(loc, elseValue, result);
+    //    m_builder.create<mlir::BranchOp>(loc, continueBlock);
+    //
+    //    m_currentFunc.getCallableRegion()->push_back(continueBlock);
+    //    m_builder.setInsertionPointToStart(continueBlock);
+    //    return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), result);
+    // TODO
+    PYLIR_UNREACHABLE;
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
@@ -235,7 +247,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
         {
             auto lhs = toBool(visit(*binOp->lhs));
             auto rhs = toBool(visit(binOp->rhs));
-            return m_builder.create<Dialect::BOrOp>(getLoc(expression, binOp->orToken), lhs, rhs);
+            return m_builder.create<mlir::OrOp>(getLoc(expression, binOp->orToken), lhs, rhs);
         });
 }
 
@@ -247,7 +259,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
         {
             auto lhs = toBool(visit(*binOp->lhs));
             auto rhs = toBool(visit(binOp->rhs));
-            return m_builder.create<Dialect::BAndOp>(getLoc(expression, binOp->andToken), lhs, rhs);
+            return m_builder.create<mlir::AndOp>(getLoc(expression, binOp->andToken), lhs, rhs);
         });
 }
 
@@ -258,7 +270,9 @@ mlir::Value pylir::CodeGen::visit(const Syntax::NotTest& expression)
         [&](const std::pair<BaseToken, std::unique_ptr<Syntax::NotTest>>& pair) -> mlir::Value
         {
             auto value = toBool(visit(*pair.second));
-            return m_builder.create<Dialect::BNegOp>(getLoc(expression, pair.first), value);
+            auto loc = getLoc(expression, pair.first);
+            auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getBoolAttr(true));
+            return m_builder.create<mlir::XOrOp>(loc, value, one);
         });
 }
 
@@ -316,46 +330,14 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         }
         auto other = visit(rhs);
         mlir::Value cmp;
-        if (Dialect::isNumbers(previousRHS.getType()) && Dialect::isNumbers(other.getType()))
-        {
-            ensureInt(previousRHS);
-            ensureInt(other);
-            Dialect::CmpPredicate predicate;
-            switch (comp)
-            {
-                case Comp::Lt: predicate = Dialect::CmpPredicate::LT; break;
-                case Comp::Le: predicate = Dialect::CmpPredicate::LE; break;
-                case Comp::Gt: predicate = Dialect::CmpPredicate::GT; break;
-                case Comp::Ge: predicate = Dialect::CmpPredicate::GE; break;
-                case Comp::Is:
-                case Comp::Eq: predicate = Dialect::CmpPredicate::EQ; break;
-                case Comp::IsNot:
-                case Comp::Ne: predicate = Dialect::CmpPredicate::NE; break;
-                default:
-                    // TODO
-                    PYLIR_UNREACHABLE;
-            }
-            if (Dialect::isIntegerLike(previousRHS.getType()) && Dialect::isIntegerLike(other.getType()))
-            {
-                cmp = m_builder.create<Dialect::ICmpOp>(getLoc(op, op.firstToken), predicate, previousRHS, other);
-            }
-            else if (previousRHS.getType().isa<Dialect::FloatType>() && other.getType().isa<Dialect::FloatType>())
-            {
-                cmp = m_builder.create<Dialect::FCmpOp>(getLoc(op, op.firstToken), predicate, previousRHS, other);
-            }
-            else
-            {
-                // TODO
-                PYLIR_UNREACHABLE;
-            }
-        }
+        // TODO cmp
         if (!result)
         {
             result = cmp;
             continue;
         }
 
-        result = m_builder.create<Dialect::BAndOp>(getLoc(op, op.firstToken), result, cmp);
+        result = m_builder.create<mlir::AndOp>(getLoc(op, op.firstToken), result, cmp);
         previousRHS = other;
     }
     return result;
@@ -370,16 +352,6 @@ mlir::Value pylir::CodeGen::visit(const Syntax::OrExpr& orExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(orExpr, binOp->bitOrToken);
-            if (lhs.getType().isa<Dialect::BoolType>() && rhs.getType().isa<Dialect::BoolType>())
-            {
-                return m_builder.create<Dialect::BOrOp>(loc, lhs, rhs);
-            }
-            if (Dialect::isIntegerLike(lhs.getType()) && Dialect::isIntegerLike(rhs.getType()))
-            {
-                ensureInt(lhs);
-                ensureInt(rhs);
-                return m_builder.create<Dialect::IOrOp>(loc, lhs, rhs);
-            }
             return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Or, "__ror__");
         });
 }
@@ -393,16 +365,6 @@ mlir::Value pylir::CodeGen::visit(const Syntax::XorExpr& xorExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(xorExpr, binOp->bitXorToken);
-            if (lhs.getType().isa<Dialect::BoolType>() && rhs.getType().isa<Dialect::BoolType>())
-            {
-                return m_builder.create<Dialect::BXorOp>(loc, lhs, rhs);
-            }
-            if (Dialect::isIntegerLike(lhs.getType()) && Dialect::isIntegerLike(rhs.getType()))
-            {
-                ensureInt(lhs);
-                ensureInt(rhs);
-                return m_builder.create<Dialect::IXorOp>(loc, lhs, rhs);
-            }
             return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Xor, "__rxor__");
         });
 }
@@ -416,16 +378,6 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AndExpr& andExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(andExpr, binOp->bitAndToken);
-            if (lhs.getType().isa<Dialect::BoolType>() && rhs.getType().isa<Dialect::BoolType>())
-            {
-                return m_builder.create<Dialect::BAndOp>(loc, lhs, rhs);
-            }
-            if (Dialect::isIntegerLike(lhs.getType()) && Dialect::isIntegerLike(rhs.getType()))
-            {
-                ensureInt(lhs);
-                ensureInt(rhs);
-                return m_builder.create<Dialect::IAndOp>(loc, lhs, rhs);
-            }
             return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::And, "__rand__");
         });
 }
@@ -439,17 +391,6 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ShiftExpr& shiftExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(shiftExpr, binOp->binToken);
-            if (Dialect::isIntegerLike(lhs.getType()) && Dialect::isIntegerLike(rhs.getType()))
-            {
-                ensureInt(lhs);
-                ensureInt(rhs);
-                switch (binOp->binToken.getTokenType())
-                {
-                    case TokenType::ShiftLeft: return m_builder.create<Dialect::IShlOp>(loc, lhs, rhs);
-                    case TokenType::ShiftRight: return m_builder.create<Dialect::IShrOp>(loc, lhs, rhs);
-                    default: PYLIR_UNREACHABLE;
-                }
-            }
             switch (binOp->binToken.getTokenType())
             {
                 case TokenType::ShiftLeft:
@@ -469,26 +410,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AExpr& aExpr)
         {
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
-            arithmeticConversion(lhs, rhs);
             auto loc = getLoc(aExpr, binOp->binToken);
-            if (Dialect::isIntegerLike(lhs.getType()) && Dialect::isIntegerLike(rhs.getType()))
-            {
-                switch (binOp->binToken.getTokenType())
-                {
-                    case TokenType::Plus: return m_builder.create<Dialect::IAddOp>(loc, lhs, rhs);
-                    case TokenType::Minus: return m_builder.create<Dialect::ISubOp>(loc, lhs, rhs);
-                    default: PYLIR_UNREACHABLE;
-                }
-            }
-            else if (lhs.getType().isa<Dialect::FloatType>() && rhs.getType().isa<Dialect::FloatType>())
-            {
-                switch (binOp->binToken.getTokenType())
-                {
-                    case TokenType::Plus: return m_builder.create<Dialect::FAddOp>(loc, lhs, rhs);
-                    case TokenType::Minus: return m_builder.create<Dialect::FSubOp>(loc, lhs, rhs);
-                    default: PYLIR_UNREACHABLE;
-                }
-            }
             switch (binOp->binToken.getTokenType())
             {
                 case TokenType::Plus: return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Add, "__radd__");
@@ -506,30 +428,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
         {
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
-            arithmeticConversion(lhs, rhs);
             auto loc = getLoc(mExpr, binOp->binToken);
-            if (Dialect::isIntegerLike(lhs.getType()) && Dialect::isIntegerLike(rhs.getType()))
-            {
-                switch (binOp->binToken.getTokenType())
-                {
-                    case TokenType::Star: return m_builder.create<Dialect::IMulOp>(loc, lhs, rhs);
-                    case TokenType::Divide: return m_builder.create<Dialect::IDivOp>(loc, lhs, rhs);
-                    case TokenType::IntDivide: return m_builder.create<Dialect::IFloorDivOp>(loc, lhs, rhs);
-                    case TokenType::Remainder: return m_builder.create<Dialect::IModOp>(loc, lhs, rhs);
-                    default: PYLIR_UNREACHABLE;
-                }
-            }
-            else if (lhs.getType().isa<Dialect::FloatType>() && rhs.getType().isa<Dialect::FloatType>())
-            {
-                switch (binOp->binToken.getTokenType())
-                {
-                    case TokenType::Star: return m_builder.create<Dialect::FMulOp>(loc, lhs, rhs);
-                    case TokenType::Divide: return m_builder.create<Dialect::FDivOp>(loc, lhs, rhs);
-                    case TokenType::IntDivide: return m_builder.create<Dialect::FFloorDivOp>(loc, lhs, rhs);
-                    case TokenType::Remainder: return m_builder.create<Dialect::FModOp>(loc, lhs, rhs);
-                    default: PYLIR_UNREACHABLE;
-                }
-            }
             switch (binOp->binToken.getTokenType())
             {
                 case TokenType::Star: return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Multiply, "__rmul__");
@@ -562,40 +461,15 @@ mlir::Value pylir::CodeGen::visit(const Syntax::UExpr& uExpr)
             {
                 case TokenType::Minus:
                 {
-                    if (Dialect::isIntegerLike(value.getType()))
-                    {
-                        ensureInt(value);
-                        return m_builder.create<Dialect::ISubOp>(
-                            getLoc(uExpr, pair.first),
-                            m_builder.create<Dialect::ConstantOp>(
-                                m_builder.getUnknownLoc(),
-                                Dialect::IntegerAttr::get(m_builder.getContext(), llvm::APInt(2, 0))),
-                            value);
-                    }
-                    else if (value.getType().isa<Dialect::FloatType>())
-                    {
-                        return m_builder.create<Dialect::FSubOp>(
-                            getLoc(uExpr, pair.first),
-                            m_builder.create<Dialect::ConstantOp>(m_builder.getUnknownLoc(),
-                                                                  Dialect::FloatAttr::get(m_builder.getContext(), 0)),
-                            value);
-                    }
                     // TODO
                     PYLIR_UNREACHABLE;
                 }
                 case TokenType::Plus:
-                    if (Dialect::isNumbers(value.getType()))
-                    {
-                        return value;
-                    }
+
                     // TODO
                     PYLIR_UNREACHABLE;
                 case TokenType::BitNegate:
-                    if (Dialect::isIntegerLike(value.getType()))
-                    {
-                        ensureInt(value);
-                        return m_builder.create<Dialect::INegOp>(getLoc(uExpr, pair.first), value);
-                    }
+
                     // TODO
                     PYLIR_UNREACHABLE;
                 default: PYLIR_UNREACHABLE;
@@ -636,20 +510,27 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
         atom.variant,
         [&](const Syntax::Atom::Literal& literal) -> mlir::Value
         {
+            auto location = getLoc(atom, literal.token);
             switch (literal.token.getTokenType())
             {
                 case TokenType::IntegerLiteral:
                 {
-                    return m_builder.create<pylir::Dialect::ConstantOp>(
-                        getLoc(atom, literal.token),
-                        Dialect::IntegerAttr::get(m_builder.getContext(),
-                                                  pylir::get<llvm::APInt>(literal.token.getValue())));
+                    auto constant = m_builder.create<Dialect::ConstantOp>(
+                        location, Dialect::IntegerAttr::get(m_builder.getContext(),
+                                                            pylir::get<llvm::APInt>(literal.token.getValue())));
+                    auto boxed = m_builder.create<Dialect::BoxOp>(
+                        location, Dialect::ObjectType::get(Dialect::getLongTypeObject(m_module)), constant);
+                    auto gcAlloc = m_builder.create<Dialect::GCAllocOp>(
+                        location, mlir::MemRefType::get({}, boxed.getType()), mlir::Value{});
+                    m_builder.create<mlir::memref::StoreOp>(location, boxed, gcAlloc);
+                    return gcAlloc;
                 }
                 case TokenType::FloatingPointLiteral:
                 {
-                    return m_builder.create<pylir::Dialect::ConstantOp>(
-                        getLoc(atom, literal.token),
-                        Dialect::FloatAttr::get(m_builder.getContext(), pylir::get<double>(literal.token.getValue())));
+                    auto constant = m_builder.create<mlir::ConstantOp>(
+                        location, m_builder.getF64FloatAttr(pylir::get<double>(literal.token.getValue())));
+                    // TODO:
+                    PYLIR_UNREACHABLE;
                 }
                 case TokenType::ComplexLiteral:
                 {
@@ -657,22 +538,31 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     PYLIR_UNREACHABLE;
                 }
                 case TokenType::StringLiteral:
-                    return m_builder.create<pylir::Dialect::ConstantOp>(
-                        getLoc(atom, literal.token),
-                        Dialect::StringAttr::get(m_builder.getContext(),
-                                                 pylir::get<std::string>(literal.token.getValue())));
+                {
+                    auto constant = m_builder.create<pylir::Dialect::ConstantOp>(
+                        location, m_builder.getStringAttr(pylir::get<std::string>(literal.token.getValue())));
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                }
                 case TokenType::ByteLiteral:
                     // TODO:
                     PYLIR_UNREACHABLE;
                 case TokenType::TrueKeyword:
-                    return m_builder.create<pylir::Dialect::ConstantOp>(
-                        getLoc(atom, literal.token), Dialect::BoolAttr::get(m_builder.getContext(), true));
+                {
+                    auto constant =
+                        m_builder.create<mlir::ConstantOp>(location, mlir::BoolAttr::get(m_builder.getContext(), true));
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                }
                 case TokenType::FalseKeyword:
-                    return m_builder.create<pylir::Dialect::ConstantOp>(
-                        getLoc(atom, literal.token), Dialect::BoolAttr::get(m_builder.getContext(), false));
+                {
+                    auto constant = m_builder.create<mlir::ConstantOp>(
+                        location, mlir::BoolAttr::get(m_builder.getContext(), false));
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                }
                 case TokenType::NoneKeyword:
-                    return m_builder.create<pylir::Dialect::DataOfOp>(getLoc(atom, literal.token),
-                                                                      Dialect::getNoneObject(m_module));
+                    return m_builder.create<pylir::Dialect::DataOfOp>(location, Dialect::getNoneObject(m_module));
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -686,73 +576,23 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 PYLIR_UNREACHABLE;
             }
             mlir::Value handle;
-            if (auto alloca = llvm::dyn_cast<Dialect::AllocaOp>(result->second))
+            if (auto alloca = llvm::dyn_cast<mlir::memref::AllocaOp>(result->second))
             {
                 handle = alloca;
             }
             else
             {
-                auto global = llvm::cast<Dialect::GlobalOp>(result->second);
-                handle = m_builder.create<Dialect::HandleOfOp>(
-                    loc, mlir::FlatSymbolRefAttr::get(global.sym_name(), global.getContext()));
+                auto global = llvm::cast<mlir::memref::GlobalOp>(result->second);
+                handle = m_builder.create<mlir::memref::GetGlobalOp>(loc, m_refRefObject,
+                                                                     m_builder.getSymbolRefAttr(global));
             }
-            return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), handle);
+            return m_builder.create<mlir::memref::LoadOp>(loc, handle);
         },
         [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
 }
 
-void pylir::CodeGen::arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs)
-{
-    // TODO complex
-    if (lhs.getType().isa<Dialect::FloatType>() || rhs.getType().isa<Dialect::FloatType>())
-    {
-        if (Dialect::isIntegerLike(lhs.getType()))
-        {
-            ensureInt(lhs);
-            lhs = m_builder.create<Dialect::ItoFOp>(m_builder.getUnknownLoc(), lhs);
-        }
-        if (Dialect::isIntegerLike(rhs.getType()))
-        {
-            ensureInt(rhs);
-            rhs = m_builder.create<Dialect::ItoFOp>(m_builder.getUnknownLoc(), rhs);
-        }
-        return;
-    }
-    if (Dialect::isIntegerLike(lhs.getType()) && Dialect::isIntegerLike(rhs.getType()))
-    {
-        ensureInt(lhs);
-        ensureInt(rhs);
-    }
-}
-
-void pylir::CodeGen::ensureInt(mlir::Value& value)
-{
-    if (value.getType().isa<Dialect::BoolType>())
-    {
-        value = m_builder.create<Dialect::BtoIOp>(m_builder.getUnknownLoc(), value);
-    }
-}
-
 mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 {
-    if (value.getType().isa<Dialect::BoolType>())
-    {
-        return value;
-    }
-    if (value.getType().isa<Dialect::IntegerType>())
-    {
-        return m_builder.create<Dialect::ICmpOp>(
-            m_builder.getUnknownLoc(), Dialect::CmpPredicate::NE, value,
-            m_builder.create<Dialect::ConstantOp>(
-                m_builder.getUnknownLoc(), Dialect::IntegerAttr::get(m_builder.getContext(), llvm::APInt(2, 0))));
-    }
-    if (value.getType().isa<Dialect::FloatType>())
-    {
-        return m_builder.create<Dialect::FCmpOp>(
-            m_builder.getUnknownLoc(), Dialect::CmpPredicate::NE, value,
-            m_builder.create<Dialect::ConstantOp>(m_builder.getUnknownLoc(),
-                                                  Dialect::FloatAttr::get(m_builder.getContext(), 0)));
-    }
     // TODO
     PYLIR_UNREACHABLE;
 }
@@ -780,11 +620,12 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
 mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
                                      Dialect::TypeSlotPredicate operation, std::string_view)
 {
-    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhs);
+    auto lhsLoad = m_builder.create<mlir::memref::LoadOp>(loc, lhs);
+    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhsLoad);
     auto slot = m_builder.create<Dialect::GetTypeSlotOp>(loc, operation, lhsType);
     auto func = slot.getResult(0);
     auto wasFound = slot.getResult(1);
-    auto result = m_builder.create<Dialect::AllocaOp>(loc);
+    auto result = m_builder.create<mlir::memref::AllocaOp>(loc, m_refRefObject);
 
     auto* foundBlock = new mlir::Block;
     auto* notFoundBlock = new mlir::Block;
@@ -801,12 +642,11 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
             m_builder.create<Dialect::DataOfOp>(loc, Dialect::getNotImplementedObject(m_module));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
         auto id = m_builder.create<Dialect::IdOp>(loc, call);
-        auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
-        auto continueBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
-        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, isNotImplemented),
-                                             notFoundBlock, continueBlock);
+        auto isNotImplemented = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::eq, id, notImplementedId);
+        auto continueBlock = mlir::OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
+        m_builder.create<mlir::CondBranchOp>(loc, isNotImplemented, notFoundBlock, continueBlock);
         m_builder.setInsertionPointToStart(continueBlock);
-        m_builder.create<Dialect::StoreOp>(loc, call, result);
+        m_builder.create<mlir::memref::StoreOp>(loc, call, result);
         m_builder.create<mlir::BranchOp>(loc, endBlock);
     }
 
@@ -861,36 +701,5 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
 
     m_currentFunc.getCallableRegion()->push_back(endBlock);
     m_builder.setInsertionPointToStart(endBlock);
-    return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), result);
-}
-
-mlir::Value pylir::CodeGen::assureCallable(mlir::Location loc, mlir::Value callable, mlir::Value args, mlir::Value dict)
-{
-    auto type = m_builder.create<Dialect::TypeOfOp>(loc, callable);
-    auto thisTypeId = m_builder.create<Dialect::IdOp>(loc, type);
-    auto data = m_builder.create<Dialect::DataOfOp>(loc, Dialect::getFunctionTypeObject(m_module));
-    auto functionTypeId = m_builder.create<Dialect::IdOp>(loc, data);
-    auto eq = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, thisTypeId, functionTypeId);
-    mlir::Block* callPath = new mlir::Block;
-    mlir::Block* raisePath = new mlir::Block;
-    mlir::Block* continuePath = new mlir::Block;
-    m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, eq), callPath, raisePath);
-
-    m_currentFunc.push_back(raisePath);
-    m_builder.setInsertionPointToStart(raisePath);
-    // TODO RAISE
-    m_builder.create<mlir::ReturnOp>(loc);
-
-    m_currentFunc.push_back(callPath);
-    m_builder.setInsertionPointToStart(callPath);
-    auto reinterpret =
-        m_builder.create<Dialect::ReinterpretOp>(loc, m_builder.getType<Dialect::FunctionType>(), callable);
-    auto fp = m_builder.create<Dialect::GetFunctionPointerOp>(loc, Dialect::getCCFuncType(m_builder.getContext()),
-                                                              reinterpret);
-    auto result = m_builder.create<mlir::CallIndirectOp>(loc, fp, mlir::ValueRange{callable, args, dict});
-    m_builder.create<mlir::BranchOp>(loc, continuePath);
-    m_currentFunc.push_back(continuePath);
-    m_builder.setInsertionPointToStart(continuePath);
-
-    return result.getResult(0);
+    return m_builder.create<mlir::memref::LoadOp>(loc, result);
 }

@@ -19,12 +19,12 @@ def Pylir_String : Pylir_Type<"String"> {
     let summary = "python string";
 }
 
-def Pylir_List : Pylir_Type<"List"> {
+def Pylir_List : Pylir_Type<"List", [MemRefElementTypeInterface]> {
     let mnemonic = "list";
     let summary = "python list";
 }
 
-def Pylir_Set : Pylir_Type<"Set"> {
+def Pylir_Set : Pylir_Type<"Set", [MemRefElementTypeInterface]> {
     let mnemonic = "set";
     let summary = "python set";
 }
@@ -34,7 +34,7 @@ def Pylir_Tuple : Pylir_Type<"Tuple"> {
     let summary = "python tuple";
 }
 
-def Pylir_Dict : Pylir_Type<"Dict"> {
+def Pylir_Dict : Pylir_Type<"Dict", [MemRefElementTypeInterface]> {
     let mnemonic = "dict";
     let summary = "python dictionary";
 }
@@ -74,6 +74,9 @@ def Pylir_Object : Pylir_Type<"Object",
               auto ret = Base::get(type.getContext());
               ret.setKnownType(type);
               return ret;
+            }]>,
+            TypeBuilderWithInferredContext<(ins "::mlir::SymbolOpInterface":$symbol), [{
+              return get(mlir::FlatSymbolRefAttr::get(symbol.getContext(), symbol.getName()));
             }]>
           ];
 
@@ -130,6 +133,14 @@ def Pylir_Float : TypeAlias<F64>;
 class ScalarMemRef<Type type> : MemRefRankOf<[type],[0]> {
     let builderCall = !if(!empty(type.builderCall),"","::mlir::MemRefType::get({}," # type.builderCall #  ")");
 }
+
+def NotUnknownObjectMemRef : TypeConstraint<And<[
+    MemRefRankOf<[AnyType], [0]>.predicate,
+    Or<[
+    Neg<Pylir_Object.predicate>,
+    SubstLeaves<"$_self", "$_self.cast<mlir::MemRefType>().getElementType()", Pylir_KnownTypeObject.predicate>
+    ]>
+]>, "MemRef of known object type or other","mlir::MemRefType">;
 
 def Pylir_Function : Type<
     And<[

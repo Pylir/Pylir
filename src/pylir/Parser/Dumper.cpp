@@ -1,5 +1,7 @@
 #include "Dumper.hpp"
 
+#include <llvm/ADT/SmallString.h>
+
 #include <pylir/Support/Variant.hpp>
 
 #include <fmt/format.h>
@@ -102,7 +104,11 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
                 literal.token.getValue(),
                 [](double value) -> std::string { return fmt::format(FMT_STRING("atom {:#}"), value); },
                 [](const llvm::APInt& apInt) -> std::string
-                { return fmt::format("atom {}", apInt.toString(10, false)); },
+                {
+                    llvm::SmallString<10> str;
+                    apInt.toStringSigned(str);
+                    return fmt::format("atom {}", std::string_view(str.data(), str.size()));
+                },
                 [&](const std::string& string) -> std::string
                 {
                     if (literal.token.getTokenType() == TokenType::StringLiteral)

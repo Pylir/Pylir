@@ -18,29 +18,24 @@ class CodeGen
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
     std::vector<std::unordered_map<std::string_view, mlir::Operation*>> m_scope{1};
+    mlir::MemRefType m_refRefObject;
 
     std::unordered_map<std::string_view, mlir::Operation*>& getCurrentScope()
     {
         return m_scope.back();
     }
 
-    void arithmeticConversion(mlir::Value& lhs, mlir::Value& rhs);
-
-    void ensureInt(mlir::Value& value);
-
     mlir::Value toBool(mlir::Value value);
 
     mlir::Value genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs, Dialect::TypeSlotPredicate operation,
                          std::string_view fallback);
-
-    mlir::Value assureCallable(mlir::Location loc, mlir::Value callable, mlir::Value args, mlir::Value dict);
 
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
     {
         auto [line, col] = m_document->getLineCol(Diag::range(fallBackLocation).first);
         return mlir::OpaqueLoc::get(
-            &astObject, m_builder.getFileLineColLoc(m_builder.getIdentifier(m_document->getFilename()), line, col));
+            &astObject, mlir::FileLineColLoc::get(m_builder.getIdentifier(m_document->getFilename()), line, col));
     }
 
     void assignTarget(const Syntax::TargetList& targetList, mlir::Value value);

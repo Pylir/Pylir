@@ -35,7 +35,7 @@ def Pylir_ConstantGlobalOp : Pylir_Op<"constantGlobal", [Symbol, NoSideEffect]> 
 
 def Pylir_DataOfOp : Pylir_Op<"dataOf",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$globalName);
-    let results = (outs Pylir_Object:$data);
+    let results = (outs ScalarMemRef<Pylir_Object>:$data);
 
     let hasFolder = 0;
 
@@ -48,7 +48,8 @@ def Pylir_DataOfOp : Pylir_Op<"dataOf",[NoSideEffect, DeclareOpInterfaceMethods<
         [{ build($_builder, $_state, value.type(), value.sym_name()); }]>];
 }
 
-def Pylir_ConstantOp : Pylir_Op<"constant",[ConstantLike, NoSideEffect]> {
+def Pylir_ConstantOp : Pylir_Op<"constant",
+    [ConstantLike, NoSideEffect, DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins AnyAttr:$value);
     let results = (outs AnyValueType:$result);
 
@@ -278,7 +279,7 @@ def Pylir_TypeSlotPredicateAttr : I32EnumAttr<"TypeSlotPredicate","",[
 }
 
 def Pylir_GetTypeSlotOp : Pylir_Op<"getTypeSlot", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect]> {
-    let arguments = (ins Pylir_TypeSlotPredicateAttr:$predicate,Arg<Pylir_TypeObject,"",[MemRead]>:$input);
+    let arguments = (ins Pylir_TypeSlotPredicateAttr:$predicate, Arg<Pylir_TypeObject,"",[MemRead]>:$input);
     let results = (outs AnyType:$result, I1:$found);
 
     let assemblyFormat = "$predicate `from` $input `:` type($input) `->` type($result) attr-dict";
@@ -310,20 +311,9 @@ def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
     let assemblyFormat = "$exception `:` type($exception) attr-dict";
 }
 
-def Pylir_GetFunctionPointerOp : Pylir_Op<"getFunctionPointer", [NoSideEffect]> {
-    let arguments = (ins Pylir_Function:$input);
-    let results = (outs FunctionType:$result);
-
-    let hasFolder = 0;
-
-    let assemblyFormat = [{
-        $input `->` type($result) attr-dict
-    }];
-}
-
 def Pylir_BoxOp : Pylir_Cast<"box", [NoSideEffect]> {
     let arguments = (ins AnyValueType:$input);
-    let results = (outs Pylir_Object:$result);
+    let results = (outs Pylir_KnownTypeObject:$result);
 
     let assemblyFormat = [{
         $input `:` type($input) `->` type($result) attr-dict
@@ -346,7 +336,7 @@ def Pylir_UnboxOp : Pylir_Cast<"unbox", [NoSideEffect]> {
 def Pylir_GCAllocOp : Pylir_Op<"gcAlloc">
 {
     let arguments = (ins Optional<Index>:$dynamicSize);
-    let results = (outs Res<AnyMemRef, "", [MemAlloc]>:$memref);
+    let results = (outs Res<NotUnknownObjectMemRef, "MemRef to allocated object", [MemAlloc]>:$memref);
 
     let hasFolder = 0;
 

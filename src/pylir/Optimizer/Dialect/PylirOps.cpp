@@ -3,6 +3,8 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/OpImplementation.h>
 
+#include <llvm/ADT/TypeSwitch.h>
+
 #include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 #include <pylir/Support/Macros.hpp>
 
@@ -11,6 +13,45 @@
 mlir::OpFoldResult pylir::Dialect::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
     return value();
+}
+
+mlir::LogicalResult pylir::Dialect::ConstantOp::inferReturnTypes(
+    ::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location> loc, ::mlir::ValueRange operands,
+    ::mlir::DictionaryAttr attributes, ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    ConstantOp::Adaptor adaptor(operands, attributes);
+    return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(adaptor.value())
+        .Case(
+            [&](Dialect::IntegerAttr)
+            {
+                inferredReturnTypes.push_back(Dialect::IntegerType::get(context));
+                return mlir::success();
+            })
+        .Case(
+            [&](mlir::StringAttr)
+            {
+                inferredReturnTypes.push_back(Dialect::StringType::get(context));
+                return mlir::success();
+            })
+        .Case(
+            [&](mlir::ArrayAttr)
+            {
+                inferredReturnTypes.push_back(Dialect::ListType::get(context));
+                return mlir::success();
+            })
+        .Case(
+            [&](Dialect::DictAttr)
+            {
+                inferredReturnTypes.push_back(Dialect::DictType::get(context));
+                return mlir::success();
+            })
+        .Case(
+            [&](Dialect::SetAttr)
+            {
+                inferredReturnTypes.push_back(Dialect::SetType::get(context));
+                return mlir::success();
+            })
+        .Default([&](mlir::Attribute attr) { return mlir::emitOptionalError(loc, "Invalid attribute ", attr); });
 }
 
 mlir::OpFoldResult pylir::Dialect::IAddOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -310,6 +351,28 @@ mlir::OpFoldResult pylir::Dialect::ItoFOp::fold(::llvm::ArrayRef<::mlir::Attribu
         return mlir::FloatAttr::get(mlir::Float64Type::get(getContext()), input.getValue().roundToDouble());
     }
     return nullptr;
+}
+
+mlir::LogicalResult pylir::Dialect::ItoIndexOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                     ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    PYLIR_ASSERT(operands.size() == 1);
+    auto integerAttr = operands[0].dyn_cast_or_null<Dialect::IntegerAttr>();
+    if (!integerAttr)
+    {
+        return mlir::failure();
+    }
+    // TODO use Datalayout, assuming 64 bit for now
+    const std::size_t indexSize = 64;
+    if (integerAttr.getValue().sge(llvm::APInt::getMaxValue(indexSize)) || integerAttr.getValue().isNegative())
+    {
+        results.emplace_back(nullptr);
+        results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+        return mlir::success();
+    }
+    results.emplace_back(mlir::IntegerAttr::get(mlir::IndexType::get(getContext()), integerAttr.getValue()));
+    results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+    return mlir::success();
 }
 
 bool pylir::Dialect::ItoFOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)

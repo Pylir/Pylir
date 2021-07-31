@@ -54,7 +54,7 @@ void pylir::Dialect::PylirDialect::initialize()
     addAttributes<
 #define GET_ATTRDEF_LIST
 #include "pylir/Optimizer/Dialect/PylirOpsAttributes.cpp.inc"
-        , SetAttr, DictAttr>();
+        >();
 }
 
 mlir::Type pylir::Dialect::PylirDialect::parseType(::mlir::DialectAsmParser& parser) const
@@ -96,7 +96,16 @@ void pylir::Dialect::PylirDialect::printAttribute(::mlir::Attribute attr, ::mlir
 mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
                                                                    ::mlir::Type type, ::mlir::Location loc)
 {
+    if (type.getDialect().getTypeID() != getTypeID() && type.getDialect().getTypeID() == value.getDialect().getTypeID())
+    {
+        return type.getDialect().materializeConstant(builder, value, type, loc);
+    }
     return builder.create<ConstantOp>(loc, type, value);
+}
+
+mlir::FlatSymbolRefAttr pylir::Dialect::ObjectType::getType() const
+{
+    return getImpl()->type;
 }
 
 void pylir::Dialect::ObjectType::setKnownType(mlir::FlatSymbolRefAttr type)
@@ -112,13 +121,6 @@ void pylir::Dialect::ObjectType::clearType()
     PYLIR_ASSERT(mlir::succeeded(result));
 }
 
-pylir::Dialect::DictAttr
-    pylir::Dialect::DictAttr::getAlreadySorted(mlir::MLIRContext* context,
-                                               llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
-{
-    return Base::get(context, value);
-}
-
 void pylir::Dialect::ObjectType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                           llvm::function_ref<void(mlir::Type)>) const
 {
@@ -126,6 +128,13 @@ void pylir::Dialect::ObjectType::walkImmediateSubElements(llvm::function_ref<voi
     {
         walkAttrsFn(getType());
     }
+}
+
+pylir::Dialect::DictAttr
+    pylir::Dialect::DictAttr::getAlreadySorted(mlir::MLIRContext* context,
+                                               llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
+{
+    return Base::get(context, value);
 }
 
 void pylir::Dialect::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -144,3 +153,5 @@ void pylir::Dialect::DictAttr::walkImmediateSubElements(llvm::function_ref<void(
                       walkAttrsFn(pair.second);
                   });
 }
+
+#include <pylir/Optimizer/Dialect/PylirOpsDialect.cpp.inc>

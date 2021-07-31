@@ -32,13 +32,13 @@ def Pylir_SetAttr : Pylir_Attr<"Set", [DeclareAttrInterfaceMethods<SubElementAtt
     let parameters = (ins ArrayRefParameter<"mlir::Attribute", "">:$value);
 
     let printer = [{
-        $_printer << getMnemonic() << '{';
+        $_printer << getMnemonic() << "<{";
         llvm::interleaveComma(getValue(), $_printer);
-        $_printer << '}';
+        $_printer << "}>";
     }];
 
     let parser = [{
-        if ($_parser.parseLBrace())
+        if ($_parser.parseLess() || $_parser.parseLBrace())
         {
             return {};
         }
@@ -60,7 +60,7 @@ def Pylir_SetAttr : Pylir_Attr<"Set", [DeclareAttrInterfaceMethods<SubElementAtt
             }
             attributes.insert(attribute);
         }
-        if ($_parser.parseRBrace())
+        if ($_parser.parseRBrace() || $_parser.parseGreater())
         {
             return {};
         }
@@ -83,13 +83,13 @@ def Pylir_DictAttr : Pylir_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementA
     let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>", "">:$value);
 
     let printer = [{
-        $_printer << getMnemonic() << '{';
+        $_printer << getMnemonic() << "<{";
         llvm::interleaveComma(getValue(), $_printer, [&](const auto& pair) { $_printer << pair.first << ':' << pair.second; });
-        $_printer << '}';
+        $_printer << "}>";
     }];
 
     let parser = [{
-        if ($_parser.parseLBrace())
+        if ($_parser.parseLess() || $_parser.parseLBrace())
         {
             return {};
         }
@@ -118,7 +118,7 @@ def Pylir_DictAttr : Pylir_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementA
                 values.emplace_back(key,value);
             }
         }
-        if ($_parser.parseRBrace())
+        if ($_parser.parseRBrace() || $_parser.parseGreater())
         {
             return {};
         }
