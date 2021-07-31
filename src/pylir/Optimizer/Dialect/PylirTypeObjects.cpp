@@ -1,5 +1,6 @@
 #include "PylirTypeObjects.hpp"
 
+#include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
 #include <pylir/Support/Macros.hpp>
@@ -91,27 +92,34 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(mlir::ModuleO
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
             dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__mul__"),
-                genFunction(module,
-                            pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
-                                                                                   TypeSlotPredicate::Multiply)
-                                .cast<mlir::FunctionType>(),
-                            "pylir_long_type__mul__",
-                            [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
-                            {
-                                auto lhs = funcOp.getArgument(0);
-                                auto rhs = funcOp.getArgument(1);
-                                // TODO type check
-                                auto lhsValue = builder.create<Dialect::UnboxOp>(
-                                    builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(), lhs);
-                                auto rhsValue = builder.create<Dialect::UnboxOp>(
-                                    builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(), rhs);
-                                auto result =
-                                    builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), lhsValue, rhsValue);
-                                builder.create<mlir::ReturnOp>(
-                                    builder.getUnknownLoc(),
-                                    mlir::ValueRange{builder.create<Dialect::BoxOp>(
-                                        builder.getUnknownLoc(), builder.getType<ObjectType>(), result)});
-                            }));
+                genFunction(
+                    module,
+                    pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
+                                                                           TypeSlotPredicate::Multiply)
+                        .cast<mlir::FunctionType>(),
+                    "pylir_long_type__mul__",
+                    [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
+                    {
+                        auto lhs = funcOp.getArgument(0);
+                        auto rhs = funcOp.getArgument(1);
+                        // TODO type check
+                        auto lhsValue = builder.create<Dialect::UnboxOp>(builder.getUnknownLoc(),
+                                                                         builder.getType<Dialect::IntegerType>(), lhs);
+                        auto rhsValue = builder.create<Dialect::UnboxOp>(builder.getUnknownLoc(),
+                                                                         builder.getType<Dialect::IntegerType>(), rhs);
+                        auto result = builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), lhsValue, rhsValue);
+                        auto box = builder.create<Dialect::BoxOp>(builder.getUnknownLoc(),
+                                                                  ObjectType::get(getLongTypeObject(module)), result);
+                        auto gcAlloc = builder.create<Dialect::GCAllocOp>(
+                            builder.getUnknownLoc(),
+                            mlir::MemRefType::get({}, ObjectType::get(getLongTypeObject(module))), mlir::Value{});
+                        builder.create<mlir::memref::StoreOp>(builder.getUnknownLoc(), box, gcAlloc);
+                        builder.create<mlir::ReturnOp>(
+                            builder.getUnknownLoc(),
+                            mlir::ValueRange{builder.create<Dialect::ReinterpretOp>(
+                                builder.getUnknownLoc(), mlir::MemRefType::get({}, builder.getType<ObjectType>()),
+                                gcAlloc)});
+                    }));
             return dict;
         });
 }

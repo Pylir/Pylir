@@ -594,6 +594,22 @@ mlir::OpFoldResult pylir::Dialect::GetStringItemOp::fold(::llvm::ArrayRef<::mlir
     return mlir::StringAttr::get(getContext(), llvm::Twine{string.getValue()[index.getValue().getZExtValue()]});
 }
 
+bool pylir::Dialect::ReinterpretOp::areCastCompatible(::mlir::TypeRange inputs, ::mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 || outputs.size() != 1)
+    {
+        return false;
+    }
+    auto inputRef = inputs[0].dyn_cast_or_null<mlir::MemRefType>();
+    auto resultRef = outputs[0].dyn_cast_or_null<mlir::MemRefType>();
+    if (!inputRef || !resultRef)
+    {
+        return false;
+    }
+    return inputRef.getElementType().isa<Dialect::ObjectType>()
+           && resultRef.getElementType().isa<Dialect::ObjectType>();
+}
+
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
 
 // TODO: Remove in MLIR 14

@@ -15,32 +15,6 @@
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/Dialect/PylirOpsAttributes.cpp.inc"
 
-namespace pylir::Dialect::detail
-{
-struct ObjectTypeStorage : public mlir::TypeStorage
-{
-    using KeyTy = std::tuple<>;
-
-    mlir::FlatSymbolRefAttr type;
-
-    bool operator==(const KeyTy&) const
-    {
-        return true;
-    }
-
-    static ObjectTypeStorage* construct(mlir::TypeStorageAllocator& allocator, const KeyTy&)
-    {
-        return new (allocator.allocate<ObjectTypeStorage>()) ObjectTypeStorage();
-    }
-
-    mlir::LogicalResult mutate(mlir::TypeStorageAllocator&, mlir::FlatSymbolRefAttr newType)
-    {
-        type = newType;
-        return mlir::success();
-    }
-};
-} // namespace pylir::Dialect::detail
-
 void pylir::Dialect::PylirDialect::initialize()
 {
     addOperations<
@@ -101,24 +75,6 @@ mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBui
         return type.getDialect().materializeConstant(builder, value, type, loc);
     }
     return builder.create<ConstantOp>(loc, type, value);
-}
-
-mlir::FlatSymbolRefAttr pylir::Dialect::ObjectType::getType() const
-{
-    return getImpl()->type;
-}
-
-void pylir::Dialect::ObjectType::setKnownType(mlir::FlatSymbolRefAttr type)
-{
-    PYLIR_ASSERT(type);
-    auto result = Base::mutate(type);
-    PYLIR_ASSERT(mlir::succeeded(result));
-}
-
-void pylir::Dialect::ObjectType::clearType()
-{
-    auto result = Base::mutate(mlir::FlatSymbolRefAttr{});
-    PYLIR_ASSERT(mlir::succeeded(result));
 }
 
 void pylir::Dialect::ObjectType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,

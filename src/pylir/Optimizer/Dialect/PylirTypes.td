@@ -68,12 +68,10 @@ def Pylir_Object : Pylir_Type<"Object",
 
     let builders = [
             TypeBuilder<(ins ), [{
-                  return Base::get($_ctxt);
+                  return Base::get($_ctxt, mlir::FlatSymbolRefAttr{});
                 }]>,
             TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$type), [{
-              auto ret = Base::get(type.getContext());
-              ret.setKnownType(type);
-              return ret;
+              return Base::get(type.getContext(), type);
             }]>,
             TypeBuilderWithInferredContext<(ins "::mlir::SymbolOpInterface":$symbol), [{
               return get(mlir::FlatSymbolRefAttr::get(symbol.getContext(), symbol.getName()));
@@ -81,13 +79,6 @@ def Pylir_Object : Pylir_Type<"Object",
           ];
 
     let skipDefaultBuilders = 1;
-    let genStorageClass = 0;
-
-    let extraClassDeclaration = [{
-        void setKnownType(mlir::FlatSymbolRefAttr type);
-
-        void clearType();
-    }];
 
     let summary = "python object";
 }

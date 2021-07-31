@@ -388,4 +388,11 @@ def Pylir_GetListItemOp : Pylir_Op<"getListItem", [NoSideEffect]> {
     let hasFolder = 0;
 }
 
+def Pylir_ReinterpretOp : Pylir_Cast<"reinterpret"> {
+    let arguments = (ins ScalarMemRef<Pylir_Object>:$input);
+    let results = (outs ScalarMemRef<Pylir_Object>:$result);
+
+    let hasFolder = 0;
+}
+
 #endif
