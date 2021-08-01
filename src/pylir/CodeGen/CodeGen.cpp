@@ -24,9 +24,6 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_module = mlir::ModuleOp::create(m_builder.getUnknownLoc());
-    Dialect::getTypeTypeObject(m_module);
-    Dialect::getFunctionTypeObject(m_module);
-    Dialect::getLongTypeObject(m_module);
     auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
                                                          mlir::FunctionType::get(m_builder.getContext(), {}, {}));
     m_module.push_back(initFunc);
@@ -101,7 +98,7 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
                     handle = m_builder.create<mlir::memref::GetGlobalOp>(location, m_refRefObject,
                                                                          m_builder.getSymbolRefAttr(global));
                 }
-                m_builder.create<mlir::memref::StoreOp>(location, value, handle);
+                m_builder.create<Dialect::StoreOp>(location, value, handle);
                 return;
             }
             if (m_scope.size() == 1)
@@ -118,12 +115,12 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
                 getCurrentScope().insert({identifierToken.getValue(), op});
                 auto handle =
                     m_builder.create<mlir::memref::GetGlobalOp>(location, op.type(), m_builder.getSymbolRefAttr(op));
-                m_builder.create<mlir::memref::StoreOp>(location, value, handle);
+                m_builder.create<Dialect::StoreOp>(location, value, handle);
                 return;
             }
 
             auto alloca = m_builder.create<mlir::memref::AllocaOp>(location, m_refRefObject);
-            m_builder.create<mlir::memref::StoreOp>(location, value, alloca);
+            m_builder.create<Dialect::StoreOp>(location, value, alloca);
             getCurrentScope().insert({identifierToken.getValue(), alloca});
         },
         [&](const Syntax::Target::Parenth& parenth)
@@ -522,7 +519,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                         location, Dialect::ObjectType::get(Dialect::getLongTypeObject(m_module)), constant);
                     auto gcAlloc = m_builder.create<Dialect::GCAllocOp>(
                         location, mlir::MemRefType::get({}, boxed.getType()), mlir::Value{});
-                    m_builder.create<mlir::memref::StoreOp>(location, boxed, gcAlloc);
+                    m_builder.create<Dialect::StoreOp>(location, boxed, gcAlloc);
                     return gcAlloc;
                 }
                 case TokenType::FloatingPointLiteral:
@@ -637,7 +634,7 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
         m_currentFunc.getCallableRegion()->push_back(foundBlock);
         m_builder.setInsertionPointToStart(foundBlock);
 
-        auto call = m_builder.create<mlir::CallIndirectOp>(loc, func, mlir::ValueRange{lhs, rhs}).getResult(0);
+        auto call = m_builder.create<Dialect::CallIndirectOp>(loc, func, mlir::ValueRange{lhs, rhs}).getResult(0);
         auto notImplementedConstant =
             m_builder.create<Dialect::DataOfOp>(loc, Dialect::getNotImplementedObject(m_module));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
@@ -646,7 +643,7 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
         auto continueBlock = mlir::OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
         m_builder.create<mlir::CondBranchOp>(loc, isNotImplemented, notFoundBlock, continueBlock);
         m_builder.setInsertionPointToStart(continueBlock);
-        m_builder.create<mlir::memref::StoreOp>(loc, call, result);
+        m_builder.create<Dialect::StoreOp>(loc, call, result);
         m_builder.create<mlir::BranchOp>(loc, endBlock);
     }
 

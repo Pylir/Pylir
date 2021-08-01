@@ -46,7 +46,7 @@ def Pylir_DataOfOp : Pylir_Op<"dataOf",[NoSideEffect, DeclareOpInterfaceMethods<
 
     let builders = [
         OpBuilder<(ins "pylir::Dialect::ConstantGlobalOp":$value),
-        [{ build($_builder, $_state, value.type(), value.sym_name()); }]>];
+        [{ build($_builder, $_state, ::mlir::MemRefType::get({}, value.type()), value.sym_name()); }]>];
 }
 
 def Pylir_ConstantOp : Pylir_Op<"constant",
@@ -425,6 +425,12 @@ def Pylir_CallIndirectOp : Pylir_Op<"call_indirect",[DeclareOpInterfaceMethods<C
 
     let verifier = ?;
     let hasFolder = 0;
+
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$callee, CArg<"mlir::ValueRange", "{}">:$operands), [{
+            return build($_builder, $_state, callee.getType().cast<mlir::FunctionType>().getResults(), callee, operands);
+        }]>
+    ];
 
     let assemblyFormat = "$callee `:` type($callee) `(` $operands `)` attr-dict `:` functional-type($operands, results)";
 }
