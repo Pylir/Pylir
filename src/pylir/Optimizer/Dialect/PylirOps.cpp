@@ -594,20 +594,30 @@ mlir::OpFoldResult pylir::Dialect::GetStringItemOp::fold(::llvm::ArrayRef<::mlir
     return mlir::StringAttr::get(getContext(), llvm::Twine{string.getValue()[index.getValue().getZExtValue()]});
 }
 
-bool pylir::Dialect::ReinterpretOp::areCastCompatible(::mlir::TypeRange inputs, ::mlir::TypeRange outputs)
+::mlir::CallInterfaceCallable pylir::Dialect::CallOp::getCallableForCallee()
 {
-    if (inputs.size() != 1 || outputs.size() != 1)
-    {
-        return false;
-    }
-    auto inputRef = inputs[0].dyn_cast_or_null<mlir::MemRefType>();
-    auto resultRef = outputs[0].dyn_cast_or_null<mlir::MemRefType>();
-    if (!inputRef || !resultRef)
-    {
-        return false;
-    }
-    return inputRef.getElementType().isa<Dialect::ObjectType>()
-           && resultRef.getElementType().isa<Dialect::ObjectType>();
+    return calleeAttr();
+}
+
+::mlir::Operation::operand_range pylir::Dialect::CallOp::getArgOperands()
+{
+    return operands();
+}
+
+::mlir::LogicalResult pylir::Dialect::CallOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    auto func = symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(this->getOperation(),calleeAttr());
+    return mlir::success(func);
+}
+
+::mlir::CallInterfaceCallable pylir::Dialect::CallIndirectOp::getCallableForCallee()
+{
+    return callee();
+}
+
+::mlir::Operation::operand_range pylir::Dialect::CallIndirectOp::getArgOperands()
+{
+    return operands();
 }
 
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>

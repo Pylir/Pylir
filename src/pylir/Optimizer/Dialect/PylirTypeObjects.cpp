@@ -114,11 +114,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(mlir::ModuleO
                             builder.getUnknownLoc(),
                             mlir::MemRefType::get({}, ObjectType::get(getLongTypeObject(module))), mlir::Value{});
                         builder.create<mlir::memref::StoreOp>(builder.getUnknownLoc(), box, gcAlloc);
-                        builder.create<mlir::ReturnOp>(
-                            builder.getUnknownLoc(),
-                            mlir::ValueRange{builder.create<Dialect::ReinterpretOp>(
-                                builder.getUnknownLoc(), mlir::MemRefType::get({}, builder.getType<ObjectType>()),
-                                gcAlloc)});
+                        builder.create<Dialect::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{gcAlloc});
                     }));
             return dict;
         });

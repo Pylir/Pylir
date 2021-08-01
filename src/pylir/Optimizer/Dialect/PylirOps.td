@@ -7,6 +7,7 @@ include "pylir/Optimizer/Dialect/PylirAttributes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
@@ -156,7 +157,7 @@ def Pylir_BtoIOp : Pylir_Cast<"bToi"> {
 }
 
 def Pylir_MakeListOp : Pylir_Op<"makeList", [NoSideEffect]> {
-    let arguments = (ins Variadic<Pylir_Object>:$input);
+    let arguments = (ins Variadic<ScalarMemRef<Pylir_Object>>:$input);
     let results = (outs Pylir_List:$result);
 
     let assemblyFormat = [{
@@ -165,7 +166,7 @@ def Pylir_MakeListOp : Pylir_Op<"makeList", [NoSideEffect]> {
 }
 
 def Pylir_MakeTupleOp : Pylir_Op<"makeTuple", [NoSideEffect]> {
-    let arguments = (ins Variadic<Pylir_Object>:$input);
+    let arguments = (ins Variadic<ScalarMemRef<Pylir_Object>>:$input);
     let results = (outs Pylir_Tuple:$result);
 
     let assemblyFormat = [{
@@ -305,7 +306,7 @@ def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
 def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
     let hasFolder = 0;
 
-    let arguments = (ins Pylir_Object:$exception);
+    let arguments = (ins ScalarMemRef<Pylir_Object>:$exception);
     let results = (outs);
 
     let assemblyFormat = "$exception `:` type($exception) attr-dict";
@@ -323,7 +324,7 @@ def Pylir_BoxOp : Pylir_Cast<"box", [NoSideEffect]> {
 }
 
 def Pylir_UnboxOp : Pylir_Cast<"unbox", [NoSideEffect]> {
-    let arguments = (ins Pylir_Object:$input);
+    let arguments = (ins ScalarMemRef<Pylir_Object>:$input);
     let results = (outs AnyImmutableType:$result);
 
     let assemblyFormat = [{
@@ -388,9 +389,67 @@ def Pylir_GetListItemOp : Pylir_Op<"getListItem", [NoSideEffect]> {
     let hasFolder = 0;
 }
 
-def Pylir_ReinterpretOp : Pylir_Cast<"reinterpret"> {
-    let arguments = (ins ScalarMemRef<Pylir_Object>:$input);
-    let results = (outs ScalarMemRef<Pylir_Object>:$result);
+def Pylir_CallOp : Pylir_Op<"call",
+    [DeclareOpInterfaceMethods<CallOpInterface>,
+     MemRefsNormalizable, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+
+    let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$operands);
+    let results = (outs Variadic<AnyType>);
+
+    let summary = "call operation";
+    let description = [{
+        Same as std.call, but allows implicit conversion from pylir.object<*> to pylir.object.
+        In the future it'll almost certainly be used to allow exception handling
+    }];
+
+    let assemblyFormat = [{
+        $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
+    }];
+    let verifier = ?;
+
+    let hasFolder = 0;
+}
+
+def Pylir_CallIndirectOp : Pylir_Op<"call_indirect",[DeclareOpInterfaceMethods<CallOpInterface>,
+                                                 TypesMatchWith<"callee result types match result types",
+                                                 "callee", "results",
+                                                 "$_self.cast<FunctionType>().getResults()">]> {
+    let summary = "indirect call operation";
+    let description = [{
+        Same as std.call_indirect, but allows implicit conversion from pylir.object<*> to pylir.object.
+        In the future it'll almost certainly be used to allow exception handling
+    }];
+
+    let arguments = (ins FunctionType:$callee, Variadic<AnyType>:$operands);
+    let results = (outs Variadic<AnyType>:$results);
+
+    let verifier = ?;
+    let hasFolder = 0;
+
+    let assemblyFormat = "$callee `:` type($callee) `(` $operands `)` attr-dict `:` functional-type($operands, results)";
+}
+
+def Pylir_ReturnOp : Pylir_Op<"return",[NoSideEffect, HasParent<"::mlir::FuncOp">, MemRefsNormalizable,
+                                        ReturnLike, Terminator]> {
+    let summary = "return operation";
+    let description = "Same as std.return but allows implicit conversion from pylir.object<*> to pylir.boject";
+
+    let arguments = (ins Variadic<AnyType>:$operands);
+    let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+
+    let hasFolder = 0;
+}
+
+def Pylir_StoreOp : Pylir_Op<"store",[MemRefsNormalizable]> {
+    let summary = "store operation";
+    let description = "Same as memref.store but allows implicit conversion from pylir.object<*> to pylir.boject";
+
+    let arguments = (ins AnyType:$value,
+                         Arg<AnyMemRef, "the reference to store to",[MemWrite]>:$memref);
+
+    let assemblyFormat = [{
+        $value `:` type($value) `,` $memref attr-dict `:` type($memref)
+      }];
 
     let hasFolder = 0;
 }
