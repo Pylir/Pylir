@@ -1,4 +1,9 @@
 #include <mlir/Pass/PassManager.h>
+#include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
+#include <mlir/Target/LLVMIR/Export.h>
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/Optimizer/Conversion/PylirToLLVM.hpp>
@@ -53,5 +58,12 @@ int main(int argc, char** argv)
     mlir::PassManager manager(&context);
     manager.enableVerifier();
     manager.addPass(pylir::Dialect::createConvertPylirToLLVMPass());
-    return mlir::failed(manager.run(module));
+    if (mlir::failed(manager.run(module)))
+    {
+        return -1;
+    }
+    llvm::LLVMContext llvmContext;
+    mlir::registerLLVMDialectTranslation(context);
+    auto llvmModule = mlir::translateModuleToLLVMIR(module, llvmContext);
+    llvmModule->print(llvm::outs(), nullptr);
 }
