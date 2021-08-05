@@ -86,6 +86,12 @@ void pylir::Dialect::ObjectType::walkImmediateSubElements(llvm::function_ref<voi
     }
 }
 
+void pylir::Dialect::PointerType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)>,
+                                                           llvm::function_ref<void(mlir::Type)> walkTypeFn) const
+{
+    walkTypeFn(getElementType());
+}
+
 pylir::Dialect::DictAttr
     pylir::Dialect::DictAttr::getAlreadySorted(mlir::MLIRContext* context,
                                                llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)

@@ -18,7 +18,7 @@ class CodeGen
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
     std::vector<std::unordered_map<std::string_view, mlir::Operation*>> m_scope{1};
-    mlir::MemRefType m_refRefObject;
+    Dialect::PointerType m_refRefObject;
 
     std::unordered_map<std::string_view, mlir::Operation*>& getCurrentScope()
     {

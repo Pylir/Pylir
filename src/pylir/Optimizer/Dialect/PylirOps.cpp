@@ -474,7 +474,7 @@ mlir::LogicalResult pylir::Dialect::DataOfOp::verifySymbolUses(::mlir::SymbolTab
 mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRContext* context,
                                                                   TypeSlotPredicate predicate)
 {
-    auto ref = mlir::MemRefType::get({}, ObjectType::get(context));
+    auto ref = Dialect::PointerType::get(ObjectType::get(context));
     switch (predicate)
     {
         case TypeSlotPredicate::DictPtr: return mlir::IndexType::get(context);
@@ -538,7 +538,7 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::Repr:
         case TypeSlotPredicate::IterNext:
         case TypeSlotPredicate::Del: return mlir::FunctionType::get(context, {ref}, {ref});
-        case TypeSlotPredicate::Dict: return mlir::MemRefType::get({}, Dialect::DictType::get(context));
+        case TypeSlotPredicate::Dict: return Dialect::PointerType::get(Dialect::DictType::get(context));
         case TypeSlotPredicate::Bases: return Dialect::TupleType::get(context);
     }
     PYLIR_UNREACHABLE;
@@ -619,6 +619,43 @@ mlir::OpFoldResult pylir::Dialect::GetStringItemOp::fold(::llvm::ArrayRef<::mlir
 {
     return operands();
 }
+
+mlir::LogicalResult pylir::Dialect::GetGlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<pylir::Dialect::GlobalOp>(this->getOperation(), name()));
+}
+
+namespace
+{
+mlir::ParseResult parseGlobalInitialValue(mlir::OpAsmParser& parser, mlir::Attribute& initializer)
+{
+    if (parser.parseOptionalEqual())
+    {
+        return mlir::success();
+    }
+    if (parser.parseOptionalKeyword("uninitialized"))
+    {
+        initializer = mlir::UnitAttr::get(parser.getBuilder().getContext());
+        return mlir::success();
+    }
+    return parser.parseAttribute(initializer);
+}
+
+void printGlobalInitialValue(mlir::OpAsmPrinter& printer, pylir::Dialect::GlobalOp, mlir::Attribute initializer)
+{
+    if (!initializer)
+    {
+        return;
+    }
+    printer << "= ";
+    if (initializer.isa<mlir::UnitAttr>())
+    {
+        printer << "uninitialized";
+        return;
+    }
+    printer << initializer;
+}
+} // namespace
 
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
 

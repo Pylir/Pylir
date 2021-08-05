@@ -1,6 +1,5 @@
 #include "PylirTypeObjects.hpp"
 
-#include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
 #include <pylir/Support/Macros.hpp>
@@ -112,8 +111,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(mlir::ModuleO
                                                                   ObjectType::get(getLongTypeObject(module)), result);
                         auto gcAlloc = builder.create<Dialect::GCAllocOp>(
                             builder.getUnknownLoc(),
-                            mlir::MemRefType::get({}, ObjectType::get(getLongTypeObject(module))), mlir::Value{});
-                        builder.create<mlir::memref::StoreOp>(builder.getUnknownLoc(), box, gcAlloc);
+                            Dialect::PointerType::get(ObjectType::get(getLongTypeObject(module))), mlir::Value{});
+                        builder.create<pylir::Dialect::StoreOp>(builder.getUnknownLoc(), box, gcAlloc);
                         builder.create<Dialect::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{gcAlloc});
                     }));
             return dict;
@@ -174,8 +173,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::M
 
 mlir::FunctionType pylir::Dialect::getCCFuncType(mlir::MLIRContext* context)
 {
-    auto ref = mlir::MemRefType::get({}, ObjectType::get(context));
+    auto ref = Dialect::PointerType::get(ObjectType::get(context));
     return mlir::FunctionType::get(
-        context, {ref, Dialect::TupleType::get(context), mlir::MemRefType::get({}, Dialect::DictType::get(context))},
+        context, {ref, Dialect::TupleType::get(context), Dialect::PointerType::get(Dialect::DictType::get(context))},
         {ref});
 }

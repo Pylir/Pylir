@@ -10,4 +10,4 @@ add_mlir_conversion_library(PylirToLLVM
         DEPENDS
         PylirConversionPassIncGen
 
-        LINK_LIBS PUBLIC PylirDialect MLIRLLVMIR MLIRPass MLIRTransforms MLIRStandardToLLVM MLIRMemRefToLLVM)
+        LINK_LIBS PUBLIC PylirDialect MLIRLLVMIR MLIRPass MLIRTransforms MLIRStandardToLLVM)

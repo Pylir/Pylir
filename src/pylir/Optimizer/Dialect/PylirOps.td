@@ -12,12 +12,9 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
 class Pylir_Op<string mneomic, list<OpTrait> traits = []> :
-    Op<Pylir_Dialect, mneomic, traits> {
-    let hasFolder = 1;
-}
+    Op<Pylir_Dialect, mneomic, traits>;
 
 def Pylir_ConstantGlobalOp : Pylir_Op<"constantGlobal", [Symbol, NoSideEffect]> {
-    let hasFolder = 0;
 
     let arguments = (ins
         SymbolNameAttr:$sym_name,
@@ -36,9 +33,7 @@ def Pylir_ConstantGlobalOp : Pylir_Op<"constantGlobal", [Symbol, NoSideEffect]> 
 
 def Pylir_DataOfOp : Pylir_Op<"dataOf",[NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$globalName);
-    let results = (outs ScalarMemRef<Pylir_Object>:$data);
-
-    let hasFolder = 0;
+    let results = (outs PointerOf<Pylir_Object>:$data);
 
     let assemblyFormat = [{
         $globalName `->` type($data) attr-dict
@@ -46,7 +41,7 @@ def Pylir_DataOfOp : Pylir_Op<"dataOf",[NoSideEffect, DeclareOpInterfaceMethods<
 
     let builders = [
         OpBuilder<(ins "pylir::Dialect::ConstantGlobalOp":$value),
-        [{ build($_builder, $_state, ::mlir::MemRefType::get({}, value.type()), value.sym_name()); }]>];
+        [{ build($_builder, $_state, ::pylir::Dialect::PointerType::get(value.type()), value.sym_name()); }]>];
 }
 
 def Pylir_ConstantOp : Pylir_Op<"constant",
@@ -57,6 +52,8 @@ def Pylir_ConstantOp : Pylir_Op<"constant",
     let assemblyFormat = [{
             $value `->` type($result) attr-dict
         }];
+
+    let hasFolder = 1;
 }
 
 class Pylir_BinOp<string name, list<OpTrait> traits = []> : Pylir_Op<name,traits> {
@@ -66,6 +63,8 @@ class Pylir_BinOp<string name, list<OpTrait> traits = []> : Pylir_Op<name,traits
     let assemblyFormat = [{
           $lhs `:` type($lhs) `,` $rhs `:` type($rhs) `->` type($result) attr-dict
         }];
+
+    let hasFolder = 1;
 }
 
 class Pylir_IBinOp<string name, list<OpTrait> traits = []>
@@ -96,6 +95,8 @@ def Pylir_INegOp : Pylir_Op<"ineg",[SameOperandsAndResultType, Involution]> {
     let assemblyFormat = [{
         $input `:` type($input) `->` type($result) attr-dict
     }];
+
+    let hasFolder = 1;
 }
 
 def Pylir_IShlOp : Pylir_IBinOp<"ishl">;
@@ -121,7 +122,7 @@ def Pylir_CmpPredicateAttr : I32EnumAttr<"CmpPredicate","",[
     let cppNamespace = "::pylir::Dialect";
 }
 
-def Pylir_ICmpOp : Pylir_Op<"icmp",[SameTypeOperands, NoSideEffect]> {
+def Pylir_ICmpOp : Pylir_Op<"icmp", [SameTypeOperands, NoSideEffect]> {
     let arguments = (ins Pylir_CmpPredicateAttr:$predicate, Pylir_Integer:$lhs, Pylir_Integer:$rhs);
     let results = (outs Pylir_Bool:$result);
 
@@ -140,6 +141,8 @@ class Pylir_Cast<string name, list<OpTrait> traits = []>
 def Pylir_ItoFOp : Pylir_Cast<"iTof"> {
     let arguments = (ins Pylir_Integer:$input);
     let results = (outs Pylir_Float:$result);
+
+    let hasFolder = 1;
 }
 
 def Pylir_ItoIndexOp : Pylir_Op<"iToIndex", [NoSideEffect]> {
@@ -149,50 +152,60 @@ def Pylir_ItoIndexOp : Pylir_Op<"iToIndex", [NoSideEffect]> {
     let assemblyFormat = [{
               $input attr-dict
     }];
+
+    let hasFolder = 1;
 }
 
 def Pylir_BtoIOp : Pylir_Cast<"bToi"> {
     let arguments = (ins Pylir_Bool:$input);
     let results = (outs Pylir_Integer:$result);
+
+    let hasFolder = 1;
 }
 
 def Pylir_MakeListOp : Pylir_Op<"makeList", [NoSideEffect]> {
-    let arguments = (ins Variadic<ScalarMemRef<Pylir_Object>>:$input);
+    let arguments = (ins Variadic<PointerOf<Pylir_Object>>:$input);
     let results = (outs Pylir_List:$result);
 
     let assemblyFormat = [{
               $input `:` type($input) `->` type($result) attr-dict
             }];
+
+    let hasFolder = 1;
 }
 
 def Pylir_MakeTupleOp : Pylir_Op<"makeTuple", [NoSideEffect]> {
-    let arguments = (ins Variadic<ScalarMemRef<Pylir_Object>>:$input);
+    let arguments = (ins Variadic<PointerOf<Pylir_Object>>:$input);
     let results = (outs Pylir_Tuple:$result);
 
     let assemblyFormat = [{
               $input `:` type($input) `->` type($result) attr-dict
             }];
+
+    let hasFolder = 1;
 }
 
 def Pylir_TupleToListOp : Pylir_Cast<"tupleToList", [NoSideEffect]> {
     let arguments = (ins Pylir_Tuple:$input);
     let results = (outs Pylir_List:$result);
+
+    let hasFolder = 1;
 }
 
 def Pylir_ListToTupleOp : Pylir_Cast<"listToTuple", [NoSideEffect]> {
     let arguments = (ins Pylir_List:$input);
     let results = (outs Pylir_Tuple:$result);
+
+    let hasFolder = 1;
 }
 
 def Pylir_TypeOfOp : Pylir_Op<"typeOf", [NoSideEffect]> {
     let arguments = (ins Pylir_Object:$input);
-    let results = (outs ScalarMemRef<Pylir_TypeObject>:$result);
+    let results = (outs PointerOf<Pylir_TypeObject>:$result);
 
     let assemblyFormat = [{
                   $input `:` type($input) `->` type($result) attr-dict
                 }];
-
-    let hasFolder = 0;
 }
 
 def Pylir_TypeSlot_DictPtr : I32EnumAttrCase<"DictPtr", 1, "__dictoffset__">;
@@ -285,28 +298,22 @@ def Pylir_GetTypeSlotOp : Pylir_Op<"getTypeSlot", [DeclareOpInterfaceMethods<Inf
 
     let assemblyFormat = "$predicate `from` $input `:` type($input) `->` type($result) attr-dict";
 
-    let hasFolder = 0;
-
     let extraClassDeclaration = [{
         static mlir::Type returnTypeFromPredicate(mlir::MLIRContext* context,TypeSlotPredicate predicate);
     }];
 }
 
 def Pylir_IdOp : Pylir_Op<"id", [NoSideEffect]> {
-    let arguments = (ins ScalarMemRef<Pylir_Object>:$input);
+    let arguments = (ins PointerOf<Pylir_Object>:$input);
     let results = (outs Index:$result);
 
     let assemblyFormat = [{
                       $input `:` type($input) attr-dict
                     }];
-
-    let hasFolder = 0;
 }
 
 def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
-    let hasFolder = 0;
-
-    let arguments = (ins ScalarMemRef<Pylir_Object>:$exception);
+    let arguments = (ins PointerOf<Pylir_Object>:$exception);
     let results = (outs);
 
     let assemblyFormat = "$exception `:` type($exception) attr-dict";
@@ -319,39 +326,37 @@ def Pylir_BoxOp : Pylir_Cast<"box", [NoSideEffect]> {
     let assemblyFormat = [{
         $input `:` type($input) `->` type($result) attr-dict
     }];
-
-    let hasFolder = 0;
 }
 
 def Pylir_UnboxOp : Pylir_Cast<"unbox", [NoSideEffect]> {
-    let arguments = (ins ScalarMemRef<Pylir_Object>:$input);
+    let arguments = (ins PointerOf<Pylir_Object>:$input);
     let results = (outs AnyImmutableType:$result);
 
     let assemblyFormat = [{
         $input `:` type($input) `->` type($result) attr-dict
     }];
-
-    let hasFolder = 0;
 }
 
 def Pylir_GCAllocOp : Pylir_Op<"gcAlloc">
 {
     let arguments = (ins Optional<Index>:$dynamicSize);
-    let results = (outs Res<NotUnknownObjectMemRef, "MemRef to allocated object", [MemAlloc]>:$memref);
-
-    let hasFolder = 0;
+    let results = (outs Res<NotUnknownObjectPointer, "Pointer to allocated object", [MemAlloc]>:$pointer);
 
     let assemblyFormat = [{
-        type($memref) (`[` $dynamicSize^ `]`)? attr-dict
+        type($pointer) (`[` $dynamicSize^ `]`)? attr-dict
     }];
+
+    let builders = [
+                OpBuilder<(ins "mlir::Type":$pointer),[{
+                    return build($_builder,$_state, pointer, {});
+                }]>
+            ];
 }
 
 def Pylir_GetRefOp : Pylir_Op<"getRef", [NoSideEffect]>
 {
-    let arguments = (ins ScalarMemRef<Pylir_Object>:$input);
-    let results = (outs ScalarMemRef<AnyMutableType>:$result);
-
-    let hasFolder = 0;
+    let arguments = (ins PointerOf<Pylir_Object>:$input);
+    let results = (outs PointerOf<AnyMutableType>:$result);
 
     let assemblyFormat = [{
             $input `:` type($input) `->` type($result) attr-dict
@@ -360,13 +365,11 @@ def Pylir_GetRefOp : Pylir_Op<"getRef", [NoSideEffect]>
 
 def Pylir_GetTupleItemOp : Pylir_Op<"getTupleItem", [NoSideEffect]> {
     let arguments = (ins Pylir_Tuple:$tuple, Index:$index);
-    let results = (outs ScalarMemRef<Pylir_Object>:$result);
+    let results = (outs PointerOf<Pylir_Object>:$result);
 
     let assemblyFormat = [{
         $tuple `[` $index `]` `->` type($result) attr-dict
     }];
-
-    let hasFolder = 0;
 }
 
 def Pylir_GetStringItemOp : Pylir_Op<"getStringItem", [NoSideEffect]> {
@@ -376,22 +379,22 @@ def Pylir_GetStringItemOp : Pylir_Op<"getStringItem", [NoSideEffect]> {
     let assemblyFormat = [{
         $string `[` $index `]` attr-dict
     }];
+
+    let hasFolder = 1;
 }
 
 def Pylir_GetListItemOp : Pylir_Op<"getListItem", [NoSideEffect]> {
-    let arguments = (ins ScalarMemRef<Pylir_List>:$list, Index:$index);
-    let results = (outs ScalarMemRef<Pylir_Object>:$result);
+    let arguments = (ins PointerOf<Pylir_List>:$list, Index:$index);
+    let results = (outs PointerOf<Pylir_Object>:$result);
 
     let assemblyFormat = [{
         $list `[` $index `]` `->` type($result) attr-dict
     }];
-
-    let hasFolder = 0;
 }
 
 def Pylir_CallOp : Pylir_Op<"call",
     [DeclareOpInterfaceMethods<CallOpInterface>,
-     MemRefsNormalizable, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+     DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
 
     let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$operands);
     let results = (outs Variadic<AnyType>);
@@ -406,8 +409,6 @@ def Pylir_CallOp : Pylir_Op<"call",
         $callee `(` $operands `)` attr-dict `:` functional-type($operands, results)
     }];
     let verifier = ?;
-
-    let hasFolder = 0;
 }
 
 def Pylir_CallIndirectOp : Pylir_Op<"call_indirect",[DeclareOpInterfaceMethods<CallOpInterface>,
@@ -424,7 +425,6 @@ def Pylir_CallIndirectOp : Pylir_Op<"call_indirect",[DeclareOpInterfaceMethods<C
     let results = (outs Variadic<AnyType>:$results);
 
     let verifier = ?;
-    let hasFolder = 0;
 
     let builders = [
         OpBuilder<(ins "mlir::Value":$callee, CArg<"mlir::ValueRange", "{}">:$operands), [{
@@ -435,29 +435,75 @@ def Pylir_CallIndirectOp : Pylir_Op<"call_indirect",[DeclareOpInterfaceMethods<C
     let assemblyFormat = "$callee `:` type($callee) `(` $operands `)` attr-dict `:` functional-type($operands, results)";
 }
 
-def Pylir_ReturnOp : Pylir_Op<"return",[NoSideEffect, HasParent<"::mlir::FuncOp">, MemRefsNormalizable,
+def Pylir_ReturnOp : Pylir_Op<"return",[NoSideEffect, HasParent<"::mlir::FuncOp">,
                                         ReturnLike, Terminator]> {
     let summary = "return operation";
     let description = "Same as std.return but allows implicit conversion from pylir.object<*> to pylir.boject";
 
     let arguments = (ins Variadic<AnyType>:$operands);
     let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
-
-    let hasFolder = 0;
 }
 
-def Pylir_StoreOp : Pylir_Op<"store",[MemRefsNormalizable]> {
+def Pylir_StoreOp : Pylir_Op<"store"> {
     let summary = "store operation";
     let description = "Same as memref.store but allows implicit conversion from pylir.object<*> to pylir.boject";
 
     let arguments = (ins AnyType:$value,
-                         Arg<AnyMemRef, "the reference to store to",[MemWrite]>:$memref);
+                         Arg<AnyPointer, "the pointer to store to",[MemWrite]>:$pointer);
 
     let assemblyFormat = [{
-        $value `:` type($value) `,` $memref attr-dict `:` type($memref)
+        $value `:` type($value) `,` $pointer attr-dict `:` type($pointer)
       }];
+}
 
-    let hasFolder = 0;
+def Pylir_LoadOp : Pylir_Op<"load", [TypesMatchWith<"result type matches element type of 'pointer'",
+                                                    "pointer", "result",
+                                                    "$_self.cast<pylir::Dialect::PointerType>().getElementType()">]> {
+    let summary = "load operation";
+
+    let arguments = (ins Arg<AnyPointer, "the pointer to load from",
+                               [MemRead]>:$pointer);
+    let results = (outs AnyType:$result);
+
+    let assemblyFormat = "$pointer attr-dict `:` type($pointer)";
+
+    let builders = [
+        OpBuilder<(ins "mlir::Value":$pointer),[{
+            return build($_builder,$_state, pointer.getType().cast<pylir::Dialect::PointerType>().getElementType(), pointer);
+        }]>
+    ];
+}
+
+def Pylir_AllocaOp : Pylir_Op<"alloca"> {
+    let arguments = (ins Optional<Index>:$dynamicSize);
+    let results = (outs Res<AnyPointer, "the allocated memory", [MemAlloc<AutomaticAllocationScopeResource>]>:$pointer);
+
+    let assemblyFormat = "(`[` $dynamicSize^ `]`)? attr-dict `:` type($pointer)";
+
+    let builders = [
+            OpBuilder<(ins "mlir::Type":$pointer),[{
+                return build($_builder,$_state, pointer, {});
+            }]>
+        ];
+}
+
+def Pylir_GlobalOp : Pylir_Op<"global", [Symbol]> {
+    let arguments = (ins
+        SymbolNameAttr:$sym_name,
+        OptionalAttr<StrAttr>:$sym_visibility,
+        TypeAttr:$type,
+        OptionalAttr<AnyAttr>:$initial_value);
+
+    let assemblyFormat = [{
+           ($sym_visibility^)? $sym_name `:` $type custom<GlobalInitialValue>($initial_value) attr-dict
+      }];
+}
+
+def Pylir_GetGlobalOp : Pylir_Op<"get_global", [NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let arguments = (ins FlatSymbolRefAttr:$name);
+    let results = (outs AnyPointer:$result);
+
+    let assemblyFormat = "$name `:` type($result) attr-dict";
 }
 
 #endif

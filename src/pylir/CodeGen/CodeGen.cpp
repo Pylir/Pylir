@@ -1,6 +1,5 @@
 #include "CodeGen.hpp"
 
-#include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
 #include <pylir/Optimizer/Dialect/PylirAttributes.hpp>
@@ -13,11 +12,10 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
         {
             context->loadDialect<pylir::Dialect::PylirDialect>();
             context->loadDialect<mlir::StandardOpsDialect>();
-            context->loadDialect<mlir::memref::MemRefDialect>();
             return context;
         }()),
       m_document(&document),
-      m_refRefObject(mlir::MemRefType::get({}, mlir::MemRefType::get({}, m_builder.getType<Dialect::ObjectType>())))
+      m_refRefObject(Dialect::PointerType::get(Dialect::PointerType::get(m_builder.getType<Dialect::ObjectType>())))
 {
 }
 
@@ -88,15 +86,15 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
             if (result != getCurrentScope().end())
             {
                 mlir::Value handle;
-                if (auto alloca = llvm::dyn_cast<mlir::memref::AllocaOp>(result->second))
+                if (auto alloca = llvm::dyn_cast<Dialect::AllocaOp>(result->second))
                 {
                     handle = alloca;
                 }
                 else
                 {
-                    auto global = llvm::cast<mlir::memref::GlobalOp>(result->second);
-                    handle = m_builder.create<mlir::memref::GetGlobalOp>(location, m_refRefObject,
-                                                                         m_builder.getSymbolRefAttr(global));
+                    auto global = llvm::cast<Dialect::GlobalOp>(result->second);
+                    handle = m_builder.create<Dialect::GetGlobalOp>(location, m_refRefObject,
+                                                                    m_builder.getSymbolRefAttr(global));
                 }
                 m_builder.create<Dialect::StoreOp>(location, value, handle);
                 return;
@@ -104,22 +102,21 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
             if (m_scope.size() == 1)
             {
                 // We are in the global scope
-                mlir::memref::GlobalOp op;
+                Dialect::GlobalOp op;
                 {
                     mlir::OpBuilder::InsertionGuard guard{m_builder};
                     m_builder.setInsertionPointToEnd(m_module.getBody());
-                    op = m_builder.create<mlir::memref::GlobalOp>(location, identifierToken.getValue(),
-                                                                  mlir::StringAttr{}, m_refRefObject,
-                                                                  m_builder.getUnitAttr(), false);
+                    op = m_builder.create<Dialect::GlobalOp>(location, identifierToken.getValue(), mlir::StringAttr{},
+                                                             m_refRefObject.getElementType(), m_builder.getUnitAttr());
                 }
                 getCurrentScope().insert({identifierToken.getValue(), op});
                 auto handle =
-                    m_builder.create<mlir::memref::GetGlobalOp>(location, op.type(), m_builder.getSymbolRefAttr(op));
+                    m_builder.create<Dialect::GetGlobalOp>(location, m_refRefObject, m_builder.getSymbolRefAttr(op));
                 m_builder.create<Dialect::StoreOp>(location, value, handle);
                 return;
             }
 
-            auto alloca = m_builder.create<mlir::memref::AllocaOp>(location, m_refRefObject);
+            auto alloca = m_builder.create<Dialect::AllocaOp>(location, m_refRefObject.getElementType());
             m_builder.create<Dialect::StoreOp>(location, value, alloca);
             getCurrentScope().insert({identifierToken.getValue(), alloca});
         },
@@ -518,7 +515,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     auto boxed = m_builder.create<Dialect::BoxOp>(
                         location, Dialect::ObjectType::get(Dialect::getLongTypeObject(m_module)), constant);
                     auto gcAlloc = m_builder.create<Dialect::GCAllocOp>(
-                        location, mlir::MemRefType::get({}, boxed.getType()), mlir::Value{});
+                        location, pylir::Dialect::PointerType::get(boxed.getType()));
                     m_builder.create<Dialect::StoreOp>(location, boxed, gcAlloc);
                     return gcAlloc;
                 }
@@ -573,17 +570,17 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 PYLIR_UNREACHABLE;
             }
             mlir::Value handle;
-            if (auto alloca = llvm::dyn_cast<mlir::memref::AllocaOp>(result->second))
+            if (auto alloca = llvm::dyn_cast<Dialect::AllocaOp>(result->second))
             {
                 handle = alloca;
             }
             else
             {
-                auto global = llvm::cast<mlir::memref::GlobalOp>(result->second);
-                handle = m_builder.create<mlir::memref::GetGlobalOp>(loc, m_refRefObject,
-                                                                     m_builder.getSymbolRefAttr(global));
+                auto global = llvm::cast<Dialect::GlobalOp>(result->second);
+                handle =
+                    m_builder.create<Dialect::GetGlobalOp>(loc, m_refRefObject, m_builder.getSymbolRefAttr(global));
             }
-            return m_builder.create<mlir::memref::LoadOp>(loc, handle);
+            return m_builder.create<Dialect::LoadOp>(loc, handle);
         },
         [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
 }
@@ -617,12 +614,12 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
 mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
                                      Dialect::TypeSlotPredicate operation, std::string_view)
 {
-    auto lhsLoad = m_builder.create<mlir::memref::LoadOp>(loc, lhs);
+    auto lhsLoad = m_builder.create<Dialect::LoadOp>(loc, lhs);
     auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhsLoad);
     auto slot = m_builder.create<Dialect::GetTypeSlotOp>(loc, operation, lhsType);
     auto func = slot.getResult(0);
     auto wasFound = slot.getResult(1);
-    auto result = m_builder.create<mlir::memref::AllocaOp>(loc, m_refRefObject);
+    auto result = m_builder.create<Dialect::AllocaOp>(loc, m_refRefObject);
 
     auto* foundBlock = new mlir::Block;
     auto* notFoundBlock = new mlir::Block;
@@ -698,5 +695,5 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
 
     m_currentFunc.getCallableRegion()->push_back(endBlock);
     m_builder.setInsertionPointToStart(endBlock);
-    return m_builder.create<mlir::memref::LoadOp>(loc, result);
+    return m_builder.create<Dialect::LoadOp>(loc, result);
 }
