@@ -23,3 +23,7 @@ add_mlir_dialect_library(PylirDialect
 
         LINK_LIBS PUBLIC MLIRIR Support MLIRInferTypeOpInterface MLIRStandard
         )
+if (PYLIR_USE_PCH)
+    target_link_libraries(PylirDialect PRIVATE COMMON_PCH)
+    target_precompile_headers(PylirDialect PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
+endif ()

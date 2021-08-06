@@ -11,6 +11,7 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/ScopeExit.h>
+#include <llvm/ADT/Triple.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Dialect/PylirDialect.hpp>
@@ -52,6 +53,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     mlir::LLVM::LLVMStructType m_pyLongObject;
     mlir::LLVM::LLVMStructType m_pyTypeObject;
     std::array<mlir::LLVM::LLVMFuncOp, static_cast<std::size_t>(RuntimeFunc::LAST_VALUE) + 1> m_runtimeFuncs;
+    llvm::Triple m_triple;
 
     mlir::Type getTypeFromTypeObject(pylir::Dialect::ConstantGlobalOp constant)
     {
@@ -139,14 +141,15 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     }
 
 public:
-    explicit PylirTypeConverter(mlir::ModuleOp module)
+    explicit PylirTypeConverter(mlir::ModuleOp module, llvm::StringRef dataLayout, llvm::StringRef triple)
         : mlir::LLVMTypeConverter(module.getContext(),
-                                  [&module]
+                                  [&dataLayout, &module]
                                   {
                                       mlir::LowerToLLVMOptions options(module.getContext());
-                                      options.useBarePtrCallConv = true;
+                                      options.dataLayout = llvm::DataLayout{dataLayout};
                                       return options;
-                                  }())
+                                  }()),
+          m_triple(triple)
     {
         addConversion(
             [&](pylir::Dialect::PointerType ptr) -> llvm::Optional<mlir::Type>
@@ -935,7 +938,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     auto module = getOperation();
 
     mlir::RewritePatternSet patterns(&getContext());
-    PylirTypeConverter converter(module);
+    PylirTypeConverter converter(module, dataLayout.getValue(), targetTriple.getValue());
 
     populateSingleOpMatchers<ConstantOpConversion, BoxConversion, IMulConversion, DataOfConversion, StoreConversion,
                              TypeOfConversion, IdConversion, ICmpConversion, GetTypeSlotConversion, GCAllocConversion,
@@ -948,6 +951,11 @@ void ConvertPylirToLLVMPass::runOnOperation()
                                         &converter.getContext(), converter);
     mlir::populateStdToLLVMConversionPatterns(converter, patterns);
 
+    module->setAttr(mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
+                    mlir::StringAttr::get(module.getContext(), targetTriple.getValue()));
+    module->setAttr(mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
+                    mlir::StringAttr::get(module.getContext(), dataLayout.getValue()));
+
     mlir::LLVMConversionTarget target(getContext());
     target.addIllegalDialect<pylir::Dialect::PylirDialect, mlir::StandardOpsDialect>();
     target.addLegalOp<mlir::ModuleOp>();
@@ -959,7 +967,6 @@ void ConvertPylirToLLVMPass::runOnOperation()
 
     if (ctors.empty())
     {
-        module.dump();
         return;
     }
 

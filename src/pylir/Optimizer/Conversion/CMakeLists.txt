@@ -11,3 +11,8 @@ add_mlir_conversion_library(PylirToLLVM
         PylirConversionPassIncGen
 
         LINK_LIBS PUBLIC PylirDialect MLIRLLVMIR MLIRPass MLIRTransforms MLIRStandardToLLVM)
+
+if (PYLIR_USE_PCH)
+    target_link_libraries(PylirToLLVM PRIVATE COMMON_PCH)
+    target_precompile_headers(PylirToLLVM PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
+endif ()

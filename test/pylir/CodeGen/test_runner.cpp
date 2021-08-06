@@ -2,8 +2,12 @@
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Export.h>
 
+#include <llvm/ADT/Triple.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/TargetRegistry.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/Optimizer/Conversion/PylirToLLVM.hpp>
@@ -14,6 +18,12 @@
 
 int main(int argc, char** argv)
 {
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmPrinters();
+    llvm::InitializeAllAsmParsers();
+
     if (argc != 3)
     {
         std::cerr << "Expected mode and file";
@@ -57,7 +67,28 @@ int main(int argc, char** argv)
     module.print(llvm::outs());
     mlir::PassManager manager(&context);
     manager.enableVerifier();
-    manager.addPass(pylir::Dialect::createConvertPylirToLLVMPass());
+
+    auto triple = llvm::Triple::normalize(LLVM_DEFAULT_TARGET_TRIPLE);
+    std::string error;
+    auto* targetM = llvm::TargetRegistry::lookupTarget(triple, error);
+    if (!targetM)
+    {
+        llvm::errs() << "Target lookup failed with error: " << error;
+        return {};
+    }
+    auto machine = std::unique_ptr<llvm::TargetMachine>(
+        targetM->createTargetMachine(triple, "generic", "", {}, llvm::Reloc::Static, {}, llvm::CodeGenOpt::Aggressive));
+
+    std::string passOptions =
+        "target-triple=" + triple + " data-layout=" + machine->createDataLayout().getStringRepresentation();
+
+    auto pass = pylir::Dialect::createConvertPylirToLLVMPass();
+    if (mlir::failed(pass->initializeOptions(passOptions)))
+    {
+        return -1;
+    }
+
+    manager.addPass(std::move(pass));
     if (mlir::failed(manager.run(module)))
     {
         return -1;
