@@ -362,8 +362,8 @@ mlir::LogicalResult pylir::Dialect::ItoIndexOp::fold(::llvm::ArrayRef<::mlir::At
     {
         return mlir::failure();
     }
-    // TODO use Datalayout, assuming 64 bit for now
-    const std::size_t indexSize = 64;
+    const std::size_t indexSize =
+        mlir::DataLayout::closest(this->getOperation()).getTypeSize(mlir::IndexType::get(getContext()));
     if (integerAttr.getValue().sge(llvm::APInt::getMaxValue(indexSize)) || integerAttr.getValue().isNegative())
     {
         results.emplace_back(nullptr);
