@@ -6,6 +6,9 @@ add_public_tablegen_target(PylirConversionPassIncGen)
 
 add_mlir_conversion_library(PylirToLLVM
         PylirToLLVM.cpp
+        WinX64.cpp
+        X86_64.cpp
+        CABI.cpp
 
         DEPENDS
         PylirConversionPassIncGen

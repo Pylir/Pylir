@@ -22,6 +22,8 @@
 #include <optional>
 
 #include "PassDetail.hpp"
+#include "WinX64.hpp"
+#include "X86_64.hpp"
 
 namespace
 {
@@ -54,6 +56,8 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     mlir::LLVM::LLVMStructType m_pyTypeObject;
     std::array<mlir::LLVM::LLVMFuncOp, static_cast<std::size_t>(RuntimeFunc::LAST_VALUE) + 1> m_runtimeFuncs;
     llvm::Triple m_triple;
+
+    std::unique_ptr<pylir::Dialect::CABI> m_cAbi;
 
     mlir::Type getTypeFromTypeObject(pylir::Dialect::ConstantGlobalOp constant)
     {
@@ -136,8 +140,8 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         auto module = builder.getBlock()->getParentOp()->getParentOfType<mlir::ModuleOp>();
         mlir::OpBuilder::InsertionGuard guard{builder};
         builder.setInsertionPointToEnd(module.getBody());
-        m_runtimeFuncs[static_cast<std::size_t>(func)] = builder.create<mlir::LLVM::LLVMFuncOp>(
-            builder.getUnknownLoc(), name, mlir::LLVM::LLVMFunctionType::get(returnType, operands));
+        m_runtimeFuncs[static_cast<std::size_t>(func)] =
+            m_cAbi->declareFunc(builder, builder.getUnknownLoc(), returnType, name, operands);
     }
 
 public:
@@ -194,6 +198,25 @@ public:
                 continue;
             }
             m_knownObjectTypes.insert({op.sym_name(), getTypeFromTypeObject(op)});
+        }
+
+        switch (m_triple.getArch())
+        {
+            case llvm::Triple::x86_64:
+            {
+                if (m_triple.isOSWindows())
+                {
+                    m_cAbi = std::make_unique<pylir::Dialect::WinX64>(mlir::DataLayout{module});
+                }
+                else
+                {
+                    m_cAbi = std::make_unique<pylir::Dialect::X86_64>(mlir::DataLayout{module});
+                }
+                break;
+            }
+            default:
+                llvm::errs() << "ABI for target triple " << m_triple.str() << " has not been imlpemented yet. Sorry";
+                std::terminate();
         }
     }
 
@@ -346,7 +369,7 @@ public:
         {
             initFunc(builder, func);
         }
-        return builder.create<mlir::LLVM::CallOp>(loc, m_runtimeFuncs[index], operands).getResult(0);
+        return m_cAbi->callFunc(builder, loc, m_runtimeFuncs[index], operands);
     }
 };
 
