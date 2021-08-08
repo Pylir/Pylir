@@ -3,8 +3,11 @@
 #include <mlir/Target/LLVMIR/Export.h>
 
 #include <llvm/ADT/Triple.h>
+#include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
@@ -96,5 +99,21 @@ int main(int argc, char** argv)
     llvm::LLVMContext llvmContext;
     mlir::registerLLVMDialectTranslation(context);
     auto llvmModule = mlir::translateModuleToLLVMIR(*module, llvmContext);
+
+    llvm::LoopAnalysisManager lam;
+    llvm::FunctionAnalysisManager fam;
+    llvm::CGSCCAnalysisManager cgam;
+    llvm::ModuleAnalysisManager mam;
+    llvm::PassBuilder passBuilder(machine.get());
+
+    fam.registerPass([&] { return passBuilder.buildDefaultAAPipeline(); });
+    passBuilder.registerModuleAnalyses(mam);
+    passBuilder.registerCGSCCAnalyses(cgam);
+    passBuilder.registerFunctionAnalyses(fam);
+    passBuilder.registerLoopAnalyses(lam);
+    passBuilder.crossRegisterProxies(lam, fam, cgam, mam);
+
+    auto mpm = passBuilder.buildPerModuleDefaultPipeline(llvm::PassBuilder::OptimizationLevel::O3);
+    mpm.run(*llvmModule, mam);
     llvmModule->print(llvm::outs(), nullptr);
 }
