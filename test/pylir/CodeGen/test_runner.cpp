@@ -64,7 +64,7 @@ int main(int argc, char** argv)
     }
     mlir::MLIRContext context;
     auto module = pylir::codegen(&context, *tree, document);
-    module.print(llvm::outs());
+    module->print(llvm::outs());
     mlir::PassManager manager(&context);
     manager.enableVerifier();
 
@@ -89,12 +89,12 @@ int main(int argc, char** argv)
     }
 
     manager.addPass(std::move(pass));
-    if (mlir::failed(manager.run(module)))
+    if (mlir::failed(manager.run(*module)))
     {
         return -1;
     }
     llvm::LLVMContext llvmContext;
     mlir::registerLLVMDialectTranslation(context);
-    auto llvmModule = mlir::translateModuleToLLVMIR(module, llvmContext);
+    auto llvmModule = mlir::translateModuleToLLVMIR(*module, llvmContext);
     llvmModule->print(llvm::outs(), nullptr);
 }

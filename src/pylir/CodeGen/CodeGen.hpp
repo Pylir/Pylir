@@ -98,7 +98,42 @@ public:
     mlir::Value visit(const Syntax::Enclosure& enclosure);
 };
 
-inline mlir::ModuleOp codegen(mlir::MLIRContext* context, const Syntax::FileInput& input, Diag::Document& document)
+class Module
+{
+    mlir::ModuleOp m_module;
+
+public:
+    Module(mlir::ModuleOp module) : m_module(module) {}
+
+    ~Module()
+    {
+        m_module->erase();
+    }
+
+    Module(const Module&) = delete;
+
+    Module(Module&& rhs) noexcept : m_module(std::exchange(rhs.m_module, mlir::ModuleOp{})) {}
+
+    Module& operator=(const Module&) = delete;
+
+    Module& operator=(Module&& rhs) noexcept
+    {
+        m_module = std::exchange(rhs.m_module, mlir::ModuleOp{});
+        return *this;
+    }
+
+    mlir::ModuleOp* operator->()
+    {
+        return &m_module;
+    }
+
+    mlir::ModuleOp& operator*()
+    {
+        return m_module;
+    }
+};
+
+inline Module codegen(mlir::MLIRContext* context, const Syntax::FileInput& input, Diag::Document& document)
 {
     CodeGen codegen{context, document};
     return codegen.visit(input);
