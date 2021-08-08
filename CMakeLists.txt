@@ -156,3 +156,4 @@ if (PYLIR_FUZZER)
 endif ()
 
 add_executable(Pylir main.cpp)
+target_link_libraries(Pylir PylirMain)
