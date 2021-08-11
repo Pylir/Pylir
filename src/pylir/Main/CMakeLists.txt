@@ -1,5 +1,10 @@
 
-llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD})
+set(LLVM_TARGET_DEFINITIONS Opts.td)
+tablegen(LLVM Opts.inc -gen-opt-parser-defs)
+add_public_tablegen_target(PylirMainOptsTableGen)
+
+llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Option)
 
 add_library(PylirMain PylirMain.cpp)
 target_link_libraries(PylirMain PRIVATE CodeGen PylirToLLVM MLIRToLLVMIRTranslationRegistration ${llvm_all})
+add_dependencies(PylirMain PylirMainOptsTableGen)

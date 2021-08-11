@@ -79,6 +79,8 @@ include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
 
+set(LLVM_TABLEGEN_EXE "llvm-tblgen")
+
 # Fedora 34 does not import mlir-tblgen, but one compiled from source does. Tis a workaround to find and get a mlir-tblgen
 # target if it is not defined
 if (NOT TARGET mlir-tblgen)

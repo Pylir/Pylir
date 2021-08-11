@@ -6,5 +6,5 @@
 
 namespace pylir
 {
-int main(llvm::ArrayRef<llvm::StringRef> args);
+int main(int argc, char* argv[]);
 }

@@ -4,10 +4,5 @@
 
 int main(int argc, char** argv)
 {
-    std::vector<llvm::StringRef> args(argc);
-    for (std::size_t i = 0; i < static_cast<std::size_t>(argc); i++)
-    {
-        args[i] = argv[i];
-    }
-    return pylir::main(args);
+    return pylir::main(argc, argv);
 }
