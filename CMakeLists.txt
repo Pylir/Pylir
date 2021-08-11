@@ -157,5 +157,5 @@ if (PYLIR_FUZZER)
     add_subdirectory(fuzzer)
 endif ()
 
-add_executable(Pylir main.cpp)
-target_link_libraries(Pylir PylirMain)
+add_executable(pylir main.cpp)
+target_link_libraries(pylir PylirMain)
