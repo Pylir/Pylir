@@ -18,6 +18,10 @@ def : F<"V", "Alias for --version">, Alias<version>, Group<grp_general>;
 
 def o : JoinedOrSeparate<["-"], "o">, HelpText<"Write output to <file>">, MetaVarName<"file">, Group<grp_general>;
 
+def grp_language : OptionGroup<"Language">, HelpText<"Language options">;
+
+def fsyntax_only : F<"fsyntax-only", "Don't compile the source file, but do check for valid syntax">, Group<grp_language>;
+
 def grp_actions : OptionGroup<"Actions">, HelpText<"Action options">;
 
 def c : JoinedOrSeparate<["-"], "c">, HelpText<"Execute argument as python code">, MetaVarName<"cmd">, Group<grp_actions>;

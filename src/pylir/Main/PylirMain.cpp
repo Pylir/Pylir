@@ -38,11 +38,6 @@ public:
     PylirOptTable() : OptTable(InfoTable) {}
 };
 
-enum class Action
-{
-
-};
-
 } // namespace
 
 int pylir::main(int argc, char* argv[])
@@ -69,6 +64,10 @@ int pylir::main(int argc, char* argv[])
     {
         llvm::outs() << "pylir " PYLIR_VERSION "\n";
         return 0;
+    }
+
+    for (auto& iter : args.getAllArgValues(OPT_INPUT))
+    {
     }
 
     return 0;
