@@ -37,6 +37,12 @@ class PylirOptTable : public llvm::opt::OptTable
 public:
     PylirOptTable() : OptTable(InfoTable) {}
 };
+
+enum class Action
+{
+
+};
+
 } // namespace
 
 int pylir::main(int argc, char* argv[])
@@ -54,8 +60,14 @@ int pylir::main(int argc, char* argv[])
 
     if (args.hasArg(OPT_help))
     {
-        table.printHelp(llvm::outs(), (llvm::Twine(argv[0]) + " [options] <input files>").str().c_str(),
+        table.printHelp(llvm::outs(), (llvm::Twine(argv[0]) + " [options] <input>").str().c_str(),
                         "Python optimizing MLIR compiler");
+        return 0;
+    }
+
+    if (args.hasArg(OPT_version))
+    {
+        llvm::outs() << "pylir " PYLIR_VERSION "\n";
         return 0;
     }
 
