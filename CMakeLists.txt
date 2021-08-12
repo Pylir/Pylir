@@ -102,6 +102,12 @@ include_directories(SYSTEM ${PROJECT_BINARY_DIR}/src)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+set(PYLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(PYLIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+set(PYLIR_TOOLS_DIR ${CMAKE_BINARY_DIR}/bin)
+
 if (NOT LLVM_ENABLE_RTTI)
     if (MSVC)
         string(REGEX REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
@@ -135,15 +141,16 @@ include_directories(src)
 include_directories(SYSTEM 3rdParty)
 add_subdirectory(3rdParty)
 add_subdirectory(src)
+add_subdirectory(tools)
 if (PYLIR_BUILD_TESTS)
-
     include(CTest)
     enable_testing()
+    add_subdirectory(unittests)
     add_subdirectory(test)
 endif ()
 
 if (PYLIR_FUZZER)
-    add_compile_definitions(CLD_IN_FUZZER)
+    add_compile_definitions(PYLIR_IN_FUZZER)
     if (WIN32)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=fuzzer-no-link,address -fno-sanitize-recover=all")
         link_libraries(clang_rt.asan.lib)
@@ -156,6 +163,3 @@ if (PYLIR_FUZZER)
 
     add_subdirectory(fuzzer)
 endif ()
-
-add_executable(pylir main.cpp)
-target_link_libraries(pylir PylirMain)
