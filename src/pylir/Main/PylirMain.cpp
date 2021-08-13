@@ -8,6 +8,8 @@
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Bitcode/BitcodeWriterPass.h>
+#include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
@@ -17,6 +19,7 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/Allocator.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/Path.h>
 #include <llvm/Support/StringSaver.h>
 #include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
@@ -87,37 +90,39 @@ bool executeAction(Action action, pylir::Diag::Document& file, llvm::opt::InputA
     mlir::MLIRContext context;
     auto module = pylir::codegen(&context, *tree, file);
 
-    std::string defaultName = "a";
+    auto filename = llvm::sys::path::filename(file.getFilename()).str();
+
+    std::string defaultName;
     if (options.hasArg(OPT_emit_mlir))
     {
-        defaultName += ".mlir";
+        defaultName = filename + ".mlir";
     }
     else if (options.hasArg(OPT_emit_llvm))
     {
         if (action == Action::ObjectFile)
         {
-            defaultName += ".bc";
+            defaultName = filename + ".bc";
         }
         else
         {
-            defaultName += ".ll";
+            defaultName = filename + ".ll";
         }
     }
     else
     {
-        if (triple.isOSWindows())
+        if (action == Action::ObjectFile)
         {
-            defaultName += ".exe";
+            defaultName = filename + ".o";
         }
         else
         {
-            defaultName += ".out";
+            defaultName = filename + ".s";
         }
     }
 
     std::error_code errorCode;
     auto output = llvm::raw_fd_ostream(options.getLastArgValue(OPT_o, defaultName), errorCode);
-    if (!errorCode)
+    if (errorCode)
     {
         // TODO error could not open output file
         return false;
@@ -175,11 +180,56 @@ bool executeAction(Action action, pylir::Diag::Document& file, llvm::opt::InputA
     passBuilder.registerLoopAnalyses(lam);
     passBuilder.crossRegisterProxies(lam, fam, cgam, mam);
 
-    //TODO adjust opt level
-    auto mpm = passBuilder.buildPerModuleDefaultPipeline(llvm::PassBuilder::OptimizationLevel::O3);
+    llvm::ModulePassManager mpm;
+    if (options.getLastArgValue(OPT_O, "0") == "0")
+    {
+        mpm = passBuilder.buildO0DefaultPipeline(llvm::PassBuilder::OptimizationLevel::O0);
+    }
+    else
+    {
+        auto level =
+            llvm::StringSwitch<std::optional<llvm::PassBuilder::OptimizationLevel>>(options.getLastArgValue(OPT_O))
+                .Case("1", llvm::PassBuilder::OptimizationLevel::O1)
+                .Case("2", llvm::PassBuilder::OptimizationLevel::O2)
+                .Case("3", llvm::PassBuilder::OptimizationLevel::O3)
+                .Case("s", llvm::PassBuilder::OptimizationLevel::Os)
+                .Case("z", llvm::PassBuilder::OptimizationLevel::Oz)
+                .Default(std::nullopt);
+        if (!level)
+        {
+            // TODO error, invalid -O
+        }
+        mpm = passBuilder.buildPerModuleDefaultPipeline(*level);
+    }
+
+    if (options.hasArg(OPT_emit_llvm))
+    {
+        if (action == Action::ObjectFile)
+        {
+            mpm.addPass(llvm::BitcodeWriterPass(output));
+        }
+        else
+        {
+            mpm.addPass(llvm::PrintModulePass(output));
+        }
+    }
+
     mpm.run(*llvmModule, mam);
 
-    //TODO: append legacy pass manager for codegen
+    if (options.hasArg(OPT_emit_llvm))
+    {
+        return true;
+    }
+
+    llvm::legacy::PassManager codeGenPasses;
+    codeGenPasses.add(llvm::createTargetTransformInfoWrapperPass(machine->getTargetIRAnalysis()));
+    if (machine->addPassesToEmitFile(codeGenPasses, output, nullptr,
+                                     action == Action::ObjectFile ? llvm::CGFT_ObjectFile : llvm::CGFT_AssemblyFile))
+    {
+        // TODO error unsupported file type for target
+    }
+
+    codeGenPasses.run(*llvmModule);
 
     return true;
 }
