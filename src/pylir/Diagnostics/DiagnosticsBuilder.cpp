@@ -305,3 +305,27 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
 
     return result;
 }
+
+std::string pylir::Diag::formatLine(Severity severity, std::string_view message)
+{
+    std::string_view severityStr;
+    fmt::color colour;
+    switch (severity)
+    {
+        case Warning:
+            severityStr = "warning";
+            colour = static_cast<fmt::color>(Diag::WARNING_COLOUR);
+            break;
+        case Error:
+            severityStr = "error";
+            colour = static_cast<fmt::color>(Diag::ERROR_COLOUR);
+            break;
+        case Note:
+            severityStr = "note";
+            colour = static_cast<fmt::color>(Diag::NOTE_COLOUR);
+            break;
+        default: PYLIR_UNREACHABLE;
+    }
+    return fmt::format(fmt::emphasis::bold | fmt::fg(colour), "{}:", severityStr)
+           + fmt::format(fmt::emphasis::bold, " {}\n", message);
+}

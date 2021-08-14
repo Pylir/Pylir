@@ -333,4 +333,6 @@ public:
     }
 };
 
+std::string formatLine(Severity severity, std::string_view message);
+
 } // namespace pylir::Diag

@@ -34,3 +34,4 @@ def grp_codegen : OptionGroup<"CodeGen">, HelpText<"Codegen options">;
 
 def O : Joined<["-"], "O">, Group<grp_codegen>, MetaVarName<"level">, HelpText<"Optimization level">;
 def O_flag : F<"O", "Alias for -O1">, Alias<O>, AliasArgs<["1"]>, Group<grp_codegen>;
+def target : Joined<["--"], "target=">, HelpText<"Generate code for the given target">;

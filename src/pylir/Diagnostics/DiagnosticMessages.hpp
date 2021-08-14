@@ -59,4 +59,28 @@ constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N = FMT_STRING("cannot assign
 
 constexpr auto UNKNOWN_FEATURE_N = FMT_STRING("unknown feature '{}'");
 
+constexpr auto CANNOT_EMIT_LLVM_IR_AND_MLIR_IR_AT_THE_SAME_TIME =
+    FMT_STRING("cannot emit LLVM IR and MLIR IR at the same time");
+
+constexpr auto LLVM_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
+    FMT_STRING("LLVM IR won't be emitted when only checking syntax");
+
+constexpr auto MLIR_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
+    FMT_STRING("MLIR IR won't be emitted when only checking syntax");
+
+constexpr auto ASSEMBLY_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
+    FMT_STRING("Assembly won't be emitted when only checking syntax");
+
+constexpr auto FAILED_TO_OPEN_FILE_N = FMT_STRING("failed to open file '{}'");
+
+constexpr auto FAILED_TO_ACCESS_FILE_N = FMT_STRING("failed to access file '{}'");
+
+constexpr auto FAILED_TO_READ_FILE_N = FMT_STRING("failed to read file '{}'");
+
+constexpr auto COULD_NOT_FIND_TARGET_N = FMT_STRING("could not find target '{}'");
+
+constexpr auto INVALID_OPTIMIZATION_LEVEL_N = FMT_STRING("invalid optimization level '{}'");
+
+constexpr auto TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N = FMT_STRING("target '{}' does not support compiling to {}");
+
 } // namespace pylir::Diag
