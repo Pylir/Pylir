@@ -192,24 +192,49 @@ struct LocationProvider<T, std::enable_if_t<std::is_integral_v<T>>>
     }
 };
 
-constexpr auto range = [](const auto& value)
+template <class T, class = void>
+struct hasLocationProviderOneArg : std::false_type
 {
-    using T = std::decay_t<decltype(value)>;
-    return LocationProvider<T>::getRange(value);
+};
+
+template <class T>
+struct hasLocationProviderOneArg<
+    T, std::void_t<decltype(LocationProvider<std::decay_t<T>>::getRange(std::declval<std::decay_t<T>>()))>>
+    : std::true_type
+{
 };
 
 template <class T, class = void>
-struct hasLocationProvider : std::false_type
+struct hasLocationProviderTwoArg : std::false_type
 {
 };
 
 template <class T>
-struct hasLocationProvider<T, std::void_t<decltype(LocationProvider<std::decay_t<T>>::getRange)>> : std::true_type
+struct hasLocationProviderTwoArg<T, std::void_t<decltype(LocationProvider<std::decay_t<T>>::getRange(
+                                        std::declval<std::decay_t<T>>(), std::declval<const void*>()))>>
+    : std::true_type
 {
 };
 
+constexpr auto range = [](const auto& value, const void* context = nullptr)
+{
+    using T = std::decay_t<decltype(value)>;
+    if constexpr (hasLocationProviderTwoArg<T>{})
+    {
+        if (context)
+        {
+            return LocationProvider<T>::getRange(value, context);
+        }
+    }
+    if constexpr (hasLocationProviderOneArg<T>{})
+    {
+        return LocationProvider<T>::getRange(value);
+    }
+    PYLIR_UNREACHABLE;
+};
+
 template <class T>
-constexpr bool hasLocationProvider_v = hasLocationProvider<T>{};
+constexpr bool hasLocationProvider_v = std::disjunction_v<hasLocationProviderOneArg<T>, hasLocationProviderTwoArg<T>>;
 
 class DiagnosticsBuilder
 {
@@ -224,21 +249,33 @@ class DiagnosticsBuilder
 
     struct Message
     {
-        Document* document;
+        const Document* document;
         std::size_t location;
         std::string message;
         std::vector<Label> labels;
     };
     std::vector<Message> m_messages;
+    const void* m_context;
 
-    static std::string printLine(std::size_t width, std::size_t lineNumber, pylir::Diag::Document& document,
+    static std::string printLine(std::size_t width, std::size_t lineNumber, const pylir::Diag::Document& document,
                                  std::vector<Label> labels);
 
     std::string emitMessage(const Message& message, Severity severity) const;
 
 public:
     template <class T, class S, class... Args>
-    DiagnosticsBuilder(Document& document, const T& location, const S& message, Args&&... args)
+    DiagnosticsBuilder(const void* context, const Document& document, const T& location, const S& message,
+                       Args&&... args)
+        : m_messages{Message{&document,
+                             range(location, context).first,
+                             fmt::format(message, std::forward<Args>(args)...),
+                             {}}},
+          m_context(context)
+    {
+    }
+
+    template <class T, class S, class... Args>
+    DiagnosticsBuilder(const Document& document, const T& location, const S& message, Args&&... args)
         : m_messages{Message{&document, range(location).first, fmt::format(message, std::forward<Args>(args)...), {}}}
     {
     }
@@ -250,8 +287,8 @@ public:
                       std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>,
                                                           DiagnosticsBuilder&>
     {
-        m_messages.back().labels.push_back(
-            {range(start).first, range(end).second, std::move(labelText), std::move(colour), std::move(emphasis)});
+        m_messages.back().labels.push_back({range(start, m_context).first, range(end, m_context).second,
+                                            std::move(labelText), std::move(colour), std::move(emphasis)});
         return *this;
     }
 
@@ -270,7 +307,7 @@ public:
                   std::optional<emphasis>&& emphasis =
                       std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        auto [start, end] = range(pos);
+        auto [start, end] = range(pos, m_context);
         m_messages.back().labels.push_back({start, end, std::move(labelText), std::move(colour), std::move(emphasis)});
         return *this;
     }
@@ -288,15 +325,16 @@ public:
     auto addNote(const T& location, const S& message,
                  Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        return addNote(*m_messages.back().document, range(location).first,
+        return addNote(*m_messages.back().document, range(location, m_context).first,
                        fmt::format(message, std::forward<Args>(args)...));
     }
 
     template <class T, class S, class... Args>
-    auto addNote(Document& document, const T& location, const S& message,
+    auto addNote(const Document& document, const T& location, const S& message,
                  Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        m_messages.push_back({&document, range(location).first, fmt::format(message, std::forward<Args>(args)...), {}});
+        m_messages.push_back(
+            {&document, range(location, m_context).first, fmt::format(message, std::forward<Args>(args)...), {}});
         return *this;
     }
 
@@ -308,7 +346,7 @@ public:
     }
 
     template <class T, class S, class... Args>
-    [[nodiscard]] auto addNote(Document& document, const T& location, const S& message,
+    [[nodiscard]] auto addNote(const Document& document, const T& location, const S& message,
                                Args&&... args) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
     {
         return std::move(addNote(document, location, message, std::forward<Args>(args)...));

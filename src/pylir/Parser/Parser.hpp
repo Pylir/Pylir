@@ -20,7 +20,7 @@ class Parser
 #define HANDLE_FEATURE(x)
 #define HANDLE_REQUIRED_FEATURE(x) bool m_##x : 1;
 #include "Features.def"
-    Diag::Document* m_document;
+    const Diag::Document* m_document;
 
     tl::expected<Token, std::string> expect(TokenType tokenType);
 
@@ -94,7 +94,7 @@ class Parser
 
 public:
     explicit Parser(
-        Diag::Document& document, int fileId = 0,
+        const Diag::Document& document, int fileId = 0,
         std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> callBack = [](auto&&) {})
         : m_lexer(document, fileId, std::move(callBack)),
           m_current(m_lexer.begin()),
@@ -106,7 +106,8 @@ public:
     }
 
     template <class T, class S, class... Args>
-    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message, Args&&... args)
+    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message,
+                                                                    Args&&... args) const
     {
         return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
     }
@@ -164,7 +165,8 @@ public:
 
     tl::expected<Syntax::LambdaExpression, std::string> parseLambdaExpression();
 
-    tl::expected<Syntax::StarredExpression, std::string> parseStarredExpression( std::optional<Syntax::AssignmentExpression>&& firstItem = std::nullopt);
+    tl::expected<Syntax::StarredExpression, std::string>
+        parseStarredExpression(std::optional<Syntax::AssignmentExpression>&& firstItem = std::nullopt);
 
     tl::expected<Syntax::StarredItem, std::string> parseStarredItem();
 

@@ -11,8 +11,8 @@
 #include <fmt/color.h>
 #include <fmt/format.h>
 
-std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::size_t lineNumber, Document& document,
-                                                       std::vector<Label> labels)
+std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::size_t lineNumber,
+                                                       const Document& document, std::vector<Label> labels)
 {
     std::string result = fmt::format("{1: >{0}} | ", width, lineNumber);
     auto line = document.getLine(lineNumber);

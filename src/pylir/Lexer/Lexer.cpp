@@ -12,7 +12,7 @@
 #include <locale>
 #include <unordered_map>
 
-pylir::Lexer::Lexer(Diag::Document& document, int fieldId,
+pylir::Lexer::Lexer(const Diag::Document& document, int fieldId,
                     std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback)
     : m_fileId(fieldId),
       m_document(&document),
@@ -421,14 +421,14 @@ bool pylir::Lexer::parseNext()
                     case 'b':
                     case 'B':
                     {
-                        if (std::next(m_current,2) == m_document->end())
+                        if (std::next(m_current, 2) == m_document->end())
                         {
                             parseIdentifier();
                             break;
                         }
-                        if (*std::next(m_current,2) == '"' || *std::next(m_current,2) == '\'')
+                        if (*std::next(m_current, 2) == '"' || *std::next(m_current, 2) == '\'')
                         {
-                            std::advance(m_current,2);
+                            std::advance(m_current, 2);
                         }
                         else
                         {
@@ -994,13 +994,13 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         m_current++;
                         if (m_current == m_document->end())
                         {
-                            //TODO deprecation
+                            // TODO deprecation
                             result += U"\\x";
                             break;
                         }
                         if (!isHex(*m_current))
                         {
-                            //TODO deprecation
+                            // TODO deprecation
                             result += U"\\x";
                             result += *m_current;
                             break;
@@ -1085,8 +1085,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                                 createDiagnosticsBuilder(m_current - m_document->begin() - count,
                                                          Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
                                                          static_cast<std::uint32_t>(value))
-                                    .addLabel(m_current - m_document->begin() - count, m_current - m_document->begin() - 1,
-                                              std::nullopt, Diag::ERROR_COLOUR)
+                                    .addLabel(m_current - m_document->begin() - count,
+                                              m_current - m_document->begin() - 1, std::nullopt, Diag::ERROR_COLOUR)
                                     .addLabel(m_current - m_document->begin() - count - 2,
                                               m_current - m_document->begin() - count - 1, std::nullopt,
                                               Diag::ERROR_COMPLY);

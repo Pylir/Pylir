@@ -79,7 +79,7 @@ public:
                                                   m_lineStarts[lineNumber] - m_lineStarts[lineNumber - 1] - 1);
     }
 
-    [[nodiscard]] bool hasLine(std::size_t lineNumber)
+    [[nodiscard]] bool hasLine(std::size_t lineNumber) const
     {
         return m_lineStarts.size() > lineNumber;
     }
