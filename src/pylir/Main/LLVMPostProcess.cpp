@@ -10,6 +10,17 @@ void pylir::postProcessLLVMModule(llvm::Module& module)
     // Normal name so it can be called from C
     llvm::GlobalAlias::create("pylir__main____init__", aliasee);
 
+    // Apply comdat to all globals with linkonce_odr
+    for (auto& iter : module.global_objects())
+    {
+        if (iter.getLinkage() == llvm::GlobalValue::LinkOnceODRLinkage)
+        {
+            auto* comdat = module.getOrInsertComdat(iter.getName());
+            comdat->setSelectionKind(llvm::Comdat::Any);
+            iter.setComdat(comdat);
+        }
+    }
+
     // Apply comdat to all functions in the ctor array
     auto* ctors = module.getGlobalVariable("llvm.global_ctors");
     if (!ctors)
@@ -35,5 +46,6 @@ void pylir::postProcessLLVMModule(llvm::Module& module)
         }
         auto* comdat = module.getOrInsertComdat(function->getName());
         comdat->setSelectionKind(llvm::Comdat::Any);
+        function->setComdat(comdat);
     }
 }

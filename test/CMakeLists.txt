@@ -4,7 +4,10 @@ set(PYLIR_TEST_DEPENDS
         pylir-opt
         pylir-translate
         pylir
-)
+        pylir-jit
+        PylirRuntime
+        PylirRuntimeMain
+        )
 
 find_package(Python COMPONENTS Interpreter)
 
