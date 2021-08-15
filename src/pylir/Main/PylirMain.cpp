@@ -30,6 +30,8 @@
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
 
+#include "LLVMPostProcess.hpp"
+
 namespace
 {
 enum ID
@@ -219,6 +221,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     llvm::LLVMContext llvmContext;
     mlir::registerLLVMDialectTranslation(context);
     auto llvmModule = mlir::translateModuleToLLVMIR(*module, llvmContext);
+    pylir::postProcessLLVMModule(*llvmModule);
 
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;

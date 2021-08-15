@@ -6,7 +6,7 @@ add_public_tablegen_target(PylirMainOptsTableGen)
 llvm_map_components_to_libnames(llvm_all ${LLVM_TARGETS_TO_BUILD} Passes)
 llvm_map_components_to_libnames(llvm_options Option)
 
-add_library(PylirMain PylirMain.cpp)
+add_library(PylirMain PylirMain.cpp LLVMPostProcess.cpp LLVMPostProcess.hpp)
 target_link_libraries(PylirMain PUBLIC Diagnostics ${llvm_options} PRIVATE CodeGen PylirToLLVM MLIRToLLVMIRTranslationRegistration ${llvm_all})
 add_dependencies(PylirMain PylirMainOptsTableGen)
 target_compile_definitions(PylirMain PRIVATE PYLIR_VERSION="${PROJECT_VERSION}")
