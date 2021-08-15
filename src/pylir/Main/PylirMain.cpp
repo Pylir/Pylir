@@ -200,8 +200,13 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         return false;
     }
 
+    llvm::Reloc::Model relocation = llvm::Reloc::Static;
+    if (triple.isOSWindows() && triple.getArch() == llvm::Triple::x86_64)
+    {
+        relocation = llvm::Reloc::PIC_;
+    }
     auto machine = std::unique_ptr<llvm::TargetMachine>(
-        targetM->createTargetMachine(triple.str(), "generic", "", {}, llvm::Reloc::Static, {}, *optLevel));
+        targetM->createTargetMachine(triple.str(), "generic", "", {}, relocation, {}, *optLevel));
 
     std::string passOptions =
         "target-triple=" + triple.str() + " data-layout=" + machine->createDataLayout().getStringRepresentation();
