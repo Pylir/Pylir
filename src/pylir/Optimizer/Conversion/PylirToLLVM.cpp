@@ -655,7 +655,12 @@ struct BoxConversion : SingleOpMatcher<BoxConversion, pylir::Dialect::BoxOp>
                  mlir::ConversionPatternRewriter& rewriter) const
     {
         auto resultType = typeConverter->convertType(op->getResultTypes()[0]);
-        auto undef = rewriter.create<mlir::LLVM::UndefOp>(op->getLoc(), resultType);
+        mlir::Value undef = rewriter.create<mlir::LLVM::UndefOp>(op->getLoc(), resultType);
+        auto typeObject = rewriter.create<mlir::LLVM::AddressOfOp>(
+            op->getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyTypeObject()),
+            op->getResultTypes()[0].cast<pylir::Dialect::ObjectType>().getType());
+        undef = rewriter.create<mlir::LLVM::InsertValueOp>(op->getLoc(), undef, typeObject,
+                                                           rewriter.getI64ArrayAttr({0, 0}));
         rewriter.replaceOpWithNewOp<mlir::LLVM::InsertValueOp>(op, undef, adaptor.input(),
                                                                rewriter.getI64ArrayAttr({1}));
     }
