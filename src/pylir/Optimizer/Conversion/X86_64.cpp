@@ -175,7 +175,7 @@ mlir::LLVM::LLVMFuncOp pylir::Dialect::X86_64::declareFunc(mlir::OpBuilder& buil
     if (!returnType.isa<mlir::LLVM::LLVMVoidType>())
     {
         auto size = getSizeOf(returnType);
-        if (size > 128)
+        if (size > 16)
         {
             adjustments.returnType = PointerToTemporary{};
             argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(returnType));
@@ -205,7 +205,7 @@ mlir::LLVM::LLVMFuncOp pylir::Dialect::X86_64::declareFunc(mlir::OpBuilder& buil
     std::uint8_t takenFloatingPointRegisters = 0;
     for (auto arg = inputTypes.begin(); arg != inputTypes.end(); arg++)
     {
-        if (getSizeOf(*arg) > 128)
+        if (getSizeOf(*arg) > 16)
         {
             adjustments.arguments.push_back(OnStack{});
             argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(*arg));
