@@ -965,6 +965,15 @@ void ConvertPylirToLLVMPass::runOnOperation()
 {
     auto module = getOperation();
 
+    std::vector<mlir::SymbolOpInterface> linkOnceODR;
+    for (auto iter : module.getOps<mlir::SymbolOpInterface>())
+    {
+        if (iter->hasAttr("linkonce"))
+        {
+            linkOnceODR.emplace_back(iter);
+        }
+    }
+
     mlir::RewritePatternSet patterns(&getContext());
     PylirTypeConverter converter(module, dataLayout.getValue(), targetTriple.getValue());
 
@@ -991,6 +1000,18 @@ void ConvertPylirToLLVMPass::runOnOperation()
     {
         signalPassFailure();
         return;
+    }
+
+    auto table = mlir::SymbolTable(module);
+    for (auto& iter : linkOnceODR)
+    {
+        auto op = table.lookup(iter.getName());
+        PYLIR_ASSERT(op);
+        llvm::TypeSwitch<mlir::Operation*>(op)
+            .Case<mlir::LLVM::LLVMFuncOp, mlir::LLVM::GlobalOp>(
+                [](auto op)
+                { op.linkageAttr(mlir::LLVM::LinkageAttr::get(op.getContext(), mlir::LLVM::Linkage::LinkonceODR)); })
+            .Default([](auto) { PYLIR_UNREACHABLE; });
     }
 
     if (ctors.empty())
