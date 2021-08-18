@@ -1,6 +1,7 @@
 
 #include "PylirMain.hpp"
 
+#include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Export.h>
@@ -217,6 +218,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         return false;
     }
 
+    manager.addPass(mlir::LLVM::createLegalizeForExportPass());
     manager.addPass(std::move(pass));
     if (mlir::failed(manager.run(*module)))
     {

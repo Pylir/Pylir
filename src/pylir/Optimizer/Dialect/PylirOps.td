@@ -293,7 +293,7 @@ def Pylir_TypeSlotPredicateAttr : I32EnumAttr<"TypeSlotPredicate","",[
 }
 
 def Pylir_GetTypeSlotOp : Pylir_Op<"getTypeSlot", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect]> {
-    let arguments = (ins Pylir_TypeSlotPredicateAttr:$predicate, Arg<Pylir_TypeObject,"",[MemRead]>:$input);
+    let arguments = (ins Pylir_TypeSlotPredicateAttr:$predicate, Arg<PointerOf<Pylir_TypeObject>, "", [MemRead]>:$input);
     let results = (outs AnyType:$result, I1:$found);
 
     let assemblyFormat = "$predicate `from` $input `:` type($input) `->` type($result) attr-dict";

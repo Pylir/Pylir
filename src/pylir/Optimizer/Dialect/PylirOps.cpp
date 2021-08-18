@@ -574,7 +574,8 @@ bool pylir::Dialect::UnboxOp::areCastCompatible(mlir::TypeRange inputs, mlir::Ty
     {
         return false;
     }
-    return !outputs[0].isa<ObjectType>() && inputs[0].isa<ObjectType>();
+    return !outputs[0].isa<ObjectType>() && inputs[0].isa<PointerType>()
+           && inputs[0].cast<PointerType>().getElementType().isa<ObjectType>();
 }
 
 mlir::OpFoldResult pylir::Dialect::GetStringItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
