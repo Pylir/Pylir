@@ -13,9 +13,9 @@ constexpr std::string_view functionTypeObjectName = "__builtins__.function";
 
 Dialect::ConstantGlobalOp getFunctionTypeObject(mlir::ModuleOp& module);
 
-constexpr std::string_view longTypeObjectName = "__builtins__.long";
+constexpr std::string_view intTypeObjectName = "__builtins__.int";
 
-Dialect::ConstantGlobalOp getLongTypeObject(mlir::ModuleOp& module);
+Dialect::ConstantGlobalOp getIntTypeObject(mlir::ModuleOp& module);
 
 constexpr std::string_view noneTypeObjectName = "__builtins__.NoneType";
 

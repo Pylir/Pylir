@@ -513,7 +513,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                         location, Dialect::IntegerAttr::get(m_builder.getContext(),
                                                             pylir::get<llvm::APInt>(literal.token.getValue())));
                     auto boxed = m_builder.create<Dialect::BoxOp>(
-                        location, Dialect::ObjectType::get(Dialect::getLongTypeObject(m_module)), constant);
+                        location, Dialect::ObjectType::get(Dialect::getIntTypeObject(m_module)), constant);
                     auto gcAlloc = m_builder.create<Dialect::GCAllocOp>(
                         location, pylir::Dialect::PointerType::get(boxed.getType()));
                     m_builder.create<Dialect::StoreOp>(location, boxed, gcAlloc);

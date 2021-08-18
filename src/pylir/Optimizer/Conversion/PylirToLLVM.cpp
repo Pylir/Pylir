@@ -67,7 +67,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         {
             return getPyTypeObject();
         }
-        if (value == llvm::StringRef{pylir::Dialect::longTypeObjectName})
+        if (value == llvm::StringRef{pylir::Dialect::intTypeObjectName})
         {
             return getPyLongObject();
         }

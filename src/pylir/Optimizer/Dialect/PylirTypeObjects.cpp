@@ -65,7 +65,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
                     module,
                     pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(), TypeSlotPredicate::Call)
                         .cast<mlir::FunctionType>(),
-                    "pylir_function_type__call__",
+                    "__builtins__.function.__call__",
                     [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
                     {
                         mlir::Value self = funcOp.getArgument(0);
@@ -81,11 +81,11 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(mlir::ModuleOp& module)
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getIntTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         ObjectType::get(mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name())),
-        module, longTypeObjectName,
+        module, intTypeObjectName,
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
@@ -96,7 +96,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(mlir::ModuleO
                     pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
                                                                            TypeSlotPredicate::Multiply)
                         .cast<mlir::FunctionType>(),
-                    "pylir_long_type__mul__",
+                    "__builtins__.int.__mul__",
                     [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
                     {
                         auto lhs = funcOp.getArgument(0);
@@ -108,10 +108,10 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getLongTypeObject(mlir::ModuleO
                                                                          builder.getType<Dialect::IntegerType>(), rhs);
                         auto result = builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), lhsValue, rhsValue);
                         auto box = builder.create<Dialect::BoxOp>(builder.getUnknownLoc(),
-                                                                  ObjectType::get(getLongTypeObject(module)), result);
+                                                                  ObjectType::get(getIntTypeObject(module)), result);
                         auto gcAlloc = builder.create<Dialect::GCAllocOp>(
                             builder.getUnknownLoc(),
-                            Dialect::PointerType::get(ObjectType::get(getLongTypeObject(module))), mlir::Value{});
+                            Dialect::PointerType::get(ObjectType::get(getIntTypeObject(module))), mlir::Value{});
                         builder.create<pylir::Dialect::StoreOp>(builder.getUnknownLoc(), box, gcAlloc);
                         builder.create<Dialect::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{gcAlloc});
                     }));
