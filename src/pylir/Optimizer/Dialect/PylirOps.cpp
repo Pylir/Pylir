@@ -410,61 +410,6 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::ConstantGlobalOp::create(mlir::
     return builder.create<ConstantGlobalOp>(location, name, type, initializer);
 }
 
-mlir::OpFoldResult pylir::Dialect::MakeListOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
-    {
-        return mlir::ArrayAttr::get(getContext(), operands);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    if (std::all_of(operands.begin(), operands.end(), [](mlir::Attribute attr) { return static_cast<bool>(attr); }))
-    {
-        return mlir::ArrayAttr::get(getContext(), operands);
-    }
-    return nullptr;
-}
-
-mlir::OpFoldResult pylir::Dialect::TupleToListOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 1);
-    if (auto tuple = operands[0].dyn_cast_or_null<mlir::ArrayAttr>())
-    {
-        return tuple;
-    }
-    return nullptr;
-}
-
-bool pylir::Dialect::TupleToListOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
-{
-    if (inputs.size() != 1 && outputs.size() != 1)
-    {
-        return false;
-    }
-    return inputs[0].isa<TupleType>() && outputs[0].isa<ListType>();
-}
-
-mlir::OpFoldResult pylir::Dialect::ListToTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    if (auto list = operands[0].dyn_cast_or_null<mlir::ArrayAttr>())
-    {
-        return list;
-    }
-    return nullptr;
-}
-
-bool pylir::Dialect::ListToTupleOp::areCastCompatible(mlir::TypeRange inputs, mlir::TypeRange outputs)
-{
-    if (inputs.size() != 1 && outputs.size() != 1)
-    {
-        return false;
-    }
-    return outputs[0].isa<TupleType>() && inputs[0].isa<ListType>();
-}
-
 mlir::LogicalResult pylir::Dialect::DataOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     auto result = symbolTable.lookupNearestSymbolFrom<Dialect::ConstantGlobalOp>(*this, globalNameAttr());

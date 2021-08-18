@@ -163,42 +163,6 @@ def Pylir_BtoIOp : Pylir_Cast<"bToi"> {
     let hasFolder = 1;
 }
 
-def Pylir_MakeListOp : Pylir_Op<"makeList", [NoSideEffect]> {
-    let arguments = (ins Variadic<PointerOf<Pylir_Object>>:$input);
-    let results = (outs Pylir_List:$result);
-
-    let assemblyFormat = [{
-              $input `:` type($input) `->` type($result) attr-dict
-            }];
-
-    let hasFolder = 1;
-}
-
-def Pylir_MakeTupleOp : Pylir_Op<"makeTuple", [NoSideEffect]> {
-    let arguments = (ins Variadic<PointerOf<Pylir_Object>>:$input);
-    let results = (outs Pylir_Tuple:$result);
-
-    let assemblyFormat = [{
-              $input `:` type($input) `->` type($result) attr-dict
-            }];
-
-    let hasFolder = 1;
-}
-
-def Pylir_TupleToListOp : Pylir_Cast<"tupleToList", [NoSideEffect]> {
-    let arguments = (ins Pylir_Tuple:$input);
-    let results = (outs Pylir_List:$result);
-
-    let hasFolder = 1;
-}
-
-def Pylir_ListToTupleOp : Pylir_Cast<"listToTuple", [NoSideEffect]> {
-    let arguments = (ins Pylir_List:$input);
-    let results = (outs Pylir_Tuple:$result);
-
-    let hasFolder = 1;
-}
-
 def Pylir_TypeOfOp : Pylir_Op<"typeOf", [NoSideEffect]> {
     let arguments = (ins Pylir_Object:$input);
     let results = (outs PointerOf<Pylir_TypeObject>:$result);
