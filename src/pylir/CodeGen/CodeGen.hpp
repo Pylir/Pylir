@@ -96,6 +96,8 @@ public:
     mlir::Value visit(const Syntax::Atom& atom);
 
     mlir::Value visit(const Syntax::Enclosure& enclosure);
+
+    mlir::Value visit(const Syntax::AssignmentExpression& assignmentExpression);
 };
 
 class Module

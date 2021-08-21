@@ -29,5 +29,9 @@ Dialect::ConstantGlobalOp getNotImplementedTypeObject(mlir::ModuleOp& module);
 
 Dialect::ConstantGlobalOp getNotImplementedObject(mlir::ModuleOp& module);
 
+constexpr std::string_view tupleTypeObjectName = "__builtins__.tuple";
+
+Dialect::ConstantGlobalOp getTupleTypeObject(mlir::ModuleOp& module);
+
 mlir::FunctionType getCCFuncType(mlir::MLIRContext* context);
 } // namespace pylir::Dialect

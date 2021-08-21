@@ -72,7 +72,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
                         mlir::Value args = funcOp.getArgument(1);
                         mlir::Value dict = funcOp.getArgument(2);
                         auto unboxed = builder.create<Dialect::UnboxOp>(builder.getUnknownLoc(),
-                                                                        getCCFuncType(builder.getContext()), self);
+                                                                        getCCFuncType(module.getContext()), self);
                         auto result = builder.create<mlir::CallIndirectOp>(builder.getUnknownLoc(), unboxed,
                                                                            mlir::ValueRange{self, args, dict});
                         builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), result.getResult(0));
@@ -174,7 +174,23 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::M
 mlir::FunctionType pylir::Dialect::getCCFuncType(mlir::MLIRContext* context)
 {
     auto ref = Dialect::PointerType::get(ObjectType::get(context));
-    return mlir::FunctionType::get(
-        context, {ref, Dialect::TupleType::get(context), Dialect::PointerType::get(Dialect::DictType::get(context))},
-        {ref});
+    return mlir::FunctionType::get(context,
+                                   {ref,
+                                    Dialect::PointerType::get(Dialect::ObjectType::get(
+                                        mlir::FlatSymbolRefAttr::get(context, tupleTypeObjectName))),
+                                    Dialect::PointerType::get(Dialect::DictType::get(context))},
+                                   {ref});
+}
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::ModuleOp& module)
+{
+    return getConstant(
+        ObjectType::get(mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name())),
+        module, tupleTypeObjectName,
+        [&]()
+        {
+            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+
+            return dict;
+        });
 }

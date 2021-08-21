@@ -171,10 +171,48 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
 {
     return pylir::match(
         starredExpression.variant,
-        [](const Syntax::StarredExpression::Items&) -> mlir::Value
+        [&](const Syntax::StarredExpression::Items& items) -> mlir::Value
         {
-            // TODO
-            PYLIR_UNREACHABLE;
+            if (items.leading.empty())
+            {
+                if (!items.last)
+                {
+                    return {};
+                }
+                return visit(pylir::get<Syntax::AssignmentExpression>(items.last->variant));
+            }
+            auto loc = getLoc(starredExpression, starredExpression);
+
+            mlir::Value count =
+                m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(0));
+            std::vector<mlir::Value> operands;
+            for (auto& [item, comma] : items.leading)
+            {
+                if (auto* assignment = std::get_if<Syntax::AssignmentExpression>(&item.variant))
+                {
+                    operands.push_back(visit(*assignment));
+                    count = m_builder.create<mlir::AddIOp>(
+                        loc, m_builder.getIndexType(), count,
+                        m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(1)));
+                    continue;
+                }
+                auto list = visit(pylir::get<std::pair<BaseToken, Syntax::OrExpr>>(item.variant).second);
+                // TODO check if iterable, add size to count, etc
+            }
+            auto tuple = m_builder.create<Dialect::GCAllocOp>(
+                loc,
+                Dialect::PointerType::get(
+                    Dialect::ObjectType::get(m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)))),
+                count);
+            m_builder.create<Dialect::MakeTupleOp>(loc, tuple, count);
+            std::size_t index = 0;
+            for (auto iter : operands)
+            {
+                auto constant =
+                    m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(index++));
+                m_builder.create<Dialect::SetTupleItemOp>(loc, tuple, constant, iter);
+            }
+            return tuple;
         },
         [&](const Syntax::Expression& expression) { return visit(expression); });
 }
@@ -595,14 +633,21 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
 {
     return pylir::match(
         enclosure.variant,
-        [&](const Syntax::Enclosure::ParenthForm& parenthForm)
+        [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> mlir::Value
         {
             if (parenthForm.expression)
             {
                 return visit(*parenthForm.expression);
             }
-            // TODO
-            PYLIR_UNREACHABLE;
+            auto loc = getLoc(parenthForm, parenthForm.openParenth);
+            auto zero = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(0));
+            auto zeroSizedStorage = m_builder.create<Dialect::GCAllocOp>(
+                loc,
+                Dialect::PointerType::get(
+                    Dialect::ObjectType::get(m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)))),
+                zero);
+            m_builder.create<Dialect::MakeTupleOp>(loc, zeroSizedStorage, zero);
+            return zeroSizedStorage;
         },
         [&](const auto&) -> mlir::Value
         {
@@ -696,4 +741,14 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
     m_currentFunc.getCallableRegion()->push_back(endBlock);
     m_builder.setInsertionPointToStart(endBlock);
     return m_builder.create<Dialect::LoadOp>(loc, result);
+}
+
+mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AssignmentExpression& assignmentExpression)
+{
+    if (!assignmentExpression.identifierAndWalrus)
+    {
+        return visit(*assignmentExpression.expression);
+    }
+    // TODO
+    PYLIR_UNREACHABLE;
 }

@@ -484,7 +484,9 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::IterNext:
         case TypeSlotPredicate::Del: return mlir::FunctionType::get(context, {ref}, {ref});
         case TypeSlotPredicate::Dict: return Dialect::PointerType::get(Dialect::DictType::get(context));
-        case TypeSlotPredicate::Bases: return Dialect::TupleType::get(context);
+        case TypeSlotPredicate::Bases:
+            return Dialect::PointerType::get(
+                Dialect::ObjectType::get(mlir::FlatSymbolRefAttr::get(context, tupleTypeObjectName)));
     }
     PYLIR_UNREACHABLE;
 }
@@ -601,6 +603,32 @@ void printGlobalInitialValue(mlir::OpAsmPrinter& printer, pylir::Dialect::Global
     }
     printer << initializer;
 }
+
+mlir::LogicalResult verifyDynamicSize(mlir::Operation* op, mlir::Value dynamicSize)
+{
+    auto elementType = op->getResultTypes()[0].cast<pylir::Dialect::PointerType>().getElementType();
+    if (elementType.isa<pylir::Dialect::ObjectType>() && elementType.cast<pylir::Dialect::ObjectType>().getType()
+        && elementType.cast<pylir::Dialect::ObjectType>().getType().getValue()
+               == llvm::StringRef{pylir::Dialect::tupleTypeObjectName})
+    {
+        if (!dynamicSize)
+        {
+            return op->emitError("Variable object type ") << elementType << " requires a dynamic size";
+        }
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult verifyDynamicSize(pylir::Dialect::GCAllocOp op)
+{
+    return verifyDynamicSize(op, op.dynamicSize());
+}
+
+mlir::LogicalResult verifyDynamicSize(pylir::Dialect::AllocaOp op)
+{
+    return verifyDynamicSize(op, op.dynamicSize());
+}
+
 } // namespace
 
 #include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>

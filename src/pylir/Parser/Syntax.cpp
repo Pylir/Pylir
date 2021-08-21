@@ -229,3 +229,26 @@ std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax:
     }
     return {range(value.identifierAndWalrus->first).first, range(*value.expression).second};
 }
+
+std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::StarredExpression, void>::getRange(
+    const Syntax::StarredExpression& value) noexcept
+{
+    return pylir::match(
+        value.variant, [](const Syntax::Expression& expression) { return range(expression); },
+        [](const Syntax::StarredExpression::Items& items) -> std::pair<std::size_t, std::size_t>
+        {
+            if (!items.leading.empty())
+            {
+                if (items.last)
+                {
+                    return {range(items.leading.front().first).first, range(*items.last).second};
+                }
+                return {range(items.leading.front().first).first, range(items.leading.back().second).second};
+            }
+            if (items.last)
+            {
+                return range(*items.last);
+            }
+            return {0, 0};
+        });
+}

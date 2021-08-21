@@ -29,11 +29,6 @@ def Pylir_Set : Pylir_Type<"Set", []> {
     let summary = "python set";
 }
 
-def Pylir_Tuple : Pylir_Type<"Tuple"> {
-    let mnemonic = "tuple";
-    let summary = "python tuple";
-}
-
 def Pylir_Dict : Pylir_Type<"Dict", []> {
     let mnemonic = "dict";
     let summary = "python dictionary";
@@ -146,6 +141,8 @@ class Pylir_KnownTypeObjectCheck<string typeObjectNameVariable> : Type<
 
 def Pylir_TypeObject : Pylir_KnownTypeObjectCheck<"typeTypeObjectName">;
 
+def Pylir_Tuple : Pylir_KnownTypeObjectCheck<"tupleTypeObjectName">;
+
 def Pylir_Bool : TypeAlias<I1>;
 
 def Pylir_Float : TypeAlias<F64>;
@@ -176,7 +173,7 @@ def Pylir_Function : Type<
         SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getResult(0)", PointerOf<Pylir_Object>.predicate>,
         CPred<"$_self.cast<::mlir::FunctionType>().getNumInputs() == 3">,
         SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(0)", PointerOf<Pylir_Object>.predicate>,
-        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(1)", Pylir_Tuple.predicate>,
+        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(1)", PointerOf<Pylir_Tuple>.predicate>,
         SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(2)", PointerOf<Pylir_Dict>.predicate>
     ]>>
 {
@@ -184,19 +181,13 @@ def Pylir_Function : Type<
     let builderCall = [{
         mlir::FunctionType::get(
             $_builder.getContext(),
-            {::pylir::Dialect::get(ObjectType::get($_builder.getContext())),
-             Dialect::TupleType::get($_builder.getContext()),
-             ::pylir::Dialect::get(Dialect::DictType::get($_builder.getContext()))},
-            {::pylir::Dialect::getget(ObjectType::get($_builder.getContext()))})
+            {}] # PointerOf<Pylir_Object>.builderCall # [{ , }]
+            # PointerOf<Pylir_Dict>.builderCall # [{ , }]
+            # PointerOf<Pylir_Tuple>.builderCall #
+            [{ { }] # PointerOf<Pylir_Object>.builderCall # [{ })
     }];
 }
 
-def AnySequenceType : AnyTypeOf<[Pylir_String, Pylir_Tuple, Pylir_List]>;
-
-def AnyImmutableType : AnyTypeOf<[Pylir_Bool, Pylir_Float, Pylir_Integer, Pylir_String, Pylir_Tuple, Pylir_Function]>;
-
-def AnyMutableType : AnyTypeOf<[Pylir_List, Pylir_Set, Pylir_Dict]>;
-
-def AnyValueType : AnyTypeOf<[AnyImmutableType, AnyMutableType]>;
+def AnyValueType : AnyTypeOf<[Pylir_Integer, Pylir_Float]>;
 
 #endif

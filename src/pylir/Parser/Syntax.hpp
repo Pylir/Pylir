@@ -1436,4 +1436,10 @@ struct LocationProvider<Syntax::AssignmentExpression, void>
         getRange(const Syntax::AssignmentExpression& assignmentExpression) noexcept;
 };
 
+template <>
+struct LocationProvider<Syntax::StarredExpression, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredExpression& starredItem) noexcept;
+};
+
 } // namespace pylir::Diag

@@ -294,7 +294,7 @@ def Pylir_BoxOp : Pylir_Cast<"box", [NoSideEffect]> {
 
 def Pylir_UnboxOp : Pylir_Cast<"unbox", [NoSideEffect]> {
     let arguments = (ins PointerOf<Pylir_Object>:$input);
-    let results = (outs AnyImmutableType:$result);
+    let results = (outs AnyValueType:$result);
 
     let assemblyFormat = [{
         $input `:` type($input) `->` type($result) attr-dict
@@ -315,20 +315,14 @@ def Pylir_GCAllocOp : Pylir_Op<"gcAlloc">
                     return build($_builder,$_state, pointer, {});
                 }]>
             ];
-}
 
-def Pylir_GetRefOp : Pylir_Op<"getRef", [NoSideEffect]>
-{
-    let arguments = (ins PointerOf<Pylir_Object>:$input);
-    let results = (outs PointerOf<AnyMutableType>:$result);
-
-    let assemblyFormat = [{
-            $input `:` type($input) `->` type($result) attr-dict
-        }];
+    let verifier = [{
+        return ::verifyDynamicSize(*this);
+    }];
 }
 
 def Pylir_GetTupleItemOp : Pylir_Op<"getTupleItem", [NoSideEffect]> {
-    let arguments = (ins Pylir_Tuple:$tuple, Index:$index);
+    let arguments = (ins PointerOf<Pylir_Tuple>:$tuple, Index:$index);
     let results = (outs PointerOf<Pylir_Object>:$result);
 
     let assemblyFormat = [{
@@ -337,7 +331,7 @@ def Pylir_GetTupleItemOp : Pylir_Op<"getTupleItem", [NoSideEffect]> {
 }
 
 def Pylir_GetStringItemOp : Pylir_Op<"getStringItem", [NoSideEffect]> {
-    let arguments = (ins Pylir_String:$string, Index:$index);
+    let arguments = (ins PointerOf<Pylir_String>:$string, Index:$index);
     let results = (outs Pylir_String:$result);
 
     let assemblyFormat = [{
@@ -449,6 +443,10 @@ def Pylir_AllocaOp : Pylir_Op<"alloca"> {
                 return build($_builder,$_state, pointer, {});
             }]>
         ];
+
+    let verifier = [{
+            return ::verifyDynamicSize(*this);
+        }];
 }
 
 def Pylir_GlobalOp : Pylir_Op<"global", [Symbol]> {
@@ -469,5 +467,31 @@ def Pylir_GetGlobalOp : Pylir_Op<"get_global", [NoSideEffect, DeclareOpInterface
 
     let assemblyFormat = "$name `:` type($result) attr-dict";
 }
+
+def Pylir_MakeTupleOp : Pylir_Op<"makeTuple"> {
+    let summary = "create a tuple";
+
+    let arguments = (ins
+                        Arg<PointerOf<Pylir_Tuple>, "Memory to emplace in",[MemWrite]>:$memory,
+                        Index:$count);
+
+    let assemblyFormat = [{
+        `size` $count `into` $memory attr-dict
+    }];
+}
+
+def Pylir_SetTupleItemOp : Pylir_Op<"setTupleItem"> {
+    let summary = "create a tuple";
+
+    let arguments = (ins
+                        Arg<PointerOf<Pylir_Tuple>, "Tuple to write to",[MemWrite]>:$memory,
+                        Index:$index,
+                        PointerOf<Pylir_Object>:$element);
+
+    let assemblyFormat = [{
+        $memory `[` $index `]` `to` $element attr-dict `:` type($element)
+    }];
+}
+
 
 #endif

@@ -45,7 +45,6 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
 {
     llvm::DenseMap<llvm::StringRef, mlir::Type> m_knownObjectTypes;
     mlir::LLVM::LLVMStructType m_pyObject;
-    mlir::LLVM::LLVMStructType m_pyTupleValue;
     mlir::LLVM::LLVMStructType m_pyTupleObject;
     mlir::LLVM::LLVMStructType m_pyDictValue;
     mlir::LLVM::LLVMStructType m_pyDictObject;
@@ -61,21 +60,9 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
 
     mlir::Type getTypeFromTypeObject(pylir::Dialect::ConstantGlobalOp constant)
     {
-        // builtin cases first
         auto value = constant.sym_name();
-        if (value == llvm::StringRef{pylir::Dialect::typeTypeObjectName})
-        {
-            return getPyTypeObject();
-        }
-        if (value == llvm::StringRef{pylir::Dialect::intTypeObjectName})
-        {
-            return getPyLongObject();
-        }
-        if (value == llvm::StringRef{pylir::Dialect::functionTypeObjectName})
-        {
-            return getPyFunctionObject();
-        }
-        // All others are just a PyObject with a dict
+        (void)value;
+        // TODO custom classes
         return getPyObject();
     }
 
@@ -166,13 +153,9 @@ public:
                 return mlir::LLVM::LLVMPointerType::get(element);
             });
 
-        addConversion([&](pylir::Dialect::TupleType) -> llvm::Optional<mlir::Type> { return getPyTupleValue(); });
-
         addConversion([&](pylir::Dialect::DictType) -> llvm::Optional<mlir::Type> { return getPyDictValue(); });
 
         addConversion([&](pylir::Dialect::IntegerType) -> llvm::Optional<mlir::Type> { return getPyLongValue(); });
-
-        addConversion([&](pylir::Dialect::TupleType) -> llvm::Optional<mlir::Type> { return getPyTupleValue(); });
 
         addConversion(
             [&](pylir::Dialect::ObjectType type) -> llvm::Optional<mlir::Type>
@@ -184,6 +167,26 @@ public:
                 auto value = type.getType().getValue();
                 return m_knownObjectTypes.lookup(value);
             });
+
+        // We need to predeclare the structs of the builtin types to resolve a few cyclic references
+        struct Builtins
+        {
+            std::string_view structName;
+            std::string_view linkageName;
+            mlir::Type (PylirTypeConverter::*getter)();
+        };
+        Builtins builtins[] = {
+            {"PyTupleObject", pylir::Dialect::tupleTypeObjectName, &PylirTypeConverter::getPyTupleObject},
+            {"PyLongObject", pylir::Dialect::intTypeObjectName, &PylirTypeConverter::getPyLongObject},
+            {"PyTypeObject", pylir::Dialect::typeTypeObjectName, &PylirTypeConverter::getPyTypeObject},
+            {"PyFunctionObject", pylir::Dialect::functionTypeObjectName, &PylirTypeConverter::getPyFunctionObject},
+        };
+        for (auto [structName, linkageName, method] : builtins)
+        {
+            (void)method;
+            m_knownObjectTypes.insert(
+                {linkageName, mlir::LLVM::LLVMStructType::getIdentified(&getContext(), structName)});
+        }
 
         for (auto op : module.getOps<pylir::Dialect::ConstantGlobalOp>())
         {
@@ -198,6 +201,13 @@ public:
                 continue;
             }
             m_knownObjectTypes.insert({op.sym_name(), getTypeFromTypeObject(op)});
+        }
+
+        for (auto [structName, linkageName, method] : builtins)
+        {
+            (void)structName;
+            (void)linkageName;
+            (this->*method)();
         }
 
         switch (m_triple.getArch())
@@ -233,20 +243,6 @@ public:
         return m_pyObject;
     }
 
-    mlir::Type getPyTupleValue()
-    {
-        if (!m_pyTupleValue)
-        {
-            m_pyTupleValue = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyTupleValue");
-            std::vector<mlir::Type> types;
-            types.emplace_back(mlir::LLVM::LLVMPointerType::get(
-                mlir::IntegerType::get(&getContext(), 8))); // opaque pointer to the tuple for now
-            auto result = m_pyTupleValue.setBody(types, false);
-            PYLIR_ASSERT(mlir::succeeded(result));
-        }
-        return m_pyTupleValue;
-    }
-
     mlir::Type getPyTupleObject()
     {
         if (!m_pyTupleObject)
@@ -254,7 +250,8 @@ public:
             m_pyTupleObject = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyTupleObject");
             std::vector<mlir::Type> types;
             types.emplace_back(getPyObject()); // base
-            types.emplace_back(getPyTupleValue());
+            types.emplace_back(getIndexType());
+            types.emplace_back(mlir::LLVM::LLVMArrayType::get(mlir::LLVM::LLVMPointerType::get(getPyObject()), 0));
             auto result = m_pyTupleObject.setBody(types, false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
@@ -372,6 +369,14 @@ public:
         return m_cAbi->callFunc(builder, loc, m_runtimeFuncs[index], operands);
     }
 };
+
+mlir::Value sizeOf(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type llvmType, mlir::Type indexType)
+{
+    auto null = builder.create<mlir::LLVM::NullOp>(loc, llvmType);
+    auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
+    auto gep = builder.create<mlir::LLVM::GEPOp>(loc, llvmType, null, mlir::ValueRange{one});
+    return builder.create<mlir::LLVM::PtrToIntOp>(loc, indexType, gep);
+}
 
 mlir::Value genNullConstant(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type llvmType)
 {
@@ -679,7 +684,6 @@ struct UnboxConversion : SingleOpMatcher<UnboxConversion, pylir::Dialect::UnboxO
         // TODO: add other builtins
         auto objectType = llvm::TypeSwitch<mlir::Type, mlir::Type>(op->getResultTypes()[0])
                               .Case([&](pylir::Dialect::IntegerType) { return getTypeConverter()->getPyLongObject(); })
-                              .Case([&](pylir::Dialect::TupleType) { return getTypeConverter()->getPyTypeObject(); })
                               .Case([&](mlir::FunctionType) { return getTypeConverter()->getPyFunctionObject(); })
                               .Default([](auto) -> mlir::Type { PYLIR_UNREACHABLE; });
         auto cast = rewriter.create<mlir::LLVM::BitcastOp>(op->getLoc(), mlir::LLVM::LLVMPointerType::get(objectType),
@@ -703,15 +707,20 @@ struct GCAllocConversion : SingleOpMatcher<GCAllocConversion, pylir::Dialect::GC
                  mlir::ConversionPatternRewriter& rewriter) const
     {
         auto type = typeConverter->convertType(op->getResultTypes()[0]);
-        auto null = rewriter.create<mlir::LLVM::NullOp>(op->getLoc(), type);
-        auto one = createIndexConstant(rewriter, op->getLoc(), 1);
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op->getLoc(), type, null, mlir::ValueRange{one});
-        mlir::Value sizeOf = rewriter.create<mlir::LLVM::PtrToIntOp>(op->getLoc(), getIndexType(), gep);
+        auto pointerElementType = type.cast<mlir::LLVM::LLVMPointerType>().getElementType();
+        mlir::Value size = sizeOf(rewriter, op->getLoc(), type, getIndexType());
         if (adaptor.dynamicSize())
         {
-            sizeOf = rewriter.create<mlir::LLVM::MulOp>(op->getLoc(), sizeOf, adaptor.dynamicSize());
+            auto elementType = pointerElementType.cast<mlir::LLVM::LLVMStructType>()
+                                   .getBody()
+                                   .back()
+                                   .cast<mlir::LLVM::LLVMArrayType>()
+                                   .getElementType();
+            auto elementSize = sizeOf(rewriter, op->getLoc(), elementType, getIndexType());
+            auto appendage = rewriter.create<mlir::LLVM::MulOp>(op->getLoc(), adaptor.dynamicSize(), elementSize);
+            size = rewriter.create<mlir::LLVM::AddOp>(op->getLoc(), size, appendage);
         }
-        auto alloc = getTypeConverter()->callRuntime(rewriter, op->getLoc(), RuntimeFunc::PylirGCAlloc, {sizeOf});
+        auto alloc = getTypeConverter()->callRuntime(rewriter, op->getLoc(), RuntimeFunc::PylirGCAlloc, {size});
         rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, type, alloc);
     }
 };
@@ -726,16 +735,21 @@ struct AllocaConversion : SingleOpMatcher<AllocaConversion, pylir::Dialect::Allo
                  mlir::ConversionPatternRewriter& rewriter) const
     {
         auto type = typeConverter->convertType(op->getResultTypes()[0]);
-        mlir::Value sizeOf;
+        auto pointerElementType = type.cast<mlir::LLVM::LLVMPointerType>().getElementType();
+        mlir::Value size = sizeOf(rewriter, op->getLoc(), pointerElementType, getIndexType());
         if (adaptor.dynamicSize())
         {
-            sizeOf = adaptor.dynamicSize();
+            auto elementType = pointerElementType.cast<mlir::LLVM::LLVMStructType>()
+                                   .getBody()
+                                   .back()
+                                   .cast<mlir::LLVM::LLVMArrayType>()
+                                   .getElementType();
+            auto elementSize = sizeOf(rewriter, op->getLoc(), elementType, getIndexType());
+            auto appendage = rewriter.create<mlir::LLVM::MulOp>(op->getLoc(), adaptor.dynamicSize(), elementSize);
+            size = rewriter.create<mlir::LLVM::AddOp>(op->getLoc(), size, appendage);
         }
-        else
-        {
-            sizeOf = createIndexConstant(rewriter, op->getLoc(), 1);
-        }
-        rewriter.replaceOpWithNewOp<mlir::LLVM::AllocaOp>(op, type, sizeOf);
+        auto alloca = rewriter.create<mlir::LLVM::AllocaOp>(op->getLoc(), getVoidPtrType(), size, 8);
+        rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, mlir::LLVM::LLVMPointerType::get(type), alloca);
     }
 };
 
@@ -945,6 +959,79 @@ struct GetTypeSlotConversion : SingleOpMatcher<GetTypeSlotConversion, pylir::Dia
     }
 };
 
+struct MakeTupleConversion : SingleOpMatcher<MakeTupleConversion, pylir::Dialect::MakeTupleOp>
+{
+    using SingleOpMatcher::SingleOpMatcher;
+
+    using SingleOpMatcher::rewrite;
+
+    void rewrite(mlir::Operation* op, pylir::Dialect::MakeTupleOp::Adaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const
+    {
+        auto exit = llvm::make_scope_exit([&] { rewriter.eraseOp(op); });
+        auto tuple = adaptor.memory();
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+
+        auto typeGEP = rewriter.create<mlir::LLVM::GEPOp>(
+            op->getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyTypeObject()), tuple,
+            mlir::ValueRange{zero, zero, zero});
+        auto tupleTypeObject = rewriter.create<mlir::LLVM::AddressOfOp>(
+            op->getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyTypeObject()),
+            rewriter.getSymbolRefAttr(pylir::Dialect::tupleTypeObjectName));
+        rewriter.create<mlir::LLVM::StoreOp>(op->getLoc(), tupleTypeObject, typeGEP);
+
+        auto sizeGEP = rewriter.create<mlir::LLVM::GEPOp>(
+            op->getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), tuple, mlir::ValueRange{zero, one});
+        rewriter.create<mlir::LLVM::StoreOp>(op->getLoc(), adaptor.count(), sizeGEP);
+    }
+};
+
+struct GetTupleItemConversion : SingleOpMatcher<GetTupleItemConversion, pylir::Dialect::GetTupleItemOp>
+{
+    using SingleOpMatcher::SingleOpMatcher;
+
+    using SingleOpMatcher::rewrite;
+
+    void rewrite(mlir::Operation* op, pylir::Dialect::GetTupleItemOp::Adaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const
+    {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto two =
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
+            op->getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObject())),
+            adaptor.tuple(), mlir::ValueRange{zero, two, adaptor.index()});
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep);
+    }
+};
+
+struct SetTupleItemConversion : SingleOpMatcher<SetTupleItemConversion, pylir::Dialect::SetTupleItemOp>
+{
+    using SingleOpMatcher::SingleOpMatcher;
+
+    using SingleOpMatcher::rewrite;
+
+    void rewrite(mlir::Operation* op, pylir::Dialect::SetTupleItemOp::Adaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const
+    {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto two =
+            rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
+            op->getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObject())),
+            adaptor.memory(), mlir::ValueRange{zero, two, adaptor.index()});
+        rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, normalizeObject(rewriter, op->getLoc(), adaptor.element()),
+                                                         gep);
+    }
+};
+
 template <class... Args>
 void populateSingleOpMatchers(PylirTypeConverter& converter, mlir::OwningRewritePatternList& patterns)
 {
@@ -980,7 +1067,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     populateSingleOpMatchers<ConstantOpConversion, BoxConversion, IMulConversion, DataOfConversion, StoreConversion,
                              TypeOfConversion, IdConversion, ICmpConversion, GetTypeSlotConversion, GCAllocConversion,
                              LoadConversion, GetGlobalConversion, AllocaConversion, CallConversion,
-                             CallIndirectConversion, UnboxConversion, ReturnConversion>(converter, patterns);
+                             CallIndirectConversion, UnboxConversion, ReturnConversion, MakeTupleConversion,
+                             GetTupleItemConversion, SetTupleItemConversion>(converter, patterns);
     std::vector<std::pair<mlir::LLVM::LLVMFuncOp, mlir::LLVM::GlobalOp>> ctors;
     patterns.insert<ConstantGlobalOpConversion>(ctors, ConstantGlobalOpConversion::Operation::getOperationName(),
                                                 &converter.getContext(), converter);
