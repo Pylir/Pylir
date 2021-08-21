@@ -10,6 +10,12 @@ void pylir::postProcessLLVMModule(llvm::Module& module)
     // Normal name so it can be called from C
     llvm::GlobalAlias::create("pylir__main____init__", aliasee);
 
+    // Add allocsize that can't be set in MLIR LLVM IR
+    if (auto alloc = module.getFunction("pylir_gc_alloc"))
+    {
+        alloc->addFnAttr(llvm::Attribute::getWithAllocSizeArgs(alloc->getContext(), 0, {}));
+    }
+
     // Apply comdat to all globals with linkonce_odr
     for (auto& iter : module.global_objects())
     {
