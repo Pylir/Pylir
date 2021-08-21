@@ -186,7 +186,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
             mlir::Value count =
                 m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(0));
             std::vector<mlir::Value> operands;
-            for (auto& [item, comma] : items.leading)
+            auto handleItem = [&](const Syntax::StarredItem& item)
             {
                 if (auto* assignment = std::get_if<Syntax::AssignmentExpression>(&item.variant))
                 {
@@ -194,10 +194,18 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
                     count = m_builder.create<mlir::AddIOp>(
                         loc, m_builder.getIndexType(), count,
                         m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(1)));
-                    continue;
+                    return;
                 }
                 auto list = visit(pylir::get<std::pair<BaseToken, Syntax::OrExpr>>(item.variant).second);
                 // TODO check if iterable, add size to count, etc
+            };
+            for (auto& [item, comma] : items.leading)
+            {
+                handleItem(item);
+            }
+            if (items.last)
+            {
+                handleItem(*items.last);
             }
             auto tuple = m_builder.create<Dialect::GCAllocOp>(
                 loc,

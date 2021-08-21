@@ -70,6 +70,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     {
         mlir::Type returnType;
         llvm::SmallVector<mlir::Type> operands;
+        llvm::SmallVector<mlir::Attribute> passthrough;
         std::string_view name;
         switch (func)
         {
@@ -129,6 +130,11 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         builder.setInsertionPointToEnd(module.getBody());
         m_runtimeFuncs[static_cast<std::size_t>(func)] =
             m_cAbi->declareFunc(builder, builder.getUnknownLoc(), returnType, name, operands);
+        if (!passthrough.empty())
+        {
+            m_runtimeFuncs[static_cast<std::size_t>(func)]->setAttr("passthrough",
+                                                                    mlir::ArrayAttr::get(&getContext(), passthrough));
+        }
     }
 
 public:
@@ -1052,12 +1058,12 @@ void ConvertPylirToLLVMPass::runOnOperation()
 {
     auto module = getOperation();
 
-    std::vector<mlir::SymbolOpInterface> linkOnceODR;
+    std::vector<std::string> linkOnceODR;
     for (auto iter : module.getOps<mlir::SymbolOpInterface>())
     {
         if (iter->hasAttr("linkonce"))
         {
-            linkOnceODR.emplace_back(iter);
+            linkOnceODR.emplace_back(iter.getName());
         }
     }
 
@@ -1093,7 +1099,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     auto table = mlir::SymbolTable(module);
     for (auto& iter : linkOnceODR)
     {
-        auto op = table.lookup(iter.getName());
+        auto op = table.lookup(iter);
         PYLIR_ASSERT(op);
         llvm::TypeSwitch<mlir::Operation*>(op)
             .Case<mlir::LLVM::LLVMFuncOp, mlir::LLVM::GlobalOp>(
