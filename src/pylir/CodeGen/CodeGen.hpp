@@ -59,6 +59,8 @@ public:
 
     mlir::Value visit(const Syntax::StarredExpression& starredExpression);
 
+    mlir::Value visit(const Syntax::ExpressionList& expressionList);
+
     mlir::Value visit(const Syntax::YieldExpression& yieldExpression);
 
     mlir::Value visit(const Syntax::Expression& expression);
@@ -94,6 +96,8 @@ public:
     mlir::Value visit(const Syntax::Primary& primary);
 
     mlir::Value visit(const Syntax::Atom& atom);
+
+    mlir::Value visit(const Syntax::Subscription& primary);
 
     mlir::Value visit(const Syntax::Enclosure& enclosure);
 

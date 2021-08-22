@@ -225,6 +225,35 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
         [&](const Syntax::Expression& expression) { return visit(expression); });
 }
 
+mlir::Value pylir::CodeGen::visit(const Syntax::ExpressionList& expressionList)
+{
+    if (!expressionList.trailingComma && expressionList.remainingExpr.empty())
+    {
+        return visit(*expressionList.firstExpr);
+    }
+
+    auto loc = getLoc(expressionList, expressionList);
+    mlir::Value count = m_builder.create<mlir::ConstantOp>(
+        loc, m_builder.getIndexType(), m_builder.getIndexAttr(expressionList.remainingExpr.size() + 1));
+    std::vector<mlir::Value> operands(expressionList.remainingExpr.size() + 1);
+    operands[0] = visit(*expressionList.firstExpr);
+    std::transform(expressionList.remainingExpr.begin(), expressionList.remainingExpr.end(), operands.begin() + 1,
+                   [&](const auto& pair) { return visit(*pair.second); });
+    auto tuple =
+        m_builder.create<Dialect::GCAllocOp>(loc,
+                                             Dialect::PointerType::get(Dialect::ObjectType::get(
+                                                 m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)))),
+                                             count);
+    m_builder.create<Dialect::MakeTupleOp>(loc, tuple, count);
+    for (auto iter : llvm::enumerate(operands))
+    {
+        auto constant =
+            m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(iter.index()));
+        m_builder.create<Dialect::SetTupleItemOp>(loc, tuple, constant, iter.value());
+    }
+    return tuple;
+}
+
 mlir::Value pylir::CodeGen::visit(const Syntax::YieldExpression& yieldExpression)
 {
     return {};
@@ -537,6 +566,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
 {
     return pylir::match(
         primary.variant, [&](const Syntax::Atom& atom) { return visit(atom); },
+        [&](const Syntax::Subscription& subscription) { return visit(subscription); },
         [&](const auto&) -> mlir::Value
         {
             // TODO
@@ -629,6 +659,31 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
             return m_builder.create<Dialect::LoadOp>(loc, handle);
         },
         [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
+}
+
+mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscription)
+{
+    auto container = visit(*subscription.primary);
+    auto indices = visit(subscription.expressionList);
+
+    auto loc = getLoc(subscription, subscription);
+    auto type = m_builder.create<Dialect::TypeOfOp>(loc, container);
+    auto result = m_builder.create<Dialect::GetTypeSlotOp>(loc, Dialect::TypeSlotPredicate::GetItem, type);
+    auto getItem = result.getResult(0);
+    auto found = result.getResult(1);
+
+    auto notFoundBlock = new mlir::Block;
+    auto foundBlock = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(loc, found, foundBlock, notFoundBlock);
+
+    m_currentFunc.getCallableRegion()->push_back(notFoundBlock);
+    m_builder.setInsertionPointToStart(notFoundBlock);
+    // TODO raise
+    m_builder.create<mlir::ReturnOp>(loc);
+
+    m_currentFunc.getCallableRegion()->push_back(foundBlock);
+    m_builder.setInsertionPointToStart(foundBlock);
+    return m_builder.create<Dialect::CallIndirectOp>(loc, getItem, mlir::ValueRange{container, indices}).getResult(0);
 }
 
 mlir::Value pylir::CodeGen::toBool(mlir::Value value)

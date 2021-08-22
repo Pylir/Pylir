@@ -554,7 +554,7 @@ mlir::OpFoldResult pylir::Dialect::GetStringItemOp::fold(::llvm::ArrayRef<::mlir
 
 ::mlir::LogicalResult pylir::Dialect::CallOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    auto func = symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(this->getOperation(),calleeAttr());
+    auto func = symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(this->getOperation(), calleeAttr());
     return mlir::success(func);
 }
 
@@ -571,6 +571,21 @@ mlir::OpFoldResult pylir::Dialect::GetStringItemOp::fold(::llvm::ArrayRef<::mlir
 mlir::LogicalResult pylir::Dialect::GetGlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     return mlir::success(symbolTable.lookupNearestSymbolFrom<pylir::Dialect::GlobalOp>(this->getOperation(), name()));
+}
+
+bool pylir::Dialect::ReinterpretOp::areCastCompatible(::mlir::TypeRange inputs, ::mlir::TypeRange outputs)
+{
+    if (inputs.size() != 1 || outputs.size() != 1)
+    {
+        return false;
+    }
+    auto inPointer = inputs[0].dyn_cast_or_null<Dialect::PointerType>();
+    auto outPointer = outputs[0].dyn_cast_or_null<Dialect::PointerType>();
+    if (!inPointer || !outPointer)
+    {
+        return false;
+    }
+    return inPointer.getElementType().isa<ObjectType>() && outPointer.getElementType().isa<ObjectType>();
 }
 
 namespace

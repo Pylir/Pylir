@@ -190,7 +190,60 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__getitem__"),
+                genFunction(
+                    module,
+                    pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
+                                                                           TypeSlotPredicate::GetItem)
+                        .cast<mlir::FunctionType>(),
+                    "__builtins__.tuple.__getitem__",
+                    [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
+                    {
+                        auto tuple = builder.create<Dialect::ReinterpretOp>(
+                            builder.getUnknownLoc(),
+                            PointerType::get(ObjectType::get(builder.getSymbolRefAttr(tupleTypeObjectName))),
+                            funcOp.getArgument(0));
+                        auto indices = funcOp.getArgument(1);
+                        // TODO type check
 
+                        auto integer = builder.create<Dialect::UnboxOp>(
+                            builder.getUnknownLoc(), builder.getType<Dialect::IntegerType>(), indices);
+                        auto result = builder.create<Dialect::ItoIndexOp>(builder.getUnknownLoc(), integer);
+                        auto index = result.getResult(0);
+                        auto overflow = result.getResult(1);
+                        // TODO check overflow
+                        (void)overflow;
+
+                        auto tupleSize = builder.create<Dialect::TupleSizeOp>(builder.getUnknownLoc(), tuple);
+
+                        auto zero = builder.create<mlir::ConstantOp>(builder.getUnknownLoc(), builder.getIndexType(),
+                                                                     builder.getIndexAttr(0));
+                        auto isNegative = builder.create<mlir::CmpIOp>(builder.getUnknownLoc(),
+                                                                       mlir::CmpIPredicate::slt, index, zero);
+
+                        auto negative = new mlir::Block;
+                        auto positive = new mlir::Block;
+                        auto successor = new mlir::Block;
+                        successor->addArgument(builder.getIndexType());
+
+                        builder.create<mlir::CondBranchOp>(builder.getUnknownLoc(), isNegative, negative, positive);
+
+                        funcOp.getCallableRegion()->push_back(negative);
+                        builder.setInsertionPointToStart(negative);
+                        auto newIndex = builder.create<mlir::AddIOp>(builder.getUnknownLoc(), index, tupleSize);
+                        builder.create<mlir::BranchOp>(builder.getUnknownLoc(), successor, mlir::ValueRange{newIndex});
+
+                        funcOp.getCallableRegion()->push_back(positive);
+                        builder.setInsertionPointToStart(positive);
+                        builder.create<mlir::BranchOp>(builder.getUnknownLoc(), successor, mlir::ValueRange{index});
+
+                        funcOp.getCallableRegion()->push_back(successor);
+                        builder.setInsertionPointToStart(successor);
+                        auto returnValue = builder.create<Dialect::GetTupleItemOp>(
+                            builder.getUnknownLoc(), builder.getType<ObjectType>(), tuple, successor->getArgument(0));
+                        builder.create<Dialect::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{returnValue});
+                    }));
             return dict;
         });
 }

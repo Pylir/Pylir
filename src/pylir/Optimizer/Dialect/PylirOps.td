@@ -350,6 +350,15 @@ def Pylir_GetListItemOp : Pylir_Op<"getListItem", [NoSideEffect]> {
     }];
 }
 
+def Pylir_ReinterpretOp : Pylir_Cast<"reinterpret", [NoSideEffect]> {
+    let arguments = (ins PointerOf<Pylir_Object>:$input);
+    let results = (outs PointerOf<Pylir_Object>:$result);
+
+    let assemblyFormat = [{
+            $input attr-dict `:` type($input) `->` type($result)
+    }];
+}
+
 def Pylir_CallOp : Pylir_Op<"call",
     [DeclareOpInterfaceMethods<CallOpInterface>,
      DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
@@ -493,5 +502,17 @@ def Pylir_SetTupleItemOp : Pylir_Op<"setTupleItem"> {
     }];
 }
 
+def Pylir_TupleSizeOp : Pylir_Op<"tupleSize"> {
+    let summary = "get tuple size";
+
+    let arguments = (ins
+                        Arg<PointerOf<Pylir_Tuple>, "Tuple to read from",[MemRead]>:$tuple);
+
+    let results = (outs Index:$size);
+
+    let assemblyFormat = [{
+        $tuple attr-dict
+    }];
+}
 
 #endif
