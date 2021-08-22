@@ -15,7 +15,7 @@ std::size_t pylir::Dialect::CABI::getSizeOf(mlir::Type type) const
         .Case<mlir::LLVM::LLVMStructType>(
             [this](mlir::LLVM::LLVMStructType structType)
             {
-                PYLIR_ASSERT(structType.isInitialized() && !structType.isPacked());
+                PYLIR_ASSERT((!structType.isIdentified() || structType.isInitialized()) && !structType.isPacked());
                 std::size_t size = 0;
                 std::size_t alignment = 0;
                 for (auto iter : structType.getBody())

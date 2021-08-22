@@ -25,6 +25,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
                                                          mlir::FunctionType::get(m_builder.getContext(), {}, {}));
     m_module.push_back(initFunc);
+
     m_builder.setInsertionPointToStart(initFunc.addEntryBlock());
     for (auto& iter : fileInput.input)
     {
@@ -37,6 +38,10 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     {
         m_builder.create<mlir::ReturnOp>(m_builder.getUnknownLoc());
     }
+
+    // Force creation of builtin types used by the runtime
+    Dialect::getIntTypeObject(m_module);
+
     return m_module;
 }
 
@@ -207,12 +212,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
             {
                 handleItem(*items.last);
             }
-            auto tuple = m_builder.create<Dialect::GCAllocOp>(
-                loc,
-                Dialect::PointerType::get(
-                    Dialect::ObjectType::get(m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)))),
-                count);
-            m_builder.create<Dialect::MakeTupleOp>(loc, tuple, count);
+            auto tuple = m_builder.create<Dialect::GCObjectAllocOp>(
+                loc, count, m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)));
             std::size_t index = 0;
             for (auto iter : operands)
             {
@@ -239,12 +240,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ExpressionList& expressionList)
     operands[0] = visit(*expressionList.firstExpr);
     std::transform(expressionList.remainingExpr.begin(), expressionList.remainingExpr.end(), operands.begin() + 1,
                    [&](const auto& pair) { return visit(*pair.second); });
-    auto tuple =
-        m_builder.create<Dialect::GCAllocOp>(loc,
-                                             Dialect::PointerType::get(Dialect::ObjectType::get(
-                                                 m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)))),
-                                             count);
-    m_builder.create<Dialect::MakeTupleOp>(loc, tuple, count);
+    auto tuple = m_builder.create<Dialect::GCObjectAllocOp>(
+        loc, count, m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)));
     for (auto iter : llvm::enumerate(operands))
     {
         auto constant =
@@ -585,15 +582,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
             {
                 case TokenType::IntegerLiteral:
                 {
-                    auto constant = m_builder.create<Dialect::ConstantOp>(
-                        location, Dialect::IntegerAttr::get(m_builder.getContext(),
-                                                            pylir::get<llvm::APInt>(literal.token.getValue())));
-                    auto boxed = m_builder.create<Dialect::BoxOp>(
-                        location, Dialect::ObjectType::get(Dialect::getIntTypeObject(m_module)), constant);
-                    auto gcAlloc = m_builder.create<Dialect::GCAllocOp>(
-                        location, pylir::Dialect::PointerType::get(boxed.getType()));
-                    m_builder.create<Dialect::StoreOp>(location, boxed, gcAlloc);
-                    return gcAlloc;
+                    return m_builder.create<Dialect::IntegerConstant>(
+                        location, pylir::get<llvm::APInt>(literal.token.getValue()));
                 }
                 case TokenType::FloatingPointLiteral:
                 {
@@ -609,8 +599,6 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 }
                 case TokenType::StringLiteral:
                 {
-                    auto constant = m_builder.create<pylir::Dialect::ConstantOp>(
-                        location, m_builder.getStringAttr(pylir::get<std::string>(literal.token.getValue())));
                     // TODO:
                     PYLIR_UNREACHABLE;
                 }
@@ -683,7 +671,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscriptio
 
     m_currentFunc.getCallableRegion()->push_back(foundBlock);
     m_builder.setInsertionPointToStart(foundBlock);
-    return m_builder.create<Dialect::CallIndirectOp>(loc, getItem, mlir::ValueRange{container, indices}).getResult(0);
+    return m_builder.create<mlir::CallIndirectOp>(loc, getItem, mlir::ValueRange{container, indices}).getResult(0);
 }
 
 mlir::Value pylir::CodeGen::toBool(mlir::Value value)
@@ -704,12 +692,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
             }
             auto loc = getLoc(parenthForm, parenthForm.openParenth);
             auto zero = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(0));
-            auto zeroSizedStorage = m_builder.create<Dialect::GCAllocOp>(
-                loc,
-                Dialect::PointerType::get(
-                    Dialect::ObjectType::get(m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)))),
-                zero);
-            m_builder.create<Dialect::MakeTupleOp>(loc, zeroSizedStorage, zero);
+            auto zeroSizedStorage = m_builder.create<Dialect::GCObjectAllocOp>(
+                loc, zero, m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)));
             return zeroSizedStorage;
         },
         [&](const auto&) -> mlir::Value
@@ -739,7 +723,7 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
         m_currentFunc.getCallableRegion()->push_back(foundBlock);
         m_builder.setInsertionPointToStart(foundBlock);
 
-        auto call = m_builder.create<Dialect::CallIndirectOp>(loc, func, mlir::ValueRange{lhs, rhs}).getResult(0);
+        auto call = m_builder.create<mlir::CallIndirectOp>(loc, func, mlir::ValueRange{lhs, rhs}).getResult(0);
         auto notImplementedConstant =
             m_builder.create<Dialect::DataOfOp>(loc, Dialect::getNotImplementedObject(m_module));
         auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);

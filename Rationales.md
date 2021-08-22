@@ -81,3 +81,22 @@ Cons of this approach:
 ### Conclusion
 
 Going for the Dictionary lookup for now as it is much more generic. YOLO
+
+## Representing object with known type in the type system
+
+As of this writing Object type has an optional parameter denoting the type of the object by referring to the type
+object. I've been debating whether this is the way to go or not.
+
+My thoughts were that I had two choices:
+
+* Analysis or transformation pass which would deduce the known type and do devirtualization
+* Attach it to the type of a value and do type deduction through various passes as well
+
+The problem was sort of, how it was supposed to be stored. Having the object type parameterized added a lot of
+complexity as these were all distinct types. I introduced special call, call_indirect and return ops which in
+translation to LLVM IR implicitly bitcasted object types of known type to ones of unknown type. I basically wanted to
+avoid reinterpret casts as these would almost certainly turn cumbersome for passes.
+
+I was thinking that I should simply remove the parameter of Object type as that'd be much much easier. I justified its
+existence as for some operations the size of the object had to be known. With time I removed many of those operations
+however. Only ones remaining are basically the allocation function.

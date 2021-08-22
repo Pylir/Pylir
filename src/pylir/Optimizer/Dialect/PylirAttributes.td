@@ -10,6 +10,11 @@ class Pylir_Attr<string name, list<Trait> traits = [], string baseCppClass = "::
 def Pylir_IntegerAttr : Pylir_Attr<"Integer"> {
     let mnemonic = "integer";
 
+    let storageType = "::pylir::Dialect::IntegerAttr";
+    let returnType = "llvm::APInt";
+    let convertFromStorage = "$_self.getValue()";
+    let constBuilderCall = "::pylir::Dialect::IntegerAttr::get($_builder.getContext(), $0)";
+
     let parameters = (ins "llvm::APInt":$value);
 
     let printer = [{

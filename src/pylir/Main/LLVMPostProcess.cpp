@@ -3,12 +3,21 @@
 
 #include <llvm/IR/IRBuilder.h>
 
+#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
+
 void pylir::postProcessLLVMModule(llvm::Module& module)
 {
     // __main__.__init__ in the future
-    auto aliasee = module.getFunction("__init__");
-    // Normal name so it can be called from C
-    llvm::GlobalAlias::create("pylir__main____init__", aliasee);
+    if (auto* aliasee = module.getFunction("__init__"))
+    {
+        // Normal name so it can be called from C
+        llvm::GlobalAlias::create("pylir__main____init__", aliasee);
+    }
+
+    if (auto* intTypeObject = module.getGlobalVariable(pylir::Dialect::intTypeObjectName))
+    {
+        llvm::GlobalAlias::create("pylir_integer_type_object", intTypeObject);
+    }
 
     // Add allocsize that can't be set in MLIR LLVM IR
     if (auto alloc = module.getFunction("pylir_gc_alloc"))

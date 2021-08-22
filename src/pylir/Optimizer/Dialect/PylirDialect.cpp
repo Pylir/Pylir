@@ -67,25 +67,6 @@ void pylir::Dialect::PylirDialect::printAttribute(::mlir::Attribute attr, ::mlir
     PYLIR_ASSERT(mlir::succeeded(result));
 }
 
-mlir::Operation* pylir::Dialect::PylirDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
-                                                                   ::mlir::Type type, ::mlir::Location loc)
-{
-    if (type.getDialect().getTypeID() != getTypeID() && type.getDialect().getTypeID() == value.getDialect().getTypeID())
-    {
-        return type.getDialect().materializeConstant(builder, value, type, loc);
-    }
-    return builder.create<ConstantOp>(loc, type, value);
-}
-
-void pylir::Dialect::ObjectType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-                                                          llvm::function_ref<void(mlir::Type)>) const
-{
-    if (getType())
-    {
-        walkAttrsFn(getType());
-    }
-}
-
 void pylir::Dialect::PointerType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)>,
                                                            llvm::function_ref<void(mlir::Type)> walkTypeFn) const
 {

@@ -11,8 +11,6 @@ def Pylir_Dialect : Dialect {
         TODO
     }];
     let cppNamespace = "::pylir::Dialect";
-
-    let hasConstantMaterializer = 1;
 }
 
 #endif
