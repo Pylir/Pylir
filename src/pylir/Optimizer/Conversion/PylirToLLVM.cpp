@@ -982,6 +982,12 @@ void ConvertPylirToLLVMPass::runOnOperation()
             .Default([](auto) { PYLIR_UNREACHABLE; });
     }
 
+    for (auto& iter : module.getOps())
+    {
+        llvm::TypeSwitch<mlir::Operation*>(&iter).Case<mlir::LLVM::LLVMFuncOp, mlir::LLVM::GlobalOp>(
+            [&](auto op) { op.dso_localAttr(mlir::UnitAttr::get(&getContext())); });
+    }
+
     if (ctors.empty())
     {
         return;

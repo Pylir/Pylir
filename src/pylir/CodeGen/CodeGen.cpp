@@ -706,8 +706,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
 mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
                                      Dialect::TypeSlotPredicate operation, std::string_view)
 {
-    auto lhsLoad = m_builder.create<Dialect::LoadOp>(loc, lhs);
-    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhsLoad);
+    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhs);
     auto slot = m_builder.create<Dialect::GetTypeSlotOp>(loc, operation, lhsType);
     auto func = slot.getResult(0);
     auto wasFound = slot.getResult(1);
