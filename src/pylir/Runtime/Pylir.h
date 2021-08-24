@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -114,6 +115,17 @@ extern "C"
     } PylirIntegerToIndexResult;
 
     PylirIntegerToIndexResult pylir_integer_to_index(PylirInteger* value);
+
+    extern PylirTypeObject pylir_string_type_object;
+
+    typedef struct PylirString
+    {
+        PylirObject m_base;
+        size_t m_count;
+        /*uint32_t values[]; */
+    } PylirString;
+
+    PylirString* pylir_string_from_utf32(PylirTypeObject* typeObject, const uint32_t* data, size_t count);
 
 #ifdef __cplusplus
 }

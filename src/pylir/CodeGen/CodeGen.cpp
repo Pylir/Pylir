@@ -598,8 +598,12 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 }
                 case TokenType::StringLiteral:
                 {
-                    // TODO:
-                    PYLIR_UNREACHABLE;
+                    auto utf32 = Text::toUTF32String(pylir::get<std::string>(literal.token.getValue()));
+                    std::vector<std::int32_t> values(utf32.begin(), utf32.end());
+                    auto stringTypeObject =
+                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getStringTypeObject(m_module));
+                    return m_builder.create<Dialect::StringConstant>(location, stringTypeObject,
+                                                                     m_builder.getI32ArrayAttr(values));
                 }
                 case TokenType::ByteLiteral:
                     // TODO:

@@ -33,5 +33,9 @@ constexpr std::string_view tupleTypeObjectName = "__builtins__.tuple";
 
 Dialect::ConstantGlobalOp getTupleTypeObject(mlir::ModuleOp& module);
 
+constexpr std::string_view stringTypeObjectName = "__builtins__.str";
+
+Dialect::ConstantGlobalOp getStringTypeObject(mlir::ModuleOp& module);
+
 mlir::FunctionType getCCFuncType(mlir::MLIRContext* context);
 } // namespace pylir::Dialect

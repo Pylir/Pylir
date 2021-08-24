@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "Pylir.h"
 
 namespace pylir::rt
@@ -22,6 +24,16 @@ T* allocVar(PylirTypeObject* typeObject, size_t count, size_t elementSize)
     base.m_type = typeObject;
     size = count;
     return object;
+}
+
+inline std::uint32_t* begin(PylirString* string)
+{
+    return reinterpret_cast<std::uint32_t*>(reinterpret_cast<char*>(string) + sizeof(PylirString));
+}
+
+inline std::uint32_t* end(PylirString* string)
+{
+    return begin(string) + string->m_count;
 }
 
 } // namespace pylir::rt

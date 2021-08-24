@@ -38,6 +38,7 @@ enum class RuntimeFunc
     PylirIntegerGreater,
     PylirIntegerLessOrEqual,
     PylirIntegerGreaterOrEqual,
+    PylirStringFromUTF32,
     PylirGCAlloc,
     LAST_VALUE = PylirGCAlloc,
 };
@@ -47,13 +48,9 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     llvm::DenseMap<llvm::StringRef, mlir::Type> m_knownObjectTypes;
     mlir::LLVM::LLVMStructType m_pyObject;
     mlir::LLVM::LLVMStructType m_pyTupleObject;
-    mlir::LLVM::LLVMStructType m_pyDictValue;
-    mlir::LLVM::LLVMStructType m_pyDictObject;
-    mlir::Type m_pyFunctionValue;
-    mlir::LLVM::LLVMStructType m_pyFunctionObject;
-    mlir::LLVM::LLVMStructType m_pyLongValue;
     mlir::LLVM::LLVMStructType m_pyIntObject;
     mlir::LLVM::LLVMStructType m_pyTypeObject;
+    mlir::LLVM::LLVMStructType m_pyStringObject;
     std::array<mlir::LLVM::LLVMFuncOp, static_cast<std::size_t>(RuntimeFunc::LAST_VALUE) + 1> m_runtimeFuncs;
     llvm::Triple m_triple;
 
@@ -73,6 +70,10 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         if (value == llvm::StringRef{pylir::Dialect::intTypeObjectName})
         {
             return getPyIntObject();
+        }
+        if (value == llvm::StringRef{pylir::Dialect::stringTypeObjectName})
+        {
+            return getPyStringObject();
         }
         // TODO custom classes
         return getPyObject();
@@ -136,6 +137,12 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
                 returnType = mlir::IntegerType::get(&getContext(), 1);
                 operands = {pyObjectRef, pyObjectRef};
                 name = "pylir_integer_greater_or_equal";
+                break;
+            case RuntimeFunc::PylirStringFromUTF32:
+                returnType = pyObjectRef;
+                operands = {pyObjectRef, mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 32)),
+                            getIndexType()};
+                name = "pylir_string_from_utf32";
                 break;
             case RuntimeFunc::PylirGCAlloc:
                 returnType = mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 8));
@@ -255,6 +262,22 @@ public:
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return m_pyIntObject;
+    }
+
+    mlir::Type getPyStringObject()
+    {
+        if (!m_pyStringObject)
+        {
+            m_pyStringObject = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyStringObject");
+            std::vector<mlir::Type> types;
+            types.emplace_back(getPyObject()); // base
+            types.emplace_back(getIndexType());
+            types.emplace_back(mlir::LLVM::LLVMArrayType::get(
+                mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 32)), 0));
+            auto result = m_pyStringObject.setBody(types, false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return m_pyStringObject;
     }
 
     mlir::Type getPyTypeObject()
@@ -933,6 +956,57 @@ struct TupleSizeConversion : SingleOpMatcher<TupleSizeConversion, pylir::Dialect
     }
 };
 
+struct StringConstantConversion : SingleOpMatcher<StringConstantConversion, pylir::Dialect::StringConstant>
+{
+    using SingleOpMatcher::SingleOpMatcher;
+
+    using SingleOpMatcher::rewrite;
+
+    void rewrite(mlir::Operation* op, pylir::Dialect::StringConstant::Adaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const
+    {
+        auto module = op->getParentOfType<mlir::ModuleOp>();
+        std::string name = ".str.";
+        auto base = name;
+        std::size_t value = 0;
+        do
+        {
+            name = base + std::to_string(value);
+            value++;
+        } while (module.lookupSymbol(name));
+
+        mlir::LLVM::GlobalOp data;
+        {
+            mlir::OpBuilder::InsertionGuard guard{rewriter};
+            rewriter.setInsertionPointToEnd(module.getBody());
+            data = rewriter.create<mlir::LLVM::GlobalOp>(
+                op->getLoc(), mlir::LLVM::LLVMArrayType::get(rewriter.getI32Type(), adaptor.value().size()), true,
+                mlir::LLVM::Linkage::Private, name, mlir::Attribute{});
+            auto block = new mlir::Block;
+            data.getInitializerRegion().push_back(block);
+            rewriter.setInsertionPointToStart(block);
+            mlir::Value undef = rewriter.create<mlir::LLVM::UndefOp>(op->getLoc(), data.type());
+            for (auto& iter : llvm::enumerate(adaptor.value()))
+            {
+                auto constant =
+                    rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), iter.value());
+                undef = rewriter.create<mlir::LLVM::InsertValueOp>(
+                    op->getLoc(), undef, constant, rewriter.getI64ArrayAttr({static_cast<std::int64_t>(iter.index())}));
+            }
+            rewriter.create<mlir::LLVM::ReturnOp>(op->getLoc(), undef);
+        }
+        mlir::Value address = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), data);
+        auto zero = createIndexConstant(rewriter, op->getLoc(), 0);
+        address =
+            rewriter.create<mlir::LLVM::GEPOp>(op->getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI32Type()),
+                                               address, mlir::ValueRange{zero, zero});
+        auto result = getTypeConverter()->callRuntime(
+            rewriter, op->getLoc(), RuntimeFunc::PylirStringFromUTF32,
+            {adaptor.typeObject(), address, createIndexConstant(rewriter, op->getLoc(), adaptor.value().size())});
+        rewriter.replaceOp(op, result);
+    }
+};
+
 template <class... Args>
 void populateSingleOpMatchers(PylirTypeConverter& converter, mlir::OwningRewritePatternList& patterns)
 {
@@ -969,7 +1043,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
                              IdConversion, ICmpConversion, GetTypeSlotConversion, GCObjectAllocConversion,
                              ObjectAllocaConversion, LoadConversion, GetGlobalConversion, AllocaConversion,
                              UnboxConversion, GetTupleItemConversion, SetTupleItemConversion, IntegerConstantConversion,
-                             ItoIndexConversion, TupleSizeConversion>(converter, patterns);
+                             ItoIndexConversion, TupleSizeConversion, StringConstantConversion>(converter, patterns);
     std::vector<std::pair<mlir::LLVM::LLVMFuncOp, mlir::LLVM::GlobalOp>> ctors;
     patterns.insert<ConstantGlobalOpConversion>(ctors, ConstantGlobalOpConversion::Operation::getOperationName(),
                                                 &converter.getContext(), converter);

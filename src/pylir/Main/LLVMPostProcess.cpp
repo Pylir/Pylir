@@ -18,6 +18,10 @@ void pylir::postProcessLLVMModule(llvm::Module& module)
     {
         llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage, "pylir_integer_type_object", intTypeObject);
     }
+    if (auto* stringTypeObject = module.getGlobalVariable(pylir::Dialect::stringTypeObjectName))
+    {
+        llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage, "pylir_string_type_object", stringTypeObject);
+    }
 
     // Add allocsize that can't be set in MLIR LLVM IR
     if (auto alloc = module.getFunction("pylir_gc_alloc"))

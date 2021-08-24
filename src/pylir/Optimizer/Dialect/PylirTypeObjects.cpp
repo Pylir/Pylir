@@ -26,16 +26,15 @@ pylir::Dialect::ConstantGlobalOp getConstant(mlir::FlatSymbolRefAttr type, mlir:
 }
 
 template <class F>
-mlir::FlatSymbolRefAttr genFunction(mlir::ModuleOp& module, mlir::FunctionType signature, std::string_view name,
-                                    F genBody)
+mlir::FlatSymbolRefAttr genFunction(mlir::ModuleOp& module, mlir::FunctionType signature, llvm::Twine name, F genBody)
 {
-    auto func = mlir::FuncOp::create(mlir::UnknownLoc::get(module.getContext()), name, signature);
+    auto func = mlir::FuncOp::create(mlir::UnknownLoc::get(module.getContext()), name.str(), signature);
     func->setAttr("linkonce", mlir::UnitAttr::get(module.getContext()));
     module.push_back(func);
     mlir::OpBuilder builder(module.getContext());
     builder.setInsertionPointToStart(func.addEntryBlock());
     genBody(builder, func);
-    return mlir::FlatSymbolRefAttr::get(module.getContext(), name);
+    return mlir::FlatSymbolRefAttr::get(module.getContext(), name.str());
 }
 } // namespace
 
@@ -65,7 +64,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
                     module,
                     pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(), TypeSlotPredicate::Call)
                         .cast<mlir::FunctionType>(),
-                    "__builtins__.function.__call__",
+                    llvm::Twine(functionTypeObjectName) + ".__call__",
                     [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
                     {
                         mlir::Value self = funcOp.getArgument(0);
@@ -93,7 +92,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getIntTypeObject(mlir::ModuleOp
                                                          pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(
                                                              module.getContext(), TypeSlotPredicate::Multiply)
                                                              .cast<mlir::FunctionType>(),
-                                                         "__builtins__.int.__mul__",
+                                                         llvm::Twine(intTypeObjectName) + ".__mul__",
                                                          [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
                                                          {
                                                              auto lhs = funcOp.getArgument(0);
@@ -178,7 +177,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
                     pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
                                                                            TypeSlotPredicate::GetItem)
                         .cast<mlir::FunctionType>(),
-                    "__builtins__.tuple.__getitem__",
+                    llvm::Twine(tupleTypeObjectName) + ".__getitem__",
                     [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
                     {
                         auto tuple = funcOp.getArgument(0);
@@ -222,4 +221,15 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
                     }));
             return dict;
         });
+}
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getStringTypeObject(mlir::ModuleOp& module)
+{
+    return getConstant(mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
+                       stringTypeObjectName,
+                       [&]()
+                       {
+                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+                           return dict;
+                       });
 }

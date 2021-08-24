@@ -402,6 +402,17 @@ def Pylir_ItoIndexOp : Pylir_Op<"iToIndex"> {
     }];
 }
 
+// String ops
+
+def Pylir_StringConstant : Pylir_Op<"stringConst"> {
+    let arguments = (ins Arg<PointerOf<Pylir_Object>, "TypeObject", [MemRead]>:$typeObject, I32ArrayAttr:$value);
+    let results = (outs Arg<PointerOf<Pylir_Object>, "Result", [MemAlloc]>:$result);
+
+    let assemblyFormat = [{
+        $value `of` $typeObject attr-dict `:` type($typeObject) `->` type($result)
+    }];
+}
+
 def Pylir_RaiseOp : Pylir_Op<"raise", [Terminator]> {
     let arguments = (ins PointerOf<Pylir_Object>:$exception);
     let results = (outs);
