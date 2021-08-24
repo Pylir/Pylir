@@ -89,7 +89,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         {
             case RuntimeFunc::PylirIntegerFromSizeT:
                 returnType = pyObjectRef;
-                operands = {getIndexType()};
+                operands = {pyObjectRef, getIndexType()};
                 name = "pylir_integer_from_size_t";
                 break;
             case RuntimeFunc::PylirIntegerToIndex:
@@ -663,8 +663,9 @@ struct IntegerConstantConversion : SingleOpMatcher<IntegerConstantConversion, py
     {
         // TODO strings instead of size_t
         auto value = adaptor.value().getValue().getSExtValue();
-        auto result = getTypeConverter()->callRuntime(rewriter, op->getLoc(), RuntimeFunc::PylirIntegerFromSizeT,
-                                                      {createIndexConstant(rewriter, op->getLoc(), value)});
+        auto result =
+            getTypeConverter()->callRuntime(rewriter, op->getLoc(), RuntimeFunc::PylirIntegerFromSizeT,
+                                            {adaptor.typeObject(), createIndexConstant(rewriter, op->getLoc(), value)});
         rewriter.replaceOp(op, result);
     }
 };
@@ -711,8 +712,28 @@ struct DataOfConversion : SingleOpMatcher<DataOfConversion, pylir::Dialect::Data
     void rewrite(mlir::Operation* op, pylir::Dialect::DataOfOp::Adaptor adaptor,
                  mlir::ConversionPatternRewriter& rewriter) const
     {
-        rewriter.replaceOpWithNewOp<mlir::LLVM::AddressOfOp>(op, typeConverter->convertType(op->getResultTypes()[0]),
-                                                             adaptor.globalName());
+        auto* global = mlir::SymbolTable::lookupNearestSymbolFrom(op, adaptor.globalName());
+        PYLIR_ASSERT(global);
+        mlir::Value address;
+        if (auto llvmGlobal = mlir::dyn_cast<mlir::LLVM::GlobalOp>(global))
+        {
+            address = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), llvmGlobal);
+        }
+        else if (auto constantGlobal = mlir::dyn_cast<pylir::Dialect::ConstantGlobalOp>(global))
+        {
+            address = rewriter.create<mlir::LLVM::AddressOfOp>(
+                op->getLoc(),
+                mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getTypeFromTypeObject(constantGlobal.type())),
+                adaptor.globalName());
+        }
+        PYLIR_ASSERT(address);
+        auto resultType = typeConverter->convertType(op->getResultTypes()[0]);
+        if (address.getType() == resultType)
+        {
+            rewriter.replaceOp(op, address);
+            return;
+        }
+        rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, resultType, address);
     }
 };
 

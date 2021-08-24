@@ -39,9 +39,6 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         m_builder.create<mlir::ReturnOp>(m_builder.getUnknownLoc());
     }
 
-    // Force creation of builtin types used by the runtime
-    Dialect::getIntTypeObject(m_module);
-
     return m_module;
 }
 
@@ -582,8 +579,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
             {
                 case TokenType::IntegerLiteral:
                 {
+                    auto intTypeObject =
+                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getIntTypeObject(m_module));
                     return m_builder.create<Dialect::IntegerConstant>(
-                        location, pylir::get<llvm::APInt>(literal.token.getValue()));
+                        location, intTypeObject, pylir::get<llvm::APInt>(literal.token.getValue()));
                 }
                 case TokenType::FloatingPointLiteral:
                 {

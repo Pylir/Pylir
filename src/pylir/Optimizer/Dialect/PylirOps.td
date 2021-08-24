@@ -309,11 +309,11 @@ def Pylir_TupleSizeOp : Pylir_Op<"tupleSize"> {
 // Integer ops
 
 def Pylir_IntegerConstant : Pylir_Op<"intConst"> {
-    let arguments = (ins Pylir_IntegerAttr:$value);
+    let arguments = (ins Arg<PointerOf<Pylir_Object>, "TypeObject", [MemRead]>:$typeObject, Pylir_IntegerAttr:$value);
     let results = (outs Arg<PointerOf<Pylir_Object>, "Result", [MemAlloc]>:$result);
 
     let assemblyFormat = [{
-        $value attr-dict
+        $value `of` $typeObject attr-dict `:` type($typeObject) `->` type($result)
     }];
 }
 

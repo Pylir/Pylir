@@ -16,7 +16,8 @@ T* alloc(PylirTypeObject* typeObject)
 template <class T>
 T* allocVar(PylirTypeObject* typeObject, size_t count, size_t elementSize)
 {
-    auto object = reinterpret_cast<T*>(pylir_gc_alloc(sizeof(T) + count * elementSize));
+    auto object = reinterpret_cast<T*>(
+        pylir_gc_alloc(sizeof(T) + count * elementSize + (typeObject->m_dictPtr != 0 ? sizeof(PylirObject*) : 0)));
     auto& [base, size] = *object;
     base.m_type = typeObject;
     size = count;

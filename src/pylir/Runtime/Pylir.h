@@ -26,6 +26,7 @@ extern "C"
 
     typedef struct PylirTypeObject
     {
+        PylirObject m_base;
         index m_dictPtr;
         PylirCCType m_call;
         PylirBinOp m_add;
@@ -102,7 +103,7 @@ extern "C"
         /* size_t values[]; */
     } PylirInteger;
 
-    PylirInteger* pylir_integer_from_size_t(size_t value);
+    PylirInteger* pylir_integer_from_size_t(PylirTypeObject* typeObject, size_t value);
 
     PylirInteger* pylir_integer_mul(PylirInteger* lhs, PylirInteger* rhs);
 

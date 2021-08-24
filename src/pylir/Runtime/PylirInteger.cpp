@@ -4,9 +4,9 @@
 
 // TODO Big Integer
 
-PylirInteger* pylir_integer_from_size_t(size_t value)
+PylirInteger* pylir_integer_from_size_t(PylirTypeObject* typeObject, size_t value)
 {
-    auto object = pylir::rt::allocVar<PylirInteger>(&pylir_integer_type_object, 0, sizeof(size_t));
+    auto object = pylir::rt::allocVar<PylirInteger>(typeObject, 0, sizeof(size_t));
 
     object->m_count = value;
 
