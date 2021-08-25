@@ -53,6 +53,9 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     mlir::LLVM::LLVMStructType m_pyStringObject;
     std::array<mlir::LLVM::LLVMFuncOp, static_cast<std::size_t>(RuntimeFunc::LAST_VALUE) + 1> m_runtimeFuncs;
     llvm::Triple m_triple;
+    std::size_t m_utf32ConstantCount = 0;
+    std::size_t m_tupleConstantCount = 0;
+    std::size_t m_stringConstantCount = 0;
 
     std::unique_ptr<pylir::Dialect::CABI> m_cAbi;
 
@@ -315,6 +318,69 @@ public:
         }
         return m_cAbi->callFunc(builder, loc, m_runtimeFuncs[index], operands);
     }
+
+    mlir::LLVM::GlobalOp getUTF32Array(mlir::OpBuilder& builder, mlir::Location loc, mlir::ModuleOp module,
+                                       llvm::ArrayRef<mlir::Attribute> value)
+    {
+        mlir::OpBuilder::InsertionGuard guard{builder};
+        builder.setInsertionPointToEnd(module.getBody());
+        auto data = builder.create<mlir::LLVM::GlobalOp>(
+            loc, mlir::LLVM::LLVMArrayType::get(builder.getI32Type(), value.size()), true, mlir::LLVM::Linkage::Private,
+            "$utf32." + std::to_string(m_utf32ConstantCount++), mlir::Attribute{});
+        auto block = new mlir::Block;
+        data.getInitializerRegion().push_back(block);
+        builder.setInsertionPointToStart(block);
+        mlir::Value undef = builder.create<mlir::LLVM::UndefOp>(loc, data.type());
+        for (auto& iter : llvm::enumerate(value))
+        {
+            auto constant = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), iter.value());
+            undef = builder.create<mlir::LLVM::InsertValueOp>(
+                loc, undef, constant, builder.getI64ArrayAttr({static_cast<std::int64_t>(iter.index())}));
+        }
+        builder.create<mlir::LLVM::ReturnOp>(loc, undef);
+        return data;
+    }
+
+    mlir::LLVM::GlobalOp getGlobalTuple(
+        mlir::OpBuilder& builder, mlir::Location loc, mlir::ModuleOp module, llvm::ArrayRef<mlir::Attribute> value,
+        llvm::function_ref<mlir::Value(mlir::OpBuilder& builder, mlir::Location loc, mlir::Attribute, std::size_t)>
+            tupleElement)
+    {
+        mlir::OpBuilder::InsertionGuard guard{builder};
+        builder.setInsertionPointToEnd(module.getBody());
+        auto body = getPyTupleObject().cast<mlir::LLVM::LLVMStructType>().getBody().vec();
+        body.back() = mlir::LLVM::LLVMArrayType::get(body.back().cast<mlir::LLVM::LLVMArrayType>().getElementType(),
+                                                     value.size());
+        auto type = mlir::LLVM::LLVMStructType::getLiteral(module.getContext(), body);
+        auto data =
+            builder.create<mlir::LLVM::GlobalOp>(loc, type, true, mlir::LLVM::Linkage::Private,
+                                                 "$tuple." + std::to_string(m_tupleConstantCount++), mlir::Attribute{});
+        auto block = new mlir::Block;
+        data.getInitializerRegion().push_back(block);
+        builder.setInsertionPointToStart(block);
+        mlir::Value undef = builder.create<mlir::LLVM::UndefOp>(loc, data.type());
+        // Type object
+        {
+            auto constant = builder.create<mlir::LLVM::AddressOfOp>(
+                loc, mlir::LLVM::LLVMPointerType::get(getPyTypeObject()),
+                mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Dialect::tupleTypeObjectName));
+            undef = builder.create<mlir::LLVM::InsertValueOp>(loc, undef, constant, builder.getI64ArrayAttr({0, 0}));
+        }
+        // Count
+        {
+            auto constant = builder.create<mlir::LLVM::ConstantOp>(
+                loc, getIndexType(), builder.getIntegerAttr(getIndexType(), value.size()));
+            undef = builder.create<mlir::LLVM::InsertValueOp>(loc, undef, constant, builder.getI64ArrayAttr({1}));
+        }
+        for (auto& iter : llvm::enumerate(value))
+        {
+            auto constant = tupleElement(builder, loc, iter.value(), iter.index());
+            undef = builder.create<mlir::LLVM::InsertValueOp>(
+                loc, undef, constant, builder.getI64ArrayAttr({2 + static_cast<std::int64_t>(iter.index())}));
+        }
+        builder.create<mlir::LLVM::ReturnOp>(loc, undef);
+        return data;
+    }
 };
 
 mlir::Value genNullConstant(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type llvmType)
@@ -415,23 +481,50 @@ struct GlobalConversionBase : SingleOpMatcher<T, Op>
                         continue;
                     }
                     seen.insert(*known);
-                    mlir::Value constant = llvm::TypeSwitch<mlir::Attribute, mlir::Value>(value)
-                                               .Case<mlir::IntegerAttr>(
-                                                   [&](mlir::IntegerAttr attr) {
-                                                       return rewriter.create<mlir::LLVM::ConstantOp>(
-                                                           loc, this->typeConverter->convertType(attr.getType()), attr);
-                                                   })
-                                               .template Case<mlir::FlatSymbolRefAttr>(
-                                                   [&](mlir::FlatSymbolRefAttr attr)
-                                                   {
-                                                       return rewriter.create<mlir::LLVM::AddressOfOp>(
-                                                           loc,
-                                                           this->typeConverter->convertType(
-                                                               pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(
-                                                                   this->getContext(), *known)),
-                                                           attr);
-                                                   })
-                                               .Default([](auto) -> mlir::Value { PYLIR_UNREACHABLE; });
+                    mlir::Value constant =
+                        llvm::TypeSwitch<mlir::Attribute, mlir::Value>(value)
+                            .Case<mlir::IntegerAttr>(
+                                [&](mlir::IntegerAttr attr) {
+                                    return rewriter.create<mlir::LLVM::ConstantOp>(
+                                        loc, this->typeConverter->convertType(attr.getType()), attr);
+                                })
+                            .template Case<mlir::FlatSymbolRefAttr>(
+                                [&](mlir::FlatSymbolRefAttr attr)
+                                {
+                                    return rewriter.create<mlir::LLVM::AddressOfOp>(
+                                        loc,
+                                        this->typeConverter->convertType(
+                                            pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(this->getContext(),
+                                                                                                   *known)),
+                                        attr);
+                                })
+                            .template Case<mlir::ArrayAttr>(
+                                [&](mlir::ArrayAttr attr)
+                                {
+                                    if (*known == pylir::Dialect::TypeSlotPredicate::Bases)
+                                    {
+                                        auto tuple = this->getTypeConverter()->getGlobalTuple(
+                                            rewriter, loc, newOp->template getParentOfType<mlir::ModuleOp>(),
+                                            attr.getValue(),
+                                            [&](mlir::OpBuilder& builder, mlir::Location loc, mlir::Attribute attr,
+                                                auto)
+                                            {
+                                                auto ref = builder.create<mlir::LLVM::AddressOfOp>(
+                                                    loc,
+                                                    mlir::LLVM::LLVMPointerType::get(
+                                                        this->getTypeConverter()->getPyTypeObject()),
+                                                    attr.cast<mlir::FlatSymbolRefAttr>());
+                                                return builder.template create<mlir::LLVM::BitcastOp>(
+                                                    loc,
+                                                    mlir::LLVM::LLVMPointerType::get(
+                                                        this->getTypeConverter()->getPyObject()),
+                                                    ref);
+                                            });
+                                        return rewriter.create<mlir::LLVM::AddressOfOp>(loc, tuple);
+                                    }
+                                    PYLIR_UNREACHABLE;
+                                })
+                            .Default([](auto) -> mlir::Value { PYLIR_UNREACHABLE; });
                     initializer = rewriter.create<mlir::LLVM::InsertValueOp>(
                         loc, initializer, constant, rewriter.getI64ArrayAttr({static_cast<std::int64_t>(*known)}));
                 }
@@ -966,35 +1059,8 @@ struct StringConstantConversion : SingleOpMatcher<StringConstantConversion, pyli
                  mlir::ConversionPatternRewriter& rewriter) const
     {
         auto module = op->getParentOfType<mlir::ModuleOp>();
-        std::string name = ".str.";
-        auto base = name;
-        std::size_t value = 0;
-        do
-        {
-            name = base + std::to_string(value);
-            value++;
-        } while (module.lookupSymbol(name));
-
-        mlir::LLVM::GlobalOp data;
-        {
-            mlir::OpBuilder::InsertionGuard guard{rewriter};
-            rewriter.setInsertionPointToEnd(module.getBody());
-            data = rewriter.create<mlir::LLVM::GlobalOp>(
-                op->getLoc(), mlir::LLVM::LLVMArrayType::get(rewriter.getI32Type(), adaptor.value().size()), true,
-                mlir::LLVM::Linkage::Private, name, mlir::Attribute{});
-            auto block = new mlir::Block;
-            data.getInitializerRegion().push_back(block);
-            rewriter.setInsertionPointToStart(block);
-            mlir::Value undef = rewriter.create<mlir::LLVM::UndefOp>(op->getLoc(), data.type());
-            for (auto& iter : llvm::enumerate(adaptor.value()))
-            {
-                auto constant =
-                    rewriter.create<mlir::LLVM::ConstantOp>(op->getLoc(), rewriter.getI32Type(), iter.value());
-                undef = rewriter.create<mlir::LLVM::InsertValueOp>(
-                    op->getLoc(), undef, constant, rewriter.getI64ArrayAttr({static_cast<std::int64_t>(iter.index())}));
-            }
-            rewriter.create<mlir::LLVM::ReturnOp>(op->getLoc(), undef);
-        }
+        mlir::LLVM::GlobalOp data =
+            getTypeConverter()->getUTF32Array(rewriter, op->getLoc(), module, adaptor.value().getValue());
         mlir::Value address = rewriter.create<mlir::LLVM::AddressOfOp>(op->getLoc(), data);
         auto zero = createIndexConstant(rewriter, op->getLoc(), 0);
         address =

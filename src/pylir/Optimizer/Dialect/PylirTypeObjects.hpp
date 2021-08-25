@@ -5,6 +5,10 @@
 
 namespace pylir::Dialect
 {
+constexpr std::string_view objectTypeObjectName = "__builtins__.object";
+
+Dialect::ConstantGlobalOp getObjectTypeObject(mlir::ModuleOp& module);
+
 constexpr std::string_view typeTypeObjectName = "__builtins__.type";
 
 Dialect::ConstantGlobalOp getTypeTypeObject(mlir::ModuleOp& module);
