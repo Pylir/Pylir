@@ -360,3 +360,22 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getStringTypeObject(mlir::Modul
             return dict;
         });
 }
+
+pylir::Dialect::ConstantGlobalOp pylir::Dialect::getBoolTypeObject(mlir::ModuleOp& module)
+{
+    return getConstant(
+        mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
+        boolTypeObjectName,
+        [&]()
+        {
+            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getIntTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(boolTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
+            return dict;
+        });
+}

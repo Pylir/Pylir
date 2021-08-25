@@ -610,17 +610,15 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     PYLIR_UNREACHABLE;
                 case TokenType::TrueKeyword:
                 {
-                    auto constant =
-                        m_builder.create<mlir::ConstantOp>(location, mlir::BoolAttr::get(m_builder.getContext(), true));
-                    // TODO:
-                    PYLIR_UNREACHABLE;
+                    auto boolTypeObject =
+                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getBoolTypeObject(m_module));
+                    return m_builder.create<Dialect::IntegerConstant>(location, boolTypeObject, llvm::APInt(2, 1));
                 }
                 case TokenType::FalseKeyword:
                 {
-                    auto constant = m_builder.create<mlir::ConstantOp>(
-                        location, mlir::BoolAttr::get(m_builder.getContext(), false));
-                    // TODO:
-                    PYLIR_UNREACHABLE;
+                    auto boolTypeObject =
+                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getBoolTypeObject(m_module));
+                    return m_builder.create<Dialect::IntegerConstant>(location, boolTypeObject, llvm::APInt(2, 0));
                 }
                 case TokenType::NoneKeyword:
                     return m_builder.create<pylir::Dialect::DataOfOp>(location, Dialect::getNoneObject(m_module));

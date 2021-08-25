@@ -41,5 +41,9 @@ constexpr std::string_view stringTypeObjectName = "__builtins__.str";
 
 Dialect::ConstantGlobalOp getStringTypeObject(mlir::ModuleOp& module);
 
+constexpr std::string_view boolTypeObjectName = "__builtins__.bool";
+
+Dialect::ConstantGlobalOp getBoolTypeObject(mlir::ModuleOp& module);
+
 mlir::FunctionType getCCFuncType(mlir::MLIRContext* context);
 } // namespace pylir::Dialect
