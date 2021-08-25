@@ -503,32 +503,26 @@ struct GlobalConversionBase : SingleOpMatcher<T, Op>
                             .template Case<mlir::ArrayAttr>(
                                 [&](mlir::ArrayAttr attr)
                                 {
-                                    if (*known == pylir::Dialect::TypeSlotPredicate::Bases)
-                                    {
-                                        auto tuple = this->getTypeConverter()->getGlobalTuple(
-                                            rewriter, loc, newOp->template getParentOfType<mlir::ModuleOp>(),
-                                            attr.getValue(),
-                                            [&](mlir::OpBuilder& builder, mlir::Location loc, mlir::Attribute attr,
-                                                auto)
-                                            {
-                                                auto ref = builder.create<mlir::LLVM::AddressOfOp>(
-                                                    loc,
-                                                    mlir::LLVM::LLVMPointerType::get(
-                                                        this->getTypeConverter()->getPyTypeObject()),
-                                                    attr.cast<mlir::FlatSymbolRefAttr>());
-                                                return builder.template create<mlir::LLVM::BitcastOp>(
-                                                    loc,
-                                                    mlir::LLVM::LLVMPointerType::get(
-                                                        this->getTypeConverter()->getPyObject()),
-                                                    ref);
-                                            });
-                                        auto ptr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, tuple);
-                                        return rewriter.create<mlir::LLVM::BitcastOp>(
-                                            loc,
-                                            mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyObject()),
-                                            ptr);
-                                    }
-                                    PYLIR_UNREACHABLE;
+                                    auto tuple = this->getTypeConverter()->getGlobalTuple(
+                                        rewriter, loc, newOp->template getParentOfType<mlir::ModuleOp>(),
+                                        attr.getValue(),
+                                        [&](mlir::OpBuilder& builder, mlir::Location loc, mlir::Attribute attr, auto)
+                                        {
+                                            auto ref = builder.create<mlir::LLVM::AddressOfOp>(
+                                                loc,
+                                                mlir::LLVM::LLVMPointerType::get(
+                                                    this->getTypeConverter()->getPyTypeObject()),
+                                                attr.cast<mlir::FlatSymbolRefAttr>());
+                                            return builder.template create<mlir::LLVM::BitcastOp>(
+                                                loc,
+                                                mlir::LLVM::LLVMPointerType::get(
+                                                    this->getTypeConverter()->getPyObject()),
+                                                ref);
+                                        });
+                                    auto ptr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, tuple);
+                                    return rewriter.create<mlir::LLVM::BitcastOp>(
+                                        loc, mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyObject()),
+                                        ptr);
                                 })
                             .Default([](auto) -> mlir::Value { PYLIR_UNREACHABLE; });
                     initializer = rewriter.create<mlir::LLVM::InsertValueOp>(

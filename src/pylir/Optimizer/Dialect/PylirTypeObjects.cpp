@@ -2,6 +2,8 @@
 
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
+#include <llvm/ADT/SetVector.h>
+
 #include <pylir/Support/Macros.hpp>
 
 namespace
@@ -36,6 +38,70 @@ mlir::FlatSymbolRefAttr genFunction(mlir::ModuleOp& module, mlir::FunctionType s
     genBody(builder, func);
     return mlir::FlatSymbolRefAttr::get(module.getContext(), name.str());
 }
+
+mlir::ArrayAttr calculateMRO(llvm::StringRef thisRef, mlir::ArrayAttr bases, mlir::ModuleOp moduleOp)
+{
+    mlir::SymbolTable symbolTable(moduleOp);
+    std::vector<mlir::Attribute> result{mlir::FlatSymbolRefAttr::get(bases.getContext(), thisRef)};
+
+    auto str = mlir::StringAttr::get(bases.getContext(), "__bases__");
+    auto getBases = [&](mlir::Attribute attribute)
+    {
+        auto lookup =
+            symbolTable.lookup<pylir::Dialect::ConstantGlobalOp>(attribute.cast<mlir::FlatSymbolRefAttr>().getValue());
+        PYLIR_ASSERT(lookup);
+        auto kvPairs = lookup.initializer().cast<pylir::Dialect::DictAttr>().getValue();
+        auto type =
+            std::find_if(kvPairs.begin(), kvPairs.end(),
+                         [&](const std::pair<mlir::Attribute, mlir::Attribute> pair) { return pair.first == str; });
+        PYLIR_ASSERT(type != kvPairs.end());
+        return type->second.cast<mlir::ArrayAttr>();
+    };
+
+    std::vector<llvm::SetVector<mlir::Attribute>> lists;
+    lists.reserve(1 + bases.getValue().size());
+    lists.emplace_back(bases.getValue().rbegin(), bases.getValue().rend());
+    for (auto& iter : llvm::reverse(bases.getValue()))
+    {
+        auto arrayAttr = getBases(iter);
+        lists.emplace_back(arrayAttr.getValue().rbegin(), arrayAttr.getValue().rend());
+        lists.back().insert(iter);
+    }
+
+    while (!lists.empty())
+    {
+        for (auto& list : llvm::reverse(lists))
+        {
+            auto head = list.back();
+            if (std::any_of(lists.begin(), lists.end(),
+                            [&](const llvm::SetVector<mlir::Attribute>& set)
+                            { return set.back() != head && set.contains(head); }))
+            {
+                continue;
+            }
+            result.emplace_back(head);
+            for (auto iter = lists.begin(); iter != lists.end();)
+            {
+                if (iter->back() != head)
+                {
+                    iter++;
+                    continue;
+                }
+                iter->pop_back();
+                if (!iter->empty())
+                {
+                    iter++;
+                    continue;
+                }
+                iter = lists.erase(iter);
+            }
+            break;
+        }
+    }
+
+    return mlir::ArrayAttr::get(bases.getContext(), result);
+}
+
 } // namespace
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getObjectTypeObject(mlir::ModuleOp& module)
@@ -58,10 +124,13 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleO
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
-                              mlir::ArrayAttr::get(module.getContext(),
-                                                   {mlir::FlatSymbolRefAttr::get(
-                                                       module.getContext(), getObjectTypeObject(module).sym_name())}));
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getObjectTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(typeTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
             return dict;
         });
 }
@@ -92,10 +161,13 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
                                                                            mlir::ValueRange{self, args, dict});
                         builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), result.getResult(0));
                     }));
-            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
-                              mlir::ArrayAttr::get(module.getContext(),
-                                                   {mlir::FlatSymbolRefAttr::get(
-                                                       module.getContext(), getObjectTypeObject(module).sym_name())}));
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getObjectTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(functionTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
             return dict;
         });
 }
@@ -123,34 +195,40 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getIntTypeObject(mlir::ModuleOp
                                 auto result = builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), lhs, rhs);
                                 builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{result});
                             }));
-            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
-                              mlir::ArrayAttr::get(module.getContext(),
-                                                   {mlir::FlatSymbolRefAttr::get(
-                                                       module.getContext(), getObjectTypeObject(module).sym_name())}));
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getObjectTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(intTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
             return dict;
         });
 }
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneTypeObject(mlir::ModuleOp& module)
 {
-    return getConstant(mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
-                       "__builtins__.None",
-                       [&]()
-                       {
-                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-                           dict.emplace_back(
-                               mlir::StringAttr::get(module.getContext(), "__bases__"),
-                               mlir::ArrayAttr::get(module.getContext(),
-                                                    {mlir::FlatSymbolRefAttr::get(
-                                                        module.getContext(), getObjectTypeObject(module).sym_name())}));
-                           return dict;
-                       });
+    return getConstant(
+        mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
+        noneTypeObjectName,
+        [&]()
+        {
+            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getObjectTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(noneTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
+            return dict;
+        });
 }
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneObject(mlir::ModuleOp& module)
 {
     return getConstant(mlir::FlatSymbolRefAttr::get(module.getContext(), getNoneTypeObject(module).sym_name()), module,
-                       noneTypeObjectName,
+                       "__builtins.None",
                        [&]()
                        {
                            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
@@ -161,14 +239,21 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneObject(mlir::ModuleOp& m
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedTypeObject(mlir::ModuleOp& module)
 {
-    return getConstant(mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
-                       notImplementedTypeObjectName,
-                       [&]()
-                       {
-                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-
-                           return dict;
-                       });
+    return getConstant(
+        mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
+        notImplementedTypeObjectName,
+        [&]()
+        {
+            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getObjectTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(notImplementedTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
+            return dict;
+        });
 }
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::ModuleOp& module)
@@ -179,10 +264,6 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::M
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
-                              mlir::ArrayAttr::get(module.getContext(),
-                                                   {mlir::FlatSymbolRefAttr::get(
-                                                       module.getContext(), getObjectTypeObject(module).sym_name())}));
             return dict;
         });
 }
@@ -250,26 +331,32 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
                                                                                    successor->getArgument(0));
                         builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{returnValue});
                     }));
-            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
-                              mlir::ArrayAttr::get(module.getContext(),
-                                                   {mlir::FlatSymbolRefAttr::get(
-                                                       module.getContext(), getObjectTypeObject(module).sym_name())}));
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getObjectTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(tupleTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
             return dict;
         });
 }
 
 pylir::Dialect::ConstantGlobalOp pylir::Dialect::getStringTypeObject(mlir::ModuleOp& module)
 {
-    return getConstant(mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
-                       stringTypeObjectName,
-                       [&]()
-                       {
-                           std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-                           dict.emplace_back(
-                               mlir::StringAttr::get(module.getContext(), "__bases__"),
-                               mlir::ArrayAttr::get(module.getContext(),
-                                                    {mlir::FlatSymbolRefAttr::get(
-                                                        module.getContext(), getObjectTypeObject(module).sym_name())}));
-                           return dict;
-                       });
+    return getConstant(
+        mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
+        stringTypeObjectName,
+        [&]()
+        {
+            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            auto& bases = dict.emplace_back(
+                mlir::StringAttr::get(module.getContext(), "__bases__"),
+                mlir::ArrayAttr::get(
+                    module.getContext(),
+                    {mlir::FlatSymbolRefAttr::get(module.getContext(), getObjectTypeObject(module).sym_name())}));
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__mro__"),
+                              calculateMRO(stringTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
+            return dict;
+        });
 }

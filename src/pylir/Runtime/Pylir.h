@@ -91,6 +91,7 @@ extern "C"
         PylirCCType m_new;
         PylirObject* m_bases;
         PylirUnaryOp m_del;
+        PylirObject* m_mro;
     } PylirTypeObject;
 
     void* pylir_gc_alloc(size_t size);
