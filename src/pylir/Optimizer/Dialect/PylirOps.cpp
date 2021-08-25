@@ -153,7 +153,9 @@ void printGlobalInitialValue(mlir::OpAsmPrinter& printer, pylir::Dialect::Global
 mlir::LogicalResult verifyDynamicSize(mlir::Operation* op, mlir::Value dynamicSize, llvm::StringRef type)
 {
     if (type == llvm::StringRef{pylir::Dialect::tupleTypeObjectName}
-        || type == llvm::StringRef{pylir::Dialect::intTypeObjectName})
+        || type == llvm::StringRef{pylir::Dialect::intTypeObjectName}
+        || type == llvm::StringRef{pylir::Dialect::boolTypeObjectName}
+        || type == llvm::StringRef{pylir::Dialect::stringTypeObjectName})
     {
         if (!dynamicSize)
         {

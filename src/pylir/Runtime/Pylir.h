@@ -126,8 +126,6 @@ extern "C"
         /*uint32_t values[]; */
     } PylirString;
 
-    PylirString* pylir_string_from_utf32(PylirTypeObject* typeObject, const uint32_t* data, size_t count);
-
 #ifdef __cplusplus
 }
 #endif

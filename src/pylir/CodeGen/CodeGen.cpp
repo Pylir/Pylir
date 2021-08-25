@@ -600,10 +600,19 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 {
                     auto utf32 = Text::toUTF32String(pylir::get<std::string>(literal.token.getValue()));
                     std::vector<std::int32_t> values(utf32.begin(), utf32.end());
-                    auto stringTypeObject =
-                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getStringTypeObject(m_module));
-                    return m_builder.create<Dialect::StringConstant>(location, stringTypeObject,
-                                                                     m_builder.getI32ArrayAttr(values));
+                    auto size = m_builder.create<mlir::ConstantOp>(location, m_builder.getIndexType(),
+                                                                   m_builder.getIndexAttr(utf32.size()));
+                    auto gcAlloc = m_builder.create<Dialect::GCObjectAllocOp>(
+                        location, size, m_builder.getSymbolRefAttr(Dialect::getStringTypeObject(m_module)));
+                    for (auto& iter : llvm::enumerate(values))
+                    {
+                        auto index = m_builder.create<mlir::ConstantOp>(location, m_builder.getIndexType(),
+                                                                        m_builder.getIndexAttr(iter.index()));
+                        auto constant = m_builder.create<mlir::ConstantOp>(location, m_builder.getI32Type(),
+                                                                           m_builder.getI32IntegerAttr(iter.value()));
+                        m_builder.create<Dialect::SetStringItemOp>(location, gcAlloc, index, constant);
+                    }
+                    return gcAlloc;
                 }
                 case TokenType::ByteLiteral:
                     // TODO:
