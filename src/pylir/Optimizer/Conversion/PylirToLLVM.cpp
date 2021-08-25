@@ -144,6 +144,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
                 returnType = mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 8));
                 operands = {getIndexType()};
                 name = "pylir_gc_alloc";
+                passthrough = {mlir::StringAttr::get(&getContext(), "inaccessiblememonly")};
                 break;
             default: PYLIR_UNREACHABLE;
         }
