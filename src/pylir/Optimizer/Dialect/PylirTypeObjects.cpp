@@ -44,8 +44,8 @@ mlir::ArrayAttr calculateMRO(llvm::StringRef thisRef, mlir::ArrayAttr bases, mli
     mlir::SymbolTable symbolTable(moduleOp);
     std::vector<mlir::Attribute> result{mlir::FlatSymbolRefAttr::get(bases.getContext(), thisRef)};
 
-    auto str = mlir::StringAttr::get(bases.getContext(), "__bases__");
-    auto getBases = [&](mlir::Attribute attribute)
+    auto str = mlir::StringAttr::get(bases.getContext(), "__mro__");
+    auto getLinearization = [&](mlir::Attribute attribute)
     {
         auto lookup =
             symbolTable.lookup<pylir::Dialect::ConstantGlobalOp>(attribute.cast<mlir::FlatSymbolRefAttr>().getValue());
@@ -60,10 +60,13 @@ mlir::ArrayAttr calculateMRO(llvm::StringRef thisRef, mlir::ArrayAttr bases, mli
 
     std::vector<llvm::SetVector<mlir::Attribute>> lists;
     lists.reserve(1 + bases.getValue().size());
-    lists.emplace_back(bases.getValue().rbegin(), bases.getValue().rend());
+    if (!bases.empty())
+    {
+        lists.emplace_back(bases.getValue().rbegin(), bases.getValue().rend());
+    }
     for (auto& iter : llvm::reverse(bases.getValue()))
     {
-        auto arrayAttr = getBases(iter);
+        auto arrayAttr = getLinearization(iter);
         lists.emplace_back(arrayAttr.getValue().rbegin(), arrayAttr.getValue().rend());
         lists.back().insert(iter);
     }
@@ -111,8 +114,11 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getObjectTypeObject(mlir::Modul
                        [&]()
                        {
                            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
-                           dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
-                                             mlir::ArrayAttr::get(module.getContext(), {}));
+                           auto& bases = dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
+                                                           mlir::ArrayAttr::get(module.getContext(), {}));
+                           dict.emplace_back(
+                               mlir::StringAttr::get(module.getContext(), "__mro__"),
+                               calculateMRO(objectTypeObjectName, bases.second.cast<mlir::ArrayAttr>(), module));
                            return dict;
                        });
 }
