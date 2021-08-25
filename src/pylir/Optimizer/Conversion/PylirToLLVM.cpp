@@ -327,6 +327,7 @@ public:
         auto data = builder.create<mlir::LLVM::GlobalOp>(
             loc, mlir::LLVM::LLVMArrayType::get(builder.getI32Type(), value.size()), true, mlir::LLVM::Linkage::Private,
             "$utf32." + std::to_string(m_utf32ConstantCount++), mlir::Attribute{});
+        data.unnamed_addrAttr(mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
         auto block = new mlir::Block;
         data.getInitializerRegion().push_back(block);
         builder.setInsertionPointToStart(block);
@@ -355,6 +356,7 @@ public:
         auto data =
             builder.create<mlir::LLVM::GlobalOp>(loc, type, true, mlir::LLVM::Linkage::Private,
                                                  "$tuple." + std::to_string(m_tupleConstantCount++), mlir::Attribute{});
+        data.unnamed_addrAttr(mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
         auto block = new mlir::Block;
         data.getInitializerRegion().push_back(block);
         builder.setInsertionPointToStart(block);
@@ -376,7 +378,7 @@ public:
         {
             auto constant = tupleElement(builder, loc, iter.value(), iter.index());
             undef = builder.create<mlir::LLVM::InsertValueOp>(
-                loc, undef, constant, builder.getI64ArrayAttr({2 + static_cast<std::int64_t>(iter.index())}));
+                loc, undef, constant, builder.getI64ArrayAttr({2, static_cast<std::int64_t>(iter.index())}));
         }
         builder.create<mlir::LLVM::ReturnOp>(loc, undef);
         return data;
@@ -520,7 +522,11 @@ struct GlobalConversionBase : SingleOpMatcher<T, Op>
                                                         this->getTypeConverter()->getPyObject()),
                                                     ref);
                                             });
-                                        return rewriter.create<mlir::LLVM::AddressOfOp>(loc, tuple);
+                                        auto ptr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, tuple);
+                                        return rewriter.create<mlir::LLVM::BitcastOp>(
+                                            loc,
+                                            mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyObject()),
+                                            ptr);
                                     }
                                     PYLIR_UNREACHABLE;
                                 })
