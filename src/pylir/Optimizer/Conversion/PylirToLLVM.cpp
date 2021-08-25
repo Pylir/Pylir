@@ -18,6 +18,7 @@
 #include <pylir/Optimizer/Dialect/PylirOps.hpp>
 #include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 #include <pylir/Support/Macros.hpp>
+#include <pylir/Support/Text.hpp>
 
 #include <optional>
 
@@ -376,6 +377,47 @@ public:
         builder.create<mlir::LLVM::ReturnOp>(loc, undef);
         return data;
     }
+
+    mlir::LLVM::GlobalOp getGlobalString(mlir::OpBuilder& builder, mlir::Location loc, mlir::ModuleOp module,
+                                         std::u32string string)
+    {
+        mlir::OpBuilder::InsertionGuard guard{builder};
+        builder.setInsertionPointToEnd(module.getBody());
+        auto body = getPyStringObject().cast<mlir::LLVM::LLVMStructType>().getBody().vec();
+        body.back() = mlir::LLVM::LLVMArrayType::get(body.back().cast<mlir::LLVM::LLVMArrayType>().getElementType(),
+                                                     string.size());
+        auto type = mlir::LLVM::LLVMStructType::getLiteral(module.getContext(), body);
+        auto data =
+            builder.create<mlir::LLVM::GlobalOp>(loc, type, true, mlir::LLVM::Linkage::Private,
+                                                 "$str." + std::to_string(m_stringConstantCount++), mlir::Attribute{});
+        data.unnamed_addrAttr(mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
+        auto block = new mlir::Block;
+        data.getInitializerRegion().push_back(block);
+        builder.setInsertionPointToStart(block);
+        mlir::Value undef = builder.create<mlir::LLVM::UndefOp>(loc, data.type());
+        // Type object
+        {
+            auto constant = builder.create<mlir::LLVM::AddressOfOp>(
+                loc, mlir::LLVM::LLVMPointerType::get(getPyTypeObject()),
+                mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Dialect::stringTypeObjectName));
+            undef = builder.create<mlir::LLVM::InsertValueOp>(loc, undef, constant, builder.getI64ArrayAttr({0, 0}));
+        }
+        // Count
+        {
+            auto constant = builder.create<mlir::LLVM::ConstantOp>(
+                loc, getIndexType(), builder.getIntegerAttr(getIndexType(), string.size()));
+            undef = builder.create<mlir::LLVM::InsertValueOp>(loc, undef, constant, builder.getI64ArrayAttr({1}));
+        }
+        for (auto& iter : llvm::enumerate(string))
+        {
+            auto constant = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(),
+                                                                   builder.getI32IntegerAttr(iter.value()));
+            undef = builder.create<mlir::LLVM::InsertValueOp>(
+                loc, undef, constant, builder.getI64ArrayAttr({2, static_cast<std::int64_t>(iter.index())}));
+        }
+        builder.create<mlir::LLVM::ReturnOp>(loc, undef);
+        return data;
+    }
 };
 
 mlir::Value genNullConstant(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type llvmType)
@@ -513,6 +555,17 @@ struct GlobalConversionBase : SingleOpMatcher<T, Op>
                                                 ref);
                                         });
                                     auto ptr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, tuple);
+                                    return rewriter.create<mlir::LLVM::BitcastOp>(
+                                        loc, mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyObject()),
+                                        ptr);
+                                })
+                            .template Case<mlir::StringAttr>(
+                                [&](mlir::StringAttr attr)
+                                {
+                                    auto utf32 = pylir::Text::toUTF32String(attr.getValue());
+                                    auto string = this->getTypeConverter()->getGlobalString(
+                                        rewriter, loc, newOp->template getParentOfType<mlir::ModuleOp>(), utf32);
+                                    auto ptr = rewriter.create<mlir::LLVM::AddressOfOp>(loc, string);
                                     return rewriter.create<mlir::LLVM::BitcastOp>(
                                         loc, mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyObject()),
                                         ptr);
