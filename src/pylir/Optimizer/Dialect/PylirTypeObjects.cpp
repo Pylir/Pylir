@@ -114,6 +114,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getObjectTypeObject(mlir::Modul
                        [&]()
                        {
                            std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+                           dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                                             mlir::StringAttr::get(module.getContext(), "object"));
                            auto& bases = dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__bases__"),
                                                            mlir::ArrayAttr::get(module.getContext(), {}));
                            dict.emplace_back(
@@ -130,6 +132,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleO
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "type"));
             auto& bases = dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__bases__"),
                 mlir::ArrayAttr::get(
@@ -149,6 +153,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "function"));
             dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__call__"),
                 genFunction(
@@ -186,6 +192,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getIntTypeObject(mlir::ModuleOp
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "int"));
             dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__mul__"),
                 genFunction(module,
@@ -220,6 +228,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneTypeObject(mlir::ModuleO
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "NoneType"));
             auto& bases = dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__bases__"),
                 mlir::ArrayAttr::get(
@@ -251,6 +261,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedTypeObject(mli
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "NotImplementedType"));
             auto& bases = dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__bases__"),
                 mlir::ArrayAttr::get(
@@ -288,6 +300,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "tuple"));
             dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__getitem__"),
                 genFunction(
@@ -356,6 +370,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getStringTypeObject(mlir::Modul
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "str"));
             auto& bases = dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__bases__"),
                 mlir::ArrayAttr::get(
@@ -375,6 +391,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getBoolTypeObject(mlir::ModuleO
         [&]()
         {
             std::vector<std::pair<mlir::Attribute, mlir::Attribute>> dict;
+            dict.emplace_back(mlir::StringAttr::get(module.getContext(), "__name__"),
+                              mlir::StringAttr::get(module.getContext(), "bool"));
             auto& bases = dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__bases__"),
                 mlir::ArrayAttr::get(

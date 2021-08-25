@@ -94,6 +94,7 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
         case TypeSlotPredicate::Del: return mlir::FunctionType::get(context, {ref}, {ref});
         case TypeSlotPredicate::Bases:
         case TypeSlotPredicate::Mro:
+        case TypeSlotPredicate::Name:
         case TypeSlotPredicate::Dict: return ref;
     }
     PYLIR_UNREACHABLE;

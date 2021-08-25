@@ -229,6 +229,7 @@ def Pylir_TypeSlot_New : I32EnumAttrCase<"New", 61, "__new__">;
 def Pylir_TypeSlot_Bases : I32EnumAttrCase<"Bases", 62, "__bases__">;
 def Pylir_TypeSlot_Del : I32EnumAttrCase<"Del", 63, "__del__">;
 def Pylir_TypeSlot_MRO : I32EnumAttrCase<"Mro", 64, "__mro__">;
+def Pylir_TypeSlot_Name : I32EnumAttrCase<"Name", 65, "__name__">;
 
 def Pylir_TypeSlotPredicateAttr : I32EnumAttr<"TypeSlotPredicate","",[
     Pylir_TypeSlot_DictPtr, Pylir_TypeSlot_Call, Pylir_TypeSlot_Add, Pylir_TypeSlot_Subtract, Pylir_TypeSlot_Multiply,
@@ -245,7 +246,7 @@ def Pylir_TypeSlotPredicateAttr : I32EnumAttr<"TypeSlotPredicate","",[
     Pylir_TypeSlot_Str, Pylir_TypeSlot_Repr, Pylir_TypeSlot_GetAttr, Pylir_TypeSlot_SetAttr, Pylir_TypeSlot_Eq,
     Pylir_TypeSlot_Ne, Pylir_TypeSlot_Lt, Pylir_TypeSlot_Gt, Pylir_TypeSlot_Le, Pylir_TypeSlot_Ge,
     Pylir_TypeSlot_IterNext, Pylir_TypeSlot_Dict, Pylir_TypeSlot_DescrGet, Pylir_TypeSlot_DescrSet, Pylir_TypeSlot_Init,
-    Pylir_TypeSlot_New, Pylir_TypeSlot_Bases, Pylir_TypeSlot_Del, Pylir_TypeSlot_MRO
+    Pylir_TypeSlot_New, Pylir_TypeSlot_Bases, Pylir_TypeSlot_Del, Pylir_TypeSlot_MRO, Pylir_TypeSlot_Name
 ]> {
     let cppNamespace = "::pylir::Dialect";
 }
