@@ -645,7 +645,7 @@ struct ConstantGlobalOpConversion : GlobalConversionBase<ConstantGlobalOpConvers
         auto resultType = getTypeConverter()->getTypeFromTypeObject(adaptor.type().getValue());
         PYLIR_ASSERT(resultType);
         auto newOp =
-            rewriter.create<mlir::LLVM::GlobalOp>(op->getLoc(), resultType, false, mlir::LLVM::Linkage::LinkonceODR,
+            rewriter.create<mlir::LLVM::GlobalOp>(op->getLoc(), resultType, true, mlir::LLVM::Linkage::LinkonceODR,
                                                   adaptor.sym_name().getValue(), mlir::Attribute{});
         genInitializer(rewriter, op->getLoc(), newOp, adaptor.initializer(), adaptor.type().getValue(),
                        adaptor.sym_name().getValue());
