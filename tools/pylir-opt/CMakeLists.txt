@@ -1,3 +1,3 @@
 
 add_executable(pylir-opt main.cpp)
-target_link_libraries(pylir-opt PylirMemDialect MLIRMlirOptMain PylirMemToLLVMIR)
+target_link_libraries(pylir-opt PylirMemDialect PylirPyDialect MLIRMlirOptMain PylirMemToLLVMIR)

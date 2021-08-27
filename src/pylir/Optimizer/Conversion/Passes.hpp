@@ -4,9 +4,9 @@
 
 #include "PylirMemToLLVMIR/PylirMemToLLVMIR.hpp"
 
-namespace pylir::Dialect
+namespace pylir
 {
 #define GEN_PASS_REGISTRATION
 #include "pylir/Optimizer/Conversion/Passes.h.inc"
 
-} // namespace pylir::Dialect
+} // namespace pylir
