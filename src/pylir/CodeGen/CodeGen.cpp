@@ -713,13 +713,49 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
         });
 }
 
+std::pair<mlir::Value, mlir::Value> pylir::CodeGen::lookupTypeSlot(mlir::Location loc, mlir::Value type,
+                                                                   Dialect::TypeSlotPredicate slot)
+{
+    auto mro = m_builder.create<Dialect::GetTypeSlotOp>(loc, Dialect::TypeSlotPredicate::Mro, type).result();
+    auto size = m_builder.create<Dialect::TupleSizeOp>(loc, mro);
+
+    auto exitBlock = new mlir::Block;
+    exitBlock->addArgument(Dialect::GetTypeSlotOp::returnTypeFromPredicate(m_builder.getContext(), slot));
+    exitBlock->addArgument(m_builder.getI1Type());
+
+    auto loopBody = new mlir::Block;
+    loopBody->addArgument(m_builder.getIndexType());
+    auto zero = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(0));
+    m_builder.create<mlir::BranchOp>(loc, loopBody, mlir::ValueRange{zero});
+
+    m_currentFunc.getCallableRegion()->push_back(loopBody);
+    m_builder.setInsertionPointToStart(loopBody);
+
+    auto thisBase = m_builder.create<Dialect::GetTupleItemOp>(loc, mro, loopBody->getArgument(0));
+    auto typeSlotOp = m_builder.create<Dialect::GetTypeSlotOp>(loc, slot, thisBase);
+    auto notFound = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(loc, typeSlotOp.found(), exitBlock,
+                                         mlir::ValueRange{typeSlotOp.result(), typeSlotOp.found()}, notFound,
+                                         mlir::ValueRange{});
+
+    m_currentFunc.getCallableRegion()->push_back(notFound);
+    m_builder.setInsertionPointToStart(notFound);
+    auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(1));
+    auto newIndex = m_builder.create<mlir::AddIOp>(loc, loopBody->getArgument(0), one);
+    auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ule, newIndex, size);
+    m_builder.create<mlir::CondBranchOp>(loc, isLess, loopBody, mlir::ValueRange{newIndex}, exitBlock,
+                                         mlir::ValueRange{typeSlotOp.result(), typeSlotOp.found()});
+
+    m_currentFunc.getCallableRegion()->push_back(exitBlock);
+    m_builder.setInsertionPointToStart(exitBlock);
+    return {exitBlock->getArgument(0), exitBlock->getArgument(1)};
+}
+
 mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
                                      Dialect::TypeSlotPredicate operation, std::string_view)
 {
     auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhs);
-    auto slot = m_builder.create<Dialect::GetTypeSlotOp>(loc, operation, lhsType);
-    auto func = slot.getResult(0);
-    auto wasFound = slot.getResult(1);
+    auto [func, wasFound] = lookupTypeSlot(loc, lhsType, operation);
     auto result = m_builder.create<Dialect::AllocaOp>(loc, m_refRefObject);
 
     auto* foundBlock = new mlir::Block;

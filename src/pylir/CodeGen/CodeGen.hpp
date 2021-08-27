@@ -27,6 +27,9 @@ class CodeGen
 
     mlir::Value toBool(mlir::Value value);
 
+    std::pair<mlir::Value, mlir::Value> lookupTypeSlot(mlir::Location loc, mlir::Value type,
+                                                       Dialect::TypeSlotPredicate slot);
+
     mlir::Value genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs, Dialect::TypeSlotPredicate operation,
                          std::string_view fallback);
 
