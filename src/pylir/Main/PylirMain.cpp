@@ -27,7 +27,7 @@
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Main/Opts.inc>
-#include <pylir/Optimizer/Conversion/PylirToLLVM.hpp>
+#include <pylir/Optimizer/Conversion/PylirMemToLLVMIR/PylirMemToLLVMIR.hpp>
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
 
@@ -212,7 +212,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     std::string passOptions =
         "target-triple=" + triple.str() + " data-layout=" + machine->createDataLayout().getStringRepresentation();
 
-    auto pass = pylir::Dialect::createConvertPylirToLLVMPass();
+    auto pass = pylir::Mem::createConvertPylirToLLVMPass();
     if (mlir::failed(pass->initializeOptions(passOptions)))
     {
         return false;

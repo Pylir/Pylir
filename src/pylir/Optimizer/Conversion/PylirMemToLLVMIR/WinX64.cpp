@@ -13,9 +13,9 @@ bool isLegalIntegerSize(std::size_t size)
 }
 } // namespace
 
-mlir::LLVM::LLVMFuncOp pylir::Dialect::WinX64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
-                                                           mlir::Type returnType, llvm::StringRef name,
-                                                           mlir::TypeRange inputTypes)
+mlir::LLVM::LLVMFuncOp pylir::Mem::WinX64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
+                                                       mlir::Type returnType, llvm::StringRef name,
+                                                       mlir::TypeRange inputTypes)
 {
     mlir::Type retType = returnType;
     llvm::SmallVector<mlir::Type> argumentTypes;
@@ -73,8 +73,8 @@ mlir::LLVM::LLVMFuncOp pylir::Dialect::WinX64::declareFunc(mlir::OpBuilder& buil
     return funcOp;
 }
 
-mlir::Value pylir::Dialect::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
-                                             mlir::ValueRange operands)
+mlir::Value pylir::Mem::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
+                                         mlir::ValueRange operands)
 {
     auto result = m_adjustments.find(func);
     PYLIR_ASSERT(result != m_adjustments.end());
@@ -165,4 +165,4 @@ mlir::Value pylir::Dialect::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Loc
     }
 }
 
-pylir::Dialect::WinX64::WinX64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}
+pylir::Mem::WinX64::WinX64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}

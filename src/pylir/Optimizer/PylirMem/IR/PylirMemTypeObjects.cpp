@@ -1,4 +1,4 @@
-#include "PylirTypeObjects.hpp"
+#include "PylirMemTypeObjects.hpp"
 
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
@@ -9,21 +9,20 @@
 namespace
 {
 template <class F>
-pylir::Dialect::ConstantGlobalOp getConstant(mlir::FlatSymbolRefAttr type, mlir::ModuleOp& module,
-                                             std::string_view name, F fillDict)
+pylir::Mem::ConstantGlobalOp getConstant(mlir::FlatSymbolRefAttr type, mlir::ModuleOp& module, std::string_view name,
+                                         F fillDict)
 {
     static_assert(std::is_invocable_r_v<std::vector<std::pair<mlir::Attribute, mlir::Attribute>>, F>);
     auto symbolTable = mlir::SymbolTable(module);
-    if (auto symbol = symbolTable.lookup<pylir::Dialect::ConstantGlobalOp>(name))
+    if (auto symbol = symbolTable.lookup<pylir::Mem::ConstantGlobalOp>(name))
     {
         return symbol;
     }
-    auto globalOp =
-        pylir::Dialect::ConstantGlobalOp::create(mlir::UnknownLoc::get(module.getContext()), name, type, {});
+    auto globalOp = pylir::Mem::ConstantGlobalOp::create(mlir::UnknownLoc::get(module.getContext()), name, type, {});
     symbolTable.insert(globalOp);
     // Insert first, then generate initializer to stop recursion
     auto dict = fillDict();
-    globalOp.initializerAttr(pylir::Dialect::DictAttr::get(module.getContext(), dict));
+    globalOp.initializerAttr(pylir::Mem::DictAttr::get(module.getContext(), dict));
     return globalOp;
 }
 
@@ -48,9 +47,9 @@ mlir::ArrayAttr calculateMRO(llvm::StringRef thisRef, mlir::ArrayAttr bases, mli
     auto getLinearization = [&](mlir::Attribute attribute)
     {
         auto lookup =
-            symbolTable.lookup<pylir::Dialect::ConstantGlobalOp>(attribute.cast<mlir::FlatSymbolRefAttr>().getValue());
+            symbolTable.lookup<pylir::Mem::ConstantGlobalOp>(attribute.cast<mlir::FlatSymbolRefAttr>().getValue());
         PYLIR_ASSERT(lookup);
-        auto kvPairs = lookup.initializer().cast<pylir::Dialect::DictAttr>().getValue();
+        auto kvPairs = lookup.initializer().cast<pylir::Mem::DictAttr>().getValue();
         auto type =
             std::find_if(kvPairs.begin(), kvPairs.end(),
                          [&](const std::pair<mlir::Attribute, mlir::Attribute> pair) { return pair.first == str; });
@@ -107,7 +106,7 @@ mlir::ArrayAttr calculateMRO(llvm::StringRef thisRef, mlir::ArrayAttr bases, mli
 
 } // namespace
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getObjectTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getObjectTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
                        objectTypeObjectName,
@@ -125,7 +124,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getObjectTypeObject(mlir::Modul
                        });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getTypeTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), typeTypeObjectName), module, typeTypeObjectName,
@@ -145,7 +144,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTypeTypeObject(mlir::ModuleO
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getFunctionTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
@@ -159,7 +158,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
                 mlir::StringAttr::get(module.getContext(), "__call__"),
                 genFunction(
                     module,
-                    pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(), TypeSlotPredicate::Call)
+                    pylir::Mem::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(), TypeSlotPredicate::Call)
                         .cast<mlir::FunctionType>(),
                     llvm::Twine(functionTypeObjectName) + ".__call__",
                     [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
@@ -167,8 +166,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
                         mlir::Value self = funcOp.getArgument(0);
                         mlir::Value args = funcOp.getArgument(1);
                         mlir::Value dict = funcOp.getArgument(2);
-                        auto unboxed = builder.create<Dialect::UnboxOp>(builder.getUnknownLoc(),
-                                                                        getCCFuncType(module.getContext()), self);
+                        auto unboxed = builder.create<Mem::UnboxOp>(builder.getUnknownLoc(),
+                                                                    getCCFuncType(module.getContext()), self);
                         auto result = builder.create<mlir::CallIndirectOp>(builder.getUnknownLoc(), unboxed,
                                                                            mlir::ValueRange{self, args, dict});
                         builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), result.getResult(0));
@@ -184,7 +183,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getFunctionTypeObject(mlir::Mod
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getIntTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getIntTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
@@ -197,16 +196,15 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getIntTypeObject(mlir::ModuleOp
             dict.emplace_back(
                 mlir::StringAttr::get(module.getContext(), "__mul__"),
                 genFunction(module,
-                            pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
-                                                                                   TypeSlotPredicate::Multiply)
-                                .cast<mlir::FunctionType>(),
+                    pylir::Mem::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(), TypeSlotPredicate::Multiply)
+                        .cast<mlir::FunctionType>(),
                             llvm::Twine(intTypeObjectName) + ".__mul__",
                             [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
                             {
                                 auto lhs = funcOp.getArgument(0);
                                 auto rhs = funcOp.getArgument(1);
                                 // TODO type check
-                                auto result = builder.create<Dialect::IMulOp>(builder.getUnknownLoc(), lhs, rhs);
+                                auto result = builder.create<Mem::IMulOp>(builder.getUnknownLoc(), lhs, rhs);
                                 builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{result});
                             }));
             auto& bases = dict.emplace_back(
@@ -220,7 +218,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getIntTypeObject(mlir::ModuleOp
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getNoneTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
@@ -241,7 +239,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneTypeObject(mlir::ModuleO
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getNoneObject(mlir::ModuleOp& module)
 {
     return getConstant(mlir::FlatSymbolRefAttr::get(module.getContext(), getNoneTypeObject(module).sym_name()), module,
                        "__builtins.None",
@@ -253,7 +251,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNoneObject(mlir::ModuleOp& m
                        });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getNotImplementedTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
@@ -274,7 +272,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedTypeObject(mli
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getNotImplementedObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getNotImplementedTypeObject(module).sym_name()), module,
@@ -286,13 +284,13 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getNotImplementedObject(mlir::M
         });
 }
 
-mlir::FunctionType pylir::Dialect::getCCFuncType(mlir::MLIRContext* context)
+mlir::FunctionType pylir::Mem::getCCFuncType(mlir::MLIRContext* context)
 {
-    auto ref = Dialect::PointerType::get(ObjectType::get(context));
+    auto ref = Mem::PointerType::get(ObjectType::get(context));
     return mlir::FunctionType::get(context, {ref, ref, ref}, {ref});
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getTupleTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
@@ -306,8 +304,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
                 mlir::StringAttr::get(module.getContext(), "__getitem__"),
                 genFunction(
                     module,
-                    pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(),
-                                                                           TypeSlotPredicate::GetItem)
+                    pylir::Mem::GetTypeSlotOp::returnTypeFromPredicate(module.getContext(), TypeSlotPredicate::GetItem)
                         .cast<mlir::FunctionType>(),
                     llvm::Twine(tupleTypeObjectName) + ".__getitem__",
                     [&](mlir::OpBuilder& builder, mlir::FuncOp funcOp)
@@ -316,13 +313,13 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
                         auto indices = funcOp.getArgument(1);
                         // TODO type check
 
-                        auto result = builder.create<Dialect::ItoIndexOp>(builder.getUnknownLoc(), indices);
+                        auto result = builder.create<Mem::ItoIndexOp>(builder.getUnknownLoc(), indices);
                         auto index = result.getResult(0);
                         auto overflow = result.getResult(1);
                         // TODO check overflow
                         (void)overflow;
 
-                        auto tupleSize = builder.create<Dialect::TupleSizeOp>(builder.getUnknownLoc(), tuple);
+                        auto tupleSize = builder.create<Mem::TupleSizeOp>(builder.getUnknownLoc(), tuple);
 
                         auto zero = builder.create<mlir::ConstantOp>(builder.getUnknownLoc(), builder.getIndexType(),
                                                                      builder.getIndexAttr(0));
@@ -347,8 +344,8 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
 
                         funcOp.getCallableRegion()->push_back(successor);
                         builder.setInsertionPointToStart(successor);
-                        auto returnValue = builder.create<Dialect::GetTupleItemOp>(builder.getUnknownLoc(), tuple,
-                                                                                   successor->getArgument(0));
+                        auto returnValue = builder.create<Mem::GetTupleItemOp>(builder.getUnknownLoc(), tuple,
+                                                                               successor->getArgument(0));
                         builder.create<mlir::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{returnValue});
                     }));
             auto& bases = dict.emplace_back(
@@ -362,7 +359,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getTupleTypeObject(mlir::Module
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getStringTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getStringTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,
@@ -383,7 +380,7 @@ pylir::Dialect::ConstantGlobalOp pylir::Dialect::getStringTypeObject(mlir::Modul
         });
 }
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::getBoolTypeObject(mlir::ModuleOp& module)
+pylir::Mem::ConstantGlobalOp pylir::Mem::getBoolTypeObject(mlir::ModuleOp& module)
 {
     return getConstant(
         mlir::FlatSymbolRefAttr::get(module.getContext(), getTypeTypeObject(module).sym_name()), module,

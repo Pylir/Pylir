@@ -4,7 +4,7 @@
 #include <mlir/IR/BuiltinOps.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
-#include <pylir/Optimizer/Dialect/PylirOps.hpp>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemOps.hpp>
 #include <pylir/Parser/Syntax.hpp>
 
 #include <unordered_map>
@@ -18,7 +18,7 @@ class CodeGen
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
     std::vector<std::unordered_map<std::string_view, mlir::Operation*>> m_scope{1};
-    Dialect::PointerType m_refRefObject;
+    Mem::PointerType m_refRefObject;
 
     std::unordered_map<std::string_view, mlir::Operation*>& getCurrentScope()
     {
@@ -28,9 +28,9 @@ class CodeGen
     mlir::Value toBool(mlir::Value value);
 
     std::pair<mlir::Value, mlir::Value> lookupTypeSlot(mlir::Location loc, mlir::Value type,
-                                                       Dialect::TypeSlotPredicate slot);
+                                                       Mem::TypeSlotPredicate slot);
 
-    mlir::Value genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs, Dialect::TypeSlotPredicate operation,
+    mlir::Value genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs, Mem::TypeSlotPredicate operation,
                          std::string_view fallback);
 
     template <class AST, class FallBackLocation>

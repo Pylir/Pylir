@@ -2,20 +2,20 @@
 
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
-#include <pylir/Optimizer/Dialect/PylirAttributes.hpp>
-#include <pylir/Optimizer/Dialect/PylirDialect.hpp>
-#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemAttributes.hpp>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemTypeObjects.hpp>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
         [&]
         {
-            context->loadDialect<pylir::Dialect::PylirDialect>();
+            context->loadDialect<pylir::Mem::PylirDialect>();
             context->loadDialect<mlir::StandardOpsDialect>();
             return context;
         }()),
       m_document(&document),
-      m_refRefObject(Dialect::PointerType::get(Dialect::PointerType::get(m_builder.getType<Dialect::ObjectType>())))
+      m_refRefObject(Mem::PointerType::get(Mem::PointerType::get(m_builder.getType<Mem::ObjectType>())))
 {
 }
 
@@ -88,38 +88,38 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
             if (result != getCurrentScope().end())
             {
                 mlir::Value handle;
-                if (auto alloca = llvm::dyn_cast<Dialect::AllocaOp>(result->second))
+                if (auto alloca = llvm::dyn_cast<Mem::AllocaOp>(result->second))
                 {
                     handle = alloca;
                 }
                 else
                 {
-                    auto global = llvm::cast<Dialect::GlobalOp>(result->second);
-                    handle = m_builder.create<Dialect::GetGlobalOp>(location, m_refRefObject,
-                                                                    m_builder.getSymbolRefAttr(global));
+                    auto global = llvm::cast<Mem::GlobalOp>(result->second);
+                    handle = m_builder.create<Mem::GetGlobalOp>(location, m_refRefObject,
+                                                                m_builder.getSymbolRefAttr(global));
                 }
-                m_builder.create<Dialect::StoreOp>(location, value, handle);
+                m_builder.create<Mem::StoreOp>(location, value, handle);
                 return;
             }
             if (m_scope.size() == 1)
             {
                 // We are in the global scope
-                Dialect::GlobalOp op;
+                Mem::GlobalOp op;
                 {
                     mlir::OpBuilder::InsertionGuard guard{m_builder};
                     m_builder.setInsertionPointToEnd(m_module.getBody());
-                    op = m_builder.create<Dialect::GlobalOp>(location, identifierToken.getValue(), mlir::StringAttr{},
-                                                             m_refRefObject.getElementType(), m_builder.getUnitAttr());
+                    op = m_builder.create<Mem::GlobalOp>(location, identifierToken.getValue(), mlir::StringAttr{},
+                                                         m_refRefObject.getElementType(), m_builder.getUnitAttr());
                 }
                 getCurrentScope().insert({identifierToken.getValue(), op});
                 auto handle =
-                    m_builder.create<Dialect::GetGlobalOp>(location, m_refRefObject, m_builder.getSymbolRefAttr(op));
-                m_builder.create<Dialect::StoreOp>(location, value, handle);
+                    m_builder.create<Mem::GetGlobalOp>(location, m_refRefObject, m_builder.getSymbolRefAttr(op));
+                m_builder.create<Mem::StoreOp>(location, value, handle);
                 return;
             }
 
-            auto alloca = m_builder.create<Dialect::AllocaOp>(location, m_refRefObject.getElementType());
-            m_builder.create<Dialect::StoreOp>(location, value, alloca);
+            auto alloca = m_builder.create<Mem::AllocaOp>(location, m_refRefObject.getElementType());
+            m_builder.create<Mem::StoreOp>(location, value, alloca);
             getCurrentScope().insert({identifierToken.getValue(), alloca});
         },
         [&](const Syntax::Target::Parenth& parenth)
@@ -209,14 +209,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
             {
                 handleItem(*items.last);
             }
-            auto tuple = m_builder.create<Dialect::GCObjectAllocOp>(
-                loc, count, m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)));
+            auto tuple = m_builder.create<Mem::GCObjectAllocOp>(
+                loc, count, m_builder.getSymbolRefAttr(Mem::getTupleTypeObject(m_module)));
             std::size_t index = 0;
             for (auto iter : operands)
             {
                 auto constant =
                     m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(index++));
-                m_builder.create<Dialect::SetTupleItemOp>(loc, tuple, constant, iter);
+                m_builder.create<Mem::SetTupleItemOp>(loc, tuple, constant, iter);
             }
             return tuple;
         },
@@ -237,13 +237,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ExpressionList& expressionList)
     operands[0] = visit(*expressionList.firstExpr);
     std::transform(expressionList.remainingExpr.begin(), expressionList.remainingExpr.end(), operands.begin() + 1,
                    [&](const auto& pair) { return visit(*pair.second); });
-    auto tuple = m_builder.create<Dialect::GCObjectAllocOp>(
-        loc, count, m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)));
+    auto tuple = m_builder.create<Mem::GCObjectAllocOp>(loc, count,
+                                                        m_builder.getSymbolRefAttr(Mem::getTupleTypeObject(m_module)));
     for (auto iter : llvm::enumerate(operands))
     {
         auto constant =
             m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(iter.index()));
-        m_builder.create<Dialect::SetTupleItemOp>(loc, tuple, constant, iter.value());
+        m_builder.create<Mem::SetTupleItemOp>(loc, tuple, constant, iter.value());
     }
     return tuple;
 }
@@ -273,31 +273,31 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     }
     auto loc = getLoc(expression, expression.suffix->ifToken);
 
-    //    auto result = m_builder.create<Dialect::AllocaOp>(loc);
+    //    auto result = m_builder.create<Mem::AllocaOp>(loc);
     //
     //    mlir::Block* thenBlock = new mlir::Block;
     //    mlir::Block* elseBlock = new mlir::Block;
     //    mlir::Block* continueBlock = new mlir::Block;
     //
     //    m_builder.create<mlir::CondBranchOp>(
-    //        loc, m_builder.create<Dialect::BtoI1Op>(loc, toBool(visit(*expression.suffix->test))), thenBlock,
+    //        loc, m_builder.create<Mem::BtoI1Op>(loc, toBool(visit(*expression.suffix->test))), thenBlock,
     //        elseBlock);
     //
     //    m_currentFunc.getCallableRegion()->push_back(thenBlock);
     //    m_builder.setInsertionPointToStart(thenBlock);
     //    auto thenValue = visit(expression.value);
-    //    m_builder.create<Dialect::StoreOp>(loc, thenValue, result);
+    //    m_builder.create<Mem::StoreOp>(loc, thenValue, result);
     //    m_builder.create<mlir::BranchOp>(loc, continueBlock);
     //
     //    m_currentFunc.getCallableRegion()->push_back(elseBlock);
     //    m_builder.setInsertionPointToStart(elseBlock);
     //    auto elseValue = visit(*expression.suffix->elseValue);
-    //    m_builder.create<Dialect::StoreOp>(loc, elseValue, result);
+    //    m_builder.create<Mem::StoreOp>(loc, elseValue, result);
     //    m_builder.create<mlir::BranchOp>(loc, continueBlock);
     //
     //    m_currentFunc.getCallableRegion()->push_back(continueBlock);
     //    m_builder.setInsertionPointToStart(continueBlock);
-    //    return m_builder.create<Dialect::LoadOp>(loc, m_builder.getType<Dialect::UnknownType>(), result);
+    //    return m_builder.create<Mem::LoadOp>(loc, m_builder.getType<Mem::UnknownType>(), result);
     // TODO
     PYLIR_UNREACHABLE;
 }
@@ -415,7 +415,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::OrExpr& orExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(orExpr, binOp->bitOrToken);
-            return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Or, "__ror__");
+            return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::Or, "__ror__");
         });
 }
 
@@ -428,7 +428,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::XorExpr& xorExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(xorExpr, binOp->bitXorToken);
-            return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Xor, "__rxor__");
+            return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::Xor, "__rxor__");
         });
 }
 
@@ -441,7 +441,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AndExpr& andExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(andExpr, binOp->bitAndToken);
-            return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::And, "__rand__");
+            return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::And, "__rand__");
         });
 }
 
@@ -457,9 +457,9 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ShiftExpr& shiftExpr)
             switch (binOp->binToken.getTokenType())
             {
                 case TokenType::ShiftLeft:
-                    return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::LShift, "__rlshift__");
+                    return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::LShift, "__rlshift__");
                 case TokenType::ShiftRight:
-                    return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::RShift, "__rrshift__");
+                    return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::RShift, "__rrshift__");
                 default: PYLIR_UNREACHABLE;
             }
         });
@@ -476,8 +476,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AExpr& aExpr)
             auto loc = getLoc(aExpr, binOp->binToken);
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::Plus: return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Add, "__radd__");
-                case TokenType::Minus: return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Subtract, "__rsub__");
+                case TokenType::Plus: return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::Add, "__radd__");
+                case TokenType::Minus: return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::Subtract, "__rsub__");
                 default: PYLIR_UNREACHABLE;
             }
         });
@@ -494,13 +494,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
             auto loc = getLoc(mExpr, binOp->binToken);
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::Star: return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Multiply, "__rmul__");
+                case TokenType::Star: return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::Multiply, "__rmul__");
                 case TokenType::Divide:
-                    return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::TrueDivide, "__rtruediv__");
+                    return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::TrueDivide, "__rtruediv__");
                 case TokenType::IntDivide:
-                    return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::FloorDivide, "__rfloordiv__");
+                    return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::FloorDivide, "__rfloordiv__");
                 case TokenType::Remainder:
-                    return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::Remainder, "__rmod__");
+                    return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::Remainder, "__rmod__");
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -509,7 +509,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
             auto lhs = visit(*atBin->lhs);
             auto rhs = visit(*atBin->rhs);
             auto loc = getLoc(mExpr, atBin->atToken);
-            return genBinOp(loc, lhs, rhs, Dialect::TypeSlotPredicate::MatrixMultiply, "__rmatmul__");
+            return genBinOp(loc, lhs, rhs, Mem::TypeSlotPredicate::MatrixMultiply, "__rmatmul__");
         });
 }
 
@@ -579,10 +579,9 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
             {
                 case TokenType::IntegerLiteral:
                 {
-                    auto intTypeObject =
-                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getIntTypeObject(m_module));
-                    return m_builder.create<Dialect::IntegerConstant>(
-                        location, intTypeObject, pylir::get<llvm::APInt>(literal.token.getValue()));
+                    auto intTypeObject = m_builder.create<Mem::DataOfOp>(location, Mem::getIntTypeObject(m_module));
+                    return m_builder.create<Mem::IntegerConstant>(location, intTypeObject,
+                                                                  pylir::get<llvm::APInt>(literal.token.getValue()));
                 }
                 case TokenType::FloatingPointLiteral:
                 {
@@ -602,15 +601,15 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     std::vector<std::int32_t> values(utf32.begin(), utf32.end());
                     auto size = m_builder.create<mlir::ConstantOp>(location, m_builder.getIndexType(),
                                                                    m_builder.getIndexAttr(utf32.size()));
-                    auto gcAlloc = m_builder.create<Dialect::GCObjectAllocOp>(
-                        location, size, m_builder.getSymbolRefAttr(Dialect::getStringTypeObject(m_module)));
+                    auto gcAlloc = m_builder.create<Mem::GCObjectAllocOp>(
+                        location, size, m_builder.getSymbolRefAttr(Mem::getStringTypeObject(m_module)));
                     for (auto& iter : llvm::enumerate(values))
                     {
                         auto index = m_builder.create<mlir::ConstantOp>(location, m_builder.getIndexType(),
                                                                         m_builder.getIndexAttr(iter.index()));
                         auto constant = m_builder.create<mlir::ConstantOp>(location, m_builder.getI32Type(),
                                                                            m_builder.getI32IntegerAttr(iter.value()));
-                        m_builder.create<Dialect::SetStringItemOp>(location, gcAlloc, index, constant);
+                        m_builder.create<Mem::SetStringItemOp>(location, gcAlloc, index, constant);
                     }
                     return gcAlloc;
                 }
@@ -619,18 +618,16 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     PYLIR_UNREACHABLE;
                 case TokenType::TrueKeyword:
                 {
-                    auto boolTypeObject =
-                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getBoolTypeObject(m_module));
-                    return m_builder.create<Dialect::IntegerConstant>(location, boolTypeObject, llvm::APInt(2, 1));
+                    auto boolTypeObject = m_builder.create<Mem::DataOfOp>(location, Mem::getBoolTypeObject(m_module));
+                    return m_builder.create<Mem::IntegerConstant>(location, boolTypeObject, llvm::APInt(2, 1));
                 }
                 case TokenType::FalseKeyword:
                 {
-                    auto boolTypeObject =
-                        m_builder.create<Dialect::DataOfOp>(location, Dialect::getBoolTypeObject(m_module));
-                    return m_builder.create<Dialect::IntegerConstant>(location, boolTypeObject, llvm::APInt(2, 0));
+                    auto boolTypeObject = m_builder.create<Mem::DataOfOp>(location, Mem::getBoolTypeObject(m_module));
+                    return m_builder.create<Mem::IntegerConstant>(location, boolTypeObject, llvm::APInt(2, 0));
                 }
                 case TokenType::NoneKeyword:
-                    return m_builder.create<pylir::Dialect::DataOfOp>(location, Dialect::getNoneObject(m_module));
+                    return m_builder.create<pylir::Mem::DataOfOp>(location, Mem::getNoneObject(m_module));
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -644,17 +641,16 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 PYLIR_UNREACHABLE;
             }
             mlir::Value handle;
-            if (auto alloca = llvm::dyn_cast<Dialect::AllocaOp>(result->second))
+            if (auto alloca = llvm::dyn_cast<Mem::AllocaOp>(result->second))
             {
                 handle = alloca;
             }
             else
             {
-                auto global = llvm::cast<Dialect::GlobalOp>(result->second);
-                handle =
-                    m_builder.create<Dialect::GetGlobalOp>(loc, m_refRefObject, m_builder.getSymbolRefAttr(global));
+                auto global = llvm::cast<Mem::GlobalOp>(result->second);
+                handle = m_builder.create<Mem::GetGlobalOp>(loc, m_refRefObject, m_builder.getSymbolRefAttr(global));
             }
-            return m_builder.create<Dialect::LoadOp>(loc, handle);
+            return m_builder.create<Mem::LoadOp>(loc, handle);
         },
         [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
 }
@@ -665,8 +661,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscriptio
     auto indices = visit(subscription.expressionList);
 
     auto loc = getLoc(subscription, subscription);
-    auto type = m_builder.create<Dialect::TypeOfOp>(loc, container);
-    auto result = m_builder.create<Dialect::GetTypeSlotOp>(loc, Dialect::TypeSlotPredicate::GetItem, type);
+    auto type = m_builder.create<Mem::TypeOfOp>(loc, container);
+    auto result = m_builder.create<Mem::GetTypeSlotOp>(loc, Mem::TypeSlotPredicate::GetItem, type);
     auto getItem = result.getResult(0);
     auto found = result.getResult(1);
 
@@ -702,8 +698,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
             }
             auto loc = getLoc(parenthForm, parenthForm.openParenth);
             auto zero = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexType(), m_builder.getIndexAttr(0));
-            auto zeroSizedStorage = m_builder.create<Dialect::GCObjectAllocOp>(
-                loc, zero, m_builder.getSymbolRefAttr(Dialect::getTupleTypeObject(m_module)));
+            auto zeroSizedStorage = m_builder.create<Mem::GCObjectAllocOp>(
+                loc, zero, m_builder.getSymbolRefAttr(Mem::getTupleTypeObject(m_module)));
             return zeroSizedStorage;
         },
         [&](const auto&) -> mlir::Value
@@ -714,13 +710,13 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
 }
 
 std::pair<mlir::Value, mlir::Value> pylir::CodeGen::lookupTypeSlot(mlir::Location loc, mlir::Value type,
-                                                                   Dialect::TypeSlotPredicate slot)
+                                                                   Mem::TypeSlotPredicate slot)
 {
-    auto mro = m_builder.create<Dialect::GetTypeSlotOp>(loc, Dialect::TypeSlotPredicate::Mro, type).result();
-    auto size = m_builder.create<Dialect::TupleSizeOp>(loc, mro);
+    auto mro = m_builder.create<Mem::GetTypeSlotOp>(loc, Mem::TypeSlotPredicate::Mro, type).result();
+    auto size = m_builder.create<Mem::TupleSizeOp>(loc, mro);
 
     auto exitBlock = new mlir::Block;
-    exitBlock->addArgument(Dialect::GetTypeSlotOp::returnTypeFromPredicate(m_builder.getContext(), slot));
+    exitBlock->addArgument(Mem::GetTypeSlotOp::returnTypeFromPredicate(m_builder.getContext(), slot));
     exitBlock->addArgument(m_builder.getI1Type());
 
     auto loopBody = new mlir::Block;
@@ -731,8 +727,8 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::lookupTypeSlot(mlir::Locatio
     m_currentFunc.getCallableRegion()->push_back(loopBody);
     m_builder.setInsertionPointToStart(loopBody);
 
-    auto thisBase = m_builder.create<Dialect::GetTupleItemOp>(loc, mro, loopBody->getArgument(0));
-    auto typeSlotOp = m_builder.create<Dialect::GetTypeSlotOp>(loc, slot, thisBase);
+    auto thisBase = m_builder.create<Mem::GetTupleItemOp>(loc, mro, loopBody->getArgument(0));
+    auto typeSlotOp = m_builder.create<Mem::GetTypeSlotOp>(loc, slot, thisBase);
     auto notFound = new mlir::Block;
     m_builder.create<mlir::CondBranchOp>(loc, typeSlotOp.found(), exitBlock,
                                          mlir::ValueRange{typeSlotOp.result(), typeSlotOp.found()}, notFound,
@@ -752,11 +748,11 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::lookupTypeSlot(mlir::Locatio
 }
 
 mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::Value rhs,
-                                     Dialect::TypeSlotPredicate operation, std::string_view)
+                                     Mem::TypeSlotPredicate operation, std::string_view)
 {
-    auto lhsType = m_builder.create<Dialect::TypeOfOp>(loc, lhs);
+    auto lhsType = m_builder.create<Mem::TypeOfOp>(loc, lhs);
     auto [func, wasFound] = lookupTypeSlot(loc, lhsType, operation);
-    auto result = m_builder.create<Dialect::AllocaOp>(loc, m_refRefObject);
+    auto result = m_builder.create<Mem::AllocaOp>(loc, m_refRefObject);
 
     auto* foundBlock = new mlir::Block;
     auto* notFoundBlock = new mlir::Block;
@@ -769,15 +765,14 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
         m_builder.setInsertionPointToStart(foundBlock);
 
         auto call = m_builder.create<mlir::CallIndirectOp>(loc, func, mlir::ValueRange{lhs, rhs}).getResult(0);
-        auto notImplementedConstant =
-            m_builder.create<Dialect::DataOfOp>(loc, Dialect::getNotImplementedObject(m_module));
-        auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
-        auto id = m_builder.create<Dialect::IdOp>(loc, call);
+        auto notImplementedConstant = m_builder.create<Mem::DataOfOp>(loc, Mem::getNotImplementedObject(m_module));
+        auto notImplementedId = m_builder.create<Mem::IdOp>(loc, notImplementedConstant);
+        auto id = m_builder.create<Mem::IdOp>(loc, call);
         auto isNotImplemented = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::eq, id, notImplementedId);
         auto continueBlock = mlir::OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
         m_builder.create<mlir::CondBranchOp>(loc, isNotImplemented, notFoundBlock, continueBlock);
         m_builder.setInsertionPointToStart(continueBlock);
-        m_builder.create<Dialect::StoreOp>(loc, call, result);
+        m_builder.create<Mem::StoreOp>(loc, call, result);
         m_builder.create<mlir::BranchOp>(loc, endBlock);
     }
 
@@ -789,38 +784,38 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
         m_builder.create<mlir::BranchOp>(loc, raiseBlock);
 
         /*TODO __r*__operator
-        auto rhsType = m_builder.create<Dialect::TypeOfOp>(loc, rhs);
+        auto rhsType = m_builder.create<Mem::TypeOfOp>(loc, rhs);
         auto tryRBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
 
-        auto rhsTypeId = m_builder.create<Dialect::IdOp>(loc, rhsType);
-        auto lhsTypeId = m_builder.create<Dialect::IdOp>(loc, lhsType);
-        auto typeEqual = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, rhsTypeId, lhsTypeId);
-        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, typeEqual), raiseBlock,
+        auto rhsTypeId = m_builder.create<Mem::IdOp>(loc, rhsType);
+        auto lhsTypeId = m_builder.create<Mem::IdOp>(loc, lhsType);
+        auto typeEqual = m_builder.create<Mem::ICmpOp>(loc, Mem::CmpPredicate::EQ, rhsTypeId, lhsTypeId);
+        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Mem::BtoI1Op>(loc, typeEqual), raiseBlock,
                                              tryRBlock);
 
         m_builder.setInsertionPointToStart(tryRBlock);
-        slot = m_builder.create<Dialect::GetAttrOp>(loc, rhsType, m_builder.getStringAttr(fallback));
+        slot = m_builder.create<Mem::GetAttrOp>(loc, rhsType, m_builder.getStringAttr(fallback));
         func = slot.getResult(0);
         wasFound = slot.getResult(1);
         auto continueBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
         m_builder.create<mlir::CondBranchOp>(loc, wasFound, continueBlock, raiseBlock);
 
         m_builder.setInsertionPointToStart(continueBlock);
-        auto posArgs = m_builder.create<Dialect::MakeTupleOp>(loc, m_builder.getType<Dialect::TupleType>(),
+        auto posArgs = m_builder.create<Mem::MakeTupleOp>(loc, m_builder.getType<Mem::TupleType>(),
                                                               mlir::ValueRange{rhs, lhs});
-        auto emptyDict = m_builder.create<Dialect::ConstantOp>(loc, Dialect::DictAttr::get(m_builder.getContext(), {}));
+        auto emptyDict = m_builder.create<Mem::ConstantOp>(loc, Mem::DictAttr::get(m_builder.getContext(), {}));
         auto call = assureCallable(loc, func, posArgs, emptyDict);
         auto notImplementedConstant =
-            m_builder.create<Dialect::DataOfOp>(loc, Dialect::getNotImplementedObject(m_module));
-        auto notImplementedId = m_builder.create<Dialect::IdOp>(loc, notImplementedConstant);
-        auto id = m_builder.create<Dialect::IdOp>(loc, call);
-        auto isNotImplemented = m_builder.create<Dialect::ICmpOp>(loc, Dialect::CmpPredicate::EQ, id, notImplementedId);
+            m_builder.create<Mem::DataOfOp>(loc, Mem::getNotImplementedObject(m_module));
+        auto notImplementedId = m_builder.create<Mem::IdOp>(loc, notImplementedConstant);
+        auto id = m_builder.create<Mem::IdOp>(loc, call);
+        auto isNotImplemented = m_builder.create<Mem::ICmpOp>(loc, Mem::CmpPredicate::EQ, id, notImplementedId);
         auto storeBlock = OpBuilder{m_builder}.createBlock(m_currentFunc.getCallableRegion());
-        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Dialect::BtoI1Op>(loc, isNotImplemented), raiseBlock,
+        m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Mem::BtoI1Op>(loc, isNotImplemented), raiseBlock,
                                              storeBlock);
 
         m_builder.setInsertionPointToStart(storeBlock);
-        m_builder.create<Dialect::StoreOp>(loc, call, result);
+        m_builder.create<Mem::StoreOp>(loc, call, result);
         m_builder.create<mlir::BranchOp>(loc, endBlock);
          */
 
@@ -832,7 +827,7 @@ mlir::Value pylir::CodeGen::genBinOp(mlir::Location loc, mlir::Value lhs, mlir::
 
     m_currentFunc.getCallableRegion()->push_back(endBlock);
     m_builder.setInsertionPointToStart(endBlock);
-    return m_builder.create<Dialect::LoadOp>(loc, result);
+    return m_builder.create<Mem::LoadOp>(loc, result);
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AssignmentExpression& assignmentExpression)

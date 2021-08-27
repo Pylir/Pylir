@@ -7,14 +7,14 @@
 #include <mlir/Support/MlirOptMain.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
-#include <pylir/Optimizer/Dialect/PylirDialect.hpp>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 
 int main(int argc, char** argv)
 {
     mlir::registerAllPasses();
 
     mlir::DialectRegistry registry;
-    registry.insert<pylir::Dialect::PylirDialect>();
+    registry.insert<pylir::Mem::PylirDialect>();
 
     pylir::Dialect::registerConversionPasses();
 

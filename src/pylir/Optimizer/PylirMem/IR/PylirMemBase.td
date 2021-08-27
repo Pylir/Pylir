@@ -5,12 +5,12 @@
 include "mlir/IR/OpBase.td"
 
 def Pylir_Dialect : Dialect {
-    let name = "pylir";
+    let name = "pylir.mem";
     let summary = "A dialect representing python programs";
     let description = [{
         TODO
     }];
-    let cppNamespace = "::pylir::Dialect";
+    let cppNamespace = "::pylir::Mem";
 }
 
 #endif

@@ -2,8 +2,8 @@
 #ifndef PYLIR_OPS_TABLEGEN
 #define PYLIR_OPS_TABLEGEN
 
-include "pylir/Optimizer/Dialect/PylirTypes.td"
-include "pylir/Optimizer/Dialect/PylirAttributes.td"
+include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.td"
+include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -42,7 +42,7 @@ def Pylir_DataOfOp : Pylir_Op<"dataOf", [NoSideEffect, DeclareOpInterfaceMethods
     }];
 
     let builders = [
-        OpBuilder<(ins "pylir::Dialect::ConstantGlobalOp":$value),
+        OpBuilder<(ins "pylir::Mem::ConstantGlobalOp":$value),
         [{ build($_builder, $_state, value.sym_name()); }]>];
 }
 
@@ -106,7 +106,7 @@ def Pylir_AllocaOp : Pylir_Op<"alloca"> {
 
 def Pylir_StoreOp : Pylir_Op<"store", [TypesMatchWith<"value type matches element type of 'pointer'",
                                                       "pointer", "value",
-                                                      "$_self.cast<::pylir::Dialect::PointerType>().getElementType()">
+                                                      "$_self.cast<::pylir::Mem::PointerType>().getElementType()">
                                                       ]> {
     let summary = "store operation";
 
@@ -119,7 +119,7 @@ def Pylir_StoreOp : Pylir_Op<"store", [TypesMatchWith<"value type matches elemen
 
 def Pylir_LoadOp : Pylir_Op<"load", [TypesMatchWith<"result type matches element type of 'pointer'",
                                                     "pointer", "result",
-                                                    "$_self.cast<pylir::Dialect::PointerType>().getElementType()">]> {
+                                                    "$_self.cast<pylir::Mem::PointerType>().getElementType()">]> {
     let summary = "load operation";
 
     let arguments = (ins Arg<AnyPointer, "the pointer to load from", [MemRead]>:$pointer);
@@ -129,7 +129,7 @@ def Pylir_LoadOp : Pylir_Op<"load", [TypesMatchWith<"result type matches element
 
     let builders = [
         OpBuilder<(ins "mlir::Value":$pointer),[{
-            return build($_builder,$_state, pointer.getType().cast<pylir::Dialect::PointerType>().getElementType(), pointer);
+            return build($_builder,$_state, pointer.getType().cast<pylir::Mem::PointerType>().getElementType(), pointer);
         }]>
     ];
 }
@@ -248,7 +248,7 @@ def Pylir_TypeSlotPredicateAttr : I32EnumAttr<"TypeSlotPredicate","",[
     Pylir_TypeSlot_IterNext, Pylir_TypeSlot_Dict, Pylir_TypeSlot_DescrGet, Pylir_TypeSlot_DescrSet, Pylir_TypeSlot_Init,
     Pylir_TypeSlot_New, Pylir_TypeSlot_Bases, Pylir_TypeSlot_Del, Pylir_TypeSlot_MRO, Pylir_TypeSlot_Name
 ]> {
-    let cppNamespace = "::pylir::Dialect";
+    let cppNamespace = "::pylir::Mem";
 }
 
 def Pylir_GetTypeSlotOp : Pylir_Op<"getTypeSlot", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect]> {
@@ -374,7 +374,7 @@ def Pylir_CmpGE : I32EnumAttrCase<"GE", 5, "ge">;
 def Pylir_CmpPredicateAttr : I32EnumAttr<"CmpPredicate","",[
     Pylir_CmpEQ, Pylir_CmpNE, Pylir_CmpLT, Pylir_CmpLE, Pylir_CmpGT, Pylir_CmpGE
 ]> {
-    let cppNamespace = "::pylir::Dialect";
+    let cppNamespace = "::pylir::Mem";
 }
 
 def Pylir_ICmpOp : Pylir_Op<"icmp", [SameTypeOperands, NoSideEffect]> {

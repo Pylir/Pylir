@@ -2,7 +2,7 @@
 #ifndef PYLIR_TYPES_TABLEGEN
 #define PYLIR_TYPES_TABLEGEN
 
-include "pylir/Optimizer/Dialect/PylirBase.td"
+include "pylir/Optimizer/PylirMem/IR/PylirMemBase.td"
 include "mlir/IR/SubElementInterfaces.td"
 include "mlir/IR/BuiltinTypeInterfaces.td"
 
@@ -51,10 +51,10 @@ def Pylir_Float : TypeAlias<F64>;
 class PointerOf<Type type> : Type<
     And<[
         Pylir_Pointer.predicate,
-        SubstLeaves<"$_self", "$_self.cast<::pylir::Dialect::PointerType>().getElementType()", type.predicate>
-    ]>, " pointer to " # type.summary, "::pylir::Dialect::PointerType"
+        SubstLeaves<"$_self", "$_self.cast<::pylir::Mem::PointerType>().getElementType()", type.predicate>
+    ]>, " pointer to " # type.summary, "::pylir::Mem::PointerType"
 > {
-    let builderCall = !if(!empty(type.builderCall),"","::pylir::Dialect::PointerType::get(" # type.builderCall # ")");
+    let builderCall = !if(!empty(type.builderCall),"","::pylir::Mem::PointerType::get(" # type.builderCall # ")");
 }
 
 def AnyPointer : PointerOf<AnyType>;

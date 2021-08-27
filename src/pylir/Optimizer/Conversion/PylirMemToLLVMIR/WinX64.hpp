@@ -5,7 +5,7 @@
 
 #include "CABI.hpp"
 
-namespace pylir::Dialect
+namespace pylir::Mem
 {
 class WinX64 final : public CABI
 {

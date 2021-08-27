@@ -1,0 +1,16 @@
+
+add_mlir_conversion_library(PylirMemToLLVMIR
+        PylirMemToLLVMIR.cpp
+        WinX64.cpp
+        X86_64.cpp
+        CABI.cpp
+
+        DEPENDS
+        PylirConversionPassIncGen
+
+        LINK_LIBS PUBLIC PylirMemDialect MLIRLLVMIR MLIRPass MLIRTransforms MLIRStandardToLLVM)
+
+if (PYLIR_USE_PCH)
+    target_link_libraries(PylirMemToLLVMIR PRIVATE COMMON_PCH)
+    target_precompile_headers(PylirMemToLLVMIR PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
+endif ()

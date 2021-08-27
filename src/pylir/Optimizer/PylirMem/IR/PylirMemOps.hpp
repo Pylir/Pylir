@@ -12,10 +12,10 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
-#include <pylir/Optimizer/Dialect/PylirOpsEnums.h.inc>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemOpsEnums.h.inc>
 
-#include "PylirAttributes.hpp"
-#include "PylirTypes.hpp"
+#include "PylirMemAttributes.hpp"
+#include "PylirMemTypes.hpp"
 
 #define GET_OP_CLASSES
-#include <pylir/Optimizer/Dialect/PylirOps.h.inc>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemOps.h.inc>

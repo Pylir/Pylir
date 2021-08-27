@@ -2,7 +2,7 @@
 #ifndef PYLIR_ATTRIBUTES_TABLEGEN
 #define PYLIR_ATTRIBUTES_TABLEGEN
 
-include "pylir/Optimizer/Dialect/PylirBase.td"
+include "pylir/Optimizer/PylirMem/IR/PylirMemBase.td"
 
 class Pylir_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
     AttrDef<Pylir_Dialect, name, traits, baseCppClass>;
@@ -10,10 +10,10 @@ class Pylir_Attr<string name, list<Trait> traits = [], string baseCppClass = "::
 def Pylir_IntegerAttr : Pylir_Attr<"Integer"> {
     let mnemonic = "integer";
 
-    let storageType = "::pylir::Dialect::IntegerAttr";
+    let storageType = "::pylir::Mem::IntegerAttr";
     let returnType = "llvm::APInt";
     let convertFromStorage = "$_self.getValue()";
-    let constBuilderCall = "::pylir::Dialect::IntegerAttr::get($_builder.getContext(), $0)";
+    let constBuilderCall = "::pylir::Mem::IntegerAttr::get($_builder.getContext(), $0)";
 
     let parameters = (ins "llvm::APInt":$value);
 

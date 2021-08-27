@@ -4,7 +4,7 @@
 
 #include <memory>
 
-namespace pylir::Dialect
+namespace pylir::Mem
 {
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirToLLVMPass();
 

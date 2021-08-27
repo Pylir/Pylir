@@ -3,7 +3,7 @@
 
 #include <llvm/IR/IRBuilder.h>
 
-#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemTypeObjects.hpp>
 
 void pylir::postProcessLLVMModule(llvm::Module& module)
 {
@@ -14,11 +14,11 @@ void pylir::postProcessLLVMModule(llvm::Module& module)
         llvm::GlobalAlias::create("pylir__main____init__", aliasee);
     }
 
-    if (auto* intTypeObject = module.getGlobalVariable(pylir::Dialect::intTypeObjectName))
+    if (auto* intTypeObject = module.getGlobalVariable(pylir::Mem::intTypeObjectName))
     {
         llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage, "pylir_integer_type_object", intTypeObject);
     }
-    if (auto* stringTypeObject = module.getGlobalVariable(pylir::Dialect::stringTypeObjectName))
+    if (auto* stringTypeObject = module.getGlobalVariable(pylir::Mem::stringTypeObjectName))
     {
         llvm::GlobalAlias::create(llvm::GlobalValue::ExternalLinkage, "pylir_string_type_object", stringTypeObject);
     }

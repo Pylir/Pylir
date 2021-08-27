@@ -3,7 +3,7 @@
 
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 
-namespace pylir::Dialect
+namespace pylir::Mem
 {
 class CABI
 {

@@ -2,7 +2,7 @@
 
 #include <mlir/Pass/Pass.h>
 
-#include "PylirToLLVM.hpp"
+#include "PylirMemToLLVMIR/PylirMemToLLVMIR.hpp"
 
 namespace pylir::Dialect
 {

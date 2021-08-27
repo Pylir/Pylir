@@ -1,34 +1,32 @@
-#include "PylirOps.hpp"
+#include "PylirMemOps.hpp"
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/OpImplementation.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/Dialect/PylirTypeObjects.hpp>
 #include <pylir/Support/Macros.hpp>
 
-#include "PylirAttributes.hpp"
+#include "PylirMemAttributes.hpp"
+#include "PylirMemTypeObjects.hpp"
 
-pylir::Dialect::ConstantGlobalOp pylir::Dialect::ConstantGlobalOp::create(::mlir::Location location,
-                                                                          ::llvm::StringRef name,
-                                                                          mlir::FlatSymbolRefAttr type,
-                                                                          mlir::Attribute initializer)
+pylir::Mem::ConstantGlobalOp pylir::Mem::ConstantGlobalOp::create(::mlir::Location location, ::llvm::StringRef name,
+                                                                  mlir::FlatSymbolRefAttr type,
+                                                                  mlir::Attribute initializer)
 {
     mlir::OpBuilder builder(location.getContext());
     return builder.create<ConstantGlobalOp>(location, name, type.getValue(), initializer);
 }
 
-mlir::LogicalResult pylir::Dialect::DataOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+mlir::LogicalResult pylir::Mem::DataOfOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    auto result = symbolTable.lookupNearestSymbolFrom<Dialect::ConstantGlobalOp>(*this, globalNameAttr());
+    auto result = symbolTable.lookupNearestSymbolFrom<Mem::ConstantGlobalOp>(*this, globalNameAttr());
     return mlir::success(result != nullptr);
 }
 
-mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRContext* context,
-                                                                  TypeSlotPredicate predicate)
+mlir::Type pylir::Mem::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRContext* context, TypeSlotPredicate predicate)
 {
-    auto ref = Dialect::PointerType::get(ObjectType::get(context));
+    auto ref = Mem::PointerType::get(ObjectType::get(context));
     switch (predicate)
     {
         case TypeSlotPredicate::DictPtr: return mlir::IndexType::get(context);
@@ -100,7 +98,7 @@ mlir::Type pylir::Dialect::GetTypeSlotOp::returnTypeFromPredicate(mlir::MLIRCont
     PYLIR_UNREACHABLE;
 }
 
-mlir::LogicalResult pylir::Dialect::GetTypeSlotOp::inferReturnTypes(
+mlir::LogicalResult pylir::Mem::GetTypeSlotOp::inferReturnTypes(
     ::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange operands,
     ::mlir::DictionaryAttr attributes, ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
 {
@@ -115,9 +113,9 @@ mlir::LogicalResult pylir::Dialect::GetTypeSlotOp::inferReturnTypes(
     return mlir::success();
 }
 
-mlir::LogicalResult pylir::Dialect::GetGlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+mlir::LogicalResult pylir::Mem::GetGlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<pylir::Dialect::GlobalOp>(this->getOperation(), name()));
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<pylir::Mem::GlobalOp>(this->getOperation(), name()));
 }
 
 namespace
@@ -136,7 +134,7 @@ mlir::ParseResult parseGlobalInitialValue(mlir::OpAsmParser& parser, mlir::Attri
     return parser.parseAttribute(initializer);
 }
 
-void printGlobalInitialValue(mlir::OpAsmPrinter& printer, pylir::Dialect::GlobalOp, mlir::Attribute initializer)
+void printGlobalInitialValue(mlir::OpAsmPrinter& printer, pylir::Mem::GlobalOp, mlir::Attribute initializer)
 {
     if (!initializer)
     {
@@ -153,10 +151,10 @@ void printGlobalInitialValue(mlir::OpAsmPrinter& printer, pylir::Dialect::Global
 
 mlir::LogicalResult verifyDynamicSize(mlir::Operation* op, mlir::Value dynamicSize, llvm::StringRef type)
 {
-    if (type == llvm::StringRef{pylir::Dialect::tupleTypeObjectName}
-        || type == llvm::StringRef{pylir::Dialect::intTypeObjectName}
-        || type == llvm::StringRef{pylir::Dialect::boolTypeObjectName}
-        || type == llvm::StringRef{pylir::Dialect::stringTypeObjectName})
+    if (type == llvm::StringRef{pylir::Mem::tupleTypeObjectName}
+        || type == llvm::StringRef{pylir::Mem::intTypeObjectName}
+        || type == llvm::StringRef{pylir::Mem::boolTypeObjectName}
+        || type == llvm::StringRef{pylir::Mem::stringTypeObjectName})
     {
         if (!dynamicSize)
         {
@@ -170,22 +168,22 @@ mlir::LogicalResult verifyDynamicSize(mlir::Operation* op, mlir::Value dynamicSi
     return mlir::success();
 }
 
-mlir::LogicalResult verifyDynamicSize(pylir::Dialect::GCObjectAllocOp op)
+mlir::LogicalResult verifyDynamicSize(pylir::Mem::GCObjectAllocOp op)
 {
     return verifyDynamicSize(op, op.variableSize(), op.type());
 }
 
-mlir::LogicalResult verifyDynamicSize(pylir::Dialect::ObjectAllocaOp op)
+mlir::LogicalResult verifyDynamicSize(pylir::Mem::ObjectAllocaOp op)
 {
     return verifyDynamicSize(op, op.variableSize(), op.type());
 }
 
 } // namespace
 
-#include <pylir/Optimizer/Dialect/PylirOpsEnums.cpp.inc>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemOpsEnums.cpp.inc>
 
 // TODO: Remove in MLIR 14
 using namespace mlir;
 
 #define GET_OP_CLASSES
-#include <pylir/Optimizer/Dialect/PylirOps.cpp.inc>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemOps.cpp.inc>
