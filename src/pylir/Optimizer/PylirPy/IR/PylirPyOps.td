@@ -60,13 +60,14 @@ def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterfa
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple"> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
-                         DefaultValuedAttr<I32ArrayAttr, "{}">:$iterExpansion,
-                         DefaultValuedAttr<I32ArrayAttr, "{}">:$mappingExpansion
+                         DefaultValuedAttr<I32ArrayAttr, "{}">:$iterExpansion
                          );
 
     let assemblyFormat = [{
-        custom<ExpandArguments>($arguments, $iterExpansion, $mappingExpansion) attr-dict
+        custom<IterArguments>($arguments, $iterExpansion) attr-dict
     }];
+
+    let hasFolder = 1;
 }
 
 #endif

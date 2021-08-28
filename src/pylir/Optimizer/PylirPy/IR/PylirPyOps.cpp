@@ -41,13 +41,14 @@ bool parseExpandArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir:
         {
             if (!parser.parseOptionalStar())
             {
-                mappings.push_back(index++);
+                mappings.push_back(index);
             }
             else
             {
-                iters.push_back(index++);
+                iters.push_back(index);
             }
         }
+        index++;
         return parser.parseOperand(operands.emplace_back());
     };
     if (parseOnce())
@@ -95,6 +96,77 @@ void printExpandArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::O
                               else if (mappings.contains(i))
                               {
                                   printer << "**" << value;
+                              }
+                              else
+                              {
+                                  printer << value;
+                              }
+                              i++;
+                          });
+    printer << ')';
+}
+
+bool parseIterArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
+                        mlir::ArrayAttr& iterExpansion)
+{
+    llvm::SmallVector<std::int32_t> iters;
+    auto exit = llvm::make_scope_exit([&] { iterExpansion = parser.getBuilder().getI32ArrayAttr(iters); });
+
+    if (parser.parseLParen())
+    {
+        return true;
+    }
+    if (!parser.parseOptionalRParen())
+    {
+        return false;
+    }
+
+    std::int32_t index = 0;
+    auto parseOnce = [&]
+    {
+        if (!parser.parseOptionalStar())
+        {
+            iters.push_back(index);
+        }
+        index++;
+        return parser.parseOperand(operands.emplace_back());
+    };
+    if (parseOnce())
+    {
+        return true;
+    }
+    while (!parser.parseOptionalComma())
+    {
+        if (parseOnce())
+        {
+            return true;
+        }
+    }
+
+    if (parser.parseRParen())
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange operands,
+                        mlir::ArrayAttr iterExpansion)
+{
+    printer << '(';
+    llvm::DenseSet<std::uint32_t> iters;
+    for (auto iter : iterExpansion.getAsValueRange<mlir::IntegerAttr>())
+    {
+        iters.insert(iter.getZExtValue());
+    }
+    int i = 0;
+    llvm::interleaveComma(operands, printer,
+                          [&](mlir::Value value)
+                          {
+                              if (iters.contains(i))
+                              {
+                                  printer << '*' << value;
                               }
                               else
                               {
@@ -199,4 +271,56 @@ mlir::CallInterfaceCallable pylir::Py::CallOp::getCallableForCallee()
 mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
 {
     return arguments();
+}
+
+mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (!std::all_of(operands.begin(), operands.end(),
+                     [](mlir::Attribute attr) -> bool { return static_cast<bool>(attr); }))
+    {
+        return nullptr;
+    }
+    llvm::SmallVector<mlir::Attribute> result;
+    auto expanders = llvm::to_vector<4>(iterExpansion().getAsValueRange<mlir::IntegerAttr>());
+    std::reverse(expanders.begin(), expanders.end());
+    for (auto iter : llvm::enumerate(operands))
+    {
+        if (expanders.empty() || expanders.back() != iter.index())
+        {
+            result.push_back(iter.value());
+            continue;
+        }
+        expanders.pop_back();
+        if (!llvm::TypeSwitch<mlir::Attribute, bool>(iter.value())
+                 .Case<Py::ListAttr, Py::TupleAttr, Py::SetAttr>(
+                     [&](auto sequences)
+                     {
+                         result.insert(result.end(), sequences.getValue().begin(), sequences.getValue().end());
+                         return true;
+                     })
+                 .Case(
+                     [&](Py::DictAttr dictAttr)
+                     {
+                         auto second = llvm::make_second_range(dictAttr.getValue());
+                         result.insert(result.end(), second.begin(), second.end());
+                         return true;
+                     })
+                 .Case(
+                     [&](mlir::StringAttr stringAttr)
+                     {
+                         auto utf32 = Text::toUTF32String(stringAttr.getValue());
+                         auto mapped = llvm::map_range(
+                             utf32,
+                             [&](char32_t codepoint) {
+                                 return mlir::StringAttr::get(getContext(), Text::toUTF8String({&codepoint, 1}));
+                             });
+                         result.insert(result.end(), mapped.begin(), mapped.end());
+                         return true;
+                     })
+                 .Default(false))
+        {
+            return nullptr;
+        }
+    }
+    return Py::TupleAttr::get(getContext(), result);
 }
