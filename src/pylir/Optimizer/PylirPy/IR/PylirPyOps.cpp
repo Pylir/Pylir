@@ -13,12 +13,12 @@
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>
 
-mlir::OpFoldResult pylir::Py::Constant::fold(::llvm::ArrayRef<::mlir::Attribute>)
+mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
     return constant();
 }
 
-mlir::OpFoldResult pylir::Py::GetAttr::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
     if (!operands[0])
@@ -28,7 +28,7 @@ mlir::OpFoldResult pylir::Py::GetAttr::fold(::llvm::ArrayRef<::mlir::Attribute> 
     return llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(operands[0]).Default(mlir::OpFoldResult{nullptr});
 }
 
-mlir::OpFoldResult pylir::Py::GetItem::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 2);
     auto object = operands[0];
