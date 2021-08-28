@@ -16,6 +16,7 @@ int main(int argc, char** argv)
 
     mlir::DialectRegistry registry;
     registry.insert<pylir::Mem::PylirDialect, pylir::Py::PylirPyDialect>();
+    mlir::registerAllDialects(registry);
 
     pylir::registerConversionPasses();
 
