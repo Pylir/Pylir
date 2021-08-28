@@ -46,4 +46,12 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
     let hasFolder = 1;
 }
 
+def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
+    let arguments = (ins DynamicType:$callee, Variadic<DynamicType>:$arguments);
+
+    let assemblyFormat = [{
+            $callee `(` $arguments `)` attr-dict
+    }];
+}
+
 #endif

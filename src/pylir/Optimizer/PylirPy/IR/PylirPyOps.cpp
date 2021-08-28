@@ -93,3 +93,13 @@ mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute
             })
         .Default(mlir::OpFoldResult{nullptr});
 }
+
+mlir::CallInterfaceCallable pylir::Py::CallOp::getCallableForCallee()
+{
+    return callee();
+}
+
+mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
+{
+    return arguments();
+}
