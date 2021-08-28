@@ -3,6 +3,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/OpImplementation.h>
 
+#include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Support/Macros.hpp>
@@ -12,11 +13,17 @@
 
 namespace
 {
-bool parseCallArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
-                        mlir::ArrayAttr& iterExpansion, mlir::ArrayAttr& mappingExpansion)
+bool parseExpandArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
+                          mlir::ArrayAttr& iterExpansion, mlir::ArrayAttr& mappingExpansion)
 {
     llvm::SmallVector<std::int32_t> iters;
     llvm::SmallVector<std::int32_t> mappings;
+    auto exit = llvm::make_scope_exit(
+        [&]
+        {
+            iterExpansion = parser.getBuilder().getI32ArrayAttr(iters);
+            mappingExpansion = parser.getBuilder().getI32ArrayAttr(mappings);
+        });
 
     if (parser.parseLParen())
     {
@@ -60,13 +67,11 @@ bool parseCallArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::O
         return true;
     }
 
-    iterExpansion = parser.getBuilder().getI32ArrayAttr(iters);
-    mappingExpansion = parser.getBuilder().getI32ArrayAttr(mappings);
     return false;
 }
 
-void printCallArguments(mlir::OpAsmPrinter& printer, pylir::Py::CallOp, mlir::OperandRange operands,
-                        mlir::ArrayAttr iterExpansion, mlir::ArrayAttr mappingExpansion)
+void printExpandArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange operands,
+                          mlir::ArrayAttr iterExpansion, mlir::ArrayAttr mappingExpansion)
 {
     printer << '(';
     llvm::DenseSet<std::uint32_t> iters;

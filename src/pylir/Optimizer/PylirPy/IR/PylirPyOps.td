@@ -49,12 +49,23 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
 def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
     let arguments = (ins DynamicType:$callee,
                          Variadic<DynamicType>:$arguments,
+                         I32ArrayAttr:$iterExpansion,
+                         I32ArrayAttr:$mappingExpansion
+                         );
+
+    let assemblyFormat = [{
+        $callee custom<ExpandArguments>($arguments, $iterExpansion, $mappingExpansion) attr-dict
+    }];
+}
+
+def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple"> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
                          DefaultValuedAttr<I32ArrayAttr, "{}">:$iterExpansion,
                          DefaultValuedAttr<I32ArrayAttr, "{}">:$mappingExpansion
                          );
 
     let assemblyFormat = [{
-            $callee custom<CallArguments>($arguments, $iterExpansion, $mappingExpansion) attr-dict
+        custom<ExpandArguments>($arguments, $iterExpansion, $mappingExpansion) attr-dict
     }];
 }
 
