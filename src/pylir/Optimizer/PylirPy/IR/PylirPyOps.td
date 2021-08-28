@@ -47,10 +47,14 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
 }
 
 def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
-    let arguments = (ins DynamicType:$callee, Variadic<DynamicType>:$arguments);
+    let arguments = (ins DynamicType:$callee,
+                         Variadic<DynamicType>:$arguments,
+                         DefaultValuedAttr<I32ArrayAttr, "{}">:$iterExpansion,
+                         DefaultValuedAttr<I32ArrayAttr, "{}">:$mappingExpansion
+                         );
 
     let assemblyFormat = [{
-            $callee `(` $arguments `)` attr-dict
+            $callee custom<CallArguments>($arguments, $iterExpansion, $mappingExpansion) attr-dict
     }];
 }
 

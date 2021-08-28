@@ -63,5 +63,5 @@ class AnyAttrOf<list<Attr> allowedAttrs, string summary = "", string cppClassNam
 }
 
 def AnyPyAttribute : AnyAttrOf<[APIntAttr, BoolAttr, F64Attr, PylirPy_ListAttr,
-                                    PylirPy_TupleAttr, PylirPy_SetAttr, PylirPy_DictAttr, StrAttr]>;
+                                    PylirPy_TupleAttr, PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, FlatSymbolRefAttr]>;
 #endif

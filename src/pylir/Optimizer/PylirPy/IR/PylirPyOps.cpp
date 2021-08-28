@@ -10,6 +10,98 @@
 
 #include "PylirPyAttributes.hpp"
 
+namespace
+{
+bool parseCallArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
+                        mlir::ArrayAttr& iterExpansion, mlir::ArrayAttr& mappingExpansion)
+{
+    llvm::SmallVector<std::int32_t> iters;
+    llvm::SmallVector<std::int32_t> mappings;
+
+    if (parser.parseLParen())
+    {
+        return true;
+    }
+    if (!parser.parseOptionalRParen())
+    {
+        return false;
+    }
+
+    std::int32_t index = 0;
+    auto parseOnce = [&]
+    {
+        if (!parser.parseOptionalStar())
+        {
+            if (!parser.parseOptionalStar())
+            {
+                mappings.push_back(index++);
+            }
+            else
+            {
+                iters.push_back(index++);
+            }
+        }
+        return parser.parseOperand(operands.emplace_back());
+    };
+    if (parseOnce())
+    {
+        return true;
+    }
+    while (!parser.parseOptionalComma())
+    {
+        if (parseOnce())
+        {
+            return true;
+        }
+    }
+
+    if (parser.parseRParen())
+    {
+        return true;
+    }
+
+    iterExpansion = parser.getBuilder().getI32ArrayAttr(iters);
+    mappingExpansion = parser.getBuilder().getI32ArrayAttr(mappings);
+    return false;
+}
+
+void printCallArguments(mlir::OpAsmPrinter& printer, pylir::Py::CallOp, mlir::OperandRange operands,
+                        mlir::ArrayAttr iterExpansion, mlir::ArrayAttr mappingExpansion)
+{
+    printer << '(';
+    llvm::DenseSet<std::uint32_t> iters;
+    for (auto iter : iterExpansion.getAsValueRange<mlir::IntegerAttr>())
+    {
+        iters.insert(iter.getZExtValue());
+    }
+    llvm::DenseSet<std::uint32_t> mappings;
+    for (auto iter : mappingExpansion.getAsValueRange<mlir::IntegerAttr>())
+    {
+        mappings.insert(iter.getZExtValue());
+    }
+    int i = 0;
+    llvm::interleaveComma(operands, printer,
+                          [&](mlir::Value value)
+                          {
+                              if (iters.contains(i))
+                              {
+                                  printer << '*' << value;
+                              }
+                              else if (mappings.contains(i))
+                              {
+                                  printer << "**" << value;
+                              }
+                              else
+                              {
+                                  printer << value;
+                              }
+                              i++;
+                          });
+    printer << ')';
+}
+
+} // namespace
+
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>
 
