@@ -5,7 +5,7 @@
 include "mlir/IR/OpBase.td"
 
 def PylirPy_Dialect : Dialect {
-    let name = "pylir.py";
+    let name = "py";
     let summary = "A dialect representing python programs";
     let description = [{
         TODO
