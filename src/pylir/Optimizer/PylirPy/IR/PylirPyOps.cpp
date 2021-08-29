@@ -407,3 +407,17 @@ mlir::OpFoldResult pylir::Py::PowerOp::fold(::llvm::ArrayRef<::mlir::Attribute> 
     // TODO: integer math
     return nullptr;
 }
+
+mlir::OpFoldResult pylir::Py::NegOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (!operands[0])
+    {
+        return nullptr;
+    }
+    if (auto floating = operands[0].dyn_cast_or_null<mlir::FloatAttr>())
+    {
+        return mlir::FloatAttr::get(floating.getType(), llvm::neg(floating.getValue()));
+    }
+    // TODO: integer math
+    return nullptr;
+}

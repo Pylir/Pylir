@@ -80,4 +80,12 @@ def PylirPy_PowerOp : PylirPy_Op<"pow"> {
     let hasFolder = 1;
 }
 
+def PylirPy_NegOp : PylirPy_Op<"neg"> {
+    let arguments = (ins DynamicType:$input);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let hasFolder = 1;
+}
+
 #endif
