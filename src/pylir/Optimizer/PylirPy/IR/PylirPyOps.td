@@ -60,11 +60,21 @@ def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterfa
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple"> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
-                         DefaultValuedAttr<I32ArrayAttr, "{}">:$iterExpansion
+                         I32ArrayAttr:$iterExpansion
                          );
 
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict
+    }];
+
+    let hasFolder = 1;
+}
+
+def PylirPy_PowerOp : PylirPy_Op<"pow"> {
+    let arguments = (ins DynamicType:$base, DynamicType:$exponent, Optional<DynamicType>:$mod);
+
+    let assemblyFormat = [{
+        $base `to` $exponent (`mod` $mod^)? attr-dict
     }];
 
     let hasFolder = 1;

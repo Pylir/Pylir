@@ -324,3 +324,86 @@ mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribu
     }
     return Py::TupleAttr::get(getContext(), result);
 }
+
+namespace
+{
+void commonType(mlir::Attribute& lhs, mlir::Attribute& rhs)
+{
+    if (lhs.dyn_cast_or_null<mlir::FloatAttr>())
+    {
+        if (auto integer = rhs.dyn_cast_or_null<mlir::IntegerAttr>())
+        {
+            rhs =
+                mlir::FloatAttr::get(mlir::Float64Type::get(rhs.getContext()), integer.getValue().roundToDouble(true));
+        }
+    }
+    if (rhs.dyn_cast_or_null<mlir::FloatAttr>())
+    {
+        if (auto integer = lhs.dyn_cast_or_null<mlir::IntegerAttr>())
+        {
+            lhs =
+                mlir::FloatAttr::get(mlir::Float64Type::get(lhs.getContext()), integer.getValue().roundToDouble(true));
+        }
+    }
+}
+} // namespace
+
+mlir::OpFoldResult pylir::Py::PowerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    // I need both operands, even if some identities only need the exponent or base, because this might just fold to
+    // a type error instead and the type returned is dependent on the value and type of each.
+    if (!operands[0] || !operands[1])
+    {
+        return nullptr;
+    }
+
+    // TODO: fold with mod
+    if (mod())
+    {
+        return nullptr;
+    }
+    auto base = operands[0];
+    auto exponent = operands[1];
+    commonType(base, exponent);
+    if (base.getTypeID() != exponent.getTypeID())
+    {
+        return nullptr;
+    }
+    // Negative exponent causes the result and operands to be converted to double
+    if (auto integer = exponent.dyn_cast_or_null<mlir::IntegerAttr>(); integer && integer.getValue().isNegative())
+    {
+        exponent =
+            mlir::FloatAttr::get(mlir::Float64Type::get(exponent.getContext()), integer.getValue().roundToDouble(true));
+        base = mlir::FloatAttr::get(mlir::Float64Type::get(base.getContext()),
+                                    base.cast<mlir::IntegerAttr>().getValue().roundToDouble(true));
+    }
+    // If the exponent is 1, return the base
+    if (auto integer = exponent.dyn_cast_or_null<mlir::IntegerAttr>(); integer && integer.getValue() == 1)
+    {
+        return base;
+    }
+    if (auto floating = exponent.dyn_cast_or_null<mlir::FloatAttr>();
+        floating && floating.getValue().convertToDouble() == 1)
+    {
+        return base;
+    }
+
+    // If the base is 1, return 1
+    if (auto integer = base.dyn_cast_or_null<mlir::IntegerAttr>(); integer && integer.getValue() == 1)
+    {
+        return base;
+    }
+    if (auto floating = base.dyn_cast_or_null<mlir::FloatAttr>();
+        floating && floating.getValue().convertToDouble() == 1)
+    {
+        return base;
+    }
+    if (base.isa<mlir::FloatAttr>())
+    {
+        auto result = std::pow(base.cast<mlir::FloatAttr>().getValue().convertToDouble(),
+                               exponent.cast<mlir::FloatAttr>().getValue().convertToDouble());
+        return mlir::FloatAttr::get(mlir::Float64Type::get(base.getContext()), result);
+    }
+    // TODO: integer math
+    return nullptr;
+}
