@@ -88,4 +88,20 @@ def PylirPy_NegOp : PylirPy_Op<"neg"> {
     let hasFolder = 1;
 }
 
+def PylirPy_PosOp : PylirPy_Op<"pos"> {
+    let arguments = (ins DynamicType:$input);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let hasFolder = 1;
+}
+
+def PylirPy_InvertOp : PylirPy_Op<"invert"> {
+    let arguments = (ins DynamicType:$input);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let hasFolder = 1;
+}
+
 #endif

@@ -431,3 +431,29 @@ mlir::OpFoldResult pylir::Py::NegOp::fold(::llvm::ArrayRef<::mlir::Attribute> op
     }
     return nullptr;
 }
+
+mlir::OpFoldResult pylir::Py::PosOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (!operands[0])
+    {
+        return nullptr;
+    }
+    if (operands[0].isa<mlir::FloatAttr, Py::IntAttr>())
+    {
+        return operands[0];
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Py::InvertOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (!operands[0])
+    {
+        return nullptr;
+    }
+    if (auto integer = operands[0].dyn_cast_or_null<Py::IntAttr>())
+    {
+        return Py::IntAttr::get(getContext(), ~integer.getValue());
+    }
+    return nullptr;
+}
