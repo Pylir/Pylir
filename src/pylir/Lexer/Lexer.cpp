@@ -1320,9 +1320,7 @@ void pylir::Lexer::parseNumber()
     isFloat = isFloat || (end != m_document->end() && (*end == U'e' || *end == U'E'));
     if (!isFloat)
     {
-        llvm::APInt integer;
-        [[maybe_unused]] auto error = llvm::StringRef(text).getAsInteger(radix, integer);
-        PYLIR_ASSERT(!error);
+        BigInt integer(text, radix);
         if (radix == 10 && m_current != m_document->end() && (*m_current == U'j' || *m_current == U'J'))
         {
             m_current++;
@@ -1331,7 +1329,7 @@ void pylir::Lexer::parseNumber()
             checkSuffix();
             return;
         }
-        if (radix == 10 && !integer.isNullValue() && text.front() == '0')
+        if (radix == 10 && !integer.isZero() && text.front() == '0')
         {
             auto* leadingEnd =
                 std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });

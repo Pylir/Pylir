@@ -10,8 +10,23 @@ class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "
     let storageType = dialect.cppNamespace # "::" # cppClassName;
 }
 
+def PylirPy_IntAttr : PylirPy_Attr<"Int"> {
+    let mnemonic = "int";
+    let summary = "python integer";
+
+    let returnType = "const ::pylir::BigInt&";
+    let convertFromStorage = "$_self.getValue()";
+    let constBuilderCall = storageType # "::get($_builder.getContext(), $0)";
+
+    let parameters = (ins "::pylir::BigInt":$value);
+
+    let genStorageClass = 0;
+
+}
+
 def PylirPy_ListAttr : PylirPy_Attr<"List"> {
     let mnemonic = "list";
+    let summary = "python list";
 
     let returnType = "llvm::ArrayRef<mlir::Attribute>";
     let convertFromStorage = "$_self.getValue()";
@@ -22,6 +37,7 @@ def PylirPy_ListAttr : PylirPy_Attr<"List"> {
 
 def PylirPy_TupleAttr : PylirPy_Attr<"Tuple"> {
     let mnemonic = "tuple";
+    let summary = "python tuple";
 
     let returnType = "llvm::ArrayRef<mlir::Attribute>";
     let convertFromStorage = "$_self.getValue()";
@@ -32,6 +48,7 @@ def PylirPy_TupleAttr : PylirPy_Attr<"Tuple"> {
 
 def PylirPy_SetAttr : PylirPy_Attr<"Set"> {
     let mnemonic = "set";
+    let summary = "python set";
 
     let returnType = "llvm::ArrayRef<mlir::Attribute>";
     let convertFromStorage = "$_self.getValue()";
@@ -42,6 +59,7 @@ def PylirPy_SetAttr : PylirPy_Attr<"Set"> {
 
 def PylirPy_DictAttr : PylirPy_Attr<"Dict"> {
     let mnemonic = "dict";
+    let summary = "python dictionary";
 
     let returnType = "llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>>";
     let convertFromStorage = "$_self.getValue()";
@@ -62,6 +80,6 @@ class AnyAttrOf<list<Attr> allowedAttrs, string summary = "", string cppClassNam
     let constBuilderCall = "$0";
 }
 
-def AnyPyAttribute : AnyAttrOf<[APIntAttr, BoolAttr, F64Attr, PylirPy_ListAttr,
+def AnyPyAttribute : AnyAttrOf<[PylirPy_IntAttr, BoolAttr, F64Attr, PylirPy_ListAttr,
                                     PylirPy_TupleAttr, PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, FlatSymbolRefAttr]>;
 #endif

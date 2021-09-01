@@ -1,8 +1,7 @@
 
 #pragma once
 
-#include <llvm/ADT/APInt.h>
-
+#include <pylir/Support/BigInt.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
 
@@ -140,7 +139,7 @@ class Token : public BaseToken
     TokenType m_tokenType;
 
 public:
-    using Variant = std::variant<std::monostate, std::string, llvm::APInt, double>;
+    using Variant = std::variant<std::monostate, std::string, BigInt, double>;
 
 private:
     Variant m_value;

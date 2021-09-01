@@ -13,10 +13,10 @@
 # RUN: --check-prefix=SYNTAX_ONLY_ASSEMBLY
 # SYNTAX_ONLY_ASSEMBLY: Assembly won't be emitted when only checking syntax
 
-# RUN: not pylir -c "x = 1" --target=wadawdagwhdawzgdwa -o - 2>&1 | \
+# RUN: not pylir -c "x = ''" --target=wadawdagwhdawzgdwa -o - 2>&1 | \
 # RUN: FileCheck %s --check-prefix=UNKNOWN_TARGET
 # UNKNOWN_TARGET: could not find target 'wadawdagwhdawzgdwa'
 
-# RUN: not pylir -c "x = 1" -Og -o - 2>&1 | \
+# RUN: not pylir -c "x = ''" -Og -o - 2>&1 | \
 # RUN: FileCheck %s --check-prefix=INVALID_OPT
 # INVALID_OPT: invalid optimization level '-Og'

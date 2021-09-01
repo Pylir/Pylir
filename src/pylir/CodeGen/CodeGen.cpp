@@ -580,8 +580,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 case TokenType::IntegerLiteral:
                 {
                     auto intTypeObject = m_builder.create<Mem::DataOfOp>(location, Mem::getIntTypeObject(m_module));
-                    return m_builder.create<Mem::IntegerConstant>(location, intTypeObject,
-                                                                  pylir::get<llvm::APInt>(literal.token.getValue()));
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                    //                    return m_builder.create<Mem::IntegerConstant>(location, intTypeObject,
+                    //                                                                  pylir::get<llvm::APInt>(literal.token.getValue()));
                 }
                 case TokenType::FloatingPointLiteral:
                 {

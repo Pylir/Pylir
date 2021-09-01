@@ -103,12 +103,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
             return pylir::match(
                 literal.token.getValue(),
                 [](double value) -> std::string { return fmt::format(FMT_STRING("atom {:#}"), value); },
-                [](const llvm::APInt& apInt) -> std::string
-                {
-                    llvm::SmallString<10> str;
-                    apInt.toStringSigned(str);
-                    return fmt::format("atom {}", std::string_view(str.data(), str.size()));
-                },
+                [](const BigInt& bigInt) -> std::string { return fmt::format("atom {}", bigInt.toString()); },
                 [&](const std::string& string) -> std::string
                 {
                     if (literal.token.getTokenType() == TokenType::StringLiteral)

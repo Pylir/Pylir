@@ -21,7 +21,7 @@ add_mlir_dialect_library(PylirMemDialect
         DEPENDS
         PylirMemOpsIncGen
 
-        LINK_LIBS PUBLIC MLIRIR Support MLIRInferTypeOpInterface MLIRStandard
+        LINK_LIBS PUBLIC MLIRIR PylirSupport MLIRInferTypeOpInterface MLIRStandard
         )
 if (PYLIR_USE_PCH)
     target_link_libraries(PylirMemDialect PRIVATE COMMON_PCH)

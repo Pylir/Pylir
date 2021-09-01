@@ -210,7 +210,7 @@ mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute
         .Case(
             [&](mlir::StringAttr attr) -> mlir::OpFoldResult
             {
-                auto integer = index.dyn_cast_or_null<mlir::IntegerAttr>();
+                auto integer = index.dyn_cast_or_null<Py::IntAttr>();
                 if (!integer)
                 {
                     return nullptr;
@@ -219,13 +219,13 @@ mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute
                 auto value = integer.getValue();
                 if (value.isNegative())
                 {
-                    value += utf32.size();
+                    value += BigInt(utf32.size());
                 }
-                if (value.isNegative() || value.sge(utf32.size()))
+                if (value.isNegative() || value >= BigInt(utf32.size()))
                 {
                     return nullptr;
                 }
-                auto codepoint = utf32[value.getZExtValue()];
+                auto codepoint = utf32[value.getInteger<std::size_t>()];
                 auto utf8 = Text::toUTF8String({&codepoint, 1});
                 return mlir::StringAttr::get(getContext(), utf8);
             })
@@ -233,7 +233,7 @@ mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute
             [&](auto sequence) -> mlir::OpFoldResult
             {
                 auto array = sequence.getValue();
-                auto integer = index.dyn_cast_or_null<mlir::IntegerAttr>();
+                auto integer = index.dyn_cast_or_null<Py::IntAttr>();
                 if (!integer)
                 {
                     return nullptr;
@@ -241,13 +241,13 @@ mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute
                 auto value = integer.getValue();
                 if (value.isNegative())
                 {
-                    value += array.size();
+                    value += BigInt(array.size());
                 }
-                if (value.isNegative() || value.sge(array.size()))
+                if (value.isNegative() || value >= BigInt(array.size()))
                 {
                     return nullptr;
                 }
-                return array[value.getZExtValue()];
+                return array[value.getInteger<std::size_t>()];
             })
         .Case(
             [&](Py::DictAttr dictAttr) -> mlir::OpFoldResult
@@ -331,18 +331,16 @@ void commonType(mlir::Attribute& lhs, mlir::Attribute& rhs)
 {
     if (lhs.dyn_cast_or_null<mlir::FloatAttr>())
     {
-        if (auto integer = rhs.dyn_cast_or_null<mlir::IntegerAttr>())
+        if (auto integer = rhs.dyn_cast_or_null<pylir::Py::IntAttr>())
         {
-            rhs =
-                mlir::FloatAttr::get(mlir::Float64Type::get(rhs.getContext()), integer.getValue().roundToDouble(true));
+            rhs = mlir::FloatAttr::get(mlir::Float64Type::get(rhs.getContext()), integer.getValue().roundToDouble());
         }
     }
     if (rhs.dyn_cast_or_null<mlir::FloatAttr>())
     {
-        if (auto integer = lhs.dyn_cast_or_null<mlir::IntegerAttr>())
+        if (auto integer = lhs.dyn_cast_or_null<pylir::Py::IntAttr>())
         {
-            lhs =
-                mlir::FloatAttr::get(mlir::Float64Type::get(lhs.getContext()), integer.getValue().roundToDouble(true));
+            lhs = mlir::FloatAttr::get(mlir::Float64Type::get(lhs.getContext()), integer.getValue().roundToDouble());
         }
     }
 }
@@ -370,15 +368,15 @@ mlir::OpFoldResult pylir::Py::PowerOp::fold(::llvm::ArrayRef<::mlir::Attribute> 
         return nullptr;
     }
     // Negative exponent causes the result and operands to be converted to double
-    if (auto integer = exponent.dyn_cast_or_null<mlir::IntegerAttr>(); integer && integer.getValue().isNegative())
+    if (auto integer = exponent.dyn_cast_or_null<Py::IntAttr>(); integer && integer.getValue().isNegative())
     {
         exponent =
-            mlir::FloatAttr::get(mlir::Float64Type::get(exponent.getContext()), integer.getValue().roundToDouble(true));
+            mlir::FloatAttr::get(mlir::Float64Type::get(exponent.getContext()), integer.getValue().roundToDouble());
         base = mlir::FloatAttr::get(mlir::Float64Type::get(base.getContext()),
-                                    base.cast<mlir::IntegerAttr>().getValue().roundToDouble(true));
+                                    base.cast<Py::IntAttr>().getValue().roundToDouble());
     }
     // If the exponent is 1, return the base
-    if (auto integer = exponent.dyn_cast_or_null<mlir::IntegerAttr>(); integer && integer.getValue() == 1)
+    if (auto integer = exponent.dyn_cast_or_null<Py::IntAttr>(); integer && integer.getValue() == BigInt(1))
     {
         return base;
     }
@@ -389,7 +387,7 @@ mlir::OpFoldResult pylir::Py::PowerOp::fold(::llvm::ArrayRef<::mlir::Attribute> 
     }
 
     // If the base is 1, return 1
-    if (auto integer = base.dyn_cast_or_null<mlir::IntegerAttr>(); integer && integer.getValue() == 1)
+    if (auto integer = base.dyn_cast_or_null<Py::IntAttr>(); integer && integer.getValue() == BigInt(1))
     {
         return base;
     }

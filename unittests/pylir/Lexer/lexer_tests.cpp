@@ -394,9 +394,9 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
-        CHECK(apInt->getZExtValue() == 30);
+        CHECK(*apInt == pylir::BigInt(30));
     }
     SECTION("Binary")
     {
@@ -406,9 +406,9 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
-        CHECK(apInt->getZExtValue() == 2);
+        CHECK(*apInt == pylir::BigInt(2));
     }
     SECTION("Octal")
     {
@@ -418,9 +418,9 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
-        CHECK(apInt->getZExtValue() == 030);
+        CHECK(*apInt == pylir::BigInt(030));
     }
     SECTION("Hex")
     {
@@ -430,9 +430,9 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
-        CHECK(apInt->getZExtValue() == 0x30);
+        CHECK(*apInt == pylir::BigInt(0x30));
     }
     SECTION("Underline")
     {
@@ -442,9 +442,9 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
-        CHECK(apInt->getZExtValue() == 0x30);
+        CHECK(*apInt == pylir::BigInt(0x30));
         LEXER_EMITS("0x3__0", pylir::Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS);
     }
     SECTION("Null")
@@ -455,9 +455,9 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<llvm::APInt>(&number.getValue());
+        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
-        CHECK(apInt->getZExtValue() == 0);
+        CHECK(apInt->isZero());
         LEXER_EMITS("00000000001", pylir::Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED);
     }
     LEXER_EMITS("0x3ll", pylir::Diag::INVALID_INTEGER_SUFFIX, "ll");

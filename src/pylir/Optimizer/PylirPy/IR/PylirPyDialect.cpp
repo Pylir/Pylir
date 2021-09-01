@@ -11,6 +11,37 @@
 #include "PylirPyOps.hpp"
 #include "PylirPyTypes.hpp"
 
+namespace pylir::Py::detail
+{
+struct IntAttrStorage : public mlir::AttributeStorage
+{
+    IntAttrStorage(BigInt value) : value(std::move(value)) {}
+
+    using KeyTy = BigInt;
+
+    bool operator==(const KeyTy& other) const
+    {
+        return value == other;
+    }
+
+    static ::llvm::hash_code hashKey(const KeyTy& key)
+    {
+        auto count = mp_ubin_size(&key.getHandle());
+        llvm::SmallVector<std::uint8_t, 10> data(count);
+        auto result = mp_to_ubin(&key.getHandle(), data.data(), count, nullptr);
+        PYLIR_ASSERT(result == MP_OKAY);
+        return llvm::hash_value(makeArrayRef(data));
+    }
+
+    static IntAttrStorage* construct(::mlir::AttributeStorageAllocator& allocator, const KeyTy& key)
+    {
+        return new (allocator.allocate<IntAttrStorage>()) IntAttrStorage(key);
+    }
+
+    BigInt value;
+};
+} // namespace pylir::Py::detail
+
 void pylir::Py::PylirPyDialect::initialize()
 {
     addOperations<
@@ -71,6 +102,28 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
 void pylir::Py::PylirPyDialect::printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const
 {
     (void)generatedAttributePrinter(attr, os);
+}
+
+pylir::BigInt pylir::Py::IntAttr::getValue() const
+{
+    return getImpl()->value;
+}
+
+void pylir::Py::IntAttr::print(::mlir::DialectAsmPrinter& printer) const
+{
+    printer << getMnemonic() << "<" << getValue().toString() << ">";
+}
+
+mlir::Attribute pylir::Py::IntAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type)
+{
+    llvm::APInt apInt;
+    if (parser.parseLess() || parser.parseInteger(apInt) || parser.parseGreater())
+    {
+        return {};
+    }
+    llvm::SmallString<10> str;
+    apInt.toStringSigned(str);
+    return IntAttr::get(context, BigInt({str.data(), str.size()}));
 }
 
 void pylir::Py::ListAttr::print(::mlir::DialectAsmPrinter& printer) const

@@ -5,7 +5,7 @@
 // CHECK: return %[[RES]]
 func @getitem_string_positive() -> !py.dynamic {
     %0 = py.constant "text"
-    %1 = py.constant 2
+    %1 = py.constant #py.int<2>
     %2 = py.getItem %0[%1]
     return %2 : !py.dynamic
 }
@@ -17,7 +17,7 @@ func @getitem_string_positive() -> !py.dynamic {
 // CHECK: return %[[RES]]
 func @getitem_string_negative() -> !py.dynamic {
     %0 = py.constant "text"
-    %1 = py.constant -1
+    %1 = py.constant #py.int<-1>
     %2 = py.getItem %0[%1]
     return %2 : !py.dynamic
 }
@@ -28,8 +28,8 @@ func @getitem_string_negative() -> !py.dynamic {
 // CHECK: %[[RES:.*]] = py.constant "x"
 // CHECK: return %[[RES]]
 func @getitem_tuple_positive() -> !py.dynamic {
-    %0 = py.constant #py.tuple<(5,"x",3)>
-    %1 = py.constant 1
+    %0 = py.constant #py.tuple<(#py.int<5>,"x",#py.int<3>)>
+    %1 = py.constant #py.int<1>
     %2 = py.getItem %0[%1]
     return %2 : !py.dynamic
 }
@@ -37,11 +37,11 @@ func @getitem_tuple_positive() -> !py.dynamic {
 // -----
 
 // CHECK-LABEL: @getitem_tuple_negative
-// CHECK: %[[RES:.*]] = py.constant 3
+// CHECK: %[[RES:.*]] = py.constant #py.int<3>
 // CHECK: return %[[RES]]
 func @getitem_tuple_negative() -> !py.dynamic {
-    %0 = py.constant #py.tuple<(5,"x",3)>
-    %1 = py.constant -1
+    %0 = py.constant #py.tuple<(#py.int<5>,"x",#py.int<3>)>
+    %1 = py.constant #py.int<-1>
     %2 = py.getItem %0[%1]
     return %2 : !py.dynamic
 }
@@ -52,8 +52,8 @@ func @getitem_tuple_negative() -> !py.dynamic {
 // CHECK: %[[RES:.*]] = py.constant "x"
 // CHECK: return %[[RES]]
 func @getitem_list_positive() -> !py.dynamic {
-    %0 = py.constant #py.list<[5,"x",3]>
-    %1 = py.constant 1
+    %0 = py.constant #py.list<[#py.int<5>,"x",#py.int<3>]>
+    %1 = py.constant #py.int<1>
     %2 = py.getItem %0[%1]
     return %2 : !py.dynamic
 }
@@ -61,11 +61,11 @@ func @getitem_list_positive() -> !py.dynamic {
 // -----
 
 // CHECK-LABEL: @getitem_list_negative
-// CHECK: %[[RES:.*]] = py.constant 3
+// CHECK: %[[RES:.*]] = py.constant #py.int<3>
 // CHECK: return %[[RES]]
 func @getitem_list_negative() -> !py.dynamic {
-    %0 = py.constant #py.list<[5,"x",3]>
-    %1 = py.constant -1
+    %0 = py.constant #py.list<[#py.int<5>,"x",#py.int<3>]>
+    %1 = py.constant #py.int<-1>
     %2 = py.getItem %0[%1]
     return %2 : !py.dynamic
 }
@@ -73,10 +73,10 @@ func @getitem_list_negative() -> !py.dynamic {
 // -----
 
 // CHECK-LABEL: @getitem_dict
-// CHECK: %[[RES:.*]] = py.constant 3
+// CHECK: %[[RES:.*]] = py.constant #py.int<3>
 // CHECK: return %[[RES]]
 func @getitem_dict() -> !py.dynamic {
-    %0 = py.constant #py.dict<{5 to "x","text" to 3}>
+    %0 = py.constant #py.dict<{#py.int<5> to "x","text" to #py.int<3>}>
     %1 = py.constant "text"
     %2 = py.getItem %0[%1]
     return %2 : !py.dynamic
