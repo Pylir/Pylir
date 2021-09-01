@@ -402,7 +402,16 @@ mlir::OpFoldResult pylir::Py::PowerOp::fold(::llvm::ArrayRef<::mlir::Attribute> 
                                exponent.cast<mlir::FloatAttr>().getValue().convertToDouble());
         return mlir::FloatAttr::get(mlir::Float64Type::get(base.getContext()), result);
     }
-    // TODO: integer math
+    if (base.isa<Py::IntAttr>())
+    {
+        auto expo = exponent.cast<Py::IntAttr>().getValue().tryGetInteger<int>();
+        if (!expo)
+        {
+            return nullptr;
+        }
+        auto result = pow(base.cast<Py::IntAttr>().getValue(), *expo);
+        return Py::IntAttr::get(getContext(), std::move(result));
+    }
     return nullptr;
 }
 
@@ -416,6 +425,9 @@ mlir::OpFoldResult pylir::Py::NegOp::fold(::llvm::ArrayRef<::mlir::Attribute> op
     {
         return mlir::FloatAttr::get(floating.getType(), llvm::neg(floating.getValue()));
     }
-    // TODO: integer math
+    if (auto integer = operands[0].dyn_cast_or_null<Py::IntAttr>())
+    {
+        return Py::IntAttr::get(getContext(), -integer.getValue());
+    }
     return nullptr;
 }

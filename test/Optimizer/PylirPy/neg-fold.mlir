@@ -8,3 +8,14 @@ func @neg_floats() -> !py.dynamic {
     %1 = py.neg %0
     return %1 : !py.dynamic
 }
+
+// -----
+
+// CHECK-LABEL: @neg_integer
+// CHECK: %[[RES:.*]] = py.constant #py.int<-5>
+// CHECK: return %[[RES]]
+func @neg_integer() -> !py.dynamic {
+    %0 = py.constant #py.int<5>
+    %1 = py.neg %0
+    return %1 : !py.dynamic
+}
