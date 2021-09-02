@@ -3,6 +3,7 @@
 
 #include <mlir/IR/DialectImplementation.h>
 
+#include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsDialect.cpp.inc"
@@ -123,7 +124,7 @@ mlir::Attribute pylir::Py::IntAttr::parse(::mlir::MLIRContext* context, ::mlir::
     }
     llvm::SmallString<10> str;
     apInt.toStringSigned(str);
-    return IntAttr::get(context, BigInt({str.data(), str.size()}));
+    return IntAttr::get(context, BigInt(std::string{str.data(), str.size()}));
 }
 
 void pylir::Py::ListAttr::print(::mlir::DialectAsmPrinter& printer) const
