@@ -68,6 +68,15 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict"> {
     let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>">:$value);
 }
 
+def PylirPy_BoolAttr : Attr<CPred<"$_self.isa<::pylir::Py::BoolAttr>()">> {
+    let summary = "python bool";
+
+    let storageType = "::pylir::Py::BoolAttr";
+    let returnType = "bool";
+    let convertFromStorage = "$_self.getValue()";
+    let constBuilderCall = "::pylir::Py::BoolAttr::get($_builder.getContext(),$0)";
+}
+
 class AnyAttrOf<list<Attr> allowedAttrs, string summary = "", string cppClassName = "::mlir::Attribute"> : Attr<
     Or<!foreach(allowedAttr,allowedAttrs,allowedAttr.predicate)>,
     !if(!eq(summary, ""),
@@ -80,6 +89,6 @@ class AnyAttrOf<list<Attr> allowedAttrs, string summary = "", string cppClassNam
     let constBuilderCall = "$0";
 }
 
-def AnyPyAttribute : AnyAttrOf<[PylirPy_IntAttr, BoolAttr, F64Attr, PylirPy_ListAttr,
+def AnyPyAttribute : AnyAttrOf<[PylirPy_IntAttr, PylirPy_BoolAttr, F64Attr, PylirPy_ListAttr,
                                     PylirPy_TupleAttr, PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, FlatSymbolRefAttr]>;
 #endif

@@ -53,10 +53,10 @@ void pylir::Py::PylirPyDialect::initialize()
 #define GET_TYPEDEF_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"
         >();
-    addAttributes<
+    addAttributes<BoolAttr,
 #define GET_ATTRDEF_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.cpp.inc"
-        >();
+                  >();
 }
 
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
@@ -95,6 +95,10 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
     {
         return {};
     }
+    if (keyword == Py::BoolAttr::getMnemonic())
+    {
+        return Py::BoolAttr::parse(getContext(), parser, type);
+    }
     mlir::Attribute result;
     (void)generatedAttributeParser(getContext(), parser, keyword, type, result);
     return result;
@@ -102,6 +106,10 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
 
 void pylir::Py::PylirPyDialect::printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const
 {
+    if (auto boolean = attr.dyn_cast_or_null<BoolAttr>())
+    {
+        return boolean.print(os);
+    }
     (void)generatedAttributePrinter(attr, os);
 }
 
@@ -288,4 +296,43 @@ mlir::Attribute pylir::Py::DictAttr::parse(::mlir::MLIRContext* context, ::mlir:
         return {};
     }
     return get(context, attrs);
+}
+
+pylir::Py::BoolAttr pylir::Py::BoolAttr::get(::mlir::MLIRContext* context, bool value)
+{
+    return Base::get(context, BigInt(value ? 1 : 0));
+}
+
+mlir::Attribute pylir::Py::BoolAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type)
+{
+    if (parser.parseLess())
+    {
+        return {};
+    }
+    llvm::StringRef keyword;
+    auto loc = parser.getCurrentLocation();
+    if (parser.parseKeyword(&keyword))
+    {
+        return {};
+    }
+    if (keyword != "True" && keyword != "False")
+    {
+        parser.emitError(loc, "Expected 'True' or 'False' instead of ") << keyword;
+        return {};
+    }
+    if (parser.parseGreater())
+    {
+        return {};
+    }
+    return get(context, keyword == "True");
+}
+
+void pylir::Py::BoolAttr::print(::mlir::DialectAsmPrinter& printer) const
+{
+    printer << getMnemonic() << "<" << (getValue() ? "True" : "False") << ">";
+}
+
+bool pylir::Py::BoolAttr::getValue() const
+{
+    return !getImpl()->value.isZero();
 }

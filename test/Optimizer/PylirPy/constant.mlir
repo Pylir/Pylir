@@ -9,8 +9,8 @@ func @test_constant_integer() -> !py.dynamic {
 
 // CHECK-LABEL: test_constant_bool
 func @test_constant_bool() -> !py.dynamic {
-    %0 = py.constant true
-    %1 = py.constant false
+    %0 = py.constant #py.bool<True>
+    %1 = py.constant #py.bool<False>
     return %0 : !py.dynamic
 }
 
