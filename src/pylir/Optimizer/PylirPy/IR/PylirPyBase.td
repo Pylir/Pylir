@@ -13,6 +13,10 @@ def PylirPy_Dialect : Dialect {
     let cppNamespace = "::pylir::Py";
 
     let hasConstantMaterializer = 1;
+
+    let extraClassDeclaration = [{
+        void initializeAttributes();
+    }];
 }
 
 #endif

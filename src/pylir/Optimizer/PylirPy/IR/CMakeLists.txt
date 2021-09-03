@@ -13,7 +13,7 @@ mlir_tablegen(PylirPyOpsEnums.cpp.inc -gen-enum-defs)
 add_public_tablegen_target(PylirPyOpsIncGen)
 add_dependencies(mlir-headers PylirPyOpsIncGen)
 
-add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp)
+add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp)
 add_dependencies(PylirPyDialect PylirPyOpsIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface MLIRStandard)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
