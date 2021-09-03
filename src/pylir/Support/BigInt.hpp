@@ -276,6 +276,41 @@ public:
         return result;
     }
 
+    friend BigInt operator<<(const BigInt& lhs, int rhs)
+    {
+        BigInt result;
+        cantFail(mp_mul_2d(lhs.m_int, rhs, result.m_int));
+        return result;
+    }
+
+    friend BigInt operator>>(const BigInt& lhs, int rhs)
+    {
+        BigInt result;
+        cantFail(mp_div_2d(lhs.m_int, rhs, result.m_int, nullptr));
+        return result;
+    }
+
+    friend BigInt operator&(const BigInt& lhs, const BigInt& rhs)
+    {
+        BigInt result;
+        cantFail(mp_and(lhs.m_int, rhs.m_int, result.m_int));
+        return result;
+    }
+
+    friend BigInt operator|(const BigInt& lhs, const BigInt& rhs)
+    {
+        BigInt result;
+        cantFail(mp_or(lhs.m_int, rhs.m_int, result.m_int));
+        return result;
+    }
+
+    friend BigInt operator^(const BigInt& lhs, const BigInt& rhs)
+    {
+        BigInt result;
+        cantFail(mp_xor(lhs.m_int, rhs.m_int, result.m_int));
+        return result;
+    }
+
     friend bool operator<(const BigInt& lhs, const BigInt& rhs)
     {
         return mp_cmp(lhs.m_int, rhs.m_int) == MP_LT;

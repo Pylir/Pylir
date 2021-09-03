@@ -104,4 +104,51 @@ def PylirPy_InvertOp : PylirPy_Op<"invert"> {
     let hasFolder = 1;
 }
 
+class PylirPy_BinOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,traits> {
+    let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
+
+    let assemblyFormat = "$lhs `,` $rhs attr-dict";
+
+    let hasFolder = 1;
+}
+
+def PylirPy_MulOp : PylirPy_BinOp<"mul">;
+def PylirPy_MatMulOp : PylirPy_BinOp<"matMul"> {
+    let hasFolder = 0;
+}
+def PylirPy_FloorDivOp : PylirPy_BinOp<"floorDiv">;
+def PylirPy_TrueDivOp : PylirPy_BinOp<"trueDiv">;
+def PylirPy_ModuloOp : PylirPy_BinOp<"mod">;
+def PylirPy_AddOp : PylirPy_BinOp<"add">;
+def PylirPy_SubOp : PylirPy_BinOp<"sub">;
+def PylirPy_LShiftOp : PylirPy_BinOp<"lshift">;
+def PylirPy_RShiftOp : PylirPy_BinOp<"rshift">;
+def PylirPy_AndOp : PylirPy_BinOp<"and">;
+def PylirPy_OrOp : PylirPy_BinOp<"or">;
+def PylirPy_XorOp : PylirPy_BinOp<"xor">;
+def PylirPy_LessOp : PylirPy_BinOp<"less"> {
+    let hasFolder = 0;
+}
+def PylirPy_LessEqualOp : PylirPy_BinOp<"lessEqual"> {
+    let hasFolder = 0;
+}
+def PylirPy_GreaterOp : PylirPy_BinOp<"greater"> {
+    let hasFolder = 0;
+}
+def PylirPy_GreaterEqualOp : PylirPy_BinOp<"greaterEqual"> {
+    let hasFolder = 0;
+}
+def PylirPy_EqualOp : PylirPy_BinOp<"equal"> {
+    let hasFolder = 0;
+}
+def PylirPy_NotEqualOp : PylirPy_BinOp<"notEqual"> {
+    let hasFolder = 0;
+}
+def PylirPy_IsOp : PylirPy_BinOp<"is"> {
+    let hasFolder = 0;
+}
+def PylirPy_InOp : PylirPy_BinOp<"in"> {
+    let hasFolder = 0;
+}
+
 #endif

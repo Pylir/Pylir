@@ -457,3 +457,183 @@ mlir::OpFoldResult pylir::Py::InvertOp::fold(::llvm::ArrayRef<::mlir::Attribute>
     }
     return nullptr;
 }
+
+namespace
+{
+template <class BinOp>
+mlir::OpFoldResult foldBin(mlir::Attribute lhs, mlir::Attribute rhs, BinOp binOp)
+{
+    if (!lhs && !rhs)
+    {
+        return nullptr;
+    }
+    return llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(lhs)
+        .Case(
+            [&](::pylir::Py::IntAttr attr) -> mlir::OpFoldResult
+            {
+                return ::pylir::Py::IntAttr::get(attr.getContext(),
+                                                 binOp(attr.getValue(), rhs.cast<::pylir::Py::IntAttr>().getValue()));
+            })
+        .Case(
+            [&](mlir::FloatAttr attr) -> mlir::OpFoldResult
+            {
+                return mlir::FloatAttr::get(
+                    attr.getType(),
+                    binOp(attr.getValue().convertToDouble(), rhs.cast<mlir::FloatAttr>().getValue().convertToDouble()));
+            })
+        .Default(mlir::OpFoldResult(nullptr));
+}
+} // namespace
+
+mlir::OpFoldResult pylir::Py::MulOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldBin(operands[0], operands[1], std::multiplies{});
+}
+
+mlir::OpFoldResult pylir::Py::FloorDivOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldBin(operands[0], operands[1],
+                   [](auto&& lhs, auto&& rhs)
+                   {
+                       if constexpr (std::is_same_v<std::decay_t<decltype(lhs)>, double>)
+                       {
+                           return std::floor(lhs / rhs);
+                       }
+                       else
+                       {
+                           return lhs / rhs;
+                       }
+                   });
+}
+
+mlir::OpFoldResult pylir::Py::TrueDivOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0];
+    auto rhs = operands[1];
+    if (!lhs && !rhs)
+    {
+        return nullptr;
+    }
+    return llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(lhs)
+        .Case(
+            [&](::pylir::Py::IntAttr attr) -> mlir::OpFoldResult
+            {
+                double other = rhs.cast<Py::IntAttr>().getValue().roundToDouble();
+                if (other == 0.0)
+                {
+                    return nullptr;
+                }
+                return mlir::FloatAttr::get(mlir::Float64Type::get(attr.getContext()),
+                                            attr.getValue().roundToDouble() / other);
+            })
+        .Case(
+            [&](mlir::FloatAttr attr) -> mlir::OpFoldResult
+            {
+                double other = rhs.cast<mlir::FloatAttr>().getValue().convertToDouble();
+                if (other == 0.0)
+                {
+                    return nullptr;
+                }
+                return mlir::FloatAttr::get(attr.getType(), attr.getValue().convertToDouble() / other);
+            })
+        .Default(mlir::OpFoldResult(nullptr));
+}
+
+mlir::OpFoldResult pylir::Py::ModuloOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldBin(operands[0], operands[1],
+                   [](auto&& lhs, auto&& rhs)
+                   {
+                       if constexpr (std::is_same_v<std::decay_t<decltype(lhs)>, double>)
+                       {
+                           return std::fmod(lhs, rhs);
+                       }
+                       else
+                       {
+                           return lhs % rhs;
+                       }
+                   });
+}
+
+mlir::OpFoldResult pylir::Py::AddOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldBin(operands[0], operands[1], std::plus{});
+}
+
+mlir::OpFoldResult pylir::Py::SubOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldBin(operands[0], operands[1], std::minus{});
+}
+
+mlir::OpFoldResult pylir::Py::LShiftOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0];
+    auto rhs = operands[1];
+    if (!lhs || !rhs)
+    {
+        return nullptr;
+    }
+    if (lhs.isa<pylir::Py::IntAttr>() && rhs.isa<pylir::Py::IntAttr>())
+    {
+        auto value = rhs.cast<pylir::Py::IntAttr>().getValue().tryGetInteger<int>();
+        if (!value)
+        {
+            return nullptr;
+        }
+        return pylir::Py::IntAttr::get(lhs.getContext(), lhs.cast<pylir::Py::IntAttr>().getValue() << *value);
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Py::RShiftOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0];
+    auto rhs = operands[1];
+    if (!lhs || !rhs)
+    {
+        return nullptr;
+    }
+    if (lhs.isa<pylir::Py::IntAttr>() && rhs.isa<pylir::Py::IntAttr>())
+    {
+        auto value = rhs.cast<pylir::Py::IntAttr>().getValue().tryGetInteger<int>();
+        if (!value)
+        {
+            return nullptr;
+        }
+        return pylir::Py::IntAttr::get(lhs.getContext(), lhs.cast<pylir::Py::IntAttr>().getValue() >> *value);
+    }
+    return nullptr;
+}
+
+namespace
+{
+template <class BinOp>
+mlir::OpFoldResult foldIntBin(mlir::Attribute lhs, mlir::Attribute rhs, BinOp binOp)
+{
+    if (!lhs || !rhs)
+    {
+        return nullptr;
+    }
+    if (lhs.isa<pylir::Py::IntAttr>() && rhs.isa<pylir::Py::IntAttr>())
+    {
+        return pylir::Py::IntAttr::get(lhs.getContext(), std::invoke(binOp, lhs.cast<pylir::Py::IntAttr>().getValue(),
+                                                                     rhs.cast<pylir::Py::IntAttr>().getValue()));
+    }
+    return nullptr;
+}
+} // namespace
+
+mlir::OpFoldResult pylir::Py::AndOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldIntBin(operands[0], operands[1], std::bit_and{});
+}
+
+mlir::OpFoldResult pylir::Py::OrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldIntBin(operands[0], operands[1], std::bit_or{});
+}
+
+mlir::OpFoldResult pylir::Py::XorOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldIntBin(operands[0], operands[1], std::bit_xor{});
+}
