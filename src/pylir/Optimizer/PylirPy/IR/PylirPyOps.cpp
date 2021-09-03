@@ -614,6 +614,11 @@ mlir::OpFoldResult foldIntBin(mlir::Attribute lhs, mlir::Attribute rhs, BinOp bi
     {
         return nullptr;
     }
+    if (lhs.isa<pylir::Py::BoolAttr>() && rhs.isa<pylir::Py::BoolAttr>())
+    {
+        return pylir::Py::BoolAttr::get(lhs.getContext(), std::invoke(binOp, lhs.cast<pylir::Py::BoolAttr>().getValue(),
+                                                                      rhs.cast<pylir::Py::BoolAttr>().getValue()));
+    }
     if (lhs.isa<pylir::Py::IntAttr>() && rhs.isa<pylir::Py::IntAttr>())
     {
         return pylir::Py::IntAttr::get(lhs.getContext(), std::invoke(binOp, lhs.cast<pylir::Py::IntAttr>().getValue(),
