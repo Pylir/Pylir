@@ -80,7 +80,9 @@ def PylirPy_PowerOp : PylirPy_Op<"pow"> {
     let hasFolder = 1;
 }
 
-def PylirPy_NegOp : PylirPy_Op<"neg"> {
+// Unary ops
+
+class PylirPy_UnaryOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name, traits> {
     let arguments = (ins DynamicType:$input);
 
     let assemblyFormat = "$input attr-dict";
@@ -88,21 +90,11 @@ def PylirPy_NegOp : PylirPy_Op<"neg"> {
     let hasFolder = 1;
 }
 
-def PylirPy_PosOp : PylirPy_Op<"pos"> {
-    let arguments = (ins DynamicType:$input);
+def PylirPy_NegOp : PylirPy_Op<"neg">;
+def PylirPy_PosOp : PylirPy_Op<"pos">;
+def PylirPy_InvertOp : PylirPy_Op<"invert">;
 
-    let assemblyFormat = "$input attr-dict";
-
-    let hasFolder = 1;
-}
-
-def PylirPy_InvertOp : PylirPy_Op<"invert"> {
-    let arguments = (ins DynamicType:$input);
-
-    let assemblyFormat = "$input attr-dict";
-
-    let hasFolder = 1;
-}
+// Binary ops
 
 class PylirPy_BinOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,traits> {
     let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
