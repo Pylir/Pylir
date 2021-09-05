@@ -69,3 +69,37 @@ func @xor_bools() -> !py.dynamic {
     %2 = py.xor %0, %1
     return %2 : !py.dynamic
 }
+
+// CHECK-LABEL: @and_mixed
+// CHECK: %[[RES:.*]] = py.constant #py.int<1>
+// CHECK: return %[[RES]]
+func @and_mixed() -> !py.dynamic {
+    %0 = py.constant #py.bool<True>
+    %1 = py.constant #py.int<5>
+    %2 = py.and %0, %1
+    return %2 : !py.dynamic
+}
+
+// -----
+
+// CHECK-LABEL: @or_mixed
+// CHECK: %[[RES:.*]] = py.constant #py.int<5>
+// CHECK: return %[[RES]]
+func @or_mixed() -> !py.dynamic {
+    %0 = py.constant #py.bool<True>
+    %1 = py.constant #py.int<5>
+    %2 = py.or %0, %1
+    return %2 : !py.dynamic
+}
+
+// -----
+
+// CHECK-LABEL: @xor_mixed
+// CHECK: %[[RES:.*]] = py.constant #py.int<4>
+// CHECK: return %[[RES]]
+func @xor_mixed() -> !py.dynamic {
+    %0 = py.constant #py.bool<True>
+    %1 = py.constant #py.int<5>
+    %2 = py.xor %0, %1
+    return %2 : !py.dynamic
+}

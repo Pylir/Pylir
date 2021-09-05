@@ -460,13 +460,47 @@ mlir::OpFoldResult pylir::Py::InvertOp::fold(::llvm::ArrayRef<::mlir::Attribute>
 
 namespace
 {
-template <class BinOp>
-mlir::OpFoldResult foldBin(mlir::Attribute lhs, mlir::Attribute rhs, BinOp binOp)
+template <class... Bins>
+mlir::OpFoldResult foldBin(mlir::Attribute lhs, mlir::Attribute rhs, Bins... bins)
 {
     if (!lhs && !rhs)
     {
         return nullptr;
     }
+    auto typeSwitch = llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(lhs);
+    (
+        [&](auto bin)
+        {
+            using T = std::decay_t<decltype(bin)>;
+            using TTrait = llvm::function_traits<T>;
+            static_assert(TTrait::num_args == 2);
+            typeSwitch.Case(
+                [&](typename TTrait::template arg_t<0> first)
+                {
+                    auto subSwitch = llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(rhs);
+                    (
+                        [&](auto searchedBin)
+                        {
+                            using U = std::decay_t<decltype(searchedBin)>;
+                            using UTrait = llvm::function_traits<U>;
+                            if constexpr (std::is_convertible_v<typename TTrait::template arg_t<0>,
+                                                                typename UTrait::template arg_t<0>>)
+                            {
+                                subSwitch.Case([&](typename UTrait::template arg_t<1> second)
+                                               { return searchedBin(first, second); });
+                            }
+                        }(bins),
+                        ...);
+                    return subSwitch.Default(mlir::OpFoldResult(nullptr));
+                });
+        }(bins),
+        ...);
+    return typeSwitch.Default(mlir::OpFoldResult(nullptr));
+}
+
+constexpr auto arithmeticCase = [](mlir::Attribute lhs, mlir::Attribute rhs, auto binOp) -> mlir::OpFoldResult
+{
+    commonType(lhs, rhs);
     return llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(lhs)
         .Case(
             [&](::pylir::Py::IntAttr attr) -> mlir::OpFoldResult
@@ -482,163 +516,212 @@ mlir::OpFoldResult foldBin(mlir::Attribute lhs, mlir::Attribute rhs, BinOp binOp
                     binOp(attr.getValue().convertToDouble(), rhs.cast<mlir::FloatAttr>().getValue().convertToDouble()));
             })
         .Default(mlir::OpFoldResult(nullptr));
-}
+};
 } // namespace
 
 mlir::OpFoldResult pylir::Py::MulOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldBin(operands[0], operands[1], std::multiplies{});
+    return foldBin(
+        operands[0], operands[1],
+        [](Py::IntAttr lhs, Py::IntAttr rhs) { return arithmeticCase(lhs, rhs, std::multiplies{}); },
+        [](mlir::FloatAttr lhs, mlir::FloatAttr rhs) { return arithmeticCase(lhs, rhs, std::multiplies{}); },
+        [](Py::IntAttr lhs, mlir::FloatAttr rhs) { return arithmeticCase(lhs, rhs, std::multiplies{}); },
+        [](mlir::FloatAttr lhs, Py::IntAttr rhs) { return arithmeticCase(lhs, rhs, std::multiplies{}); });
 }
 
 mlir::OpFoldResult pylir::Py::FloorDivOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldBin(operands[0], operands[1],
-                   [](auto&& lhs, auto&& rhs)
-                   {
-                       if constexpr (std::is_same_v<std::decay_t<decltype(lhs)>, double>)
-                       {
-                           return std::floor(lhs / rhs);
-                       }
-                       else
-                       {
-                           return lhs / rhs;
-                       }
-                   });
+    return foldBin(
+        operands[0], operands[1],
+        [this](Py::IntAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return Py::IntAttr::get(getContext(), lhs.getValue() / rhs.getValue());
+        },
+        [](mlir::FloatAttr lhs, mlir::FloatAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(lhs.getType(), std::floor(lhs.getValueAsDouble() / rhs.getValueAsDouble()));
+        },
+        [](Py::IntAttr lhs, mlir::FloatAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(rhs.getType(),
+                                        std::floor(lhs.getValue().roundToDouble() / rhs.getValueAsDouble()));
+        },
+        [](mlir::FloatAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(lhs.getType(),
+                                        std::floor(lhs.getValueAsDouble() / rhs.getValue().roundToDouble()));
+        });
 }
 
 mlir::OpFoldResult pylir::Py::TrueDivOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto lhs = operands[0];
-    auto rhs = operands[1];
-    if (!lhs && !rhs)
-    {
-        return nullptr;
-    }
-    return llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(lhs)
-        .Case(
-            [&](::pylir::Py::IntAttr attr) -> mlir::OpFoldResult
+    return foldBin(
+        operands[0], operands[1],
+        [this](Py::IntAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
             {
-                double other = rhs.cast<Py::IntAttr>().getValue().roundToDouble();
-                if (other == 0.0)
-                {
-                    return nullptr;
-                }
-                return mlir::FloatAttr::get(mlir::Float64Type::get(attr.getContext()),
-                                            attr.getValue().roundToDouble() / other);
-            })
-        .Case(
-            [&](mlir::FloatAttr attr) -> mlir::OpFoldResult
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(mlir::Float64Type::get(getContext()),
+                                        lhs.getValue().roundToDouble() / rhs.getValue().roundToDouble());
+        },
+        [](mlir::FloatAttr lhs, mlir::FloatAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
             {
-                double other = rhs.cast<mlir::FloatAttr>().getValue().convertToDouble();
-                if (other == 0.0)
-                {
-                    return nullptr;
-                }
-                return mlir::FloatAttr::get(attr.getType(), attr.getValue().convertToDouble() / other);
-            })
-        .Default(mlir::OpFoldResult(nullptr));
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(lhs.getType(), lhs.getValue() / rhs.getValue());
+        },
+        [](Py::IntAttr lhs, mlir::FloatAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(rhs.getType(), llvm::APFloat(lhs.getValue().roundToDouble()) / rhs.getValue());
+        },
+        [](mlir::FloatAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(lhs.getType(), lhs.getValue() / llvm::APFloat(rhs.getValue().roundToDouble()));
+        });
 }
 
 mlir::OpFoldResult pylir::Py::ModuloOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldBin(operands[0], operands[1],
-                   [](auto&& lhs, auto&& rhs)
-                   {
-                       if constexpr (std::is_same_v<std::decay_t<decltype(lhs)>, double>)
-                       {
-                           return std::fmod(lhs, rhs);
-                       }
-                       else
-                       {
-                           return lhs % rhs;
-                       }
-                   });
+    return foldBin(
+        operands[0], operands[1],
+        [this](Py::IntAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return Py::IntAttr::get(getContext(), lhs.getValue() % rhs.getValue());
+        },
+        [](mlir::FloatAttr lhs, mlir::FloatAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(lhs.getType(), std::fmod(lhs.getValueAsDouble(), rhs.getValueAsDouble()));
+        },
+        [](Py::IntAttr lhs, mlir::FloatAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(rhs.getType(),
+                                        std::fmod(lhs.getValue().roundToDouble(), rhs.getValueAsDouble()));
+        },
+        [](mlir::FloatAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+        {
+            if (rhs.getValue().isZero())
+            {
+                return nullptr;
+            }
+            return mlir::FloatAttr::get(lhs.getType(),
+                                        std::fmod(lhs.getValueAsDouble(), rhs.getValue().roundToDouble()));
+        });
 }
 
 mlir::OpFoldResult pylir::Py::AddOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldBin(operands[0], operands[1], std::plus{});
+    return foldBin(
+        operands[0], operands[1],
+        [](Py::IntAttr lhs, Py::IntAttr rhs) { return arithmeticCase(lhs, rhs, std::plus{}); },
+        [](mlir::FloatAttr lhs, mlir::FloatAttr rhs) { return arithmeticCase(lhs, rhs, std::plus{}); },
+        [](Py::IntAttr lhs, mlir::FloatAttr rhs) { return arithmeticCase(lhs, rhs, std::plus{}); },
+        [](mlir::FloatAttr lhs, Py::IntAttr rhs) { return arithmeticCase(lhs, rhs, std::plus{}); });
 }
 
 mlir::OpFoldResult pylir::Py::SubOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldBin(operands[0], operands[1], std::minus{});
+    return foldBin(
+        operands[0], operands[1],
+        [](Py::IntAttr lhs, Py::IntAttr rhs) { return arithmeticCase(lhs, rhs, std::minus{}); },
+        [](mlir::FloatAttr lhs, mlir::FloatAttr rhs) { return arithmeticCase(lhs, rhs, std::minus{}); },
+        [](Py::IntAttr lhs, mlir::FloatAttr rhs) { return arithmeticCase(lhs, rhs, std::minus{}); },
+        [](mlir::FloatAttr lhs, Py::IntAttr rhs) { return arithmeticCase(lhs, rhs, std::minus{}); });
 }
 
 mlir::OpFoldResult pylir::Py::LShiftOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto lhs = operands[0];
-    auto rhs = operands[1];
-    if (!lhs || !rhs)
-    {
-        return nullptr;
-    }
-    if (lhs.isa<pylir::Py::IntAttr>() && rhs.isa<pylir::Py::IntAttr>())
-    {
-        auto value = rhs.cast<pylir::Py::IntAttr>().getValue().tryGetInteger<int>();
-        if (!value)
-        {
-            return nullptr;
-        }
-        return pylir::Py::IntAttr::get(lhs.getContext(), lhs.cast<pylir::Py::IntAttr>().getValue() << *value);
-    }
-    return nullptr;
+    return foldBin(operands[0], operands[1],
+                   [this](Py::IntAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+                   {
+                       auto value = rhs.getValue().tryGetInteger<int>();
+                       if (!value)
+                       {
+                           return nullptr;
+                       }
+                       return Py::IntAttr::get(getContext(), lhs.getValue() << *value);
+                   });
 }
 
 mlir::OpFoldResult pylir::Py::RShiftOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto lhs = operands[0];
-    auto rhs = operands[1];
-    if (!lhs || !rhs)
-    {
-        return nullptr;
-    }
-    if (lhs.isa<pylir::Py::IntAttr>() && rhs.isa<pylir::Py::IntAttr>())
-    {
-        auto value = rhs.cast<pylir::Py::IntAttr>().getValue().tryGetInteger<int>();
-        if (!value)
-        {
-            return nullptr;
-        }
-        return pylir::Py::IntAttr::get(lhs.getContext(), lhs.cast<pylir::Py::IntAttr>().getValue() >> *value);
-    }
-    return nullptr;
+    return foldBin(operands[0], operands[1],
+                   [this](Py::IntAttr lhs, Py::IntAttr rhs) -> mlir::OpFoldResult
+                   {
+                       auto value = rhs.getValue().tryGetInteger<int>();
+                       if (!value)
+                       {
+                           return nullptr;
+                       }
+                       return Py::IntAttr::get(getContext(), lhs.getValue() >> *value);
+                   });
 }
-
-namespace
-{
-template <class BinOp>
-mlir::OpFoldResult foldIntBin(mlir::Attribute lhs, mlir::Attribute rhs, BinOp binOp)
-{
-    if (!lhs || !rhs)
-    {
-        return nullptr;
-    }
-    if (lhs.isa<pylir::Py::BoolAttr>() && rhs.isa<pylir::Py::BoolAttr>())
-    {
-        return pylir::Py::BoolAttr::get(lhs.getContext(), std::invoke(binOp, lhs.cast<pylir::Py::BoolAttr>().getValue(),
-                                                                      rhs.cast<pylir::Py::BoolAttr>().getValue()));
-    }
-    if (lhs.isa<pylir::Py::IntAttr>() && rhs.isa<pylir::Py::IntAttr>())
-    {
-        return pylir::Py::IntAttr::get(lhs.getContext(), std::invoke(binOp, lhs.cast<pylir::Py::IntAttr>().getValue(),
-                                                                     rhs.cast<pylir::Py::IntAttr>().getValue()));
-    }
-    return nullptr;
-}
-} // namespace
 
 mlir::OpFoldResult pylir::Py::AndOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldIntBin(operands[0], operands[1], std::bit_and{});
+    return foldBin(
+        operands[0], operands[1],
+        [this](Py::BoolAttr lhs, Py::BoolAttr rhs)
+        { return Py::BoolAttr::get(getContext(), lhs.getValue() & rhs.getValue()); },
+        [this](Py::IntAttr lhs, Py::IntAttr rhs)
+        { return Py::IntAttr::get(getContext(), lhs.getValue() & rhs.getValue()); });
 }
 
 mlir::OpFoldResult pylir::Py::OrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldIntBin(operands[0], operands[1], std::bit_or{});
+    return foldBin(
+        operands[0], operands[1],
+        [this](Py::BoolAttr lhs, Py::BoolAttr rhs)
+        { return Py::BoolAttr::get(getContext(), lhs.getValue() | rhs.getValue()); },
+        [this](Py::IntAttr lhs, Py::IntAttr rhs)
+        { return Py::IntAttr::get(getContext(), lhs.getValue() | rhs.getValue()); });
 }
 
 mlir::OpFoldResult pylir::Py::XorOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    return foldIntBin(operands[0], operands[1], std::bit_xor{});
+    return foldBin(
+        operands[0], operands[1],
+        [this](Py::BoolAttr lhs, Py::BoolAttr rhs)
+        { return Py::BoolAttr::get(getContext(), lhs.getValue() ^ rhs.getValue()); },
+        [this](Py::IntAttr lhs, Py::IntAttr rhs)
+        { return Py::IntAttr::get(getContext(), lhs.getValue() ^ rhs.getValue()); });
 }

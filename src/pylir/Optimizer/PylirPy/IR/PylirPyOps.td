@@ -90,9 +90,9 @@ class PylirPy_UnaryOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,
     let hasFolder = 1;
 }
 
-def PylirPy_NegOp : PylirPy_Op<"neg">;
-def PylirPy_PosOp : PylirPy_Op<"pos">;
-def PylirPy_InvertOp : PylirPy_Op<"invert">;
+def PylirPy_NegOp : PylirPy_UnaryOp<"neg">;
+def PylirPy_PosOp : PylirPy_UnaryOp<"pos">;
+def PylirPy_InvertOp : PylirPy_UnaryOp<"invert">;
 
 // Binary ops
 
