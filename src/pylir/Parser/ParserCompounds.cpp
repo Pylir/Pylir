@@ -103,6 +103,15 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             }
             return Syntax::CompoundStmt{std::move(*withStmt)};
         }
+        case TokenType::WhileKeyword:
+        {
+            auto whileStmt = parseWhileStmt();
+            if (!whileStmt)
+            {
+                return tl::unexpected{std::move(whileStmt).error()};
+            }
+            return Syntax::CompoundStmt{std::move(*whileStmt)};
+        }
         case TokenType::DefKeyword:
         {
             auto funcDef = parseFuncDef({}, std::nullopt);

@@ -418,6 +418,7 @@ inline bool firstInExpression(TokenType tokenType)
         case TokenType::TrueKeyword:
         case TokenType::FalseKeyword:
         case TokenType::NoneKeyword:
+        case TokenType::NotKeyword:
         case TokenType::OpenParentheses:
         case TokenType::OpenSquareBracket:
         case TokenType::OpenBrace: return true;
