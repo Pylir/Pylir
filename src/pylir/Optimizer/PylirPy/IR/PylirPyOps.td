@@ -6,10 +6,12 @@ include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/CallInterfaces.td"
 
 def DynamicType : TypeAlias<PylirPy_DynamicType>;
+def HandleType : TypeAlias<PylirPy_HandleType>;
 
 class PylirPy_Op<string mneomic, list<OpTrait> traits = []> :
     Op<PylirPy_Dialect, mneomic, traits> {
@@ -46,7 +48,8 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
     let hasFolder = 1;
 }
 
-def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
+def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>,
+                                         DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins DynamicType:$callee,
                          Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion,
@@ -58,7 +61,7 @@ def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterfa
     }];
 }
 
-def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple"> {
+def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion
                          );
@@ -93,6 +96,7 @@ class PylirPy_UnaryOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,
 def PylirPy_NegOp : PylirPy_UnaryOp<"neg">;
 def PylirPy_PosOp : PylirPy_UnaryOp<"pos">;
 def PylirPy_InvertOp : PylirPy_UnaryOp<"invert">;
+def PylirPy_BoolOp : PylirPy_UnaryOp<"bool">;
 
 // Binary ops
 
@@ -141,6 +145,64 @@ def PylirPy_IsOp : PylirPy_BinOp<"is"> {
 }
 def PylirPy_InOp : PylirPy_BinOp<"in"> {
     let hasFolder = 0;
+}
+
+// Conversions
+
+def PylirPy_BoolToI1Op : PylirPy_Op<"boolToI1"> {
+    let arguments = (ins I1:$input);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let hasFolder = 1;
+}
+
+// Memory operations
+
+def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
+    let arguments = (ins
+            SymbolNameAttr:$sym_name,
+            OptionalAttr<StrAttr>:$sym_visibility);
+
+    let assemblyFormat = [{
+        ($sym_visibility^)? $sym_name attr-dict
+    }];
+}
+
+def PylirPy_GetGlobalOp : PylirPy_Op<"get_global", [NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let arguments = (ins FlatSymbolRefAttr:$name);
+    let results = (outs HandleType:$handle);
+
+    let assemblyFormat = "$name attr-dict";
+}
+
+
+def PylirPy_AllocaOp : PylirPy_Op<"alloca"> {
+    let arguments = (ins );
+    let results = (outs Res<HandleType, "the allocated memory", [MemAlloc<AutomaticAllocationScopeResource>]>:$handle);
+
+    let assemblyFormat = "attr-dict `:` type($handle)";
+}
+
+// Memory access Operation
+
+def PylirPy_StoreOp : PylirPy_Op<"store"> {
+    let summary = "store operation";
+
+    let arguments = (ins DynamicType:$value, Arg<HandleType, "the handle to store to", [MemWrite]>:$handle);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $value `into` $handle attr-dict
+      }];
+}
+
+def PylirPy_LoadOp : PylirPy_Op<"load"> {
+    let summary = "load operation";
+
+    let arguments = (ins Arg<HandleType, "the handle to load from", [MemRead]>:$handle);
+
+    let assemblyFormat = "$handle attr-dict";
 }
 
 #endif

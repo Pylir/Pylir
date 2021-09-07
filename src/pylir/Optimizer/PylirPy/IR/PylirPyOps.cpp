@@ -177,10 +177,13 @@ void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::Ope
     printer << ')';
 }
 
+mlir::Attribute toBool(mlir::Attribute value)
+{
+    return llvm::TypeSwitch<mlir::Attribute, mlir::Attribute>(value).Default({});
+}
+
 } // namespace
 
-#define GET_OP_CLASSES
-#include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>
 
 mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
@@ -725,3 +728,56 @@ mlir::OpFoldResult pylir::Py::XorOp::fold(::llvm::ArrayRef<::mlir::Attribute> op
         [this](Py::IntAttr lhs, Py::IntAttr rhs)
         { return Py::IntAttr::get(getContext(), lhs.getValue() ^ rhs.getValue()); });
 }
+
+mlir::LogicalResult pylir::Py::MakeTupleOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                             ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                             ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                             ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::CallOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                        ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                        ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                        ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::OpFoldResult pylir::Py::BoolOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (!operands[0])
+    {
+        return nullptr;
+    }
+    auto result = toBool(operands[0]);
+    if (!result)
+    {
+        return nullptr;
+    }
+    return result;
+}
+
+mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute> operands)
+{
+    auto boolean = operands[0].dyn_cast_or_null<Py::BoolAttr>();
+    if (!boolean)
+    {
+        return nullptr;
+    }
+    return mlir::BoolAttr::get(getContext(), boolean.getValue());
+}
+
+mlir::LogicalResult pylir::Py::GetGlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return mlir::success(symbolTable.lookupNearestSymbolFrom(*this, name()));
+}
+
+// TODO remove MLIR 14
+using namespace mlir;
+
+#define GET_OP_CLASSES
+#include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>
