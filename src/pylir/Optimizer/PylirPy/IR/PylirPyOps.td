@@ -169,7 +169,7 @@ def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
     }];
 }
 
-def PylirPy_GetGlobalOp : PylirPy_Op<"get_global", [NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_GetGlobalOp : PylirPy_Op<"getGlobal", [NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$name);
     let results = (outs HandleType:$handle);
 
