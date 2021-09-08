@@ -14,15 +14,18 @@
 namespace
 {
 bool parseExpandArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
-                          mlir::ArrayAttr& iterExpansion, mlir::ArrayAttr& mappingExpansion)
+                          mlir::ArrayAttr& iterExpansion, mlir::ArrayAttr& mappingExpansion,
+                          mlir::ArrayAttr& keywordArgs)
 {
     llvm::SmallVector<std::int32_t> iters;
     llvm::SmallVector<std::int32_t> mappings;
+    llvm::SmallVector<llvm::StringRef> keywords;
     auto exit = llvm::make_scope_exit(
         [&]
         {
             iterExpansion = parser.getBuilder().getI32ArrayAttr(iters);
             mappingExpansion = parser.getBuilder().getI32ArrayAttr(mappings);
+            keywordArgs = parser.getBuilder().getStrArrayAttr(keywords);
         });
 
     if (parser.parseLParen())
@@ -35,8 +38,9 @@ bool parseExpandArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir:
     }
 
     std::int32_t index = 0;
-    auto parseOnce = [&]
+    auto parseOnce = [&]() -> mlir::LogicalResult
     {
+        llvm::StringRef keyword;
         if (!parser.parseOptionalStar())
         {
             if (!parser.parseOptionalStar())
@@ -48,16 +52,24 @@ bool parseExpandArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir:
                 iters.push_back(index);
             }
         }
+        else if (!parser.parseOptionalKeyword(&keyword))
+        {
+            if (parser.parseEqual())
+            {
+                return mlir::failure();
+            }
+        }
+        keywords.push_back(keyword);
         index++;
         return parser.parseOperand(operands.emplace_back());
     };
-    if (parseOnce())
+    if (mlir::failed(parseOnce()))
     {
         return true;
     }
     while (!parser.parseOptionalComma())
     {
-        if (parseOnce())
+        if (mlir::failed(parseOnce()))
         {
             return true;
         }
@@ -72,7 +84,7 @@ bool parseExpandArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir:
 }
 
 void printExpandArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange operands,
-                          mlir::ArrayAttr iterExpansion, mlir::ArrayAttr mappingExpansion)
+                          mlir::ArrayAttr iterExpansion, mlir::ArrayAttr mappingExpansion, mlir::ArrayAttr keywords)
 {
     printer << '(';
     llvm::DenseSet<std::uint32_t> iters;
@@ -96,6 +108,10 @@ void printExpandArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::O
                               else if (mappings.contains(i))
                               {
                                   printer << "**" << value;
+                              }
+                              else if (!keywords[i].cast<mlir::StringAttr>().getValue().empty())
+                              {
+                                  printer << keywords[i].cast<mlir::StringAttr>().getValue() << " = " << value;
                               }
                               else
                               {

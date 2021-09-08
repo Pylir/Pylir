@@ -7,6 +7,6 @@ func @callop_test() -> !py.dynamic {
     %2 = py.constant "string"
     %3 = py.constant #py.tuple<(#py.int<0>,#py.int<2>)>
     %4 = py.call %0(*%3, %2, **%1)
-    %5 = py.call %0()
+    %5 = py.call %0(k = %2, %4)
     return %4 : !py.dynamic
 }

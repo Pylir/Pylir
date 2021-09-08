@@ -53,11 +53,20 @@ def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterfa
     let arguments = (ins DynamicType:$callee,
                          Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion,
-                         I32ArrayAttr:$mappingExpansion
+                         I32ArrayAttr:$mappingExpansion,
+                         StrArrayAttr:$keywords
                          );
 
     let assemblyFormat = [{
-        $callee custom<ExpandArguments>($arguments, $iterExpansion, $mappingExpansion) attr-dict
+        $callee custom<ExpandArguments>($arguments, $iterExpansion, $mappingExpansion, $keywords) attr-dict
+    }];
+
+    let verifier = [{
+        if(keywords().size() != arguments().size())
+        {
+            return emitError("keywords array size not equal to argument count");
+        }
+        return mlir::success();
     }];
 }
 
