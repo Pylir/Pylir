@@ -702,8 +702,6 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
             auto loc = getLoc(setDisplay, setDisplay.openBrace);
             return pylir::match(
                 setDisplay.variant,
-                [&](std::monostate) -> mlir::Value
-                { return m_builder.create<Py::MakeSetOp>(loc, mlir::ValueRange{}, m_builder.getI32ArrayAttr({})); },
                 [&](const Syntax::StarredList& list) -> mlir::Value { return visit<Py::MakeSetOp>(list); },
                 [&](const Syntax::Comprehension&) -> mlir::Value
                 {
