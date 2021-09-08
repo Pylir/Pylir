@@ -82,6 +82,26 @@ def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple",[DeclareOpInterfaceMethods<Infe
     let hasFolder = 1;
 }
 
+def PylirPy_MakeListOp : PylirPy_Op<"makeList",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         I32ArrayAttr:$iterExpansion
+                         );
+
+    let assemblyFormat = [{
+        custom<IterArguments>($arguments, $iterExpansion) attr-dict
+    }];
+}
+
+def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         I32ArrayAttr:$iterExpansion
+                         );
+
+    let assemblyFormat = [{
+        custom<IterArguments>($arguments, $iterExpansion) attr-dict
+    }];
+}
+
 def PylirPy_PowerOp : PylirPy_Op<"pow"> {
     let arguments = (ins DynamicType:$base, DynamicType:$exponent, Optional<DynamicType>:$mod);
 

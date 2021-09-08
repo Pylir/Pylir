@@ -267,3 +267,18 @@ std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax:
     }
     return {first.first, range(*expressionList.remainingExpr.back().second).second};
 }
+
+std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::StarredList, void>::getRange(
+    const Syntax::StarredList& starredList) noexcept
+{
+    auto first = range(*starredList.firstExpr);
+    if (starredList.trailingComma)
+    {
+        return {first.first, range(*starredList.trailingComma).second};
+    }
+    if (starredList.remainingExpr.empty())
+    {
+        return first;
+    }
+    return {first.first, range(*starredList.remainingExpr.back().second).second};
+}

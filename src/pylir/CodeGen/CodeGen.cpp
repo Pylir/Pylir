@@ -165,6 +165,31 @@ void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
     }
 }
 
+template <class Op>
+mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
+{
+    auto loc = getLoc(starredList, starredList);
+    std::vector<std::int32_t> starred;
+    std::vector<mlir::Value> operands;
+    auto handleItem = [&](const Syntax::StarredItem& item, std::size_t index)
+    {
+        pylir::match(
+            item.variant,
+            [&](const Syntax::AssignmentExpression& assignment) { operands.push_back(visit(assignment)); },
+            [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
+            {
+                operands.push_back(visit(pair.second));
+                starred.push_back(index);
+            });
+    };
+    handleItem(*starredList.firstExpr, 0);
+    for (auto& iter : llvm::enumerate(starredList.remainingExpr))
+    {
+        handleItem(*iter.value().second, iter.index() + 1);
+    }
+    return m_builder.create<Op>(loc, operands, m_builder.getI32ArrayAttr(starred));
+}
+
 mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpression)
 {
     return pylir::match(
@@ -658,9 +683,37 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
             auto loc = getLoc(parenthForm, parenthForm.openParenth);
             return m_builder.create<Py::MakeTupleOp>(loc, mlir::ValueRange{}, m_builder.getI32ArrayAttr({}));
         },
+        [&](const Syntax::Enclosure::ListDisplay& listDisplay) -> mlir::Value
+        {
+            auto loc = getLoc(listDisplay, listDisplay.openSquare);
+            return pylir::match(
+                listDisplay.variant,
+                [&](std::monostate) -> mlir::Value
+                { return m_builder.create<Py::MakeListOp>(loc, mlir::ValueRange{}, m_builder.getI32ArrayAttr({})); },
+                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<Py::MakeListOp>(list); },
+                [&](const Syntax::Comprehension&) -> mlir::Value
+                {
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                });
+        },
+        [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> mlir::Value
+        {
+            auto loc = getLoc(setDisplay, setDisplay.openBrace);
+            return pylir::match(
+                setDisplay.variant,
+                [&](std::monostate) -> mlir::Value
+                { return m_builder.create<Py::MakeSetOp>(loc, mlir::ValueRange{}, m_builder.getI32ArrayAttr({})); },
+                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<Py::MakeSetOp>(list); },
+                [&](const Syntax::Comprehension&) -> mlir::Value
+                {
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                });
+        },
         [&](const auto&) -> mlir::Value
         {
-            // TODO
+            // TODO:
             PYLIR_UNREACHABLE;
         });
 }

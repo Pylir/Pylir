@@ -39,6 +39,9 @@ class CodeGen
 
     void assignTarget(const Syntax::Target& target, mlir::Value value);
 
+    template <class Op>
+    mlir::Value visit(const Syntax::StarredList& starredList);
+
 public:
     CodeGen(mlir::MLIRContext* context, Diag::Document& document);
 

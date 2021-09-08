@@ -754,6 +754,24 @@ mlir::LogicalResult pylir::Py::MakeTupleOp::inferReturnTypes(::mlir::MLIRContext
     return mlir::success();
 }
 
+mlir::LogicalResult pylir::Py::MakeListOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                            ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                            ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                            ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::MakeSetOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                           ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                           ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                           ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
 mlir::LogicalResult pylir::Py::CallOp::inferReturnTypes(::mlir::MLIRContext* context,
                                                         ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
                                                         ::mlir::DictionaryAttr, ::mlir::RegionRange,
