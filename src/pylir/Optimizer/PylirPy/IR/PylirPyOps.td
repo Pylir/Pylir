@@ -193,6 +193,8 @@ def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility);
 
+    let results = (outs);
+
     let assemblyFormat = [{
         ($sym_visibility^)? $sym_name attr-dict
     }];

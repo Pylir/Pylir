@@ -6,6 +6,8 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
+#include "GlobalDiscoverer.hpp"
+
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
         [&]
@@ -21,6 +23,20 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_module = mlir::ModuleOp::create(m_builder.getUnknownLoc());
+
+    m_builder.setInsertionPointToEnd(m_module.getBody());
+    GlobalDiscoverer discoverer(
+        [&](const IdentifierToken& token)
+        {
+            if (getCurrentScope().count(token.getValue()))
+            {
+                return;
+            }
+            auto op = m_builder.create<Py::GlobalOp>(getLoc(token, token), token.getValue(), mlir::StringAttr{});
+            getCurrentScope().insert({token.getValue(), op});
+        });
+    discoverer.visit(fileInput);
+
     auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
                                                          mlir::FunctionType::get(m_builder.getContext(), {}, {}));
     m_module.push_back(initFunc);
@@ -60,7 +76,6 @@ void pylir::CodeGen::visit(const Syntax::StmtList& stmtList)
 void pylir::CodeGen::visit(const Syntax::CompoundStmt& compoundStmt)
 {
     // TODO
-    PYLIR_UNREACHABLE;
 }
 
 void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
@@ -83,40 +98,8 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
         [&](const IdentifierToken& identifierToken)
         {
             auto location = getLoc(identifierToken, identifierToken);
-            auto result = getCurrentScope().find(identifierToken.getValue());
-            if (result != getCurrentScope().end())
-            {
-                mlir::Value handle;
-                if (auto alloca = llvm::dyn_cast<Py::AllocaOp>(result->second))
-                {
-                    handle = alloca;
-                }
-                else
-                {
-                    auto global = llvm::cast<Py::GlobalOp>(result->second);
-                    handle = m_builder.create<Py::GetGlobalOp>(location, m_builder.getSymbolRefAttr(global));
-                }
-                m_builder.create<Py::StoreOp>(location, value, handle);
-                return;
-            }
-            if (m_scope.size() == 1)
-            {
-                // We are in the global scope
-                Py::GlobalOp op;
-                {
-                    mlir::OpBuilder::InsertionGuard guard{m_builder};
-                    m_builder.setInsertionPointToEnd(m_module.getBody());
-                    op = m_builder.create<Py::GlobalOp>(location, identifierToken.getValue(), mlir::StringAttr{});
-                }
-                getCurrentScope().insert({identifierToken.getValue(), op});
-                auto handle = m_builder.create<Py::GetGlobalOp>(location, m_builder.getSymbolRefAttr(op));
-                m_builder.create<Py::StoreOp>(location, value, handle);
-                return;
-            }
-
-            auto alloca = m_builder.create<Py::AllocaOp>(location);
-            m_builder.create<Py::StoreOp>(location, value, alloca);
-            getCurrentScope().insert({identifierToken.getValue(), alloca});
+            auto handle = genIdentifierLookup(identifierToken);
+            m_builder.create<Py::StoreOp>(location, value, handle);
         },
         [&](const Syntax::Target::Parenth& parenth)
         {
@@ -579,6 +562,28 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
         });
 }
 
+mlir::Value pylir::CodeGen::genIdentifierLookup(const IdentifierToken& identifierToken)
+{
+    auto loc = getLoc(identifierToken, identifierToken);
+    auto result = getCurrentScope().find(identifierToken.getValue());
+    if (result == getCurrentScope().end())
+    {
+        // TODO
+        PYLIR_UNREACHABLE;
+    }
+    mlir::Value handle;
+    if (auto alloca = llvm::dyn_cast<Py::AllocaOp>(result->second))
+    {
+        handle = alloca;
+    }
+    else
+    {
+        auto global = llvm::cast<Py::GlobalOp>(result->second);
+        handle = m_builder.create<Py::GetGlobalOp>(loc, m_builder.getSymbolRefAttr(global));
+    }
+    return handle;
+}
+
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
 {
     return pylir::match(
@@ -629,22 +634,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
         [&](const IdentifierToken& identifierToken) -> mlir::Value
         {
             auto loc = getLoc(identifierToken, identifierToken);
-            auto result = getCurrentScope().find(identifierToken.getValue());
-            if (result == getCurrentScope().end())
-            {
-                // TODO
-                PYLIR_UNREACHABLE;
-            }
-            mlir::Value handle;
-            if (auto alloca = llvm::dyn_cast<Py::AllocaOp>(result->second))
-            {
-                handle = alloca;
-            }
-            else
-            {
-                auto global = llvm::cast<Py::GlobalOp>(result->second);
-                handle = m_builder.create<Py::GetGlobalOp>(loc, m_builder.getSymbolRefAttr(global));
-            }
+            auto handle = genIdentifierLookup(identifierToken);
             return m_builder.create<Py::LoadOp>(loc, handle);
         },
         [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
@@ -722,6 +712,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AssignmentExpression& ass
     {
         return visit(*assignmentExpression.expression);
     }
-    // TODO
-    PYLIR_UNREACHABLE;
+    auto value = visit(*assignmentExpression.expression);
+    auto handle = genIdentifierLookup(assignmentExpression.identifierAndWalrus->first);
+    m_builder.create<Py::StoreOp>(getLoc(assignmentExpression, assignmentExpression), value, handle);
+    return value;
 }

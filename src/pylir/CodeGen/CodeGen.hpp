@@ -27,6 +27,8 @@ class CodeGen
 
     mlir::Value toBool(mlir::Value value);
 
+    mlir::Value genIdentifierLookup(const IdentifierToken& token);
+
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
     {
