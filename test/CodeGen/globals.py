@@ -1,7 +1,20 @@
 # RUN: pylir %s -emit-mlir -o - | FileCheck %s
 
+# CHECK-DAG: global @x
+# CHECK-DAG: global @y
+# CHECK-DAG: global @z
+
 x = 2
 
+# CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<2>
+# CHECK-DAG: %[[X:.*]] = py.getGlobal @x
+# CHECK: py.store %[[VALUE]] into %[[X]]
+
+x
+
+
+# CHECK: %[[X:.*]] = py.getGlobal @x
+# CHECK: py.load %[[X]]
 
 def foo():
     global y
@@ -9,6 +22,6 @@ def foo():
 
 (z := 3)
 
-# CHECK: global @x
-# CHECK: global @y
-# CHECK: global @z
+# CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<3>
+# CHECK-DAG: %[[Z:.*]] = py.getGlobal @z
+# CHECK: py.store %[[VALUE]] into %[[Z]]
