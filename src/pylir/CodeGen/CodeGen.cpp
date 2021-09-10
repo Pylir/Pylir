@@ -49,7 +49,8 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
             visit(*statement);
         }
     }
-    if (m_builder.getBlock() && !m_builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>())
+    if (m_builder.getBlock()
+        && (m_builder.getBlock()->empty() || !m_builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()))
     {
         m_builder.create<mlir::ReturnOp>(m_builder.getUnknownLoc());
     }
@@ -329,7 +330,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::NotTest& expression)
         expression.variant, [&](const Syntax::Comparison& comparison) { return visit(comparison); },
         [&](const std::pair<BaseToken, std::unique_ptr<Syntax::NotTest>>& pair) -> mlir::Value
         {
-            auto value = visit(*pair.second);
+            auto value = toBool(visit(*pair.second));
             auto loc = getLoc(expression, pair.first);
             return m_builder.create<Py::InvertOp>(loc, value);
         });
@@ -346,6 +347,20 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
     auto previousRHS = first;
     for (auto& [op, rhs] : comparison.rest)
     {
+        auto loc = getLoc(op.firstToken, op.firstToken);
+
+        mlir::Block* found;
+        if (result)
+        {
+            found = new mlir::Block;
+            found->addArgument(m_builder.getType<Py::DynamicType>());
+            auto rhsTry = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(loc, toI1(result), found, result, rhsTry, mlir::ValueRange{});
+
+            m_currentFunc.getCallableRegion()->push_back(rhsTry);
+            m_builder.setInsertionPointToStart(rhsTry);
+        }
+
         enum class Comp
         {
             Lt,
@@ -377,7 +392,6 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         }
         auto other = visit(rhs);
         mlir::Value cmp;
-        auto loc = getLoc(op.firstToken, op.firstToken);
         switch (comp)
         {
             case Comp::Lt: cmp = m_builder.create<Py::LessOp>(loc, previousRHS, other); break;
@@ -391,6 +405,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         }
         if (invert)
         {
+            cmp = m_builder.create<Py::InvertOp>(loc, toBool(cmp));
         }
         previousRHS = other;
         if (!result)
@@ -398,9 +413,11 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
             result = cmp;
             continue;
         }
+        m_builder.create<mlir::BranchOp>(loc, found, cmp);
 
-        // TODO short circuit and return value proper
-        result = m_builder.create<mlir::AndOp>(getLoc(op, op.firstToken), result, cmp);
+        m_currentFunc.getCallableRegion()->push_back(found);
+        m_builder.setInsertionPointToStart(found);
+        result = found->getArgument(0);
     }
     return result;
 }
