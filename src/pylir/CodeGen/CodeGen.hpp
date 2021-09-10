@@ -44,6 +44,13 @@ class CodeGen
     template <class Op>
     mlir::Value visit(const Syntax::StarredList& starredList);
 
+    bool needsTerminator()
+    {
+        return m_builder.getBlock()
+               && (m_builder.getBlock()->empty()
+                   || !m_builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>());
+    }
+
 public:
     CodeGen(mlir::MLIRContext* context, Diag::Document& document);
 
@@ -54,6 +61,26 @@ public:
     void visit(const Syntax::StmtList& stmtList);
 
     void visit(const Syntax::CompoundStmt& compoundStmt);
+
+    void visit(const Syntax::IfStmt& ifStmt);
+
+    void visit(const Syntax::WhileStmt& whileStmt);
+
+    void visit(const Syntax::ForStmt& forStmt);
+
+    void visit(const Syntax::TryStmt& tryStmt);
+
+    void visit(const Syntax::WithStmt& withStmt);
+
+    void visit(const Syntax::FuncDef& funcDef);
+
+    void visit(const Syntax::ClassDef& classDef);
+
+    void visit(const Syntax::AsyncForStmt& asyncForStmt);
+
+    void visit(const Syntax::AsyncWithStmt& asyncWithStmt);
+
+    void visit(const Syntax::Suite& suite);
 
     void visit(const Syntax::SimpleStmt& simpleStmt);
 

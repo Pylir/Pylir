@@ -49,8 +49,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
             visit(*statement);
         }
     }
-    if (m_builder.getBlock()
-        && (m_builder.getBlock()->empty() || !m_builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>()))
+    if (needsTerminator())
     {
         m_builder.create<mlir::ReturnOp>(m_builder.getUnknownLoc());
     }
@@ -76,7 +75,7 @@ void pylir::CodeGen::visit(const Syntax::StmtList& stmtList)
 
 void pylir::CodeGen::visit(const Syntax::CompoundStmt& compoundStmt)
 {
-    // TODO
+    pylir::match(compoundStmt.variant, [&](const auto& value) { visit(value); });
 }
 
 void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
@@ -733,4 +732,107 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AssignmentExpression& ass
     auto handle = genIdentifierLookup(assignmentExpression.identifierAndWalrus->first);
     m_builder.create<Py::StoreOp>(getLoc(assignmentExpression, assignmentExpression), value, handle);
     return value;
+}
+
+void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
+{
+    auto condition = visit(ifStmt.condition);
+    auto trueBlock = new mlir::Block;
+    auto thenBlock = new mlir::Block;
+    mlir::Block* elseBlock;
+    if (!ifStmt.elseSection && ifStmt.elifs.empty())
+    {
+        elseBlock = thenBlock;
+    }
+    else
+    {
+        elseBlock = new mlir::Block;
+    }
+    auto loc = getLoc(ifStmt.ifKeyword, ifStmt.ifKeyword);
+    m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), trueBlock, elseBlock);
+
+    m_currentFunc.getCallableRegion()->push_back(trueBlock);
+    m_builder.setInsertionPointToStart(trueBlock);
+    visit(*ifStmt.suite);
+    if (needsTerminator())
+    {
+        m_builder.create<mlir::BranchOp>(loc, thenBlock);
+    }
+    if (thenBlock == elseBlock)
+    {
+        m_currentFunc.getCallableRegion()->push_back(thenBlock);
+        m_builder.setInsertionPointToStart(thenBlock);
+        return;
+    }
+    m_currentFunc.getCallableRegion()->push_back(elseBlock);
+    m_builder.setInsertionPointToStart(elseBlock);
+    for (auto& iter : llvm::enumerate(ifStmt.elifs))
+    {
+        loc = getLoc(iter.value().elif, iter.value().elif);
+        condition = visit(iter.value().condition);
+        trueBlock = new mlir::Block;
+        if (iter.index() == ifStmt.elifs.size() - 1 && !ifStmt.elseSection)
+        {
+            elseBlock = thenBlock;
+        }
+        else
+        {
+            elseBlock = new mlir::Block;
+        }
+
+        m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), trueBlock, elseBlock);
+
+        m_currentFunc.getCallableRegion()->push_back(trueBlock);
+        m_builder.setInsertionPointToStart(trueBlock);
+        visit(*iter.value().suite);
+        if (needsTerminator())
+        {
+            m_builder.create<mlir::BranchOp>(loc, thenBlock);
+        }
+        if (thenBlock != elseBlock)
+        {
+            m_currentFunc.getCallableRegion()->push_back(elseBlock);
+            m_builder.setInsertionPointToStart(elseBlock);
+        }
+    }
+    if (ifStmt.elseSection)
+    {
+        visit(*ifStmt.elseSection->suite);
+        if (needsTerminator())
+        {
+            m_builder.create<mlir::BranchOp>(loc, thenBlock);
+        }
+    }
+
+    m_currentFunc.getCallableRegion()->push_back(thenBlock);
+    m_builder.setInsertionPointToStart(thenBlock);
+}
+
+void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt) {}
+
+void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt) {}
+
+void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt) {}
+
+void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
+
+void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef) {}
+
+void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {}
+
+void pylir::CodeGen::visit(const pylir::Syntax::AsyncForStmt& asyncForStmt) {}
+
+void pylir::CodeGen::visit(const pylir::Syntax::AsyncWithStmt& asyncWithStmt) {}
+
+void pylir::CodeGen::visit(const Syntax::Suite& suite)
+{
+    pylir::match(
+        suite.variant, [&](const Syntax::Suite::SingleLine& singleLine) { visit(singleLine.stmtList); },
+        [&](const Syntax::Suite::MultiLine& singleLine)
+        {
+            for (auto& iter : singleLine.statements)
+            {
+                visit(iter);
+            }
+        });
 }
