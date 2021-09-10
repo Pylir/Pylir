@@ -4,6 +4,10 @@
 
 void pylir::GlobalDiscoverer::visit(const Syntax::FuncDef& funcDef)
 {
+    if (m_inGlobalScope)
+    {
+        m_callback(funcDef.funcName);
+    }
     ValueReset reset(m_inGlobalScope, m_inGlobalScope);
     Visitor::visit(funcDef);
 }

@@ -3,6 +3,7 @@
 # CHECK-DAG: global @x
 # CHECK-DAG: global @y
 # CHECK-DAG: global @z
+# CHECK-DAG: global @foo
 
 x = 2
 

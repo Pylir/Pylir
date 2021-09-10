@@ -8,6 +8,7 @@
 
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Text.hpp>
+#include <pylir/Support/Variant.hpp>
 
 #include "PylirPyAttributes.hpp"
 
@@ -807,7 +808,45 @@ mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute>
 
 mlir::LogicalResult pylir::Py::GetGlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom(*this, name()));
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalOp>(*this, name()));
+}
+
+mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, function()));
+}
+
+void pylir::Py::CallOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, ::mlir::Value callee,
+                              const std::vector<::pylir::Py::CallArgs>& args)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    std::vector<std::int32_t> mappingExpansion;
+    std::vector<llvm::StringRef> keywords;
+    for (auto& iter : llvm::enumerate(args))
+    {
+        llvm::StringRef ref;
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                iterExpansion.push_back(iter.index());
+            },
+            [&](Py::MappingExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                mappingExpansion.push_back(iter.index());
+            },
+            [&](Py::KeywordArg keywordArg)
+            {
+                values.push_back(keywordArg.value);
+                ref = keywordArg.name;
+            });
+        keywords.push_back(ref);
+    }
+    build(odsBuilder, odsState, callee, values, odsBuilder.getI32ArrayAttr(iterExpansion),
+          odsBuilder.getI32ArrayAttr(mappingExpansion), odsBuilder.getStrArrayAttr(keywords));
 }
 
 // TODO remove MLIR 14

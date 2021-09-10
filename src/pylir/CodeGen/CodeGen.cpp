@@ -87,7 +87,11 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO
             PYLIR_UNREACHABLE;
         },
-        [&](const Syntax::StarredExpression& expression) { visit(expression); },
+        [&](const Syntax::GlobalStmt&)
+        {
+            // TODO register in current scope
+        },
+        [&](const Syntax::PassStmt&) {}, [&](const Syntax::StarredExpression& expression) { visit(expression); },
         [&](const Syntax::AssignmentStmt& statement) { visit(statement); });
 }
 
@@ -816,7 +820,57 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt) {}
 
 void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 
-void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef) {}
+void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
+{
+    // TODO: default args and all that stuff
+    std::size_t argCount = 0;
+    if (funcDef.parameterList)
+    {
+        class ParamVisitor : public Syntax::Visitor<ParamVisitor>
+        {
+            std::size_t& m_count;
+
+        public:
+            explicit ParamVisitor(std::size_t& count) : m_count(count) {}
+
+            using Visitor::visit;
+
+            void visit(const Syntax::ParameterList::Parameter&)
+            {
+                m_count++;
+            }
+        } visitor(argCount);
+        visitor.visit(*funcDef.parameterList);
+    }
+    auto loc = getLoc(funcDef.funcName, funcDef.funcName);
+    mlir::FuncOp func;
+    {
+        mlir::OpBuilder::InsertionGuard guard{m_builder};
+        // TODO return m_builder.getType<Py::DynamicType>()
+        func = mlir::FuncOp::create(
+            loc, std::string(funcDef.funcName.getValue()) + "$impl",
+            m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()), {}));
+        func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
+        m_module.push_back(func);
+        auto entry = func.addEntryBlock();
+        m_builder.setInsertionPointToStart(entry);
+        visit(*funcDef.suite);
+        if (needsTerminator())
+        {
+            // TODO: return none
+            m_builder.create<mlir::ReturnOp>(loc);
+        }
+    }
+    mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, m_builder.getSymbolRefAttr(func));
+    for (auto& iter : llvm::reverse(funcDef.decorators))
+    {
+        auto decLoc = getLoc(iter.atSign, iter.atSign);
+        auto decorator = visit(iter.assignmentExpression);
+        value = m_builder.create<Py::CallOp>(decLoc, decorator, std::vector<Py::CallArgs>{value});
+    }
+    auto handle = genIdentifierLookup(funcDef.funcName);
+    m_builder.create<Py::StoreOp>(loc, value, handle);
+}
 
 void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {}
 

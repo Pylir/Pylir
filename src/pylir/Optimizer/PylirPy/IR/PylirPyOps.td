@@ -57,6 +57,10 @@ def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterfa
                          StrArrayAttr:$keywords
                          );
 
+    let builders = [
+        OpBuilder<(ins "::mlir::Value":$callee,"const std::vector<::pylir::Py::CallArgs>&":$args)>
+    ];
+
     let assemblyFormat = [{
         $callee custom<ExpandArguments>($arguments, $iterExpansion, $mappingExpansion, $keywords) attr-dict
     }];
@@ -99,6 +103,15 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",[DeclareOpInterfaceMethods<InferTyp
 
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict
+    }];
+}
+
+def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [NoSideEffect,
+                                                 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let arguments = (ins FlatSymbolRefAttr:$function);
+
+    let assemblyFormat = [{
+        $function attr-dict
     }];
 }
 
