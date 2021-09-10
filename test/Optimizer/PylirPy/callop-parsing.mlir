@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @callop_test
 func @callop_test() -> !py.dynamic {
-    %0 = py.constant @outside
+    %0 = py.constant #py.int<0>
     %1 = py.constant #py.dict<{"a" to #py.int<3>, "b" to #py.list<[#py.int<5>]>}>
     %2 = py.constant "string"
     %3 = py.constant #py.tuple<(#py.int<0>,#py.int<2>)>

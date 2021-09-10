@@ -6,6 +6,8 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
+#include <variant>
+
 #include "PylirPyTypes.hpp"
 
 namespace pylir::Py
