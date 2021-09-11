@@ -2,6 +2,7 @@
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Support/Functional.hpp>
+#include <pylir/Support/ValueReset.hpp>
 
 tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInput()
 {
@@ -23,7 +24,7 @@ tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInpu
         }
         statements.emplace_back(std::move(*statement));
     }
-    return Syntax::FileInput{std::move(statements)};
+    return Syntax::FileInput{std::move(statements), {m_globals.begin(), m_globals.end()}};
 }
 
 tl::expected<pylir::Syntax::Statement, std::string> pylir::Parser::parseStatement()
@@ -379,6 +380,7 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
     {
         return tl::unexpected{std::move(targetList).error()};
     }
+    addToLocals(*targetList);
     auto inKeyword = expect(TokenType::InKeyword);
     if (!inKeyword)
     {
@@ -899,6 +901,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     {
         return tl::unexpected{std::move(funcName).error()};
     }
+    addToLocals(*funcName);
     auto openParenth = expect(TokenType::OpenParentheses);
     if (!openParenth)
     {
@@ -935,7 +938,12 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     {
         return tl::unexpected{std::move(colon).error()};
     }
+    m_namespace.emplace_back();
+    pylir::ValueReset reset(m_inClass, m_inClass);
+    m_inClass = false;
     auto suite = parseSuite();
+    auto locals = std::move(m_namespace.back().locals);
+    m_namespace.pop_back();
     if (!suite)
     {
         return tl::unexpected{std::move(suite).error()};
@@ -949,7 +957,8 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
                            *closeParenth,
                            std::move(suffix),
                            *colon,
-                           std::make_unique<Syntax::Suite>(std::move(*suite))};
+                           std::make_unique<Syntax::Suite>(std::move(*suite)),
+                           {locals.begin(), locals.end()}};
 }
 
 tl::expected<pylir::Syntax::ClassDef, std::string>
@@ -965,6 +974,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     {
         return tl::unexpected{std::move(className).error()};
     }
+    addToLocals(*className);
     std::optional<Syntax::ClassDef::Inheritance> inheritance;
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::OpenParentheses)
     {
@@ -991,6 +1001,8 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     {
         return tl::unexpected{std::move(colon).error()};
     }
+    pylir::ValueReset reset(m_inClass, m_inClass);
+    m_inClass = true;
     auto suite = parseSuite();
     if (!suite)
     {

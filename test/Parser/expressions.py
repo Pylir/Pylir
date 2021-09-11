@@ -270,9 +270,17 @@ raise 5 from 3
 # CHECK: expression: atom 3
 
 global a, b, c
+
+
 # CHECK: global a, b, c
 
-nonlocal a, b, c
+def foo():
+    a = b = c = 3
+
+    def outer():
+        nonlocal a, b, c
+
+
 # CHECK: nonlocal a, b, c
 
 a = 3; b = 4

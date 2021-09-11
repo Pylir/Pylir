@@ -87,11 +87,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO
             PYLIR_UNREACHABLE;
         },
-        [&](const Syntax::GlobalStmt&)
-        {
-            // TODO register in current scope
-        },
-        [&](const Syntax::PassStmt&) {}, [&](const Syntax::StarredExpression& expression) { visit(expression); },
+        [&](const Syntax::NonLocalStmt&) {}, [&](const Syntax::GlobalStmt&) {}, [&](const Syntax::PassStmt&) {},
+        [&](const Syntax::StarredExpression& expression) { visit(expression); },
         [&](const Syntax::AssignmentStmt& statement) { visit(statement); });
 }
 

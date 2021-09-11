@@ -16,7 +16,8 @@ class CodeGen
     mlir::ModuleOp m_module;
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
-    std::vector<std::unordered_map<std::string_view, mlir::Operation*>> m_scope{1};
+    using ScopeContainer = std::vector<std::unordered_map<std::string_view, mlir::Operation*>>;
+    ScopeContainer m_scope{1};
 
     std::unordered_map<std::string_view, mlir::Operation*>& getCurrentScope()
     {

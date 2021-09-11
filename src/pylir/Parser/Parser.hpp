@@ -5,6 +5,8 @@
 #include <pylir/Diagnostics/Document.hpp>
 #include <pylir/Lexer/Lexer.hpp>
 
+#include <unordered_set>
+
 #include <tcb/span.hpp>
 #include <tl/expected.hpp>
 
@@ -22,7 +24,36 @@ class Parser
 #include "Features.def"
     const Diag::Document* m_document;
 
+    struct IdentifierHash
+    {
+        std::size_t operator()(const IdentifierToken& identifierToken) const noexcept
+        {
+            return std::hash<std::string_view>{}(identifierToken.getValue());
+        }
+    };
+
+    struct IdentifierEquals
+    {
+        bool operator()(const IdentifierToken& lhs, const IdentifierToken& rhs) const noexcept
+        {
+            return lhs.getValue() == rhs.getValue();
+        }
+    };
+
+    struct Scope
+    {
+        std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> locals;
+        std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> freeVariables;
+    };
+    std::vector<Scope> m_namespace;
+    std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> m_globals;
+    bool m_inClass = false;
+
     tl::expected<Token, std::string> expect(TokenType tokenType);
+
+    void addToLocals(const Token& token);
+
+    void addToLocals(const Syntax::TargetList& targetList);
 
     bool lookaheadEquals(tcb::span<const TokenType> tokens);
 

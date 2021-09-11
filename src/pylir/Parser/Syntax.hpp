@@ -1157,6 +1157,8 @@ struct FuncDef
     std::optional<std::pair<BaseToken, Expression>> suffix;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
+
+    std::vector<IdentifierToken> localVariables;
 };
 
 /**
@@ -1272,6 +1274,7 @@ struct Suite
 struct FileInput
 {
     std::vector<std::variant<BaseToken, Statement>> input;
+    std::vector<IdentifierToken> globals;
 };
 
 bool firstInAssignmentExpression(TokenType tokenType)

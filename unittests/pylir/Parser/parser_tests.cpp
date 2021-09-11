@@ -54,3 +54,33 @@ TEST_CASE("Parse augmented assignment statement", "[Parser]")
     PARSER_EMITS("*b += 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "starred item");
     PARSER_EMITS("(b) += 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "enclosure");
 }
+
+TEST_CASE("Parse namespaces", "[Parser]")
+{
+    PARSER_EMITS("def foo():\n"
+                 "    a = 3\n"
+                 "    nonlocal a\n",
+                 pylir::Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE, "a");
+    PARSER_EMITS("def foo():\n"
+                 "    a = 3\n\n"
+                 "\n    def inner():\n        nonlocal a\n        nonlocal a\n"
+                 "",
+                 pylir::Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_FREE_VARIABLE, "a");
+    PARSER_EMITS("def foo():\n"
+                 "    a = 3\n\n"
+                 "\n    def inner():\n        global a\n        nonlocal a\n"
+                 "",
+                 pylir::Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_FREE_VARIABLE, "a");
+    PARSER_EMITS("def foo():\n"
+                 "    nonlocal a\n",
+                 pylir::Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, "a");
+    PARSER_EMITS("a = 0\n"
+                 "def foo():\n"
+                 "    nonlocal a\n",
+                 pylir::Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, "a");
+    PARSER_EMITS("def foo():\n"
+                 "    a = 3\n\n"
+                 "\n    def inner():\n        nonlocal a\n        global a\n"
+                 "",
+                 pylir::Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_FREE_VARIABLE, "a");
+}

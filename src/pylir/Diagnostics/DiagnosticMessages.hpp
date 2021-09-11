@@ -83,4 +83,22 @@ constexpr auto INVALID_OPTIMIZATION_LEVEL_N = FMT_STRING("invalid optimization l
 
 constexpr auto TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N = FMT_STRING("target '{}' does not support compiling to {}");
 
+constexpr auto DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE =
+    FMT_STRING("declaration of global '{}' conflicts with local variable");
+
+constexpr auto DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_FREE_VARIABLE =
+    FMT_STRING("declaration of global '{}' conflicts with free variable");
+
+constexpr auto DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE =
+    FMT_STRING("declaration of nonlocal '{}' conflicts with local variable");
+
+constexpr auto DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_FREE_VARIABLE =
+    FMT_STRING("declaration of nonlocal '{}' conflicts with free variable");
+
+constexpr auto LOCAL_VARIABLE_BOUND_HERE = FMT_STRING("local variable bound here");
+
+constexpr auto FREE_VARIABLE_BOUND_HERE = FMT_STRING("free variable bound here");
+
+constexpr auto COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES = FMT_STRING("could not find variable '{}' in outer scopes");
+
 } // namespace pylir::Diag
