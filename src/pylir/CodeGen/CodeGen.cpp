@@ -719,6 +719,44 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
                     PYLIR_UNREACHABLE;
                 });
         },
+        [&](const Syntax::Enclosure::DictDisplay& dictDisplay) -> mlir::Value
+        {
+            auto loc = getLoc(dictDisplay, dictDisplay.openBrace);
+            return pylir::match(
+                dictDisplay.variant,
+                [&](std::monostate) -> mlir::Value
+                { return m_builder.create<Py::MakeDictOp>(loc, std::vector<Py::DictArgs>{}); },
+                [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& list) -> mlir::Value
+                {
+                    std::vector<Py::DictArgs> result;
+                    result.reserve(list.remainingExpr.size() + 1);
+                    auto handleOne = [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum)
+                    {
+                        pylir::match(
+                            keyDatum.variant,
+                            [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Key& key)
+                            {
+                                auto first = visit(key.first);
+                                auto second = visit(key.second);
+                                result.push_back(std::pair{first, second});
+                            },
+                            [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Datum& key)
+                            { result.push_back(Py::MappingExpansion{visit(key.orExpr)}); });
+                    };
+                    handleOne(*list.firstExpr);
+                    for (auto& [token, iter] : list.remainingExpr)
+                    {
+                        (void)token;
+                        handleOne(*iter);
+                    }
+                    return m_builder.create<Py::MakeDictOp>(loc, result);
+                },
+                [&](const Syntax::Enclosure::DictDisplay::DictComprehension&) -> mlir::Value
+                {
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                });
+        },
         [&](const auto&) -> mlir::Value
         {
             // TODO:

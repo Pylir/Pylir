@@ -106,6 +106,23 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",[DeclareOpInterfaceMethods<InferTyp
     }];
 }
 
+def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
+                                                 DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+    let arguments = (ins
+                        Variadic<DynamicType>:$keys,
+                        Variadic<DynamicType>:$values,
+                        I32ArrayAttr:$mappingExpansion
+                        );
+
+    let builders = [
+            OpBuilder<(ins "const std::vector<::pylir::Py::DictArgs>&":$keyValues)>
+    ];
+
+    let assemblyFormat = [{
+            custom<MappingArguments>($keys, $values, $mappingExpansion) attr-dict
+    }];
+}
+
 def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [NoSideEffect,
                                                  DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$function);

@@ -195,13 +195,91 @@ void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::Ope
     printer << ')';
 }
 
+bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& keys,
+                           llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& values,
+                           mlir::ArrayAttr& mappingExpansion)
+{
+    llvm::SmallVector<std::int32_t> mappings;
+    auto exit = llvm::make_scope_exit([&] { mappingExpansion = parser.getBuilder().getI32ArrayAttr(mappings); });
+
+    if (parser.parseLParen())
+    {
+        return true;
+    }
+    if (!parser.parseOptionalRParen())
+    {
+        return false;
+    }
+
+    std::int32_t index = 0;
+    auto parseOnce = [&]() -> mlir::ParseResult
+    {
+        if (!parser.parseOptionalStar())
+        {
+            if (parser.parseStar())
+            {
+                return mlir::failure();
+            }
+            mappings.push_back(index);
+            index++;
+            return parser.parseOperand(keys.emplace_back());
+        }
+        index++;
+        return mlir::failure(parser.parseOperand(keys.emplace_back()) || parser.parseColon()
+                             || parser.parseOperand(values.emplace_back()));
+    };
+    if (parseOnce())
+    {
+        return true;
+    }
+    while (!parser.parseOptionalComma())
+    {
+        if (parseOnce())
+        {
+            return true;
+        }
+    }
+
+    if (parser.parseRParen())
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange keys,
+                           mlir::OperandRange values, mlir::ArrayAttr mappingExpansion)
+{
+    printer << '(';
+    llvm::DenseSet<std::uint32_t> iters;
+    for (auto iter : mappingExpansion.getAsValueRange<mlir::IntegerAttr>())
+    {
+        iters.insert(iter.getZExtValue());
+    }
+    int i = 0;
+    std::size_t valueCounter = 0;
+    llvm::interleaveComma(keys, printer,
+                          [&](mlir::Value key)
+                          {
+                              if (iters.contains(i))
+                              {
+                                  printer << "**" << key;
+                                  i++;
+                                  return;
+                              }
+                              printer << key << " : " << values[valueCounter++];
+                              i++;
+                          });
+    printer << ')';
+}
+
 mlir::Attribute toBool(mlir::Attribute value)
 {
     return llvm::TypeSwitch<mlir::Attribute, mlir::Attribute>(value).Default({});
 }
 
 } // namespace
-
 
 mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
@@ -774,6 +852,15 @@ mlir::LogicalResult pylir::Py::MakeSetOp::inferReturnTypes(::mlir::MLIRContext* 
     return mlir::success();
 }
 
+mlir::LogicalResult pylir::Py::MakeDictOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                            ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                            ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                            ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
 mlir::LogicalResult pylir::Py::CallOp::inferReturnTypes(::mlir::MLIRContext* context,
                                                         ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
                                                         ::mlir::DictionaryAttr, ::mlir::RegionRange,
@@ -848,6 +935,29 @@ void pylir::Py::CallOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationSt
     }
     build(odsBuilder, odsState, callee, values, odsBuilder.getI32ArrayAttr(iterExpansion),
           odsBuilder.getI32ArrayAttr(mappingExpansion), odsBuilder.getStrArrayAttr(keywords));
+}
+
+void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                  const std::vector<::pylir::Py::DictArgs>& args)
+{
+    std::vector<mlir::Value> keys, values;
+    std::vector<std::int32_t> mappingExpansion;
+    for (auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(),
+            [&](std::pair<mlir::Value, mlir::Value> pair)
+            {
+                keys.push_back(pair.first);
+                values.push_back(pair.second);
+            },
+            [&](Py::MappingExpansion expansion)
+            {
+                keys.push_back(expansion.value);
+                mappingExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion));
 }
 
 // TODO remove MLIR 14

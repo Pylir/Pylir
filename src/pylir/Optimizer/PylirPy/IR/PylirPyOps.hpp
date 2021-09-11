@@ -29,6 +29,7 @@ struct KeywordArg
 };
 
 using CallArgs = std::variant<mlir::Value, IterExpansion, MappingExpansion, KeywordArg>;
+using DictArgs = std::variant<std::pair<mlir::Value, mlir::Value>, MappingExpansion>;
 
 } // namespace pylir::Py
 
