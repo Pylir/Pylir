@@ -857,7 +857,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
-    // TODO: default args and all that stuff
+    // TODO: default args, cells etc
     std::size_t argCount = 0;
     if (funcDef.parameterList)
     {
@@ -889,6 +889,14 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         m_module.push_back(func);
         auto entry = func.addEntryBlock();
         m_builder.setInsertionPointToStart(entry);
+
+        m_scope.emplace_back();
+        auto exit = llvm::make_scope_exit([&] { m_scope.pop_back(); });
+        for (auto& iter : funcDef.localVariables)
+        {
+            m_scope.back().emplace(iter.getValue(), m_builder.create<Py::AllocaOp>(getLoc(iter, iter)));
+        }
+
         visit(*funcDef.suite);
         if (needsTerminator())
         {
