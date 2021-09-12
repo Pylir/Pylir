@@ -86,18 +86,26 @@ constexpr auto TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N = FMT_STRING("target '{}
 constexpr auto DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE =
     FMT_STRING("declaration of global '{}' conflicts with local variable");
 
-constexpr auto DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_FREE_VARIABLE =
-    FMT_STRING("declaration of global '{}' conflicts with free variable");
+constexpr auto DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE =
+    FMT_STRING("declaration of global '{}' conflicts with nonlocal variable");
+
+constexpr auto GLOBAL_N_USED_PRIOR_TO_DECLARATION = FMT_STRING("global '{}' used prior to declaration");
 
 constexpr auto DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE =
     FMT_STRING("declaration of nonlocal '{}' conflicts with local variable");
 
-constexpr auto DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_FREE_VARIABLE =
-    FMT_STRING("declaration of nonlocal '{}' conflicts with free variable");
+constexpr auto DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE =
+    FMT_STRING("declaration of nonlocal '{}' conflicts with global variable");
 
-constexpr auto LOCAL_VARIABLE_BOUND_HERE = FMT_STRING("local variable bound here");
+constexpr auto NONLOCAL_N_USED_PRIOR_TO_DECLARATION = FMT_STRING("nonlocal '{}' used prior to declaration");
 
-constexpr auto FREE_VARIABLE_BOUND_HERE = FMT_STRING("free variable bound here");
+constexpr auto LOCAL_VARIABLE_N_BOUND_HERE = FMT_STRING("local variable '{}' bound here");
+
+constexpr auto GLOBAL_VARIABLE_N_BOUND_HERE = FMT_STRING("global variable '{}' bound here");
+
+constexpr auto NONLOCAL_VARIABLE_N_BOUND_HERE = FMT_STRING("nonlocal variable '{}' bound here");
+
+constexpr auto N_USED_HERE = FMT_STRING("'{}' used here");
 
 constexpr auto COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES = FMT_STRING("could not find variable '{}' in outer scopes");
 

@@ -1159,6 +1159,7 @@ struct FuncDef
     std::unique_ptr<Suite> suite;
 
     std::vector<IdentifierToken> localVariables;
+    std::vector<IdentifierToken> nonLocalVariables;
 };
 
 /**

@@ -322,33 +322,51 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                 {
                     if (!m_namespace.empty())
                     {
-                        if (auto result = m_namespace.back().locals.find(nonLocal);
-                            result != m_namespace.back().locals.end())
+                        if (auto result = m_namespace.back().identifiers.find(nonLocal);
+                            result != m_namespace.back().identifiers.end())
                         {
-                            return tl::unexpected{
-                                createDiagnosticsBuilder(nonLocal,
-                                                         Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
-                                                         nonLocal.getValue())
-                                    .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
-                                    .addNote(*result, Diag::LOCAL_VARIABLE_BOUND_HERE)
-                                    .addLabel(*result, std::nullopt, Diag::NOTE_COLOUR)
-                                    .emitError()};
-                        }
-                        if (auto result = m_namespace.back().freeVariables.find(nonLocal);
-                            result != m_namespace.back().freeVariables.end())
-                        {
-                            return tl::unexpected{
-                                createDiagnosticsBuilder(nonLocal,
-                                                         Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_FREE_VARIABLE,
-                                                         nonLocal.getValue())
-                                    .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
-                                    .addNote(*result, Diag::FREE_VARIABLE_BOUND_HERE)
-                                    .addLabel(*result, std::nullopt, Diag::NOTE_COLOUR)
-                                    .emitError()};
+                            switch (result->second)
+                            {
+                                case Scope::Kind::Local:
+                                    return tl::unexpected{
+                                        createDiagnosticsBuilder(
+                                            nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
+                                            nonLocal.getValue())
+                                            .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                            .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE,
+                                                     nonLocal.getValue())
+                                            .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                            .emitError()};
+                                case Scope::Kind::Global:
+                                    return tl::unexpected{
+                                        createDiagnosticsBuilder(
+                                            nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
+                                            nonLocal.getValue())
+                                            .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                            .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE,
+                                                     nonLocal.getValue())
+                                            .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                            .emitError()};
+                                case Scope::Kind::Unknown:
+                                    return tl::unexpected{
+                                        createDiagnosticsBuilder(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION,
+                                                                 nonLocal.getValue())
+                                            .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                            .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
+                                            .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                            .emitError()};
+                                case Scope::Kind::NonLocal: break;
+                            }
                         }
                     }
+
                     if (std::none_of(m_namespace.begin(), m_namespace.end(),
-                                     [&](const Scope& scope) -> bool { return scope.locals.count(nonLocal); }))
+                                     [&](const Scope& scope) -> bool
+                                     {
+                                         auto result = scope.identifiers.find(nonLocal);
+                                         return result != scope.identifiers.end()
+                                                && result->second == Scope::Kind::Local;
+                                     }))
                     {
                         return tl::unexpected{createDiagnosticsBuilder(nonLocal,
                                                                        Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
@@ -356,6 +374,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                                                   .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
                                                   .emitError()};
                     }
+
                     return {};
                 };
                 if (auto error = handleToken(IdentifierToken{*identifier}); !error)
@@ -364,7 +383,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                 }
                 if (!m_namespace.empty())
                 {
-                    m_namespace.back().freeVariables.insert(IdentifierToken{*identifier});
+                    m_namespace.back().identifiers.emplace(IdentifierToken{*identifier}, Scope::Kind::NonLocal);
                 }
                 for (auto& iter : rest)
                 {
@@ -374,7 +393,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                     }
                     if (!m_namespace.empty())
                     {
-                        m_namespace.back().freeVariables.insert(iter.second);
+                        m_namespace.back().identifiers.emplace(iter.second, Scope::Kind::NonLocal);
                     }
                 }
                 return Syntax::SimpleStmt{
@@ -385,26 +404,39 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 auto handleToken = [&](const IdentifierToken& global) -> tl::expected<void, std::string>
                 {
-                    if (auto result = m_namespace.back().locals.find(global); result != m_namespace.back().locals.end())
+                    if (auto result = m_namespace.back().identifiers.find(global);
+                        result != m_namespace.back().identifiers.end())
                     {
-                        return tl::unexpected{
-                            createDiagnosticsBuilder(
-                                global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE, global.getValue())
-                                .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
-                                .addNote(*result, Diag::LOCAL_VARIABLE_BOUND_HERE)
-                                .addLabel(*result, std::nullopt, Diag::NOTE_COLOUR)
-                                .emitError()};
-                    }
-                    if (auto result = m_namespace.back().freeVariables.find(global);
-                        result != m_namespace.back().freeVariables.end())
-                    {
-                        return tl::unexpected{
-                            createDiagnosticsBuilder(global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_FREE_VARIABLE,
-                                                     global.getValue())
-                                .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
-                                .addNote(*result, Diag::FREE_VARIABLE_BOUND_HERE)
-                                .addLabel(*result, std::nullopt, Diag::NOTE_COLOUR)
-                                .emitError()};
+                        switch (result->second)
+                        {
+                            case Scope::Kind::Local:
+                                return tl::unexpected{
+                                    createDiagnosticsBuilder(
+                                        global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
+                                        global.getValue())
+                                        .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
+                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                        .emitError()};
+                            case Scope::Kind::NonLocal:
+                                return tl::unexpected{
+                                    createDiagnosticsBuilder(
+                                        global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE,
+                                        global.getValue())
+                                        .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addNote(result->first, Diag::NONLOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
+                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                        .emitError()};
+                            case Scope::Kind::Unknown:
+                                return tl::unexpected{createDiagnosticsBuilder(global,
+                                                                               Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION,
+                                                                               global.getValue())
+                                                          .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
+                                                          .addNote(result->first, Diag::N_USED_HERE, global.getValue())
+                                                          .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                                          .emitError()};
+                            case Scope::Kind::Global: break;
+                        }
                     }
                     return {};
                 };
@@ -413,7 +445,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                     return tl::unexpected{std::move(error).error()};
                 }
                 m_globals.insert(IdentifierToken{*identifier});
-                m_namespace.back().freeVariables.insert(IdentifierToken{*identifier});
+                m_namespace.back().identifiers.emplace(IdentifierToken{*identifier}, Scope::Kind::Global);
                 for (auto& iter : rest)
                 {
                     if (auto error = handleToken(iter.second); !error)
@@ -421,7 +453,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                         return tl::unexpected{std::move(error).error()};
                     }
                     m_globals.insert(iter.second);
-                    m_namespace.back().freeVariables.insert(iter.second);
+                    m_namespace.back().identifiers.emplace(iter.second, Scope::Kind::Global);
                 }
             }
             else

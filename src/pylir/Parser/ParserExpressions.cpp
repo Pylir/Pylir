@@ -52,7 +52,14 @@ tl::expected<pylir::Syntax::Atom, std::string> pylir::Parser::parseAtom()
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>((*m_current++).getValue())};
         case TokenType::Identifier:
         {
-            return Syntax::Atom{IdentifierToken{*m_current++}};
+            auto identifierToken = IdentifierToken{*m_current++};
+            if (!m_namespace.empty())
+            {
+                // emplace will only insert if it is not already contained. So it will only be marked as unknown
+                // if we didn't know it's kind already
+                m_namespace.back().identifiers.emplace(identifierToken, Scope::Kind::Unknown);
+            }
+            return Syntax::Atom{identifierToken};
         }
         case TokenType::StringLiteral:
         case TokenType::ByteLiteral:

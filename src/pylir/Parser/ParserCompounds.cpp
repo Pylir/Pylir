@@ -942,7 +942,14 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     pylir::ValueReset reset(m_inClass, m_inClass);
     m_inClass = false;
     auto suite = parseSuite();
-    auto locals = std::move(m_namespace.back().locals);
+    std::vector<IdentifierToken> locals;
+    for (auto& [token, kind] : m_namespace.back().identifiers)
+    {
+        if (kind == Scope::Kind::Local)
+        {
+            locals.push_back(std::move(token));
+        }
+    }
     m_namespace.pop_back();
     if (!suite)
     {
@@ -958,7 +965,8 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
                            std::move(suffix),
                            *colon,
                            std::make_unique<Syntax::Suite>(std::move(*suite)),
-                           {locals.begin(), locals.end()}};
+                           std::move(locals),
+                           {}};
 }
 
 tl::expected<pylir::Syntax::ClassDef, std::string>

@@ -5,6 +5,7 @@
 #include <pylir/Diagnostics/Document.hpp>
 #include <pylir/Lexer/Lexer.hpp>
 
+#include <unordered_map>
 #include <unordered_set>
 
 #include <tcb/span.hpp>
@@ -42,8 +43,15 @@ class Parser
 
     struct Scope
     {
-        std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> locals;
-        std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> freeVariables;
+        enum class Kind
+        {
+            Local,
+            NonLocal,
+            Global,
+            Unknown
+        };
+
+        std::unordered_map<IdentifierToken, Kind, IdentifierHash, IdentifierEquals> identifiers;
     };
     std::vector<Scope> m_namespace;
     std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> m_globals;

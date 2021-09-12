@@ -7,11 +7,16 @@
 void pylir::Parser::addToLocals(const pylir::Token& token)
 {
     PYLIR_ASSERT(token.getTokenType() == TokenType::Identifier);
-    if (m_inClass || m_namespace.empty() || m_namespace.back().freeVariables.count(IdentifierToken{token}))
+    auto identifierToken = IdentifierToken{token};
+    if (m_inClass || m_namespace.empty())
     {
         return;
     }
-    m_namespace.back().locals.insert(IdentifierToken{token});
+    auto result = m_namespace.back().identifiers.find(identifierToken);
+    if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
+    {
+        m_namespace.back().identifiers.insert_or_assign(result, identifierToken, Scope::Kind::Local);
+    }
 }
 
 void pylir::Parser::addToLocals(const Syntax::TargetList& targetList)
@@ -38,11 +43,11 @@ void pylir::Parser::addToLocals(const Syntax::TargetList& targetList)
     } visitor{{},
               [&](const IdentifierToken& token)
               {
-                  if (m_namespace.back().freeVariables.count(token))
+                  auto result = m_namespace.back().identifiers.find(token);
+                  if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
                   {
-                      return;
+                      m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
                   }
-                  m_namespace.back().locals.insert(token);
               }};
     visitor.visit(targetList);
 }
