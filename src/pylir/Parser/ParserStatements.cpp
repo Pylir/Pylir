@@ -320,61 +320,44 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 auto handleToken = [&](const IdentifierToken& nonLocal) -> tl::expected<void, std::string>
                 {
-                    if (!m_namespace.empty())
+                    if (m_namespace.empty())
                     {
-                        if (auto result = m_namespace.back().identifiers.find(nonLocal);
-                            result != m_namespace.back().identifiers.end())
+                        return {};
+                    }
+                    if (auto result = m_namespace.back().identifiers.find(nonLocal);
+                        result != m_namespace.back().identifiers.end())
+                    {
+                        switch (result->second)
                         {
-                            switch (result->second)
-                            {
-                                case Scope::Kind::Local:
-                                    return tl::unexpected{
-                                        createDiagnosticsBuilder(
-                                            nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
-                                            nonLocal.getValue())
-                                            .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
-                                            .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE,
-                                                     nonLocal.getValue())
-                                            .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                            .emitError()};
-                                case Scope::Kind::Global:
-                                    return tl::unexpected{
-                                        createDiagnosticsBuilder(
-                                            nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
-                                            nonLocal.getValue())
-                                            .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
-                                            .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE,
-                                                     nonLocal.getValue())
-                                            .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                            .emitError()};
-                                case Scope::Kind::Unknown:
-                                    return tl::unexpected{
-                                        createDiagnosticsBuilder(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION,
-                                                                 nonLocal.getValue())
-                                            .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
-                                            .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
-                                            .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                            .emitError()};
-                                case Scope::Kind::NonLocal: break;
-                            }
+                            case Scope::Kind::Local:
+                                return tl::unexpected{
+                                    createDiagnosticsBuilder(
+                                        nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
+                                        nonLocal.getValue())
+                                        .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
+                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                        .emitError()};
+                            case Scope::Kind::Global:
+                                return tl::unexpected{
+                                    createDiagnosticsBuilder(
+                                        nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
+                                        nonLocal.getValue())
+                                        .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
+                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                        .emitError()};
+                            case Scope::Kind::Unknown:
+                                return tl::unexpected{
+                                    createDiagnosticsBuilder(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION,
+                                                             nonLocal.getValue())
+                                        .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
+                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
+                                        .emitError()};
+                            case Scope::Kind::NonLocal: break;
                         }
                     }
-
-                    if (std::none_of(m_namespace.begin(), m_namespace.end(),
-                                     [&](const Scope& scope) -> bool
-                                     {
-                                         auto result = scope.identifiers.find(nonLocal);
-                                         return result != scope.identifiers.end()
-                                                && result->second == Scope::Kind::Local;
-                                     }))
-                    {
-                        return tl::unexpected{createDiagnosticsBuilder(nonLocal,
-                                                                       Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
-                                                                       nonLocal.getValue())
-                                                  .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
-                                                  .emitError()};
-                    }
-
                     return {};
                 };
                 if (auto error = handleToken(IdentifierToken{*identifier}); !error)

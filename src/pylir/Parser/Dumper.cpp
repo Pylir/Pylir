@@ -21,6 +21,22 @@ std::vector<std::string_view> splitLines(std::string_view text)
     result.push_back(text);
     return result;
 }
+
+std::string dumpVariables(const pylir::IdentifierSet& tokens)
+{
+    std::vector<std::string> variables(tokens.size());
+    std::transform(tokens.begin(), tokens.end(), variables.begin(),
+                   [](const pylir::IdentifierToken& token) { return std::string(token.getValue()); });
+    std::sort(variables.begin(), variables.end());
+    PYLIR_ASSERT(!variables.empty());
+    std::string text = variables[0];
+    for (std::size_t i = 1; i < variables.size(); i++)
+    {
+        text += ", ";
+        text += variables[i];
+    }
+    return text;
+}
 } // namespace
 
 std::string pylir::Dumper::Builder::addLastChild(std::string_view lastChildDump,
@@ -865,6 +881,10 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AnnotatedAssignmentSmt& ann
 std::string pylir::Dumper::dump(const pylir::Syntax::FileInput& fileInput)
 {
     auto builder = createBuilder("file input");
+    if (!fileInput.globals.empty())
+    {
+        builder.add(dumpVariables(fileInput.globals), "globals");
+    }
     for (auto& iter : fileInput.input)
     {
         if (auto* statement = std::get_if<Syntax::Statement>(&iter))
@@ -1109,6 +1129,14 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
     if (funcDef.suffix)
     {
         builder.add(funcDef.suffix->second, "suffix");
+    }
+    if (!funcDef.localVariables.empty())
+    {
+        builder.add(dumpVariables(funcDef.localVariables), "locals");
+    }
+    if (!funcDef.nonLocalVariables.empty())
+    {
+        builder.add(dumpVariables(funcDef.nonLocalVariables), "nonlocals");
     }
     return builder.add(*funcDef.suite).emit();
 }

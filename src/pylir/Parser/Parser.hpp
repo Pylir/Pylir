@@ -25,22 +25,6 @@ class Parser
 #include "Features.def"
     const Diag::Document* m_document;
 
-    struct IdentifierHash
-    {
-        std::size_t operator()(const IdentifierToken& identifierToken) const noexcept
-        {
-            return std::hash<std::string_view>{}(identifierToken.getValue());
-        }
-    };
-
-    struct IdentifierEquals
-    {
-        bool operator()(const IdentifierToken& lhs, const IdentifierToken& rhs) const noexcept
-        {
-            return lhs.getValue() == rhs.getValue();
-        }
-    };
-
     struct Scope
     {
         enum class Kind
@@ -51,7 +35,7 @@ class Parser
             Unknown
         };
 
-        std::unordered_map<IdentifierToken, Kind, IdentifierHash, IdentifierEquals> identifiers;
+        IdentifierMap<Kind> identifiers;
     };
     std::vector<Scope> m_namespace;
     std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> m_globals;
@@ -60,6 +44,8 @@ class Parser
     tl::expected<Token, std::string> expect(TokenType tokenType);
 
     void addToLocals(const Token& token);
+
+    void addToLocals(const IdentifierToken& token);
 
     void addToLocals(const Syntax::TargetList& targetList);
 

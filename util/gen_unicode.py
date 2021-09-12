@@ -12,17 +12,21 @@ id_start = unicode_category['Lu'] + unicode_category['Ll'] + unicode_category[
     'Lt'] + unicode_category['Lm'] + unicode_category['Lo'] + unicode_category[
                'Nl'] + unicode_category['Other_ID_Start'] + ['_']
 
-id_continue = id_start + unicode_category['Mn'] + unicode_category['Mc'] + \
-              unicode_category['Nd'] + unicode_category['Pc'] + \
-              unicode_category['Other_ID_Continue']
+id_continue = sortedcontainers.SortedSet(
+    id_start + unicode_category['Mn'] + unicode_category['Mc'] +
+    unicode_category['Nd'] + unicode_category['Pc'] +
+    unicode_category['Other_ID_Continue'])
 
-xid_continue = [c for c in id_continue if
-                unicodedata.normalize('NFKC', c) in id_continue]
+xid_continue = sortedcontainers.SortedSet([c for c in id_continue if
+                                           unicodedata.normalize('NFKC',
+                                                                 c) in id_continue])
 
-xid_start = [c for c in id_start if
-             unicodedata.normalize('NFKC',
-                                   c) in id_start or unicodedata.normalize(
-                 'NFKC', c) in xid_continue]
+xid_start = sortedcontainers.SortedSet()
+for c in id_start:
+    normalized = unicodedata.normalize('NFKC', c)
+    if normalized[0] in id_start and all(
+            c in xid_continue for c in normalized[1:]):
+        xid_start.add(c)
 
 
 def gen_unicode_char_range(iterable, variable_name):
@@ -49,4 +53,4 @@ def gen_unicode_char_range(iterable, variable_name):
 
 
 gen_unicode_char_range(xid_start, "initialCharacters")
-gen_unicode_char_range(xid_start, "legalIdentifiers")
+gen_unicode_char_range(xid_continue, "legalIdentifiers")

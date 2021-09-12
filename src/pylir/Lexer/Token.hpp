@@ -7,6 +7,8 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -188,6 +190,26 @@ public:
         return m_value;
     }
 };
+
+struct IdentifierHash
+{
+    std::size_t operator()(const IdentifierToken& identifierToken) const noexcept
+    {
+        return std::hash<std::string_view>{}(identifierToken.getValue());
+    }
+};
+
+struct IdentifierEquals
+{
+    bool operator()(const IdentifierToken& lhs, const IdentifierToken& rhs) const noexcept
+    {
+        return lhs.getValue() == rhs.getValue();
+    }
+};
+
+using IdentifierSet = std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals>;
+template <class T>
+using IdentifierMap = std::unordered_map<IdentifierToken, T, IdentifierHash, IdentifierEquals>;
 
 namespace Diag
 {

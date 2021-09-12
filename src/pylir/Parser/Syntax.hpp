@@ -1158,8 +1158,9 @@ struct FuncDef
     BaseToken colon;
     std::unique_ptr<Suite> suite;
 
-    std::vector<IdentifierToken> localVariables;
-    std::vector<IdentifierToken> nonLocalVariables;
+    IdentifierSet localVariables;
+    IdentifierSet nonLocalVariables;
+    IdentifierSet unknown; // only temporarily used
 };
 
 /**
@@ -1275,7 +1276,7 @@ struct Suite
 struct FileInput
 {
     std::vector<std::variant<BaseToken, Statement>> input;
-    std::vector<IdentifierToken> globals;
+    IdentifierSet globals;
 };
 
 bool firstInAssignmentExpression(TokenType tokenType)

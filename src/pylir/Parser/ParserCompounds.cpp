@@ -4,6 +4,8 @@
 #include <pylir/Support/Functional.hpp>
 #include <pylir/Support/ValueReset.hpp>
 
+#include "Visitor.hpp"
+
 tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInput()
 {
     std::vector<std::variant<BaseToken, Syntax::Statement>> statements;
@@ -941,20 +943,144 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     m_namespace.emplace_back();
     pylir::ValueReset reset(m_inClass, m_inClass);
     m_inClass = false;
+    // add parameters to local variables
+
+    if (parameterList)
+    {
+        class ParamVisitor : public Syntax::Visitor<ParamVisitor>
+        {
+        public:
+            std::function<void(const IdentifierToken&)> callback;
+
+            using Visitor::visit;
+
+            void visit(const Syntax::ParameterList::Parameter& parameter)
+            {
+                callback(parameter.identifier);
+            }
+        } visitor{{}, [&](const IdentifierToken& token) { addToLocals(token); }};
+        visitor.visit(*parameterList);
+    }
+
     auto suite = parseSuite();
-    std::vector<IdentifierToken> locals;
+    IdentifierSet locals;
+    IdentifierSet nonLocals;
+    IdentifierSet unknowns;
+
     for (auto& [token, kind] : m_namespace.back().identifiers)
     {
-        if (kind == Scope::Kind::Local)
+        switch (kind)
         {
-            locals.push_back(std::move(token));
+            case Scope::Kind::Local: locals.insert(std::move(token)); break;
+            case Scope::Kind::NonLocal: nonLocals.insert(std::move(token)); break;
+            case Scope::Kind::Unknown: unknowns.insert(std::move(token)); break;
+            default: break;
         }
     }
+
     m_namespace.pop_back();
     if (!suite)
     {
         return tl::unexpected{std::move(suite).error()};
     }
+
+    if (m_namespace.empty())
+    {
+        // this indicates that this funcdef is at global scope. We now need to resolve any nonlocals inside any nested
+        // funcDefs and figure out whether any unknowns are nonlocal or global
+
+        // Unknowns of this funcDef can't be nonlocal as only variables from the global namespace could be in use. Clear
+        // it. CodeGen will issue NameErrors if need be
+        unknowns.clear();
+        if (auto first = nonLocals.begin(); first != nonLocals.end())
+        {
+            return tl::unexpected{
+                createDiagnosticsBuilder(*first, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, first->getValue())
+                    .addLabel(*first, std::nullopt, Diag::ERROR_COLOUR)
+                    .emitError()};
+        }
+
+        class FuncVisitor : public Syntax::Visitor<FuncVisitor>
+        {
+        public:
+            std::vector<const IdentifierSet*> scopes;
+            std::function<std::string(const IdentifierToken&)> onError;
+            std::optional<std::string> error;
+            std::vector<const IdentifierSet*> previousNonLocals;
+            Syntax::FuncDef* parentDef = nullptr;
+
+            using Visitor::visit;
+
+            void visit(const Syntax::FuncDef& funcDef)
+            {
+                scopes.push_back(&funcDef.localVariables);
+                // TODO: consider having a non `const` version, using something different from Syntax::Visitor.
+                //       SOMETHING to get rid of const_cast here
+                auto& def = const_cast<Syntax::FuncDef&>(funcDef);
+                {
+                    pylir::ValueReset reset(parentDef, parentDef);
+                    parentDef = &def;
+                    Visitor::visit(funcDef);
+                }
+                if (error)
+                {
+                    scopes.pop_back();
+                    return;
+                }
+
+                for (auto& iter : def.nonLocalVariables)
+                {
+                    if (std::none_of(scopes.begin(), scopes.end(),
+                                     [&](const IdentifierSet* set) -> bool { return set->count(iter); }))
+                    {
+                        error = onError(iter);
+                        break;
+                    }
+                }
+
+                for (auto& iter : def.unknown)
+                {
+                    if (std::any_of(scopes.begin(), scopes.end(),
+                                    [&](const IdentifierSet* set) -> bool { return set->count(iter); }))
+                    {
+                        def.nonLocalVariables.insert(iter);
+                    }
+                }
+                def.unknown.clear();
+
+                // add any non locals from nested functions except if they are local to this function aka the referred
+                // to local
+                if (parentDef)
+                {
+                    for (auto& iter : def.nonLocalVariables)
+                    {
+                        if (!parentDef->localVariables.count(iter))
+                        {
+                            parentDef->nonLocalVariables.insert(iter);
+                        }
+                    }
+                }
+
+                scopes.pop_back();
+            }
+        } visitor{{},
+                  {&locals},
+                  [&](const IdentifierToken& token)
+                  {
+                      return createDiagnosticsBuilder(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
+                                                      token.getValue())
+                          .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
+                          .emitError();
+                  },
+                  {},
+                  {}};
+        visitor.visit(*suite);
+        if (visitor.error)
+        {
+            return tl::unexpected{std::move(*visitor.error)};
+        }
+    }
+
     return Syntax::FuncDef{std::move(decorators),
                            asyncKeyword,
                            *defKeyword,
@@ -966,7 +1092,8 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
                            *colon,
                            std::make_unique<Syntax::Suite>(std::move(*suite)),
                            std::move(locals),
-                           {}};
+                           std::move(nonLocals),
+                           std::move(unknowns)};
 }
 
 tl::expected<pylir::Syntax::ClassDef, std::string>

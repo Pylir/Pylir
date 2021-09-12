@@ -8,14 +8,19 @@ void pylir::Parser::addToLocals(const pylir::Token& token)
 {
     PYLIR_ASSERT(token.getTokenType() == TokenType::Identifier);
     auto identifierToken = IdentifierToken{token};
+    addToLocals(identifierToken);
+}
+
+void pylir::Parser::addToLocals(const IdentifierToken& token)
+{
     if (m_inClass || m_namespace.empty())
     {
         return;
     }
-    auto result = m_namespace.back().identifiers.find(identifierToken);
+    auto result = m_namespace.back().identifiers.find(token);
     if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
     {
-        m_namespace.back().identifiers.insert_or_assign(result, identifierToken, Scope::Kind::Local);
+        m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
     }
 }
 
