@@ -845,7 +845,7 @@ tl::expected<pylir::Syntax::AssignmentExpression, std::string> pylir::Parser::pa
                       [](const Token& token, TokenType rhs) { return token.getTokenType() == rhs; }))
     {
         prefix.emplace(*m_current, *std::next(m_current));
-        addToLocals(*m_current);
+        addToNamespace(*m_current);
         std::advance(m_current, 2);
     }
     auto expression = parseExpression();
@@ -1185,7 +1185,7 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
     {
         return tl::unexpected{std::move(targetList).error()};
     }
-    addToLocals(*targetList);
+    addToNamespace(*targetList);
     auto inToken = expect(TokenType::InKeyword);
     if (!inToken)
     {

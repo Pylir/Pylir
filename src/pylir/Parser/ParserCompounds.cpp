@@ -382,7 +382,7 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
     {
         return tl::unexpected{std::move(targetList).error()};
     }
-    addToLocals(*targetList);
+    addToNamespace(*targetList);
     auto inKeyword = expect(TokenType::InKeyword);
     if (!inKeyword)
     {
@@ -903,7 +903,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     {
         return tl::unexpected{std::move(funcName).error()};
     }
-    addToLocals(*funcName);
+    addToNamespace(*funcName);
     auto openParenth = expect(TokenType::OpenParentheses);
     if (!openParenth)
     {
@@ -958,7 +958,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
             {
                 callback(parameter.identifier);
             }
-        } visitor{{}, [&](const IdentifierToken& token) { addToLocals(token); }};
+        } visitor{{}, [&](const IdentifierToken& token) { addToNamespace(token); }};
         visitor.visit(*parameterList);
     }
 
@@ -1109,7 +1109,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     {
         return tl::unexpected{std::move(className).error()};
     }
-    addToLocals(*className);
+    addToNamespace(*className);
     std::optional<Syntax::ClassDef::Inheritance> inheritance;
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::OpenParentheses)
     {

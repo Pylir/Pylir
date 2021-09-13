@@ -4,17 +4,22 @@
 
 #include "Visitor.hpp"
 
-void pylir::Parser::addToLocals(const pylir::Token& token)
+void pylir::Parser::addToNamespace(const pylir::Token& token)
 {
     PYLIR_ASSERT(token.getTokenType() == TokenType::Identifier);
     auto identifierToken = IdentifierToken{token};
-    addToLocals(identifierToken);
+    addToNamespace(identifierToken);
 }
 
-void pylir::Parser::addToLocals(const IdentifierToken& token)
+void pylir::Parser::addToNamespace(const IdentifierToken& token)
 {
-    if (m_inClass || m_namespace.empty())
+    if (m_inClass)
     {
+        return;
+    }
+    if (m_namespace.empty())
+    {
+        m_globals.insert(token);
         return;
     }
     auto result = m_namespace.back().identifiers.find(token);
@@ -24,9 +29,9 @@ void pylir::Parser::addToLocals(const IdentifierToken& token)
     }
 }
 
-void pylir::Parser::addToLocals(const Syntax::TargetList& targetList)
+void pylir::Parser::addToNamespace(const Syntax::TargetList& targetList)
 {
-    if (m_inClass || m_namespace.empty())
+    if (m_inClass)
     {
         return;
     }
@@ -48,6 +53,11 @@ void pylir::Parser::addToLocals(const Syntax::TargetList& targetList)
     } visitor{{},
               [&](const IdentifierToken& token)
               {
+                  if (m_namespace.empty())
+                  {
+                      m_globals.insert(token);
+                      return;
+                  }
                   auto result = m_namespace.back().identifiers.find(token);
                   if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
                   {

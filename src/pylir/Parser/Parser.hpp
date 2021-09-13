@@ -43,11 +43,11 @@ class Parser
 
     tl::expected<Token, std::string> expect(TokenType tokenType);
 
-    void addToLocals(const Token& token);
+    void addToNamespace(const Token& token);
 
-    void addToLocals(const IdentifierToken& token);
+    void addToNamespace(const IdentifierToken& token);
 
-    void addToLocals(const Syntax::TargetList& targetList);
+    void addToNamespace(const Syntax::TargetList& targetList);
 
     bool lookaheadEquals(tcb::span<const TokenType> tokens);
 

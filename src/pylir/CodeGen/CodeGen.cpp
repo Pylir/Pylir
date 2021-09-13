@@ -5,8 +5,7 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-
-#include "GlobalDiscoverer.hpp"
+#include <pylir/Parser/Visitor.hpp>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
@@ -25,17 +24,11 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     m_module = mlir::ModuleOp::create(m_builder.getUnknownLoc());
 
     m_builder.setInsertionPointToEnd(m_module.getBody());
-    GlobalDiscoverer discoverer(
-        [&](const IdentifierToken& token)
-        {
-            if (getCurrentScope().count(token.getValue()))
-            {
-                return;
-            }
-            auto op = m_builder.create<Py::GlobalOp>(getLoc(token, token), token.getValue(), mlir::StringAttr{});
-            getCurrentScope().insert({token.getValue(), op});
-        });
-    discoverer.visit(fileInput);
+    for (auto& token : fileInput.globals)
+    {
+        auto op = m_builder.create<Py::GlobalOp>(getLoc(token, token), token.getValue(), mlir::StringAttr{});
+        getCurrentScope().insert({token.getValue(), op});
+    }
 
     auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
                                                          mlir::FunctionType::get(m_builder.getContext(), {}, {}));

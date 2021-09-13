@@ -1,5 +1,7 @@
 # RUN: pylir %s -fsyntax-only -emit-ast 2>&1 | FileCheck %s
 
+# CHECK: globals: foo, outer, outer2, x
+
 def foo():
     global x
     c = 3
@@ -9,9 +11,6 @@ def foo():
         c = b + a
 
     a = 0
-
-
-# CHECK: globals: x
 
 # CHECK-LABEL: function foo
 # CHECK: locals: a, c

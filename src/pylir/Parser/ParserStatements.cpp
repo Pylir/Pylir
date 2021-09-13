@@ -140,7 +140,7 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
         {
             return tl::unexpected{std::move(targetList).error()};
         }
-        addToLocals(*targetList);
+        addToNamespace(*targetList);
         targets.emplace_back(std::move(*targetList), assignment);
     } while (m_current != m_lexer.end() && Syntax::firstInTarget(m_current->getTokenType()));
     if (leftOverStarredExpression)
@@ -245,7 +245,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 return tl::unexpected{std::move(targetList).error()};
             }
-            addToLocals(*targetList);
+            addToNamespace(*targetList);
             return Syntax::SimpleStmt{Syntax::DelStmt{delKeyword, std::move(*targetList)}};
         }
         case TokenType::ReturnKeyword:
@@ -531,7 +531,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                     {
                         return tl::unexpected{std::move(targetList).error()};
                     }
-                    addToLocals(*targetList);
+                    addToNamespace(*targetList);
                     auto assignmentStmt = parseAssignmentStmt(std::move(*targetList));
                     if (!assignmentStmt)
                     {
