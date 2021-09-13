@@ -2,6 +2,8 @@
 
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
+#include <llvm/ADT/ScopeExit.h>
+
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
