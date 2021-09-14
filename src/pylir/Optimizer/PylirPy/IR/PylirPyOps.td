@@ -48,29 +48,14 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
     let hasFolder = 1;
 }
 
-def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>,
-                                         DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+def PylirPy_CallOp : PylirPy_Op<"call"> {
     let arguments = (ins DynamicType:$callee,
-                         Variadic<DynamicType>:$arguments,
-                         I32ArrayAttr:$iterExpansion,
-                         I32ArrayAttr:$mappingExpansion,
-                         StrArrayAttr:$keywords
+                         DynamicType:$tuple,
+                         DynamicType:$dict
                          );
 
-    let builders = [
-        OpBuilder<(ins "::mlir::Value":$callee,"const std::vector<::pylir::Py::CallArgs>&":$args)>
-    ];
-
     let assemblyFormat = [{
-        $callee custom<ExpandArguments>($arguments, $iterExpansion, $mappingExpansion, $keywords) attr-dict
-    }];
-
-    let verifier = [{
-        if(keywords().size() != arguments().size())
-        {
-            return emitError("keywords array size not equal to argument count");
-        }
-        return mlir::success();
+        $callee `(` `*` $tuple `,` `*``*` $dict `)` attr-dict
     }];
 }
 
@@ -83,6 +68,10 @@ def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple",[DeclareOpInterfaceMethods<Infe
         custom<IterArguments>($arguments, $iterExpansion) attr-dict
     }];
 
+    let builders = [
+        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$keyValues)>
+    ];
+
     let hasFolder = 1;
 }
 
@@ -94,6 +83,10 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList",[DeclareOpInterfaceMethods<InferT
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict
     }];
+
+    let builders = [
+        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$keyValues)>
+    ];
 }
 
 def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
@@ -115,7 +108,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
                         );
 
     let builders = [
-            OpBuilder<(ins "const std::vector<::pylir::Py::DictArgs>&":$keyValues)>
+            OpBuilder<(ins "const std::vector<::pylir::Py::DictArg>&":$keyValues)>
     ];
 
     let assemblyFormat = [{
@@ -123,8 +116,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
     }];
 }
 
-def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [NoSideEffect,
-                                                 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$function);
 
     let assemblyFormat = [{

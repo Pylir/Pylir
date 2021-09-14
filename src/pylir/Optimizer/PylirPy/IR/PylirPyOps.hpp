@@ -22,14 +22,8 @@ struct MappingExpansion
     mlir::Value value;
 };
 
-struct KeywordArg
-{
-    llvm::StringRef name;
-    mlir::Value value;
-};
-
-using CallArgs = std::variant<mlir::Value, IterExpansion, MappingExpansion, KeywordArg>;
-using DictArgs = std::variant<std::pair<mlir::Value, mlir::Value>, MappingExpansion>;
+using DictArg = std::variant<std::pair<mlir::Value, mlir::Value>, MappingExpansion>;
+using IterArg = std::variant<mlir::Value, IterExpansion>;
 
 } // namespace pylir::Py
 

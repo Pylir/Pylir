@@ -362,16 +362,6 @@ mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute
         .Default(mlir::OpFoldResult{nullptr});
 }
 
-mlir::CallInterfaceCallable pylir::Py::CallOp::getCallableForCallee()
-{
-    return callee();
-}
-
-mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
-{
-    return arguments();
-}
-
 mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (!std::all_of(operands.begin(), operands.end(),
@@ -861,15 +851,6 @@ mlir::LogicalResult pylir::Py::MakeDictOp::inferReturnTypes(::mlir::MLIRContext*
     return mlir::success();
 }
 
-mlir::LogicalResult pylir::Py::CallOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                        ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                        ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                        ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
 mlir::OpFoldResult pylir::Py::BoolOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (!operands[0])
@@ -904,41 +885,44 @@ mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableC
     return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, function()));
 }
 
-void pylir::Py::CallOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, ::mlir::Value callee,
-                              const std::vector<::pylir::Py::CallArgs>& args)
+void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                   const std::vector<::pylir::Py::IterArg>& args)
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
-    std::vector<std::int32_t> mappingExpansion;
-    std::vector<llvm::StringRef> keywords;
     for (auto& iter : llvm::enumerate(args))
     {
-        llvm::StringRef ref;
         pylir::match(
             iter.value(), [&](mlir::Value value) { values.push_back(value); },
             [&](Py::IterExpansion expansion)
             {
                 values.push_back(expansion.value);
                 iterExpansion.push_back(iter.index());
-            },
-            [&](Py::MappingExpansion expansion)
+            });
+    }
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
+}
+
+void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                  const std::vector<::pylir::Py::IterArg>& args)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    for (auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
             {
                 values.push_back(expansion.value);
-                mappingExpansion.push_back(iter.index());
-            },
-            [&](Py::KeywordArg keywordArg)
-            {
-                values.push_back(keywordArg.value);
-                ref = keywordArg.name;
+                iterExpansion.push_back(iter.index());
             });
-        keywords.push_back(ref);
     }
-    build(odsBuilder, odsState, callee, values, odsBuilder.getI32ArrayAttr(iterExpansion),
-          odsBuilder.getI32ArrayAttr(mappingExpansion), odsBuilder.getStrArrayAttr(keywords));
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
 }
 
 void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                  const std::vector<::pylir::Py::DictArgs>& args)
+                                  const std::vector<::pylir::Py::DictArg>& args)
 {
     std::vector<mlir::Value> keys, values;
     std::vector<std::int32_t> mappingExpansion;

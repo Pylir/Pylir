@@ -717,10 +717,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
             return pylir::match(
                 dictDisplay.variant,
                 [&](std::monostate) -> mlir::Value
-                { return m_builder.create<Py::MakeDictOp>(loc, std::vector<Py::DictArgs>{}); },
+                { return m_builder.create<Py::MakeDictOp>(loc, std::vector<Py::DictArg>{}); },
                 [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& list) -> mlir::Value
                 {
-                    std::vector<Py::DictArgs> result;
+                    std::vector<Py::DictArg> result;
                     result.reserve(list.remainingExpr.size() + 1);
                     auto handleOne = [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum)
                     {
@@ -904,7 +904,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     {
         auto decLoc = getLoc(iter.atSign, iter.atSign);
         auto decorator = visit(iter.assignmentExpression);
-        value = m_builder.create<Py::CallOp>(decLoc, decorator, std::vector<Py::CallArgs>{value});
+        value = m_builder.create<Py::CallOp>(decLoc, decorator,
+                                             m_builder.create<Py::MakeTupleOp>(decLoc, std::vector<Py::IterArg>{value}),
+                                             m_builder.create<Py::MakeDictOp>(decLoc, std::vector<Py::DictArg>{}));
     }
     auto handle = genIdentifierLookup(funcDef.funcName);
     m_builder.create<Py::StoreOp>(loc, value, handle);
