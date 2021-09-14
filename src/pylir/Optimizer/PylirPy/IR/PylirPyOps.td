@@ -57,6 +57,14 @@ def PylirPy_CallOp : PylirPy_Op<"call"> {
     let assemblyFormat = [{
         $callee `(` `*` $tuple `,` `*``*` $dict `)` attr-dict
     }];
+
+    let verifier = [{
+        if (!tuple().getDefiningOp<::pylir::Py::MakeTupleOp>() || !dict().getDefiningOp<::pylir::Py::MakeDictOp>())
+        {
+            return emitError("tuple and dict operands must be makeTuple and makeDict ops");
+        }
+        return mlir::success();
+    }];
 }
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
