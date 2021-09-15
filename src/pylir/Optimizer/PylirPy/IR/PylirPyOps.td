@@ -38,6 +38,15 @@ def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {
     let hasFolder = 1;
 }
 
+def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
+    let arguments = (ins DynamicType:$value,DynamicType:$object, StrAttr:$attribute);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $attribute `from` $object `to` $value attr-dict
+    }];
+}
+
 def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
     let arguments = (ins DynamicType:$object, DynamicType:$index);
 
@@ -46,6 +55,15 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
     }];
 
     let hasFolder = 1;
+}
+
+def PylirPy_SetItemOp : PylirPy_Op<"setItem"> {
+    let arguments = (ins DynamicType:$value, DynamicType:$object, DynamicType:$index);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $object `[` $index `]` `to` $value attr-dict
+    }];
 }
 
 def PylirPy_CallOp : PylirPy_Op<"call"> {
@@ -262,6 +280,15 @@ def PylirPy_LoadOp : PylirPy_Op<"load"> {
     let summary = "load operation";
 
     let arguments = (ins Arg<HandleType, "the handle to load from", [MemRead]>:$handle);
+
+    let assemblyFormat = "$handle attr-dict";
+}
+
+def PylirPy_IsUnboundOp : PylirPy_Op<"isUnbound"> {
+    let summary = "checks whether the handle is unbound";
+
+    let arguments = (ins HandleType:$handle);
+    let results = (outs I1:$result);
 
     let assemblyFormat = "$handle attr-dict";
 }

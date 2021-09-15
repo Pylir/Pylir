@@ -16,10 +16,25 @@ class CodeGen
     mlir::ModuleOp m_module;
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
-    using ScopeContainer = std::vector<std::unordered_map<std::string_view, mlir::Operation*>>;
+
+    enum Kind
+    {
+        Global,
+        StackAlloc,
+        Cell,
+        Dictionary
+    };
+
+    struct Identifier
+    {
+        Kind kind;
+        mlir::Operation* op;
+    };
+
+    using ScopeContainer = std::vector<std::unordered_map<std::string_view, Identifier>>;
     ScopeContainer m_scope{1};
 
-    std::unordered_map<std::string_view, mlir::Operation*>& getCurrentScope()
+    std::unordered_map<std::string_view, Identifier>& getCurrentScope()
     {
         return m_scope.back();
     }
@@ -28,7 +43,9 @@ class CodeGen
 
     mlir::Value toBool(mlir::Value value);
 
-    mlir::Value genIdentifierLookup(const IdentifierToken& token);
+    mlir::Value readIdentifier(const IdentifierToken& token);
+
+    void writeIdentifier(const IdentifierToken& token, mlir::Value value);
 
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
