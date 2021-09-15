@@ -149,6 +149,8 @@ public:
     mlir::Value visit(const Syntax::Enclosure& enclosure);
 
     mlir::Value visit(const Syntax::AssignmentExpression& assignmentExpression);
+
+    std::pair<mlir::Value, mlir::Value> visit(const Syntax::ArgumentList& argumentList);
 };
 
 class Module

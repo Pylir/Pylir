@@ -561,6 +561,24 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
     return pylir::match(
         primary.variant, [&](const Syntax::Atom& atom) { return visit(atom); },
         [&](const Syntax::Subscription& subscription) { return visit(subscription); },
+        [&](const Syntax::Call& call) -> mlir::Value
+        {
+            auto loc = getLoc(call, call.openParentheses);
+            auto callable = visit(*call.primary);
+            auto [tuple, keywords] = pylir::match(
+                call.variant,
+                [&](std::monostate) -> std::pair<mlir::Value, mlir::Value> {
+                    return {m_builder.create<Py::MakeTupleOp>(loc), m_builder.create<Py::MakeDictOp>(loc)};
+                },
+                [&](const std::pair<Syntax::ArgumentList, std::optional<BaseToken>>& pair)
+                    -> std::pair<mlir::Value, mlir::Value> { return visit(pair.first); },
+                [&](const std::unique_ptr<Syntax::Comprehension>& comprehension) -> std::pair<mlir::Value, mlir::Value>
+                {
+                    // TODO:
+                    PYLIR_UNREACHABLE;
+                });
+            return m_builder.create<Py::CallOp>(loc, callable, tuple, keywords);
+        },
         [&](const auto&) -> mlir::Value
         {
             // TODO
@@ -960,4 +978,63 @@ void pylir::CodeGen::visit(const Syntax::Suite& suite)
                 visit(iter);
             }
         });
+}
+
+std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::ArgumentList& argumentList)
+{
+    auto loc = getLoc(argumentList, argumentList);
+    std::vector<Py::IterArg> iterArgs;
+    std::vector<Py::DictArg> dictArgs;
+    if (argumentList.positionalArguments)
+    {
+        auto handlePositionalItem = [&](const Syntax::ArgumentList::PositionalItem& positionalItem)
+        {
+            pylir::match(
+                positionalItem.variant,
+                [&](const std::unique_ptr<Syntax::AssignmentExpression>& expression)
+                { iterArgs.emplace_back(visit(*expression)); },
+                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
+                { iterArgs.push_back(Py::IterExpansion{visit(*star.expression)}); });
+        };
+        handlePositionalItem(argumentList.positionalArguments->firstItem);
+        for (auto& [token, rest] : argumentList.positionalArguments->rest)
+        {
+            (void)token;
+            handlePositionalItem(rest);
+        }
+    }
+    auto handleKeywordItem = [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
+    {
+        auto key = m_builder.create<Py::ConstantOp>(getLoc(keywordItem.identifier, keywordItem.identifier),
+                                                    m_builder.getStringAttr(keywordItem.identifier.getValue()));
+        auto value = visit(*keywordItem.expression);
+        dictArgs.push_back(std::pair{key, value});
+    };
+    if (argumentList.starredAndKeywords)
+    {
+        auto handleExpression = [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
+        { iterArgs.push_back(Py::IterExpansion{visit(*expression.expression)}); };
+        auto handleStarredAndKeywords = [&](const Syntax::ArgumentList::StarredAndKeywords::Variant& variant)
+        { pylir::match(variant, handleKeywordItem, handleExpression); };
+        handleKeywordItem(argumentList.starredAndKeywords->first);
+        for (auto& [token, variant] : argumentList.starredAndKeywords->rest)
+        {
+            (void)token;
+            handleStarredAndKeywords(variant);
+        }
+    }
+    if (argumentList.keywordArguments)
+    {
+        auto handleExpression = [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
+        { dictArgs.push_back(Py::MappingExpansion{visit(*expression.expression)}); };
+        auto handleKeywordArguments = [&](const Syntax::ArgumentList::KeywordArguments::Variant& variant)
+        { pylir::match(variant, handleKeywordItem, handleExpression); };
+        handleExpression(argumentList.keywordArguments->first);
+        for (auto& [token, variant] : argumentList.keywordArguments->rest)
+        {
+            (void)token;
+            handleKeywordArguments(variant);
+        }
+    }
+    return {m_builder.create<Py::MakeTupleOp>(loc, iterArgs), m_builder.create<Py::MakeDictOp>(loc, dictArgs)};
 }

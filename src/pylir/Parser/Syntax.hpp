@@ -1460,4 +1460,11 @@ struct LocationProvider<Syntax::StarredList, void>
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredList& starredList) noexcept;
 };
 
+template <>
+struct LocationProvider<Syntax::ArgumentList, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ArgumentList& argumentList) noexcept;
+};
+
+
 } // namespace pylir::Diag

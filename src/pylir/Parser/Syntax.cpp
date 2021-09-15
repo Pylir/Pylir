@@ -282,3 +282,43 @@ std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax:
     }
     return {first.first, range(*starredList.remainingExpr.back().second).second};
 }
+
+std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::ArgumentList, void>::getRange(
+    const Syntax::ArgumentList& argumentList) noexcept
+{
+    auto handlePositionalItem = [&](const Syntax::ArgumentList::PositionalItem& item)
+    {
+        return pylir::match(
+            item.variant, [&](const Syntax::ArgumentList::PositionalItem::Star& star) { return range(star.asterisk); },
+            [&](const std::unique_ptr<Syntax::AssignmentExpression>& assignmentExpression)
+            { return range(*assignmentExpression); });
+    };
+    std::pair<std::size_t, std::size_t> first;
+    if (argumentList.positionalArguments)
+    {
+        first = handlePositionalItem(argumentList.positionalArguments->firstItem);
+    }
+    else if (argumentList.starredAndKeywords)
+    {
+        first = range(argumentList.starredAndKeywords->first.identifier);
+    }
+    else if (argumentList.keywordArguments)
+    {
+        first = range(argumentList.keywordArguments->first.doubleAsterisk);
+    }
+
+    std::pair<std::size_t, std::size_t> last;
+    if (argumentList.keywordArguments)
+    {
+        last = range(argumentList.keywordArguments->first.doubleAsterisk);
+    }
+    else if (argumentList.starredAndKeywords)
+    {
+        last = range(argumentList.starredAndKeywords->first.identifier);
+    }
+    else if (argumentList.positionalArguments)
+    {
+        last = handlePositionalItem(argumentList.positionalArguments->firstItem);
+    }
+    return {first.first, last.second};
+}

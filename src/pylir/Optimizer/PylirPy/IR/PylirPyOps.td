@@ -95,7 +95,7 @@ def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple",[DeclareOpInterfaceMethods<Infe
     }];
 
     let builders = [
-        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$keyValues)>
+        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$values)>
     ];
 
     let hasFolder = 1;
@@ -111,7 +111,7 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList",[DeclareOpInterfaceMethods<InferT
     }];
 
     let builders = [
-        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$keyValues)>
+        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$values)>
     ];
 }
 
@@ -134,7 +134,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
                         );
 
     let builders = [
-            OpBuilder<(ins "const std::vector<::pylir::Py::DictArg>&":$keyValues)>
+            OpBuilder<(ins CArg<"const std::vector<::pylir::Py::DictArg>&","{}">:$keyValues)>
     ];
 
     let assemblyFormat = [{
