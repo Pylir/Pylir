@@ -150,6 +150,20 @@ def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [DeclareOpInterfaceMethods<Symbo
     }];
 }
 
+def PylirPy_MakeClassOp : PylirPy_Op<"makeClass"> {
+    let arguments = (ins FlatSymbolRefAttr:$initFunc, DynamicType:$name, DynamicType:$bases, DynamicType:$keywords);
+
+    let assemblyFormat = "$name `,` $initFunc `,` $bases `,` $keywords attr-dict";
+
+    let verifier = [{
+        if (!isStrictTuple(bases()) || !isStrictDict(keywords()))
+        {
+            return emitError("bases and keywords operands must be makeTuple, makeDict or tuple or dict constant ops");
+        }
+        return mlir::success();
+    }];
+}
+
 def PylirPy_PowerOp : PylirPy_Op<"pow"> {
     let arguments = (ins DynamicType:$base, DynamicType:$exponent, Optional<DynamicType>:$mod);
 

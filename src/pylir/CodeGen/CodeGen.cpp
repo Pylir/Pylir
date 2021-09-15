@@ -961,7 +961,43 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     writeIdentifier(funcDef.funcName, value);
 }
 
-void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {}
+void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
+{
+    auto loc = getLoc(classDef, classDef.className);
+    mlir::Value bases, keywords;
+    if (classDef.inheritance && classDef.inheritance->argumentList)
+    {
+        std::tie(bases, keywords) = visit(*classDef.inheritance->argumentList);
+    }
+    else
+    {
+        bases = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext(), {}));
+        keywords = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+    }
+    auto name = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(classDef.className.getValue()));
+
+    mlir::FuncOp func;
+    {
+        mlir::OpBuilder::InsertionGuard guard{m_builder};
+        func = mlir::FuncOp::create(
+            loc, std::string(classDef.className.getValue()) + "$impl",
+            m_builder.getFunctionType(
+                std::vector<mlir::Type>(2 /* cell tuple + namespace dict */, m_builder.getType<Py::DynamicType>()),
+                {m_builder.getType<Py::DynamicType>()}));
+        func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
+        m_module.push_back(func);
+        auto entry = func.addEntryBlock();
+        m_builder.setInsertionPointToStart(entry);
+
+        m_scope.emplace_back();
+        auto exit = llvm::make_scope_exit([&] { m_scope.pop_back(); });
+
+        visit(*classDef.suite);
+        m_builder.create<mlir::ReturnOp>(loc, func.getArgument(1));
+    }
+    auto value = m_builder.create<Py::MakeClassOp>(loc, m_builder.getSymbolRefAttr(func), name, bases, keywords);
+    writeIdentifier(classDef.className, value);
+}
 
 void pylir::CodeGen::visit(const pylir::Syntax::AsyncForStmt& asyncForStmt) {}
 
