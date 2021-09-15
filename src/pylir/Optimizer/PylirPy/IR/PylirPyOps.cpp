@@ -170,6 +170,34 @@ mlir::Attribute toBool(mlir::Attribute value)
     return llvm::TypeSwitch<mlir::Attribute, mlir::Attribute>(value).Default({});
 }
 
+bool isStrictTuple(mlir::Value value)
+{
+    if (value.getDefiningOp<pylir::Py::MakeTupleOp>())
+    {
+        return true;
+    }
+    auto constant = value.getDefiningOp<pylir::Py::ConstantOp>();
+    if (!constant)
+    {
+        return false;
+    }
+    return constant.constant().isa<pylir::Py::TupleAttr>();
+}
+
+bool isStrictDict(mlir::Value value)
+{
+    if (value.getDefiningOp<pylir::Py::MakeDictOp>())
+    {
+        return true;
+    }
+    auto constant = value.getDefiningOp<pylir::Py::ConstantOp>();
+    if (!constant)
+    {
+        return false;
+    }
+    return constant.constant().isa<pylir::Py::DictAttr>();
+}
+
 } // namespace
 
 mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)

@@ -77,9 +77,9 @@ def PylirPy_CallOp : PylirPy_Op<"call"> {
     }];
 
     let verifier = [{
-        if (!tuple().getDefiningOp<::pylir::Py::MakeTupleOp>() || !dict().getDefiningOp<::pylir::Py::MakeDictOp>())
+        if (!isStrictTuple(tuple()) || !isStrictDict(dict()))
         {
-            return emitError("tuple and dict operands must be makeTuple and makeDict ops");
+            return emitError("tuple and dict operands must be makeTuple, makeDict or tuple or dict constant ops");
         }
         return mlir::success();
     }];
