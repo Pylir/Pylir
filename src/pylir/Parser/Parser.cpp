@@ -19,17 +19,9 @@ void pylir::Parser::addToNamespace(const IdentifierToken& token)
         return;
     }
     auto result = m_namespace.back().identifiers.find(token);
-    if (!m_namespace.back().classScope)
+    if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
     {
-        if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
-        {
-            m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
-        }
-        return;
-    }
-    if (result == m_namespace.back().identifiers.end())
-    {
-        m_namespace.back().identifiers.emplace(token, Scope::Kind::Unknown);
+        m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
     }
 }
 

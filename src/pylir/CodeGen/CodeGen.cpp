@@ -590,6 +590,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
 void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mlir::Value value)
 {
     auto loc = getLoc(identifierToken, identifierToken);
+    if (m_classNamespace)
+    {
+        auto str = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(identifierToken.getValue()));
+        m_builder.create<Py::SetItemOp>(loc, value, m_classNamespace, str);
+        return;
+    }
+
     auto result = getCurrentScope().find(identifierToken.getValue());
     // Should not be possible
     PYLIR_ASSERT(result != getCurrentScope().end());
@@ -603,7 +610,7 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
         case StackAlloc: handle = result->second.op->getResult(0); break;
         case Cell:
             m_builder.create<Py::SetAttrOp>(loc, value, result->second.op->getResult(0),
-                                            m_builder.getStringAttr(identifierToken.getValue()));
+                                            m_builder.getStringAttr("cell_content"));
             break;
     }
     m_builder.create<Py::StoreOp>(loc, value, handle);
@@ -613,6 +620,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
 {
     auto loc = getLoc(identifierToken, identifierToken);
     mlir::Block* classNamespaceFound = nullptr;
+    ScopeContainer::value_type::const_iterator result;
     if (m_classNamespace)
     {
         classNamespaceFound = new mlir::Block;
@@ -624,12 +632,27 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
                                              mlir::ValueRange{});
         m_currentFunc.getCallableRegion()->push_back(elseBlock);
         m_builder.setInsertionPointToStart(elseBlock);
+
+        // if not found in locals, it does not import free variables but rather goes straight to the global scope.
+        // beyond that it could also access the builtins scope which does not yet exist and idk if it has to and will
+        // exist
+        result = m_scope[0].find(identifierToken.getValue());
     }
-    auto result = getCurrentScope().find(identifierToken.getValue());
+    else
+    {
+        result = getCurrentScope().find(identifierToken.getValue());
+    }
     if (result == getCurrentScope().end())
     {
-        // TODO NameError
-        PYLIR_UNREACHABLE;
+        // TODO raise NameError
+        m_builder.create<mlir::ReturnOp>(loc);
+        if (!m_classNamespace)
+        {
+            return {};
+        }
+        m_currentFunc.getCallableRegion()->push_back(classNamespaceFound);
+        m_builder.setInsertionPointToStart(classNamespaceFound);
+        return classNamespaceFound->getArgument(0);
     }
     mlir::Value handle;
     switch (result->second.kind)
@@ -640,7 +663,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         case StackAlloc: handle = result->second.op->getResult(0); break;
         case Cell:
             return m_builder.create<Py::GetAttrOp>(loc, result->second.op->getResult(0),
-                                                   m_builder.getStringAttr(identifierToken.getValue()));
+                                                   m_builder.getStringAttr("cell_content"));
     }
     auto condition = m_builder.create<Py::IsUnboundOp>(loc, handle);
     auto unbound = new mlir::Block;

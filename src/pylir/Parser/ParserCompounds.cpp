@@ -1176,6 +1176,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     m_namespace.back().classScope = true;
     auto suite = parseSuite();
     IdentifierSet nonLocals;
+    IdentifierSet locals;
     IdentifierSet unknowns;
 
     for (auto& [token, kind] : m_namespace.back().identifiers)
@@ -1183,6 +1184,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
         switch (kind)
         {
             case Scope::Kind::NonLocal: nonLocals.insert(std::move(token)); break;
+            case Scope::Kind::Local: locals.insert(std::move(token)); break;
             case Scope::Kind::Unknown: unknowns.insert(std::move(token)); break;
             default: break;
         }
@@ -1208,6 +1210,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
                             std::move(inheritance),
                             *colon,
                             std::make_unique<Syntax::Suite>(std::move(*suite)),
+                            std::move(locals),
                             std::move(nonLocals),
                             std::move(unknowns)};
 }

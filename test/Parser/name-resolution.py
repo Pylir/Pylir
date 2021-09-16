@@ -70,6 +70,7 @@ def outer3():
 # CHECK-LABEL: function outer3
 # CHECK: locals: Foo, y
 # CHECK-LABEL: class Foo
+# CHECK: locals: foo
 # CHECK: nonlocals: y
 # CHECK-LABEL: function foo
 # CHECK: locals: self
@@ -79,7 +80,7 @@ def bar():
     x = 3
 
     class Bar:
-        def outer():
+        def outer(self):
             def inner():
                 def inner2():
                     nonlocal x
@@ -87,9 +88,10 @@ def bar():
 # CHECK-LABEL: function bar
 # CHECK: locals: Bar, x
 # CHECK-LABEL: class Bar
+# CHECK: locals: outer
 # CHECK: nonlocals: x
 # CHECK-LABEL: function outer
-# CHECK: locals: inner
+# CHECK: locals: inner, self
 # CHECK-LABEL: function inner
 # CHECK: locals: inner2
 # CHECK: nonlocals: x
