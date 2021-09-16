@@ -16,13 +16,13 @@ class CodeGen
     mlir::ModuleOp m_module;
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
+    mlir::Value m_classNamespace{};
 
     enum Kind
     {
         Global,
         StackAlloc,
-        Cell,
-        Dictionary
+        Cell
     };
 
     struct Identifier

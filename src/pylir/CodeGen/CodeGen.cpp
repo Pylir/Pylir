@@ -8,6 +8,7 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Parser/Visitor.hpp>
+#include <pylir/Support/ValueReset.hpp>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
@@ -604,11 +605,6 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
             m_builder.create<Py::SetAttrOp>(loc, value, result->second.op->getResult(0),
                                             m_builder.getStringAttr(identifierToken.getValue()));
             break;
-        case Dictionary:
-            auto constant = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(identifierToken.getValue()));
-
-            m_builder.create<Py::SetItemOp>(loc, value, result->second.op->getResult(0), constant);
-            break;
     }
     m_builder.create<Py::StoreOp>(loc, value, handle);
 }
@@ -616,6 +612,19 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
 mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToken)
 {
     auto loc = getLoc(identifierToken, identifierToken);
+    mlir::Block* classNamespaceFound = nullptr;
+    if (m_classNamespace)
+    {
+        classNamespaceFound = new mlir::Block;
+        classNamespaceFound->addArgument(m_builder.getType<Py::DynamicType>());
+        auto str = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(identifierToken.getValue()));
+        auto tryGet = m_builder.create<Py::DictTryGetItemOp>(loc, m_classNamespace, str);
+        mlir::Block* elseBlock = new mlir::Block;
+        m_builder.create<mlir::CondBranchOp>(loc, tryGet.found(), classNamespaceFound, tryGet.result(), elseBlock,
+                                             mlir::ValueRange{});
+        m_currentFunc.getCallableRegion()->push_back(elseBlock);
+        m_builder.setInsertionPointToStart(elseBlock);
+    }
     auto result = getCurrentScope().find(identifierToken.getValue());
     if (result == getCurrentScope().end())
     {
@@ -632,9 +641,6 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         case Cell:
             return m_builder.create<Py::GetAttrOp>(loc, result->second.op->getResult(0),
                                                    m_builder.getStringAttr(identifierToken.getValue()));
-        case Dictionary:
-            auto constant = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(identifierToken.getValue()));
-            return m_builder.create<Py::GetItemOp>(loc, result->second.op->getResult(0), constant);
     }
     auto condition = m_builder.create<Py::IsUnboundOp>(loc, handle);
     auto unbound = new mlir::Block;
@@ -648,7 +654,16 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
 
     m_currentFunc.push_back(found);
     m_builder.setInsertionPointToStart(found);
-    return m_builder.create<Py::LoadOp>(loc, handle);
+    if (!classNamespaceFound)
+    {
+        return m_builder.create<Py::LoadOp>(loc, handle);
+    }
+    m_builder.create<mlir::BranchOp>(loc, classNamespaceFound,
+                                     mlir::ValueRange{m_builder.create<Py::LoadOp>(loc, handle)});
+
+    m_currentFunc.getCallableRegion()->push_back(classNamespaceFound);
+    m_builder.setInsertionPointToStart(classNamespaceFound);
+    return classNamespaceFound->getArgument(0);
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
@@ -901,6 +916,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
+    pylir::ValueReset reset(m_classNamespace, m_classNamespace);
+    m_classNamespace = {};
     // TODO: default args, cells etc
     std::size_t argCount = 0;
     if (funcDef.parameterList)
@@ -931,6 +948,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()), {}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
+        pylir::ValueReset resetFunc(m_currentFunc, m_currentFunc);
+        m_currentFunc = func;
         auto entry = func.addEntryBlock();
         m_builder.setInsertionPointToStart(entry);
 
@@ -986,14 +1005,18 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                 {m_builder.getType<Py::DynamicType>()}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
+        pylir::ValueReset resetFunc(m_currentFunc, m_currentFunc);
+        m_currentFunc = func;
         auto entry = func.addEntryBlock();
         m_builder.setInsertionPointToStart(entry);
 
         m_scope.emplace_back();
         auto exit = llvm::make_scope_exit([&] { m_scope.pop_back(); });
+        pylir::ValueReset reset(m_classNamespace, m_classNamespace);
+        m_classNamespace = func.getArgument(1);
 
         visit(*classDef.suite);
-        m_builder.create<mlir::ReturnOp>(loc, func.getArgument(1));
+        m_builder.create<mlir::ReturnOp>(loc, m_classNamespace);
     }
     auto value = m_builder.create<Py::MakeClassOp>(loc, m_builder.getSymbolRefAttr(func), name, bases, keywords);
     writeIdentifier(classDef.className, value);

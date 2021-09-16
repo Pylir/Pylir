@@ -57,6 +57,15 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
     let hasFolder = 1;
 }
 
+def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
+    let arguments = (ins DynamicType:$object, DynamicType:$index);
+    let results = (outs DynamicType:$result, I1:$found);
+
+    let assemblyFormat = [{
+        $object `[` $index `]` attr-dict
+    }];
+}
+
 def PylirPy_SetItemOp : PylirPy_Op<"setItem"> {
     let arguments = (ins DynamicType:$value, DynamicType:$object, DynamicType:$index);
     let results = (outs);
