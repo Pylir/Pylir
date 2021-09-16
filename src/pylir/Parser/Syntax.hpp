@@ -1182,6 +1182,9 @@ struct ClassDef
     std::optional<Inheritance> inheritance;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
+
+    IdentifierSet nonLocalVariables;
+    IdentifierSet unknown; // only temporarily used
 };
 
 /**

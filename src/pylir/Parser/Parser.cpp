@@ -13,28 +13,28 @@ void pylir::Parser::addToNamespace(const pylir::Token& token)
 
 void pylir::Parser::addToNamespace(const IdentifierToken& token)
 {
-    if (m_inClass)
-    {
-        return;
-    }
     if (m_namespace.empty())
     {
         m_globals.insert(token);
         return;
     }
     auto result = m_namespace.back().identifiers.find(token);
-    if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
+    if (!m_namespace.back().classScope)
     {
-        m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
+        if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
+        {
+            m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
+        }
+        return;
+    }
+    if (result == m_namespace.back().identifiers.end())
+    {
+        m_namespace.back().identifiers.emplace(token, Scope::Kind::Unknown);
     }
 }
 
 void pylir::Parser::addToNamespace(const Syntax::TargetList& targetList)
 {
-    if (m_inClass)
-    {
-        return;
-    }
     class TargetVisitor : public Syntax::Visitor<TargetVisitor>
     {
     public:
@@ -52,18 +52,7 @@ void pylir::Parser::addToNamespace(const Syntax::TargetList& targetList)
         }
     } visitor{{},
               [&](const IdentifierToken& token)
-              {
-                  if (m_namespace.empty())
-                  {
-                      m_globals.insert(token);
-                      return;
-                  }
-                  auto result = m_namespace.back().identifiers.find(token);
-                  if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
-                  {
-                      m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
-                  }
-              }};
+              { addToNamespace(token); }};
     visitor.visit(targetList);
 }
 

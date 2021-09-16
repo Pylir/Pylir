@@ -86,4 +86,42 @@ TEST_CASE("Parse namespaces", "[Parser]")
                  "        a\n"
                  "        nonlocal a\n",
                  pylir::Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION, "a");
+
+    // All these things should work just as well if inside a class
+    PARSER_EMITS("class Foo:\n"
+                 "  def foo():\n"
+                 "    a = 3\n"
+                 "    nonlocal a\n",
+                 pylir::Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE, "a");
+    PARSER_EMITS("class Foo:\n"
+                 "  def foo():\n"
+                 "    a = 3\n\n"
+                 "\n    def inner():\n        global a\n        nonlocal a\n"
+                 "",
+                 pylir::Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE, "a");
+    PARSER_EMITS("class Foo:\n"
+                 "  def foo():\n"
+                 "    nonlocal a\n",
+                 pylir::Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, "a");
+    PARSER_EMITS("a = 0\n"
+                 "class Foo:\n"
+                 "  def foo():\n"
+                 "    nonlocal a\n",
+                 pylir::Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, "a");
+    PARSER_EMITS("class Foo:\n"
+                 "  def foo():\n"
+                 "    a = 3\n\n"
+                 "\n    def inner():\n        nonlocal a\n        global a\n"
+                 "",
+                 pylir::Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE, "a");
+    PARSER_EMITS("class Foo:\n"
+                 "  def foo():\n"
+                 "    a\n"
+                 "    global a\n",
+                 pylir::Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION, "a");
+    PARSER_EMITS("class Foo:\n"
+                 "  def outer():\n    a = 3\n\n    def foo():\n"
+                 "        a\n"
+                 "        nonlocal a\n",
+                 pylir::Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION, "a");
 }

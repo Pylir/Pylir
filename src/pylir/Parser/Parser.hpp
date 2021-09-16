@@ -35,11 +35,11 @@ class Parser
             Unknown
         };
 
+        bool classScope{};
         IdentifierMap<Kind> identifiers;
     };
     std::vector<Scope> m_namespace;
     std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> m_globals;
-    bool m_inClass = false;
 
     tl::expected<Token, std::string> expect(TokenType tokenType);
 
@@ -48,6 +48,9 @@ class Parser
     void addToNamespace(const IdentifierToken& token);
 
     void addToNamespace(const Syntax::TargetList& targetList);
+
+    std::optional<std::string> finishNamespace(pylir::Syntax::Suite& suite, const IdentifierSet& nonLocals,
+                                               std::vector<const pylir::IdentifierSet*> scopes = {});
 
     bool lookaheadEquals(tcb::span<const TokenType> tokens);
 

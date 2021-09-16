@@ -1152,6 +1152,10 @@ std::string pylir::Dumper::dump(const Syntax::ClassDef& classDef)
     {
         builder.add(*classDef.inheritance->argumentList);
     }
+    if (!classDef.nonLocalVariables.empty())
+    {
+        builder.add(dumpVariables(classDef.nonLocalVariables), "nonlocals");
+    }
     builder.add(*classDef.suite);
     return builder.emit();
 }
