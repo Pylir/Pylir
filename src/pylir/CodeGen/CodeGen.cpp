@@ -620,7 +620,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
 {
     auto loc = getLoc(identifierToken, identifierToken);
     mlir::Block* classNamespaceFound = nullptr;
-    ScopeContainer::value_type::const_iterator result;
+    ScopeContainer::value_type* scope;
     if (m_classNamespace)
     {
         classNamespaceFound = new mlir::Block;
@@ -636,13 +636,14 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         // if not found in locals, it does not import free variables but rather goes straight to the global scope.
         // beyond that it could also access the builtins scope which does not yet exist and idk if it has to and will
         // exist
-        result = m_scope[0].find(identifierToken.getValue());
+        scope = &m_scope[0];
     }
     else
     {
-        result = getCurrentScope().find(identifierToken.getValue());
+        scope = &getCurrentScope();
     }
-    if (result == getCurrentScope().end())
+    auto result = scope->find(identifierToken.getValue());
+    if (result == scope->end())
     {
         // TODO raise NameError
         m_builder.create<mlir::ReturnOp>(loc);
