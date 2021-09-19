@@ -353,6 +353,8 @@ tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStm
     {
         return tl::unexpected{std::move(colon).error()};
     }
+    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
     {
@@ -400,6 +402,8 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
     {
         return tl::unexpected{std::move(colon).error()};
     }
+    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
     {
@@ -1079,6 +1083,8 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
         visitor.visit(*parameterList);
     }
 
+    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    m_inLoop = false;
     auto suite = parseSuite();
     IdentifierSet locals;
     IdentifierSet nonLocals;
@@ -1174,6 +1180,8 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     m_namespace.emplace_back();
     std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
     m_namespace.back().classScope = true;
+    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    m_inLoop = false;
     auto suite = parseSuite();
     IdentifierSet nonLocals;
     IdentifierSet locals;

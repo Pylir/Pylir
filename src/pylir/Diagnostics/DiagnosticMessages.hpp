@@ -109,4 +109,6 @@ constexpr auto N_USED_HERE = FMT_STRING("'{}' used here");
 
 constexpr auto COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES = FMT_STRING("could not find variable '{}' in outer scopes");
 
+constexpr auto OCCURRENCE_OF_N_OUTSIDE_OF_LOOP = FMT_STRING("occurrence of {:q^} outside of loop");
+
 } // namespace pylir::Diag

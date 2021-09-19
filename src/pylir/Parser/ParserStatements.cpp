@@ -235,8 +235,24 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             return Syntax::SimpleStmt{std::move(*assertStmt)};
         }
         case TokenType::PassKeyword: return Syntax::SimpleStmt{Syntax::PassStmt{*m_current++}};
-        case TokenType::BreakKeyword: return Syntax::SimpleStmt{Syntax::BreakStmt{*m_current++}};
-        case TokenType::ContinueKeyword: return Syntax::SimpleStmt{Syntax::ContinueStmt{*m_current++}};
+        case TokenType::BreakKeyword:
+            if (!m_inLoop)
+            {
+                return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP,
+                                                               m_current->getTokenType())
+                                          .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
+                                          .emitError()};
+            }
+            return Syntax::SimpleStmt{Syntax::BreakStmt{*m_current++}};
+        case TokenType::ContinueKeyword:
+            if (!m_inLoop)
+            {
+                return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP,
+                                                               m_current->getTokenType())
+                                          .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
+                                          .emitError()};
+            }
+            return Syntax::SimpleStmt{Syntax::ContinueStmt{*m_current++}};
         case TokenType::DelKeyword:
         {
             auto delKeyword = *m_current++;
