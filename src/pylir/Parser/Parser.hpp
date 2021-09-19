@@ -41,6 +41,7 @@ class Parser
     std::vector<Scope> m_namespace;
     std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals> m_globals;
     bool m_inLoop = false;
+    bool m_inFunc = false;
 
     tl::expected<Token, std::string> expect(TokenType tokenType);
 

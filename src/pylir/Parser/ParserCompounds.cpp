@@ -1083,8 +1083,10 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
         visitor.visit(*parameterList);
     }
 
-    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    pylir::ValueReset resetLoop(m_inLoop, m_inLoop);
+    pylir::ValueReset resetFunc(m_inFunc, m_inFunc);
     m_inLoop = false;
+    m_inFunc = true;
     auto suite = parseSuite();
     IdentifierSet locals;
     IdentifierSet nonLocals;
@@ -1180,8 +1182,10 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     m_namespace.emplace_back();
     std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
     m_namespace.back().classScope = true;
-    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    pylir::ValueReset resetLoop(m_inLoop, m_inLoop);
+    pylir::ValueReset resetFunc(m_inFunc, m_inFunc);
     m_inLoop = false;
+    m_inFunc = false;
     auto suite = parseSuite();
     IdentifierSet nonLocals;
     IdentifierSet locals;

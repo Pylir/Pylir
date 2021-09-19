@@ -111,4 +111,6 @@ constexpr auto COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES = FMT_STRING("could not
 
 constexpr auto OCCURRENCE_OF_N_OUTSIDE_OF_LOOP = FMT_STRING("occurrence of {:q^} outside of loop");
 
+constexpr auto OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION = FMT_STRING("occurrence of 'return' outside of function");
+
 } // namespace pylir::Diag

@@ -29,13 +29,29 @@ TEST_CASE("Parse break continue statement", "[Parser")
     PARSER_EMITS("break", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
     PARSER_EMITS("continue", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
     PARSER_EMITS("while True:\n    def foo():\n        break\n"
-                 "", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
+                 "",
+                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
     PARSER_EMITS("while True:\n    def foo():\n        continue\n"
-                 "", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
+                 "",
+                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
     PARSER_EMITS("while True:\n    class Foo:\n        break\n"
-                 "", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
+                 "",
+                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
     PARSER_EMITS("while True:\n    class Foo:\n        continue\n"
-                 "", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
+                 "",
+                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
+}
+
+TEST_CASE("Parse return statement", "[Parser]")
+{
+    PARSER_EMITS("return", pylir::Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION);
+    PARSER_EMITS("class Foo:\n"
+                 "    return",
+                 pylir::Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION);
+    PARSER_EMITS("def foo():\n"
+                 "    class Foo:\n"
+                 "        return",
+                 pylir::Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION);
 }
 
 TEST_CASE("Parse assignment statement", "[Parser]")

@@ -266,6 +266,13 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
         }
         case TokenType::ReturnKeyword:
         {
+            if (!m_inFunc)
+            {
+                return tl::unexpected{
+                    createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION)
+                        .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
+                        .emitError()};
+            }
             auto returnKeyword = *m_current++;
             if (m_current == m_lexer.end() || !Syntax::firstInExpression(m_current->getTokenType()))
             {
