@@ -19,6 +19,7 @@ x
 
 def foo():
     global y
+    y = 3
 
 
 (z := 3)
@@ -26,3 +27,8 @@ def foo():
 # CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<3>
 # CHECK-DAG: %[[Z:.*]] = py.getGlobal @z
 # CHECK: py.store %[[VALUE]] into %[[Z]]
+
+# CHECK-LABEL: func private @"foo$impl[0]"
+# CHECK: %[[VALUE:.*]] = py.constant #py.int<3>
+# CHECK: %[[Y:.*]] = py.getGlobal @y
+# CHECK: py.store %[[VALUE]] into %[[Y]]

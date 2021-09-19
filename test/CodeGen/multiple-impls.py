@@ -2,11 +2,13 @@
 
 
 def foo():
-    pass
+    global x
+    x = 3
 
 
 def foo():
-    pass
+    global x
+    x = 2
 
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo$impl[0]"
 # CHECK: %[[FOO:.*]] = py.getGlobal @foo

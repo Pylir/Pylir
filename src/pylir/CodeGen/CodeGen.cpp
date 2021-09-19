@@ -83,8 +83,26 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO
             PYLIR_UNREACHABLE;
         },
-        [&](const Syntax::NonLocalStmt&) {}, [&](const Syntax::GlobalStmt&) {}, [&](const Syntax::PassStmt&) {},
-        [&](const Syntax::StarredExpression& expression) { visit(expression); },
+        [&](const Syntax::NonLocalStmt&) {},
+        [&](const Syntax::GlobalStmt& globalStmt)
+        {
+            if (m_scope.size() == 1)
+            {
+                return;
+            }
+            auto handleIdentifier = [&](const IdentifierToken& token) {
+                auto result = m_scope[0].find(token.getValue());
+                PYLIR_ASSERT(result != m_scope[0].end());
+                getCurrentScope().insert(*result);
+            };
+            handleIdentifier(globalStmt.identifier);
+            for (auto& [token, identifier] : globalStmt.rest)
+            {
+                (void)token;
+                handleIdentifier(identifier);
+            }
+        },
+        [&](const Syntax::PassStmt&) {}, [&](const Syntax::StarredExpression& expression) { visit(expression); },
         [&](const Syntax::AssignmentStmt& statement) { visit(statement); });
 }
 
