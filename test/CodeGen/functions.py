@@ -4,14 +4,14 @@
 
 # CHECK-LABEL: __init__
 
-# CHECK: %[[RES:.*]] = py.makeFunc @foo$impl
+# CHECK: %[[RES:.*]] = py.makeFunc @"foo$impl[0]"
 # CHECK: %[[FOO:.*]] = py.getGlobal @foo
 # CHECK: py.store %[[RES]] into %[[FOO]]
 
 def foo():
     x = 3
 
-# CHECK: func private @foo$impl
+# CHECK: func private @"foo$impl[0]"
 
 # CHECK: %[[X:.*]] = py.alloca
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>

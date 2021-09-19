@@ -969,7 +969,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         // TODO return m_builder.getType<Py::DynamicType>()
         auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
         func = mlir::FuncOp::create(
-            loc, qualifiedName + "$impl",
+            loc, formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()), {}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
@@ -1033,7 +1033,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     {
         mlir::OpBuilder::InsertionGuard guard{m_builder};
         func = mlir::FuncOp::create(
-            loc, qualifiedName + "$impl",
+            loc, formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(
                 std::vector<mlir::Type>(2 /* cell tuple + namespace dict */, m_builder.getType<Py::DynamicType>()),
                 {m_builder.getType<Py::DynamicType>()}));
@@ -1150,5 +1150,14 @@ std::string pylir::CodeGen::formQualifiedName(std::string_view symbol)
         llvm::interleave(m_qualifierStack, os, ".");
         os << "." << symbol;
     }
+    return result;
+}
+
+std::string pylir::CodeGen::formImplName(std::string_view symbol)
+{
+    auto result = std::string(symbol);
+    auto& index = m_implNames[result];
+    result += "[" + std::to_string(index) + "]";
+    index++;
     return result;
 }

@@ -13,7 +13,7 @@ def outer():
 
 # CHECK-DAG: %[[BASES:.*]] = py.constant #py.tuple<()>
 # CHECK-DAG: %[[KEYWORDS:.*]] = py.constant #py.dict<{}>
-# CHECK-DAG: %[[NAME:.*]] = py.constant "Foo"
+# CHECK-DAG: %[[NAME:.*]] = py.constant "outer.<locals>.Foo"
 # CHECK: py.makeClass %[[NAME]], @[[FUNC:.*]], %[[BASES]], %[[KEYWORDS]]
 
 # CHECK: func private @[[FUNC]]

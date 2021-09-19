@@ -18,6 +18,7 @@ class CodeGen
     Diag::Document* m_document;
     mlir::Value m_classNamespace{};
     std::vector<std::string> m_qualifierStack;
+    std::unordered_map<std::string, std::size_t> m_implNames;
 
     enum Kind
     {
@@ -57,6 +58,8 @@ class CodeGen
     }
 
     std::string formQualifiedName(std::string_view symbol);
+
+    std::string formImplName(std::string_view symbol);
 
     void assignTarget(const Syntax::TargetList& targetList, mlir::Value value);
 
