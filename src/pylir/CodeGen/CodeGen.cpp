@@ -18,22 +18,22 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
             context->loadDialect<mlir::StandardOpsDialect>();
             return context;
         }()),
+      m_module(mlir::ModuleOp::create(m_builder.getUnknownLoc())),
       m_document(&document)
 {
 }
 
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
-    m_module = mlir::ModuleOp::create(m_builder.getUnknownLoc());
-
     m_builder.setInsertionPointToEnd(m_module.getBody());
     for (auto& token : fileInput.globals)
     {
-        auto op = m_builder.create<Py::GlobalOp>(getLoc(token, token), token.getValue(), mlir::StringAttr{});
+        auto op = m_builder.create<Py::GlobalOp>(getLoc(token, token), formQualifiedName(token.getValue()),
+                                                 mlir::StringAttr{});
         getCurrentScope().emplace(token.getValue(), Identifier{Kind::Global, op});
     }
 
-    auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), "__init__",
+    auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), formQualifiedName("__init__"),
                                                          mlir::FunctionType::get(m_builder.getContext(), {}, {}));
     m_module.push_back(initFunc);
 
@@ -940,8 +940,6 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
-    pylir::ValueReset reset(m_classNamespace, m_classNamespace);
-    m_classNamespace = {};
     // TODO: default args, cells etc
     std::size_t argCount = 0;
     if (funcDef.parameterList)
@@ -966,9 +964,12 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     mlir::FuncOp func;
     {
         mlir::OpBuilder::InsertionGuard guard{m_builder};
+        pylir::ValueReset reset(m_classNamespace, m_classNamespace);
+        m_classNamespace = {};
         // TODO return m_builder.getType<Py::DynamicType>()
+        auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
         func = mlir::FuncOp::create(
-            loc, std::string(funcDef.funcName.getValue()) + "$impl",
+            loc, qualifiedName + "$impl",
             m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()), {}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
@@ -978,7 +979,15 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         m_builder.setInsertionPointToStart(entry);
 
         m_scope.emplace_back();
-        auto exit = llvm::make_scope_exit([&] { m_scope.pop_back(); });
+        m_qualifierStack.emplace_back(funcDef.funcName.getValue());
+        m_qualifierStack.push_back("<locals>");
+        auto exit = llvm::make_scope_exit(
+            [&]
+            {
+                m_scope.pop_back();
+                m_qualifierStack.pop_back();
+                m_qualifierStack.pop_back();
+            });
         for (auto& iter : funcDef.localVariables)
         {
             m_scope.back().emplace(iter.getValue(),
@@ -1017,13 +1026,14 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         bases = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext(), {}));
         keywords = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
     }
-    auto name = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(classDef.className.getValue()));
+    auto qualifiedName = formQualifiedName(classDef.className.getValue());
+    auto name = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(qualifiedName));
 
     mlir::FuncOp func;
     {
         mlir::OpBuilder::InsertionGuard guard{m_builder};
         func = mlir::FuncOp::create(
-            loc, std::string(classDef.className.getValue()) + "$impl",
+            loc, qualifiedName + "$impl",
             m_builder.getFunctionType(
                 std::vector<mlir::Type>(2 /* cell tuple + namespace dict */, m_builder.getType<Py::DynamicType>()),
                 {m_builder.getType<Py::DynamicType>()}));
@@ -1035,7 +1045,13 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         m_builder.setInsertionPointToStart(entry);
 
         m_scope.emplace_back();
-        auto exit = llvm::make_scope_exit([&] { m_scope.pop_back(); });
+        m_qualifierStack.emplace_back(classDef.className.getValue());
+        auto exit = llvm::make_scope_exit(
+            [&]
+            {
+                m_scope.pop_back();
+                m_qualifierStack.pop_back();
+            });
         pylir::ValueReset reset(m_classNamespace, m_classNamespace);
         m_classNamespace = func.getArgument(1);
 
@@ -1120,4 +1136,19 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
         }
     }
     return {m_builder.create<Py::MakeTupleOp>(loc, iterArgs), m_builder.create<Py::MakeDictOp>(loc, dictArgs)};
+}
+
+std::string pylir::CodeGen::formQualifiedName(std::string_view symbol)
+{
+    if (m_qualifierStack.empty())
+    {
+        return std::string(symbol);
+    }
+    std::string result;
+    {
+        llvm::raw_string_ostream os(result);
+        llvm::interleave(m_qualifierStack, os, ".");
+        os << "." << symbol;
+    }
+    return result;
 }

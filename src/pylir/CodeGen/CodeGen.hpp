@@ -17,6 +17,7 @@ class CodeGen
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
     mlir::Value m_classNamespace{};
+    std::vector<std::string> m_qualifierStack;
 
     enum Kind
     {
@@ -54,6 +55,8 @@ class CodeGen
         return mlir::OpaqueLoc::get(
             &astObject, mlir::FileLineColLoc::get(m_builder.getIdentifier(m_document->getFilename()), line, col));
     }
+
+    std::string formQualifiedName(std::string_view symbol);
 
     void assignTarget(const Syntax::TargetList& targetList, mlir::Value value);
 
