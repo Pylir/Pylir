@@ -20,6 +20,13 @@ class CodeGen
     std::vector<std::string> m_qualifierStack;
     std::unordered_map<std::string, std::size_t> m_implNames;
 
+    struct Loop
+    {
+        mlir::Block* breakBlock;
+        mlir::Block* continueBlock;
+    };
+    std::vector<Loop> m_loopStack;
+
     enum Kind
     {
         Global,
@@ -106,7 +113,7 @@ public:
 
     void visit(const Syntax::Suite& suite);
 
-    void visit(const Syntax::SimpleStmt& simpleStmt);
+    void visit(const Syntax::SimpleStmt& continueStmt);
 
     void visit(const Syntax::AssignmentStmt& assignmentStmt);
 

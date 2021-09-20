@@ -83,6 +83,16 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO
             PYLIR_UNREACHABLE;
         },
+        [&](const Syntax::BreakStmt& breakStmt)
+        {
+            auto loc = getLoc(breakStmt, breakStmt.breakKeyword);
+            m_builder.create<mlir::BranchOp>(loc, m_loopStack.back().breakBlock);
+        },
+        [&](const Syntax::ContinueStmt& continueStmt)
+        {
+            auto loc = getLoc(continueStmt, continueStmt.continueKeyword);
+            m_builder.create<mlir::BranchOp>(loc, m_loopStack.back().continueBlock);
+        },
         [&](const Syntax::NonLocalStmt&) {},
         [&](const Syntax::GlobalStmt& globalStmt)
         {
@@ -90,7 +100,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             {
                 return;
             }
-            auto handleIdentifier = [&](const IdentifierToken& token) {
+            auto handleIdentifier = [&](const IdentifierToken& token)
+            {
                 auto result = m_scope[0].find(token.getValue());
                 PYLIR_ASSERT(result != m_scope[0].end());
                 getCurrentScope().insert(*result);
@@ -948,7 +959,53 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     m_builder.setInsertionPointToStart(thenBlock);
 }
 
-void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt) {}
+void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
+{
+    auto loc = getLoc(whileStmt, whileStmt.whileKeyword);
+    auto conditionBlock = new mlir::Block;
+    auto thenBlock = new mlir::Block;
+    m_builder.create<mlir::BranchOp>(loc, conditionBlock);
+    m_currentFunc.push_back(conditionBlock);
+
+    m_builder.setInsertionPointToStart(conditionBlock);
+    auto condition = visit(whileStmt.condition);
+    mlir::Block* elseBlock;
+    if (whileStmt.elseSection)
+    {
+        elseBlock = new mlir::Block;
+    }
+    else
+    {
+        elseBlock = thenBlock;
+    }
+    mlir::Block* body = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), body, elseBlock);
+
+    m_currentFunc.push_back(body);
+    m_builder.setInsertionPointToStart(body);
+    m_loopStack.push_back({thenBlock, conditionBlock});
+    std::optional exit = llvm::make_scope_exit([&] { m_loopStack.pop_back(); });
+    visit(*whileStmt.suite);
+    if (needsTerminator())
+    {
+        m_builder.create<mlir::BranchOp>(loc, conditionBlock);
+    }
+    exit.reset();
+
+    m_currentFunc.push_back(elseBlock);
+    m_builder.setInsertionPointToStart(elseBlock);
+    if (elseBlock == thenBlock)
+    {
+        return;
+    }
+    visit(*whileStmt.elseSection->suite);
+    if (needsTerminator())
+    {
+        m_builder.create<mlir::BranchOp>(loc, thenBlock);
+    }
+    m_currentFunc.push_back(thenBlock);
+    m_builder.setInsertionPointToStart(thenBlock);
+}
 
 void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt) {}
 
