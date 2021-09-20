@@ -281,15 +281,15 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
 
     m_builder.create<mlir::CondBranchOp>(loc, condition, found, elseBlock);
 
-    m_currentFunc.getCallableRegion()->push_back(found);
+    m_currentFunc.push_back(found);
     m_builder.setInsertionPointToStart(found);
     m_builder.create<mlir::BranchOp>(loc, thenBlock, visit(expression.value));
 
-    m_currentFunc.getCallableRegion()->push_back(elseBlock);
+    m_currentFunc.push_back(elseBlock);
     m_builder.setInsertionPointToStart(elseBlock);
     m_builder.create<mlir::BranchOp>(loc, thenBlock, visit(*expression.suffix->elseValue));
 
-    m_currentFunc.getCallableRegion()->push_back(thenBlock);
+    m_currentFunc.push_back(thenBlock);
     m_builder.setInsertionPointToStart(thenBlock);
     return thenBlock->getArgument(0);
 }
@@ -307,12 +307,12 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
             auto rhsTry = new mlir::Block;
             m_builder.create<mlir::CondBranchOp>(loc, toI1(lhs), found, lhs, rhsTry, mlir::ValueRange{});
 
-            m_currentFunc.getCallableRegion()->push_back(rhsTry);
+            m_currentFunc.push_back(rhsTry);
             m_builder.setInsertionPointToStart(rhsTry);
             auto rhs = visit(binOp->rhs);
             m_builder.create<mlir::BranchOp>(loc, found, rhs);
 
-            m_currentFunc.getCallableRegion()->push_back(found);
+            m_currentFunc.push_back(found);
             m_builder.setInsertionPointToStart(found);
             return found->getArgument(0);
         });
@@ -332,12 +332,12 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
             m_builder.create<mlir::CondBranchOp>(loc, toI1(lhs), rhsTry, mlir::ValueRange{}, found,
                                                  mlir::ValueRange{lhs});
 
-            m_currentFunc.getCallableRegion()->push_back(rhsTry);
+            m_currentFunc.push_back(rhsTry);
             m_builder.setInsertionPointToStart(rhsTry);
             auto rhs = visit(binOp->rhs);
             m_builder.create<mlir::BranchOp>(loc, found, rhs);
 
-            m_currentFunc.getCallableRegion()->push_back(found);
+            m_currentFunc.push_back(found);
             m_builder.setInsertionPointToStart(found);
             return found->getArgument(0);
         });
@@ -376,7 +376,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
             auto rhsTry = new mlir::Block;
             m_builder.create<mlir::CondBranchOp>(loc, toI1(result), found, result, rhsTry, mlir::ValueRange{});
 
-            m_currentFunc.getCallableRegion()->push_back(rhsTry);
+            m_currentFunc.push_back(rhsTry);
             m_builder.setInsertionPointToStart(rhsTry);
         }
 
@@ -434,7 +434,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         }
         m_builder.create<mlir::BranchOp>(loc, found, cmp);
 
-        m_currentFunc.getCallableRegion()->push_back(found);
+        m_currentFunc.push_back(found);
         m_builder.setInsertionPointToStart(found);
         result = found->getArgument(0);
     }
@@ -659,7 +659,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         mlir::Block* elseBlock = new mlir::Block;
         m_builder.create<mlir::CondBranchOp>(loc, tryGet.found(), classNamespaceFound, tryGet.result(), elseBlock,
                                              mlir::ValueRange{});
-        m_currentFunc.getCallableRegion()->push_back(elseBlock);
+        m_currentFunc.push_back(elseBlock);
         m_builder.setInsertionPointToStart(elseBlock);
 
         // if not found in locals, it does not import free variables but rather goes straight to the global scope.
@@ -680,7 +680,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         {
             return {};
         }
-        m_currentFunc.getCallableRegion()->push_back(classNamespaceFound);
+        m_currentFunc.push_back(classNamespaceFound);
         m_builder.setInsertionPointToStart(classNamespaceFound);
         return classNamespaceFound->getArgument(0);
     }
@@ -714,7 +714,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     m_builder.create<mlir::BranchOp>(loc, classNamespaceFound,
                                      mlir::ValueRange{m_builder.create<Py::LoadOp>(loc, handle)});
 
-    m_currentFunc.getCallableRegion()->push_back(classNamespaceFound);
+    m_currentFunc.push_back(classNamespaceFound);
     m_builder.setInsertionPointToStart(classNamespaceFound);
     return classNamespaceFound->getArgument(0);
 }
@@ -901,7 +901,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     auto loc = getLoc(ifStmt.ifKeyword, ifStmt.ifKeyword);
     m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), trueBlock, elseBlock);
 
-    m_currentFunc.getCallableRegion()->push_back(trueBlock);
+    m_currentFunc.push_back(trueBlock);
     m_builder.setInsertionPointToStart(trueBlock);
     visit(*ifStmt.suite);
     if (needsTerminator())
@@ -910,11 +910,11 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     }
     if (thenBlock == elseBlock)
     {
-        m_currentFunc.getCallableRegion()->push_back(thenBlock);
+        m_currentFunc.push_back(thenBlock);
         m_builder.setInsertionPointToStart(thenBlock);
         return;
     }
-    m_currentFunc.getCallableRegion()->push_back(elseBlock);
+    m_currentFunc.push_back(elseBlock);
     m_builder.setInsertionPointToStart(elseBlock);
     for (auto& iter : llvm::enumerate(ifStmt.elifs))
     {
@@ -932,7 +932,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
 
         m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), trueBlock, elseBlock);
 
-        m_currentFunc.getCallableRegion()->push_back(trueBlock);
+        m_currentFunc.push_back(trueBlock);
         m_builder.setInsertionPointToStart(trueBlock);
         visit(*iter.value().suite);
         if (needsTerminator())
@@ -941,7 +941,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         }
         if (thenBlock != elseBlock)
         {
-            m_currentFunc.getCallableRegion()->push_back(elseBlock);
+            m_currentFunc.push_back(elseBlock);
             m_builder.setInsertionPointToStart(elseBlock);
         }
     }
@@ -954,7 +954,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         }
     }
 
-    m_currentFunc.getCallableRegion()->push_back(thenBlock);
+    m_currentFunc.push_back(thenBlock);
     m_builder.setInsertionPointToStart(thenBlock);
 }
 
