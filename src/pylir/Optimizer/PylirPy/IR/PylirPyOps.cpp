@@ -205,6 +205,11 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return constant();
 }
 
+mlir::OpFoldResult pylir::Py::SingletonOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
+{
+    return singletonAttr();
+}
+
 mlir::OpFoldResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 1);
@@ -862,6 +867,8 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     }
     build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion));
 }
+
+#include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
 
 // TODO remove MLIR 14
 using namespace mlir;

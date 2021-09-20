@@ -16,3 +16,6 @@ True
 False
 
 # CHECK: constant #py.bool<False>
+
+None
+# CHECK: singleton None

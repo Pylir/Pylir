@@ -173,6 +173,35 @@ def PylirPy_MakeClassOp : PylirPy_Op<"makeClass"> {
     }];
 }
 
+def PylirPy_Singleton_None : I32EnumAttrCase<"None", 0>;
+def PylirPy_Singleton_NotImplemented : I32EnumAttrCase<"NotImplemented", 1>;
+def PylirPy_Singleton_Type : I32EnumAttrCase<"Type", 2, "type">;
+def PylirPy_Singleton_Object : I32EnumAttrCase<"Object", 3, "object">;
+def PylirPy_Singleton_Int : I32EnumAttrCase<"Int", 4, "int">;
+def PylirPy_Singleton_Float : I32EnumAttrCase<"Float", 5, "float">;
+def PylirPy_Singleton_Tuple : I32EnumAttrCase<"Tuple", 6, "tuple">;
+def PylirPy_Singleton_List : I32EnumAttrCase<"List", 7, "list">;
+def PylirPy_Singleton_Dict : I32EnumAttrCase<"Dict", 8, "dict">;
+def PylirPy_Singleton_Cell : I32EnumAttrCase<"Cell", 9, "cell">;
+
+def PylirPy_SingletonAttr : I32EnumAttr<"SingletonKind", "", [
+    PylirPy_Singleton_None, PylirPy_Singleton_NotImplemented, PylirPy_Singleton_Type, PylirPy_Singleton_Object,
+    PylirPy_Singleton_Int, PylirPy_Singleton_Float, PylirPy_Singleton_Tuple, PylirPy_Singleton_List,
+    PylirPy_Singleton_Dict, PylirPy_Singleton_Cell
+]> {
+       let cppNamespace = "::pylir::Py";
+}
+
+def PylirPy_SingletonOp : PylirPy_Op<"singleton", [ConstantLike]> {
+    let arguments = (ins PylirPy_SingletonAttr:$singleton);
+
+    let assemblyFormat = [{
+        $singleton attr-dict
+    }];
+
+    let hasFolder = 1;
+}
+
 def PylirPy_PowerOp : PylirPy_Op<"pow"> {
     let arguments = (ins DynamicType:$base, DynamicType:$exponent, Optional<DynamicType>:$mod);
 

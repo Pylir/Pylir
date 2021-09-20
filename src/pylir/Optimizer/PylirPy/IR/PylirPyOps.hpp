@@ -28,5 +28,7 @@ using IterArg = std::variant<mlir::Value, IterExpansion>;
 
 } // namespace pylir::Py
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.h.inc>
+
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.h.inc>

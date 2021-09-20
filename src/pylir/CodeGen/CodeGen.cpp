@@ -761,8 +761,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     return m_builder.create<Py::ConstantOp>(location, Py::BoolAttr::get(m_builder.getContext(), false));
                 }
                 case TokenType::NoneKeyword:
-                    // TODO:
-                    PYLIR_UNREACHABLE;
+                    return m_builder.create<Py::SingletonOp>(location, Py::SingletonKind::None);
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -1041,11 +1040,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         mlir::OpBuilder::InsertionGuard guard{m_builder};
         pylir::ValueReset reset(m_classNamespace, m_classNamespace);
         m_classNamespace = {};
-        // TODO return m_builder.getType<Py::DynamicType>()
         auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
         func = mlir::FuncOp::create(
             loc, formImplName(qualifiedName + "$impl"),
-            m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()), {}));
+            m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()),
+                                      {m_builder.getType<Py::DynamicType>()}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
         pylir::ValueReset resetFunc(m_currentFunc, m_currentFunc);
@@ -1072,8 +1071,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         visit(*funcDef.suite);
         if (needsTerminator())
         {
-            // TODO: return none
-            m_builder.create<mlir::ReturnOp>(loc);
+            m_builder.create<mlir::ReturnOp>(
+                loc, mlir::ValueRange{m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None)});
         }
     }
     mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, m_builder.getSymbolRefAttr(func));
