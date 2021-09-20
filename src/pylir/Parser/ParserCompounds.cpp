@@ -353,7 +353,7 @@ tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStm
     {
         return tl::unexpected{std::move(colon).error()};
     }
-    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    std::optional reset = pylir::ValueReset(m_inLoop, m_inLoop);
     m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
@@ -363,6 +363,7 @@ tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStm
     std::optional<Syntax::IfStmt::Else> elseSection;
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::ElseKeyword)
     {
+        reset.reset();
         auto parsedElse = parseElse();
         if (!parsedElse)
         {
@@ -402,7 +403,7 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
     {
         return tl::unexpected{std::move(colon).error()};
     }
-    pylir::ValueReset reset(m_inLoop, m_inLoop);
+    std::optional reset = pylir::ValueReset(m_inLoop, m_inLoop);
     m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
@@ -412,6 +413,7 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
     std::optional<Syntax::IfStmt::Else> elseSection;
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::ElseKeyword)
     {
+        reset.reset();
         auto parsedElse = parseElse();
         if (!parsedElse)
         {

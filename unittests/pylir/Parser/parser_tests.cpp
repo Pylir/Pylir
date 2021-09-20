@@ -40,6 +40,16 @@ TEST_CASE("Parse break continue statement", "[Parser")
     PARSER_EMITS("while True:\n    class Foo:\n        continue\n"
                  "",
                  pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
+    PARSER_EMITS("while True:\n"
+                 "  pass\n"
+                 "else:\n"
+                 "  break\n",
+                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
+    PARSER_EMITS("while True:\n"
+                 "  pass\n"
+                 "else:\n"
+                 "  continue\n",
+                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
 }
 
 TEST_CASE("Parse return statement", "[Parser]")
