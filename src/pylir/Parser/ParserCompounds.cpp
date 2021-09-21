@@ -781,7 +781,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
                 Syntax::ParameterList::StarArgs::DoubleStar{powerOf, std::move(*expandParameter), trailingComma}}}};
     };
 
-    Syntax::ParameterList::DefParameter* firstDefaultParameter = nullptr;
+    std::optional<IdentifierToken> firstDefaultParameter;
 
     auto parseParameterListNoPosOnlyPrefix = [&]() -> tl::expected<Syntax::ParameterList::NoPosOnly, std::string>
     {
@@ -803,7 +803,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
         }
         if (!firstDefaultParameter && first->defaultArg)
         {
-            firstDefaultParameter = &*first;
+            firstDefaultParameter = first->parameter.identifier;
         }
         else if (firstDefaultParameter && !first->defaultArg.has_value())
         {
@@ -813,8 +813,8 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
                     first->parameter.identifier.getValue())
                     .addLabel(first->parameter.identifier, std::nullopt, Diag::ERROR_COLOUR)
                     .addNote(*firstDefaultParameter, Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
-                             firstDefaultParameter->parameter.identifier.getValue())
-                    .addLabel(*firstDefaultParameter, std::nullopt, Diag::ERROR_COLOUR)
+                             firstDefaultParameter->getValue())
+                    .addLabel(*firstDefaultParameter, std::nullopt, Diag::NOTE_COLOUR)
                     .emitError()};
         }
         std::vector<std::pair<BaseToken, Syntax::ParameterList::DefParameter>> defParameters;
@@ -828,7 +828,7 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
             }
             if (!firstDefaultParameter && defParameter->defaultArg.has_value())
             {
-                firstDefaultParameter = &*defParameter;
+                firstDefaultParameter = defParameter->parameter.identifier;
             }
             else if (firstDefaultParameter && !defParameter->defaultArg.has_value())
             {
@@ -839,8 +839,8 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
                         defParameter->parameter.identifier.getValue())
                         .addLabel(defParameter->parameter.identifier, std::nullopt, Diag::ERROR_COLOUR)
                         .addNote(*firstDefaultParameter, Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
-                                 firstDefaultParameter->parameter.identifier.getValue())
-                        .addLabel(*firstDefaultParameter, std::nullopt, Diag::ERROR_COLOUR)
+                                 firstDefaultParameter->getValue())
+                        .addLabel(*firstDefaultParameter, std::nullopt, Diag::NOTE_COLOUR)
                         .emitError()};
             }
             defParameters.emplace_back(comma, std::move(*defParameter));
