@@ -159,7 +159,7 @@ def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [DeclareOpInterfaceMethods<Symbo
     }];
 }
 
-def PylirPy_MakeClassOp : PylirPy_Op<"makeClass"> {
+def PylirPy_MakeClassOp : PylirPy_Op<"makeClass", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$initFunc, DynamicType:$name, DynamicType:$bases, DynamicType:$keywords);
 
     let assemblyFormat = "$name `,` $initFunc `,` $bases `,` $keywords attr-dict";
@@ -192,7 +192,7 @@ def PylirPy_SingletonAttr : I32EnumAttr<"SingletonKind", "", [
        let cppNamespace = "::pylir::Py";
 }
 
-def PylirPy_SingletonOp : PylirPy_Op<"singleton", [ConstantLike]> {
+def PylirPy_SingletonOp : PylirPy_Op<"singleton", [ConstantLike, NoSideEffect]> {
     let arguments = (ins PylirPy_SingletonAttr:$singleton);
 
     let assemblyFormat = [{

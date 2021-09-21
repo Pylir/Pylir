@@ -809,6 +809,11 @@ mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableC
     return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, function()));
 }
 
+mlir::LogicalResult pylir::Py::MakeClassOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, initFunc()));
+}
+
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                    const std::vector<::pylir::Py::IterArg>& args)
 {
