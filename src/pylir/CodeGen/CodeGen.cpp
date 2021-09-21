@@ -83,6 +83,18 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO
             PYLIR_UNREACHABLE;
         },
+        [&](const Syntax::ReturnStmt& returnStmt)
+        {
+            auto loc = getLoc(returnStmt, returnStmt.returnKeyword);
+            if (!returnStmt.expressions)
+            {
+                auto none = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None);
+                m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{none});
+                return;
+            }
+            auto value = visit(*returnStmt.expressions);
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{value});
+        },
         [&](const Syntax::BreakStmt& breakStmt)
         {
             auto loc = getLoc(breakStmt, breakStmt.breakKeyword);
