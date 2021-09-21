@@ -1027,7 +1027,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
     // TODO: default args, cells etc
-    std::size_t argCount = 0;
+    std::vector<IdentifierToken> argumentNames;
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
     if (funcDef.parameterList)
@@ -1035,7 +1035,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         class ParamVisitor : public Syntax::Visitor<ParamVisitor>
         {
         public:
-            std::size_t& count;
+            std::vector<IdentifierToken>& argumentNames;
             std::vector<Py::IterArg>& defaultParameters;
             std::vector<Py::DictArg>& keywordOnlyDefaultParameters;
             std::function<mlir::Value(const Syntax::Expression&)> calcCallback;
@@ -1045,9 +1045,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 
             using Visitor::visit;
 
-            void visit(const Syntax::ParameterList::Parameter&)
+            void visit(const Syntax::ParameterList::Parameter& param)
             {
-                count++;
+                argumentNames.push_back(param.identifier);
             }
 
             void visit(const Syntax::ParameterList::DefParameter& defParameter)
@@ -1078,7 +1078,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 Visitor::visit(star);
             }
         } visitor{{},
-                  argCount,
+                  argumentNames,
                   defaultParameters,
                   keywordOnlyDefaultParameters,
                   [this](const Syntax::Expression& expression) { return visit(expression); },
@@ -1095,8 +1095,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         m_classNamespace = {};
         func = mlir::FuncOp::create(
             loc, formImplName(qualifiedName + "$impl"),
-            m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()),
-                                      {m_builder.getType<Py::DynamicType>()}));
+            m_builder.getFunctionType(
+                std::vector<mlir::Type>(argumentNames.size(), m_builder.getType<Py::DynamicType>()),
+                {m_builder.getType<Py::DynamicType>()}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
         pylir::ValueReset resetFunc(m_currentFunc, m_currentFunc);
@@ -1114,7 +1115,18 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 m_qualifierStack.pop_back();
                 m_qualifierStack.pop_back();
             });
-        for (auto& iter : funcDef.localVariables)
+        for (auto [name, value] : llvm::zip(argumentNames, func.getArguments()))
+        {
+            auto allocaOp = m_builder.create<Py::AllocaOp>(getLoc(name, name));
+            m_scope.back().emplace(name.getValue(), Identifier{Kind::StackAlloc, allocaOp});
+            m_builder.create<Py::StoreOp>(loc, value, allocaOp);
+        }
+        auto set = funcDef.localVariables;
+        for (auto& iter : argumentNames)
+        {
+            set.erase(iter);
+        }
+        for (auto& iter : set)
         {
             m_scope.back().emplace(iter.getValue(),
                                    Identifier{Kind::StackAlloc, m_builder.create<Py::AllocaOp>(getLoc(iter, iter))});
