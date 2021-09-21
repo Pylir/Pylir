@@ -781,6 +781,8 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
                 Syntax::ParameterList::StarArgs::DoubleStar{powerOf, std::move(*expandParameter), trailingComma}}}};
     };
 
+    Syntax::ParameterList::DefParameter* firstDefaultParameter = nullptr;
+
     auto parseParameterListNoPosOnlyPrefix = [&]() -> tl::expected<Syntax::ParameterList::NoPosOnly, std::string>
     {
         if (m_current != m_lexer.end()
@@ -799,6 +801,22 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
         {
             return tl::unexpected{std::move(first).error()};
         }
+        if (!firstDefaultParameter && first->defaultArg)
+        {
+            firstDefaultParameter = &*first;
+        }
+        else if (firstDefaultParameter && !first->defaultArg.has_value())
+        {
+            return tl::unexpected{
+                createDiagnosticsBuilder(
+                    *first, Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
+                    first->parameter.identifier.getValue())
+                    .addLabel(first->parameter.identifier, std::nullopt, Diag::ERROR_COLOUR)
+                    .addNote(*firstDefaultParameter, Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
+                             firstDefaultParameter->parameter.identifier.getValue())
+                    .addLabel(*firstDefaultParameter, std::nullopt, Diag::ERROR_COLOUR)
+                    .emitError()};
+        }
         std::vector<std::pair<BaseToken, Syntax::ParameterList::DefParameter>> defParameters;
         while (lookaheadEquals(std::array{TokenType::Comma, TokenType::Identifier}))
         {
@@ -807,6 +825,23 @@ tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parsePara
             if (!defParameter)
             {
                 return tl::unexpected{std::move(defParameter).error()};
+            }
+            if (!firstDefaultParameter && defParameter->defaultArg.has_value())
+            {
+                firstDefaultParameter = &*defParameter;
+            }
+            else if (firstDefaultParameter && !defParameter->defaultArg.has_value())
+            {
+                return tl::unexpected{
+                    createDiagnosticsBuilder(
+                        *defParameter,
+                        Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
+                        defParameter->parameter.identifier.getValue())
+                        .addLabel(defParameter->parameter.identifier, std::nullopt, Diag::ERROR_COLOUR)
+                        .addNote(*firstDefaultParameter, Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
+                                 firstDefaultParameter->parameter.identifier.getValue())
+                        .addLabel(*firstDefaultParameter, std::nullopt, Diag::ERROR_COLOUR)
+                        .emitError()};
             }
             defParameters.emplace_back(comma, std::move(*defParameter));
         }

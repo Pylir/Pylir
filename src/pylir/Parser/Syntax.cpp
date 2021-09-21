@@ -322,3 +322,25 @@ std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax:
     }
     return {first.first, last.second};
 }
+
+std::pair<std::size_t, std::size_t>
+    pylir::Diag::LocationProvider<pylir::Syntax::ParameterList::Parameter, void>::getRange(
+        const Syntax::ParameterList::Parameter& parameter) noexcept
+{
+    if (!parameter.type)
+    {
+        return range(parameter.identifier);
+    }
+    return {range(parameter.identifier).first, range(parameter.type->second).second};
+}
+
+std::pair<std::size_t, std::size_t>
+    pylir::Diag::LocationProvider<pylir::Syntax::ParameterList::DefParameter, void>::getRange(
+        const Syntax::ParameterList::DefParameter& defParameter) noexcept
+{
+    if (!defParameter.defaultArg)
+    {
+        return range(defParameter.parameter);
+    }
+    return {range(defParameter.parameter).first, range(defParameter.defaultArg->second).second};
+}

@@ -113,4 +113,9 @@ constexpr auto OCCURRENCE_OF_N_OUTSIDE_OF_LOOP = FMT_STRING("occurrence of {:q^}
 
 constexpr auto OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION = FMT_STRING("occurrence of 'return' outside of function");
 
+constexpr auto NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS =
+    FMT_STRING("no default argument for parameter '{}' following parameters with default arguments");
+
+constexpr auto PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE = FMT_STRING("parameter '{}' with default argument here");
+
 } // namespace pylir::Diag

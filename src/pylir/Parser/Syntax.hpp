@@ -1470,4 +1470,17 @@ struct LocationProvider<Syntax::ArgumentList, void>
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::ArgumentList& argumentList) noexcept;
 };
 
+template <>
+struct LocationProvider<Syntax::ParameterList::Parameter, void>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ParameterList::Parameter& parameter) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::ParameterList::DefParameter, void>
+{
+    static std::pair<std::size_t, std::size_t>
+        getRange(const Syntax::ParameterList::DefParameter& defParameter) noexcept;
+};
+
 } // namespace pylir::Diag

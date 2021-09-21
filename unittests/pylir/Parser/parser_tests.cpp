@@ -165,3 +165,13 @@ TEST_CASE("Parse namespaces", "[Parser]")
                  "        nonlocal a\n",
                  pylir::Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION, "a");
 }
+
+TEST_CASE("Parse function definition", "[Parser]")
+{
+    PARSER_EMITS("def foo(a = 3,c):\n"
+                 "  pass",
+                 pylir::Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS, "c");
+    PARSER_EMITS("def foo(a = 3, /, c):\n"
+                 "  pass",
+                 pylir::Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS, "c");
+}
