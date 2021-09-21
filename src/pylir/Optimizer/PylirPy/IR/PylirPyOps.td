@@ -43,7 +43,7 @@ def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
     let results = (outs);
 
     let assemblyFormat = [{
-        $attribute `from` $object `to` $value attr-dict
+        $attribute `of` $object `to` $value attr-dict
     }];
 }
 

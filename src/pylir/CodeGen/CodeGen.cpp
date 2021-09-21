@@ -1016,31 +1016,71 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
     // TODO: default args, cells etc
     std::size_t argCount = 0;
+    std::vector<Py::IterArg> defaultParameters;
+    std::vector<Py::DictArg> keywordOnlyDefaultParameters;
     if (funcDef.parameterList)
     {
         class ParamVisitor : public Syntax::Visitor<ParamVisitor>
         {
-            std::size_t& m_count;
-
         public:
-            explicit ParamVisitor(std::size_t& count) : m_count(count) {}
+            std::size_t& count;
+            std::vector<Py::IterArg>& defaultParameters;
+            std::vector<Py::DictArg>& keywordOnlyDefaultParameters;
+            std::function<mlir::Value(const Syntax::Expression&)> calcCallback;
+            mlir::OpBuilder& builder;
+            std::function<mlir::Location(const IdentifierToken&)> locCallback;
+            bool keywordOnly = false;
 
             using Visitor::visit;
 
             void visit(const Syntax::ParameterList::Parameter&)
             {
-                m_count++;
+                count++;
             }
-        } visitor(argCount);
+
+            void visit(const Syntax::ParameterList::DefParameter& defParameter)
+            {
+                Visitor::visit(defParameter);
+                if (!defParameter.defaultArg)
+                {
+                    return;
+                }
+                auto value = calcCallback(defParameter.defaultArg->second);
+                if (!keywordOnly)
+                {
+                    defaultParameters.push_back(value);
+                    return;
+                }
+                auto name =
+                    builder.create<Py::ConstantOp>(locCallback(defParameter.parameter.identifier),
+                                                   builder.getStringAttr(defParameter.parameter.identifier.getValue()));
+                keywordOnlyDefaultParameters.push_back(std::pair{name, value});
+            }
+
+            void visit(const Syntax::ParameterList::StarArgs& star)
+            {
+                if (std::holds_alternative<Syntax::ParameterList::StarArgs::Star>(star.variant))
+                {
+                    keywordOnly = true;
+                }
+                Visitor::visit(star);
+            }
+        } visitor{{},
+                  argCount,
+                  defaultParameters,
+                  keywordOnlyDefaultParameters,
+                  [this](const Syntax::Expression& expression) { return visit(expression); },
+                  m_builder,
+                  [this](const IdentifierToken& token) { return getLoc(token, token); }};
         visitor.visit(*funcDef.parameterList);
     }
     auto loc = getLoc(funcDef.funcName, funcDef.funcName);
+    auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
     mlir::FuncOp func;
     {
         mlir::OpBuilder::InsertionGuard guard{m_builder};
         pylir::ValueReset reset(m_classNamespace, m_classNamespace);
         m_classNamespace = {};
-        auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
         func = mlir::FuncOp::create(
             loc, formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(std::vector<mlir::Type>(argCount, m_builder.getType<Py::DynamicType>()),
@@ -1076,6 +1116,35 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
     }
     mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, m_builder.getSymbolRefAttr(func));
+    m_builder.create<Py::SetAttrOp>(
+        loc, m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(funcDef.funcName.getValue())), value,
+        m_builder.getStringAttr("__name__"));
+    m_builder.create<Py::SetAttrOp>(loc, m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(qualifiedName)),
+                                    value, m_builder.getStringAttr("__qualname__"));
+    {
+        mlir::Value defaults;
+        if (defaultParameters.empty())
+        {
+            defaults = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None);
+        }
+        else
+        {
+            defaults = m_builder.create<Py::MakeTupleOp>(loc, defaultParameters);
+        }
+        m_builder.create<Py::SetAttrOp>(loc, defaults, value, m_builder.getStringAttr("__defaults__"));
+    }
+    {
+        mlir::Value kwDefaults;
+        if (keywordOnlyDefaultParameters.empty())
+        {
+            kwDefaults = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None);
+        }
+        else
+        {
+            kwDefaults = m_builder.create<Py::MakeDictOp>(loc, keywordOnlyDefaultParameters);
+        }
+        m_builder.create<Py::SetAttrOp>(loc, kwDefaults, value, m_builder.getStringAttr("__kwdefaults__"));
+    }
     for (auto& iter : llvm::reverse(funcDef.decorators))
     {
         auto decLoc = getLoc(iter.atSign, iter.atSign);
