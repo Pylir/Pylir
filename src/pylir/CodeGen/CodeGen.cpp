@@ -1115,21 +1115,39 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 m_qualifierStack.pop_back();
                 m_qualifierStack.pop_back();
             });
+        auto locals = funcDef.localVariables;
+        auto closures = funcDef.closures;
         for (auto [name, value] : llvm::zip(argumentNames, func.getArguments()))
         {
-            auto allocaOp = m_builder.create<Py::AllocaOp>(getLoc(name, name));
-            m_scope.back().emplace(name.getValue(), Identifier{Kind::StackAlloc, allocaOp});
-            m_builder.create<Py::StoreOp>(loc, value, allocaOp);
+            if (funcDef.closures.count(name))
+            {
+                auto closureType = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::Cell);
+                auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{value});
+                auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+                auto cell = m_builder.create<Py::NewOp>(loc, closureType, tuple, emptyDict);
+                m_scope.back().emplace(name.getValue(), Identifier{Kind::Cell, cell});
+                closures.erase(name);
+            }
+            else
+            {
+                auto allocaOp = m_builder.create<Py::AllocaOp>(getLoc(name, name));
+                m_scope.back().emplace(name.getValue(), Identifier{Kind::StackAlloc, allocaOp});
+                m_builder.create<Py::StoreOp>(loc, value, allocaOp);
+                locals.erase(name);
+            }
         }
-        auto set = funcDef.localVariables;
-        for (auto& iter : argumentNames)
-        {
-            set.erase(iter);
-        }
-        for (auto& iter : set)
+        for (auto& iter : locals)
         {
             m_scope.back().emplace(iter.getValue(),
                                    Identifier{Kind::StackAlloc, m_builder.create<Py::AllocaOp>(getLoc(iter, iter))});
+        }
+        for (auto& iter : closures)
+        {
+            auto closureType = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::Cell);
+            auto emptyTuple = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext(), {}));
+            auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+            auto cell = m_builder.create<Py::NewOp>(loc, closureType, emptyTuple, emptyDict);
+            m_scope.back().emplace(iter.getValue(), Identifier{Kind::Cell, cell});
         }
 
         visit(*funcDef.suite);

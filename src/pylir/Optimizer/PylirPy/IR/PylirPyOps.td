@@ -173,6 +173,24 @@ def PylirPy_MakeClassOp : PylirPy_Op<"makeClass", [DeclareOpInterfaceMethods<Sym
     }];
 }
 
+def PylirPy_NewOp : PylirPy_Op<"new"> {
+    let arguments = (ins DynamicType:$type,
+                         DynamicType:$tuple,
+                         DynamicType:$dict);
+
+    let assemblyFormat = [{
+            $type `(` `*` $tuple `,` `*``*` $dict `)` attr-dict
+    }];
+
+    let verifier = [{
+        if (!isStrictTuple(tuple()) || !isStrictDict(dict()))
+        {
+            return emitError("tuple and dict operands must be makeTuple, makeDict or tuple or dict constant ops");
+        }
+        return mlir::success();
+    }];
+}
+
 def PylirPy_Singleton_None : I32EnumAttrCase<"None", 0>;
 def PylirPy_Singleton_NotImplemented : I32EnumAttrCase<"NotImplemented", 1>;
 def PylirPy_Singleton_Type : I32EnumAttrCase<"Type", 2, "type">;
