@@ -51,8 +51,9 @@ class Parser
 
     void addToNamespace(const Syntax::TargetList& targetList);
 
-    std::optional<std::string> finishNamespace(pylir::Syntax::Suite& suite, const IdentifierSet& nonLocals,
-                                               std::vector<const pylir::IdentifierSet*> scopes = {});
+    tl::expected<IdentifierSet, std::string> finishNamespace(pylir::Syntax::Suite& suite,
+                                                             const IdentifierSet& nonLocals,
+                                                             std::vector<const pylir::IdentifierSet*> scopes = {});
 
     bool lookaheadEquals(tcb::span<const TokenType> tokens);
 

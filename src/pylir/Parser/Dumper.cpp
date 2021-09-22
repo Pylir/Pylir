@@ -1138,6 +1138,10 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
     {
         builder.add(dumpVariables(funcDef.nonLocalVariables), "nonlocals");
     }
+    if (!funcDef.closures.empty())
+    {
+        builder.add(dumpVariables(funcDef.closures), "closures");
+    }
     return builder.add(*funcDef.suite).emit();
 }
 

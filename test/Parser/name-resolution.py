@@ -14,12 +14,14 @@ def foo():
 
 
 # CHECK-LABEL: function foo
-# CHECK: locals: a, c
+# CHECK: locals: inner
 # CHECK-NOT: nonlocals:
+# CHECK: closures: a, c
 
 # CHECK-LABEL: function inner
 # CHECK: locals: b
 # CHECK: nonlocals: a, c
+# CHECK-NOT: closures:
 
 def outer():
     def inner():
@@ -30,14 +32,17 @@ def outer():
 
 
 # CHECK-LABEL: function outer
-# CHECK: locals: inner, x
+# CHECK: locals: inner
+# CHECK: closures: x
 
 # CHECK-LABEL: function inner
 # CHECK: locals: inner2
 # CHECK: nonlocals: x
+# CHECK-NOT: closures:
 # CHECk_LABEL: function inner2
 # CHECK-NOT: locals:
 # CHECK: nonlocals: x
+# CHECK-NOT: closures:
 
 x = 0
 
@@ -50,11 +55,14 @@ def outer2():
 
 
 # CHECK-LABEL: function outer2
-# CHECK: locals: inner, x
+# CHECK: locals: inner
+# CHECK-NOT: nonlocals
+# CHECK: closures: x
 
 # CHECK-LABEL: function inner
 # CHECK-NOT: locals:
 # CHECK: nonlocals: x
+# CHECK-NOT: closures:
 
 def outer3():
     y = 3
@@ -68,13 +76,17 @@ def outer3():
 
 
 # CHECK-LABEL: function outer3
-# CHECK: locals: Foo, y
+# CHECK: locals: Foo
+# CHECK: closures: y
+# CHECK-NOT: closures:
 # CHECK-LABEL: class Foo
 # CHECK: locals: foo
 # CHECK: nonlocals: y
+# CHECK-NOT: closures:
 # CHECK-LABEL: function foo
 # CHECK: locals: self
 # CHECK: nonlocals: y
+# CHECK-NOT: closures:
 
 def bar():
     x = 3
@@ -86,15 +98,21 @@ def bar():
                     nonlocal x
 
 # CHECK-LABEL: function bar
-# CHECK: locals: Bar, x
+# CHECK: locals: Bar
+# CHECK: closures: x
 # CHECK-LABEL: class Bar
 # CHECK: locals: outer
 # CHECK: nonlocals: x
+# CHECK-NOT: closures:
 # CHECK-LABEL: function outer
 # CHECK: locals: inner, self
+# CHECK: nonlocals: x
+# CHECK-NOT: closures:
 # CHECK-LABEL: function inner
 # CHECK: locals: inner2
 # CHECK: nonlocals: x
+# CHECK-NOT: closures:
 # CHECk_LABEL: function inner2
 # CHECK-NOT: locals:
 # CHECK: nonlocals: x
+# CHECK-NOT: closures:

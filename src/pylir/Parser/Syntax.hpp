@@ -1160,6 +1160,7 @@ struct FuncDef
 
     IdentifierSet localVariables;
     IdentifierSet nonLocalVariables;
+    IdentifierSet closures;
     IdentifierSet unknown; // only temporarily used
 };
 

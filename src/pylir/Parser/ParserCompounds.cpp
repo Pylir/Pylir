@@ -967,20 +967,26 @@ class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
 
         // add any non locals from nested functions except if they are local to this function aka the referred
         // to local
-        if (std::holds_alternative<std::monostate>(parentDef))
-        {
-            return;
-        }
-
         for (auto& iter : def.nonLocalVariables)
         {
             pylir::match(
-                parentDef, [](std::monostate) {},
+                parentDef,
+                [&](std::monostate)
+                {
+                    // Any non locals going up that haven't caused an error are from the very top level function at
+                    // global scope
+                    closures.insert(iter);
+                },
                 [&](pylir::Syntax::FuncDef* funcDef)
                 {
-                    if (!funcDef->localVariables.count(iter))
+                    if (auto result = funcDef->localVariables.find(iter); result == funcDef->localVariables.end())
                     {
                         funcDef->nonLocalVariables.insert(iter);
+                    }
+                    else
+                    {
+                        funcDef->localVariables.erase(result);
+                        funcDef->closures.insert(iter);
                     }
                 },
                 [&](pylir::Syntax::ClassDef* classDef) { classDef->nonLocalVariables.insert(iter); });
@@ -992,6 +998,7 @@ public:
     std::function<std::string(const pylir::IdentifierToken&)> onError;
     std::optional<std::string> error;
     std::variant<std::monostate, pylir::Syntax::FuncDef*, pylir::Syntax::ClassDef*> parentDef;
+    pylir::IdentifierSet closures;
 
     using Visitor::visit;
 
@@ -1025,14 +1032,16 @@ public:
 
 } // namespace
 
-std::optional<std::string> pylir::Parser::finishNamespace(pylir::Syntax::Suite& suite, const IdentifierSet& nonLocals,
-                                                          std::vector<const pylir::IdentifierSet*> scopes)
+tl::expected<pylir::IdentifierSet, std::string>
+    pylir::Parser::finishNamespace(pylir::Syntax::Suite& suite, const IdentifierSet& nonLocals,
+                                   std::vector<const pylir::IdentifierSet*> scopes)
 {
     if (auto first = nonLocals.begin(); first != nonLocals.end())
     {
-        return createDiagnosticsBuilder(*first, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, first->getValue())
-            .addLabel(*first, std::nullopt, Diag::ERROR_COLOUR)
-            .emitError();
+        return tl::unexpected{
+            createDiagnosticsBuilder(*first, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, first->getValue())
+                .addLabel(*first, std::nullopt, Diag::ERROR_COLOUR)
+                .emitError()};
     }
     NamespaceVisitor visitor{{},
                              std::move(scopes),
@@ -1044,9 +1053,14 @@ std::optional<std::string> pylir::Parser::finishNamespace(pylir::Syntax::Suite& 
                                      .emitError();
                              },
                              {},
+                             {},
                              {}};
     visitor.visit(suite);
-    return std::move(visitor.error);
+    if (visitor.error)
+    {
+        return tl::unexpected{std::move(*visitor.error)};
+    }
+    return std::move(visitor.closures);
 }
 
 tl::expected<pylir::Syntax::FuncDef, std::string>
@@ -1127,6 +1141,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     auto suite = parseSuite();
     IdentifierSet locals;
     IdentifierSet nonLocals;
+    IdentifierSet closures;
     IdentifierSet unknowns;
 
     for (auto& [token, kind] : m_namespace.back().identifiers)
@@ -1155,9 +1170,15 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
         // it. CodeGen will issue NameErrors if need be
         unknowns.clear();
 
-        if (auto error = finishNamespace(*suite, nonLocals, {&locals}))
+        auto error = finishNamespace(*suite, nonLocals, {&locals});
+        if (!error)
         {
-            return tl::unexpected{std::move(*error)};
+            return tl::unexpected{std::move(error.error())};
+        }
+        closures = std::move(*error);
+        for (auto& iter : closures)
+        {
+            locals.erase(iter);
         }
     }
 
@@ -1173,6 +1194,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
                            std::make_unique<Syntax::Suite>(std::move(*suite)),
                            std::move(locals),
                            std::move(nonLocals),
+                           std::move(closures),
                            std::move(unknowns)};
 }
 
@@ -1248,9 +1270,9 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     {
         // unknowns can't be nonlocal because locals don't exist at global scope anymore
         unknowns.clear();
-        if (auto error = finishNamespace(*suite, nonLocals))
+        if (auto error = finishNamespace(*suite, nonLocals); !error)
         {
-            return tl::unexpected{std::move(*error)};
+            return tl::unexpected{std::move(error.error())};
         }
     }
     return Syntax::ClassDef{std::move(decorators),
