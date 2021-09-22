@@ -651,8 +651,8 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
         case StackAlloc: handle = result->second.op->getResult(0); break;
         case Cell:
             m_builder.create<Py::SetAttrOp>(loc, value, result->second.op->getResult(0),
-                                            m_builder.getStringAttr("cell_content"));
-            break;
+                                            m_builder.getStringAttr("cell_contents"));
+            return;
     }
     m_builder.create<Py::StoreOp>(loc, value, handle);
 }
@@ -705,7 +705,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         case StackAlloc: handle = result->second.op->getResult(0); break;
         case Cell:
             return m_builder.create<Py::GetAttrOp>(loc, result->second.op->getResult(0),
-                                                   m_builder.getStringAttr("cell_content"));
+                                                   m_builder.getStringAttr("cell_contents"));
     }
     auto condition = m_builder.create<Py::IsUnboundOp>(loc, handle);
     auto unbound = new mlir::Block;
@@ -1026,7 +1026,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
-    // TODO: default args, cells etc
+    // TODO: adapter for calling convention
     std::vector<IdentifierToken> argumentNames;
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
@@ -1088,6 +1088,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     }
     auto loc = getLoc(funcDef.funcName, funcDef.funcName);
     auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
+    std::vector<IdentifierToken> usedClosures;
     mlir::FuncOp func;
     {
         mlir::OpBuilder::InsertionGuard guard{m_builder};
@@ -1096,7 +1097,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         func = mlir::FuncOp::create(
             loc, formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(
-                std::vector<mlir::Type>(argumentNames.size(), m_builder.getType<Py::DynamicType>()),
+                std::vector<mlir::Type>(1 + argumentNames.size(), m_builder.getType<Py::DynamicType>()),
                 {m_builder.getType<Py::DynamicType>()}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
@@ -1117,7 +1118,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             });
         auto locals = funcDef.localVariables;
         auto closures = funcDef.closures;
-        for (auto [name, value] : llvm::zip(argumentNames, func.getArguments()))
+        for (auto [name, value] : llvm::zip(argumentNames, llvm::drop_begin(func.getArguments())))
         {
             if (funcDef.closures.count(name))
             {
@@ -1148,6 +1149,19 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
             auto cell = m_builder.create<Py::NewOp>(loc, closureType, emptyTuple, emptyDict);
             m_scope.back().emplace(iter.getValue(), Identifier{Kind::Cell, cell});
+        }
+        if (!funcDef.nonLocalVariables.empty())
+        {
+            auto self = func.getArgument(0);
+            auto closureTuple = m_builder.create<Py::GetAttrOp>(loc, self, m_builder.getStringAttr("__closure__"));
+            for (auto& iter : llvm::enumerate(funcDef.nonLocalVariables))
+            {
+                auto constant = m_builder.create<Py::ConstantOp>(
+                    loc, Py::IntAttr::get(m_builder.getContext(), BigInt(iter.index())));
+                auto cell = m_builder.create<Py::GetItemOp>(loc, closureTuple, constant);
+                m_scope.back().emplace(iter.value().getValue(), Identifier{Kind::Cell, cell});
+                usedClosures.push_back(iter.value());
+            }
         }
 
         visit(*funcDef.suite);
@@ -1186,6 +1200,26 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             kwDefaults = m_builder.create<Py::MakeDictOp>(loc, keywordOnlyDefaultParameters);
         }
         m_builder.create<Py::SetAttrOp>(loc, kwDefaults, value, m_builder.getStringAttr("__kwdefaults__"));
+    }
+    {
+        mlir::Value closure;
+        if (usedClosures.empty())
+        {
+            closure = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None);
+        }
+        else
+        {
+            std::vector<Py::IterArg> args(usedClosures.size());
+            std::transform(usedClosures.begin(), usedClosures.end(), args.begin(),
+                           [&](const IdentifierToken& token) -> Py::IterArg
+                           {
+                               auto result = getCurrentScope().find(token.getValue());
+                               PYLIR_ASSERT(result != getCurrentScope().end());
+                               return result->second.op->getResult(0);
+                           });
+            closure = m_builder.create<Py::MakeTupleOp>(loc, args);
+        }
+        m_builder.create<Py::SetAttrOp>(loc, closure, value, m_builder.getStringAttr("__closure__"));
     }
     for (auto& iter : llvm::reverse(funcDef.decorators))
     {

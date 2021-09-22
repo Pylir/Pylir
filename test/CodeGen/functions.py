@@ -13,6 +13,8 @@
 # CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
 # CHECK: %[[KWDEFAULTS:.*]] = py.singleton None
 # CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
+# CHECK: %[[CLOSURE:.*]] = py.singleton None
+# CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
 # CHECK: %[[FOO:.*]] = py.getGlobal @foo
 # CHECK: py.store %[[RES]] into %[[FOO]]
 
@@ -24,10 +26,8 @@ def foo():
 
 # CHECK-LABEL: func private @"foo$impl[0]"
 
-# CHECK: %[[X:.*]] = py.alloca
-# CHECK: %[[BAR:.*]] = py.alloca
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: py.store %[[THREE]] into %[[X]]
+# CHECK: py.store %[[THREE]] into %{{.*}}
 
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK: %[[ONE:.*]] = py.constant #py.int<1>
@@ -41,9 +41,12 @@ def foo():
 # CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
 # CHECK: %[[KWDEFAULTS:.*]] = py.makeDict (%[[C]] : %[[ONE]])
 # CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
-# CHECK: py.store %[[RES]] into %[[BAR]]
+# CHECK: %[[CLOSURE:.*]] = py.singleton None
+# CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
+# CHECK: py.store %[[RES]] into %{{.*}}
 
 # CHECK: func private @"foo.<locals>.bar$impl[0]"
+# CHECK-SAME: %{{[[:alnum:]]+}}
 # CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 # CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 # CHECK: %[[a:.*]] = py.alloc
