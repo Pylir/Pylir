@@ -297,7 +297,8 @@ def PylirPy_InOp : PylirPy_BinOp<"in"> {
 // Conversions
 
 def PylirPy_BoolToI1Op : PylirPy_Op<"boolToI1"> {
-    let arguments = (ins I1:$input);
+    let arguments = (ins DynamicType:$input);
+    let results = (outs I1:$result);
 
     let assemblyFormat = "$input attr-dict";
 
