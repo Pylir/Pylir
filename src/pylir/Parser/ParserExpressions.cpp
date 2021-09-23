@@ -6,6 +6,12 @@
 
 tl::expected<pylir::Syntax::YieldExpression, std::string> pylir::Parser::parseYieldExpression()
 {
+    if (!m_inFunc)
+    {
+        return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION)
+                                  .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
+                                  .emitError()};
+    }
     auto yield = expect(TokenType::YieldKeyword);
     if (!yield)
     {

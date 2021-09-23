@@ -64,6 +64,18 @@ TEST_CASE("Parse return statement", "[Parser]")
                  pylir::Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION);
 }
 
+TEST_CASE("Parse yield expression", "[Parser]")
+{
+    PARSER_EMITS("yield 5", pylir::Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION);
+    PARSER_EMITS("class Foo:\n"
+                 "    yield 5",
+                 pylir::Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION);
+    PARSER_EMITS("def foo():\n"
+                 "    class Foo:\n"
+                 "        yield 5",
+                 pylir::Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION);
+}
+
 TEST_CASE("Parse assignment statement", "[Parser]")
 {
     PARSER_EMITS("= 3", pylir::Diag::EXPECTED_N_BEFORE_N, "identifier", "assignment");
@@ -83,7 +95,7 @@ TEST_CASE("Parse assignment statement", "[Parser]")
     PARSER_EMITS("{5} = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "set display");
     PARSER_EMITS("[5 for c in f] = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "list display");
     PARSER_EMITS("[5] = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "literal");
-    PARSER_EMITS("(yield 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "yield expression");
+    PARSER_EMITS("def foo():(yield 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "yield expression");
     PARSER_EMITS("(c for c in f) = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "generator expression");
 }
 

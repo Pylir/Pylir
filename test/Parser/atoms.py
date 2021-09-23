@@ -34,10 +34,11 @@ False
 # CHECK-NEXT: atom 5
 # CHECK-NEXT: atom 3
 
-(yield from 5)
-(yield)
-(yield 5)
-(yield 5, 5,)
+def foo():
+    (yield from 5)
+    (yield)
+    (yield 5)
+    (yield 5, 5,)
 
 # CHECK: yieldatom
 # CHECK-NEXT: yield from
