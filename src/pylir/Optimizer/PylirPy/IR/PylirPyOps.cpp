@@ -873,6 +873,32 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion));
 }
 
+mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    {
+        auto lhs = operands[0].dyn_cast_or_null<Py::SingletonKindAttr>();
+        auto rhs = operands[1].dyn_cast_or_null<Py::SingletonKindAttr>();
+        if (lhs && rhs && lhs.getValue() == rhs.getValue())
+        {
+            return Py::BoolAttr::get(getContext(), true);
+        }
+    }
+    if (lhs() == rhs())
+    {
+        return Py::BoolAttr::get(getContext(), true);
+    }
+    {
+        auto lhsEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(lhs().getDefiningOp());
+        auto rhsEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(rhs().getDefiningOp());
+        if (lhsEffect && rhsEffect && lhsEffect.hasEffect<mlir::MemoryEffects::Allocate>()
+            && rhsEffect.hasEffect<mlir::MemoryEffects::Allocate>())
+        {
+            return Py::BoolAttr::get(getContext(), false);
+        }
+    }
+    return nullptr;
+}
+
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
 
 // TODO remove MLIR 14

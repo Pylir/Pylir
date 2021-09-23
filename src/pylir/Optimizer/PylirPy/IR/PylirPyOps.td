@@ -94,7 +94,12 @@ def PylirPy_CallOp : PylirPy_Op<"call"> {
     }];
 }
 
-def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+class PylirPy_MakeOp<string mneomic, list<OpTrait> traits = []> :
+    Op<PylirPy_Dialect, mneomic, traits> {
+    let results = (outs Arg<DynamicType,"",[MemAlloc]>:$result);
+}
+
+def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion
                          );
@@ -110,7 +115,7 @@ def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple",[DeclareOpInterfaceMethods<Infe
     let hasFolder = 1;
 }
 
-def PylirPy_MakeListOp : PylirPy_Op<"makeList",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+def PylirPy_MakeListOp : PylirPy_MakeOp<"makeList",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion
                          );
@@ -124,7 +129,7 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList",[DeclareOpInterfaceMethods<InferT
     ];
 }
 
-def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+def PylirPy_MakeSetOp : PylirPy_MakeOp<"makeSet",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion
                          );
@@ -134,7 +139,7 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",[DeclareOpInterfaceMethods<InferTyp
     }];
 }
 
-def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
+def PylirPy_MakeDictOp : PylirPy_MakeOp<"makeDict", [AttrSizedOperandSegments,
                                                  DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins
                         Variadic<DynamicType>:$keys,
@@ -151,7 +156,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
     }];
 }
 
-def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_MakeFuncOp : PylirPy_MakeOp<"makeFunc", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$function);
 
     let assemblyFormat = [{
@@ -159,7 +164,7 @@ def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [DeclareOpInterfaceMethods<Symbo
     }];
 }
 
-def PylirPy_MakeClassOp : PylirPy_Op<"makeClass", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_MakeClassOp : PylirPy_MakeOp<"makeClass", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$initFunc, DynamicType:$name, DynamicType:$bases, DynamicType:$keywords);
 
     let assemblyFormat = "$name `,` $initFunc `,` $bases `,` $keywords attr-dict";
@@ -287,9 +292,7 @@ def PylirPy_EqualOp : PylirPy_BinOp<"equal"> {
 def PylirPy_NotEqualOp : PylirPy_BinOp<"notEqual"> {
     let hasFolder = 0;
 }
-def PylirPy_IsOp : PylirPy_BinOp<"is"> {
-    let hasFolder = 0;
-}
+def PylirPy_IsOp : PylirPy_BinOp<"is">;
 def PylirPy_InOp : PylirPy_BinOp<"in"> {
     let hasFolder = 0;
 }
