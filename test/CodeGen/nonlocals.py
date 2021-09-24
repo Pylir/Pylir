@@ -17,8 +17,8 @@ def foo():
 
 # CHECK-LABEL: func private @"foo.<locals>.bar$impl[0]"
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
-# CHECK: %[[TUPLE:.*]] = py.getAttr "__closure__" from %[[SELF]]
+# CHECK: %[[TUPLE:.*]], %{{.*}} = py.getAttr "__closure__" from %[[SELF]]
 # CHECK: %[[ZERO:.*]] = py.constant #py.int<0>
 # CHECK: %[[X:.*]] = py.getItem %[[TUPLE]][%[[ZERO]]]
-# CHECK: %[[VALUE:.*]] = py.getAttr "cell_contents" from %[[X]]
+# CHECK: %[[VALUE:.*]], %{{.*}} = py.getAttr "cell_contents" from %[[X]]
 # CHECK: return %[[VALUE]]

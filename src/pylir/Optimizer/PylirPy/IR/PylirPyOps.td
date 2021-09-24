@@ -30,17 +30,16 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
 
 def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {
     let arguments = (ins DynamicType:$object, StrAttr:$attribute);
+    let results = (outs DynamicType:$result, I1:$success);
 
     let assemblyFormat = [{
         $attribute `from` $object attr-dict
     }];
-
-    let hasFolder = 1;
 }
 
 def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
-    let arguments = (ins DynamicType:$value,DynamicType:$object, StrAttr:$attribute);
-    let results = (outs);
+    let arguments = (ins DynamicType:$value, Arg<DynamicType, "", [MemWrite]>:$object, StrAttr:$attribute);
+    let results = (outs I1:$success);
 
     let assemblyFormat = [{
         $attribute `of` $object `to` $value attr-dict
@@ -292,10 +291,11 @@ def PylirPy_EqualOp : PylirPy_BinOp<"equal"> {
 def PylirPy_NotEqualOp : PylirPy_BinOp<"notEqual"> {
     let hasFolder = 0;
 }
-def PylirPy_IsOp : PylirPy_BinOp<"is">;
 def PylirPy_InOp : PylirPy_BinOp<"in"> {
     let hasFolder = 0;
 }
+
+def PylirPy_IsOp : PylirPy_BinOp<"is", [NoSideEffect]>;
 
 // Conversions
 
@@ -358,7 +358,7 @@ def PylirPy_LoadOp : PylirPy_Op<"load"> {
     let assemblyFormat = "$handle attr-dict";
 }
 
-def PylirPy_IsUnboundOp : PylirPy_Op<"isUnbound"> {
+def PylirPy_IsUnboundOp : PylirPy_Op<"isUnbound", [NoSideEffect]> {
     let summary = "checks whether the handle is unbound";
 
     let arguments = (ins HandleType:$handle);

@@ -210,16 +210,6 @@ mlir::OpFoldResult pylir::Py::SingletonOp::fold(::llvm::ArrayRef<::mlir::Attribu
     return singletonAttr();
 }
 
-mlir::OpFoldResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    PYLIR_ASSERT(operands.size() == 1);
-    if (!operands[0])
-    {
-        return nullptr;
-    }
-    return llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(operands[0]).Default(mlir::OpFoldResult{nullptr});
-}
-
 mlir::OpFoldResult pylir::Py::GetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     PYLIR_ASSERT(operands.size() == 2);

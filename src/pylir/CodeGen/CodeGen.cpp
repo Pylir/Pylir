@@ -704,8 +704,22 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             break;
         case StackAlloc: handle = result->second.op->getResult(0); break;
         case Cell:
-            return m_builder.create<Py::GetAttrOp>(loc, result->second.op->getResult(0),
-                                                   m_builder.getStringAttr("cell_contents"));
+        {
+            auto getAttrOp = m_builder.create<Py::GetAttrOp>(loc, result->second.op->getResult(0),
+                                                             m_builder.getStringAttr("cell_contents"));
+            auto success = new mlir::Block;
+            auto failure = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(loc, getAttrOp.success(), success, failure);
+
+            m_currentFunc.push_back(failure);
+            m_builder.setInsertionPointToStart(failure);
+            // TODO: throw UnboundLocalError
+            m_builder.create<mlir::ReturnOp>(loc);
+
+            m_currentFunc.push_back(success);
+            m_builder.setInsertionPointToStart(success);
+            return getAttrOp.result();
+        }
     }
     auto condition = m_builder.create<Py::IsUnboundOp>(loc, handle);
     auto unbound = new mlir::Block;
@@ -1158,7 +1172,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             {
                 auto constant = m_builder.create<Py::ConstantOp>(
                     loc, Py::IntAttr::get(m_builder.getContext(), BigInt(iter.index())));
-                auto cell = m_builder.create<Py::GetItemOp>(loc, closureTuple, constant);
+                auto cell = m_builder.create<Py::GetItemOp>(loc, closureTuple.result(), constant);
                 m_scope.back().emplace(iter.value().getValue(), Identifier{Kind::Cell, cell});
                 usedClosures.push_back(iter.value());
             }
