@@ -4,6 +4,7 @@
 #include <mlir/IR/BuiltinOps.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Parser/Syntax.hpp>
 
 #include <unordered_map>
@@ -55,6 +56,10 @@ class CodeGen
     mlir::Value readIdentifier(const IdentifierToken& token);
 
     void writeIdentifier(const IdentifierToken& token, mlir::Value value);
+
+    mlir::Value buildException(mlir::Location loc, Py::SingletonKind kind, std::vector<Py::IterArg> args);
+
+    void raiseException(mlir::Value exceptionObject);
 
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)

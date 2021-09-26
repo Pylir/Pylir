@@ -205,11 +205,15 @@ def PylirPy_Singleton_Tuple : I32EnumAttrCase<"Tuple", 6, "tuple">;
 def PylirPy_Singleton_List : I32EnumAttrCase<"List", 7, "list">;
 def PylirPy_Singleton_Dict : I32EnumAttrCase<"Dict", 8, "dict">;
 def PylirPy_Singleton_Cell : I32EnumAttrCase<"Cell", 9, "cell">;
+def PylirPy_Singleton_NameError : I32EnumAttrCase<"NameError", 10>;
+def PylirPy_Singleton_TypeError : I32EnumAttrCase<"TypeError", 11>;
+def PylirPy_Singleton_UnboundLocalError : I32EnumAttrCase<"UnboundLocalError", 12>;
 
 def PylirPy_SingletonAttr : I32EnumAttr<"SingletonKind", "", [
     PylirPy_Singleton_None, PylirPy_Singleton_NotImplemented, PylirPy_Singleton_Type, PylirPy_Singleton_Object,
     PylirPy_Singleton_Int, PylirPy_Singleton_Float, PylirPy_Singleton_Tuple, PylirPy_Singleton_List,
-    PylirPy_Singleton_Dict, PylirPy_Singleton_Cell
+    PylirPy_Singleton_Dict, PylirPy_Singleton_Cell, PylirPy_Singleton_NameError, PylirPy_Singleton_TypeError,
+    PylirPy_Singleton_UnboundLocalError
 ]> {
        let cppNamespace = "::pylir::Py";
 }
@@ -365,6 +369,19 @@ def PylirPy_IsUnboundOp : PylirPy_Op<"isUnbound", [NoSideEffect]> {
     let results = (outs I1:$result);
 
     let assemblyFormat = "$handle attr-dict";
+}
+
+// Exception handling
+
+def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
+    let summary = "raise exception";
+
+    let arguments = (ins DynamicType:$exception);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $exception attr-dict
+    }];
 }
 
 #endif
