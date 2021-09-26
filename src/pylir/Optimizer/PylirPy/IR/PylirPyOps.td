@@ -26,6 +26,11 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
     }];
 
     let hasFolder = 1;
+
+    let description = [{
+        Creates a constant value from the given attribute.
+        Writing to a value returned from this op is undefined behaviour.
+    }];
 }
 
 def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {
@@ -35,6 +40,13 @@ def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {
     let assemblyFormat = [{
         $attribute `from` $object attr-dict
     }];
+
+    let description = [{
+        Gets the attribute from `$object` called `$attribute`. This is NOT equal to pythons `__getattr__` or
+        `__getattribute__` but more akin to `object.__dict__[attribute]` except that `$attribute` has to be a constant
+        and failure is indicated by `$success`. The result of the operation is put into `$result`. `$success` is 1
+        if the attribute was found, 0 else. Reading `$result` is undefined behaviour if `$success` is 0.
+    }];
 }
 
 def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
@@ -43,6 +55,14 @@ def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
 
     let assemblyFormat = [{
         $attribute `of` $object `to` $value attr-dict
+    }];
+
+    let description = [{
+        Sets the attribute called `$attribute` of `$object` to `$value`. This is NOT equal to pythons `__setattr__` but
+        more akin to `object.__dict__[attribute] = value` for an object with a dict object. This operation does however
+        not require the object to have a dictionary (eg. if it has slots). If setting the attribute was unsuccessful,
+        due to the object having neither a dictionary nor a slot of the given name, then `$success` is set to 0. On
+        success it is set to 1
     }];
 }
 
@@ -57,11 +77,45 @@ def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
 }
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
-    let arguments = (ins DynamicType:$object, DynamicType:$index);
+    let arguments = (ins DynamicType:$dict, DynamicType:$index);
     let results = (outs DynamicType:$result, I1:$found);
 
     let assemblyFormat = [{
-        $object `[` $index `]` attr-dict
+        $dict `[` $index `]` attr-dict
+    }];
+
+    let description = [{
+        This op looks up the value of `$index` in the dictionary `$dict`. If found it'll be returned in `$result`
+        and `$found` will be 1. If not found, `$found` will be 0. Reading from `$result` when `$found` is 0 is undefined
+        behaviour. If `$dict` is not really a dict (or a subclass of) the behaviour is undefined.
+    }];
+}
+
+def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
+    let arguments = (ins DynamicType:$tuple, AnyInteger:$index);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = [{
+        $tuple `[` $index `:` type($index) `]` attr-dict
+    }];
+
+    let description = [{
+        This op fetches the object stored at `$index` in `$tuple`. If `$tuple` is not really a tuple (or subclass of)
+        or `$index` is out of range for the tuple, the behaviour is undefined.
+    }];
+}
+
+def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len"> {
+    let arguments = (ins DynamicType:$tuple);
+    let results = (outs AnyInteger:$result);
+
+    let assemblyFormat = [{
+        $tuple `:` type($result) attr-dict
+    }];
+
+    let description = [{
+        This op returns the length of `$tuple` as the given integer type. If `$tuple` is not really a tuple (or a
+        subclass of) then the behaviour of is undefined.
     }];
 }
 
@@ -112,6 +166,17 @@ def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple",[DeclareOpInterfaceMethods<
     ];
 
     let hasFolder = 1;
+
+    let description = [{
+        This op creates a tuple from the given arguments. If an argument is prefixed by a `*` then it must be iterable
+        and its elements will be copied into the tuple at the given position.
+        As this operation creates a tuple it can never alias another tuple created by this op unless both are turned
+        into the same constants (at which point aliasing becomes irrelevant).
+
+        This op as well as the constant op are the only ones capable of creating a tuple. After creation it is impossible
+        to be modified. If it contains objects that are mutable however, those may still be modified. This way one is
+        capable of arguing about the tuple in a typical SSA fashion.
+    }];
 }
 
 def PylirPy_MakeListOp : PylirPy_MakeOp<"makeList",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
