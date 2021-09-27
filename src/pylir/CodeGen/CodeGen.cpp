@@ -738,7 +738,6 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         auto exception = buildException(loc, Py::SingletonKind::UnboundLocalError, /*TODO: string arg*/ {});
         raiseException(exception);
     }
-    m_builder.create<mlir::ReturnOp>(loc);
 
     m_currentFunc.push_back(found);
     m_builder.setInsertionPointToStart(found);
