@@ -721,7 +721,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             return getAttrOp.result();
         }
     }
-    auto condition = m_builder.create<Py::IsUnboundOp>(loc, handle);
+    auto condition = m_builder.create<Py::IsUnboundHandleOp>(loc, handle);
     auto unbound = new mlir::Block;
     auto found = new mlir::Block;
     m_builder.create<mlir::CondBranchOp>(loc, condition, unbound, found);

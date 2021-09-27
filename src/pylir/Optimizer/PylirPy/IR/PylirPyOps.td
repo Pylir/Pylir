@@ -389,6 +389,10 @@ def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
     let assemblyFormat = [{
         ($sym_visibility^)? $sym_name attr-dict
     }];
+
+    let description = [{
+        This op creates a global handle to which objects can be bound. By default it is unbound.
+    }];
 }
 
 def PylirPy_GetGlobalOp : PylirPy_Op<"getGlobal", [NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
@@ -396,6 +400,10 @@ def PylirPy_GetGlobalOp : PylirPy_Op<"getGlobal", [NoSideEffect, DeclareOpInterf
     let results = (outs HandleType:$handle);
 
     let assemblyFormat = "$name attr-dict";
+
+    let description = [{
+        This op converts a global reference by the symbol into a handle useable by py.store and py.load instructions.
+    }];
 }
 
 
@@ -404,6 +412,11 @@ def PylirPy_AllocaOp : PylirPy_Op<"alloca"> {
     let results = (outs Res<HandleType, "the allocated memory", [MemAlloc<AutomaticAllocationScopeResource>]>:$handle);
 
     let assemblyFormat = "attr-dict `:` type($handle)";
+
+    let description = [{
+        This op creates a handle that is valid in the current allocation scope and allows you to bind objects to it.
+        By default it is created in an unbound state.
+    }];
 }
 
 // Memory access Operation
@@ -416,7 +429,12 @@ def PylirPy_StoreOp : PylirPy_Op<"store"> {
 
     let assemblyFormat = [{
         $value `into` $handle attr-dict
-      }];
+    }];
+
+    let description = [{
+        This op binds the object denoted by `$value` to the `$handle`. Subsequent loads will return the last stored
+        values.
+    }];
 }
 
 def PylirPy_LoadOp : PylirPy_Op<"load"> {
@@ -425,9 +443,37 @@ def PylirPy_LoadOp : PylirPy_Op<"load"> {
     let arguments = (ins Arg<HandleType, "the handle to load from", [MemRead]>:$handle);
 
     let assemblyFormat = "$handle attr-dict";
+
+    let description = [{
+        This op retrieves the object that was last stored into the `$handle`. If `$handle` is unbound it returns
+        `py.unboundValue`.
+    }];
 }
 
-def PylirPy_IsUnboundOp : PylirPy_Op<"isUnbound", [NoSideEffect]> {
+def PylirPy_UnboundValue : PylirPy_Op<"unboundValue", [NoSideEffect, ConstantLike]> {
+    let summary = "value returned by the load of an unbound handle";
+
+    let description = [{
+        This constant is the value returned by the load of an unbound handle. Using this value except in
+        `py.isUnboundValue`, `py.getattr` and `py.store` is undefined behaviour.
+    }];
+
+    let arguments = (ins);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "attr-dict";
+}
+
+def PylirPy_IsUnboundValueOp : PylirPy_Op<"isUnboundValue", [NoSideEffect]> {
+    let summary = "checks whether the value is an unbound value";
+
+    let arguments = (ins DynamicType:$value);
+    let results = (outs I1:$result);
+
+    let assemblyFormat = "$value attr-dict";
+}
+
+def PylirPy_IsUnboundHandleOp : PylirPy_Op<"isUnboundHandle", [NoSideEffect]> {
     let summary = "checks whether the handle is unbound";
 
     let arguments = (ins HandleType:$handle);
