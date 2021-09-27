@@ -12,6 +12,25 @@ include "mlir/Interfaces/CallInterfaces.td"
 
 def DynamicType : TypeAlias<PylirPy_DynamicType>;
 def HandleType : TypeAlias<PylirPy_HandleType>;
+def PyFunctionType : Type<
+    And<[
+        FunctionType.predicate,
+        CPred<"$_self.cast<::mlir::FunctionType>().getNumResults() == 1">,
+        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getResult(0)", DynamicType.predicate>,
+        CPred<"$_self.cast<::mlir::FunctionType>().getNumInputs() == 3">,
+        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(0)", DynamicType.predicate>,
+        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(1)", DynamicType.predicate>,
+        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(2)", DynamicType.predicate>
+    ]>>
+{
+    let summary = "python function";
+    let builderCall = [{
+        mlir::FunctionType::get(
+            $_builder.getContext(),
+            {$_builder.getType<pylir::Py::DynamicType>(),$_builder.getType<pylir::Py::DynamicType>(),
+             $_builder.getType<pylir::Py::DynamicType>()},{$_builder.getType<pylir::Py::DynamicType>()})
+    }];
+}
 
 class PylirPy_Op<string mneomic, list<OpTrait> traits = []> :
     Op<PylirPy_Dialect, mneomic, traits> {
@@ -63,6 +82,17 @@ def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
         not require the object to have a dictionary (eg. if it has slots). If setting the attribute was unsuccessful,
         due to the object having neither a dictionary nor a slot of the given name, then `$success` is set to 0. On
         success it is set to 1
+    }];
+}
+
+def PylirPy_TypeOfOp : PylirPy_Op<"typeOf"> {
+    let arguments = (ins DynamicType:$object);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "$object attr-dict";
+
+    let description = [{
+        Retrieves the type of the object. This will always be an instance of `builtins.type` or a subclass.
     }];
 }
 
@@ -119,31 +149,23 @@ def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len"> {
     }];
 }
 
+def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
+    let arguments = (ins DynamicType:$function);
+    let results = (outs PyFunctionType:$result);
+
+    let assemblyFormat = "$function attr-dict";
+
+    let description = [{
+
+    }];
+}
+
 def PylirPy_SetItemOp : PylirPy_Op<"setItem"> {
     let arguments = (ins DynamicType:$value, DynamicType:$object, DynamicType:$index);
     let results = (outs);
 
     let assemblyFormat = [{
         $object `[` $index `]` `to` $value attr-dict
-    }];
-}
-
-def PylirPy_CallOp : PylirPy_Op<"call"> {
-    let arguments = (ins DynamicType:$callee,
-                         DynamicType:$tuple,
-                         DynamicType:$dict
-                         );
-
-    let assemblyFormat = [{
-        $callee `(` `*` $tuple `,` `*``*` $dict `)` attr-dict
-    }];
-
-    let verifier = [{
-        if (!isStrictTuple(tuple()) || !isStrictDict(dict()))
-        {
-            return emitError("tuple and dict operands must be makeTuple, makeDict or tuple or dict constant ops");
-        }
-        return mlir::success();
     }];
 }
 
@@ -273,12 +295,13 @@ def PylirPy_Singleton_Cell : I32EnumAttrCase<"Cell", 9, "cell">;
 def PylirPy_Singleton_NameError : I32EnumAttrCase<"NameError", 10>;
 def PylirPy_Singleton_TypeError : I32EnumAttrCase<"TypeError", 11>;
 def PylirPy_Singleton_UnboundLocalError : I32EnumAttrCase<"UnboundLocalError", 12>;
+def PylirPy_Singleton_Function : I32EnumAttrCase<"Function", 13, "function">;
 
 def PylirPy_SingletonAttr : I32EnumAttr<"SingletonKind", "", [
     PylirPy_Singleton_None, PylirPy_Singleton_NotImplemented, PylirPy_Singleton_Type, PylirPy_Singleton_Object,
     PylirPy_Singleton_Int, PylirPy_Singleton_Float, PylirPy_Singleton_Tuple, PylirPy_Singleton_List,
     PylirPy_Singleton_Dict, PylirPy_Singleton_Cell, PylirPy_Singleton_NameError, PylirPy_Singleton_TypeError,
-    PylirPy_Singleton_UnboundLocalError
+    PylirPy_Singleton_UnboundLocalError, PylirPy_Singleton_Function
 ]> {
        let cppNamespace = "::pylir::Py";
 }
@@ -450,7 +473,7 @@ def PylirPy_LoadOp : PylirPy_Op<"load"> {
     }];
 }
 
-def PylirPy_UnboundValue : PylirPy_Op<"unboundValue", [NoSideEffect, ConstantLike]> {
+def PylirPy_UnboundValueOp : PylirPy_Op<"unboundValue", [NoSideEffect, ConstantLike]> {
     let summary = "value returned by the load of an unbound handle";
 
     let description = [{

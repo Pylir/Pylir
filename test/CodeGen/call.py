@@ -10,7 +10,9 @@ x()
 # CHECK: %[[X_LOADED:.*]] = py.load %[[X]]
 # CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple ()
 # CHECK-DAG: %[[DICT:.*]] = py.makeDict ()
-# CHECK: py.call %[[X_LOADED]](* %[[TUPLE]], * * %[[DICT]])
+# ... mro lookup
+# CHECK: %[[FUNC:.*]] = py.function.getFunction %[[X_CHECKED:[[:alnum:]]+]]
+# CHECK: call_indirect %[[FUNC]](%[[X_CHECKED]], %[[TUPLE]], %[[DICT]])
 
 x(5, k=3)
 
@@ -19,7 +21,9 @@ x(5, k=3)
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (%[[FIVE]])
 # CHECK-DAG: %[[DICT:.*]] = py.makeDict (%[[K]] : %[[THREE]])
-# CHECK: py.call %{{[[:alnum:]]+}}(* %[[TUPLE]], * * %[[DICT]])
+# ... mro lookup
+# CHECK: %[[FUNC:.*]] = py.function.getFunction %[[X_CHECKED:[[:alnum:]]+]]
+# CHECK: call_indirect %[[FUNC]](%[[X_CHECKED]], %[[TUPLE]], %[[DICT]])
 
 x(*(), **{})
 
@@ -29,4 +33,6 @@ x(*(), **{})
 # CHECK: %[[ARG2:.*]] = py.makeDict ()
 # CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (*%[[ARG1]])
 # CHECK-DAG: %[[DICT:.*]] = py.makeDict (**%[[ARG2]])
-# CHECK: py.call %[[X_LOADED]](* %[[TUPLE]], * * %[[DICT]])
+# ... mro lookup
+# CHECK: %[[FUNC:.*]] = py.function.getFunction %[[X_CHECKED:[[:alnum:]]+]]
+# CHECK: call_indirect %[[FUNC]](%[[X_CHECKED]], %[[TUPLE]], %[[DICT]])
