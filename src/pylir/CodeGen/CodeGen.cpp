@@ -1178,9 +1178,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             auto closureTuple = m_builder.create<Py::GetAttrOp>(loc, self, m_builder.getStringAttr("__closure__"));
             for (auto& iter : llvm::enumerate(funcDef.nonLocalVariables))
             {
-                auto constant = m_builder.create<Py::ConstantOp>(
-                    loc, Py::IntAttr::get(m_builder.getContext(), BigInt(iter.index())));
-                auto cell = m_builder.create<Py::GetItemOp>(loc, closureTuple.result(), constant);
+                auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(iter.index()));
+                auto cell = m_builder.create<Py::TupleIntegerGetItemOp>(loc, closureTuple.result(), constant);
                 m_scope.back().emplace(iter.value().getValue(), Identifier{Kind::Cell, cell});
                 usedClosures.push_back(iter.value());
             }
