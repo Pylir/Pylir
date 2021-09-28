@@ -65,6 +65,9 @@ class CodeGen
 
     std::pair<mlir::Value, mlir::Value> buildMROLookup(mlir::Location loc, mlir::Value type, llvm::Twine attribute);
 
+    mlir::Value buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type, mlir::Value tuple,
+                                       mlir::Value dict);
+
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
     {

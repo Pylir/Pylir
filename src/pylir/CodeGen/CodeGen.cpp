@@ -143,6 +143,18 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
             // TODO
             PYLIR_UNREACHABLE;
         },
+        [&](const Syntax::Subscription& subscription)
+        {
+            auto container = visit(*subscription.primary);
+            auto indices = visit(subscription.expressionList);
+
+            auto loc = getLoc(subscription, subscription);
+            auto type = m_builder.create<Py::TypeOfOp>(loc, container);
+            buildSpecialMethodCall(
+                loc, "__setitem__", type,
+                m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{container, indices, value}),
+                m_builder.create<Py::MakeDictOp>(loc));
+        },
         [&](const Syntax::Target::Square& square)
         {
             if (square.targetList)
@@ -810,20 +822,9 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscriptio
 
     auto loc = getLoc(subscription, subscription);
     auto type = m_builder.create<Py::TypeOfOp>(loc, container);
-    auto [method, found] = buildMROLookup(loc, type, "__getitem__");
-    auto notFound = new mlir::Block;
-    auto exec = new mlir::Block;
-    m_builder.create<mlir::CondBranchOp>(loc, found, exec, notFound);
-
-    m_currentFunc.push_back(notFound);
-    m_builder.setInsertionPointToStart(notFound);
-    auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
-    raiseException(exception);
-
-    m_currentFunc.push_back(exec);
-    m_builder.setInsertionPointToStart(exec);
-    return buildCall(loc, method, m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{container, indices}),
-                     m_builder.create<Py::MakeDictOp>(loc));
+    return buildSpecialMethodCall(loc, "__getitem__", type,
+                                  m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{container, indices}),
+                                  m_builder.create<Py::MakeDictOp>(loc));
 }
 
 mlir::Value pylir::CodeGen::toI1(mlir::Value value)
@@ -1515,4 +1516,22 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
     auto function = m_builder.create<Py::FunctionGetFunctionOp>(loc, found->getArgument(0));
     return m_builder.create<mlir::CallIndirectOp>(loc, function, mlir::ValueRange{found->getArgument(0), tuple, dict})
         .getResult(0);
+}
+
+mlir::Value pylir::CodeGen::buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type,
+                                                   mlir::Value tuple, mlir::Value dict)
+{
+    auto [method, found] = buildMROLookup(loc, type, methodName);
+    auto notFound = new mlir::Block;
+    auto exec = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(loc, found, exec, notFound);
+
+    m_currentFunc.push_back(notFound);
+    m_builder.setInsertionPointToStart(notFound);
+    auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
+    raiseException(exception);
+
+    m_currentFunc.push_back(exec);
+    m_builder.setInsertionPointToStart(exec);
+    return buildCall(loc, method, tuple, dict);
 }
