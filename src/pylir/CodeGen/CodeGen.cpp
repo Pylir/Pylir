@@ -634,7 +634,7 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
     if (m_classNamespace)
     {
         auto str = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(identifierToken.getValue()));
-        m_builder.create<Py::SetItemOp>(loc, value, m_classNamespace, str);
+        m_builder.create<Py::DictSetItemOp>(loc, m_classNamespace, str, value);
         return;
     }
 
@@ -809,7 +809,21 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscriptio
     auto indices = visit(subscription.expressionList);
 
     auto loc = getLoc(subscription, subscription);
-    return m_builder.create<Py::GetItemOp>(loc, container, indices);
+    auto type = m_builder.create<Py::TypeOfOp>(loc, container);
+    auto [method, found] = buildMROLookup(loc, type, "__getitem__");
+    auto notFound = new mlir::Block;
+    auto exec = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(loc, found, exec, notFound);
+
+    m_currentFunc.push_back(notFound);
+    m_builder.setInsertionPointToStart(notFound);
+    auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
+    raiseException(exception);
+
+    m_currentFunc.push_back(exec);
+    m_builder.setInsertionPointToStart(exec);
+    return buildCall(loc, method, m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{container, indices}),
+                     m_builder.create<Py::MakeDictOp>(loc));
 }
 
 mlir::Value pylir::CodeGen::toI1(mlir::Value value)

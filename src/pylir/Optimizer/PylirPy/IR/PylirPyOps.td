@@ -96,16 +96,6 @@ def PylirPy_TypeOfOp : PylirPy_Op<"typeOf"> {
     }];
 }
 
-def PylirPy_GetItemOp : PylirPy_Op<"getItem"> {
-    let arguments = (ins DynamicType:$object, DynamicType:$index);
-
-    let assemblyFormat = [{
-        $object `[` $index `]` attr-dict
-    }];
-
-    let hasFolder = 1;
-}
-
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
     let arguments = (ins DynamicType:$dict, DynamicType:$index);
     let results = (outs DynamicType:$result, I1:$found);
@@ -118,6 +108,18 @@ def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
         This op looks up the value of `$index` in the dictionary `$dict`. If found it'll be returned in `$result`
         and `$found` will be 1. If not found, `$found` will be 0. Reading from `$result` when `$found` is 0 is undefined
         behaviour. If `$dict` is not really a dict (or a subclass of) the behaviour is undefined.
+    }];
+}
+
+def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem"> {
+    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key, DynamicType:$value);
+    let results = (outs);
+
+    let assemblyFormat = "$dict `[` $key `]` `to` $value attr-dict";
+
+    let description = [{
+        This op inserts the value `$value` into the dictionary with the key `$key`. If `$key` already exists the
+        previous value gets overwritten. If `$dict` is not a dictionary (or a subclass of) the behaviour is undefined.
     }];
 }
 
@@ -157,15 +159,6 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
 
     let description = [{
 
-    }];
-}
-
-def PylirPy_SetItemOp : PylirPy_Op<"setItem"> {
-    let arguments = (ins DynamicType:$value, DynamicType:$object, DynamicType:$index);
-    let results = (outs);
-
-    let assemblyFormat = [{
-        $object `[` $index `]` `to` $value attr-dict
     }];
 }
 

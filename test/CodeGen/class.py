@@ -25,7 +25,7 @@ def outer():
 # CHECK: ^[[TRUE]]:
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK: %[[X:.*]] = py.constant "x"
-# CHECK: py.setItem %[[DICT]][%[[X]]] to %[[THREE]]
+# CHECK: py.dict.setItem %[[DICT]][%[[X]]] to %[[THREE]]
 
 # CHECK: ^[[FALSE]]:
 # CHECK: %[[X:.*]] = py.constant "x"
@@ -39,6 +39,6 @@ def outer():
 
 # CHECK: ^[[DICT_FOUND]](%[[RESULT:[[:alnum:]]+]]: !py.dynamic {{.*}}):
 # CHECK: %[[Y:.*]] = py.constant "y"
-# CHECK: py.setItem %[[DICT]][%[[Y]]] to %[[RESULT]]
+# CHECK: py.dict.setItem %[[DICT]][%[[Y]]] to %[[RESULT]]
 
 # CHECK: return %[[DICT]]
