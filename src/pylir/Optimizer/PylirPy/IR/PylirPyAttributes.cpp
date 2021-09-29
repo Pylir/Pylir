@@ -22,9 +22,9 @@ struct IntAttrStorage : public mlir::AttributeStorage
 
     static ::llvm::hash_code hashKey(const KeyTy& key)
     {
-        auto count = mp_ubin_size(&key.getHandle());
+        auto count = mp_sbin_size(&key.getHandle());
         llvm::SmallVector<std::uint8_t, 10> data(count);
-        auto result = mp_to_ubin(&key.getHandle(), data.data(), count, nullptr);
+        auto result = mp_to_sbin(&key.getHandle(), data.data(), count, nullptr);
         PYLIR_ASSERT(result == MP_OKAY);
         return llvm::hash_value(makeArrayRef(data));
     }
