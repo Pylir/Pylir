@@ -9,6 +9,7 @@
 
 #include <variant>
 
+#include "PylirPyAttributes.hpp"
 #include "PylirPyTypes.hpp"
 
 namespace pylir::Py

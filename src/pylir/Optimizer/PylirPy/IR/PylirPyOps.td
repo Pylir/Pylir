@@ -275,30 +275,6 @@ def PylirPy_NewOp : PylirPy_Op<"new"> {
     }];
 }
 
-def PylirPy_Singleton_None : I32EnumAttrCase<"None", 0>;
-def PylirPy_Singleton_NotImplemented : I32EnumAttrCase<"NotImplemented", 1>;
-def PylirPy_Singleton_Type : I32EnumAttrCase<"Type", 2, "type">;
-def PylirPy_Singleton_Object : I32EnumAttrCase<"Object", 3, "object">;
-def PylirPy_Singleton_Int : I32EnumAttrCase<"Int", 4, "int">;
-def PylirPy_Singleton_Float : I32EnumAttrCase<"Float", 5, "float">;
-def PylirPy_Singleton_Tuple : I32EnumAttrCase<"Tuple", 6, "tuple">;
-def PylirPy_Singleton_List : I32EnumAttrCase<"List", 7, "list">;
-def PylirPy_Singleton_Dict : I32EnumAttrCase<"Dict", 8, "dict">;
-def PylirPy_Singleton_Cell : I32EnumAttrCase<"Cell", 9, "cell">;
-def PylirPy_Singleton_NameError : I32EnumAttrCase<"NameError", 10>;
-def PylirPy_Singleton_TypeError : I32EnumAttrCase<"TypeError", 11>;
-def PylirPy_Singleton_UnboundLocalError : I32EnumAttrCase<"UnboundLocalError", 12>;
-def PylirPy_Singleton_Function : I32EnumAttrCase<"Function", 13, "function">;
-
-def PylirPy_SingletonAttr : I32EnumAttr<"SingletonKind", "", [
-    PylirPy_Singleton_None, PylirPy_Singleton_NotImplemented, PylirPy_Singleton_Type, PylirPy_Singleton_Object,
-    PylirPy_Singleton_Int, PylirPy_Singleton_Float, PylirPy_Singleton_Tuple, PylirPy_Singleton_List,
-    PylirPy_Singleton_Dict, PylirPy_Singleton_Cell, PylirPy_Singleton_NameError, PylirPy_Singleton_TypeError,
-    PylirPy_Singleton_UnboundLocalError, PylirPy_Singleton_Function
-]> {
-       let cppNamespace = "::pylir::Py";
-}
-
 def PylirPy_SingletonOp : PylirPy_Op<"singleton", [ConstantLike, NoSideEffect]> {
     let arguments = (ins PylirPy_SingletonAttr:$singleton);
 
@@ -394,6 +370,12 @@ def PylirPy_BoolToI1Op : PylirPy_Op<"boolToI1"> {
 }
 
 // Memory operations
+
+def PylirPy_SingletonImplOp : PylirPy_Op<"singletonImpl"> {
+    let arguments = (ins PylirPy_SingletonAttr:$sym, PylirPy_ObjectAttr:$initializer);
+
+    let results = (outs);
+}
 
 def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
     let arguments = (ins
