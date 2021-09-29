@@ -33,7 +33,7 @@ def outer():
 # CHECK: cond_br %[[FOUND]], ^[[DICT_FOUND:.*]](%[[ITEM]] : !py.dynamic), ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[ELSE]]:
-# CHECK: py.getGlobal @x
+# CHECK: py.getGlobalHandle @x
 # ...
 # CHECK: br ^[[DICT_FOUND]]
 

@@ -28,7 +28,7 @@ else:
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:
-# CHECK: py.getGlobal @x
+# CHECK: py.getGlobalHandle @x
 # ... rest of if
 # CHECK: br ^[[BREAK:[[:alnum:]]+]]
 
@@ -52,7 +52,7 @@ while True:
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[THEN:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:
-# CHECK: py.getGlobal @x
+# CHECK: py.getGlobalHandle @x
 # ... rest of if
 # CHECK: br ^[[TEST]]
 

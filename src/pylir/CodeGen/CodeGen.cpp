@@ -28,8 +28,8 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     m_builder.setInsertionPointToEnd(m_module.getBody());
     for (auto& token : fileInput.globals)
     {
-        auto op = m_builder.create<Py::GlobalOp>(getLoc(token, token), formQualifiedName(token.getValue()),
-                                                 mlir::StringAttr{});
+        auto op = m_builder.create<Py::GlobalHandleOp>(getLoc(token, token), formQualifiedName(token.getValue()),
+                                                       mlir::StringAttr{});
         getCurrentScope().emplace(token.getValue(), Identifier{Kind::Global, op});
     }
 
@@ -658,7 +658,7 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
     switch (result->second.kind)
     {
         case Global:
-            handle = m_builder.create<Py::GetGlobalOp>(loc, m_builder.getSymbolRefAttr(result->second.op));
+            handle = m_builder.create<Py::GetGlobalHandleOp>(loc, m_builder.getSymbolRefAttr(result->second.op));
             break;
         case StackAlloc: handle = result->second.op->getResult(0); break;
         case Cell:
@@ -712,7 +712,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     switch (result->second.kind)
     {
         case Global:
-            handle = m_builder.create<Py::GetGlobalOp>(loc, m_builder.getSymbolRefAttr(result->second.op));
+            handle = m_builder.create<Py::GetGlobalHandleOp>(loc, m_builder.getSymbolRefAttr(result->second.op));
             break;
         case StackAlloc: handle = result->second.op->getResult(0); break;
         case Cell:

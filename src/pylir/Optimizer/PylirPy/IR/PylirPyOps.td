@@ -395,7 +395,7 @@ def PylirPy_BoolToI1Op : PylirPy_Op<"boolToI1"> {
 
 // Memory operations
 
-def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
+def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
     let arguments = (ins
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility);
@@ -411,14 +411,16 @@ def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
     }];
 }
 
-def PylirPy_GetGlobalOp : PylirPy_Op<"getGlobal", [NoSideEffect, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_GetGlobalHandleOp : PylirPy_Op<"getGlobalHandle", [NoSideEffect,
+                                                               DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$name);
     let results = (outs HandleType:$handle);
 
     let assemblyFormat = "$name attr-dict";
 
     let description = [{
-        This op converts a global reference by the symbol into a handle useable by py.store and py.load instructions.
+        This op converts a `globalHandle` op referenced by the symbol into a handle usable by py.store and py.load
+        instructions.
     }];
 }
 

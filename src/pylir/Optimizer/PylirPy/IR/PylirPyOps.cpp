@@ -723,9 +723,9 @@ mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute>
     return mlir::BoolAttr::get(getContext(), boolean.getValue());
 }
 
-mlir::LogicalResult pylir::Py::GetGlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+mlir::LogicalResult pylir::Py::GetGlobalHandleOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalOp>(*this, name()));
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalHandleOp>(*this, name()));
 }
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)

@@ -15,7 +15,7 @@
 # CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
 # CHECK: %[[CLOSURE:.*]] = py.singleton None
 # CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
-# CHECK: %[[FOO:.*]] = py.getGlobal @foo
+# CHECK: %[[FOO:.*]] = py.getGlobalHandle @foo
 # CHECK: py.store %[[RES]] into %[[FOO]]
 
 def foo():
