@@ -1567,7 +1567,6 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef
     auto tuple = cc.getArgument(1);
     auto dict = cc.getArgument(2);
 
-    // TODO: make empty instead of None if None
     auto defaultTuple = m_builder.create<Py::GetAttrOp>(loc, self, m_builder.getStringAttr("__defaults__")).result();
     auto kwDefaultDict = m_builder.create<Py::GetAttrOp>(loc, self, m_builder.getStringAttr("__kwdefaults__")).result();
     auto tupleLen = m_builder.create<Py::TupleIntegerLenOp>(loc, m_builder.getIndexType(), tuple);
