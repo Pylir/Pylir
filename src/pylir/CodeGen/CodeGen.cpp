@@ -1064,27 +1064,27 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
     // TODO: adapter for calling convention
-    std::vector<IdentifierToken> argumentNames;
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
+    std::vector<FunctionParameter> functionParameters;
     if (funcDef.parameterList)
     {
         class ParamVisitor : public Syntax::Visitor<ParamVisitor>
         {
         public:
-            std::vector<IdentifierToken>& argumentNames;
             std::vector<Py::IterArg>& defaultParameters;
             std::vector<Py::DictArg>& keywordOnlyDefaultParameters;
+            std::vector<FunctionParameter>& functionParameters;
             std::function<mlir::Value(const Syntax::Expression&)> calcCallback;
             mlir::OpBuilder& builder;
             std::function<mlir::Location(const IdentifierToken&)> locCallback;
-            bool keywordOnly = false;
+            FunctionParameter::Kind kind;
 
             using Visitor::visit;
 
             void visit(const Syntax::ParameterList::Parameter& param)
             {
-                argumentNames.push_back(param.identifier);
+                functionParameters.push_back({param.identifier, kind, false});
             }
 
             void visit(const Syntax::ParameterList::DefParameter& defParameter)
@@ -1094,8 +1094,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 {
                     return;
                 }
+                functionParameters.back().hasDefaultParam = true;
                 auto value = calcCallback(defParameter.defaultArg->second);
-                if (!keywordOnly)
+                if (kind != FunctionParameter::KeywordOnly)
                 {
                     defaultParameters.push_back(value);
                     return;
@@ -1106,18 +1107,30 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 keywordOnlyDefaultParameters.push_back(std::pair{name, value});
             }
 
+            void visit(const Syntax::ParameterList::PosOnly& posOnlyNode)
+            {
+                kind = FunctionParameter::PosOnly;
+                Visitor::visit(posOnlyNode);
+            }
+
+            void visit(const Syntax::ParameterList::NoPosOnly& noPosOnly)
+            {
+                kind = FunctionParameter::Normal;
+                Visitor::visit(noPosOnly);
+            }
+
             void visit(const Syntax::ParameterList::StarArgs& star)
             {
                 if (std::holds_alternative<Syntax::ParameterList::StarArgs::Star>(star.variant))
                 {
-                    keywordOnly = true;
+                    kind = FunctionParameter::KeywordOnly;
                 }
                 Visitor::visit(star);
             }
         } visitor{{},
-                  argumentNames,
                   defaultParameters,
                   keywordOnlyDefaultParameters,
+                  functionParameters,
                   [this](const Syntax::Expression& expression) { return visit(expression); },
                   m_builder,
                   [this](const IdentifierToken& token) { return getLoc(token, token); }};
@@ -1134,7 +1147,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         func = mlir::FuncOp::create(
             loc, formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(
-                std::vector<mlir::Type>(1 + argumentNames.size(), m_builder.getType<Py::DynamicType>()),
+                std::vector<mlir::Type>(1 + functionParameters.size(), m_builder.getType<Py::DynamicType>()),
                 {m_builder.getType<Py::DynamicType>()}));
         func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
         m_module.push_back(func);
@@ -1155,23 +1168,23 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             });
         auto locals = funcDef.localVariables;
         auto closures = funcDef.closures;
-        for (auto [name, value] : llvm::zip(argumentNames, llvm::drop_begin(func.getArguments())))
+        for (auto [name, value] : llvm::zip(functionParameters, llvm::drop_begin(func.getArguments())))
         {
-            if (funcDef.closures.count(name))
+            if (funcDef.closures.count(name.token))
             {
                 auto closureType = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::Cell);
                 auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{value});
                 auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
                 auto cell = m_builder.create<Py::NewOp>(loc, closureType, tuple, emptyDict);
-                m_scope.back().emplace(name.getValue(), Identifier{Kind::Cell, cell});
-                closures.erase(name);
+                m_scope.back().emplace(name.token.getValue(), Identifier{Kind::Cell, cell});
+                closures.erase(name.token);
             }
             else
             {
-                auto allocaOp = m_builder.create<Py::AllocaOp>(getLoc(name, name));
-                m_scope.back().emplace(name.getValue(), Identifier{Kind::StackAlloc, allocaOp});
+                auto allocaOp = m_builder.create<Py::AllocaOp>(getLoc(name.token, name.token));
+                m_scope.back().emplace(name.token.getValue(), Identifier{Kind::StackAlloc, allocaOp});
                 m_builder.create<Py::StoreOp>(loc, value, allocaOp);
-                locals.erase(name);
+                locals.erase(name.token);
             }
         }
         for (auto& iter : locals)
@@ -1206,6 +1219,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             m_builder.create<mlir::ReturnOp>(
                 loc, mlir::ValueRange{m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None)});
         }
+        func = buildFunctionCC(loc, formImplName(qualifiedName + "$cc"), func, functionParameters);
     }
     mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, m_builder.getSymbolRefAttr(func));
     m_builder.create<Py::SetAttrOp>(
@@ -1534,4 +1548,144 @@ mlir::Value pylir::CodeGen::buildSpecialMethodCall(mlir::Location loc, llvm::Twi
     m_currentFunc.push_back(exec);
     m_builder.setInsertionPointToStart(exec);
     return buildCall(loc, method, tuple, dict);
+}
+
+mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef name, mlir::FuncOp implementation,
+                                             const std::vector<FunctionParameter>& parameters)
+{
+    mlir::OpBuilder::InsertionGuard guard(m_builder);
+    m_builder.setInsertionPointToEnd(m_module.getBody());
+    auto cc = m_builder.create<mlir::FuncOp>(
+        loc, name,
+        m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
+                                   m_builder.getType<Py::DynamicType>()},
+                                  {m_builder.getType<Py::DynamicType>()}));
+    pylir::ValueReset reset(m_currentFunc, m_currentFunc);
+    m_currentFunc = cc;
+    m_builder.setInsertionPointToStart(cc.addEntryBlock());
+    auto self = cc.getArgument(0);
+    auto tuple = cc.getArgument(1);
+    auto dict = cc.getArgument(2);
+
+    // TODO: make empty instead of None if None
+    auto defaultTuple = m_builder.create<Py::GetAttrOp>(loc, self, m_builder.getStringAttr("__defaults__")).result();
+    auto kwDefaultDict = m_builder.create<Py::GetAttrOp>(loc, self, m_builder.getStringAttr("__kwdefaults__")).result();
+    auto tupleLen = m_builder.create<Py::TupleIntegerLenOp>(loc, m_builder.getIndexType(), tuple);
+
+    std::vector<mlir::Value> args{self};
+    std::size_t posIndex = 0;
+    std::size_t posDefaultsIndex = 0;
+    for (auto& iter : parameters)
+    {
+        auto loc = getLoc(iter.token, iter.token);
+        mlir::Value argValue;
+        if (iter.kind != FunctionParameter::KeywordOnly)
+        {
+            auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posIndex++));
+            auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, constant, tupleLen);
+            auto lessBlock = new mlir::Block;
+            auto fallbackOrError = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, fallbackOrError);
+
+            auto resultBlock = new mlir::Block;
+            resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
+            m_currentFunc.push_back(fallbackOrError);
+            m_builder.setInsertionPointToStart(fallbackOrError);
+            auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
+            m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
+
+            m_currentFunc.push_back(lessBlock);
+            m_builder.setInsertionPointToStart(lessBlock);
+            auto fetched = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, constant);
+            m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{fetched});
+
+            m_currentFunc.push_back(resultBlock);
+            m_builder.setInsertionPointToStart(resultBlock);
+            argValue = resultBlock->getArgument(0);
+        }
+        if (iter.kind != FunctionParameter::PosOnly)
+        {
+            auto constant = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.token.getValue()));
+            auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, dict, constant);
+            auto foundBlock = new mlir::Block;
+            auto notFoundBlock = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(loc, lookup.found(), foundBlock, notFoundBlock);
+
+            auto resultBlock = new mlir::Block;
+            resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
+            m_currentFunc.push_back(notFoundBlock);
+            m_builder.setInsertionPointToStart(notFoundBlock);
+            auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
+            m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
+
+            m_currentFunc.push_back(foundBlock);
+            m_builder.setInsertionPointToStart(foundBlock);
+            // value can't be assigned both through a positional argument as well as keyword argument
+            if (argValue)
+            {
+                auto isUnbound = m_builder.create<Py::IsUnboundValueOp>(loc, argValue);
+                auto boundBlock = new mlir::Block;
+                m_builder.create<mlir::CondBranchOp>(loc, isUnbound, resultBlock, mlir::ValueRange{lookup.result()},
+                                                     boundBlock, mlir::ValueRange{});
+
+                m_currentFunc.push_back(boundBlock);
+                m_builder.setInsertionPointToStart(boundBlock);
+                auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
+                raiseException(exception);
+            }
+            else
+            {
+                m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{lookup.result()});
+            }
+
+            m_currentFunc.push_back(resultBlock);
+            m_builder.setInsertionPointToStart(resultBlock);
+            argValue = resultBlock->getArgument(0);
+        }
+        auto isUnbound = m_builder.create<Py::IsUnboundValueOp>(loc, argValue);
+        auto unboundBlock = new mlir::Block;
+        auto boundBlock = new mlir::Block;
+        boundBlock->addArgument(m_builder.getType<Py::DynamicType>());
+        m_builder.create<mlir::CondBranchOp>(loc, isUnbound, unboundBlock, boundBlock, mlir::ValueRange{argValue});
+
+        m_currentFunc.push_back(unboundBlock);
+        m_builder.setInsertionPointToStart(unboundBlock);
+        if (!iter.hasDefaultParam)
+        {
+            auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
+            raiseException(exception);
+        }
+        else
+        {
+            mlir::Value defaultArg;
+            switch (iter.kind)
+            {
+                case FunctionParameter::Normal:
+                case FunctionParameter::PosOnly:
+                {
+                    auto index = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posDefaultsIndex++));
+                    defaultArg = m_builder.create<Py::TupleIntegerGetItemOp>(loc, defaultTuple, index);
+                    break;
+                }
+                case FunctionParameter::KeywordOnly:
+                {
+                    auto index = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.token.getValue()));
+                    auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, kwDefaultDict, index);
+                    // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this also
+                    //      affects __defaults__
+                    defaultArg = lookup.result();
+                    break;
+                }
+            }
+            m_builder.create<mlir::BranchOp>(loc, boundBlock, mlir::ValueRange{defaultArg});
+        }
+
+        m_currentFunc.push_back(boundBlock);
+        m_builder.setInsertionPointToStart(boundBlock);
+        args.push_back(boundBlock->getArgument(0));
+    }
+
+    auto result = m_builder.create<mlir::CallOp>(loc, implementation, args);
+    m_builder.create<mlir::ReturnOp>(loc, result->getResults());
+    return cc;
 }

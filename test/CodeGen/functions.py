@@ -4,7 +4,7 @@
 
 # CHECK-LABEL: __init__
 
-# CHECK: %[[RES:.*]] = py.makeFunc @"foo$impl[0]"
+# CHECK: %[[RES:.*]] = py.makeFunc @"foo$cc[0]"
 # CHECK: %[[NAME:.*]] = py.constant "foo"
 # CHECK: py.setAttr "__name__" of %[[RES]] to %[[NAME]]
 # CHECK: %[[NAME:.*]] = py.constant "foo"
@@ -32,7 +32,7 @@ def foo():
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK: %[[ONE:.*]] = py.constant #py.int<1>
 # CHECK: %[[C:.*]] = py.constant "c"
-# CHECK: %[[RES:.*]] = py.makeFunc @"foo.<locals>.bar$impl[0]"
+# CHECK: %[[RES:.*]] = py.makeFunc @"foo.<locals>.bar$cc[0]"
 # CHECK: %[[NAME:.*]] = py.constant "bar"
 # CHECK: py.setAttr "__name__" of %[[RES]] to %[[NAME]]
 # CHECK: %[[NAME:.*]] = py.constant "foo.<locals>.bar"

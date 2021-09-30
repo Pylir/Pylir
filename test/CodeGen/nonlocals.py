@@ -10,7 +10,7 @@ def foo():
 # CHECK: %[[CELL:.*]] = py.singleton cell
 # CHECK: %[[X:.*]] = py.new %[[CELL]]
 
-# CHECK: %[[BAR:.*]] = py.makeFunc @"foo.<locals>.bar$impl[0]"
+# CHECK: %[[BAR:.*]] = py.makeFunc @"foo.<locals>.bar$cc[0]"
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[X]])
 # CHECK: py.setAttr "__closure__" of %[[BAR]] to %[[TUPLE]]
 

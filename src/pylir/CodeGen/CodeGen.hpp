@@ -68,6 +68,21 @@ class CodeGen
     mlir::Value buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type, mlir::Value tuple,
                                        mlir::Value dict);
 
+    struct FunctionParameter
+    {
+        IdentifierToken token;
+        enum Kind
+        {
+            Normal,
+            PosOnly,
+            KeywordOnly,
+        } kind;
+        bool hasDefaultParam;
+    };
+
+    mlir::FuncOp buildFunctionCC(mlir::Location loc, llvm::StringRef name, mlir::FuncOp implementation,
+                                 const std::vector<FunctionParameter>& parameters);
+
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
     {
