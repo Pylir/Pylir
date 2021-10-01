@@ -372,7 +372,7 @@ def PylirPy_BoolToI1Op : PylirPy_Op<"boolToI1"> {
 // Memory operations
 
 def PylirPy_SingletonImplOp : PylirPy_Op<"singletonImpl"> {
-    let arguments = (ins PylirPy_SingletonAttr:$sym, PylirPy_ObjectAttr:$initializer);
+    let arguments = (ins PylirPy_SingletonAttr:$sym, AnyPyAttribute:$initializer);
 
     let results = (outs);
 }
