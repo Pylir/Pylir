@@ -1559,7 +1559,8 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef
         loc, name,
         m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
                                    m_builder.getType<Py::DynamicType>()},
-                                  {m_builder.getType<Py::DynamicType>()}));
+                                  {m_builder.getType<Py::DynamicType>()}),
+        m_builder.getStringAttr("private"));
     pylir::ValueReset reset(m_currentFunc, m_currentFunc);
     m_currentFunc = cc;
     m_builder.setInsertionPointToStart(cc.addEntryBlock());
@@ -1583,13 +1584,13 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef
             auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posIndex++));
             auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, constant, tupleLen);
             auto lessBlock = new mlir::Block;
-            auto fallbackOrError = new mlir::Block;
-            m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, fallbackOrError);
+            auto unboundBlock = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, unboundBlock);
 
             auto resultBlock = new mlir::Block;
             resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
-            m_currentFunc.push_back(fallbackOrError);
-            m_builder.setInsertionPointToStart(fallbackOrError);
+            m_currentFunc.push_back(unboundBlock);
+            m_builder.setInsertionPointToStart(unboundBlock);
             auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
             m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
 
