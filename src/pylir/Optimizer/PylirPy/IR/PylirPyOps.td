@@ -50,6 +50,8 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
         Creates a constant value from the given attribute.
         Writing to a value returned from this op is undefined behaviour.
     }];
+
+    let verifier = "return ::verify(*this);";
 }
 
 def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {

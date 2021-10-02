@@ -823,6 +823,22 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
     return nullptr;
 }
 
+namespace
+{
+mlir::LogicalResult verify(pylir::Py::ConstantOp op)
+{
+    for (auto& uses : op->getUses())
+    {
+        if (auto interface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(uses.getOwner());
+            interface && interface.getEffectOnValue<mlir::MemoryEffects::Write>(op))
+        {
+            return uses.getOwner()->emitError("Write to a constant value is not allowed");
+        }
+    }
+    return mlir::success();
+}
+} // namespace
+
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
 
 // TODO remove MLIR 14
