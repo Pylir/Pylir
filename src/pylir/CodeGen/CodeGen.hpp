@@ -2,6 +2,7 @@
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/OwningOpRef.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -193,42 +194,8 @@ public:
     std::pair<mlir::Value, mlir::Value> visit(const Syntax::ArgumentList& argumentList);
 };
 
-class Module
-{
-    mlir::ModuleOp m_module;
-
-public:
-    Module(mlir::ModuleOp module) : m_module(module) {}
-
-    ~Module()
-    {
-        m_module->erase();
-    }
-
-    Module(const Module&) = delete;
-
-    Module(Module&& rhs) noexcept : m_module(std::exchange(rhs.m_module, mlir::ModuleOp{})) {}
-
-    Module& operator=(const Module&) = delete;
-
-    Module& operator=(Module&& rhs) noexcept
-    {
-        m_module = std::exchange(rhs.m_module, mlir::ModuleOp{});
-        return *this;
-    }
-
-    mlir::ModuleOp* operator->()
-    {
-        return &m_module;
-    }
-
-    mlir::ModuleOp& operator*()
-    {
-        return m_module;
-    }
-};
-
-inline Module codegen(mlir::MLIRContext* context, const Syntax::FileInput& input, Diag::Document& document)
+inline mlir::OwningOpRef<mlir::ModuleOp> codegen(mlir::MLIRContext* context, const Syntax::FileInput& input,
+                                                 Diag::Document& document)
 {
     CodeGen codegen{context, document};
     return codegen.visit(input);
