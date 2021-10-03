@@ -300,7 +300,12 @@ bool pylir::Py::BoolAttr::getValue() const
 
 void pylir::Py::ObjectAttr::print(::mlir::DialectAsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<type: " << getType() << ", __dict__: " << getAttributes() << ">";
+    printer << getMnemonic() << "<type: " << getType();
+    if (getBuiltinValue())
+    {
+        printer << ", value: " << *getBuiltinValue();
+    }
+    printer << ", __dict__: " << getAttributes() << ">";
 }
 
 mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser,
@@ -309,10 +314,23 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::MLIRContext* context, ::mli
     mlir::Attribute type;
     Py::DictAttr dictAttr;
     if (parser.parseLess() || parser.parseKeyword("type") || parser.parseColon() || parser.parseAttribute(type)
-        || parser.parseComma() || parser.parseKeyword("__dict__") || parser.parseColon()
-        || parser.parseAttribute(dictAttr) || parser.parseGreater())
+        || parser.parseComma())
     {
         return {};
     }
-    return get(context, type, dictAttr);
+    llvm::Optional<mlir::Attribute> builtinValue;
+    if (!parser.parseOptionalKeyword("value"))
+    {
+        builtinValue.emplace();
+        if (parser.parseColon() || parser.parseAttribute(*builtinValue) || parser.parseComma())
+        {
+            return {};
+        }
+    }
+    if (parser.parseKeyword("__dict__") || parser.parseColon() || parser.parseAttribute(dictAttr)
+        || parser.parseGreater())
+    {
+        return {};
+    }
+    return get(context, type, dictAttr, builtinValue);
 }

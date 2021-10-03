@@ -126,7 +126,7 @@ def PylirPy_ObjectAttr : PylirPy_Attr<"Object"> {
     let mnemonic = "dict";
     let summary = PylirPy_ObjectAttrPreDecl.summary;
 
-    let parameters = (ins "mlir::Attribute":$type, "::pylir::Py::DictAttr":$attributes);
+    let parameters = (ins "mlir::Attribute":$type, "::pylir::Py::DictAttr":$attributes, "::llvm::Optional<mlir::Attribute>":$builtinValue);
 }
 
 #endif
