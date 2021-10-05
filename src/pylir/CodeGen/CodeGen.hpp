@@ -110,6 +110,8 @@ class CodeGen
                    || !m_builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>());
     }
 
+    void createBuiltinsImpl();
+
 public:
     CodeGen(mlir::MLIRContext* context, Diag::Document& document);
 

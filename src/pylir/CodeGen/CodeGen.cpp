@@ -26,6 +26,8 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_builder.setInsertionPointToEnd(m_module.getBody());
+    createBuiltinsImpl();
+
     for (auto& token : fileInput.globals)
     {
         auto op = m_builder.create<Py::GlobalHandleOp>(getLoc(token, token), formQualifiedName(token.getValue()),
