@@ -259,6 +259,12 @@ def PylirPy_MakeClassOp : PylirPy_MakeOp<"makeClass", [DeclareOpInterfaceMethods
     }];
 }
 
+def PylirPy_MakeObjectOp : PylirPy_MakeOp<"makeObject"> {
+    let arguments = (ins DynamicType:$typeObj);
+
+    let assemblyFormat = "$typeObj attr-dict";
+}
+
 def PylirPy_NewOp : PylirPy_Op<"new"> {
     let arguments = (ins DynamicType:$type,
                          DynamicType:$tuple,
