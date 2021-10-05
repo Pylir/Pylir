@@ -71,7 +71,7 @@ class CodeGen
 
     struct FunctionParameter
     {
-        IdentifierToken token;
+        std::string name;
         enum Kind
         {
             Normal,
