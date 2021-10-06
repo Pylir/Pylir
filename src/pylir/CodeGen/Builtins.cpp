@@ -7,12 +7,12 @@ void pylir::CodeGen::createBuiltinsImpl()
     auto loc = m_builder.getUnknownLoc();
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
-        auto newCall = m_builder.create<mlir::FuncOp>(
-            loc, formImplName("builtins.object.__new__$impl"),
-            m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
-                                       m_builder.getType<Py::DynamicType>()},
-                                      {m_builder.getType<Py::DynamicType>()}));
         {
+            auto newCall = m_builder.create<mlir::FuncOp>(
+                loc, formImplName("builtins.object.__new__$impl"),
+                m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
+                                           m_builder.getType<Py::DynamicType>()},
+                                          {m_builder.getType<Py::DynamicType>()}));
             mlir::OpBuilder::InsertionGuard guard{m_builder};
             m_builder.setInsertionPointToStart(newCall.addEntryBlock());
             [[maybe_unused]] auto self = newCall.getArgument(0);
@@ -24,12 +24,18 @@ void pylir::CodeGen::createBuiltinsImpl()
             auto typeObj = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, constant);
             auto obj = m_builder.create<Py::MakeObjectOp>(loc, typeObj);
             m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{obj});
+
+            members.emplace_back(
+                m_builder.getStringAttr("__new__"),
+                Py::ObjectAttr::get(m_builder.getContext(),
+                                    Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
+                                    Py::DictAttr::get(m_builder.getContext(), {}),
+                                    m_builder.getSymbolRefAttr(newCall)));
         }
         members.emplace_back(
-            m_builder.getStringAttr("__new__"),
-            Py::ObjectAttr::get(m_builder.getContext(),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
-                                Py::DictAttr::get(m_builder.getContext(), {}), m_builder.getSymbolRefAttr(newCall)));
+            m_builder.getStringAttr("__mro__"),
+            Py::TupleAttr::get(m_builder.getContext(),
+                               {Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Object)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
         m_builder.create<Py::SingletonImplOp>(

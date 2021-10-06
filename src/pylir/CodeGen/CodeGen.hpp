@@ -39,7 +39,7 @@ class CodeGen
     struct Identifier
     {
         Kind kind;
-        mlir::Operation* op;
+        mlir::PointerUnion<mlir::Value, mlir::Operation*> op;
     };
 
     using ScopeContainer = std::vector<std::unordered_map<std::string_view, Identifier>>;

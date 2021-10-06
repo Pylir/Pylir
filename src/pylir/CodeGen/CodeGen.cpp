@@ -32,7 +32,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     {
         auto op = m_builder.create<Py::GlobalHandleOp>(getLoc(token, token), formQualifiedName(token.getValue()),
                                                        mlir::StringAttr{});
-        getCurrentScope().emplace(token.getValue(), Identifier{Kind::Global, op});
+        getCurrentScope().emplace(token.getValue(), Identifier{Kind::Global, op.getOperation()});
     }
 
     auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), formQualifiedName("__init__"),
@@ -660,11 +660,12 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
     switch (result->second.kind)
     {
         case Global:
-            handle = m_builder.create<Py::GetGlobalHandleOp>(loc, m_builder.getSymbolRefAttr(result->second.op));
+            handle = m_builder.create<Py::GetGlobalHandleOp>(
+                loc, m_builder.getSymbolRefAttr(result->second.op.get<mlir::Operation*>()));
             break;
-        case StackAlloc: handle = result->second.op->getResult(0); break;
+        case StackAlloc: handle = result->second.op.get<mlir::Value>(); break;
         case Cell:
-            m_builder.create<Py::SetAttrOp>(loc, value, result->second.op->getResult(0),
+            m_builder.create<Py::SetAttrOp>(loc, value, result->second.op.get<mlir::Value>(),
                                             m_builder.getStringAttr("cell_contents"));
             return;
     }
@@ -714,12 +715,13 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     switch (result->second.kind)
     {
         case Global:
-            handle = m_builder.create<Py::GetGlobalHandleOp>(loc, m_builder.getSymbolRefAttr(result->second.op));
+            handle = m_builder.create<Py::GetGlobalHandleOp>(
+                loc, m_builder.getSymbolRefAttr(result->second.op.get<mlir::Operation*>()));
             break;
-        case StackAlloc: handle = result->second.op->getResult(0); break;
+        case StackAlloc: handle = result->second.op.get<mlir::Value>(); break;
         case Cell:
         {
-            auto getAttrOp = m_builder.create<Py::GetAttrOp>(loc, result->second.op->getResult(0),
+            auto getAttrOp = m_builder.create<Py::GetAttrOp>(loc, result->second.op.get<mlir::Value>(),
                                                              m_builder.getStringAttr("cell_contents"));
             auto success = new mlir::Block;
             auto failure = new mlir::Block;
@@ -1179,32 +1181,43 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             if (funcDef.closures.count(name))
             {
                 auto closureType = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::Cell);
-                auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{value});
+                auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType, value});
                 auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
-                auto cell = m_builder.create<Py::NewOp>(loc, closureType, tuple, emptyDict);
+                auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
+                auto cell =
+                    m_builder
+                        .create<mlir::CallIndirectOp>(loc, m_builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
+                                                      mlir::ValueRange{newMethod, tuple, emptyDict})
+                        ->getResult(0);
                 m_scope.back().emplace(name.getValue(), Identifier{Kind::Cell, cell});
                 closures.erase(name);
             }
             else
             {
                 auto allocaOp = m_builder.create<Py::AllocaOp>(getLoc(name, name));
-                m_scope.back().emplace(name.getValue(), Identifier{Kind::StackAlloc, allocaOp});
+                m_scope.back().emplace(name.getValue(), Identifier{Kind::StackAlloc, mlir::Value{allocaOp}});
                 m_builder.create<Py::StoreOp>(loc, value, allocaOp);
                 locals.erase(name);
             }
         }
         for (auto& iter : locals)
         {
-            m_scope.back().emplace(iter.getValue(),
-                                   Identifier{Kind::StackAlloc, m_builder.create<Py::AllocaOp>(getLoc(iter, iter))});
+            m_scope.back().emplace(
+                iter.getValue(),
+                Identifier{Kind::StackAlloc, mlir::Value{m_builder.create<Py::AllocaOp>(getLoc(iter, iter))}});
         }
         for (auto& iter : closures)
         {
             auto closureType = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::Cell);
-            auto emptyTuple = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext(), {}));
+            auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType});
             auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
-            auto cell = m_builder.create<Py::NewOp>(loc, closureType, emptyTuple, emptyDict);
-            m_scope.back().emplace(iter.getValue(), Identifier{Kind::Cell, cell});
+            auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
+            auto cell =
+                m_builder
+                    .create<mlir::CallIndirectOp>(loc, m_builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
+                                                  mlir::ValueRange{newMethod, tuple, emptyDict})
+                    ->getResult(0);
+            m_scope.back().emplace(iter.getValue(), Identifier{Kind::Cell, mlir::Value{cell}});
         }
         if (!funcDef.nonLocalVariables.empty())
         {
@@ -1214,7 +1227,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             {
                 auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(iter.index()));
                 auto cell = m_builder.create<Py::TupleIntegerGetItemOp>(loc, closureTuple.result(), constant);
-                m_scope.back().emplace(iter.value().getValue(), Identifier{Kind::Cell, cell});
+                m_scope.back().emplace(iter.value().getValue(), Identifier{Kind::Cell, mlir::Value{cell}});
                 usedClosures.push_back(iter.value());
             }
         }
@@ -1271,7 +1284,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                            {
                                auto result = getCurrentScope().find(token.getValue());
                                PYLIR_ASSERT(result != getCurrentScope().end());
-                               return result->second.op->getResult(0);
+                               return result->second.op.get<mlir::Value>();
                            });
             closure = m_builder.create<Py::MakeTupleOp>(loc, args);
         }
@@ -1439,9 +1452,15 @@ std::string pylir::CodeGen::formImplName(std::string_view symbol)
 mlir::Value pylir::CodeGen::buildException(mlir::Location loc, Py::SingletonKind kind, std::vector<Py::IterArg> args)
 {
     auto typeObj = m_builder.create<Py::SingletonOp>(loc, kind);
+    args.emplace(args.begin(), typeObj);
     auto tuple = m_builder.create<Py::MakeTupleOp>(loc, args);
     auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
-    auto obj = m_builder.create<Py::NewOp>(loc, typeObj, tuple, dict);
+    auto newMethod = m_builder.create<Py::GetAttrOp>(loc, typeObj, "__new__").result();
+
+    auto obj = m_builder
+                   .create<mlir::CallIndirectOp>(loc, m_builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
+                                                 mlir::ValueRange{newMethod, tuple, dict})
+                   ->getResult(0);
     m_builder.create<Py::SetAttrOp>(loc, tuple, obj, m_builder.getStringAttr("args"));
     auto context = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None);
     m_builder.create<Py::SetAttrOp>(loc, context, obj, m_builder.getStringAttr("__context__"));
