@@ -4,7 +4,7 @@ def foo(*args, **kwd):
     pass
 
 
-# CHECK: func private @"foo$cc[0]"
+# CHECK-LABEL: func private @"foo$cc[0]"
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
 # CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]
@@ -14,7 +14,7 @@ def foo(*args, **kwd):
 def bar(a, *args, k, **kwd):
     pass
 
-# CHECK: func private @"bar$cc[0]"
+# CHECK-LABEL: func private @"bar$cc[0]"
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
 # CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]

@@ -1593,13 +1593,13 @@ mlir::Value pylir::CodeGen::buildSpecialMethodCall(mlir::Location loc, llvm::Twi
     return buildCall(loc, method, tuple, dict);
 }
 
-mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef name, mlir::FuncOp implementation,
+mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
                                              const std::vector<FunctionParameter>& parameters)
 {
     mlir::OpBuilder::InsertionGuard guard(m_builder);
     m_builder.setInsertionPointToEnd(m_module.getBody());
     auto cc = m_builder.create<mlir::FuncOp>(
-        loc, name,
+        loc, name.str(),
         m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
                                    m_builder.getType<Py::DynamicType>()},
                                   {m_builder.getType<Py::DynamicType>()}),

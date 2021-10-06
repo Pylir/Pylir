@@ -1,7 +1,5 @@
 # RUN: pylir %s -emit-mlir -o - | FileCheck %s
 
-# CHECK: @foo
-
 # CHECK-LABEL: __init__
 
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo$cc[0]"

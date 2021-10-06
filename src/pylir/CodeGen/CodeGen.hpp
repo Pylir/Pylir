@@ -83,7 +83,7 @@ class CodeGen
         bool hasDefaultParam;
     };
 
-    mlir::FuncOp buildFunctionCC(mlir::Location loc, llvm::StringRef name, mlir::FuncOp implementation,
+    mlir::FuncOp buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
                                  const std::vector<FunctionParameter>& parameters);
 
     template <class AST, class FallBackLocation>
