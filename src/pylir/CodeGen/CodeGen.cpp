@@ -1084,7 +1084,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             std::function<mlir::Value(const Syntax::Expression&)> calcCallback;
             mlir::OpBuilder& builder;
             std::function<mlir::Location(const IdentifierToken&)> locCallback;
-            FunctionParameter::Kind kind;
+            FunctionParameter::Kind kind{};
 
             using Visitor::visit;
 
@@ -1128,11 +1128,31 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 
             void visit(const Syntax::ParameterList::StarArgs& star)
             {
-                if (std::holds_alternative<Syntax::ParameterList::StarArgs::Star>(star.variant))
+                auto doubleStarHandler = [&](const Syntax::ParameterList::StarArgs::DoubleStar& doubleStar)
                 {
-                    kind = FunctionParameter::KeywordOnly;
-                }
-                Visitor::visit(star);
+                    visit(doubleStar.parameter);
+                    functionParameters.back().kind = FunctionParameter::KeywordRest;
+                };
+                pylir::match(
+                    star.variant,
+                    [&](const Syntax::ParameterList::StarArgs::Star& star)
+                    {
+                        kind = FunctionParameter::KeywordOnly;
+                        if (star.parameter)
+                        {
+                            visit(*star.parameter);
+                            functionParameters.back().kind = FunctionParameter::PosRest;
+                        }
+                        for (auto& iter : llvm::make_second_range(star.defParameters))
+                        {
+                            visit(iter);
+                        }
+                        if (star.further && star.further->doubleStar)
+                        {
+                            doubleStarHandler(*star.further->doubleStar);
+                        }
+                    },
+                    doubleStarHandler);
             }
         } visitor{{},
                   defaultParameters,
@@ -1603,110 +1623,137 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef
     for (auto& iter : parameters)
     {
         mlir::Value argValue;
-        if (iter.kind != FunctionParameter::KeywordOnly)
+        switch (iter.kind)
         {
-            auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posIndex++));
-            auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, constant, tupleLen);
-            auto lessBlock = new mlir::Block;
-            auto unboundBlock = new mlir::Block;
-            m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, unboundBlock);
+            case FunctionParameter::Normal:
+            case FunctionParameter::PosOnly:
+            {
+                auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posIndex++));
+                auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, constant, tupleLen);
+                auto lessBlock = new mlir::Block;
+                auto unboundBlock = new mlir::Block;
+                m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, unboundBlock);
 
-            auto resultBlock = new mlir::Block;
-            resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
-            m_currentFunc.push_back(unboundBlock);
-            m_builder.setInsertionPointToStart(unboundBlock);
-            auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
-            m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
+                auto resultBlock = new mlir::Block;
+                resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
+                m_currentFunc.push_back(unboundBlock);
+                m_builder.setInsertionPointToStart(unboundBlock);
+                auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
+                m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
 
-            m_currentFunc.push_back(lessBlock);
-            m_builder.setInsertionPointToStart(lessBlock);
-            auto fetched = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, constant);
-            m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{fetched});
+                m_currentFunc.push_back(lessBlock);
+                m_builder.setInsertionPointToStart(lessBlock);
+                auto fetched = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, constant);
+                m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{fetched});
 
-            m_currentFunc.push_back(resultBlock);
-            m_builder.setInsertionPointToStart(resultBlock);
-            argValue = resultBlock->getArgument(0);
+                m_currentFunc.push_back(resultBlock);
+                m_builder.setInsertionPointToStart(resultBlock);
+                argValue = resultBlock->getArgument(0);
+                if (iter.kind == FunctionParameter::PosOnly)
+                {
+                    break;
+                }
+                [[fallthrough]];
+            }
+            case FunctionParameter::KeywordOnly:
+            {
+                auto constant = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.name));
+                auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, dict, constant);
+                auto foundBlock = new mlir::Block;
+                auto notFoundBlock = new mlir::Block;
+                m_builder.create<mlir::CondBranchOp>(loc, lookup.found(), foundBlock, notFoundBlock);
+
+                auto resultBlock = new mlir::Block;
+                resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
+                m_currentFunc.push_back(notFoundBlock);
+                m_builder.setInsertionPointToStart(notFoundBlock);
+                auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
+                m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
+
+                m_currentFunc.push_back(foundBlock);
+                m_builder.setInsertionPointToStart(foundBlock);
+                // value can't be assigned both through a positional argument as well as keyword argument
+                if (argValue)
+                {
+                    auto isUnbound = m_builder.create<Py::IsUnboundValueOp>(loc, argValue);
+                    auto boundBlock = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(loc, isUnbound, resultBlock, mlir::ValueRange{lookup.result()},
+                                                         boundBlock, mlir::ValueRange{});
+
+                    m_currentFunc.push_back(boundBlock);
+                    m_builder.setInsertionPointToStart(boundBlock);
+                    auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
+                    raiseException(exception);
+                }
+                else
+                {
+                    m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{lookup.result()});
+                }
+
+                m_currentFunc.push_back(resultBlock);
+                m_builder.setInsertionPointToStart(resultBlock);
+                argValue = resultBlock->getArgument(0);
+                break;
+            }
+            case FunctionParameter::PosRest: break;
+            case FunctionParameter::KeywordRest: break;
         }
-        if (iter.kind != FunctionParameter::PosOnly)
+        switch (iter.kind)
         {
-            auto constant = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.name));
-            auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, dict, constant);
-            auto foundBlock = new mlir::Block;
-            auto notFoundBlock = new mlir::Block;
-            m_builder.create<mlir::CondBranchOp>(loc, lookup.found(), foundBlock, notFoundBlock);
-
-            auto resultBlock = new mlir::Block;
-            resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
-            m_currentFunc.push_back(notFoundBlock);
-            m_builder.setInsertionPointToStart(notFoundBlock);
-            auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
-            m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
-
-            m_currentFunc.push_back(foundBlock);
-            m_builder.setInsertionPointToStart(foundBlock);
-            // value can't be assigned both through a positional argument as well as keyword argument
-            if (argValue)
+            case FunctionParameter::PosOnly:
+            case FunctionParameter::Normal:
+            case FunctionParameter::KeywordOnly:
             {
                 auto isUnbound = m_builder.create<Py::IsUnboundValueOp>(loc, argValue);
+                auto unboundBlock = new mlir::Block;
                 auto boundBlock = new mlir::Block;
-                m_builder.create<mlir::CondBranchOp>(loc, isUnbound, resultBlock, mlir::ValueRange{lookup.result()},
-                                                     boundBlock, mlir::ValueRange{});
+                boundBlock->addArgument(m_builder.getType<Py::DynamicType>());
+                m_builder.create<mlir::CondBranchOp>(loc, isUnbound, unboundBlock, boundBlock,
+                                                     mlir::ValueRange{argValue});
+
+                m_currentFunc.push_back(unboundBlock);
+                m_builder.setInsertionPointToStart(unboundBlock);
+                if (!iter.hasDefaultParam)
+                {
+                    auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
+                    raiseException(exception);
+                }
+                else
+                {
+                    mlir::Value defaultArg;
+                    switch (iter.kind)
+                    {
+                        case FunctionParameter::Normal:
+                        case FunctionParameter::PosOnly:
+                        {
+                            auto index =
+                                m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posDefaultsIndex++));
+                            defaultArg = m_builder.create<Py::TupleIntegerGetItemOp>(loc, defaultTuple, index);
+                            break;
+                        }
+                        case FunctionParameter::KeywordOnly:
+                        {
+                            auto index = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.name));
+                            auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, kwDefaultDict, index);
+                            // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this
+                            // also
+                            //      affects __defaults__
+                            defaultArg = lookup.result();
+                            break;
+                        }
+                        default: PYLIR_UNREACHABLE;
+                    }
+                    m_builder.create<mlir::BranchOp>(loc, boundBlock, mlir::ValueRange{defaultArg});
+                }
 
                 m_currentFunc.push_back(boundBlock);
                 m_builder.setInsertionPointToStart(boundBlock);
-                auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
-                raiseException(exception);
+                args.push_back(boundBlock->getArgument(0));
+                break;
             }
-            else
-            {
-                m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{lookup.result()});
-            }
-
-            m_currentFunc.push_back(resultBlock);
-            m_builder.setInsertionPointToStart(resultBlock);
-            argValue = resultBlock->getArgument(0);
+            case FunctionParameter::PosRest: break;
+            case FunctionParameter::KeywordRest: break;
         }
-        auto isUnbound = m_builder.create<Py::IsUnboundValueOp>(loc, argValue);
-        auto unboundBlock = new mlir::Block;
-        auto boundBlock = new mlir::Block;
-        boundBlock->addArgument(m_builder.getType<Py::DynamicType>());
-        m_builder.create<mlir::CondBranchOp>(loc, isUnbound, unboundBlock, boundBlock, mlir::ValueRange{argValue});
-
-        m_currentFunc.push_back(unboundBlock);
-        m_builder.setInsertionPointToStart(unboundBlock);
-        if (!iter.hasDefaultParam)
-        {
-            auto exception = buildException(loc, Py::SingletonKind::TypeError, {});
-            raiseException(exception);
-        }
-        else
-        {
-            mlir::Value defaultArg;
-            switch (iter.kind)
-            {
-                case FunctionParameter::Normal:
-                case FunctionParameter::PosOnly:
-                {
-                    auto index = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posDefaultsIndex++));
-                    defaultArg = m_builder.create<Py::TupleIntegerGetItemOp>(loc, defaultTuple, index);
-                    break;
-                }
-                case FunctionParameter::KeywordOnly:
-                {
-                    auto index = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.name));
-                    auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, kwDefaultDict, index);
-                    // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this also
-                    //      affects __defaults__
-                    defaultArg = lookup.result();
-                    break;
-                }
-            }
-            m_builder.create<mlir::BranchOp>(loc, boundBlock, mlir::ValueRange{defaultArg});
-        }
-
-        m_currentFunc.push_back(boundBlock);
-        m_builder.setInsertionPointToStart(boundBlock);
-        args.push_back(boundBlock->getArgument(0));
     }
 
     auto result = m_builder.create<mlir::CallOp>(loc, implementation, args);

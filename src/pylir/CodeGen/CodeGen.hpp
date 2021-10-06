@@ -77,6 +77,8 @@ class CodeGen
             Normal,
             PosOnly,
             KeywordOnly,
+            PosRest,
+            KeywordRest,
         } kind;
         bool hasDefaultParam;
     };
