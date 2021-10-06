@@ -103,12 +103,13 @@ def PylirPy_Singleton_NameError : I32EnumAttrCase<"NameError", 10>;
 def PylirPy_Singleton_TypeError : I32EnumAttrCase<"TypeError", 11>;
 def PylirPy_Singleton_UnboundLocalError : I32EnumAttrCase<"UnboundLocalError", 12>;
 def PylirPy_Singleton_Function : I32EnumAttrCase<"Function", 13, "function">;
+def PylirPy_Singleton_BaseException : I32EnumAttrCase<"BaseException", 14>;
 
 def PylirPy_SingletonAttr : I32EnumAttr<"SingletonKind", "", [
     PylirPy_Singleton_None, PylirPy_Singleton_NotImplemented, PylirPy_Singleton_Type, PylirPy_Singleton_Object,
     PylirPy_Singleton_Int, PylirPy_Singleton_Float, PylirPy_Singleton_Tuple, PylirPy_Singleton_List,
     PylirPy_Singleton_Dict, PylirPy_Singleton_Cell, PylirPy_Singleton_NameError, PylirPy_Singleton_TypeError,
-    PylirPy_Singleton_UnboundLocalError, PylirPy_Singleton_Function
+    PylirPy_Singleton_UnboundLocalError, PylirPy_Singleton_Function, PylirPy_Singleton_BaseException
 ]> {
     let cppNamespace = "::pylir::Py";
 }

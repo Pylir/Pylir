@@ -1481,7 +1481,6 @@ mlir::Value pylir::CodeGen::buildException(mlir::Location loc, Py::SingletonKind
                    .create<mlir::CallIndirectOp>(loc, m_builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
                                                  mlir::ValueRange{newMethod, tuple, dict})
                    ->getResult(0);
-    m_builder.create<Py::SetAttrOp>(loc, tuple, obj, m_builder.getStringAttr("args"));
     auto context = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None);
     m_builder.create<Py::SetAttrOp>(loc, context, obj, m_builder.getStringAttr("__context__"));
     auto cause = m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None);

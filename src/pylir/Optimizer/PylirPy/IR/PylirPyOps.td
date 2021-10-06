@@ -405,6 +405,8 @@ def PylirPy_SingletonImplOp : PylirPy_Op<"singletonImpl"> {
     let arguments = (ins PylirPy_SingletonAttr:$sym, AnyPyAttribute:$initializer);
 
     let results = (outs);
+
+    let assemblyFormat = "$sym `=` $initializer attr-dict";
 }
 
 def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
