@@ -1672,6 +1672,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef
 
                 m_currentFunc.push_back(foundBlock);
                 m_builder.setInsertionPointToStart(foundBlock);
+                m_builder.create<Py::DictDelItemOp>(loc, dict, constant);
                 // value can't be assigned both through a positional argument as well as keyword argument
                 if (argValue)
                 {
@@ -1695,8 +1696,43 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef
                 argValue = resultBlock->getArgument(0);
                 break;
             }
-            case FunctionParameter::PosRest: break;
-            case FunctionParameter::KeywordRest: break;
+            case FunctionParameter::PosRest:
+            {
+                // if posIndex is 0 then no other positional arguments existed. As a shortcut we can then simply assign
+                // the tuple to argValue instead of creating it from a list
+                if (posIndex == 0)
+                {
+                    argValue = tuple;
+                    break;
+                }
+                auto list = m_builder.create<Py::MakeListOp>(loc);
+                auto start = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posIndex));
+                auto conditionBlock = new mlir::Block;
+                conditionBlock->addArgument(m_builder.getIndexType());
+                m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{start});
+
+                m_currentFunc.push_back(conditionBlock);
+                m_builder.setInsertionPointToStart(conditionBlock);
+                auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult,
+                                                             conditionBlock->getArgument(0), tupleLen);
+                auto lessBlock = new mlir::Block;
+                auto endBlock = new mlir::Block;
+                m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, endBlock);
+
+                m_currentFunc.push_back(lessBlock);
+                m_builder.setInsertionPointToStart(lessBlock);
+                auto fetched = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
+                m_builder.create<Py::ListAppendOp>(loc, list, fetched);
+                auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(1));
+                auto incremented = m_builder.create<mlir::AddIOp>(loc, conditionBlock->getArgument(0), one);
+                m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{incremented});
+
+                m_currentFunc.push_back(endBlock);
+                m_builder.setInsertionPointToStart(endBlock);
+                argValue = m_builder.create<Py::ListToTupleOp>(loc, list);
+                break;
+            }
+            case FunctionParameter::KeywordRest: argValue = dict; break;
         }
         switch (iter.kind)
         {
@@ -1751,8 +1787,8 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::StringRef
                 args.push_back(boundBlock->getArgument(0));
                 break;
             }
-            case FunctionParameter::PosRest: break;
-            case FunctionParameter::KeywordRest: break;
+            case FunctionParameter::PosRest:
+            case FunctionParameter::KeywordRest: args.push_back(argValue); break;
         }
     }
 

@@ -125,6 +125,19 @@ def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem"> {
     }];
 }
 
+def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
+    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key);
+    let results = (outs I1:$existed);
+
+    let assemblyFormat = "$key `from` $dict attr-dict";
+
+    let description = [{
+        This op deletes the entry identified by `$key` from the dictionary. If the dictionary did not contain an entry
+        with the given key the result is 0, otherwise 1.
+        If `$dict` is not a dictionary (or a subclass of) the behaviour is undefined.
+    }];
+}
+
 def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
     let arguments = (ins DynamicType:$tuple, AnyInteger:$index);
     let results = (outs DynamicType:$result);
@@ -150,6 +163,33 @@ def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len"> {
     let description = [{
         This op returns the length of `$tuple` as the given integer type. If `$tuple` is not really a tuple (or a
         subclass of) then the behaviour of is undefined.
+    }];
+}
+
+def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
+    let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list, DynamicType:$item);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $list `,` $item attr-dict
+    }];
+
+    let description = [{
+        This op appends the `$item` to the very end of `$list`. If `$list` is not really a list (or subclass of)
+        the behaviour is undefined.
+    }];
+}
+
+def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple"> {
+    let arguments = (ins DynamicType:$list);
+
+    let assemblyFormat = [{
+        $list attr-dict
+    }];
+
+    let description = [{
+        This op creates a tuple from the elements in `$list`. The list remains unmodified.
+        If `$list` is not really a list (or subclass of) the behaviour is undefined.
     }];
 }
 
