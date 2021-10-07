@@ -12,6 +12,28 @@
 
 namespace pylir
 {
+
+namespace Builtins
+{
+constexpr static std::string_view None = "builtins.None";
+constexpr static std::string_view NoneType = "builtins.NoneType";
+constexpr static std::string_view NotImplemented = "builtins.NotImplemented";
+constexpr static std::string_view Type = "builtins.type";
+constexpr static std::string_view Object = "builtins.object";
+constexpr static std::string_view Int = "builtins.int";
+constexpr static std::string_view Float = "builtins.float";
+constexpr static std::string_view Tuple = "builtins.tuple";
+constexpr static std::string_view List = "builtins.list";
+constexpr static std::string_view Dict = "builtins.dict";
+constexpr static std::string_view Function = "builtins.function";
+constexpr static std::string_view Cell = "builtins.cell";
+constexpr static std::string_view BaseException = "builtins.BaseException";
+constexpr static std::string_view Exception = "builtins.Exception";
+constexpr static std::string_view TypeError = "builtins.TypeError";
+constexpr static std::string_view NameError = "builtins.NameError";
+constexpr static std::string_view UnboundLocalError = "builtins.UnboundLocalError";
+} // namespace Builtins
+
 class CodeGen
 {
     mlir::OpBuilder m_builder;
@@ -58,7 +80,7 @@ class CodeGen
 
     void writeIdentifier(const IdentifierToken& token, mlir::Value value);
 
-    mlir::Value buildException(mlir::Location loc, Py::SingletonKind kind, std::vector<Py::IterArg> args);
+    mlir::Value buildException(mlir::Location loc, std::string_view type, std::vector<Py::IterArg> args);
 
     void raiseException(mlir::Value exceptionObject);
 

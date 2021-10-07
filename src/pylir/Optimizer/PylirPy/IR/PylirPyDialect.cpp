@@ -23,9 +23,5 @@ void pylir::Py::PylirPyDialect::initialize()
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
                                                                 ::mlir::Type type, ::mlir::Location loc)
 {
-    if (auto singleton = value.dyn_cast_or_null<Py::SingletonKindAttr>())
-    {
-        return builder.create<Py::SingletonOp>(loc, type, singleton);
-    }
     return builder.create<Py::ConstantOp>(loc, type, value);
 }

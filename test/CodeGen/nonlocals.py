@@ -7,7 +7,7 @@ def foo():
         return x
 
 # CHECK-LABEL: func private @"foo$impl[0]"
-# CHECK: %[[CELL:.*]] = py.singleton cell
+# CHECK: %[[CELL:.*]] = py.getGlobalValue @builtins.cell
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[CELL]])
 # CHECK: %[[NEW_METHOD:.*]], %{{[[:alnum:]]+}} = py.getAttr "__new__" from %[[CELL]]
 # CHECK: %[[CALLABLE:.*]] = py.function.getFunction %[[NEW_METHOD]]

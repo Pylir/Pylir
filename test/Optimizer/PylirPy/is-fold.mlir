@@ -23,12 +23,14 @@ func @two_allocs(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
+py.globalValue const @one = #py.int<0>
+
 // CHECK-LABEL: @singletons
 // CHECK: %[[RES:.*]] = py.constant #py.bool<True>
 // CHECK: return %[[RES]]
 func @singletons() -> !py.dynamic {
-    %0 = py.singleton None
-    %1 = py.singleton None
+    %0 = py.getGlobalValue @one
+    %1 = py.getGlobalValue @one
     %2 = py.is %0, %1
     return %2 : !py.dynamic
 }

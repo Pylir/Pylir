@@ -305,16 +305,6 @@ def PylirPy_MakeObjectOp : PylirPy_MakeOp<"makeObject"> {
     let assemblyFormat = "$typeObj attr-dict";
 }
 
-def PylirPy_SingletonOp : PylirPy_Op<"singleton", [ConstantLike, NoSideEffect]> {
-    let arguments = (ins PylirPy_SingletonAttr:$singleton);
-
-    let assemblyFormat = [{
-        $singleton attr-dict
-    }];
-
-    let hasFolder = 1;
-}
-
 def PylirPy_PowerOp : PylirPy_Op<"pow"> {
     let arguments = (ins DynamicType:$base, DynamicType:$exponent, Optional<DynamicType>:$mod);
 
@@ -401,12 +391,23 @@ def PylirPy_BoolToI1Op : PylirPy_Op<"boolToI1"> {
 
 // Memory operations
 
-def PylirPy_SingletonImplOp : PylirPy_Op<"singletonImpl"> {
-    let arguments = (ins PylirPy_SingletonAttr:$sym, AnyPyAttribute:$initializer);
+def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [Symbol]> {
+    let arguments = (ins
+            SymbolNameAttr:$sym_name,
+            OptionalAttr<StrAttr>:$sym_visibility,
+            UnitAttr:$constant,
+            AnyPyAttribute:$initializer);
 
     let results = (outs);
 
-    let assemblyFormat = "$sym `=` $initializer attr-dict";
+    let assemblyFormat = [{
+        ($sym_visibility^)? (`const` $constant^)? $sym_name `=` $initializer attr-dict
+    }];
+
+    let description = [{
+        This op creates a global value whose lifetime is global. If marked as constant, operations that write to it
+        are undefined behaviour.
+    }];
 }
 
 def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
@@ -438,6 +439,17 @@ def PylirPy_GetGlobalHandleOp : PylirPy_Op<"getGlobalHandle", [NoSideEffect,
     }];
 }
 
+def PylirPy_GetGlobalValueOp : PylirPy_Op<"getGlobalValue", [NoSideEffect,
+                                                             DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let arguments = (ins FlatSymbolRefAttr:$name);
+    let results = (outs DynamicType:$value);
+
+    let assemblyFormat = "$name attr-dict";
+
+    let description = [{
+        This op converts a `globalValue` op referenced by the symbol into a value usable by normal instructions
+    }];
+}
 
 def PylirPy_AllocaOp : PylirPy_Op<"alloca"> {
     let arguments = (ins );

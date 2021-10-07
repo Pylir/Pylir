@@ -205,11 +205,6 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return constant();
 }
 
-mlir::OpFoldResult pylir::Py::SingletonOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
-{
-    return singletonAttr();
-}
-
 mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (!std::all_of(operands.begin(), operands.end(),
@@ -723,6 +718,11 @@ mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute>
     return mlir::BoolAttr::get(getContext(), boolean.getValue());
 }
 
+mlir::LogicalResult pylir::Py::GetGlobalValueOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalValueOp>(*this, name()));
+}
+
 mlir::LogicalResult pylir::Py::GetGlobalHandleOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalHandleOp>(*this, name()));
@@ -797,14 +797,14 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion));
 }
 
-mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
     {
-        auto lhs = operands[0].dyn_cast_or_null<Py::SingletonKindAttr>();
-        auto rhs = operands[1].dyn_cast_or_null<Py::SingletonKindAttr>();
-        if (lhs && rhs && lhs.getValue() == rhs.getValue())
+        auto lhsGlobal = lhs().getDefiningOp<Py::GetGlobalValueOp>();
+        auto rhsGlobal = rhs().getDefiningOp<Py::GetGlobalValueOp>();
+        if (lhsGlobal && rhsGlobal)
         {
-            return Py::BoolAttr::get(getContext(), true);
+            return Py::BoolAttr::get(getContext(), lhsGlobal.name() == rhsGlobal.name());
         }
     }
     if (lhs() == rhs())

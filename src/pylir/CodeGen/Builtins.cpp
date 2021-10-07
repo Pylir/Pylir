@@ -4,11 +4,10 @@
 
 void pylir::CodeGen::createBuiltinsImpl()
 {
-    auto noDefaultsFunctionDict = Py::DictAttr::get(
-        m_builder.getContext(), {{m_builder.getStringAttr("__defaults__"),
-                                  Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::None)},
-                                 {m_builder.getStringAttr("__kwdefaults__"),
-                                  Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::None)}});
+    auto noDefaultsFunctionDict =
+        Py::DictAttr::get(m_builder.getContext(),
+                          {{m_builder.getStringAttr("__defaults__"), m_builder.getSymbolRefAttr(Builtins::None)},
+                           {m_builder.getStringAttr("__kwdefaults__"), m_builder.getSymbolRefAttr(Builtins::None)}});
     auto loc = m_builder.getUnknownLoc();
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
@@ -31,8 +30,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
-                Py::ObjectAttr::get(m_builder.getContext(),
-                                    Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function),
                                     noDefaultsFunctionDict,
                                     m_builder.getSymbolRefAttr(buildFunctionCC(
                                         loc, "builtins.object.__new__$cc", newCall,
@@ -51,8 +49,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
-                Py::ObjectAttr::get(m_builder.getContext(),
-                                    Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function),
                                     noDefaultsFunctionDict,
                                     m_builder.getSymbolRefAttr(
                                         buildFunctionCC(loc, "builtins.object.__init__$cc", initCall,
@@ -60,15 +57,12 @@ void pylir::CodeGen::createBuiltinsImpl()
         }
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(),
-                               {Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Object)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::Object)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::SingletonImplOp>(
-            loc, Py::SingletonKind::Object,
-            Py::ObjectAttr::get(m_builder.getContext(),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Type), dict,
-                                llvm::None));
+        m_builder.create<Py::GlobalValueOp>(
+            loc, Builtins::Object, mlir::StringAttr{}, true,
+            Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Type), dict, llvm::None));
     }
     mlir::FuncOp baseExceptionNew;
     mlir::FuncOp baseExceptionInit;
@@ -93,9 +87,7 @@ void pylir::CodeGen::createBuiltinsImpl()
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
                 Py::ObjectAttr::get(
-                    m_builder.getContext(),
-                    Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
-                    noDefaultsFunctionDict,
+                    m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function), noDefaultsFunctionDict,
                     m_builder.getSymbolRefAttr(baseExceptionNew = buildFunctionCC(
                                                    loc, "builtins.BaseException.__new__$cc", newCall,
                                                    {FunctionParameter{"", FunctionParameter::PosOnly, false},
@@ -118,9 +110,7 @@ void pylir::CodeGen::createBuiltinsImpl()
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
                 Py::ObjectAttr::get(
-                    m_builder.getContext(),
-                    Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
-                    noDefaultsFunctionDict,
+                    m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function), noDefaultsFunctionDict,
                     m_builder.getSymbolRefAttr(baseExceptionInit = buildFunctionCC(
                                                    loc, formImplName("builtins.BaseException.__init__$cc"), initCall,
                                                    {FunctionParameter{"", FunctionParameter::PosOnly, false},
@@ -128,55 +118,41 @@ void pylir::CodeGen::createBuiltinsImpl()
         }
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(),
-                               {Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::BaseException),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Object)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::BaseException),
+                                                        m_builder.getSymbolRefAttr(Builtins::Object)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::SingletonImplOp>(
-            loc, Py::SingletonKind::BaseException,
-            Py::ObjectAttr::get(m_builder.getContext(),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Type), dict,
-                                llvm::None));
+        m_builder.create<Py::GlobalValueOp>(
+            loc, Builtins::BaseException, mlir::StringAttr{}, true,
+            Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Type), dict, llvm::None));
     }
-    auto createExceptionSubclass = [&](Py::SingletonKind kind, llvm::Twine name, std::vector<Py::SingletonKind> bases)
+    auto createExceptionSubclass = [&](llvm::Twine name, std::vector<std::string_view> bases)
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
-        members.emplace_back(
-            m_builder.getStringAttr("__new__"),
-            Py::ObjectAttr::get(m_builder.getContext(),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
-                                noDefaultsFunctionDict,
-                                m_builder.getSymbolRefAttr(
-                                    buildFunctionCC(loc, "builtins." + name + ".__new__$cc", baseExceptionNew,
-                                                    {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                                     FunctionParameter{"", FunctionParameter::PosRest, false}}))));
+        members.emplace_back(m_builder.getStringAttr("__new__"),
+                             Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function),
+                                                 noDefaultsFunctionDict,
+                                                 m_builder.getSymbolRefAttr(buildFunctionCC(
+                                                     loc, name + ".__new__$cc", baseExceptionNew,
+                                                     {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                                                      FunctionParameter{"", FunctionParameter::PosRest, false}}))));
         std::vector<mlir::Attribute> attr(1 + bases.size());
-        attr.front() = Py::SingletonKindAttr::get(m_builder.getContext(), kind);
+        attr.front() = m_builder.getSymbolRefAttr(name.str());
         std::transform(bases.begin(), bases.end(), attr.begin(),
-                       [this](Py::SingletonKind kind)
-                       { return Py::SingletonKindAttr::get(m_builder.getContext(), kind); });
+                       [this](std::string_view kind) { return m_builder.getSymbolRefAttr(kind); });
         members.emplace_back(m_builder.getStringAttr("__mro__"), Py::TupleAttr::get(m_builder.getContext(), attr));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::SingletonImplOp>(
-            loc, kind,
-            Py::ObjectAttr::get(m_builder.getContext(),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Type), dict,
-                                llvm::None));
+        m_builder.create<Py::GlobalValueOp>(
+            loc, name.str(), mlir::StringAttr{}, true,
+            Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Type), dict, llvm::None));
     };
 
-    createExceptionSubclass(Py::SingletonKind::Exception, "Exception",
-                            {Py::SingletonKind::BaseException, Py::SingletonKind::Object});
-    createExceptionSubclass(
-        Py::SingletonKind::TypeError, "TypeError",
-        {Py::SingletonKind::Exception, Py::SingletonKind::BaseException, Py::SingletonKind::Object});
-    createExceptionSubclass(
-        Py::SingletonKind::NameError, "NameError",
-        {Py::SingletonKind::Exception, Py::SingletonKind::BaseException, Py::SingletonKind::Object});
-    createExceptionSubclass(Py::SingletonKind::UnboundLocalError, "UnboundLocalError",
-                            {Py::SingletonKind::NameError, Py::SingletonKind::Exception,
-                             Py::SingletonKind::BaseException, Py::SingletonKind::Object});
+    createExceptionSubclass(Builtins::Exception, {Builtins::BaseException, Builtins::Object});
+    createExceptionSubclass(Builtins::TypeError, {Builtins::Exception, Builtins::BaseException, Builtins::Object});
+    createExceptionSubclass(Builtins::NameError, {Builtins::Exception, Builtins::BaseException, Builtins::Object});
+    createExceptionSubclass(Builtins::UnboundLocalError,
+                            {Builtins::NameError, Builtins::Exception, Builtins::BaseException, Builtins::Object});
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         {
@@ -189,12 +165,11 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_currentFunc = newCall;
             // TODO: probably disallow subclassing NoneType here
             m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::SingletonOp>(loc, Py::SingletonKind::None)});
+                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None)});
 
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
-                Py::ObjectAttr::get(m_builder.getContext(),
-                                    Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function),
                                     noDefaultsFunctionDict,
                                     m_builder.getSymbolRefAttr(
                                         buildFunctionCC(loc, "builtins.NoneType.__new__$cc", newCall,
@@ -202,35 +177,28 @@ void pylir::CodeGen::createBuiltinsImpl()
         }
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(),
-                               {Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::NoneType),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Object)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::NoneType),
+                                                        m_builder.getSymbolRefAttr(Builtins::Object)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::SingletonImplOp>(
-            loc, Py::SingletonKind::NoneType,
-            Py::ObjectAttr::get(m_builder.getContext(),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Type), dict,
-                                llvm::None));
+        m_builder.create<Py::GlobalValueOp>(
+            loc, Builtins::NoneType, mlir::StringAttr{}, true,
+            Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Type), dict, llvm::None));
     }
-    m_builder.create<Py::SingletonImplOp>(
-        loc, Py::SingletonKind::None,
-        Py::ObjectAttr::get(m_builder.getContext(),
-                            Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::NoneType),
-                            Py::DictAttr::get(m_builder.getContext(), {}), llvm::None));
+    m_builder.create<Py::GlobalValueOp>(loc, Builtins::None, mlir::StringAttr{}, true,
+                                        Py::ObjectAttr::get(m_builder.getContext(),
+                                                            m_builder.getSymbolRefAttr(Builtins::NoneType),
+                                                            Py::DictAttr::get(m_builder.getContext(), {}), llvm::None));
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(),
-                               {Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Function),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Object)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::Function),
+                                                        m_builder.getSymbolRefAttr(Builtins::Object)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::SingletonImplOp>(
-            loc, Py::SingletonKind::Function,
-            Py::ObjectAttr::get(m_builder.getContext(),
-                                Py::SingletonKindAttr::get(m_builder.getContext(), Py::SingletonKind::Type), dict,
-                                llvm::None));
+        m_builder.create<Py::GlobalValueOp>(
+            loc, Builtins::Function, mlir::StringAttr{}, true,
+            Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Type), dict, llvm::None));
     }
 }
