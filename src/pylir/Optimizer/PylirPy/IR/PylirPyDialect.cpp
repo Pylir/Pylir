@@ -23,5 +23,10 @@ void pylir::Py::PylirPyDialect::initialize()
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
                                                                 ::mlir::Type type, ::mlir::Location loc)
 {
-    return builder.create<Py::ConstantOp>(loc, type, value);
+    if (&value.getDialect() == this || (value.isa<mlir::FloatAttr>() && value.getType().isa<mlir::Float64Type>())
+        || value.isa<mlir::StringAttr>())
+    {
+        return builder.create<Py::ConstantOp>(loc, type, value);
+    }
+    return nullptr;
 }
