@@ -96,6 +96,11 @@ def PylirPy_ObjectAttr : PylirPy_Attr<"Object"> {
     let parameters = (ins "mlir::Attribute":$type, "::pylir::Py::DictAttr":$attributes, "::llvm::Optional<mlir::Attribute>":$builtinValue);
 }
 
+def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
+    let mnemonic = "unbound";
+    let summary = "python unbound value";
+}
+
 def AnyPyAttribute : AnyAttrOf<[PylirPy_IntAttr, PylirPy_BoolAttr, F64Attr, PylirPy_ListAttr, PylirPy_TupleAttr,
                                 PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, PylirPy_ObjectAttr]>;
 

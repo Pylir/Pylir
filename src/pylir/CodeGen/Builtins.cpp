@@ -87,6 +87,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             auto obj = m_builder.create<Py::MakeObjectOp>(loc, clazz);
             m_builder.create<Py::SetAttrOp>(loc, args, obj, "args");
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{obj});
 
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
@@ -110,6 +111,9 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_currentFunc = initCall;
 
             m_builder.create<Py::SetAttrOp>(loc, args, self, "args");
+            // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
+            m_builder.create<mlir::ReturnOp>(
+                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None)});
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
@@ -138,7 +142,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                  noDefaultsFunctionDict, m_builder.getSymbolRefAttr(baseExceptionNew)));
         std::vector<mlir::Attribute> attr(1 + bases.size());
         attr.front() = m_builder.getSymbolRefAttr(name.str());
-        std::transform(bases.begin(), bases.end(), attr.begin(),
+        std::transform(bases.begin(), bases.end(), attr.begin() + 1,
                        [this](std::string_view kind) { return m_builder.getSymbolRefAttr(kind); });
         members.emplace_back(m_builder.getStringAttr("__mro__"), Py::TupleAttr::get(m_builder.getContext(), attr));
 

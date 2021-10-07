@@ -205,6 +205,11 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return constant();
 }
 
+mlir::OpFoldResult pylir::Py::UnboundValueOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
+{
+    return Py::UnboundAttr::get(getContext());
+}
+
 mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (!std::all_of(operands.begin(), operands.end(),

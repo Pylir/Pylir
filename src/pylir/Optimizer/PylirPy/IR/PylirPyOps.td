@@ -31,6 +31,7 @@ def PyFunctionType : Type<
              $_builder.getType<pylir::Py::DynamicType>()},{$_builder.getType<pylir::Py::DynamicType>()})
     }];
 }
+def IntegerLike : TypeConstraint<Or<[Index.predicate, AnySignlessInteger.predicate]>>;
 
 class PylirPy_Op<string mneomic, list<OpTrait> traits = []> :
     Op<PylirPy_Dialect, mneomic, traits> {
@@ -139,7 +140,7 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
 }
 
 def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
-    let arguments = (ins DynamicType:$tuple, AnyInteger:$index);
+    let arguments = (ins DynamicType:$tuple, IntegerLike:$index);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -154,7 +155,7 @@ def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
 
 def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len"> {
     let arguments = (ins DynamicType:$tuple);
-    let results = (outs AnyInteger:$result);
+    let results = (outs IntegerLike:$result);
 
     let assemblyFormat = [{
         $tuple `:` type($result) attr-dict
@@ -525,6 +526,8 @@ def PylirPy_UnboundValueOp : PylirPy_Op<"unboundValue", [NoSideEffect, ConstantL
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "attr-dict";
+
+    let hasFolder = 1;
 }
 
 def PylirPy_IsUnboundValueOp : PylirPy_Op<"isUnboundValue", [NoSideEffect]> {
