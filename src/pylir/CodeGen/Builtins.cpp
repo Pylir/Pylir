@@ -135,11 +135,7 @@ void pylir::CodeGen::createBuiltinsImpl()
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         members.emplace_back(m_builder.getStringAttr("__new__"),
                              Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function),
-                                                 noDefaultsFunctionDict,
-                                                 m_builder.getSymbolRefAttr(buildFunctionCC(
-                                                     loc, name + ".__new__$cc", baseExceptionNew,
-                                                     {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                                      FunctionParameter{"", FunctionParameter::PosRest, false}}))));
+                                                 noDefaultsFunctionDict, m_builder.getSymbolRefAttr(baseExceptionNew)));
         std::vector<mlir::Attribute> attr(1 + bases.size());
         attr.front() = m_builder.getSymbolRefAttr(name.str());
         std::transform(bases.begin(), bases.end(), attr.begin(),
