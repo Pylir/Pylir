@@ -376,17 +376,36 @@ def PylirPy_InOp : PylirPy_BinOp<"in"> {
     let hasFolder = 0;
 }
 
-def PylirPy_IsOp : PylirPy_BinOp<"is", [NoSideEffect]>;
+def PylirPy_IsOp : PylirPy_BinOp<"is", [NoSideEffect]> {
+    let results = (outs I1:$result);
+}
 
 // Conversions
 
-def PylirPy_BoolToI1Op : PylirPy_Op<"boolToI1"> {
+def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1"> {
     let arguments = (ins DynamicType:$input);
     let results = (outs I1:$result);
 
     let assemblyFormat = "$input attr-dict";
 
     let hasFolder = 1;
+
+    let description = [{
+        This op converts the boolean given by `$input` into an `I1` value that is usable for eg. conditional branches.
+        If `$input` is not really a `bool` (or a subclasses of) the behaviour is undefined.
+    }];
+}
+
+def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1"> {
+    let arguments = (ins I1:$input);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let hasFolder = 1;
+
+    let description = [{
+        This op converts an `I1` given by `$input` into a python bool object.
+    }];
 }
 
 // Memory operations

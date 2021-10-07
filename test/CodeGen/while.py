@@ -6,7 +6,7 @@ while True:
 # CHECK: ^[[TEST:[[:alnum:]]+]]:
 # CHECK: %[[COND:.*]] = py.constant #py.bool<True>
 # CHECK: %[[COND_BOOL:.*]] = py.bool %[[COND]]
-# CHECK: %[[COND_I1:.*]] = py.boolToI1 %[[COND_BOOL]]
+# CHECK: %[[COND_I1:.*]] = py.bool.toI1 %[[COND_BOOL]]
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[THEN:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:
@@ -24,7 +24,7 @@ else:
 # CHECK: ^[[TEST:[[:alnum:]]+]]:
 # CHECK: %[[COND:.*]] = py.constant #py.bool<True>
 # CHECK: %[[COND_BOOL:.*]] = py.bool %[[COND]]
-# CHECK: %[[COND_I1:.*]] = py.boolToI1 %[[COND_BOOL]]
+# CHECK: %[[COND_I1:.*]] = py.bool.toI1 %[[COND_BOOL]]
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:
@@ -48,7 +48,7 @@ while True:
 # CHECK: ^[[TEST:[[:alnum:]]+]]:
 # CHECK: %[[COND:.*]] = py.constant #py.bool<True>
 # CHECK: %[[COND_BOOL:.*]] = py.bool %[[COND]]
-# CHECK: %[[COND_I1:.*]] = py.boolToI1 %[[COND_BOOL]]
+# CHECK: %[[COND_I1:.*]] = py.bool.toI1 %[[COND_BOOL]]
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[THEN:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:

@@ -7,7 +7,7 @@
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK: %[[LESS:.*]] = py.less %[[ONE]], %[[THREE]]
 # CHECK: %[[LESS_BOOL:.*]] = py.bool %[[LESS]]
-# CHECK: %[[LESS_I1:.*]] = py.boolToI1 %[[LESS_BOOL]]
+# CHECK: %[[LESS_I1:.*]] = py.bool.toI1 %[[LESS_BOOL]]
 # CHECK: cond_br %[[LESS_I1]], ^[[FOUND:.*]](%[[LESS]] : !py.dynamic), ^[[NOT_FOUND:[[:alnum:]]+]]
 
 # CHECK: ^[[NOT_FOUND]]:

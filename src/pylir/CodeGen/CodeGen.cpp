@@ -445,7 +445,9 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
             case Comp::Ne: cmp = m_builder.create<Py::NotEqualOp>(loc, previousRHS, other); break;
             case Comp::Ge: cmp = m_builder.create<Py::GreaterEqualOp>(loc, previousRHS, other); break;
             case Comp::Le: cmp = m_builder.create<Py::LessEqualOp>(loc, previousRHS, other); break;
-            case Comp::Is: cmp = m_builder.create<Py::IsOp>(loc, previousRHS, other); break;
+            case Comp::Is:
+                cmp = m_builder.create<Py::BoolFromI1Op>(loc, m_builder.create<Py::IsOp>(loc, previousRHS, other));
+                break;
             case Comp::In: cmp = m_builder.create<Py::InOp>(loc, previousRHS, other); break;
         }
         if (invert)
@@ -1543,8 +1545,8 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
     auto found = new mlir::Block;
     auto body = new mlir::Block;
     found->addArgument(m_builder.getType<Py::DynamicType>());
-    m_builder.create<mlir::CondBranchOp>(loc, m_builder.create<Py::BoolToI1Op>(loc, isFunction), found,
-                                         mlir::ValueRange{condition->getArgument(0)}, body, mlir::ValueRange{});
+    m_builder.create<mlir::CondBranchOp>(loc, isFunction, found, mlir::ValueRange{condition->getArgument(0)}, body,
+                                         mlir::ValueRange{});
 
     {
         m_currentFunc.push_back(body);

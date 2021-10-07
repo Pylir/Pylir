@@ -718,6 +718,16 @@ mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute>
     return mlir::BoolAttr::get(getContext(), boolean.getValue());
 }
 
+mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(::llvm::ArrayRef<mlir::Attribute> operands)
+{
+    auto boolean = operands[0].dyn_cast_or_null<mlir::BoolAttr>();
+    if (!boolean)
+    {
+        return nullptr;
+    }
+    return Py::BoolAttr::get(getContext(), boolean.getValue());
+}
+
 mlir::LogicalResult pylir::Py::GetGlobalValueOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalValueOp>(*this, name()));
@@ -804,12 +814,13 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
         auto rhsGlobal = rhs().getDefiningOp<Py::GetGlobalValueOp>();
         if (lhsGlobal && rhsGlobal)
         {
-            return Py::BoolAttr::get(getContext(), lhsGlobal.name() == rhsGlobal.name());
+            return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1),
+                                          rhsGlobal.name() == lhsGlobal.name());
         }
     }
     if (lhs() == rhs())
     {
-        return Py::BoolAttr::get(getContext(), true);
+        return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1), true);
     }
     {
         auto lhsEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(lhs().getDefiningOp());
@@ -817,7 +828,7 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
         if (lhsEffect && rhsEffect && lhsEffect.hasEffect<mlir::MemoryEffects::Allocate>()
             && rhsEffect.hasEffect<mlir::MemoryEffects::Allocate>())
         {
-            return Py::BoolAttr::get(getContext(), false);
+            return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1), false);
         }
     }
     return nullptr;

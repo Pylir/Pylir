@@ -6,7 +6,8 @@
 func @same_value() -> !py.dynamic {
     %0 = py.makeTuple ()
     %1 = py.is %0, %0
-    return %1 : !py.dynamic
+    %2 = py.bool.fromI1 %1
+    return %2 : !py.dynamic
 }
 
 // -----
@@ -18,7 +19,8 @@ func @two_allocs(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.makeTuple (%arg0)
     %2 = py.is %0, %1
-    return %2 : !py.dynamic
+    %3 = py.bool.fromI1 %2
+    return %3 : !py.dynamic
 }
 
 // -----
@@ -32,6 +34,7 @@ func @singletons() -> !py.dynamic {
     %0 = py.getGlobalValue @one
     %1 = py.getGlobalValue @one
     %2 = py.is %0, %1
-    return %2 : !py.dynamic
+    %3 = py.bool.fromI1 %2
+    return %3 : !py.dynamic
 }
 
