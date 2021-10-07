@@ -47,6 +47,10 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_builder.setInsertionPointToStart(initCall.addEntryBlock());
             m_currentFunc = initCall;
 
+            // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
+            m_builder.create<mlir::ReturnOp>(
+                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None)});
+
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
                 Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function),
