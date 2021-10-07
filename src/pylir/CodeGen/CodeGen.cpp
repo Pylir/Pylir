@@ -1551,10 +1551,10 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
     {
         m_currentFunc.push_back(body);
         m_builder.setInsertionPointToStart(body);
-        auto [call, success] = buildMROLookup(loc, type, "__call__");
+        auto [call, failure] = buildMROLookup(loc, type, "__call__");
         auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
-        m_builder.create<mlir::CondBranchOp>(loc, success, condition, mlir::ValueRange{call}, found,
-                                             mlir::ValueRange{unboundValue});
+        m_builder.create<mlir::CondBranchOp>(loc, failure, found, mlir::ValueRange{unboundValue}, condition,
+                                             mlir::ValueRange{call});
     }
 
     m_currentFunc.push_back(found);
@@ -1579,10 +1579,10 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
 mlir::Value pylir::CodeGen::buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type,
                                                    mlir::Value tuple, mlir::Value dict)
 {
-    auto [method, found] = buildMROLookup(loc, type, methodName);
+    auto [method, failure] = buildMROLookup(loc, type, methodName);
     auto notFound = new mlir::Block;
     auto exec = new mlir::Block;
-    m_builder.create<mlir::CondBranchOp>(loc, found, exec, notFound);
+    m_builder.create<mlir::CondBranchOp>(loc, failure, notFound, exec);
 
     m_currentFunc.push_back(notFound);
     m_builder.setInsertionPointToStart(notFound);
