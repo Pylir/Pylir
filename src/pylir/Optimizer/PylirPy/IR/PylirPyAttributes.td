@@ -102,6 +102,6 @@ def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
 }
 
 def AnyPyAttribute : AnyAttrOf<[PylirPy_IntAttr, PylirPy_BoolAttr, F64Attr, PylirPy_ListAttr, PylirPy_TupleAttr,
-                                PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, PylirPy_ObjectAttr]>;
+                                PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, PylirPy_ObjectAttr, PylirPy_UnboundAttr]>;
 
 #endif

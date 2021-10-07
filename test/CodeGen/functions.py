@@ -65,7 +65,7 @@ def foo():
 # CHECK: cond_br %[[IS_LESS]], ^[[LESS_BLOCK:.*]], ^[[UNBOUND_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[UNBOUND:.*]] = py.unboundValue
+# CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
 # CHECK: br ^[[RESULT_BLOCK:[[:alnum:]]+]](
 # CHECK-SAME: %[[UNBOUND]]
 # CHECK-SAME: )
@@ -87,7 +87,7 @@ def foo():
 # CHECK: cond_br %[[FOUND]], ^[[FOUND_BLOCK:.*]], ^[[NOT_FOUND_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[NOT_FOUND_BLOCK]]:
-# CHECK: %[[UNBOUND:.*]] = py.unboundValue
+# CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
 # CHECK: br ^[[RESULT_BLOCK:[[:alnum:]]+]](
 # CHECK-SAME: %[[UNBOUND]]
 # CHECK-SAME: )
@@ -132,7 +132,7 @@ def foo():
 # CHECK: cond_br %[[FOUND]], ^[[FOUND_BLOCK:.*]], ^[[NOT_FOUND_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[NOT_FOUND_BLOCK]]:
-# CHECK: %[[UNBOUND:.*]] = py.unboundValue
+# CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
 # CHECK: br ^[[RESULT_BLOCK:[[:alnum:]]+]](
 # CHECK-SAME: %[[UNBOUND]]
 # CHECK-SAME: )

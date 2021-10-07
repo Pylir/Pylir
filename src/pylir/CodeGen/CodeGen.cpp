@@ -1512,7 +1512,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::buildMROLookup(mlir::Locatio
     auto found = new mlir::Block;
     found->addArgument(m_builder.getType<Py::DynamicType>());
     auto body = new mlir::Block;
-    auto unbound = m_builder.create<Py::UnboundValueOp>(loc);
+    auto unbound = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
     m_builder.create<mlir::CondBranchOp>(loc, cmp, body, found, mlir::ValueRange{unbound});
 
     m_currentFunc.push_back(body);
@@ -1552,7 +1552,7 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
         m_currentFunc.push_back(body);
         m_builder.setInsertionPointToStart(body);
         auto [call, success] = buildMROLookup(loc, type, "__call__");
-        auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
+        auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
         m_builder.create<mlir::CondBranchOp>(loc, success, condition, mlir::ValueRange{call}, found,
                                              mlir::ValueRange{unboundValue});
     }
@@ -1637,7 +1637,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                 resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
                 m_currentFunc.push_back(unboundBlock);
                 m_builder.setInsertionPointToStart(unboundBlock);
-                auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
+                auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
                 m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
 
                 m_currentFunc.push_back(lessBlock);
@@ -1666,7 +1666,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                 resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
                 m_currentFunc.push_back(notFoundBlock);
                 m_builder.setInsertionPointToStart(notFoundBlock);
-                auto unboundValue = m_builder.create<Py::UnboundValueOp>(loc);
+                auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
                 m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
 
                 m_currentFunc.push_back(foundBlock);

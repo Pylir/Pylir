@@ -514,22 +514,6 @@ def PylirPy_LoadOp : PylirPy_Op<"load"> {
     }];
 }
 
-def PylirPy_UnboundValueOp : PylirPy_Op<"unboundValue", [NoSideEffect, ConstantLike]> {
-    let summary = "value returned by the load of an unbound handle";
-
-    let description = [{
-        This constant is the value returned by the load of an unbound handle. Using this value except in
-        `py.isUnboundValue`, `py.getattr` and `py.store` is undefined behaviour.
-    }];
-
-    let arguments = (ins);
-    let results = (outs DynamicType:$result);
-
-    let assemblyFormat = "attr-dict";
-
-    let hasFolder = 1;
-}
-
 def PylirPy_IsUnboundValueOp : PylirPy_Op<"isUnboundValue", [NoSideEffect]> {
     let summary = "checks whether the value is an unbound value";
 
@@ -537,6 +521,8 @@ def PylirPy_IsUnboundValueOp : PylirPy_Op<"isUnboundValue", [NoSideEffect]> {
     let results = (outs I1:$result);
 
     let assemblyFormat = "$value attr-dict";
+
+    let hasFolder = 1;
 }
 
 def PylirPy_IsUnboundHandleOp : PylirPy_Op<"isUnboundHandle", [NoSideEffect]> {

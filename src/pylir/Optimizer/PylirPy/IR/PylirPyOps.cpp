@@ -205,11 +205,6 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return constant();
 }
 
-mlir::OpFoldResult pylir::Py::UnboundValueOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
-{
-    return Py::UnboundAttr::get(getContext());
-}
-
 mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (!std::all_of(operands.begin(), operands.end(),
@@ -731,6 +726,15 @@ mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(::llvm::ArrayRef<mlir::Attribut
         return nullptr;
     }
     return Py::BoolAttr::get(getContext(), boolean.getValue());
+}
+
+mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (operands[0])
+    {
+        return mlir::BoolAttr::get(getContext(), operands[0].isa<Py::UnboundAttr>());
+    }
+    return nullptr;
 }
 
 mlir::LogicalResult pylir::Py::GetGlobalValueOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
