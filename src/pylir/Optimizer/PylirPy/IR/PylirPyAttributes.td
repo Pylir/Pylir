@@ -2,8 +2,8 @@
 #ifndef PYLIR_PY_ATTR_TABLEGEN
 #define PYLIR_PY_ATTR_TABLEGEN
 
-
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
+include "mlir/IR/SubElementInterfaces.td"
 
 class AnyAttrOf<list<Attr> allowedAttrs, string summary = "", string cppClassName = "::mlir::Attribute"> : Attr<
     Or<!foreach(allowedAttr,allowedAttrs,allowedAttr.predicate)>,
@@ -36,7 +36,7 @@ def PylirPy_IntAttr : PylirPy_Attr<"Int"> {
 
 }
 
-def PylirPy_ListAttr : PylirPy_Attr<"List"> {
+def PylirPy_ListAttr : PylirPy_Attr<"List", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
     let mnemonic = "list";
     let summary = "python list";
 
@@ -47,7 +47,7 @@ def PylirPy_ListAttr : PylirPy_Attr<"List"> {
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
 
-def PylirPy_TupleAttr : PylirPy_Attr<"Tuple"> {
+def PylirPy_TupleAttr : PylirPy_Attr<"Tuple", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
     let mnemonic = "tuple";
     let summary = "python tuple";
 
@@ -58,7 +58,7 @@ def PylirPy_TupleAttr : PylirPy_Attr<"Tuple"> {
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
 
-def PylirPy_SetAttr : PylirPy_Attr<"Set"> {
+def PylirPy_SetAttr : PylirPy_Attr<"Set", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
     let mnemonic = "set";
     let summary = "python set";
 
@@ -69,7 +69,7 @@ def PylirPy_SetAttr : PylirPy_Attr<"Set"> {
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict"> {
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
     let mnemonic = "dict";
     let summary = "python dictionary";
 
@@ -89,7 +89,7 @@ def PylirPy_BoolAttr : Attr<CPred<"$_self.isa<::pylir::Py::BoolAttr>()">> {
     let constBuilderCall = "::pylir::Py::BoolAttr::get($_builder.getContext(),$0)";
 }
 
-def PylirPy_ObjectAttr : PylirPy_Attr<"Object"> {
+def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
     let mnemonic = "obj";
     let summary = "python object";
 

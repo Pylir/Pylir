@@ -2,6 +2,7 @@
 #pragma once
 
 #include <mlir/IR/Attributes.h>
+#include <mlir/IR/SubElementInterfaces.h>
 
 #include <pylir/Support/BigInt.hpp>
 

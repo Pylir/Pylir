@@ -334,3 +334,43 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::MLIRContext* context, ::mli
     }
     return get(context, type, dictAttr, builtinValue);
 }
+
+void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                   llvm::function_ref<void(mlir::Type)>) const
+{
+    std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
+}
+
+void pylir::Py::TupleAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                    llvm::function_ref<void(mlir::Type)>) const
+{
+    std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
+}
+
+void pylir::Py::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                  llvm::function_ref<void(mlir::Type)>) const
+{
+    std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
+}
+
+void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                   llvm::function_ref<void(mlir::Type)>) const
+{
+    std::for_each(getValue().begin(), getValue().end(),
+                  [&](auto&& pair)
+                  {
+                      walkAttrsFn(pair.first);
+                      walkAttrsFn(pair.second);
+                  });
+}
+
+void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                     llvm::function_ref<void(mlir::Type)>) const
+{
+    walkAttrsFn(getType());
+    walkAttrsFn(getAttributes());
+    if (getBuiltinValue())
+    {
+        walkAttrsFn(*getBuiltinValue());
+    }
+}
