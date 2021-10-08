@@ -9,6 +9,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 def DynamicType : TypeAlias<PylirPy_DynamicType>;
 def HandleType : TypeAlias<PylirPy_HandleType>;
@@ -536,7 +537,7 @@ def PylirPy_IsUnboundHandleOp : PylirPy_Op<"isUnboundHandle", [NoSideEffect]> {
 
 // Exception handling
 
-def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
+def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator, ReturnLike]> {
     let summary = "raise exception";
 
     let arguments = (ins DynamicType:$exception);
@@ -544,6 +545,52 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
 
     let assemblyFormat = [{
         $exception attr-dict
+    }];
+}
+
+class PylirPy_InvokeBase<string mnemonic,list<OpTrait> traits = []> : PylirPy_Op<mnemonic,
+                                            !listconcat(traits,[Terminator, DeclareOpInterfaceMethods<CallOpInterface>,
+                                             DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments,
+                                             DeclareOpInterfaceMethods<InferTypeOpInterface>])> {
+    let summary = "invoke operation";
+    let description = [{
+
+    }];
+
+    let successors = (successor AnySuccessor:$happyPath, AnySuccessor:$exceptionPath);
+}
+
+def PylirPy_InvokeOp : PylirPy_InvokeBase<"invoke",[DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let arguments = (ins FlatSymbolRefAttr:$callee,
+                         Variadic<DynamicType>:$operands,
+                         Variadic<DynamicType>:$normalDestOperands,
+                         Variadic<DynamicType>:$unwindDestOperands);
+
+
+    let assemblyFormat = [{
+        $callee `(` $operands `)` attr-dict `:` functional-type($operands, results) `\n`
+        ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
+                `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
+    }];
+}
+
+def PylirPy_InvokeIndirectOp : PylirPy_InvokeBase<"invoke_indirect",
+                                       [TypesMatchWith<"callee input types match argument types",
+                                                        "callee", "operands",
+                                                        "$_self.cast<FunctionType>().getInputs()">,
+                                        TypesMatchWith<"callee result types match result types",
+                                                        "callee", "result",
+                                                        "$_self.cast<FunctionType>().getResults()[0]">]> {
+    let arguments = (ins FunctionType:$callee,
+                         Variadic<DynamicType>:$operands,
+                         Variadic<DynamicType>:$normalDestOperands,
+                         Variadic<DynamicType>:$unwindDestOperands);
+
+
+    let assemblyFormat = [{
+        $callee `(` $operands `)` attr-dict `:` type($callee) `\n`
+        ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
+                `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
     }];
 }
 

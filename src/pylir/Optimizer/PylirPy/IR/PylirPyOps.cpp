@@ -843,6 +843,71 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
     return nullptr;
 }
 
+mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, callee()));
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return normalDestOperandsMutable();
+    }
+    return llvm::None;
+}
+
+mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
+{
+    return calleeAttr();
+}
+
+mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
+{
+    return operands();
+}
+
+mlir::LogicalResult pylir::Py::InvokeOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                          ::llvm::Optional<::mlir::Location> ,
+                                                          ::mlir::ValueRange ,
+                                                          ::mlir::DictionaryAttr ,
+                                                          ::mlir::RegionRange ,
+                                                          ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeIndirectOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return normalDestOperandsMutable();
+    }
+    return llvm::None;
+}
+
+mlir::CallInterfaceCallable pylir::Py::InvokeIndirectOp::getCallableForCallee()
+{
+    return callee();
+}
+
+mlir::Operation::operand_range pylir::Py::InvokeIndirectOp::getArgOperands()
+{
+    return operands();
+}
+
+mlir::LogicalResult pylir::Py::InvokeIndirectOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                                  ::llvm::Optional<::mlir::Location> ,
+                                                                  ::mlir::ValueRange ,
+                                                                  ::mlir::DictionaryAttr ,
+                                                                  ::mlir::RegionRange ,
+                                                                  ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
 namespace
 {
 mlir::LogicalResult verify(pylir::Py::ConstantOp op)
