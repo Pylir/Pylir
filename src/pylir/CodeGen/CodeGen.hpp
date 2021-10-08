@@ -50,8 +50,7 @@ class CodeGen
     {
         mlir::Block* breakBlock;
         mlir::Block* continueBlock;
-    };
-    std::vector<Loop> m_loopStack;
+    } m_currentLoop;
 
     enum Kind
     {

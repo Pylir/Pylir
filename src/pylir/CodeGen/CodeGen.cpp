@@ -108,13 +108,13 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
         [&](const Syntax::BreakStmt& breakStmt)
         {
             auto loc = getLoc(breakStmt, breakStmt.breakKeyword);
-            m_builder.create<mlir::BranchOp>(loc, m_loopStack.back().breakBlock);
+            m_builder.create<mlir::BranchOp>(loc, m_currentLoop.breakBlock);
             m_builder.clearInsertionPoint();
         },
         [&](const Syntax::ContinueStmt& continueStmt)
         {
             auto loc = getLoc(continueStmt, continueStmt.continueKeyword);
-            m_builder.create<mlir::BranchOp>(loc, m_loopStack.back().continueBlock);
+            m_builder.create<mlir::BranchOp>(loc, m_currentLoop.continueBlock);
             m_builder.clearInsertionPoint();
         },
         [&](const Syntax::NonLocalStmt&) {},
@@ -1021,8 +1021,8 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), body, elseBlock);
 
     implementBlock(body);
-    m_loopStack.push_back({thenBlock, conditionBlock});
-    std::optional exit = llvm::make_scope_exit([&] { m_loopStack.pop_back(); });
+    std::optional exit = pylir::ValueReset(m_currentLoop);
+    m_currentLoop = {thenBlock, conditionBlock};
     visit(*whileStmt.suite);
     if (needsTerminator())
     {
