@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 #include <utility>
 
 namespace pylir
@@ -7,6 +8,8 @@ namespace pylir
 template <class T>
 class ValueReset
 {
+    static_assert(!std::is_const_v<T>);
+
     T m_valueAfter;
     T* m_assignedTo;
 
@@ -15,6 +18,8 @@ public:
     ValueReset(T& assignedTo, U valueAfter) : m_valueAfter(valueAfter), m_assignedTo(&assignedTo)
     {
     }
+
+    explicit ValueReset(T& assignedTo) : ValueReset(assignedTo, assignedTo) {}
 
     ~ValueReset()
     {

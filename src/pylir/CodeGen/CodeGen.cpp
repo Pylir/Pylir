@@ -35,11 +35,10 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         getCurrentScope().emplace(token.getValue(), Identifier{Kind::Global, op.getOperation()});
     }
 
-    auto initFunc = m_currentFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), formQualifiedName("__init__"),
-                                                         mlir::FunctionType::get(m_builder.getContext(), {}, {}));
-    m_module.push_back(initFunc);
+    auto initFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), formQualifiedName("__init__"),
+                                         mlir::FunctionType::get(m_builder.getContext(), {}, {}));
+    auto reset = implementFunction(initFunc);
 
-    m_builder.setInsertionPointToStart(initFunc.addEntryBlock());
     for (auto& iter : fileInput.input)
     {
         if (auto* statement = std::get_if<Syntax::Statement>(&iter))
@@ -307,16 +306,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
 
     m_builder.create<mlir::CondBranchOp>(loc, condition, found, elseBlock);
 
-    m_currentFunc.push_back(found);
-    m_builder.setInsertionPointToStart(found);
+    implementBlock(found);
     m_builder.create<mlir::BranchOp>(loc, thenBlock, visit(expression.value));
 
-    m_currentFunc.push_back(elseBlock);
-    m_builder.setInsertionPointToStart(elseBlock);
+    implementBlock(elseBlock);
     m_builder.create<mlir::BranchOp>(loc, thenBlock, visit(*expression.suffix->elseValue));
 
-    m_currentFunc.push_back(thenBlock);
-    m_builder.setInsertionPointToStart(thenBlock);
+    implementBlock(thenBlock);
     return thenBlock->getArgument(0);
 }
 
@@ -333,13 +329,11 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
             auto rhsTry = new mlir::Block;
             m_builder.create<mlir::CondBranchOp>(loc, toI1(lhs), found, lhs, rhsTry, mlir::ValueRange{});
 
-            m_currentFunc.push_back(rhsTry);
-            m_builder.setInsertionPointToStart(rhsTry);
+            implementBlock(rhsTry);
             auto rhs = visit(binOp->rhs);
             m_builder.create<mlir::BranchOp>(loc, found, rhs);
 
-            m_currentFunc.push_back(found);
-            m_builder.setInsertionPointToStart(found);
+            implementBlock(found);
             return found->getArgument(0);
         });
 }
@@ -358,13 +352,11 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
             m_builder.create<mlir::CondBranchOp>(loc, toI1(lhs), rhsTry, mlir::ValueRange{}, found,
                                                  mlir::ValueRange{lhs});
 
-            m_currentFunc.push_back(rhsTry);
-            m_builder.setInsertionPointToStart(rhsTry);
+            implementBlock(rhsTry);
             auto rhs = visit(binOp->rhs);
             m_builder.create<mlir::BranchOp>(loc, found, rhs);
 
-            m_currentFunc.push_back(found);
-            m_builder.setInsertionPointToStart(found);
+            implementBlock(found);
             return found->getArgument(0);
         });
 }
@@ -402,8 +394,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
             auto rhsTry = new mlir::Block;
             m_builder.create<mlir::CondBranchOp>(loc, toI1(result), found, result, rhsTry, mlir::ValueRange{});
 
-            m_currentFunc.push_back(rhsTry);
-            m_builder.setInsertionPointToStart(rhsTry);
+            implementBlock(rhsTry);
         }
 
         enum class Comp
@@ -462,8 +453,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         }
         m_builder.create<mlir::BranchOp>(loc, found, cmp);
 
-        m_currentFunc.push_back(found);
-        m_builder.setInsertionPointToStart(found);
+        implementBlock(found);
         result = found->getArgument(0);
     }
     return result;
@@ -687,8 +677,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         mlir::Block* elseBlock = new mlir::Block;
         m_builder.create<mlir::CondBranchOp>(loc, tryGet.found(), classNamespaceFound, tryGet.result(), elseBlock,
                                              mlir::ValueRange{});
-        m_currentFunc.push_back(elseBlock);
-        m_builder.setInsertionPointToStart(elseBlock);
+        implementBlock(elseBlock);
 
         // if not found in locals, it does not import free variables but rather goes straight to the global scope.
         // beyond that it could also access the builtins scope which does not yet exist and idk if it has to and will
@@ -708,8 +697,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         {
             return {};
         }
-        m_currentFunc.push_back(classNamespaceFound);
-        m_builder.setInsertionPointToStart(classNamespaceFound);
+        implementBlock(classNamespaceFound);
         return classNamespaceFound->getArgument(0);
     }
     mlir::Value handle;
@@ -728,13 +716,11 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             auto failure = new mlir::Block;
             m_builder.create<mlir::CondBranchOp>(loc, getAttrOp.success(), success, failure);
 
-            m_currentFunc.push_back(failure);
-            m_builder.setInsertionPointToStart(failure);
+            implementBlock(failure);
             auto exception = buildException(loc, Builtins::UnboundLocalError, /*TODO: string arg*/ {});
             raiseException(exception);
 
-            m_currentFunc.push_back(success);
-            m_builder.setInsertionPointToStart(success);
+            implementBlock(success);
             return getAttrOp.result();
         }
     }
@@ -743,8 +729,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     auto found = new mlir::Block;
     m_builder.create<mlir::CondBranchOp>(loc, condition, unbound, found);
 
-    m_currentFunc.push_back(unbound);
-    m_builder.setInsertionPointToStart(unbound);
+    implementBlock(unbound);
     if (result->second.kind == Global)
     {
         auto exception = buildException(loc, Builtins::NameError, /*TODO: string arg*/ {});
@@ -756,8 +741,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         raiseException(exception);
     }
 
-    m_currentFunc.push_back(found);
-    m_builder.setInsertionPointToStart(found);
+    implementBlock(found);
     if (!classNamespaceFound)
     {
         return m_builder.create<Py::LoadOp>(loc, handle);
@@ -765,8 +749,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     m_builder.create<mlir::BranchOp>(loc, classNamespaceFound,
                                      mlir::ValueRange{m_builder.create<Py::LoadOp>(loc, handle)});
 
-    m_currentFunc.push_back(classNamespaceFound);
-    m_builder.setInsertionPointToStart(classNamespaceFound);
+    implementBlock(classNamespaceFound);
     return classNamespaceFound->getArgument(0);
 }
 
@@ -954,8 +937,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     auto loc = getLoc(ifStmt.ifKeyword, ifStmt.ifKeyword);
     m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), trueBlock, elseBlock);
 
-    m_currentFunc.push_back(trueBlock);
-    m_builder.setInsertionPointToStart(trueBlock);
+    implementBlock(trueBlock);
     visit(*ifStmt.suite);
     if (needsTerminator())
     {
@@ -963,12 +945,10 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     }
     if (thenBlock == elseBlock)
     {
-        m_currentFunc.push_back(thenBlock);
-        m_builder.setInsertionPointToStart(thenBlock);
+        implementBlock(thenBlock);
         return;
     }
-    m_currentFunc.push_back(elseBlock);
-    m_builder.setInsertionPointToStart(elseBlock);
+    implementBlock(elseBlock);
     for (auto& iter : llvm::enumerate(ifStmt.elifs))
     {
         loc = getLoc(iter.value().elif, iter.value().elif);
@@ -985,8 +965,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
 
         m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), trueBlock, elseBlock);
 
-        m_currentFunc.push_back(trueBlock);
-        m_builder.setInsertionPointToStart(trueBlock);
+        implementBlock(trueBlock);
         visit(*iter.value().suite);
         if (needsTerminator())
         {
@@ -994,8 +973,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         }
         if (thenBlock != elseBlock)
         {
-            m_currentFunc.push_back(elseBlock);
-            m_builder.setInsertionPointToStart(elseBlock);
+            implementBlock(elseBlock);
         }
     }
     if (ifStmt.elseSection)
@@ -1007,8 +985,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         }
     }
 
-    m_currentFunc.push_back(thenBlock);
-    m_builder.setInsertionPointToStart(thenBlock);
+    implementBlock(thenBlock);
 }
 
 void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
@@ -1017,9 +994,8 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     auto conditionBlock = new mlir::Block;
     auto thenBlock = new mlir::Block;
     m_builder.create<mlir::BranchOp>(loc, conditionBlock);
-    m_currentFunc.push_back(conditionBlock);
 
-    m_builder.setInsertionPointToStart(conditionBlock);
+    implementBlock(conditionBlock);
     auto condition = visit(whileStmt.condition);
     mlir::Block* elseBlock;
     if (whileStmt.elseSection)
@@ -1033,8 +1009,7 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     mlir::Block* body = new mlir::Block;
     m_builder.create<mlir::CondBranchOp>(loc, toI1(condition), body, elseBlock);
 
-    m_currentFunc.push_back(body);
-    m_builder.setInsertionPointToStart(body);
+    implementBlock(body);
     m_loopStack.push_back({thenBlock, conditionBlock});
     std::optional exit = llvm::make_scope_exit([&] { m_loopStack.pop_back(); });
     visit(*whileStmt.suite);
@@ -1044,8 +1019,7 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     }
     exit.reset();
 
-    m_currentFunc.push_back(elseBlock);
-    m_builder.setInsertionPointToStart(elseBlock);
+    implementBlock(elseBlock);
     if (elseBlock == thenBlock)
     {
         return;
@@ -1055,8 +1029,7 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     {
         m_builder.create<mlir::BranchOp>(loc, thenBlock);
     }
-    m_currentFunc.push_back(thenBlock);
-    m_builder.setInsertionPointToStart(thenBlock);
+    implementBlock(thenBlock);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt) {}
@@ -1067,7 +1040,6 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
-    // TODO: adapter for calling convention
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
     std::vector<IdentifierToken> functionParametersTokens;
@@ -1169,20 +1141,15 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     std::vector<IdentifierToken> usedClosures;
     mlir::FuncOp func;
     {
-        mlir::OpBuilder::InsertionGuard guard{m_builder};
-        pylir::ValueReset reset(m_classNamespace, m_classNamespace);
+        pylir::ValueReset namespaceReset(m_classNamespace);
         m_classNamespace = {};
         func = mlir::FuncOp::create(
             loc, formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(
                 std::vector<mlir::Type>(1 + functionParameters.size(), m_builder.getType<Py::DynamicType>()),
                 {m_builder.getType<Py::DynamicType>()}));
-        func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
-        m_module.push_back(func);
-        pylir::ValueReset resetFunc(m_currentFunc, m_currentFunc);
-        m_currentFunc = func;
-        auto entry = func.addEntryBlock();
-        m_builder.setInsertionPointToStart(entry);
+        func.setVisibility(mlir::SymbolTable::Visibility::Private);
+        auto reset = implementFunction(func);
 
         m_scope.emplace_back();
         m_qualifierStack.emplace_back(funcDef.funcName.getValue());
@@ -1338,19 +1305,13 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
 
     mlir::FuncOp func;
     {
-        mlir::OpBuilder::InsertionGuard guard{m_builder};
         func = mlir::FuncOp::create(
             loc, formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(
                 std::vector<mlir::Type>(2 /* cell tuple + namespace dict */, m_builder.getType<Py::DynamicType>()),
                 {m_builder.getType<Py::DynamicType>()}));
-        func.sym_visibilityAttr(m_builder.getStringAttr(("private")));
-        m_module.push_back(func);
-        pylir::ValueReset resetFunc(m_currentFunc, m_currentFunc);
-        m_currentFunc = func;
-        auto entry = func.addEntryBlock();
-        m_builder.setInsertionPointToStart(entry);
-
+        func.setVisibility(mlir::SymbolTable::Visibility::Private);
+        auto reset = implementFunction(func);
         m_scope.emplace_back();
         m_qualifierStack.emplace_back(classDef.className.getValue());
         auto exit = llvm::make_scope_exit(
@@ -1359,7 +1320,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                 m_scope.pop_back();
                 m_qualifierStack.pop_back();
             });
-        pylir::ValueReset reset(m_classNamespace, m_classNamespace);
+        pylir::ValueReset namespaceReset(m_classNamespace);
         m_classNamespace = func.getArgument(1);
 
         visit(*classDef.suite);
@@ -1506,8 +1467,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::buildMROLookup(mlir::Locatio
     condition->addArgument(m_builder.getIndexType());
     m_builder.create<mlir::BranchOp>(loc, condition, mlir::ValueRange{zero});
 
-    m_currentFunc.push_back(condition);
-    m_builder.setInsertionPointToStart(condition);
+    implementBlock(condition);
     auto cmp = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, condition->getArgument(0), len);
     auto found = new mlir::Block;
     found->addArgument(m_builder.getType<Py::DynamicType>());
@@ -1515,8 +1475,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::buildMROLookup(mlir::Locatio
     auto unbound = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
     m_builder.create<mlir::CondBranchOp>(loc, cmp, body, found, mlir::ValueRange{unbound});
 
-    m_currentFunc.push_back(body);
-    m_builder.setInsertionPointToStart(body);
+    implementBlock(body);
     auto entry = m_builder.create<Py::TupleIntegerGetItemOp>(loc, mro, condition->getArgument(0));
     auto fetch = m_builder.create<Py::GetAttrOp>(loc, entry, m_builder.getStringAttr(attribute));
     auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(1));
@@ -1524,8 +1483,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::buildMROLookup(mlir::Locatio
     m_builder.create<mlir::CondBranchOp>(loc, fetch.success(), found, mlir::ValueRange{fetch.result()}, condition,
                                          mlir::ValueRange{incremented});
 
-    m_currentFunc.push_back(found);
-    m_builder.setInsertionPointToStart(found);
+    implementBlock(found);
     auto success = m_builder.create<Py::IsUnboundValueOp>(loc, found->getArgument(0));
     return {found->getArgument(0), success};
 }
@@ -1537,8 +1495,7 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
     auto func = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::Function);
     m_builder.create<mlir::BranchOp>(loc, condition, mlir::ValueRange{callable});
 
-    m_currentFunc.push_back(condition);
-    m_builder.setInsertionPointToStart(condition);
+    implementBlock(condition);
     auto type = m_builder.create<Py::TypeOfOp>(loc, condition->getArgument(0));
     auto isFunction = m_builder.create<Py::IsOp>(loc, type, func);
 
@@ -1549,28 +1506,24 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
                                          mlir::ValueRange{});
 
     {
-        m_currentFunc.push_back(body);
-        m_builder.setInsertionPointToStart(body);
+        implementBlock(body);
         auto [call, failure] = buildMROLookup(loc, type, "__call__");
         auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
         m_builder.create<mlir::CondBranchOp>(loc, failure, found, mlir::ValueRange{unboundValue}, condition,
                                              mlir::ValueRange{call});
     }
 
-    m_currentFunc.push_back(found);
-    m_builder.setInsertionPointToStart(found);
+    implementBlock(found);
     auto isUnbound = m_builder.create<Py::IsUnboundValueOp>(loc, found->getArgument(0));
     auto notBound = new mlir::Block;
     auto typeCall = new mlir::Block;
     m_builder.create<mlir::CondBranchOp>(loc, isUnbound, notBound, typeCall);
 
-    m_currentFunc.push_back(notBound);
-    m_builder.setInsertionPointToStart(notBound);
+    implementBlock(notBound);
     auto typeError = buildException(loc, Builtins::TypeError, {});
     raiseException(typeError);
 
-    m_currentFunc.push_back(typeCall);
-    m_builder.setInsertionPointToStart(typeCall);
+    implementBlock(typeCall);
     auto function = m_builder.create<Py::FunctionGetFunctionOp>(loc, found->getArgument(0));
     return m_builder.create<mlir::CallIndirectOp>(loc, function, mlir::ValueRange{found->getArgument(0), tuple, dict})
         .getResult(0);
@@ -1584,30 +1537,25 @@ mlir::Value pylir::CodeGen::buildSpecialMethodCall(mlir::Location loc, llvm::Twi
     auto exec = new mlir::Block;
     m_builder.create<mlir::CondBranchOp>(loc, failure, notFound, exec);
 
-    m_currentFunc.push_back(notFound);
-    m_builder.setInsertionPointToStart(notFound);
+    implementBlock(notFound);
     auto exception = buildException(loc, Builtins::TypeError, {});
     raiseException(exception);
 
-    m_currentFunc.push_back(exec);
-    m_builder.setInsertionPointToStart(exec);
+    implementBlock(exec);
     return buildCall(loc, method, tuple, dict);
 }
 
 mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
                                              const std::vector<FunctionParameter>& parameters)
 {
-    mlir::OpBuilder::InsertionGuard guard(m_builder);
-    m_builder.setInsertionPointToEnd(m_module.getBody());
-    auto cc = m_builder.create<mlir::FuncOp>(
+    auto cc = mlir::FuncOp::create(
         loc, name.str(),
         m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
                                    m_builder.getType<Py::DynamicType>()},
-                                  {m_builder.getType<Py::DynamicType>()}),
-        m_builder.getStringAttr("private"));
-    pylir::ValueReset reset(m_currentFunc, m_currentFunc);
-    m_currentFunc = cc;
-    m_builder.setInsertionPointToStart(cc.addEntryBlock());
+                                  {m_builder.getType<Py::DynamicType>()}));
+    cc.setVisibility(mlir::SymbolTable::Visibility::Private);
+    auto reset = implementFunction(cc);
+
     auto self = cc.getArgument(0);
     auto tuple = cc.getArgument(1);
     auto dict = cc.getArgument(2);
@@ -1635,18 +1583,15 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
 
                 auto resultBlock = new mlir::Block;
                 resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
-                m_currentFunc.push_back(unboundBlock);
-                m_builder.setInsertionPointToStart(unboundBlock);
+                implementBlock(unboundBlock);
                 auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
                 m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
 
-                m_currentFunc.push_back(lessBlock);
-                m_builder.setInsertionPointToStart(lessBlock);
+                implementBlock(lessBlock);
                 auto fetched = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, constant);
                 m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{fetched});
 
-                m_currentFunc.push_back(resultBlock);
-                m_builder.setInsertionPointToStart(resultBlock);
+                implementBlock(resultBlock);
                 argValue = resultBlock->getArgument(0);
                 if (iter.kind == FunctionParameter::PosOnly)
                 {
@@ -1664,13 +1609,11 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
 
                 auto resultBlock = new mlir::Block;
                 resultBlock->addArgument(m_builder.getType<Py::DynamicType>());
-                m_currentFunc.push_back(notFoundBlock);
-                m_builder.setInsertionPointToStart(notFoundBlock);
+                implementBlock(notFoundBlock);
                 auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
                 m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{unboundValue});
 
-                m_currentFunc.push_back(foundBlock);
-                m_builder.setInsertionPointToStart(foundBlock);
+                implementBlock(foundBlock);
                 m_builder.create<Py::DictDelItemOp>(loc, dict, constant);
                 // value can't be assigned both through a positional argument as well as keyword argument
                 if (argValue)
@@ -1680,8 +1623,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                     m_builder.create<mlir::CondBranchOp>(loc, isUnbound, resultBlock, mlir::ValueRange{lookup.result()},
                                                          boundBlock, mlir::ValueRange{});
 
-                    m_currentFunc.push_back(boundBlock);
-                    m_builder.setInsertionPointToStart(boundBlock);
+                    implementBlock(boundBlock);
                     auto exception = buildException(loc, Builtins::TypeError, {});
                     raiseException(exception);
                 }
@@ -1690,8 +1632,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                     m_builder.create<mlir::BranchOp>(loc, resultBlock, mlir::ValueRange{lookup.result()});
                 }
 
-                m_currentFunc.push_back(resultBlock);
-                m_builder.setInsertionPointToStart(resultBlock);
+                implementBlock(resultBlock);
                 argValue = resultBlock->getArgument(0);
                 break;
             }
@@ -1710,24 +1651,21 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                 conditionBlock->addArgument(m_builder.getIndexType());
                 m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{start});
 
-                m_currentFunc.push_back(conditionBlock);
-                m_builder.setInsertionPointToStart(conditionBlock);
+                implementBlock(conditionBlock);
                 auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult,
                                                              conditionBlock->getArgument(0), tupleLen);
                 auto lessBlock = new mlir::Block;
                 auto endBlock = new mlir::Block;
                 m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, endBlock);
 
-                m_currentFunc.push_back(lessBlock);
-                m_builder.setInsertionPointToStart(lessBlock);
+                implementBlock(lessBlock);
                 auto fetched = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
                 m_builder.create<Py::ListAppendOp>(loc, list, fetched);
                 auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(1));
                 auto incremented = m_builder.create<mlir::AddIOp>(loc, conditionBlock->getArgument(0), one);
                 m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{incremented});
 
-                m_currentFunc.push_back(endBlock);
-                m_builder.setInsertionPointToStart(endBlock);
+                implementBlock(endBlock);
                 argValue = m_builder.create<Py::ListToTupleOp>(loc, list);
                 break;
             }
@@ -1746,8 +1684,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                 m_builder.create<mlir::CondBranchOp>(loc, isUnbound, unboundBlock, boundBlock,
                                                      mlir::ValueRange{argValue});
 
-                m_currentFunc.push_back(unboundBlock);
-                m_builder.setInsertionPointToStart(unboundBlock);
+                implementBlock(unboundBlock);
                 if (!iter.hasDefaultParam)
                 {
                     auto exception = buildException(loc, Builtins::TypeError, {});
@@ -1781,8 +1718,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                     m_builder.create<mlir::BranchOp>(loc, boundBlock, mlir::ValueRange{defaultArg});
                 }
 
-                m_currentFunc.push_back(boundBlock);
-                m_builder.setInsertionPointToStart(boundBlock);
+                implementBlock(boundBlock);
                 args.push_back(boundBlock->getArgument(0));
                 break;
             }

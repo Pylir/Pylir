@@ -7,7 +7,9 @@
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Parser/Syntax.hpp>
+#include <pylir/Support/ValueReset.hpp>
 
+#include <tuple>
 #include <unordered_map>
 
 namespace pylir
@@ -135,6 +137,21 @@ class CodeGen
     }
 
     void createBuiltinsImpl();
+
+    [[nodiscard]] auto implementFunction(mlir::FuncOp funcOp)
+    {
+        auto tuple = std::make_tuple(pylir::ValueReset(m_currentFunc), mlir::OpBuilder::InsertionGuard{m_builder});
+        m_currentFunc = funcOp;
+        m_module.push_back(m_currentFunc);
+        m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
+        return tuple;
+    }
+
+    void implementBlock(mlir::Block* block)
+    {
+        m_currentFunc.push_back(block);
+        m_builder.setInsertionPointToStart(block);
+    }
 
 public:
     CodeGen(mlir::MLIRContext* context, Diag::Document& document);

@@ -12,13 +12,13 @@ void pylir::CodeGen::createBuiltinsImpl()
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         {
-            auto newCall = m_builder.create<mlir::FuncOp>(
+            auto newCall = mlir::FuncOp::create(
                 loc, "builtins.object.__new__$impl",
                 m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
                                            m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>()},
                                           {m_builder.getType<Py::DynamicType>()}));
-            mlir::OpBuilder::InsertionGuard guard{m_builder};
-            m_builder.setInsertionPointToStart(newCall.addEntryBlock());
+            auto reset = implementFunction(newCall);
+
             [[maybe_unused]] auto self = newCall.getArgument(0);
             auto clazz = newCall.getArgument(1);
             [[maybe_unused]] auto args = newCall.getArgument(2);
@@ -39,13 +39,11 @@ void pylir::CodeGen::createBuiltinsImpl()
                                          FunctionParameter{"", FunctionParameter::KeywordRest, false}}))));
         }
         {
-            auto initCall = m_builder.create<mlir::FuncOp>(
+            auto initCall = mlir::FuncOp::create(
                 loc, "builtins.object.__init__$impl",
                 m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>()},
                                           {m_builder.getType<Py::DynamicType>()}));
-            mlir::OpBuilder::InsertionGuard guard{m_builder};
-            m_builder.setInsertionPointToStart(initCall.addEntryBlock());
-            m_currentFunc = initCall;
+            auto reset = implementFunction(initCall);
 
             // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
             m_builder.create<mlir::ReturnOp>(
@@ -73,13 +71,13 @@ void pylir::CodeGen::createBuiltinsImpl()
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         {
-            auto newCall = m_builder.create<mlir::FuncOp>(
+            auto newCall = mlir::FuncOp::create(
                 loc, "builtins.BaseException.__new__$impl",
                 m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
                                            m_builder.getType<Py::DynamicType>()},
                                           {m_builder.getType<Py::DynamicType>()}));
-            mlir::OpBuilder::InsertionGuard guard{m_builder};
-            m_builder.setInsertionPointToStart(newCall.addEntryBlock());
+            auto reset = implementFunction(newCall);
+
             [[maybe_unused]] auto self = newCall.getArgument(0);
             [[maybe_unused]] auto clazz = newCall.getArgument(1);
             [[maybe_unused]] auto args = newCall.getArgument(2);
@@ -99,13 +97,13 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                     FunctionParameter{"", FunctionParameter::PosRest, false}}))));
         }
         {
-            auto initCall = m_builder.create<mlir::FuncOp>(
+            auto initCall = mlir::FuncOp::create(
                 loc, "builtins.BaseException.__init__$impl",
                 m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
                                            m_builder.getType<Py::DynamicType>()},
                                           {m_builder.getType<Py::DynamicType>()}));
-            mlir::OpBuilder::InsertionGuard guard{m_builder};
-            m_builder.setInsertionPointToStart(initCall.addEntryBlock());
+            auto reset = implementFunction(initCall);
+
             [[maybe_unused]] auto self = initCall.getArgument(1);
             [[maybe_unused]] auto args = initCall.getArgument(2);
             m_currentFunc = initCall;
@@ -160,13 +158,12 @@ void pylir::CodeGen::createBuiltinsImpl()
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         {
-            auto newCall = m_builder.create<mlir::FuncOp>(
+            auto newCall = mlir::FuncOp::create(
                 loc, "builtins.NoneType.__new__$impl",
                 m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>()},
                                           {m_builder.getType<Py::DynamicType>()}));
-            mlir::OpBuilder::InsertionGuard guard{m_builder};
-            m_builder.setInsertionPointToStart(newCall.addEntryBlock());
-            m_currentFunc = newCall;
+            auto reset = implementFunction(newCall);
+
             // TODO: probably disallow subclassing NoneType here
             m_builder.create<mlir::ReturnOp>(
                 loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None)});
