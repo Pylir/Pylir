@@ -56,6 +56,10 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 
 void pylir::CodeGen::visit(const Syntax::Statement& statement)
 {
+    if (!m_builder.getInsertionBlock())
+    {
+        return;
+    }
     pylir::match(
         statement.variant, [&](const Syntax::CompoundStmt& compoundStmt) { visit(compoundStmt); },
         [&](const Syntax::Statement::SingleLine& singleLine) { visit(singleLine.stmtList); });
@@ -63,6 +67,10 @@ void pylir::CodeGen::visit(const Syntax::Statement& statement)
 
 void pylir::CodeGen::visit(const Syntax::StmtList& stmtList)
 {
+    if (!m_builder.getInsertionBlock())
+    {
+        return;
+    }
     visit(*stmtList.firstExpr);
     for (auto& iter : stmtList.remainingExpr)
     {
@@ -95,16 +103,19 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             }
             auto value = visit(*returnStmt.expressions);
             m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{value});
+            m_builder.clearInsertionPoint();
         },
         [&](const Syntax::BreakStmt& breakStmt)
         {
             auto loc = getLoc(breakStmt, breakStmt.breakKeyword);
             m_builder.create<mlir::BranchOp>(loc, m_loopStack.back().breakBlock);
+            m_builder.clearInsertionPoint();
         },
         [&](const Syntax::ContinueStmt& continueStmt)
         {
             auto loc = getLoc(continueStmt, continueStmt.continueKeyword);
             m_builder.create<mlir::BranchOp>(loc, m_loopStack.back().continueBlock);
+            m_builder.clearInsertionPoint();
         },
         [&](const Syntax::NonLocalStmt&) {},
         [&](const Syntax::GlobalStmt& globalStmt)
