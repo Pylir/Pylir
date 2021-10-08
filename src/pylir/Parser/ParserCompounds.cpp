@@ -469,6 +469,8 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
                                                         std::make_unique<Syntax::Suite>(std::move(*finallySuite))}};
     }
 
+    std::optional<Token> catchAll;
+    bool catchAllIssuedAlready = false;
     std::vector<Syntax::TryStmt::Except> exceptSections;
     do
     {
@@ -476,6 +478,15 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         if (!exceptKeyword)
         {
             return tl::unexpected{std::move(exceptKeyword).error()};
+        }
+        if (catchAll && !catchAllIssuedAlready)
+        {
+            // Don't issue this more than once
+            catchAllIssuedAlready = true;
+            return tl::unexpected{
+                createDiagnosticsBuilder(*catchAll, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
+                    .addLabel(*catchAll, std::nullopt, Diag::ERROR_COLOUR, Diag::emphasis::bold)
+                    .emitError()};
         }
         if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::Colon)
         {
@@ -491,6 +502,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
             }
             exceptSections.push_back(
                 {*exceptKeyword, std::nullopt, *exceptColon, std::make_unique<Syntax::Suite>(std::move(*exceptSuite))});
+            catchAll = *exceptKeyword;
             continue;
         }
         auto expression = parseExpression();

@@ -120,4 +120,6 @@ constexpr auto NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEF
 
 constexpr auto PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE = FMT_STRING("parameter '{}' with default argument here");
 
+constexpr auto EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST = FMT_STRING("except clause without expression must come last");
+
 } // namespace pylir::Diag

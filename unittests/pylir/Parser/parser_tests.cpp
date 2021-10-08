@@ -24,6 +24,17 @@
 
 using namespace Catch::Matchers;
 
+TEST_CASE("Parse try statement", "[Parser]")
+{
+    PARSER_EMITS("try:\n"
+                 "    pass\n"
+                 "except:\n"
+                 "    pass\n"
+                 "except int:\n"
+                 "    pass\n",
+                 pylir::Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST);
+}
+
 TEST_CASE("Parse break continue statement", "[Parser")
 {
     PARSER_EMITS("break", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
