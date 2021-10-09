@@ -1321,6 +1321,12 @@ tl::expected<pylir::Syntax::StarredExpression, std::string>
         // If a comma doesn't follow, then it's the last optional trailing starred_item
         if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
         {
+            // if there were no leading expressions (aka no commas) and it is an expansion (with a star), then it's
+            // a syntax error as those are only possible when commas are involved (to form a tuple).
+            if (leading.empty() && std::holds_alternative<std::pair<BaseToken, Syntax::OrExpr>>(item->variant))
+            {
+                return tl::unexpected{expect(TokenType::Comma).error()};
+            }
             last = std::make_unique<Syntax::StarredItem>(std::move(*item));
             break;
         }

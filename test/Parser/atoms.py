@@ -60,6 +60,7 @@ def foo():
 [5]
 [5, 3]
 [*5, 3]
+[*5]
 
 # CHECK: list display empty
 # CHECK: list display
@@ -76,9 +77,14 @@ def foo():
 # CHECK-NEXT: atom 5
 # CHECK-NEXT: atom 3
 
+# CHECK: list display
+# CHECK-NEXT: starred item
+# CHECK-NEXT: atom 5
+
 {5}
 {5, 3}
 {*5, 3}
+{*5}
 
 # CHECK: set display
 # CHECK-NEXT: atom 5
@@ -93,6 +99,11 @@ def foo():
 # CHECK-NEXT: starred item
 # CHECK-NEXT: atom 5
 # CHECK-NEXT: atom 3
+
+# CHECK: set display
+# CHECK-NEXT: starred item
+# CHECK-NEXT: atom 5
+
 
 {}
 {5: 3}

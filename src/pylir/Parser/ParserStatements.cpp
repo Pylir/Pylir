@@ -1092,14 +1092,7 @@ struct Visitor
                         std::move(items.last->variant),
                         [&](Syntax::AssignmentExpression&& assignmentExpression)
                         { return visit(std::move(assignmentExpression)); },
-                        [&](std::pair<BaseToken, Syntax::OrExpr>&& pair) -> Ret
-                        {
-                            return tl::unexpected{
-                                parser.createDiagnosticsBuilder(assignOp, Diag::CANNOT_ASSIGN_TO_N, "starred item")
-                                    .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
-                                    .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                    .emitError()};
-                        });
+                        [&](std::pair<BaseToken, Syntax::OrExpr>&&) -> Ret { PYLIR_UNREACHABLE; });
                 }
                 else
                 {

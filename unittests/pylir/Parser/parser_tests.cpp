@@ -114,7 +114,8 @@ TEST_CASE("Parse augmented assignment statement", "[Parser]")
 {
     PARSER_EMITS("+= 3", pylir::Diag::EXPECTED_N_BEFORE_N, "identifier", "assignment");
     PARSER_EMITS("a,b += 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "multiple values");
-    PARSER_EMITS("*b += 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "starred item");
+    PARSER_EMITS("*b += 3", pylir::Diag::EXPECTED_N_INSTEAD_OF_N, pylir::TokenType::Comma,
+                 pylir::TokenType::PlusAssignment);
     PARSER_EMITS("(b) += 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "enclosure");
 }
 
