@@ -519,6 +519,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
             {
                 return tl::unexpected{std::move(id).error()};
             }
+            addToNamespace(*id);
             name.emplace(asKeyword, IdentifierToken{*id});
         }
         auto exceptColon = expect(TokenType::Colon);

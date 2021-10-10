@@ -50,7 +50,11 @@ class CodeGen
     {
         mlir::Block* breakBlock;
         mlir::Block* continueBlock;
-    } m_currentLoop;
+    } m_currentLoop{nullptr, nullptr};
+
+    mlir::Block* m_currentExceptBlock = nullptr;
+    std::vector<const Syntax::TryStmt::Finally*> m_finallyBlocks;
+    bool m_inExceptHandlers = false;
 
     enum Kind
     {
@@ -139,7 +143,10 @@ class CodeGen
 
     [[nodiscard]] auto implementFunction(mlir::FuncOp funcOp)
     {
-        auto tuple = std::make_tuple(pylir::ValueReset(m_currentFunc), mlir::OpBuilder::InsertionGuard{m_builder});
+        auto tuple = std::make_tuple(pylir::ValueReset(m_currentFunc), mlir::OpBuilder::InsertionGuard{m_builder},
+                                     pylir::ValueReset(m_currentLoop), pylir::ValueReset(m_currentExceptBlock));
+        m_currentLoop = {nullptr, nullptr};
+        m_currentExceptBlock = nullptr;
         m_currentFunc = funcOp;
         m_module.push_back(m_currentFunc);
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());

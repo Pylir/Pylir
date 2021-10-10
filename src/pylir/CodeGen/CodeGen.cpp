@@ -1045,7 +1045,106 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
 
 void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt) {}
 
-void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt) {}
+void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
+{
+    auto exceptionHandler = new mlir::Block;
+    exceptionHandler->addArgument(m_builder.getType<Py::DynamicType>());
+    std::optional reset = pylir::ValueReset(m_currentExceptBlock);
+    auto lambda = [&] { m_finallyBlocks.pop_back(); };
+    std::optional<decltype(llvm::make_scope_exit(lambda))> popFinally;
+    if (tryStmt.finally)
+    {
+        m_finallyBlocks.push_back(&*tryStmt.finally);
+        popFinally.emplace(llvm::make_scope_exit(lambda));
+    }
+    visit(*tryStmt.suite);
+    if (needsTerminator())
+    {
+        if (tryStmt.elseSection)
+        {
+            visit(*tryStmt.elseSection->suite);
+            if (needsTerminator() && tryStmt.finally)
+            {
+                visit(*tryStmt.finally->suite);
+            }
+        }
+        else if (tryStmt.finally)
+        {
+            visit(*tryStmt.finally->suite);
+        }
+    }
+    if (tryStmt.excepts.empty())
+    {
+        return;
+    }
+
+    mlir::Block* continueBlock = new mlir::Block;
+    if (needsTerminator())
+    {
+        m_builder.create<mlir::BranchOp>(getLoc(tryStmt, tryStmt.tryKeyword), continueBlock);
+    }
+
+    auto enterFinallyCode = [&]
+    {
+        auto back = m_finallyBlocks.back();
+        m_finallyBlocks.pop_back();
+        return std::make_tuple(llvm::make_scope_exit([back, this] { m_finallyBlocks.push_back(back); }));
+    };
+
+    implementBlock(exceptionHandler);
+    pylir::ValueReset exceptHandlerGuard(m_inExceptHandlers);
+    // Exceptions thrown in exception handlers (including the expression after except) are propagated upwards and not
+    // handled by this block
+    reset.reset();
+    m_inExceptHandlers = true;
+
+    mlir::Block* finallyBlock = new mlir::Block;
+    for (auto& iter : tryStmt.excepts)
+    {
+        auto loc = getLoc(iter, iter.exceptKeyword);
+        if (!iter.expression)
+        {
+            visit(*iter.suite);
+            if (needsTerminator())
+            {
+                m_builder.create<mlir::BranchOp>(loc, finallyBlock);
+            }
+            continue;
+        }
+        auto value = visit(iter.expression->first);
+        if (iter.expression->second)
+        {
+            // TODO: Python requires this identifier to be unbound at the end of the exception handler as if done in
+            //       a finally section
+            writeIdentifier(iter.expression->second->second, exceptionHandler->getArgument(0));
+        }
+        // TODO: actual matching and suite
+    }
+    if (needsTerminator())
+    {
+        if (tryStmt.finally)
+        {
+            auto finallyCode = enterFinallyCode();
+            visit(*tryStmt.finally->suite);
+        }
+        if (needsTerminator())
+        {
+            m_builder.create<Py::RaiseOp>(getLoc(tryStmt, tryStmt.tryKeyword), exceptionHandler->getArgument(0));
+        }
+    }
+    if (finallyBlock->hasNoPredecessors())
+    {
+        finallyBlock->erase();
+        return;
+    }
+    implementBlock(finallyBlock);
+    if (!tryStmt.finally)
+    {
+        return;
+    }
+    popFinally.reset();
+    visit(*tryStmt.finally->suite);
+}
 
 void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
 
@@ -1462,8 +1561,14 @@ mlir::Value pylir::CodeGen::buildException(mlir::Location loc, std::string_view 
 
 void pylir::CodeGen::raiseException(mlir::Value exceptionObject)
 {
-    // TODO: branch to except handlers
-    m_builder.create<Py::RaiseOp>(exceptionObject.getLoc(), exceptionObject);
+    if (m_currentExceptBlock)
+    {
+        m_builder.create<mlir::BranchOp>(exceptionObject.getLoc(), m_currentExceptBlock, exceptionObject);
+    }
+    else
+    {
+        m_builder.create<Py::RaiseOp>(exceptionObject.getLoc(), exceptionObject);
+    }
     m_builder.clearInsertionPoint();
 }
 
@@ -1536,8 +1641,18 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
 
     implementBlock(typeCall);
     auto function = m_builder.create<Py::FunctionGetFunctionOp>(loc, found->getArgument(0));
-    return m_builder.create<mlir::CallIndirectOp>(loc, function, mlir::ValueRange{found->getArgument(0), tuple, dict})
-        .getResult(0);
+    if (!m_currentExceptBlock)
+    {
+        return m_builder
+            .create<mlir::CallIndirectOp>(loc, function, mlir::ValueRange{found->getArgument(0), tuple, dict})
+            .getResult(0);
+    }
+    auto happyPath = new mlir::Block;
+    auto result =
+        m_builder.create<Py::InvokeIndirectOp>(loc, function, mlir::ValueRange{found->getArgument(0), tuple, dict},
+                                               mlir::ValueRange{}, mlir::ValueRange{}, happyPath, m_currentExceptBlock);
+    implementBlock(happyPath);
+    return result;
 }
 
 mlir::Value pylir::CodeGen::buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type,
