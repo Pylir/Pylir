@@ -97,22 +97,26 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             auto loc = getLoc(returnStmt, returnStmt.returnKeyword);
             if (!returnStmt.expressions)
             {
+                executeFinallyBlocks(false);
                 auto none = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None);
                 m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{none});
                 return;
             }
             auto value = visit(*returnStmt.expressions);
+            executeFinallyBlocks(true);
             m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{value});
             m_builder.clearInsertionPoint();
         },
         [&](const Syntax::BreakStmt& breakStmt)
         {
+            executeFinallyBlocks();
             auto loc = getLoc(breakStmt, breakStmt.breakKeyword);
             m_builder.create<mlir::BranchOp>(loc, m_currentLoop.breakBlock);
             m_builder.clearInsertionPoint();
         },
         [&](const Syntax::ContinueStmt& continueStmt)
         {
+            executeFinallyBlocks();
             auto loc = getLoc(continueStmt, continueStmt.continueKeyword);
             m_builder.create<mlir::BranchOp>(loc, m_currentLoop.continueBlock);
             m_builder.clearInsertionPoint();
@@ -1054,10 +1058,22 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
     std::optional<decltype(llvm::make_scope_exit(lambda))> popFinally;
     if (tryStmt.finally)
     {
-        m_finallyBlocks.push_back(&*tryStmt.finally);
+        m_finallyBlocks.push_back({&*tryStmt.finally, m_currentLoop, m_currentExceptBlock});
         popFinally.emplace(llvm::make_scope_exit(lambda));
     }
+    m_currentExceptBlock = exceptionHandler;
     visit(*tryStmt.suite);
+
+    auto enterFinallyCode = [&]
+    {
+        auto back = m_finallyBlocks.back();
+        m_finallyBlocks.pop_back();
+        auto tuple = std::make_tuple(llvm::make_scope_exit([back, this] { m_finallyBlocks.push_back(back); }),
+                                     pylir::ValueReset(m_currentExceptBlock));
+        m_currentExceptBlock = back.parentExceptBlock;
+        return tuple;
+    };
+
     if (needsTerminator())
     {
         if (tryStmt.elseSection)
@@ -1065,40 +1081,29 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             visit(*tryStmt.elseSection->suite);
             if (needsTerminator() && tryStmt.finally)
             {
+                auto finalSection = enterFinallyCode();
                 visit(*tryStmt.finally->suite);
             }
         }
         else if (tryStmt.finally)
         {
+            auto finalSection = enterFinallyCode();
             visit(*tryStmt.finally->suite);
         }
     }
-    if (tryStmt.excepts.empty())
-    {
-        return;
-    }
 
-    mlir::Block* continueBlock = new mlir::Block;
+    mlir::Block* continueBlock = nullptr;
     if (needsTerminator())
     {
+        continueBlock = new mlir::Block;
         m_builder.create<mlir::BranchOp>(getLoc(tryStmt, tryStmt.tryKeyword), continueBlock);
     }
 
-    auto enterFinallyCode = [&]
-    {
-        auto back = m_finallyBlocks.back();
-        m_finallyBlocks.pop_back();
-        return std::make_tuple(llvm::make_scope_exit([back, this] { m_finallyBlocks.push_back(back); }));
-    };
-
     implementBlock(exceptionHandler);
-    pylir::ValueReset exceptHandlerGuard(m_inExceptHandlers);
     // Exceptions thrown in exception handlers (including the expression after except) are propagated upwards and not
     // handled by this block
     reset.reset();
-    m_inExceptHandlers = true;
 
-    mlir::Block* finallyBlock = new mlir::Block;
     for (auto& iter : tryStmt.excepts)
     {
         auto loc = getLoc(iter, iter.exceptKeyword);
@@ -1107,7 +1112,19 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             visit(*iter.suite);
             if (needsTerminator())
             {
-                m_builder.create<mlir::BranchOp>(loc, finallyBlock);
+                if (tryStmt.finally)
+                {
+                    auto finallySection = enterFinallyCode();
+                    visit(*tryStmt.finally->suite);
+                }
+                if (needsTerminator())
+                {
+                    if (!continueBlock)
+                    {
+                        continueBlock = new mlir::Block;
+                    }
+                    m_builder.create<mlir::BranchOp>(loc, continueBlock);
+                }
             }
             continue;
         }
@@ -1119,6 +1136,22 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             writeIdentifier(iter.expression->second->second, exceptionHandler->getArgument(0));
         }
         // TODO: actual matching and suite
+        if (needsTerminator())
+        {
+            if (tryStmt.finally)
+            {
+                auto finallySection = enterFinallyCode();
+                visit(*tryStmt.finally->suite);
+            }
+            if (needsTerminator())
+            {
+                if (!continueBlock)
+                {
+                    continueBlock = new mlir::Block;
+                }
+                m_builder.create<mlir::BranchOp>(loc, continueBlock);
+            }
+        }
     }
     if (needsTerminator())
     {
@@ -1132,18 +1165,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             m_builder.create<Py::RaiseOp>(getLoc(tryStmt, tryStmt.tryKeyword), exceptionHandler->getArgument(0));
         }
     }
-    if (finallyBlock->hasNoPredecessors())
+    if (continueBlock)
     {
-        finallyBlock->erase();
-        return;
+        implementBlock(continueBlock);
     }
-    implementBlock(finallyBlock);
-    if (!tryStmt.finally)
-    {
-        return;
-    }
-    popFinally.reset();
-    visit(*tryStmt.finally->suite);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
@@ -1856,4 +1881,49 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
     auto result = m_builder.create<mlir::CallOp>(loc, implementation, args);
     m_builder.create<mlir::ReturnOp>(loc, result->getResults());
     return cc;
+}
+
+void pylir::CodeGen::executeFinallyBlocks(bool fullUnwind)
+{
+    // This whole sequence here is made quite complicated due to a few reasons:
+    // try statements can be nested and they can execute ANY code. Including function returns.
+    // If we were to simply execute all finally blocks in reverse this could easily lead to an infinite recursion in
+    // the following case:
+    //
+    // try:
+    //      ...
+    // finally:
+    //      return
+    //
+    // The return would lead us to executeFinallyBlocks here and it'd once again generate the finally that we are
+    // currently executing. For that reason we are saving the current finally stack, pop one and generate that, and at
+    // the end restore it for future statements.
+    //
+    // Further care needs to be taken for `raise` inside of finally:
+    //
+    // def foo():
+    //    try: #1
+    //        try: #2
+    //            return
+    //        finally:
+    //            raise ValueError
+    //    except ValueError:
+    //        return "caught"
+    //    finally:
+    //        raise ValueError
+    //
+    // The finallies are basically executed as if outside the try block (even if we don't generate them as such)
+    // which means exceptions raised within them are propagated upwards and not handled by their exception handler
+    // but the enclosing one (if it exists)
+    auto copy = m_finallyBlocks;
+    auto reset = llvm::make_scope_exit([&] { m_finallyBlocks = std::move(copy); });
+
+    for (auto iter = copy.rbegin();
+         iter != copy.rend() && (fullUnwind || iter->parentLoop == m_currentLoop) && needsTerminator(); iter++)
+    {
+        pylir::ValueReset exceptReset(m_currentExceptBlock);
+        m_currentExceptBlock = iter->parentExceptBlock;
+        m_finallyBlocks.pop_back();
+        visit(*iter->finallySuite->suite);
+    }
 }

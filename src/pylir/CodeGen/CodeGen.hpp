@@ -7,6 +7,7 @@
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Parser/Syntax.hpp>
+#include <pylir/Support/Macros.hpp>
 #include <pylir/Support/ValueReset.hpp>
 
 #include <tuple>
@@ -50,11 +51,28 @@ class CodeGen
     {
         mlir::Block* breakBlock;
         mlir::Block* continueBlock;
+
+        bool operator==(const Loop& rhs) const
+        {
+            return std::tie(breakBlock, continueBlock) == std::tie(rhs.breakBlock, rhs.continueBlock);
+        }
+
+        bool operator!=(const Loop& rhs) const
+        {
+            return !(rhs == *this);
+        }
     } m_currentLoop{nullptr, nullptr};
 
     mlir::Block* m_currentExceptBlock = nullptr;
-    std::vector<const Syntax::TryStmt::Finally*> m_finallyBlocks;
-    bool m_inExceptHandlers = false;
+    struct FinallyBlocks
+    {
+        const Syntax::TryStmt::Finally* PYLIR_NON_NULL finallySuite;
+        Loop parentLoop;
+        mlir::Block* parentExceptBlock;
+    };
+    std::vector<FinallyBlocks> m_finallyBlocks;
+
+    void executeFinallyBlocks(bool fullUnwind = false);
 
     enum Kind
     {
