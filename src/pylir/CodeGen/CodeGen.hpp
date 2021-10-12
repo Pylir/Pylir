@@ -114,6 +114,14 @@ class CodeGen
     mlir::Value buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type, mlir::Value tuple,
                                        mlir::Value dict);
 
+    mlir::Value makeTuple(mlir::Location loc, const std::vector<Py::IterArg>& args);
+
+    mlir::Value makeList(mlir::Location loc, const std::vector<Py::IterArg>& args);
+
+    mlir::Value makeSet(mlir::Location loc, const std::vector<Py::IterArg>& args);
+
+    mlir::Value makeDict(mlir::Location loc, const std::vector<Py::DictArg>& args);
+
     struct FunctionParameter
     {
         std::string name;
@@ -147,7 +155,7 @@ class CodeGen
 
     void assignTarget(const Syntax::Target& target, mlir::Value value);
 
-    template <class Op>
+    template <mlir::Value (CodeGen::*op)(mlir::Location, const std::vector<Py::IterArg>&)>
     mlir::Value visit(const Syntax::StarredList& starredList);
 
     bool needsTerminator()

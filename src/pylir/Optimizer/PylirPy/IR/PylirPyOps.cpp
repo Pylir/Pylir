@@ -793,6 +793,24 @@ void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
 }
 
+void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                 const std::vector<::pylir::Py::IterArg>& args)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    for (auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                iterExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
+}
+
 void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                   const std::vector<::pylir::Py::DictArg>& args)
 {
@@ -897,15 +915,174 @@ mlir::Operation::operand_range pylir::Py::InvokeIndirectOp::getArgOperands()
     return operands();
 }
 
-mlir::LogicalResult pylir::Py::InvokeIndirectOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                                  ::llvm::Optional<::mlir::Location> ,
-                                                                  ::mlir::ValueRange ,
-                                                                  ::mlir::DictionaryAttr ,
-                                                                  ::mlir::RegionRange ,
-                                                                  ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+mlir::LogicalResult
+    pylir::Py::InvokeIndirectOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
+                                                  ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                  ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
 {
     inferredReturnTypes.push_back(Py::DynamicType::get(context));
     return mlir::success();
+}
+
+mlir::LogicalResult
+    pylir::Py::MakeTupleExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
+                                               ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                               ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeTupleExOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return normalDestOperandsMutable();
+    }
+    return llvm::None;
+}
+
+void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                     const std::vector<::pylir::Py::IterArg>& args, mlir::Block* happyPath,
+                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
+                                     mlir::ValueRange unwindDestOperands)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    for (auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                iterExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+          unwindDestOperands, happyPath, unwindPath);
+}
+
+mlir::LogicalResult
+    pylir::Py::MakeListExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
+                                              ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                              ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeListExOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return normalDestOperandsMutable();
+    }
+    return llvm::None;
+}
+
+void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                    const std::vector<::pylir::Py::IterArg>& args, mlir::Block* happyPath,
+                                    mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
+                                    mlir::ValueRange unwindDestOperands)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    for (auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                iterExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+          unwindDestOperands, happyPath, unwindPath);
+}
+
+mlir::LogicalResult pylir::Py::MakeSetExOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                             ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                             ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                             ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeSetExOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return normalDestOperandsMutable();
+    }
+    return llvm::None;
+}
+
+void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                   const std::vector<::pylir::Py::IterArg>& args, mlir::Block* happyPath,
+                                   mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
+                                   mlir::ValueRange unwindDestOperands)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    for (auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                iterExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+          unwindDestOperands, happyPath, unwindPath);
+}
+
+mlir::LogicalResult
+    pylir::Py::MakeDictExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
+                                              ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                              ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeDictExOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return normalDestOperandsMutable();
+    }
+    return llvm::None;
+}
+
+void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                    const std::vector<::pylir::Py::DictArg>& keyValues, mlir::Block* happyPath,
+                                    mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
+                                    mlir::ValueRange unwindDestOperands)
+{
+    std::vector<mlir::Value> keys, values;
+    std::vector<std::int32_t> mappingExpansion;
+    for (auto& iter : llvm::enumerate(keyValues))
+    {
+        pylir::match(
+            iter.value(),
+            [&](std::pair<mlir::Value, mlir::Value> pair)
+            {
+                keys.push_back(pair.first);
+                values.push_back(pair.second);
+            },
+            [&](Py::MappingExpansion expansion)
+            {
+                keys.push_back(expansion.value);
+                mappingExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion), normalDestOperands,
+          unwindDestOperands, happyPath, unwindPath);
 }
 
 namespace

@@ -208,29 +208,25 @@ void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
     }
 }
 
-template <class Op>
+template <mlir::Value (pylir::CodeGen::*op)(mlir::Location, const std::vector<pylir::Py::IterArg>&)>
 mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
 {
     auto loc = getLoc(starredList, starredList);
-    std::vector<std::int32_t> starred;
-    std::vector<mlir::Value> operands;
+    std::vector<Py::IterArg> operands;
     auto handleItem = [&](const Syntax::StarredItem& item, std::size_t index)
     {
         pylir::match(
             item.variant,
             [&](const Syntax::AssignmentExpression& assignment) { operands.push_back(visit(assignment)); },
             [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
-            {
-                operands.push_back(visit(pair.second));
-                starred.push_back(index);
-            });
+            { operands.push_back(Py::IterExpansion{visit(pair.second)}); });
     };
     handleItem(*starredList.firstExpr, 0);
     for (auto& iter : llvm::enumerate(starredList.remainingExpr))
     {
         handleItem(*iter.value().second, iter.index() + 1);
     }
-    return m_builder.create<Op>(loc, operands, m_builder.getI32ArrayAttr(starred));
+    return std::invoke(op, *this, loc, operands);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpression)
@@ -248,18 +244,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
                 return visit(pylir::get<Syntax::AssignmentExpression>(items.last->variant));
             }
             auto loc = getLoc(starredExpression, starredExpression);
-            std::vector<std::int32_t> starred;
-            std::vector<mlir::Value> operands;
+            std::vector<Py::IterArg> operands;
             auto handleItem = [&](const Syntax::StarredItem& item, std::size_t index)
             {
                 pylir::match(
                     item.variant,
-                    [&](const Syntax::AssignmentExpression& assignment) { operands.push_back(visit(assignment)); },
+                    [&](const Syntax::AssignmentExpression& assignment) { operands.emplace_back(visit(assignment)); },
                     [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
-                    {
-                        operands.push_back(visit(pair.second));
-                        starred.push_back(index);
-                    });
+                    { operands.emplace_back(Py::IterExpansion{visit(pair.second)}); });
             };
             for (auto& iter : llvm::enumerate(items.leading))
             {
@@ -269,7 +261,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
             {
                 handleItem(*items.last, items.leading.size());
             }
-            return m_builder.create<Py::MakeTupleOp>(loc, operands, m_builder.getI32ArrayAttr(starred));
+            return makeTuple(loc, operands);
         },
         [&](const Syntax::Expression& expression) { return visit(expression); });
 }
@@ -851,16 +843,15 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
                 return visit(*parenthForm.expression);
             }
             auto loc = getLoc(parenthForm, parenthForm.openParenth);
-            return m_builder.create<Py::MakeTupleOp>(loc, mlir::ValueRange{}, m_builder.getI32ArrayAttr({}));
+            return m_builder.create<Py::MakeTupleOp>(loc);
         },
         [&](const Syntax::Enclosure::ListDisplay& listDisplay) -> mlir::Value
         {
             auto loc = getLoc(listDisplay, listDisplay.openSquare);
             return pylir::match(
                 listDisplay.variant,
-                [&](std::monostate) -> mlir::Value
-                { return m_builder.create<Py::MakeListOp>(loc, mlir::ValueRange{}, m_builder.getI32ArrayAttr({})); },
-                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<Py::MakeListOp>(list); },
+                [&](std::monostate) -> mlir::Value { return m_builder.create<Py::MakeListOp>(loc); },
+                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<&CodeGen::makeList>(list); },
                 [&](const Syntax::Comprehension&) -> mlir::Value
                 {
                     // TODO:
@@ -872,7 +863,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
             auto loc = getLoc(setDisplay, setDisplay.openBrace);
             return pylir::match(
                 setDisplay.variant,
-                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<Py::MakeSetOp>(list); },
+                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<&CodeGen::makeSet>(list); },
                 [&](const Syntax::Comprehension&) -> mlir::Value
                 {
                     // TODO:
@@ -1538,7 +1529,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
             handleKeywordArguments(variant);
         }
     }
-    return {m_builder.create<Py::MakeTupleOp>(loc, iterArgs), m_builder.create<Py::MakeDictOp>(loc, dictArgs)};
+    return {makeTuple(loc, iterArgs), makeDict(loc, dictArgs)};
 }
 
 std::string pylir::CodeGen::formQualifiedName(std::string_view symbol)
@@ -1569,7 +1560,7 @@ mlir::Value pylir::CodeGen::buildException(mlir::Location loc, std::string_view 
 {
     auto typeObj = m_builder.create<Py::GetGlobalValueOp>(loc, kind);
     args.emplace(args.begin(), typeObj);
-    auto tuple = m_builder.create<Py::MakeTupleOp>(loc, args);
+    auto tuple = makeTuple(loc, args);
     auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
     auto newMethod = m_builder.create<Py::GetAttrOp>(loc, typeObj, "__new__").result();
 
@@ -1926,4 +1917,77 @@ void pylir::CodeGen::executeFinallyBlocks(bool fullUnwind)
         m_finallyBlocks.pop_back();
         visit(*iter->finallySuite->suite);
     }
+}
+
+mlir::Value pylir::CodeGen::makeTuple(mlir::Location loc, const std::vector<Py::IterArg>& args)
+{
+    if (!m_currentExceptBlock)
+    {
+        return m_builder.create<Py::MakeTupleOp>(loc, args);
+    }
+    if (std::all_of(args.begin(), args.end(),
+                    [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
+    {
+        return m_builder.create<Py::MakeTupleOp>(loc, args);
+    }
+    auto happyPath = new mlir::Block;
+    auto result = m_builder.create<Py::MakeTupleExOp>(loc, args, happyPath, mlir::ValueRange{}, m_currentExceptBlock,
+                                                      mlir::ValueRange{});
+    implementBlock(happyPath);
+    return result;
+}
+
+mlir::Value pylir::CodeGen::makeList(mlir::Location loc, const std::vector<Py::IterArg>& args)
+{
+    if (!m_currentExceptBlock)
+    {
+        return m_builder.create<Py::MakeListOp>(loc, args);
+    }
+    if (std::all_of(args.begin(), args.end(),
+                    [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
+    {
+        return m_builder.create<Py::MakeListOp>(loc, args);
+    }
+    auto happyPath = new mlir::Block;
+    auto result = m_builder.create<Py::MakeListExOp>(loc, args, happyPath, mlir::ValueRange{}, m_currentExceptBlock,
+                                                     mlir::ValueRange{});
+    implementBlock(happyPath);
+    return result;
+}
+
+mlir::Value pylir::CodeGen::makeSet(mlir::Location loc, const std::vector<Py::IterArg>& args)
+{
+    if (!m_currentExceptBlock)
+    {
+        return m_builder.create<Py::MakeSetOp>(loc, args);
+    }
+    if (std::all_of(args.begin(), args.end(),
+                    [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
+    {
+        return m_builder.create<Py::MakeSetOp>(loc, args);
+    }
+    auto happyPath = new mlir::Block;
+    auto result = m_builder.create<Py::MakeSetExOp>(loc, args, happyPath, mlir::ValueRange{}, m_currentExceptBlock,
+                                                    mlir::ValueRange{});
+    implementBlock(happyPath);
+    return result;
+}
+
+mlir::Value pylir::CodeGen::makeDict(mlir::Location loc, const std::vector<Py::DictArg>& args)
+{
+    if (!m_currentExceptBlock)
+    {
+        return m_builder.create<Py::MakeDictOp>(loc, args);
+    }
+    if (std::all_of(args.begin(), args.end(),
+                    [](const Py::DictArg& arg)
+                    { return std::holds_alternative<std::pair<mlir::Value, mlir::Value>>(arg); }))
+    {
+        return m_builder.create<Py::MakeDictOp>(loc, args);
+    }
+    auto happyPath = new mlir::Block;
+    auto result = m_builder.create<Py::MakeDictExOp>(loc, args, happyPath, mlir::ValueRange{}, m_currentExceptBlock,
+                                                     mlir::ValueRange{});
+    implementBlock(happyPath);
+    return result;
 }

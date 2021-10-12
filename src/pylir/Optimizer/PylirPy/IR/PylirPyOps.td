@@ -206,12 +206,19 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
     }];
 }
 
-class PylirPy_MakeOp<string mneomic, list<OpTrait> traits = []> :
-    Op<PylirPy_Dialect, mneomic, traits> {
+class PylirPy_MakeOp<string mnemonic, list<OpTrait> traits = []> :
+    Op<PylirPy_Dialect, mnemonic, traits> {
     let results = (outs Arg<DynamicType,"",[MemAlloc]>:$result);
 }
 
-def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+class PylirPy_MakeExOp<string mnemonic, list<OpTrait> traits = []> :
+    PylirPy_MakeOp<mnemonic, !listconcat(traits,[Terminator, AttrSizedOperandSegments,
+                                                 DeclareOpInterfaceMethods<BranchOpInterface>,
+                                                 DeclareOpInterfaceMethods<InferTypeOpInterface>])> {
+    let successors = (successor AnySuccessor:$happyPath, AnySuccessor:$exceptionPath);
+}
+
+def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion
                          );
@@ -221,7 +228,7 @@ def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple",[DeclareOpInterfaceMethods<
     }];
 
     let builders = [
-        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$values)>
+        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$args)>
     ];
 
     let hasFolder = 1;
@@ -235,6 +242,29 @@ def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple",[DeclareOpInterfaceMethods<
         This op as well as the constant op are the only ones capable of creating a tuple. After creation it is impossible
         to be modified. If it contains objects that are mutable however, those may still be modified. This way one is
         capable of arguing about the tuple in a typical SSA fashion.
+    }];
+}
+
+def PylirPy_MakeTupleExOp : PylirPy_MakeExOp<"makeTupleEx"> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         I32ArrayAttr:$iterExpansion,
+                         Variadic<DynamicType>:$normalDestOperands,
+                         Variadic<DynamicType>:$unwindDestOperands
+                         );
+
+    let builders = [
+        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$args,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let assemblyFormat = [{
+        custom<IterArguments>($arguments, $iterExpansion) attr-dict `\n`
+        ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
+                `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
     }];
 }
 
@@ -252,13 +282,63 @@ def PylirPy_MakeListOp : PylirPy_MakeOp<"makeList",[DeclareOpInterfaceMethods<In
     ];
 }
 
+def PylirPy_MakeListExOp : PylirPy_MakeExOp<"makeListEx"> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         I32ArrayAttr:$iterExpansion,
+                         Variadic<DynamicType>:$normalDestOperands,
+                         Variadic<DynamicType>:$unwindDestOperands
+                         );
+
+    let builders = [
+        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$args,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let assemblyFormat = [{
+        custom<IterArguments>($arguments, $iterExpansion) attr-dict `\n`
+        ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
+                `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
+    }];
+}
+
 def PylirPy_MakeSetOp : PylirPy_MakeOp<"makeSet",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion
                          );
 
+    let builders = [
+        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$values)>
+    ];
+
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict
+    }];
+}
+
+def PylirPy_MakeSetExOp : PylirPy_MakeExOp<"makeSetEx"> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         I32ArrayAttr:$iterExpansion,
+                         Variadic<DynamicType>:$normalDestOperands,
+                         Variadic<DynamicType>:$unwindDestOperands
+                         );
+
+    let builders = [
+        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$args,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let assemblyFormat = [{
+        custom<IterArguments>($arguments, $iterExpansion) attr-dict `\n`
+        ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
+                `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
     }];
 }
 
@@ -276,6 +356,30 @@ def PylirPy_MakeDictOp : PylirPy_MakeOp<"makeDict", [AttrSizedOperandSegments,
 
     let assemblyFormat = [{
             custom<MappingArguments>($keys, $values, $mappingExpansion) attr-dict
+    }];
+}
+
+def PylirPy_MakeDictExOp : PylirPy_MakeExOp<"makeDictEx"> {
+    let arguments = (ins Variadic<DynamicType>:$keys,
+                         Variadic<DynamicType>:$values,
+                         I32ArrayAttr:$mappingExpansion,
+                         Variadic<DynamicType>:$normalDestOperands,
+                         Variadic<DynamicType>:$unwindDestOperands
+                         );
+
+    let builders = [
+        OpBuilder<(ins "const std::vector<::pylir::Py::DictArg>&":$keyValues,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let assemblyFormat = [{
+        custom<MappingArguments>($keys, $values, $mappingExpansion) attr-dict `\n`
+        ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
+                `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
     }];
 }
 
