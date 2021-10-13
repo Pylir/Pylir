@@ -100,6 +100,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         return true;
     }
     mlir::MLIRContext context;
+    context.getDiagEngine().registerHandler([](mlir::Diagnostic& diagnostic) { diagnostic.print(llvm::errs()); });
     auto module = pylir::codegen(&context, *tree, file);
 
     auto filename = llvm::sys::path::filename(file.getFilename()).str();
@@ -164,7 +165,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     {
         if (mlir::failed(manager.run(*module)))
         {
-            return -1;
+            return false;
         }
         module->print(output, mlir::OpPrintingFlags{}.enableDebugInfo());
         return true;

@@ -100,6 +100,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
                 executeFinallyBlocks(false);
                 auto none = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None);
                 m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{none});
+                m_builder.clearInsertionPoint();
                 return;
             }
             auto value = visit(*returnStmt.expressions);
