@@ -28,6 +28,7 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Main/Opts.inc>
 #include <pylir/Optimizer/Conversion/PylirMemToLLVMIR/PylirMemToLLVMIR.hpp>
+#include <pylir/Optimizer/PylirPy/Transform/Passes.hpp>
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
 
@@ -152,6 +153,12 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         return false;
     }
     mlir::PassManager manager(&context);
+#ifndef NDEBUG
+    manager.enableVerifier();
+    manager.enableCrashReproducerGeneration("failure.mlir");
+    manager.enableIRPrinting(std::make_unique<mlir::PassManager::IRPrinterConfig>(false, false, true));
+#endif
+    manager.addPass(pylir::Py::createExpandPyDialectPass());
     // TODO add transformations
     if (options.hasArg(OPT_emit_mlir))
     {

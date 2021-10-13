@@ -1,0 +1,13 @@
+
+set(LLVM_TARGET_DEFINITIONS Passes.td)
+mlir_tablegen(Passes.h.inc -gen-pass-decls -name Transform)
+add_public_tablegen_target(PylirPyTransformPassIncGen)
+
+add_mlir_dialect_library(PylirPyTransforms
+        ExpandPyDialect/ExpandPyDialect.cpp
+
+        DEPENDS
+        PylirPyTransformPassIncGen
+
+        LINK_LIBS PUBLIC
+        MLIRPass MLIRTransforms PylirPyDialect)
