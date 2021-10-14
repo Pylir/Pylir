@@ -214,7 +214,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
 {
     auto loc = getLoc(starredList, starredList);
     std::vector<Py::IterArg> operands;
-    auto handleItem = [&](const Syntax::StarredItem& item, std::size_t index)
+    auto handleItem = [&](const Syntax::StarredItem& item)
     {
         pylir::match(
             item.variant,
@@ -222,10 +222,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
             [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
             { operands.push_back(Py::IterExpansion{visit(pair.second)}); });
     };
-    handleItem(*starredList.firstExpr, 0);
-    for (auto& iter : llvm::enumerate(starredList.remainingExpr))
+    handleItem(*starredList.firstExpr);
+    for (auto& iter : starredList.remainingExpr)
     {
-        handleItem(*iter.value().second, iter.index() + 1);
+        handleItem(*iter.second);
     }
     return std::invoke(op, *this, loc, operands);
 }
@@ -246,7 +246,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
             }
             auto loc = getLoc(starredExpression, starredExpression);
             std::vector<Py::IterArg> operands;
-            auto handleItem = [&](const Syntax::StarredItem& item, std::size_t index)
+            auto handleItem = [&](const Syntax::StarredItem& item)
             {
                 pylir::match(
                     item.variant,
@@ -254,13 +254,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
                     [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
                     { operands.emplace_back(Py::IterExpansion{visit(pair.second)}); });
             };
-            for (auto& iter : llvm::enumerate(items.leading))
+            for (auto& iter : items.leading)
             {
-                handleItem(iter.value().first, iter.index());
+                handleItem(iter.first);
             }
             if (items.last)
             {
-                handleItem(*items.last, items.leading.size());
+                handleItem(*items.last);
             }
             return makeTuple(loc, operands);
         },

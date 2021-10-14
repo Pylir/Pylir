@@ -202,4 +202,41 @@ void pylir::CodeGen::createBuiltinsImpl()
             loc, Builtins::Function, mlir::StringAttr{}, true,
             Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Type), dict, llvm::None));
     }
+    {
+        std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
+        {
+            auto newCall = mlir::FuncOp::create(
+                loc, "builtins.cell.__new__$impl",
+                m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
+                                           m_builder.getType<Py::DynamicType>()},
+                                          {m_builder.getType<Py::DynamicType>()}));
+            auto reset = implementFunction(newCall);
+
+            auto clazz = newCall.getArgument(1);
+            [[maybe_unused]] auto args = newCall.getArgument(2);
+
+            // TODO: maybe check clazz
+            auto obj = m_builder.create<Py::MakeObjectOp>(loc, clazz);
+            // TODO: check args for size, if len 0, set cell_content to unbound, if len 1 set to the value else error
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{obj});
+
+            members.emplace_back(
+                m_builder.getStringAttr("__new__"),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function),
+                                    noDefaultsFunctionDict,
+                                    m_builder.getSymbolRefAttr(
+                                        buildFunctionCC(loc, "builtins.cell.__new__$cc", newCall,
+                                                        {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                                                         FunctionParameter{"", FunctionParameter::PosRest, false}}))));
+        }
+        members.emplace_back(
+            m_builder.getStringAttr("__mro__"),
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::Cell),
+                                                        m_builder.getSymbolRefAttr(Builtins::Object)}));
+
+        auto dict = Py::DictAttr::get(m_builder.getContext(), members);
+        m_builder.create<Py::GlobalValueOp>(
+            loc, Builtins::Cell, mlir::StringAttr{}, true,
+            Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Type), dict, llvm::None));
+    }
 }

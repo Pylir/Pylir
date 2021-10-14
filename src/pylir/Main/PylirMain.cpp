@@ -156,7 +156,9 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     mlir::PassManager manager(&context);
 #ifndef NDEBUG
     manager.enableVerifier();
+    #if !defined(__MINGW32_MAJOR_VERSION) || !defined(__clang__)
     manager.enableCrashReproducerGeneration("failure.mlir");
+    #endif
     manager.enableIRPrinting(std::make_unique<mlir::PassManager::IRPrinterConfig>(false, false, true));
 #endif
     manager.addPass(pylir::Py::createExpandPyDialectPass());

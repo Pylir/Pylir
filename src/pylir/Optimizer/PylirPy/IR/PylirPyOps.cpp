@@ -737,24 +737,37 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     return nullptr;
 }
 
+namespace
+{
+template <class SymbolOp>
+mlir::LogicalResult verifySymbolUse(mlir::Operation* op, llvm::StringRef name, mlir::SymbolTableCollection& symbolTable)
+{
+    if (!symbolTable.lookupNearestSymbolFrom<SymbolOp>(op, name))
+    {
+        return op->emitOpError("Failed to find ") << SymbolOp::getOperationName() << " named " << name;
+    }
+    return mlir::success();
+}
+} // namespace
+
 mlir::LogicalResult pylir::Py::GetGlobalValueOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalValueOp>(*this, name()));
+    return verifySymbolUse<Py::GlobalValueOp>(*this, name(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::GetGlobalHandleOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<Py::GlobalHandleOp>(*this, name()));
+    return verifySymbolUse<Py::GlobalHandleOp>(*this, name(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, function()));
+    return verifySymbolUse<mlir::FuncOp>(*this, function(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::MakeClassOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, initFunc()));
+    return verifySymbolUse<mlir::FuncOp>(*this, initFunc(), symbolTable);
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -886,10 +899,8 @@ mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
 }
 
 mlir::LogicalResult pylir::Py::InvokeOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                          ::llvm::Optional<::mlir::Location> ,
-                                                          ::mlir::ValueRange ,
-                                                          ::mlir::DictionaryAttr ,
-                                                          ::mlir::RegionRange ,
+                                                          ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                          ::mlir::DictionaryAttr, ::mlir::RegionRange,
                                                           ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
 {
     inferredReturnTypes.push_back(Py::DynamicType::get(context));
