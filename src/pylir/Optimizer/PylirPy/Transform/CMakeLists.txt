@@ -3,11 +3,7 @@ set(LLVM_TARGET_DEFINITIONS Passes.td)
 mlir_tablegen(Passes.h.inc -gen-pass-decls -name Transform)
 add_public_tablegen_target(PylirPyTransformPassIncGen)
 
-add_mlir_dialect_library(PylirPyTransforms
-        ExpandPyDialect/ExpandPyDialect.cpp
-
-        DEPENDS
-        PylirPyTransformPassIncGen
-
-        LINK_LIBS PUBLIC
-        MLIRPass MLIRTransforms PylirPyDialect)
+add_library(PylirPyTransforms ExpandPyDialect/ExpandPyDialect.cpp)
+add_dependencies(PylirPyTransforms PylirPyTransformPassIncGen)
+target_link_libraries(PylirPyTransforms PUBLIC PylirPyDialect PRIVATE MLIRPass MLIRTransforms)
+set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)

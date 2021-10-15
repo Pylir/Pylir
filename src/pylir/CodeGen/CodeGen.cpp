@@ -931,11 +931,11 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
 {
     auto condition = visit(ifStmt.condition);
     auto trueBlock = new mlir::Block;
-    auto thenBlock = new mlir::Block;
+    auto thenBlock = std::make_unique<mlir::Block>();
     mlir::Block* elseBlock;
     if (!ifStmt.elseSection && ifStmt.elifs.empty())
     {
-        elseBlock = thenBlock;
+        elseBlock = thenBlock.get();
     }
     else
     {
@@ -948,11 +948,14 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     visit(*ifStmt.suite);
     if (needsTerminator())
     {
-        m_builder.create<mlir::BranchOp>(loc, thenBlock);
+        m_builder.create<mlir::BranchOp>(loc, thenBlock.get());
     }
-    if (thenBlock == elseBlock)
+    if (thenBlock.get() == elseBlock)
     {
-        implementBlock(thenBlock);
+        if (!thenBlock->hasNoPredecessors())
+        {
+            implementBlock(thenBlock.release());
+        }
         return;
     }
     implementBlock(elseBlock);
@@ -963,7 +966,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         trueBlock = new mlir::Block;
         if (iter.index() == ifStmt.elifs.size() - 1 && !ifStmt.elseSection)
         {
-            elseBlock = thenBlock;
+            elseBlock = thenBlock.get();
         }
         else
         {
@@ -976,9 +979,9 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         visit(*iter.value().suite);
         if (needsTerminator())
         {
-            m_builder.create<mlir::BranchOp>(loc, thenBlock);
+            m_builder.create<mlir::BranchOp>(loc, thenBlock.get());
         }
-        if (thenBlock != elseBlock)
+        if (thenBlock.get() != elseBlock)
         {
             implementBlock(elseBlock);
         }
@@ -988,11 +991,14 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         visit(*ifStmt.elseSection->suite);
         if (needsTerminator())
         {
-            m_builder.create<mlir::BranchOp>(loc, thenBlock);
+            m_builder.create<mlir::BranchOp>(loc, thenBlock.get());
         }
     }
 
-    implementBlock(thenBlock);
+    if (!thenBlock->hasNoPredecessors())
+    {
+        implementBlock(thenBlock.release());
+    }
 }
 
 void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)

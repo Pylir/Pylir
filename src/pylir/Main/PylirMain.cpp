@@ -161,7 +161,6 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     #endif
     manager.enableIRPrinting(std::make_unique<mlir::PassManager::IRPrinterConfig>(false, false, true));
 #endif
-    manager.addPass(pylir::Py::createExpandPyDialectPass());
     // TODO add transformations
     if (options.hasArg(OPT_emit_mlir))
     {
@@ -172,6 +171,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         module->print(output, mlir::OpPrintingFlags{}.enableDebugInfo());
         return true;
     }
+    manager.addNestedPass<mlir::FuncOp>(pylir::Py::createExpandPyDialectPass());
 
     auto triple = llvm::Triple(options.getLastArgValue(OPT_target, LLVM_DEFAULT_TARGET_TRIPLE));
     std::string error;

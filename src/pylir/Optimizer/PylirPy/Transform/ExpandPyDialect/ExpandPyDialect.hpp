@@ -7,6 +7,6 @@
 
 namespace pylir::Py
 {
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createExpandPyDialectPass();
+std::unique_ptr<mlir::Pass> createExpandPyDialectPass();
 
 }
