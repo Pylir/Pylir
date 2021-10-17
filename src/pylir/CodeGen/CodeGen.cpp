@@ -1133,7 +1133,65 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             //       a finally section
             writeIdentifier(iter.expression->second->second, exceptionHandler->getArgument(0));
         }
-        // TODO: actual matching and suite
+        auto tupleType = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::Tuple);
+        auto isTuple = m_builder.create<Py::IsOp>(loc, value, tupleType);
+        auto tupleBlock = new mlir::Block;
+        auto exceptionBlock = new mlir::Block;
+        m_builder.create<mlir::CondBranchOp>(loc, isTuple, tupleBlock, exceptionBlock);
+
+        auto skipBlock = new mlir::Block;
+        auto suiteBlock = new mlir::Block;
+        {
+            implementBlock(exceptionBlock);
+            // TODO: check value is a type
+            auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::BaseException);
+            auto isSubclass = buildSubclassCheck(loc, value, baseException);
+            auto raiseBlock = new mlir::Block;
+            auto noTypeErrorBlock = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(loc, isSubclass, noTypeErrorBlock, raiseBlock);
+
+            implementBlock(raiseBlock);
+            auto exception = buildException(loc, Builtins::TypeError, {});
+            raiseException(exception);
+
+            implementBlock(noTypeErrorBlock);
+            auto exceptionType = m_builder.create<Py::TypeOfOp>(loc, exceptionHandler->getArgument(0));
+            isSubclass = buildSubclassCheck(loc, exceptionType, value);
+            m_builder.create<mlir::CondBranchOp>(loc, isSubclass, suiteBlock, skipBlock);
+        }
+        {
+            implementBlock(exceptionBlock);
+            auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::BaseException);
+            auto noTypeErrorsBlock = new mlir::Block;
+            buildTupleForEach(loc, value, noTypeErrorsBlock, {},
+                              [&](mlir::Value entry)
+                              {
+                                  // TODO: check entry is a type
+                                  auto isSubclass = buildSubclassCheck(loc, entry, baseException);
+                                  auto raiseBlock = new mlir::Block;
+                                  auto noTypeErrorBlock = new mlir::Block;
+                                  m_builder.create<mlir::CondBranchOp>(loc, isSubclass, noTypeErrorBlock, raiseBlock);
+
+                                  implementBlock(raiseBlock);
+                                  auto exception = buildException(loc, Builtins::TypeError, {});
+                                  raiseException(exception);
+
+                                  implementBlock(noTypeErrorBlock);
+                              });
+            implementBlock(noTypeErrorsBlock);
+            auto exceptionType = m_builder.create<Py::TypeOfOp>(loc, exceptionHandler->getArgument(0));
+            buildTupleForEach(loc, value, skipBlock, {},
+                              [&](mlir::Value entry)
+                              {
+                                  auto isSubclass = buildSubclassCheck(loc, exceptionType, entry);
+                                  auto continueLoop = new mlir::Block;
+                                  m_builder.create<mlir::CondBranchOp>(loc, isSubclass, suiteBlock, continueLoop);
+                                  implementBlock(continueLoop);
+                              });
+        }
+
+        implementBlock(suiteBlock);
+        visit(*iter.suite);
         if (needsTerminator())
         {
             if (tryStmt.finally)
@@ -1150,6 +1208,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
                 m_builder.create<mlir::BranchOp>(loc, continueBlock);
             }
         }
+        implementBlock(skipBlock);
     }
     if (needsTerminator())
     {
@@ -1997,4 +2056,50 @@ mlir::Value pylir::CodeGen::makeDict(mlir::Location loc, const std::vector<Py::D
                                                      mlir::ValueRange{});
     implementBlock(happyPath);
     return result;
+}
+
+mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Location loc, mlir::Value type, mlir::Value base)
+{
+    auto mro = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
+    auto end = new mlir::Block;
+    end->addArgument(m_builder.getI1Type());
+    auto falseConstant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getBoolAttr(false));
+    buildTupleForEach(loc, mro, end, {falseConstant},
+                      [&](mlir::Value entry)
+                      {
+                          auto isType = m_builder.create<Py::IsOp>(loc, entry, base);
+                          auto notFound = new mlir::Block;
+                          auto trueConstant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getBoolAttr(true));
+                          m_builder.create<mlir::CondBranchOp>(loc, isType, end, mlir::ValueRange{trueConstant},
+                                                               notFound, mlir::ValueRange{});
+
+                          implementBlock(notFound);
+                      });
+    implementBlock(end);
+    return end->getArgument(0);
+}
+
+void pylir::CodeGen::buildTupleForEach(mlir::Location loc, mlir::Value tuple, mlir::Block* endBlock,
+                                       mlir::ValueRange endArgs,
+                                       llvm::function_ref<void(mlir::Value)> iterationCallback)
+{
+    auto tupleSize = m_builder.create<Py::TupleIntegerLenOp>(loc, m_builder.getIndexType(), tuple);
+    auto startConstant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(0));
+    auto conditionBlock = new mlir::Block;
+    conditionBlock->addArgument(m_builder.getIndexType());
+    m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
+
+    implementBlock(conditionBlock);
+    auto isLess =
+        m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, conditionBlock->getArgument(0), tupleSize);
+    auto body = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(loc, isLess, body, endBlock, endArgs);
+
+    implementBlock(body);
+    auto entry = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
+    iterationCallback(entry);
+    PYLIR_ASSERT(needsTerminator());
+    auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(1));
+    auto nextIter = m_builder.create<mlir::AddIOp>(loc, conditionBlock->getArgument(0), one);
+    m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{nextIter});
 }
