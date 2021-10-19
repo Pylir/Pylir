@@ -61,6 +61,10 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         if (auto* statement = std::get_if<Syntax::Statement>(&iter))
         {
             visit(*statement);
+            if (!m_builder.getInsertionBlock())
+            {
+                break;
+            }
         }
     }
     if (needsTerminator())
@@ -91,6 +95,10 @@ void pylir::CodeGen::visit(const Syntax::StmtList& stmtList)
     visit(*stmtList.firstExpr);
     for (auto& iter : stmtList.remainingExpr)
     {
+        if (!m_builder.getInsertionBlock())
+        {
+            return;
+        }
         visit(*iter.second);
     }
 }
@@ -121,6 +129,10 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
                 return;
             }
             auto value = visit(*returnStmt.expressions);
+            if (!value)
+            {
+                return;
+            }
             executeFinallyBlocks(true);
             m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{value});
             m_builder.clearInsertionPoint();
@@ -180,7 +192,15 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
         [&](const Syntax::Subscription& subscription)
         {
             auto container = visit(*subscription.primary);
+            if (!container)
+            {
+                return;
+            }
             auto indices = visit(subscription.expressionList);
+            if (!container)
+            {
+                return;
+            }
 
             auto loc = getLoc(subscription, subscription);
             auto type = m_builder.create<Py::TypeOfOp>(loc, container);
@@ -220,9 +240,17 @@ void pylir::CodeGen::assignTarget(const Syntax::TargetList& targetList, mlir::Va
 void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
 {
     auto rhs = pylir::match(assignmentStmt.variant, [&](const auto& value) { return visit(value); });
+    if (!rhs)
+    {
+        return;
+    }
     for (auto& [list, token] : assignmentStmt.targets)
     {
         assignTarget(list, rhs);
+        if (!m_builder.getInsertionBlock())
+        {
+            return;
+        }
     }
 }
 
@@ -233,16 +261,39 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
     std::vector<Py::IterArg> operands;
     auto handleItem = [&](const Syntax::StarredItem& item)
     {
-        pylir::match(
+        return pylir::match(
             item.variant,
-            [&](const Syntax::AssignmentExpression& assignment) { operands.push_back(visit(assignment)); },
+            [&](const Syntax::AssignmentExpression& assignment)
+            {
+                auto value = visit(assignment);
+                if (!value)
+                {
+                    return false;
+                }
+                operands.push_back(value);
+                return true;
+            },
             [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
-            { operands.push_back(Py::IterExpansion{visit(pair.second)}); });
+            {
+                auto value = visit(pair.second);
+                if (!value)
+                {
+                    return false;
+                }
+                operands.push_back(Py::IterExpansion{value});
+                return true;
+            });
     };
-    handleItem(*starredList.firstExpr);
+    if (!handleItem(*starredList.firstExpr))
+    {
+        return {};
+    }
     for (auto& iter : starredList.remainingExpr)
     {
-        handleItem(*iter.second);
+        if (!handleItem(*iter.second))
+        {
+            return {};
+        }
     }
     return std::invoke(op, *this, loc, operands);
 }
@@ -265,19 +316,42 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
             std::vector<Py::IterArg> operands;
             auto handleItem = [&](const Syntax::StarredItem& item)
             {
-                pylir::match(
+                return pylir::match(
                     item.variant,
-                    [&](const Syntax::AssignmentExpression& assignment) { operands.emplace_back(visit(assignment)); },
+                    [&](const Syntax::AssignmentExpression& assignment)
+                    {
+                        auto value = visit(assignment);
+                        if (!value)
+                        {
+                            return false;
+                        }
+                        operands.emplace_back(value);
+                        return true;
+                    },
                     [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
-                    { operands.emplace_back(Py::IterExpansion{visit(pair.second)}); });
+                    {
+                        auto value = visit(pair.second);
+                        if (!value)
+                        {
+                            return false;
+                        }
+                        operands.emplace_back(Py::IterExpansion{value});
+                        return true;
+                    });
             };
             for (auto& iter : items.leading)
             {
-                handleItem(iter.first);
+                if (!handleItem(iter.first))
+                {
+                    return {};
+                }
             }
             if (items.last)
             {
-                handleItem(*items.last);
+                if (!handleItem(*items.last))
+                {
+                    return {};
+                }
             }
             return makeTuple(loc, operands);
         },
@@ -294,8 +368,19 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ExpressionList& expressionList)
     auto loc = getLoc(expressionList, expressionList);
     std::vector<mlir::Value> operands(1 + expressionList.remainingExpr.size());
     operands[0] = visit(*expressionList.firstExpr);
-    std::transform(expressionList.remainingExpr.begin(), expressionList.remainingExpr.end(), operands.begin() + 1,
-                   [&](const auto& pair) { return visit(*pair.second); });
+    if (!operands[0])
+    {
+        return {};
+    }
+    for (auto& iter : llvm::enumerate(expressionList.remainingExpr))
+    {
+        auto value = visit(*iter.value().second);
+        if (!value)
+        {
+            return {};
+        }
+        operands[iter.index() + 1] = value;
+    }
     return m_builder.create<Py::MakeTupleOp>(loc, operands, m_builder.getI32ArrayAttr({}));
 }
 
@@ -324,6 +409,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     }
     auto loc = getLoc(expression, expression.suffix->ifToken);
     auto condition = toI1(visit(*expression.suffix->test));
+    if (!condition)
+    {
+        return {};
+    }
     auto found = BlockPtr{};
     auto elseBlock = BlockPtr{};
     auto thenBlock = BlockPtr{};
@@ -332,11 +421,23 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     m_builder.create<mlir::CondBranchOp>(loc, condition, found, elseBlock);
 
     implementBlock(found);
-    m_builder.create<mlir::BranchOp>(loc, thenBlock, visit(expression.value));
+    auto trueValue = visit(expression.value);
+    if (trueValue)
+    {
+        m_builder.create<mlir::BranchOp>(loc, thenBlock, trueValue);
+    }
 
     implementBlock(elseBlock);
-    m_builder.create<mlir::BranchOp>(loc, thenBlock, visit(*expression.suffix->elseValue));
+    auto falseValue = visit(*expression.suffix->elseValue);
+    if (falseValue)
+    {
+        m_builder.create<mlir::BranchOp>(loc, thenBlock, falseValue);
+    }
 
+    if (thenBlock->hasNoPredecessors())
+    {
+        return {};
+    }
     implementBlock(thenBlock);
     return thenBlock->getArgument(0);
 }
@@ -349,6 +450,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
         {
             auto loc = getLoc(expression, binOp->orToken);
             auto lhs = visit(*binOp->lhs);
+            if (!lhs)
+            {
+                return {};
+            }
             auto found = BlockPtr{};
             found->addArgument(m_builder.getType<Py::DynamicType>());
             auto rhsTry = BlockPtr{};
@@ -356,7 +461,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
 
             implementBlock(rhsTry);
             auto rhs = visit(binOp->rhs);
-            m_builder.create<mlir::BranchOp>(loc, found, rhs);
+            if (rhs)
+            {
+                m_builder.create<mlir::BranchOp>(loc, found, rhs);
+            }
 
             implementBlock(found);
             return found->getArgument(0);
@@ -371,6 +479,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
         {
             auto loc = getLoc(expression, binOp->andToken);
             auto lhs = visit(*binOp->lhs);
+            if (!lhs)
+            {
+                return {};
+            }
             auto found = BlockPtr{};
             found->addArgument(m_builder.getType<Py::DynamicType>());
             auto rhsTry = BlockPtr{};
@@ -379,7 +491,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
 
             implementBlock(rhsTry);
             auto rhs = visit(binOp->rhs);
-            m_builder.create<mlir::BranchOp>(loc, found, rhs);
+            if (rhs)
+            {
+                m_builder.create<mlir::BranchOp>(loc, found, rhs);
+            }
 
             implementBlock(found);
             return found->getArgument(0);
@@ -406,6 +521,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
     }
     mlir::Value result;
     auto first = visit(comparison.left);
+    if (!first)
+    {
+        return {};
+    }
     auto previousRHS = first;
     for (auto& [op, rhs] : comparison.rest)
     {
@@ -450,34 +569,41 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
             invert = true;
         }
         auto other = visit(rhs);
-        mlir::Value cmp;
-        switch (comp)
+        if (other)
         {
-            case Comp::Lt: cmp = m_builder.create<Py::LessOp>(loc, previousRHS, other); break;
-            case Comp::Gt: cmp = m_builder.create<Py::GreaterOp>(loc, previousRHS, other); break;
-            case Comp::Eq: cmp = m_builder.create<Py::EqualOp>(loc, previousRHS, other); break;
-            case Comp::Ne: cmp = m_builder.create<Py::NotEqualOp>(loc, previousRHS, other); break;
-            case Comp::Ge: cmp = m_builder.create<Py::GreaterEqualOp>(loc, previousRHS, other); break;
-            case Comp::Le: cmp = m_builder.create<Py::LessEqualOp>(loc, previousRHS, other); break;
-            case Comp::Is:
-                cmp = m_builder.create<Py::BoolFromI1Op>(loc, m_builder.create<Py::IsOp>(loc, previousRHS, other));
-                break;
-            case Comp::In: cmp = m_builder.create<Py::InOp>(loc, previousRHS, other); break;
+            mlir::Value cmp;
+            switch (comp)
+            {
+                case Comp::Lt: cmp = m_builder.create<Py::LessOp>(loc, previousRHS, other); break;
+                case Comp::Gt: cmp = m_builder.create<Py::GreaterOp>(loc, previousRHS, other); break;
+                case Comp::Eq: cmp = m_builder.create<Py::EqualOp>(loc, previousRHS, other); break;
+                case Comp::Ne: cmp = m_builder.create<Py::NotEqualOp>(loc, previousRHS, other); break;
+                case Comp::Ge: cmp = m_builder.create<Py::GreaterEqualOp>(loc, previousRHS, other); break;
+                case Comp::Le: cmp = m_builder.create<Py::LessEqualOp>(loc, previousRHS, other); break;
+                case Comp::Is:
+                    cmp = m_builder.create<Py::BoolFromI1Op>(loc, m_builder.create<Py::IsOp>(loc, previousRHS, other));
+                    break;
+                case Comp::In: cmp = m_builder.create<Py::InOp>(loc, previousRHS, other); break;
+            }
+            if (invert)
+            {
+                cmp = m_builder.create<Py::InvertOp>(loc, toBool(cmp));
+            }
+            previousRHS = other;
+            if (!result)
+            {
+                result = cmp;
+                continue;
+            }
+            m_builder.create<mlir::BranchOp>(loc, found, cmp);
         }
-        if (invert)
-        {
-            cmp = m_builder.create<Py::InvertOp>(loc, toBool(cmp));
-        }
-        previousRHS = other;
-        if (!result)
-        {
-            result = cmp;
-            continue;
-        }
-        m_builder.create<mlir::BranchOp>(loc, found, cmp);
 
         implementBlock(found);
         result = found->getArgument(0);
+        if (!other)
+        {
+            break;
+        }
     }
     return result;
 }
@@ -636,6 +762,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
         {
             auto loc = getLoc(call, call.openParentheses);
             auto callable = visit(*call.primary);
+            if (!callable)
+            {
+                return {};
+            }
             auto [tuple, keywords] = pylir::match(
                 call.variant,
                 [&](std::monostate) -> std::pair<mlir::Value, mlir::Value> {
@@ -648,6 +778,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
                     // TODO:
                     PYLIR_UNREACHABLE;
                 });
+            if (!tuple || !keywords)
+            {
+                return {};
+            }
             return buildCall(loc, callable, tuple, keywords);
         },
         [&](const auto&) -> mlir::Value
@@ -842,7 +976,15 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscription)
 {
     auto container = visit(*subscription.primary);
+    if (!container)
+    {
+        return {};
+    }
     auto indices = visit(subscription.expressionList);
+    if (!container)
+    {
+        return {};
+    }
 
     auto loc = getLoc(subscription, subscription);
     auto type = m_builder.create<Py::TypeOfOp>(loc, container);
@@ -913,22 +1055,45 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
                     result.reserve(list.remainingExpr.size() + 1);
                     auto handleOne = [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum)
                     {
-                        pylir::match(
+                        return pylir::match(
                             keyDatum.variant,
                             [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Key& key)
                             {
                                 auto first = visit(key.first);
+                                if (!first)
+                                {
+                                    return false;
+                                }
                                 auto second = visit(key.second);
+                                if (!second)
+                                {
+                                    return false;
+                                }
                                 result.push_back(std::pair{first, second});
+                                return true;
                             },
                             [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Datum& key)
-                            { result.push_back(Py::MappingExpansion{visit(key.orExpr)}); });
+                            {
+                                auto mapping = visit(key.orExpr);
+                                if (!mapping)
+                                {
+                                    return false;
+                                }
+                                result.push_back(Py::MappingExpansion{mapping});
+                                return true;
+                            });
                     };
-                    handleOne(*list.firstExpr);
+                    if (!handleOne(*list.firstExpr))
+                    {
+                        return {};
+                    }
                     for (auto& [token, iter] : list.remainingExpr)
                     {
                         (void)token;
-                        handleOne(*iter);
+                        if (!handleOne(*iter))
+                        {
+                            return {};
+                        }
                     }
                     return m_builder.create<Py::MakeDictOp>(loc, result);
                 },
@@ -952,6 +1117,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AssignmentExpression& ass
         return visit(*assignmentExpression.expression);
     }
     auto value = visit(*assignmentExpression.expression);
+    if (!value)
+    {
+        return {};
+    }
     writeIdentifier(assignmentExpression.identifierAndWalrus->first, value);
     return value;
 }
@@ -959,6 +1128,10 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AssignmentExpression& ass
 void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
 {
     auto condition = visit(ifStmt.condition);
+    if (!condition)
+    {
+        return;
+    }
     auto trueBlock = BlockPtr{};
     BlockPtr thenBlock;
     auto exitBlock = llvm::make_scope_exit(
@@ -996,6 +1169,10 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     {
         loc = getLoc(iter.value().elif, iter.value().elif);
         condition = visit(iter.value().condition);
+        if (!condition)
+        {
+            return;
+        }
         trueBlock = BlockPtr{};
         if (iter.index() == ifStmt.elifs.size() - 1 && !ifStmt.elseSection)
         {
@@ -1046,6 +1223,10 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
 
     implementBlock(conditionBlock);
     auto condition = visit(whileStmt.condition);
+    if (!condition)
+    {
+        return;
+    }
     mlir::Block* elseBlock;
     if (whileStmt.elseSection)
     {
@@ -1169,6 +1350,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             continue;
         }
         auto value = visit(iter.expression->first);
+        if (!value)
+        {
+            return;
+        }
         if (iter.expression->second)
         {
             // TODO: Python requires this identifier to be unbound at the end of the exception handler as if done in
@@ -1288,19 +1473,35 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 
             void visit(const Syntax::ParameterList::Parameter& param)
             {
+                if (!builder.getInsertionBlock())
+                {
+                    return;
+                }
                 functionParameters.push_back({std::string(param.identifier.getValue()), kind, false});
                 functionParametersTokens.push_back(param.identifier);
             }
 
             void visit(const Syntax::ParameterList::DefParameter& defParameter)
             {
+                if (!builder.getInsertionBlock())
+                {
+                    return;
+                }
                 Visitor::visit(defParameter);
                 if (!defParameter.defaultArg)
                 {
                     return;
                 }
+                if (!builder.getInsertionBlock())
+                {
+                    return;
+                }
                 functionParameters.back().hasDefaultParam = true;
                 auto value = calcCallback(defParameter.defaultArg->second);
+                if (!value)
+                {
+                    return;
+                }
                 if (kind != FunctionParameter::KeywordOnly)
                 {
                     defaultParameters.push_back(value);
@@ -1314,21 +1515,37 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 
             void visit(const Syntax::ParameterList::PosOnly& posOnlyNode)
             {
+                if (!builder.getInsertionBlock())
+                {
+                    return;
+                }
                 kind = FunctionParameter::PosOnly;
                 Visitor::visit(posOnlyNode);
             }
 
             void visit(const Syntax::ParameterList::NoPosOnly& noPosOnly)
             {
+                if (!builder.getInsertionBlock())
+                {
+                    return;
+                }
                 kind = FunctionParameter::Normal;
                 Visitor::visit(noPosOnly);
             }
 
             void visit(const Syntax::ParameterList::StarArgs& star)
             {
+                if (!builder.getInsertionBlock())
+                {
+                    return;
+                }
                 auto doubleStarHandler = [&](const Syntax::ParameterList::StarArgs::DoubleStar& doubleStar)
                 {
                     visit(doubleStar.parameter);
+                    if (!builder.getInsertionBlock())
+                    {
+                        return;
+                    }
                     functionParameters.back().kind = FunctionParameter::KeywordRest;
                 };
                 pylir::match(
@@ -1339,11 +1556,19 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                         if (star.parameter)
                         {
                             visit(*star.parameter);
+                            if (!builder.getInsertionBlock())
+                            {
+                                return;
+                            }
                             functionParameters.back().kind = FunctionParameter::PosRest;
                         }
                         for (auto& iter : llvm::make_second_range(star.defParameters))
                         {
                             visit(iter);
+                            if (!builder.getInsertionBlock())
+                            {
+                                return;
+                            }
                         }
                         if (star.further && star.further->doubleStar)
                         {
@@ -1361,6 +1586,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                   m_builder,
                   [this](const IdentifierToken& token) { return getLoc(token, token); }};
         visitor.visit(*funcDef.parameterList);
+        if (!m_builder.getInsertionBlock())
+        {
+            return;
+        }
     }
     auto loc = getLoc(funcDef.funcName, funcDef.funcName);
     auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
@@ -1507,6 +1736,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     {
         auto decLoc = getLoc(iter.atSign, iter.atSign);
         auto decorator = visit(iter.assignmentExpression);
+        if (!decorator)
+        {
+            return;
+        }
         value = buildCall(decLoc, decorator, m_builder.create<Py::MakeTupleOp>(decLoc, std::vector<Py::IterArg>{value}),
                           m_builder.create<Py::ConstantOp>(decLoc, Py::DictAttr::get(m_builder.getContext(), {})));
     }
@@ -1582,18 +1815,40 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
     {
         auto handlePositionalItem = [&](const Syntax::ArgumentList::PositionalItem& positionalItem)
         {
-            pylir::match(
+            return pylir::match(
                 positionalItem.variant,
                 [&](const std::unique_ptr<Syntax::AssignmentExpression>& expression)
-                { iterArgs.emplace_back(visit(*expression)); },
+                {
+                    auto iter = visit(*expression);
+                    if (!iter)
+                    {
+                        return false;
+                    }
+                    iterArgs.emplace_back(iter);
+                    return true;
+                },
                 [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                { iterArgs.push_back(Py::IterExpansion{visit(*star.expression)}); });
+                {
+                    auto iter = visit(*star.expression);
+                    if (!iter)
+                    {
+                        return false;
+                    }
+                    iterArgs.push_back(Py::IterExpansion{iter});
+                    return true;
+                });
         };
-        handlePositionalItem(argumentList.positionalArguments->firstItem);
+        if (!handlePositionalItem(argumentList.positionalArguments->firstItem))
+        {
+            return {{}, {}};
+        }
         for (auto& [token, rest] : argumentList.positionalArguments->rest)
         {
             (void)token;
-            handlePositionalItem(rest);
+            if (!handlePositionalItem(rest))
+            {
+                return {{}, {}};
+            }
         }
     }
     auto handleKeywordItem = [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
@@ -1601,32 +1856,65 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
         auto key = m_builder.create<Py::ConstantOp>(getLoc(keywordItem.identifier, keywordItem.identifier),
                                                     m_builder.getStringAttr(keywordItem.identifier.getValue()));
         auto value = visit(*keywordItem.expression);
+        if (!value)
+        {
+            return false;
+        }
         dictArgs.push_back(std::pair{key, value});
+        return true;
     };
     if (argumentList.starredAndKeywords)
     {
         auto handleExpression = [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
-        { iterArgs.push_back(Py::IterExpansion{visit(*expression.expression)}); };
+        {
+            auto value = visit(*expression.expression);
+            if (!value)
+            {
+                return false;
+            }
+            iterArgs.push_back(Py::IterExpansion{value});
+            return true;
+        };
         auto handleStarredAndKeywords = [&](const Syntax::ArgumentList::StarredAndKeywords::Variant& variant)
-        { pylir::match(variant, handleKeywordItem, handleExpression); };
-        handleKeywordItem(argumentList.starredAndKeywords->first);
+        { return pylir::match(variant, handleKeywordItem, handleExpression); };
+        if (!handleKeywordItem(argumentList.starredAndKeywords->first))
+        {
+            return {{}, {}};
+        }
         for (auto& [token, variant] : argumentList.starredAndKeywords->rest)
         {
             (void)token;
-            handleStarredAndKeywords(variant);
+            if (!handleStarredAndKeywords(variant))
+            {
+                return {{}, {}};
+            }
         }
     }
     if (argumentList.keywordArguments)
     {
         auto handleExpression = [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
-        { dictArgs.push_back(Py::MappingExpansion{visit(*expression.expression)}); };
+        {
+            auto value = visit(*expression.expression);
+            if (!value)
+            {
+                return false;
+            }
+            dictArgs.push_back(Py::MappingExpansion{value});
+            return true;
+        };
         auto handleKeywordArguments = [&](const Syntax::ArgumentList::KeywordArguments::Variant& variant)
-        { pylir::match(variant, handleKeywordItem, handleExpression); };
-        handleExpression(argumentList.keywordArguments->first);
+        { return pylir::match(variant, handleKeywordItem, handleExpression); };
+        if (!handleExpression(argumentList.keywordArguments->first))
+        {
+            return {{}, {}};
+        }
         for (auto& [token, variant] : argumentList.keywordArguments->rest)
         {
             (void)token;
-            handleKeywordArguments(variant);
+            if (!handleKeywordArguments(variant))
+            {
+                return {{}, {}};
+            }
         }
     }
     return {makeTuple(loc, iterArgs), makeDict(loc, dictArgs)};
