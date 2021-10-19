@@ -95,6 +95,72 @@ class CodeGen
         return m_scope.back();
     }
 
+    class BlockPtr
+    {
+        mlir::Block* m_block;
+
+        void maybeDestroy()
+        {
+            if (!m_block)
+            {
+                return;
+            }
+            if (!m_block->hasNoPredecessors())
+            {
+                PYLIR_ASSERT(m_block->getParent() && "Block has uses but does not have a parent");
+                return;
+            }
+            PYLIR_ASSERT(!m_block->getParent() && "Block should not have a parent region if it is unreachable");
+            delete m_block;
+        }
+
+    public:
+        BlockPtr() : m_block(new mlir::Block) {}
+
+        explicit BlockPtr(mlir::Block* block) : m_block(block) {}
+
+        ~BlockPtr()
+        {
+            maybeDestroy();
+        }
+
+        BlockPtr(const BlockPtr&) = delete;
+        BlockPtr& operator=(const BlockPtr&) = delete;
+        BlockPtr(BlockPtr&& rhs) noexcept : m_block(std::exchange(rhs.m_block, nullptr)) {}
+        BlockPtr& operator=(BlockPtr&& rhs) noexcept
+        {
+            maybeDestroy();
+            m_block = std::exchange(rhs.m_block, nullptr);
+            return *this;
+        }
+
+        mlir::Block* get() const
+        {
+            PYLIR_ASSERT(m_block);
+            return m_block;
+        }
+
+        operator mlir::Block*() const
+        {
+            return get();
+        }
+
+        mlir::Block* operator->() const
+        {
+            return get();
+        }
+
+        friend bool operator==(const BlockPtr& lhs, mlir::Block* rhs)
+        {
+            return lhs.get() == rhs;
+        }
+
+        friend bool operator==(mlir::Block* rhs, const BlockPtr& lhs)
+        {
+            return lhs.get() == rhs;
+        }
+    };
+
     mlir::Value toI1(mlir::Value value);
 
     mlir::Value toBool(mlir::Value value);
@@ -191,6 +257,11 @@ class CodeGen
     {
         m_currentFunc.push_back(block);
         m_builder.setInsertionPointToStart(block);
+    }
+
+    void implementBlock(const BlockPtr& blockPtr)
+    {
+        implementBlock(blockPtr.get());
     }
 
 public:
