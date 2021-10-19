@@ -1,0 +1,24 @@
+
+#ifndef BUILTIN
+#error BUILTIN is not defined
+#endif
+
+BUILTIN(None, "builtins.None", false)
+BUILTIN(NoneType, "builtins.NoneType", false)
+BUILTIN(NotImplemented, "builtins.NotImplemented", true)
+BUILTIN(Type, "builtins.type", true)
+BUILTIN(Object, "builtins.object", true)
+BUILTIN(Int, "builtins.int", true)
+BUILTIN(Float, "builtins.float", true)
+BUILTIN(Tuple, "builtins.tuple", true)
+BUILTIN(List, "builtins.list", true)
+BUILTIN(Dict, "builtins.dict", true)
+BUILTIN(Function, "builtins.function", true)
+BUILTIN(Cell, "builtins.cell", false)
+BUILTIN(BaseException, "builtins.BaseException", true)
+BUILTIN(Exception, "builtins.Exception", true)
+BUILTIN(TypeError, "builtins.TypeError", true)
+BUILTIN(NameError, "builtins.NameError", true)
+BUILTIN(UnboundLocalError, "builtins.UnboundLocalError", true)
+
+#undef BUILTIN

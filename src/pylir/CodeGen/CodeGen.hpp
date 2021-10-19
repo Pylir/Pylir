@@ -18,23 +18,20 @@ namespace pylir
 
 namespace Builtins
 {
-constexpr static std::string_view None = "builtins.None";
-constexpr static std::string_view NoneType = "builtins.NoneType";
-constexpr static std::string_view NotImplemented = "builtins.NotImplemented";
-constexpr static std::string_view Type = "builtins.type";
-constexpr static std::string_view Object = "builtins.object";
-constexpr static std::string_view Int = "builtins.int";
-constexpr static std::string_view Float = "builtins.float";
-constexpr static std::string_view Tuple = "builtins.tuple";
-constexpr static std::string_view List = "builtins.list";
-constexpr static std::string_view Dict = "builtins.dict";
-constexpr static std::string_view Function = "builtins.function";
-constexpr static std::string_view Cell = "builtins.cell";
-constexpr static std::string_view BaseException = "builtins.BaseException";
-constexpr static std::string_view Exception = "builtins.Exception";
-constexpr static std::string_view TypeError = "builtins.TypeError";
-constexpr static std::string_view NameError = "builtins.NameError";
-constexpr static std::string_view UnboundLocalError = "builtins.UnboundLocalError";
+
+struct Builtin
+{
+    std::string_view name;
+    bool isPublic;
+};
+
+#define BUILTIN(x, s, isPublic) constexpr Builtin x = {s, isPublic};
+#include "Builtins.def"
+
+constexpr std::array allBuiltins = {
+#define BUILTIN(x, ...) x,
+#include "Builtins.def"
+};
 } // namespace Builtins
 
 class CodeGen
@@ -46,6 +43,7 @@ class CodeGen
     mlir::Value m_classNamespace{};
     std::vector<std::string> m_qualifierStack;
     std::unordered_map<std::string, std::size_t> m_implNames;
+    std::unordered_map<std::string_view, std::string_view> m_builtinNamespace;
 
     struct Loop
     {
