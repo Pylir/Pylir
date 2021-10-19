@@ -850,7 +850,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             auto builtinValue = m_builder.create<Py::GetGlobalValueOp>(loc, builtin->second);
             if (!m_classNamespace)
             {
-                return {};
+                return builtinValue;
             }
             m_builder.create<mlir::BranchOp>(loc, classNamespaceFound, mlir::ValueRange{builtinValue});
             implementBlock(classNamespaceFound);
@@ -1361,7 +1361,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             writeIdentifier(iter.expression->second->second, exceptionHandler->getArgument(0));
         }
         auto tupleType = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::Tuple.name);
-        auto isTuple = m_builder.create<Py::IsOp>(loc, value, tupleType);
+        auto isTuple = m_builder.create<Py::IsOp>(loc, m_builder.create<Py::TypeOfOp>(loc, value), tupleType);
         auto tupleBlock = BlockPtr{};
         auto exceptionBlock = BlockPtr{};
         m_builder.create<mlir::CondBranchOp>(loc, isTuple, tupleBlock, exceptionBlock);
@@ -1387,7 +1387,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             m_builder.create<mlir::CondBranchOp>(loc, isSubclass, suiteBlock, skipBlock);
         }
         {
-            implementBlock(exceptionBlock);
+            implementBlock(tupleBlock);
             auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::BaseException.name);
             BlockPtr noTypeErrorsBlock;
             buildTupleForEach(loc, value, noTypeErrorsBlock, {},
