@@ -117,6 +117,64 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO
             PYLIR_UNREACHABLE;
         },
+        [&](const Syntax::RaiseStmt& raiseStmt)
+        {
+            if (!raiseStmt.expressions)
+            {
+                // TODO: Get current exception via sys.exc_info()
+                PYLIR_UNREACHABLE;
+            }
+            auto expression = visit(raiseStmt.expressions->first);
+            if (!expression)
+            {
+                return;
+            }
+            // TODO: attach __cause__ and __context__
+            auto loc = getLoc(raiseStmt, raiseStmt.raise);
+            auto typeOf = m_builder.create<Py::TypeOfOp>(loc, expression);
+            auto typeObject = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::Type.name);
+            auto isTypeSubclass = buildSubclassCheck(loc, typeOf, typeObject);
+            BlockPtr isType, instanceBlock;
+            instanceBlock->addArgument(m_builder.getType<Py::DynamicType>());
+            m_builder.create<mlir::CondBranchOp>(loc, isTypeSubclass, isType, instanceBlock,
+                                                 mlir::ValueRange{expression});
+
+            {
+                implementBlock(isType);
+                auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::BaseException.name);
+                auto isBaseException = buildSubclassCheck(loc, expression, baseException);
+                BlockPtr typeError, createException;
+                m_builder.create<mlir::CondBranchOp>(loc, isBaseException, createException, typeError);
+
+                {
+                    implementBlock(typeError);
+                    auto exception = buildException(loc, Builtins::TypeError.name, {});
+                    raiseException(exception);
+                }
+
+                implementBlock(createException);
+                auto tuple = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext(), {}));
+                auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+                auto exception = buildCall(loc, expression, tuple, dict);
+                m_builder.create<mlir::BranchOp>(loc, instanceBlock, mlir::ValueRange{exception});
+            }
+
+            implementBlock(instanceBlock);
+            typeOf = m_builder.create<Py::TypeOfOp>(loc, instanceBlock->getArgument(0));
+            auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::BaseException.name);
+            auto isBaseException = buildSubclassCheck(loc, typeOf, baseException);
+            BlockPtr typeError, raiseBlock;
+            m_builder.create<mlir::CondBranchOp>(loc, isBaseException, raiseBlock, typeError);
+
+            {
+                implementBlock(typeError);
+                auto exception = buildException(loc, Builtins::TypeError.name, {});
+                raiseException(exception);
+            }
+
+            implementBlock(raiseBlock);
+            raiseException(instanceBlock->getArgument(0));
+        },
         [&](const Syntax::ReturnStmt& returnStmt)
         {
             auto loc = getLoc(returnStmt, returnStmt.returnKeyword);
