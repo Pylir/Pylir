@@ -20,5 +20,6 @@ BUILTIN(Exception, "builtins.Exception", true)
 BUILTIN(TypeError, "builtins.TypeError", true)
 BUILTIN(NameError, "builtins.NameError", true)
 BUILTIN(UnboundLocalError, "builtins.UnboundLocalError", true)
+BUILTIN(StopIteration, "builtins.StopIteration", true)
 
 #undef BUILTIN
