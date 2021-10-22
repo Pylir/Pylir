@@ -1318,7 +1318,106 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     }
 }
 
-void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt) {}
+void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
+{
+    auto iterable = visit(forStmt.expressionList);
+    if (!iterable)
+    {
+        return;
+    }
+    auto loc = getLoc(forStmt, forStmt.forKeyword);
+    auto type = m_builder.create<Py::TypeOfOp>(loc, iterable);
+    auto iterMethod = buildMROLookup(loc, type, "__iter__");
+    BlockPtr notIterableBlock, iterableBlock;
+    m_builder.create<mlir::CondBranchOp>(loc, iterMethod.second, iterableBlock, notIterableBlock);
+
+    {
+        implementBlock(notIterableBlock);
+        auto exception = buildException(loc, Builtins::TypeError.name, {});
+        raiseException(exception);
+    }
+
+    implementBlock(iterableBlock);
+    auto iterObject = buildCall(loc, iterMethod.first,
+                                m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{iterMethod.first}),
+                                m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})));
+    auto nextMethod = buildMROLookup(loc, type, "__next__");
+    BlockPtr notNextBlock, condition;
+    m_builder.create<mlir::CondBranchOp>(loc, nextMethod.second, condition, notNextBlock);
+
+    {
+        implementBlock(notNextBlock);
+        auto exception = buildException(loc, Builtins::TypeError.name, {});
+        raiseException(exception);
+    }
+
+    implementBlock(condition);
+    BlockPtr exceptionHandler, thenBlock;
+    auto implementThenBlock = llvm::make_scope_exit(
+        [&]
+        {
+            if (!thenBlock->hasNoPredecessors())
+            {
+                implementBlock(thenBlock);
+            }
+        });
+
+    exceptionHandler->addArgument(m_builder.getType<Py::DynamicType>());
+    std::optional reset = pylir::ValueReset(m_currentExceptBlock);
+    m_currentExceptBlock = exceptionHandler;
+    auto next = buildCall(loc, nextMethod.first,
+                          m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{nextMethod.first}),
+                          m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})));
+    reset.reset();
+    assignTarget(forStmt.targetList, next);
+    mlir::Block* elseBlock;
+    if (forStmt.elseSection)
+    {
+        elseBlock = new mlir::Block;
+    }
+    else
+    {
+        elseBlock = thenBlock;
+    }
+    BlockPtr body;
+    m_builder.create<mlir::BranchOp>(loc, body);
+
+    implementBlock(body);
+    std::optional exit = pylir::ValueReset(m_currentLoop);
+    m_currentLoop = {thenBlock, condition};
+    visit(*forStmt.suite);
+    if (needsTerminator())
+    {
+        m_builder.create<mlir::BranchOp>(loc, condition);
+    }
+    exit.reset();
+    if (!exceptionHandler->hasNoPredecessors())
+    {
+        implementBlock(exceptionHandler);
+        auto exception = exceptionHandler->getArgument(0);
+        auto exceptionType = m_builder.create<Py::TypeOfOp>(loc, exception);
+        auto stopIteration = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::StopIteration.name);
+        auto isStopIteration = buildSubclassCheck(loc, exceptionType, stopIteration);
+        BlockPtr reraiseBlock, exitBlock;
+        m_builder.create<mlir::CondBranchOp>(loc, isStopIteration, exitBlock, reraiseBlock);
+
+        implementBlock(reraiseBlock);
+        raiseException(exception);
+
+        implementBlock(exitBlock);
+        m_builder.create<mlir::BranchOp>(loc, elseBlock);
+    }
+    if (elseBlock == thenBlock)
+    {
+        return;
+    }
+    implementBlock(elseBlock);
+    visit(*forStmt.elseSection->suite);
+    if (needsTerminator())
+    {
+        m_builder.create<mlir::BranchOp>(loc, thenBlock);
+    }
+}
 
 void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
 {
