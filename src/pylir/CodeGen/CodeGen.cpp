@@ -1365,9 +1365,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
     exceptionHandler->addArgument(m_builder.getType<Py::DynamicType>());
     std::optional reset = pylir::ValueReset(m_currentExceptBlock);
     m_currentExceptBlock = exceptionHandler;
-    auto next = buildCall(loc, nextMethod.first,
-                          m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{nextMethod.first}),
-                          m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})));
+    auto next =
+        buildCall(loc, nextMethod.first,
+                  m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{nextMethod.first, iterObject}),
+                  m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})));
     reset.reset();
     assignTarget(forStmt.targetList, next);
     mlir::Block* elseBlock;
