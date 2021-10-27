@@ -173,8 +173,6 @@ class CodeGen
 
     mlir::Value buildCall(mlir::Location loc, mlir::Value callable, mlir::Value tuple, mlir::Value dict);
 
-    std::pair<mlir::Value, mlir::Value> buildMROLookup(mlir::Location loc, mlir::Value type, llvm::Twine attribute);
-
     mlir::Value buildSubclassCheck(mlir::Location loc, mlir::Value type, mlir::Value base);
 
     void buildTupleForEach(mlir::Location loc, mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,

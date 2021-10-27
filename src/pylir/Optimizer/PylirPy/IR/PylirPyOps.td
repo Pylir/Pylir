@@ -206,6 +206,50 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
     }];
 }
 
+// linear searches
+
+def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$mroTuple, StrAttr:$attribute);
+    let results = (outs DynamicType:$result, I1:$success);
+
+    let assemblyFormat = "$attribute `in` $mroTuple attr-dict";
+
+    let description = [{
+        This op does a linear search through the given tuple, returning the first element which contains the given
+        attribute. If `$mroTuple` is not really a tuple (or subclass of) the behaviour is undefined. If the attribute
+        was found `$success` returns `true` and `false` otherwise. If `false`, using `$result` is undefined behaviour.
+    }];
+}
+
+def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$callable);
+    let results = (outs DynamicType:$result, I1:$success);
+
+    let assemblyFormat = "$callable attr-dict";
+
+    let description = [{
+        This op does a recursive search through the `__call__` operators results of `$callable` until a result of type
+        `@builtins.function` is found, or the current item has no `__call__` operator exists. If successful `$success`
+        returns `true` and `$result` is guaranteed to be of type `@builtins.function`. Otherwise `$success` is false
+        and using `$result` is undefined behaviour.
+    }];
+}
+
+def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$mroTuple, DynamicType:$element);
+    let results = (outs I1:$success);
+
+    let assemblyFormat = "$element `in` $mroTuple attr-dict";
+
+    let description = [{
+        This op does a linear search through the given tuple, checking whether `$element` is contained within.
+        If it is `$success` returns `true`, `false` otherwise. This is used to check whether a type is a subclass
+        of another. If `$mroTuple` is not really a tuple (or subclass of) the behaviour is undefined.
+    }];
+}
+
+// Make ops
+
 class PylirPy_MakeOp<string mnemonic, list<OpTrait> traits = []> :
     Op<PylirPy_Dialect, mnemonic, traits> {
     let results = (outs Arg<DynamicType,"",[MemAlloc]>:$result);

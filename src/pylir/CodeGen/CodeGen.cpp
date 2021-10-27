@@ -1327,9 +1327,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
     }
     auto loc = getLoc(forStmt, forStmt.forKeyword);
     auto type = m_builder.create<Py::TypeOfOp>(loc, iterable);
-    auto iterMethod = buildMROLookup(loc, type, "__iter__");
+    auto typeMRO = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
+    auto iterMethod = m_builder.create<Py::MROLookupOp>(loc, typeMRO, "__iter__");
     BlockPtr notIterableBlock, iterableBlock;
-    m_builder.create<mlir::CondBranchOp>(loc, iterMethod.second, iterableBlock, notIterableBlock);
+    m_builder.create<mlir::CondBranchOp>(loc, iterMethod.success(), iterableBlock, notIterableBlock);
 
     {
         implementBlock(notIterableBlock);
@@ -1338,12 +1339,12 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
     }
 
     implementBlock(iterableBlock);
-    auto iterObject = buildCall(loc, iterMethod.first,
-                                m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{iterMethod.first}),
+    auto iterObject = buildCall(loc, iterMethod.result(),
+                                m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{iterMethod.result()}),
                                 m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})));
-    auto nextMethod = buildMROLookup(loc, type, "__next__");
+    auto nextMethod = m_builder.create<Py::MROLookupOp>(loc, typeMRO, "__next__");
     BlockPtr notNextBlock, condition;
-    m_builder.create<mlir::CondBranchOp>(loc, nextMethod.second, condition, notNextBlock);
+    m_builder.create<mlir::CondBranchOp>(loc, nextMethod.success(), condition, notNextBlock);
 
     {
         implementBlock(notNextBlock);
@@ -1366,8 +1367,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
     std::optional reset = pylir::ValueReset(m_currentExceptBlock);
     m_currentExceptBlock = exceptionHandler;
     auto next =
-        buildCall(loc, nextMethod.first,
-                  m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{nextMethod.first, iterObject}),
+        buildCall(loc, nextMethod.result(),
+                  m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{nextMethod.result(), iterObject}),
                   m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})));
     reset.reset();
     assignTarget(forStmt.targetList, next);
@@ -2134,84 +2135,27 @@ void pylir::CodeGen::raiseException(mlir::Value exceptionObject)
     m_builder.clearInsertionPoint();
 }
 
-std::pair<mlir::Value, mlir::Value> pylir::CodeGen::buildMROLookup(mlir::Location loc, mlir::Value type,
-                                                                   llvm::Twine attribute)
-{
-    auto mro = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
-    auto len = m_builder.create<Py::TupleIntegerLenOp>(loc, m_builder.getIndexType(), mro);
-    auto zero = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(0));
-
-    auto condition = BlockPtr{};
-    condition->addArgument(m_builder.getIndexType());
-    m_builder.create<mlir::BranchOp>(loc, condition, mlir::ValueRange{zero});
-
-    implementBlock(condition);
-    auto cmp = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, condition->getArgument(0), len);
-    auto found = BlockPtr{};
-    found->addArgument(m_builder.getType<Py::DynamicType>());
-    auto body = BlockPtr{};
-    auto unbound = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
-    m_builder.create<mlir::CondBranchOp>(loc, cmp, body, found, mlir::ValueRange{unbound});
-
-    implementBlock(body);
-    auto entry = m_builder.create<Py::TupleIntegerGetItemOp>(loc, mro, condition->getArgument(0));
-    auto fetch = m_builder.create<Py::GetAttrOp>(loc, entry, m_builder.getStringAttr(attribute));
-    auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(1));
-    auto incremented = m_builder.create<mlir::AddIOp>(loc, condition->getArgument(0), one);
-    m_builder.create<mlir::CondBranchOp>(loc, fetch.success(), found, mlir::ValueRange{fetch.result()}, condition,
-                                         mlir::ValueRange{incremented});
-
-    implementBlock(found);
-    auto success = m_builder.create<Py::IsUnboundValueOp>(loc, found->getArgument(0));
-    return {found->getArgument(0), success};
-}
-
 mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, mlir::Value tuple, mlir::Value dict)
 {
-    auto condition = BlockPtr{};
-    condition->addArgument(m_builder.getType<Py::DynamicType>());
-    auto func = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::Function.name);
-    m_builder.create<mlir::BranchOp>(loc, condition, mlir::ValueRange{callable});
-
-    implementBlock(condition);
-    auto type = m_builder.create<Py::TypeOfOp>(loc, condition->getArgument(0));
-    auto isFunction = m_builder.create<Py::IsOp>(loc, type, func);
-
-    auto found = BlockPtr{};
-    auto body = BlockPtr{};
-    found->addArgument(m_builder.getType<Py::DynamicType>());
-    m_builder.create<mlir::CondBranchOp>(loc, isFunction, found, mlir::ValueRange{condition->getArgument(0)}, body,
-                                         mlir::ValueRange{});
-
-    {
-        implementBlock(body);
-        auto [call, failure] = buildMROLookup(loc, type, "__call__");
-        auto unboundValue = m_builder.create<Py::ConstantOp>(loc, Py::UnboundAttr::get(m_builder.getContext()));
-        m_builder.create<mlir::CondBranchOp>(loc, failure, found, mlir::ValueRange{unboundValue}, condition,
-                                             mlir::ValueRange{call});
-    }
-
-    implementBlock(found);
-    auto isUnbound = m_builder.create<Py::IsUnboundValueOp>(loc, found->getArgument(0));
-    auto notBound = BlockPtr{};
-    auto typeCall = BlockPtr{};
-    m_builder.create<mlir::CondBranchOp>(loc, isUnbound, notBound, typeCall);
+    BlockPtr typeCall, notBound;
+    auto functionObj = m_builder.create<Py::GetFunctionOp>(loc, callable);
+    m_builder.create<mlir::CondBranchOp>(loc, functionObj.success(), typeCall, notBound);
 
     implementBlock(notBound);
     auto typeError = buildException(loc, Builtins::TypeError.name, {});
     raiseException(typeError);
 
     implementBlock(typeCall);
-    auto function = m_builder.create<Py::FunctionGetFunctionOp>(loc, found->getArgument(0));
+    auto function = m_builder.create<Py::FunctionGetFunctionOp>(loc, functionObj.result());
     if (!m_currentExceptBlock)
     {
         return m_builder
-            .create<mlir::CallIndirectOp>(loc, function, mlir::ValueRange{found->getArgument(0), tuple, dict})
+            .create<mlir::CallIndirectOp>(loc, function, mlir::ValueRange{functionObj.result(), tuple, dict})
             .getResult(0);
     }
     auto happyPath = BlockPtr{};
     auto result =
-        m_builder.create<Py::InvokeIndirectOp>(loc, function, mlir::ValueRange{found->getArgument(0), tuple, dict},
+        m_builder.create<Py::InvokeIndirectOp>(loc, function, mlir::ValueRange{functionObj.result(), tuple, dict},
                                                mlir::ValueRange{}, mlir::ValueRange{}, happyPath, m_currentExceptBlock);
     implementBlock(happyPath);
     return result;
@@ -2220,17 +2164,18 @@ mlir::Value pylir::CodeGen::buildCall(mlir::Location loc, mlir::Value callable, 
 mlir::Value pylir::CodeGen::buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type,
                                                    mlir::Value tuple, mlir::Value dict)
 {
-    auto [method, failure] = buildMROLookup(loc, type, methodName);
+    auto mroTuple = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
+    auto lookup = m_builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
     auto notFound = BlockPtr{};
     auto exec = BlockPtr{};
-    m_builder.create<mlir::CondBranchOp>(loc, failure, notFound, exec);
+    m_builder.create<mlir::CondBranchOp>(loc, lookup.success(), exec, notFound);
 
     implementBlock(notFound);
     auto exception = buildException(loc, Builtins::TypeError.name, {});
     raiseException(exception);
 
     implementBlock(exec);
-    return buildCall(loc, method, tuple, dict);
+    return buildCall(loc, lookup.result(), tuple, dict);
 }
 
 mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
@@ -2541,22 +2486,7 @@ mlir::Value pylir::CodeGen::makeDict(mlir::Location loc, const std::vector<Py::D
 mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Location loc, mlir::Value type, mlir::Value base)
 {
     auto mro = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
-    auto end = BlockPtr{};
-    end->addArgument(m_builder.getI1Type());
-    auto falseConstant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getBoolAttr(false));
-    buildTupleForEach(loc, mro, end, {falseConstant},
-                      [&](mlir::Value entry)
-                      {
-                          auto isType = m_builder.create<Py::IsOp>(loc, entry, base);
-                          auto notFound = BlockPtr{};
-                          auto trueConstant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getBoolAttr(true));
-                          m_builder.create<mlir::CondBranchOp>(loc, isType, end, mlir::ValueRange{trueConstant},
-                                                               notFound, mlir::ValueRange{});
-
-                          implementBlock(notFound);
-                      });
-    implementBlock(end);
-    return end->getArgument(0);
+    return m_builder.create<Py::LinearContainsOp>(loc, mro, base);
 }
 
 void pylir::CodeGen::buildTupleForEach(mlir::Location loc, mlir::Value tuple, mlir::Block* endBlock,
