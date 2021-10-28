@@ -159,9 +159,9 @@ class CodeGen
         }
     };
 
-    mlir::Value toI1(mlir::Value value);
+    mlir::Value toI1(mlir::Location loc, mlir::Value value);
 
-    mlir::Value toBool(mlir::Value value);
+    mlir::Value toBool(mlir::Location loc, mlir::Value value);
 
     mlir::Value readIdentifier(const IdentifierToken& token);
 

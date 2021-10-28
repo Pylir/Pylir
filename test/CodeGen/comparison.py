@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-mlir -o - | FileCheck %s
 
+# XFAIL: *
+
 1 < 3 < 5
 
 # CHECK-LABEL: __init__

@@ -57,7 +57,7 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
 }
 
 def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {
-    let arguments = (ins DynamicType:$object, StrAttr:$attribute);
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$object, StrAttr:$attribute);
     let results = (outs DynamicType:$result, I1:$success);
 
     let assemblyFormat = [{
@@ -89,7 +89,7 @@ def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
     }];
 }
 
-def PylirPy_TypeOfOp : PylirPy_Op<"typeOf"> {
+def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect]> {
     let arguments = (ins DynamicType:$object);
     let results = (outs DynamicType:$result);
 
@@ -101,7 +101,7 @@ def PylirPy_TypeOfOp : PylirPy_Op<"typeOf"> {
 }
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
-    let arguments = (ins DynamicType:$dict, DynamicType:$index);
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$dict, DynamicType:$index);
     let results = (outs DynamicType:$result, I1:$found);
 
     let assemblyFormat = [{
@@ -140,7 +140,7 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
     }];
 }
 
-def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
+def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple, IntegerLike:$index);
     let results = (outs DynamicType:$result);
 
@@ -154,7 +154,7 @@ def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
     }];
 }
 
-def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len"> {
+def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple);
     let results = (outs IntegerLike:$result);
 
@@ -183,7 +183,7 @@ def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
 }
 
 def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple"> {
-    let arguments = (ins DynamicType:$list);
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$list);
 
     let assemblyFormat = [{
         $list attr-dict
@@ -195,7 +195,7 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple"> {
     }];
 }
 
-def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
+def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEffect]> {
     let arguments = (ins DynamicType:$function);
     let results = (outs PyFunctionType:$result);
 
@@ -455,16 +455,6 @@ def PylirPy_MakeObjectOp : PylirPy_MakeOp<"makeObject"> {
     let assemblyFormat = "$typeObj attr-dict";
 }
 
-def PylirPy_PowerOp : PylirPy_Op<"pow"> {
-    let arguments = (ins DynamicType:$base, DynamicType:$exponent, Optional<DynamicType>:$mod);
-
-    let assemblyFormat = [{
-        $base `to` $exponent (`mod` $mod^)? attr-dict
-    }];
-
-    let hasFolder = 1;
-}
-
 // Unary ops
 
 class PylirPy_UnaryOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name, traits> {
@@ -474,11 +464,6 @@ class PylirPy_UnaryOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,
 
     let hasFolder = 1;
 }
-
-def PylirPy_NegOp : PylirPy_UnaryOp<"neg">;
-def PylirPy_PosOp : PylirPy_UnaryOp<"pos">;
-def PylirPy_InvertOp : PylirPy_UnaryOp<"invert">;
-def PylirPy_BoolOp : PylirPy_UnaryOp<"bool">;
 
 // Binary ops
 
@@ -490,49 +475,13 @@ class PylirPy_BinOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,tr
     let hasFolder = 1;
 }
 
-def PylirPy_MulOp : PylirPy_BinOp<"mul">;
-def PylirPy_MatMulOp : PylirPy_BinOp<"matMul"> {
-    let hasFolder = 0;
-}
-def PylirPy_FloorDivOp : PylirPy_BinOp<"floorDiv">;
-def PylirPy_TrueDivOp : PylirPy_BinOp<"trueDiv">;
-def PylirPy_ModuloOp : PylirPy_BinOp<"mod">;
-def PylirPy_AddOp : PylirPy_BinOp<"add">;
-def PylirPy_SubOp : PylirPy_BinOp<"sub">;
-def PylirPy_LShiftOp : PylirPy_BinOp<"lshift">;
-def PylirPy_RShiftOp : PylirPy_BinOp<"rshift">;
-def PylirPy_AndOp : PylirPy_BinOp<"and">;
-def PylirPy_OrOp : PylirPy_BinOp<"or">;
-def PylirPy_XorOp : PylirPy_BinOp<"xor">;
-def PylirPy_LessOp : PylirPy_BinOp<"less"> {
-    let hasFolder = 0;
-}
-def PylirPy_LessEqualOp : PylirPy_BinOp<"lessEqual"> {
-    let hasFolder = 0;
-}
-def PylirPy_GreaterOp : PylirPy_BinOp<"greater"> {
-    let hasFolder = 0;
-}
-def PylirPy_GreaterEqualOp : PylirPy_BinOp<"greaterEqual"> {
-    let hasFolder = 0;
-}
-def PylirPy_EqualOp : PylirPy_BinOp<"equal"> {
-    let hasFolder = 0;
-}
-def PylirPy_NotEqualOp : PylirPy_BinOp<"notEqual"> {
-    let hasFolder = 0;
-}
-def PylirPy_InOp : PylirPy_BinOp<"in"> {
-    let hasFolder = 0;
-}
-
-def PylirPy_IsOp : PylirPy_BinOp<"is", [NoSideEffect]> {
+def PylirPy_IsOp : PylirPy_BinOp<"is", [NoSideEffect, Commutative]> {
     let results = (outs I1:$result);
 }
 
 // Conversions
 
-def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1"> {
+def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoSideEffect]> {
     let arguments = (ins DynamicType:$input);
     let results = (outs I1:$result);
 
@@ -546,7 +495,7 @@ def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1"> {
     }];
 }
 
-def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1"> {
+def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [NoSideEffect]> {
     let arguments = (ins I1:$input);
 
     let assemblyFormat = "$input attr-dict";

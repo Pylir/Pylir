@@ -5,7 +5,9 @@ while True:
 
 # CHECK: ^[[TEST:[[:alnum:]]+]]:
 # CHECK: %[[COND:.*]] = py.constant #py.bool<True>
-# CHECK: %[[COND_BOOL:.*]] = py.bool %[[COND]]
+# CHECK-DAG: %[[DICT:.*]] = py.constant #py.dict<{}>
+# CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (%[[COND]])
+# CHECK: %[[COND_BOOL:.*]] = call_indirect %{{.*}}(%{{.*}}, %[[TUPLE]], %[[DICT]])
 # CHECK: %[[COND_I1:.*]] = py.bool.toI1 %[[COND_BOOL]]
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[THEN:[[:alnum:]]+]]
 
@@ -22,9 +24,8 @@ else:
     pass
 
 # CHECK: ^[[TEST:[[:alnum:]]+]]:
-# CHECK: %[[COND:.*]] = py.constant #py.bool<True>
-# CHECK: %[[COND_BOOL:.*]] = py.bool %[[COND]]
-# CHECK: %[[COND_I1:.*]] = py.bool.toI1 %[[COND_BOOL]]
+# __bool__ call...
+# CHECK: %[[COND_I1:.*]] = py.bool.toI1
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:
@@ -46,9 +47,8 @@ while True:
         break
 
 # CHECK: ^[[TEST:[[:alnum:]]+]]:
-# CHECK: %[[COND:.*]] = py.constant #py.bool<True>
-# CHECK: %[[COND_BOOL:.*]] = py.bool %[[COND]]
-# CHECK: %[[COND_I1:.*]] = py.bool.toI1 %[[COND_BOOL]]
+# __bool__ call...
+# CHECK: %[[COND_I1:.*]] = py.bool.toI1
 # CHECK: cond_br %[[COND_I1]], ^[[BODY:[[:alnum:]]+]], ^[[THEN:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:

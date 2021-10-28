@@ -20,7 +20,7 @@ def foo():
     x = 3
 
     def bar(a=3, *, c=1):
-        return a + c
+        pass
 
 # CHECK-LABEL: func private @"foo$impl[0]"
 

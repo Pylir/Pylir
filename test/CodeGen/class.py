@@ -20,7 +20,8 @@ def outer():
 # CHECK-SAME: %[[CELL:[[:alnum:]]+]]: !py.dynamic
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]: !py.dynamic
 
-# CHECK: cond_br %{{.*}}, ^[[TRUE:.*]], ^[[FALSE:[[:alnum:]]+]]
+# CHECK: %[[COND:.*]] = py.bool.toI1
+# CHECK: cond_br %[[COND]], ^[[TRUE:.*]], ^[[FALSE:[[:alnum:]]+]]
 
 # CHECK: ^[[TRUE]]:
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>

@@ -6,7 +6,9 @@ if 3:
     5
 
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: %[[THREE_BOOL:.*]] = py.bool %[[THREE]]
+# CHECK-DAG: %[[DICT:.*]] = py.constant #py.dict<{}>
+# CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (%[[THREE]])
+# CHECK: %[[THREE_BOOL:.*]] = call_indirect %{{.*}}(%{{.*}}, %[[TUPLE]], %[[DICT]])
 # CHECK: %[[THREE_I1:.*]] = py.bool.toI1 %[[THREE_BOOL]]
 # CHECK: cond_br %[[THREE_I1]], ^[[TRUE:.*]], ^[[THEN:[[:alnum:]]+]]
 
@@ -21,9 +23,8 @@ if 3:
 else:
     4
 
-# CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: %[[THREE_BOOL:.*]] = py.bool %[[THREE]]
-# CHECK: %[[THREE_I1:.*]] = py.bool.toI1 %[[THREE_BOOL]]
+# __bool__ call...
+# CHECK: %[[THREE_I1:.*]] = py.bool.toI1
 # CHECK: cond_br %[[THREE_I1]], ^[[TRUE:.*]], ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[TRUE]]:
@@ -42,9 +43,8 @@ if 3:
 elif 4:
     6
 
-# CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: %[[THREE_BOOL:.*]] = py.bool %[[THREE]]
-# CHECK: %[[THREE_I1:.*]] = py.bool.toI1 %[[THREE_BOOL]]
+# __bool__ call...
+# CHECK: %[[THREE_I1:.*]] = py.bool.toI1
 # CHECK: cond_br %[[THREE_I1]], ^[[TRUE:.*]], ^[[ELIF:[[:alnum:]]+]]
 
 # CHECK: ^[[TRUE]]:
@@ -52,9 +52,8 @@ elif 4:
 # CHECK: br ^[[THEN:[[:alnum:]]+]]
 
 # CHECK: ^[[ELIF]]:
-# CHECK: %[[FOUR:.*]] = py.constant #py.int<4>
-# CHECK: %[[FOUR_BOOL:.*]] = py.bool %[[FOUR]]
-# CHECK: %[[FOUR_I1:.*]] = py.bool.toI1 %[[FOUR_BOOL]]
+# __bool__ call...
+# CHECK: %[[FOUR_I1:.*]] = py.bool.toI1
 # CHECK: cond_br %[[FOUR_I1]], ^[[ELIF_TRUE:.*]], ^[[THEN]]
 
 # CHECK: ^[[ELIF_TRUE]]:
@@ -71,9 +70,8 @@ elif 4:
 else:
     7
 
-# CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: %[[THREE_BOOL:.*]] = py.bool %[[THREE]]
-# CHECK: %[[THREE_I1:.*]] = py.bool.toI1 %[[THREE_BOOL]]
+# __bool__ call...
+# CHECK: %[[THREE_I1:.*]] = py.bool.toI1
 # CHECK: cond_br %[[THREE_I1]], ^[[TRUE:.*]], ^[[ELIF:[[:alnum:]]+]]
 
 # CHECK: ^[[TRUE]]:
@@ -81,9 +79,8 @@ else:
 # CHECK: br ^[[THEN:[[:alnum:]]+]]
 
 # CHECK: ^[[ELIF]]:
-# CHECK: %[[FOUR:.*]] = py.constant #py.int<4>
-# CHECK: %[[FOUR_BOOL:.*]] = py.bool %[[FOUR]]
-# CHECK: %[[FOUR_I1:.*]] = py.bool.toI1 %[[FOUR_BOOL]]
+# __bool__ call...
+# CHECK: %[[FOUR_I1:.*]] = py.bool.toI1
 # CHECK: cond_br %[[FOUR_I1]], ^[[ELIF_TRUE:.*]], ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[ELIF_TRUE]]:
