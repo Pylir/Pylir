@@ -140,7 +140,7 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
     }];
 }
 
-def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem", [NoSideEffect]> {
+def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
     let arguments = (ins DynamicType:$tuple, IntegerLike:$index);
     let results = (outs DynamicType:$result);
 
@@ -154,7 +154,7 @@ def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem", [NoSideE
     }];
 }
 
-def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len", [NoSideEffect]> {
+def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len"> {
     let arguments = (ins DynamicType:$tuple);
     let results = (outs IntegerLike:$result);
 
@@ -195,7 +195,7 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple"> {
     }];
 }
 
-def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEffect]> {
+def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
     let arguments = (ins DynamicType:$function);
     let results = (outs PyFunctionType:$result);
 
@@ -208,7 +208,7 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEf
 
 // linear searches
 
-def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect]> {
+def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup"> {
     let arguments = (ins DynamicType:$mroTuple, StrAttr:$attribute);
     let results = (outs DynamicType:$result, I1:$success);
 
@@ -221,7 +221,7 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect]> {
     }];
 }
 
-def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction", [NoSideEffect]> {
+def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction"> {
     let arguments = (ins DynamicType:$callable);
     let results = (outs DynamicType:$result, I1:$success);
 
@@ -235,7 +235,7 @@ def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction", [NoSideEffect]> {
     }];
 }
 
-def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
+def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains"> {
     let arguments = (ins DynamicType:$mroTuple, DynamicType:$element);
     let results = (outs I1:$success);
 
@@ -481,7 +481,7 @@ def PylirPy_IsOp : PylirPy_BinOp<"is", [NoSideEffect, Commutative]> {
 
 // Conversions
 
-def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoSideEffect]> {
+def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1"> {
     let arguments = (ins DynamicType:$input);
     let results = (outs I1:$result);
 
