@@ -87,11 +87,12 @@ struct MakeExOpTupleExpansionRemove : TupleExpansionRemover<T>
     }
 };
 
-struct MakeTupleExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>
+template <class ExOp, class NormalOp>
+struct MakeExOpExceptionSimplifier : mlir::OpRewritePattern<ExOp>
 {
-    using mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>::OpRewritePattern;
+    using mlir::OpRewritePattern<ExOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::MakeTupleExOp op, mlir::PatternRewriter& rewriter) const override
+    mlir::LogicalResult matchAndRewrite(ExOp op, mlir::PatternRewriter& rewriter) const override
     {
         if (!op.iterExpansion().empty())
         {
@@ -100,61 +101,13 @@ struct MakeTupleExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp
         auto happyPath = op.happyPath();
         if (!happyPath->getSinglePredecessor())
         {
-            auto newOp = rewriter.replaceOpWithNewOp<pylir::Py::MakeTupleOp>(op, op.arguments(), op.iterExpansion());
+            auto newOp = rewriter.replaceOpWithNewOp<NormalOp>(op, op.arguments(), op.iterExpansion());
             rewriter.setInsertionPointAfter(newOp);
             rewriter.create<mlir::BranchOp>(newOp.getLoc(), happyPath);
             return mlir::success();
         }
-        rewriter.mergeBlockBefore(happyPath, op, op.normalDestOperands());
-        rewriter.replaceOpWithNewOp<pylir::Py::MakeTupleOp>(op, op.arguments(), op.iterExpansion());
-        return mlir::success();
-    }
-};
-
-struct MakeListExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeListExOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::MakeListExOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::MakeListExOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        if (!op.iterExpansion().empty())
-        {
-            return mlir::failure();
-        }
-        auto happyPath = op.happyPath();
-        if (!happyPath->getSinglePredecessor())
-        {
-            auto newOp = rewriter.replaceOpWithNewOp<pylir::Py::MakeListOp>(op, op.arguments(), op.iterExpansion());
-            rewriter.setInsertionPointAfter(newOp);
-            rewriter.create<mlir::BranchOp>(newOp.getLoc(), happyPath);
-            return mlir::success();
-        }
-        rewriter.mergeBlockBefore(happyPath, op, op.normalDestOperands());
-        rewriter.replaceOpWithNewOp<pylir::Py::MakeListOp>(op, op.arguments(), op.iterExpansion());
-        return mlir::success();
-    }
-};
-
-struct MakeSetExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeSetExOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::MakeSetExOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::MakeSetExOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        if (!op.iterExpansion().empty())
-        {
-            return mlir::failure();
-        }
-        auto happyPath = op.happyPath();
-        if (!happyPath->getSinglePredecessor())
-        {
-            auto newOp = rewriter.replaceOpWithNewOp<pylir::Py::MakeSetOp>(op, op.arguments(), op.iterExpansion());
-            rewriter.setInsertionPointAfter(newOp);
-            rewriter.create<mlir::BranchOp>(newOp.getLoc(), happyPath);
-            return mlir::success();
-        }
-        rewriter.mergeBlockBefore(happyPath, op, op.normalDestOperands());
-        rewriter.replaceOpWithNewOp<pylir::Py::MakeSetOp>(op, op.arguments(), op.iterExpansion());
+        rewriter.mergeBlocks(happyPath, op->getBlock(), op.normalDestOperands());
+        rewriter.replaceOpWithNewOp<NormalOp>(op, op.arguments(), op.iterExpansion());
         return mlir::success();
     }
 };
@@ -178,7 +131,7 @@ struct MakeDictExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeDictExOp>
             rewriter.create<mlir::BranchOp>(newOp.getLoc(), happyPath);
             return mlir::success();
         }
-        rewriter.mergeBlockBefore(happyPath, op, op.normalDestOperands());
+        rewriter.mergeBlocks(happyPath, op->getBlock(), op.normalDestOperands());
         rewriter.replaceOpWithNewOp<pylir::Py::MakeDictOp>(op, op.keys(), op.values(), op.mappingExpansion());
         return mlir::success();
     }
@@ -207,21 +160,21 @@ void pylir::Py::MakeTupleExOp::getCanonicalizationPatterns(::mlir::RewritePatter
                                                            ::mlir::MLIRContext* context)
 {
     results.add<MakeExOpTupleExpansionRemove<MakeTupleExOp>>(context);
-    results.add<MakeTupleExOpSimplifier>(context);
+    results.add<MakeExOpExceptionSimplifier<MakeTupleExOp, MakeTupleOp>>(context);
 }
 
 void pylir::Py::MakeListExOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
                                                           ::mlir::MLIRContext* context)
 {
-    results.add<MakeExOpTupleExpansionRemove<MakeTupleExOp>>(context);
-    results.add<MakeListExOpSimplifier>(context);
+    results.add<MakeExOpTupleExpansionRemove<MakeListExOp>>(context);
+    results.add<MakeExOpExceptionSimplifier<MakeListExOp, MakeListOp>>(context);
 }
 
 void pylir::Py::MakeSetExOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
                                                          ::mlir::MLIRContext* context)
 {
-    results.add<MakeExOpTupleExpansionRemove<MakeTupleExOp>>(context);
-    results.add<MakeSetExOpSimplifier>(context);
+    results.add<MakeExOpTupleExpansionRemove<MakeSetExOp>>(context);
+    results.add<MakeExOpExceptionSimplifier<MakeSetExOp, MakeSetOp>>(context);
 }
 
 void pylir::Py::MakeDictExOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
