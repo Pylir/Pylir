@@ -42,3 +42,18 @@ func @make_set_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: %[[CONST:.*]] = py.constant
 // CHECK: %[[RESULT:.*]] = py.makeSet (%[[CONST]], %[[ARG]])
 // CHECK: return %[[RESULT]]
+
+// -----
+
+func @make_tuple_op_constant(%arg0 : !py.dynamic) -> !py.dynamic {
+    %1 = py.constant #py.tuple<(#py.int<3>, "test")>
+    %2 = py.makeTuple (%arg0, *%1)
+    return %2 : !py.dynamic
+}
+
+// CHECK-LABEL: @make_tuple_op_constant
+// CHECK-SAME: %[[ARG:[[:alnum:]]+]]
+// CHECK: %[[CONST1:.*]] = py.constant #py.int<3>
+// CHECK: %[[CONST2:.*]] = py.constant "test"
+// CHECK: %[[RESULT:.*]] = py.makeTuple (%[[ARG]], %[[CONST1]], %[[CONST2]])
+// CHECK: return %[[RESULT]]

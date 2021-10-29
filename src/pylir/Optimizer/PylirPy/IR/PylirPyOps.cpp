@@ -23,22 +23,34 @@ struct TupleExpansionRemover : mlir::OpRewritePattern<T>
 
     mlir::LogicalResult match(T op) const final
     {
-        return mlir::success(llvm::any_of(op.getIterArgs(),
-                                          [&](const auto& variant)
-                                          {
-                                              auto* expansion = std::get_if<pylir::Py::IterExpansion>(&variant);
-                                              if (!expansion)
-                                              {
-                                                  return false;
-                                              }
-                                              return mlir::isa<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(
-                                                  expansion->value.getDefiningOp());
-                                          }));
+        return mlir::success(
+            llvm::any_of(op.getIterArgs(),
+                         [&](const auto& variant)
+                         {
+                             auto* expansion = std::get_if<pylir::Py::IterExpansion>(&variant);
+                             if (!expansion)
+                             {
+                                 return false;
+                             }
+                             auto definingOp = expansion->value.getDefiningOp();
+                             if (!definingOp)
+                             {
+                                 return false;
+                             }
+                             if (auto constant = mlir::dyn_cast<pylir::Py::ConstantOp>(definingOp))
+                             {
+                                 // TODO: StringAttr
+                                 return constant.constant()
+                                     .template isa<pylir::Py::ListAttr, pylir::Py::TupleAttr, pylir::Py::SetAttr>();
+                             }
+                             return mlir::isa<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(definingOp);
+                         }));
     }
 
 protected:
-    llvm::SmallVector<pylir::Py::IterArg> getNewExpansions(T op) const
+    llvm::SmallVector<pylir::Py::IterArg> getNewExpansions(T op, mlir::OpBuilder& builder) const
     {
+        builder.setInsertionPoint(op);
         llvm::SmallVector<pylir::Py::IterArg> currentArgs = op.getIterArgs();
         for (auto begin = currentArgs.begin(); begin != currentArgs.end();)
         {
@@ -56,6 +68,29 @@ protected:
                         begin = currentArgs.erase(begin);
                         begin = currentArgs.insert(begin, subRange.begin(), subRange.end());
                     })
+                .Case(
+                    [&](pylir::Py::ConstantOp constant)
+                    {
+                        llvm::TypeSwitch<mlir::Attribute>(constant.constant())
+                            .Case<pylir::Py::ListAttr, pylir::Py::SetAttr, pylir::Py::TupleAttr>(
+                                [&](auto attr)
+                                {
+                                    auto values = attr.getValue();
+                                    begin = currentArgs.erase(begin);
+                                    auto range = llvm::map_range(values,
+                                                                 [&](mlir::Attribute attribute)
+                                                                 {
+                                                                     return constant->getDialect()
+                                                                         ->materializeConstant(
+                                                                             builder, attribute,
+                                                                             builder.getType<pylir::Py::DynamicType>(),
+                                                                             op.getLoc())
+                                                                         ->getResult(0);
+                                                                 });
+                                    begin = currentArgs.insert(begin, range.begin(), range.end());
+                                })
+                            .Default([&](auto&&) { begin++; });
+                    })
                 .Default([&](auto&&) { begin++; });
         }
         return currentArgs;
@@ -69,7 +104,7 @@ struct MakeOpTupleExpansionRemove : TupleExpansionRemover<T>
 
     void rewrite(T op, mlir::PatternRewriter& rewriter) const override
     {
-        auto newArgs = this->getNewExpansions(op);
+        auto newArgs = this->getNewExpansions(op, rewriter);
         rewriter.replaceOpWithNewOp<T>(op, newArgs);
     }
 };
@@ -81,7 +116,7 @@ struct MakeExOpTupleExpansionRemove : TupleExpansionRemover<T>
 
     void rewrite(T op, mlir::PatternRewriter& rewriter) const override
     {
-        auto newArgs = this->getNewExpansions(op);
+        auto newArgs = this->getNewExpansions(op, rewriter);
         rewriter.replaceOpWithNewOp<T>(op, newArgs, op.happyPath(), op.normalDestOperands(), op.exceptionPath(),
                                        op.unwindDestOperands());
     }
