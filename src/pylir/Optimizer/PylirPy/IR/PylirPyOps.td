@@ -272,7 +272,7 @@ def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple", [DeclareOpInterfaceMethods
     }];
 
     let builders = [
-        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$args)>
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
     ];
 
     let hasFolder = 1;
@@ -287,6 +287,12 @@ def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple", [DeclareOpInterfaceMethods
         to be modified. If it contains objects that are mutable however, those may still be modified. This way one is
         capable of arguing about the tuple in a typical SSA fashion.
     }];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
+    }];
 }
 
 def PylirPy_MakeTupleExOp : PylirPy_MakeExOp<"makeTupleEx"> {
@@ -297,7 +303,7 @@ def PylirPy_MakeTupleExOp : PylirPy_MakeExOp<"makeTupleEx"> {
                          );
 
     let builders = [
-        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$args,
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
                        "mlir::Block*":$happyPath,
                        "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
@@ -305,10 +311,18 @@ def PylirPy_MakeTupleExOp : PylirPy_MakeExOp<"makeTupleEx"> {
          )>
     ];
 
+    let hasFolder = 1;
+
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict `\n`
         ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
                 `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
+    }];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
     }];
 }
 
@@ -322,8 +336,14 @@ def PylirPy_MakeListOp : PylirPy_MakeOp<"makeList",[DeclareOpInterfaceMethods<In
     }];
 
     let builders = [
-        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$values)>
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$values)>
     ];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
+    }];
 }
 
 def PylirPy_MakeListExOp : PylirPy_MakeExOp<"makeListEx"> {
@@ -334,7 +354,7 @@ def PylirPy_MakeListExOp : PylirPy_MakeExOp<"makeListEx"> {
                          );
 
     let builders = [
-        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$args,
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
                        "mlir::Block*":$happyPath,
                        "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
@@ -347,6 +367,12 @@ def PylirPy_MakeListExOp : PylirPy_MakeExOp<"makeListEx"> {
         ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
                 `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
     }];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
+    }];
 }
 
 def PylirPy_MakeSetOp : PylirPy_MakeOp<"makeSet",[DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
@@ -355,11 +381,17 @@ def PylirPy_MakeSetOp : PylirPy_MakeOp<"makeSet",[DeclareOpInterfaceMethods<Infe
                          );
 
     let builders = [
-        OpBuilder<(ins CArg<"const std::vector<::pylir::Py::IterArg>&","{}">:$values)>
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$values)>
     ];
 
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict
+    }];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
     }];
 }
 
@@ -371,7 +403,7 @@ def PylirPy_MakeSetExOp : PylirPy_MakeExOp<"makeSetEx"> {
                          );
 
     let builders = [
-        OpBuilder<(ins "const std::vector<::pylir::Py::IterArg>&":$args,
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
                        "mlir::Block*":$happyPath,
                        "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
@@ -383,6 +415,12 @@ def PylirPy_MakeSetExOp : PylirPy_MakeExOp<"makeSetEx"> {
         custom<IterArguments>($arguments, $iterExpansion) attr-dict `\n`
         ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
                 `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
+    }];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
     }];
 }
 
@@ -425,6 +463,8 @@ def PylirPy_MakeDictExOp : PylirPy_MakeExOp<"makeDictEx"> {
         ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
                 `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
     }];
+
+    let hasCanonicalizer = 1;
 }
 
 def PylirPy_MakeFuncOp : PylirPy_MakeOp<"makeFunc", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
