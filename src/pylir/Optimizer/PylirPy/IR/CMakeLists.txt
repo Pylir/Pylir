@@ -15,7 +15,7 @@ add_dependencies(mlir-headers PylirPyOpsIncGen)
 
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp)
 add_dependencies(PylirPyDialect PylirPyOpsIncGen)
-target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface MLIRStandard)
+target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PRIVATE MLIRStandard)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)
     target_link_libraries(PylirPyDialect PRIVATE COMMON_PCH)

@@ -1,13 +1,15 @@
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
+#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+
 #include "CodeGen.hpp"
 
 void pylir::CodeGen::createBuiltinsImpl()
 {
     auto noDefaultsFunctionDict = Py::DictAttr::get(
         m_builder.getContext(),
-        {{m_builder.getStringAttr("__defaults__"), m_builder.getSymbolRefAttr(Builtins::None.name)},
-         {m_builder.getStringAttr("__kwdefaults__"), m_builder.getSymbolRefAttr(Builtins::None.name)}});
+        {{m_builder.getStringAttr("__defaults__"), m_builder.getSymbolRefAttr(Py::Builtins::None.name)},
+         {m_builder.getStringAttr("__kwdefaults__"), m_builder.getSymbolRefAttr(Py::Builtins::None.name)}});
     auto loc = m_builder.getUnknownLoc();
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
@@ -30,7 +32,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
-                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function.name),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
                                     noDefaultsFunctionDict,
                                     m_builder.getSymbolRefAttr(buildFunctionCC(
                                         loc, "builtins.object.__new__$cc", newCall,
@@ -47,11 +49,11 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
             m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None.name)});
+                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
-                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function.name),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
                                     noDefaultsFunctionDict,
                                     m_builder.getSymbolRefAttr(
                                         buildFunctionCC(loc, "builtins.object.__init__$cc", initCall,
@@ -59,13 +61,13 @@ void pylir::CodeGen::createBuiltinsImpl()
         }
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::Object.name)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Py::Builtins::Object.name)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::GlobalValueOp>(loc, Builtins::Object.name, mlir::StringAttr{}, true,
+        m_builder.create<Py::GlobalValueOp>(loc, Py::Builtins::Object.name, mlir::StringAttr{}, true,
                                             Py::ObjectAttr::get(m_builder.getContext(),
-                                                                m_builder.getSymbolRefAttr(Builtins::Type.name), dict,
-                                                                llvm::None));
+                                                                m_builder.getSymbolRefAttr(Py::Builtins::Type.name),
+                                                                dict, llvm::None));
     }
     mlir::FuncOp baseExceptionNew;
     mlir::FuncOp baseExceptionInit;
@@ -91,7 +93,8 @@ void pylir::CodeGen::createBuiltinsImpl()
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
                 Py::ObjectAttr::get(
-                    m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function.name), noDefaultsFunctionDict,
+                    m_builder.getContext(), m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
+                    noDefaultsFunctionDict,
                     m_builder.getSymbolRefAttr(baseExceptionNew = buildFunctionCC(
                                                    loc, "builtins.BaseException.__new__$cc", newCall,
                                                    {FunctionParameter{"", FunctionParameter::PosOnly, false},
@@ -111,12 +114,13 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_builder.create<Py::SetAttrOp>(loc, args, self, "args");
             // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
             m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None.name)});
+                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
                 Py::ObjectAttr::get(
-                    m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function.name), noDefaultsFunctionDict,
+                    m_builder.getContext(), m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
+                    noDefaultsFunctionDict,
                     m_builder.getSymbolRefAttr(baseExceptionInit = buildFunctionCC(
                                                    loc, formImplName("builtins.BaseException.__init__$cc"), initCall,
                                                    {FunctionParameter{"", FunctionParameter::PosOnly, false},
@@ -124,45 +128,47 @@ void pylir::CodeGen::createBuiltinsImpl()
         }
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::BaseException.name),
-                                                        m_builder.getSymbolRefAttr(Builtins::Object.name)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name),
+                                                        m_builder.getSymbolRefAttr(Py::Builtins::Object.name)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::GlobalValueOp>(loc, Builtins::BaseException.name, mlir::StringAttr{}, true,
+        m_builder.create<Py::GlobalValueOp>(loc, Py::Builtins::BaseException.name, mlir::StringAttr{}, true,
                                             Py::ObjectAttr::get(m_builder.getContext(),
-                                                                m_builder.getSymbolRefAttr(Builtins::Type.name), dict,
-                                                                llvm::None));
+                                                                m_builder.getSymbolRefAttr(Py::Builtins::Type.name),
+                                                                dict, llvm::None));
     }
-    auto createExceptionSubclass = [&](const Builtins::Builtin& builtin, std::vector<Builtins::Builtin> bases)
+    auto createExceptionSubclass = [&](const Py::Builtins::Builtin& builtin, std::vector<Py::Builtins::Builtin> bases)
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         members.emplace_back(m_builder.getStringAttr("__new__"),
                              Py::ObjectAttr::get(m_builder.getContext(),
-                                                 m_builder.getSymbolRefAttr(Builtins::Function.name),
+                                                 m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
                                                  noDefaultsFunctionDict, m_builder.getSymbolRefAttr(baseExceptionNew)));
         std::vector<mlir::Attribute> attr(1 + bases.size());
         attr.front() = m_builder.getSymbolRefAttr(builtin.name);
         std::transform(bases.begin(), bases.end(), attr.begin() + 1,
-                       [this](const Builtins::Builtin& kind) { return m_builder.getSymbolRefAttr(kind.name); });
+                       [this](const Py::Builtins::Builtin& kind) { return m_builder.getSymbolRefAttr(kind.name); });
         members.emplace_back(m_builder.getStringAttr("__mro__"), Py::TupleAttr::get(m_builder.getContext(), attr));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
         m_builder.create<Py::GlobalValueOp>(loc, builtin.name, mlir::StringAttr{}, true,
                                             Py::ObjectAttr::get(m_builder.getContext(),
-                                                                m_builder.getSymbolRefAttr(Builtins::Type.name), dict,
-                                                                llvm::None));
+                                                                m_builder.getSymbolRefAttr(Py::Builtins::Type.name),
+                                                                dict, llvm::None));
     };
 
-    createExceptionSubclass(Builtins::Exception, {Builtins::BaseException, Builtins::Object});
-    createExceptionSubclass(Builtins::TypeError, {Builtins::Exception, Builtins::BaseException, Builtins::Object});
-    createExceptionSubclass(Builtins::NameError, {Builtins::Exception, Builtins::BaseException, Builtins::Object});
-    createExceptionSubclass(Builtins::UnboundLocalError,
-                            {Builtins::NameError, Builtins::Exception, Builtins::BaseException, Builtins::Object});
+    createExceptionSubclass(Py::Builtins::Exception, {Py::Builtins::BaseException, Py::Builtins::Object});
+    createExceptionSubclass(Py::Builtins::TypeError,
+                            {Py::Builtins::Exception, Py::Builtins::BaseException, Py::Builtins::Object});
+    createExceptionSubclass(Py::Builtins::NameError,
+                            {Py::Builtins::Exception, Py::Builtins::BaseException, Py::Builtins::Object});
+    createExceptionSubclass(Py::Builtins::UnboundLocalError, {Py::Builtins::NameError, Py::Builtins::Exception,
+                                                              Py::Builtins::BaseException, Py::Builtins::Object});
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         members.emplace_back(m_builder.getStringAttr("__new__"),
                              Py::ObjectAttr::get(m_builder.getContext(),
-                                                 m_builder.getSymbolRefAttr(Builtins::Function.name),
+                                                 m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
                                                  noDefaultsFunctionDict, m_builder.getSymbolRefAttr(baseExceptionNew)));
         {
             auto initCall = mlir::FuncOp::create(
@@ -189,19 +195,20 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_builder.create<mlir::BranchOp>(loc, continueBlock, mlir::ValueRange{firstElement});
 
             implementBlock(noneBlock);
-            auto none = m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None.name);
+            auto none = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name);
             m_builder.create<mlir::BranchOp>(loc, continueBlock, mlir::ValueRange{none});
 
             implementBlock(continueBlock);
             m_builder.create<Py::SetAttrOp>(loc, continueBlock->getArgument(0), self, "value");
             // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
             m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None.name)});
+                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
                 Py::ObjectAttr::get(
-                    m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function.name), noDefaultsFunctionDict,
+                    m_builder.getContext(), m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
+                    noDefaultsFunctionDict,
                     m_builder.getSymbolRefAttr(baseExceptionInit = buildFunctionCC(
                                                    loc, formImplName("builtins.StopIteration.__init__$cc"), initCall,
                                                    {FunctionParameter{"", FunctionParameter::PosOnly, false},
@@ -210,15 +217,15 @@ void pylir::CodeGen::createBuiltinsImpl()
 
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::Exception.name),
-                                                        m_builder.getSymbolRefAttr(Builtins::BaseException.name),
-                                                        m_builder.getSymbolRefAttr(Builtins::Object.name)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Py::Builtins::Exception.name),
+                                                        m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name),
+                                                        m_builder.getSymbolRefAttr(Py::Builtins::Object.name)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::GlobalValueOp>(loc, Builtins::StopIteration.name, mlir::StringAttr{}, true,
+        m_builder.create<Py::GlobalValueOp>(loc, Py::Builtins::StopIteration.name, mlir::StringAttr{}, true,
                                             Py::ObjectAttr::get(m_builder.getContext(),
-                                                                m_builder.getSymbolRefAttr(Builtins::Type.name), dict,
-                                                                llvm::None));
+                                                                m_builder.getSymbolRefAttr(Py::Builtins::Type.name),
+                                                                dict, llvm::None));
     }
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
@@ -231,11 +238,11 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             // TODO: probably disallow subclassing NoneType here
             m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Builtins::None.name)});
+                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
 
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
-                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function.name),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
                                     noDefaultsFunctionDict,
                                     m_builder.getSymbolRefAttr(
                                         buildFunctionCC(loc, "builtins.NoneType.__new__$cc", newCall,
@@ -243,31 +250,31 @@ void pylir::CodeGen::createBuiltinsImpl()
         }
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::NoneType.name),
-                                                        m_builder.getSymbolRefAttr(Builtins::Object.name)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Py::Builtins::NoneType.name),
+                                                        m_builder.getSymbolRefAttr(Py::Builtins::Object.name)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::GlobalValueOp>(loc, Builtins::NoneType.name, mlir::StringAttr{}, true,
+        m_builder.create<Py::GlobalValueOp>(loc, Py::Builtins::NoneType.name, mlir::StringAttr{}, true,
                                             Py::ObjectAttr::get(m_builder.getContext(),
-                                                                m_builder.getSymbolRefAttr(Builtins::Type.name), dict,
-                                                                llvm::None));
+                                                                m_builder.getSymbolRefAttr(Py::Builtins::Type.name),
+                                                                dict, llvm::None));
     }
-    m_builder.create<Py::GlobalValueOp>(loc, Builtins::None.name, mlir::StringAttr{}, true,
+    m_builder.create<Py::GlobalValueOp>(loc, Py::Builtins::None.name, mlir::StringAttr{}, true,
                                         Py::ObjectAttr::get(m_builder.getContext(),
-                                                            m_builder.getSymbolRefAttr(Builtins::NoneType.name),
+                                                            m_builder.getSymbolRefAttr(Py::Builtins::NoneType.name),
                                                             Py::DictAttr::get(m_builder.getContext(), {}), llvm::None));
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::Function.name),
-                                                        m_builder.getSymbolRefAttr(Builtins::Object.name)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
+                                                        m_builder.getSymbolRefAttr(Py::Builtins::Object.name)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::GlobalValueOp>(loc, Builtins::Function.name, mlir::StringAttr{}, true,
+        m_builder.create<Py::GlobalValueOp>(loc, Py::Builtins::Function.name, mlir::StringAttr{}, true,
                                             Py::ObjectAttr::get(m_builder.getContext(),
-                                                                m_builder.getSymbolRefAttr(Builtins::Type.name), dict,
-                                                                llvm::None));
+                                                                m_builder.getSymbolRefAttr(Py::Builtins::Type.name),
+                                                                dict, llvm::None));
     }
     {
         std::vector<std::pair<mlir::Attribute, mlir::Attribute>> members;
@@ -289,7 +296,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),
-                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Builtins::Function.name),
+                Py::ObjectAttr::get(m_builder.getContext(), m_builder.getSymbolRefAttr(Py::Builtins::Function.name),
                                     noDefaultsFunctionDict,
                                     m_builder.getSymbolRefAttr(
                                         buildFunctionCC(loc, "builtins.cell.__new__$cc", newCall,
@@ -298,13 +305,13 @@ void pylir::CodeGen::createBuiltinsImpl()
         }
         members.emplace_back(
             m_builder.getStringAttr("__mro__"),
-            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Builtins::Cell.name),
-                                                        m_builder.getSymbolRefAttr(Builtins::Object.name)}));
+            Py::TupleAttr::get(m_builder.getContext(), {m_builder.getSymbolRefAttr(Py::Builtins::Cell.name),
+                                                        m_builder.getSymbolRefAttr(Py::Builtins::Object.name)}));
 
         auto dict = Py::DictAttr::get(m_builder.getContext(), members);
-        m_builder.create<Py::GlobalValueOp>(loc, Builtins::Cell.name, mlir::StringAttr{}, true,
+        m_builder.create<Py::GlobalValueOp>(loc, Py::Builtins::Cell.name, mlir::StringAttr{}, true,
                                             Py::ObjectAttr::get(m_builder.getContext(),
-                                                                m_builder.getSymbolRefAttr(Builtins::Type.name), dict,
-                                                                llvm::None));
+                                                                m_builder.getSymbolRefAttr(Py::Builtins::Type.name),
+                                                                dict, llvm::None));
     }
 }

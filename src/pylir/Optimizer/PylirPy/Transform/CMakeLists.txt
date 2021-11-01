@@ -5,5 +5,5 @@ add_public_tablegen_target(PylirPyTransformPassIncGen)
 
 add_library(PylirPyTransforms ExpandPyDialect/ExpandPyDialect.cpp)
 add_dependencies(PylirPyTransforms PylirPyTransformPassIncGen)
-target_link_libraries(PylirPyTransforms PUBLIC PylirPyDialect PRIVATE MLIRPass MLIRTransforms)
+target_link_libraries(PylirPyTransforms PUBLIC PylirPyDialect MLIRPass PRIVATE MLIRTransforms PylirPyUtil MLIRStandard)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)

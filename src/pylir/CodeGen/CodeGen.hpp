@@ -16,24 +16,6 @@
 namespace pylir
 {
 
-namespace Builtins
-{
-
-struct Builtin
-{
-    std::string_view name;
-    bool isPublic;
-};
-
-#define BUILTIN(x, s, isPublic) constexpr Builtin x = {s, isPublic};
-#include "Builtins.def"
-
-constexpr std::array allBuiltins = {
-#define BUILTIN(x, ...) x,
-#include "Builtins.def"
-};
-} // namespace Builtins
-
 class CodeGen
 {
     mlir::OpBuilder m_builder;
@@ -167,19 +149,12 @@ class CodeGen
 
     void writeIdentifier(const IdentifierToken& token, mlir::Value value);
 
-    mlir::Value buildException(mlir::Location loc, std::string_view type, std::vector<Py::IterArg> args);
-
     void raiseException(mlir::Value exceptionObject);
-
-    mlir::Value buildCall(mlir::Location loc, mlir::Value callable, mlir::Value tuple, mlir::Value dict);
 
     mlir::Value buildSubclassCheck(mlir::Location loc, mlir::Value type, mlir::Value base);
 
     void buildTupleForEach(mlir::Location loc, mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,
                            llvm::function_ref<void(mlir::Value)> iterationCallback);
-
-    mlir::Value buildSpecialMethodCall(mlir::Location loc, llvm::Twine methodName, mlir::Value type, mlir::Value tuple,
-                                       mlir::Value dict);
 
     mlir::Value makeTuple(mlir::Location loc, const std::vector<Py::IterArg>& args);
 

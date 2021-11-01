@@ -1,9 +1,13 @@
 #include "ExpandPyDialect.hpp"
 
+#include <llvm/ADT/TypeSwitch.h>
+
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/Transform/PassDetail.hpp>
 
 namespace
@@ -22,8 +26,7 @@ struct GetFunctionPattern : mlir::OpRewritePattern<pylir::Py::GetFunctionOp>
         endBlock->addArgument(rewriter.getI1Type(), loc);
 
         rewriter.setInsertionPointToEnd(block);
-        auto func = rewriter.create<pylir::Py::GetGlobalValueOp>(
-            loc, /*TODO: find a proper place to put builtins for both mid and frontend*/ "builtins.function");
+        auto func = rewriter.create<pylir::Py::GetGlobalValueOp>(loc, pylir::Py::Builtins::Function.name);
         auto condition = new mlir::Block;
         condition->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
         rewriter.create<mlir::BranchOp>(loc, condition, mlir::ValueRange{op.callable()});
@@ -146,6 +149,157 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
     }
 };
 
+struct TupleUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::MakeTupleOp>::OpRewritePattern;
+
+    void rewrite(pylir::Py::MakeTupleOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        rewriter.setInsertionPoint(op);
+        auto list = rewriter.create<pylir::Py::MakeListOp>(op.getLoc(), op.arguments(), op.iterExpansion());
+        rewriter.replaceOpWithNewOp<pylir::Py::ListToTupleOp>(op, list);
+    }
+
+    mlir::LogicalResult match(pylir::Py::MakeTupleOp op) const override
+    {
+        return mlir::success(!op.iterExpansion().empty());
+    }
+};
+
+struct TupleExUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>::OpRewritePattern;
+
+    void rewrite(pylir::Py::MakeTupleExOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        rewriter.setInsertionPoint(op);
+        auto list = rewriter.create<pylir::Py::MakeListExOp>(op.getLoc(), op.arguments(), op.iterExpansion(),
+                                                             op.normalDestOperands(), op.unwindDestOperands(),
+                                                             op.happyPath(), op.exceptionPath());
+        rewriter.replaceOpWithNewOp<pylir::Py::ListToTupleOp>(op, list);
+    }
+
+    mlir::LogicalResult match(pylir::Py::MakeTupleExOp op) const override
+    {
+        return mlir::success(!op.iterExpansion().empty());
+    }
+};
+
+template <class TargetOp, class InsertOp, class NormalMakeOp = TargetOp>
+struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
+{
+    using mlir::OpRewritePattern<TargetOp>::OpRewritePattern;
+
+    constexpr static bool hasExceptions = std::disjunction_v<std::is_same<TargetOp, pylir::Py::MakeListExOp>,
+                                                             std::is_same<TargetOp, pylir::Py::MakeSetExOp>>;
+
+    void rewrite(TargetOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        mlir::Block* exceptionPath = nullptr;
+        if constexpr (hasExceptions)
+        {
+            exceptionPath = op.exceptionPath();
+        }
+        auto block = op->getBlock();
+        auto dest = block->splitBlock(op);
+        rewriter.setInsertionPointToEnd(block);
+        auto loc = op.getLoc();
+        auto range = op.iterExpansion().template getAsRange<mlir::IntegerAttr>();
+        PYLIR_ASSERT(!range.empty());
+        auto begin = range.begin();
+        auto prefix = op.getOperands().take_front(begin->getValue().getZExtValue());
+        auto list = rewriter.create<NormalMakeOp>(loc, prefix, rewriter.getI32ArrayAttr({}));
+        for (auto iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), begin->getValue().getZExtValue()))
+        {
+            if (begin == range.end() || begin->getValue() != iter.index())
+            {
+                rewriter.create<InsertOp>(loc, list, iter.value());
+                continue;
+            }
+            begin++;
+            auto type = rewriter.create<pylir::Py::TypeOfOp>(loc, iter.value());
+            auto iterObject = pylir::Py::buildSpecialMethodCall(
+                loc, rewriter, "__iter__", type,
+                rewriter.create<pylir::Py::MakeTupleOp>(loc, std::vector<pylir::Py::IterArg>{iter.value()}),
+                rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext(), {})),
+                exceptionPath);
+
+            auto typeMRO = rewriter.create<pylir::Py::GetAttrOp>(loc, type, "__mro__").result();
+            auto nextMethod = rewriter.create<pylir::Py::MROLookupOp>(loc, typeMRO, "__next__");
+            auto notNextBlock = new mlir::Block;
+            auto condition = new mlir::Block;
+            rewriter.create<mlir::CondBranchOp>(loc, nextMethod.success(), condition, notNextBlock);
+
+            {
+                notNextBlock->insertBefore(dest);
+                rewriter.setInsertionPointToStart(notNextBlock);
+                auto exception =
+                    pylir::Py::buildException(loc, rewriter, pylir::Py::Builtins::TypeError.name, {}, exceptionPath);
+                if (exceptionPath)
+                {
+                    rewriter.create<mlir::BranchOp>(loc, exceptionPath, exception);
+                }
+                else
+                {
+                    rewriter.create<pylir::Py::RaiseOp>(loc, exception);
+                }
+            }
+
+            condition->insertBefore(dest);
+            rewriter.setInsertionPointToStart(condition);
+            auto exceptionHandler = new mlir::Block;
+            exceptionHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>());
+            auto next = pylir::Py::buildCall(
+                loc, rewriter, nextMethod.result(),
+                rewriter.create<pylir::Py::MakeTupleOp>(loc, std::vector<pylir::Py::IterArg>{iterObject}),
+                rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext(), {})),
+                exceptionHandler);
+
+            rewriter.create<InsertOp>(loc, list, next);
+            rewriter.create<mlir::BranchOp>(loc, condition);
+
+            exceptionHandler->insertBefore(dest);
+            rewriter.setInsertionPointToStart(exceptionHandler);
+            auto exception = exceptionHandler->getArgument(0);
+            auto exceptionType = rewriter.create<pylir::Py::TypeOfOp>(loc, exception);
+            auto stopIteration =
+                rewriter.create<pylir::Py::GetGlobalValueOp>(loc, pylir::Py::Builtins::StopIteration.name);
+            auto mro = rewriter.create<pylir::Py::GetAttrOp>(loc, exceptionType, "__mro__").result();
+            auto isStopIteration = rewriter.create<pylir::Py::LinearContainsOp>(loc, mro, stopIteration);
+            auto reraiseBlock = new mlir::Block;
+            auto exitBlock = new mlir::Block;
+            rewriter.create<mlir::CondBranchOp>(loc, isStopIteration, exitBlock, reraiseBlock);
+
+            reraiseBlock->insertBefore(dest);
+            rewriter.setInsertionPointToStart(reraiseBlock);
+            if (exceptionPath)
+            {
+                rewriter.create<mlir::BranchOp>(loc, exceptionPath, exception);
+            }
+            else
+            {
+                rewriter.create<pylir::Py::RaiseOp>(loc, exception);
+            }
+
+            exitBlock->insertBefore(dest);
+            rewriter.setInsertionPointToStart(exitBlock);
+        }
+        rewriter.create<mlir::BranchOp>(loc, dest);
+
+        if constexpr (hasExceptions)
+        {
+            rewriter.setInsertionPointAfter(op);
+            rewriter.template create<mlir::BranchOp>(loc, op.happyPath());
+        }
+        rewriter.replaceOp(op, {list});
+    }
+
+    mlir::LogicalResult match(TargetOp op) const override
+    {
+        return mlir::success(!op.iterExpansion().empty());
+    }
+};
+
 struct ExpandPyDialectPass : public pylir::Py::ExpandPyDialectBase<ExpandPyDialectPass>
 {
     void runOnFunction() override;
@@ -160,11 +314,12 @@ void ExpandPyDialectPass::runOnFunction()
                                  pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>(
         [](mlir::Operation* op) -> bool
         {
-            if (mlir::isa<pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>(op))
-            {
-                return op->getAttrOfType<mlir::ArrayAttr>("mappingExpansion").empty();
-            }
-            return op->getAttrOfType<mlir::ArrayAttr>("iterExpansion").empty();
+            return llvm::TypeSwitch<mlir::Operation*, bool>(op)
+                .Case<pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>([](auto op)
+                                                                      { return op.mappingExpansion().empty(); })
+                .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListOp, pylir::Py::MakeListExOp,
+                      pylir::Py::MakeSetOp, pylir::Py::MakeSetExOp>([](auto op) { return op.iterExpansion().empty(); })
+                .Default(false);
         });
     target.addIllegalOp<pylir::Py::MakeClassOp, pylir::Py::LinearContainsOp, pylir::Py::GetFunctionOp,
                         pylir::Py::MROLookupOp>();
@@ -173,6 +328,11 @@ void ExpandPyDialectPass::runOnFunction()
     patterns.add<LinearContainsPattern>(&getContext());
     patterns.add<MROLookupPattern>(&getContext());
     patterns.add<GetFunctionPattern>(&getContext());
+    patterns.add<TupleUnrollPattern>(&getContext());
+    patterns.add<TupleExUnrollPattern>(&getContext());
+    patterns.add<SequenceUnrollPattern<pylir::Py::MakeListOp, pylir::Py::ListAppendOp>>(&getContext());
+    patterns.add<SequenceUnrollPattern<pylir::Py::MakeListExOp, pylir::Py::ListAppendOp, pylir::Py::MakeListOp>>(
+        &getContext());
     if (mlir::failed(mlir::applyPartialConversion(getFunction(), target, std::move(patterns))))
     {
         signalPassFailure();
