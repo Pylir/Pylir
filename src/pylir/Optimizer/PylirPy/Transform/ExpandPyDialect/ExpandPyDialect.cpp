@@ -1,14 +1,14 @@
 #include "ExpandPyDialect.hpp"
 
-#include <llvm/ADT/TypeSwitch.h>
-
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/Transforms/DialectConversion.h>
 
+#include <llvm/ADT/TypeSwitch.h>
+
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/Transform/PassDetail.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
 namespace
 {
@@ -207,11 +207,11 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
         auto range = op.iterExpansion().template getAsRange<mlir::IntegerAttr>();
         PYLIR_ASSERT(!range.empty());
         auto begin = range.begin();
-        auto prefix = op.getOperands().take_front(begin->getValue().getZExtValue());
+        auto prefix = op.getOperands().take_front((*begin).getValue().getZExtValue());
         auto list = rewriter.create<NormalMakeOp>(loc, prefix, rewriter.getI32ArrayAttr({}));
-        for (auto iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), begin->getValue().getZExtValue()))
+        for (auto iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), (*begin).getValue().getZExtValue()))
         {
-            if (begin == range.end() || begin->getValue() != iter.index())
+            if (begin == range.end() || (*begin).getValue() != iter.index())
             {
                 rewriter.create<InsertOp>(loc, list, iter.value());
                 continue;
