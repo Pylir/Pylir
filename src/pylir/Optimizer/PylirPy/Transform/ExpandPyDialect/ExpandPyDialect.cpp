@@ -284,12 +284,20 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             exitBlock->insertBefore(dest);
             rewriter.setInsertionPointToStart(exitBlock);
         }
-        rewriter.create<mlir::BranchOp>(loc, dest);
+        rewriter.mergeBlocks(dest, rewriter.getBlock());
 
         if constexpr (hasExceptions)
         {
             rewriter.setInsertionPointAfter(op);
-            rewriter.template create<mlir::BranchOp>(loc, op.happyPath());
+            mlir::Block* happyPath = op.happyPath();
+            if (!happyPath->getSinglePredecessor())
+            {
+                rewriter.template create<mlir::BranchOp>(loc, happyPath);
+            }
+            else
+            {
+                rewriter.mergeBlocks(happyPath, op->getBlock(), op.normalDestOperands());
+            }
         }
         rewriter.replaceOp(op, {list});
     }
