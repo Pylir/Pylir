@@ -1,12 +1,13 @@
 #include "Passes.hpp"
 
+#include "PassDetail.hpp"
+
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Transform/PassDetail.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
