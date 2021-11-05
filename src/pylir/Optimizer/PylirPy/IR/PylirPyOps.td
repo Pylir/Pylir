@@ -140,7 +140,7 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
     }];
 }
 
-def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
+def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple, IntegerLike:$index);
     let results = (outs DynamicType:$result);
 
@@ -154,7 +154,7 @@ def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem"> {
     }];
 }
 
-def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len"> {
+def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple);
     let results = (outs IntegerLike:$result);
 
@@ -195,7 +195,7 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple"> {
     }];
 }
 
-def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
+def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEffect]> {
     let arguments = (ins DynamicType:$function);
     let results = (outs PyFunctionType:$result);
 
@@ -208,7 +208,7 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction"> {
 
 // linear searches
 
-def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup"> {
+def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect]> {
     let arguments = (ins DynamicType:$mroTuple, StrAttr:$attribute);
     let results = (outs DynamicType:$result, I1:$success);
 
@@ -222,7 +222,7 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup"> {
 }
 
 def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction"> {
-    let arguments = (ins DynamicType:$callable);
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$callable);
     let results = (outs DynamicType:$result, I1:$success);
 
     let assemblyFormat = "$callable attr-dict";
@@ -235,7 +235,7 @@ def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction"> {
     }];
 }
 
-def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains"> {
+def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
     let arguments = (ins DynamicType:$mroTuple, DynamicType:$element);
     let results = (outs I1:$success);
 
@@ -521,7 +521,7 @@ def PylirPy_IsOp : PylirPy_BinOp<"is", [NoSideEffect, Commutative]> {
 
 // Conversions
 
-def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1"> {
+def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoSideEffect]> {
     let arguments = (ins DynamicType:$input);
     let results = (outs I1:$result);
 
@@ -661,15 +661,6 @@ def PylirPy_IsUnboundValueOp : PylirPy_Op<"isUnboundValue", [NoSideEffect]> {
     let assemblyFormat = "$value attr-dict";
 
     let hasFolder = 1;
-}
-
-def PylirPy_IsUnboundHandleOp : PylirPy_Op<"isUnboundHandle", [NoSideEffect]> {
-    let summary = "checks whether the handle is unbound";
-
-    let arguments = (ins HandleType:$handle);
-    let results = (outs I1:$result);
-
-    let assemblyFormat = "$handle attr-dict";
 }
 
 // Exception handling

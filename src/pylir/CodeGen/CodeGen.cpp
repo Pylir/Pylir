@@ -964,7 +964,8 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             return getAttrOp.result();
         }
     }
-    auto condition = m_builder.create<Py::IsUnboundHandleOp>(loc, handle);
+    auto load = m_builder.create<Py::LoadOp>(loc, handle);
+    auto condition = m_builder.create<Py::IsUnboundValueOp>(loc, load);
     auto unbound = BlockPtr{};
     auto found = BlockPtr{};
     m_builder.create<mlir::CondBranchOp>(loc, condition, unbound, found);
@@ -986,10 +987,9 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     implementBlock(found);
     if (!m_classNamespace)
     {
-        return m_builder.create<Py::LoadOp>(loc, handle);
+        return load;
     }
-    m_builder.create<mlir::BranchOp>(loc, classNamespaceFound,
-                                     mlir::ValueRange{m_builder.create<Py::LoadOp>(loc, handle)});
+    m_builder.create<mlir::BranchOp>(loc, classNamespaceFound, mlir::ValueRange{load});
 
     implementBlock(classNamespaceFound);
     return classNamespaceFound->getArgument(0);
