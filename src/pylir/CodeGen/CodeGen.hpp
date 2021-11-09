@@ -4,6 +4,9 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OwningOpRef.h>
 
+#include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/DenseMap.h>
+
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Parser/Syntax.hpp>
@@ -11,6 +14,7 @@
 #include <pylir/Support/ValueReset.hpp>
 
 #include <tuple>
+#include <stack>
 #include <unordered_map>
 
 namespace pylir
@@ -54,25 +58,43 @@ class CodeGen
 
     void executeFinallyBlocks(bool fullUnwind = false);
 
-    enum Kind
-    {
-        Global,
-        StackAlloc,
-        Cell
-    };
-
     struct Identifier
     {
-        Kind kind;
-        mlir::PointerUnion<mlir::Value, mlir::Operation*> op;
+        enum Kind
+        {
+            Global = 0,
+            StackAlloc = 1,
+            Cell = 2
+        };
+        using DefinitionMap = llvm::DenseMap<mlir::Block*, mlir::Value>;
+        std::variant<mlir::Operation*, DefinitionMap, mlir::Value> kind;
     };
 
-    using ScopeContainer = std::vector<std::unordered_map<std::string_view, Identifier>>;
-    ScopeContainer m_scope{1};
-
-    std::unordered_map<std::string_view, Identifier>& getCurrentScope()
+    struct Scope
     {
-        return m_scope.back();
+        std::unordered_map<std::string_view, Identifier> identifiers;
+        // Opposite of sealed blocks. Blocks are assumed to be sealed unless contained in here
+        llvm::DenseMap<mlir::Block*, std::vector<Identifier::DefinitionMap * PYLIR_NON_NULL>> openBlocks;
+    };
+
+    Scope m_globalScope;
+    std::stack<Scope> m_scope;
+
+    void markOpenBlock(mlir::Block* block);
+
+    void sealBlock(mlir::Block* block);
+
+    mlir::Value tryRemoveTrivialBlockArgument(mlir::BlockArgument argument);
+
+    mlir::Value addBlockArguments(Identifier::DefinitionMap& map, mlir::BlockArgument argument);
+
+    mlir::Value readVariable(Identifier::DefinitionMap& map, mlir::Block* block);
+
+    mlir::Value readVariableRecursive(Identifier::DefinitionMap& map, mlir::Block* block);
+
+    Scope& getCurrentScope()
+    {
+        return m_scope.empty() ? m_globalScope : m_scope.top();
     }
 
     class BlockPtr

@@ -22,6 +22,4 @@ def foo():
 # CHECK-LABEL: func private @"foo$impl[0]"
 
 # CHECK: %[[FIVE:.*]] = py.constant #py.int<5>
-# CHECK: py.store %[[FIVE]] into %[[TYPE_ERROR:[[:alnum:]]+]]
-# CHECK: %[[VALUE:.*]] = py.load %[[TYPE_ERROR]]
-# CHECK: return %[[VALUE]]
+# CHECK: return %[[FIVE]]

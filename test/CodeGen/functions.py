@@ -25,8 +25,6 @@ def foo():
 # CHECK-LABEL: func private @"foo$impl[0]"
 
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: py.store %[[THREE]] into %{{.*}}
-
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK: %[[ONE:.*]] = py.constant #py.int<1>
 # CHECK: %[[C:.*]] = py.constant "c"
@@ -41,16 +39,11 @@ def foo():
 # CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
 # CHECK: %[[CLOSURE:.*]] = py.getGlobalValue @builtins.None
 # CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
-# CHECK: py.store %[[RES]] into %{{.*}}
 
 # CHECK: func private @"foo.<locals>.bar$impl[0]"
 # CHECK-SAME: %{{[[:alnum:]]+}}
 # CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 # CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-# CHECK: %[[a:.*]] = py.alloc
-# CHECK: py.store %[[ARG0]] into %[[a]]
-# CHECK: %[[c:.*]] = py.alloc
-# CHECK: py.store %[[ARG1]] into %[[c]]
 
 # CHECK: func private @"foo.<locals>.bar$cc[0]"
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
