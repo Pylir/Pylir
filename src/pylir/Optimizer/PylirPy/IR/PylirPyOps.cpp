@@ -252,7 +252,7 @@ llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute>
                          result.insert(result.end(), attr.getValue().begin(), attr.getValue().end());
                          return true;
                      })
-                 //TODO: string attr
+                 // TODO: string attr
                  .Default(false))
         {
             return llvm::None;
@@ -305,6 +305,23 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     if (operands[0])
     {
         return mlir::BoolAttr::get(getContext(), operands[0].isa<Py::UnboundAttr>());
+    }
+    if (auto blockArg = value().dyn_cast<mlir::BlockArgument>(); blockArg)
+    {
+        if (blockArg.getOwner()->isEntryBlock())
+        {
+            return mlir::BoolAttr::get(getContext(), false);
+        }
+        return nullptr;
+    }
+    // For now we are sanctioning all the Ops in the Py dialect with the exception of LoadOp, they can never
+    // produce an unbound op. Others will have to be manually sanctioned. TODO: Probably want to have a trait for this
+    if (auto* op = value().getDefiningOp();
+        op
+        && (op->getDialect() == this->getOperation()->getDialect() || mlir::isa<mlir::CallOp, mlir::CallIndirectOp>(op))
+        && !mlir::isa<Py::LoadOp>(op))
+    {
+        return mlir::BoolAttr::get(getContext(), false);
     }
     return nullptr;
 }
