@@ -12,7 +12,6 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 def DynamicType : TypeAlias<PylirPy_DynamicType>;
-def HandleType : TypeAlias<PylirPy_HandleType>;
 def PyFunctionType : Type<
     And<[
         FunctionType.predicate,
@@ -584,19 +583,6 @@ def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
     }];
 }
 
-def PylirPy_GetGlobalHandleOp : PylirPy_Op<"getGlobalHandle", [NoSideEffect,
-                                                               DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-    let arguments = (ins FlatSymbolRefAttr:$name);
-    let results = (outs HandleType:$handle);
-
-    let assemblyFormat = "$name attr-dict";
-
-    let description = [{
-        This op converts a `globalHandle` op referenced by the symbol into a handle usable by py.store and py.load
-        instructions.
-    }];
-}
-
 def PylirPy_GetGlobalValueOp : PylirPy_Op<"getGlobalValue", [NoSideEffect,
                                                              DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$name);
@@ -609,24 +595,12 @@ def PylirPy_GetGlobalValueOp : PylirPy_Op<"getGlobalValue", [NoSideEffect,
     }];
 }
 
-def PylirPy_AllocaOp : PylirPy_Op<"alloca"> {
-    let arguments = (ins );
-    let results = (outs Res<HandleType, "the allocated memory", [MemAlloc<AutomaticAllocationScopeResource>]>:$handle);
-
-    let assemblyFormat = "attr-dict `:` type($handle)";
-
-    let description = [{
-        This op creates a handle that is valid in the current allocation scope and allows you to bind objects to it.
-        By default it is created in an unbound state.
-    }];
-}
-
 // Memory access Operation
 
-def PylirPy_StoreOp : PylirPy_Op<"store"> {
+def PylirPy_StoreOp : PylirPy_Op<"store", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "store operation";
 
-    let arguments = (ins DynamicType:$value, Arg<HandleType, "the handle to store to", [MemWrite]>:$handle);
+    let arguments = (ins DynamicType:$value, FlatSymbolRefAttr:$handle);
     let results = (outs);
 
     let assemblyFormat = [{
@@ -639,10 +613,10 @@ def PylirPy_StoreOp : PylirPy_Op<"store"> {
     }];
 }
 
-def PylirPy_LoadOp : PylirPy_Op<"load"> {
+def PylirPy_LoadOp : PylirPy_Op<"load", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "load operation";
 
-    let arguments = (ins Arg<HandleType, "the handle to load from", [MemRead]>:$handle);
+    let arguments = (ins FlatSymbolRefAttr:$handle);
 
     let assemblyFormat = "$handle attr-dict";
 

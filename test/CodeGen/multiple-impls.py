@@ -11,12 +11,10 @@ def foo():
     x = 2
 
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo$cc[0]"
-# CHECK: %[[FOO:.*]] = py.getGlobalHandle @foo
-# CHECK: py.store %[[RES]] into %[[FOO]]
+# CHECK: py.store %[[RES]] into @foo
 
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo$cc[1]"
-# CHECK: %[[FOO:.*]] = py.getGlobalHandle @foo
-# CHECK: py.store %[[RES]] into %[[FOO]]
+# CHECK: py.store %[[RES]] into @foo
 
 # CHECK-DAG: func private @"foo$impl[0]"
 # CHECK-DAG: func private @"foo$impl[1]"

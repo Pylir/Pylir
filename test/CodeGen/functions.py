@@ -13,8 +13,7 @@
 # CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
 # CHECK: %[[CLOSURE:.*]] = py.getGlobalValue @builtins.None
 # CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
-# CHECK: %[[FOO:.*]] = py.getGlobalHandle @foo
-# CHECK: py.store %[[RES]] into %[[FOO]]
+# CHECK: py.store %[[RES]] into @foo
 
 def foo():
     x = 3

@@ -572,9 +572,14 @@ mlir::LogicalResult pylir::Py::GetGlobalValueOp::verifySymbolUses(::mlir::Symbol
     return verifySymbolUse<Py::GlobalValueOp>(*this, name(), symbolTable);
 }
 
-mlir::LogicalResult pylir::Py::GetGlobalHandleOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, name(), symbolTable);
+    return verifySymbolUse<Py::GlobalHandleOp>(*this, handle(), symbolTable);
+}
+
+mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return verifySymbolUse<Py::GlobalHandleOp>(*this, handle(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)

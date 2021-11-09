@@ -5,14 +5,14 @@
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Parser/Visitor.hpp>
-#include <pylir/Support/ValueReset.hpp>
 #include <pylir/Support/Functional.hpp>
+#include <pylir/Support/ValueReset.hpp>
 
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
@@ -879,11 +879,7 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
 
     pylir::match(
         result->second.kind,
-        [&](mlir::Operation* global)
-        {
-            auto handle = m_builder.create<Py::GetGlobalHandleOp>(loc, m_builder.getSymbolRefAttr(global));
-            m_builder.create<Py::StoreOp>(loc, value, handle);
-        },
+        [&](mlir::Operation* global) { m_builder.create<Py::StoreOp>(loc, value, m_builder.getSymbolRefAttr(global)); },
         [&](mlir::Value cell) { m_builder.create<Py::SetAttrOp>(loc, value, cell, "cell_contents"); },
         [&](Identifier::DefinitionMap& localMap) { localMap[m_builder.getBlock()] = value; });
 }
@@ -941,18 +937,13 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     switch (result->second.kind.index())
     {
         case Identifier::Global:
-        {
-            auto handle = m_builder.create<Py::GetGlobalHandleOp>(
+            loadedValue = m_builder.create<Py::LoadOp>(
                 loc, m_builder.getSymbolRefAttr(pylir::get<mlir::Operation*>(result->second.kind)));
-            loadedValue = m_builder.create<Py::LoadOp>(loc, handle);
             break;
-        }
         case Identifier::StackAlloc:
-        {
             loadedValue =
                 readVariable(pylir::get<Identifier::DefinitionMap>(result->second.kind), m_builder.getBlock());
             break;
-        }
         case Identifier::Cell:
         {
             auto getAttrOp =

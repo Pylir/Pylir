@@ -34,7 +34,7 @@ def outer():
 # CHECK: cond_br %[[FOUND]], ^[[DICT_FOUND:.*]](%[[ITEM]] : !py.dynamic), ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[ELSE]]:
-# CHECK: py.getGlobalHandle @x
+# CHECK: py.load @x
 # ...
 # CHECK: br ^[[DICT_FOUND]]
 

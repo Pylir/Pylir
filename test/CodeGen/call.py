@@ -6,16 +6,14 @@ global x
 
 x()
 
-# CHECK: %[[X:.*]] = py.getGlobalHandle @x
-# CHECK: %[[X_LOADED:.*]] = py.load %[[X]]
+# CHECK: %[[X_LOADED:.*]] = py.load @x
 # CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple ()
 # CHECK-DAG: %[[DICT:.*]] = py.makeDict ()
 # CHECK: call_indirect %{{.*}}(%{{.*}}, %[[TUPLE]], %[[DICT]])
 
 x(5, k=3)
 
-# CHECK: %[[X:.*]] = py.getGlobalHandle @x
-# CHECK: %[[X_LOADED:.*]] = py.load %[[X]]
+# CHECK: %[[X_LOADED:.*]] = py.load @x
 # CHECK: %[[FIVE:.*]] = py.constant #py.int<5>
 # CHECK: %[[K:.*]] = py.constant "k"
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
@@ -26,8 +24,7 @@ x(5, k=3)
 
 x(*(), **{})
 
-# CHECK: %[[X:.*]] = py.getGlobalHandle @x
-# CHECK: %[[X_LOADED:.*]] = py.load %[[X]]
+# CHECK: %[[X_LOADED:.*]] = py.load @x
 # CHECK: %[[ARG1:.*]] = py.makeTuple ()
 # CHECK: %[[ARG2:.*]] = py.makeDict ()
 # CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (*%[[ARG1]])

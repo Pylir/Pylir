@@ -6,10 +6,8 @@ object
 
 # CHECK: py.getGlobalValue @builtins.object
 
-# CHECK: %[[HANDLE:.*]] = py.getGlobalHandle @BaseException
-# CHECK: %[[VALUE:.*]] = py.load %[[HANDLE]]
-# CHECK: %[[X:.*]] = py.getGlobalHandle @x
-# CHECK: py.store %[[VALUE]] into %[[X]]
+# CHECK: %[[VALUE:.*]] = py.load @BaseException
+# CHECK: py.store %[[VALUE]] into @x
 x = BaseException
 
 BaseException = True

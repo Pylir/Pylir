@@ -12,9 +12,4 @@ def PylirPy_DynamicType : PylirPy_Type<"Dynamic"> {
     let summary = "dynamic type";
 }
 
-def PylirPy_HandleType : PylirPy_Type<"Handle"> {
-    let mnemonic = "handle";
-    let summary = "handle type";
-}
-
 #endif

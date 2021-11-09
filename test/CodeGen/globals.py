@@ -8,14 +8,12 @@
 x = 2
 
 # CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<2>
-# CHECK-DAG: %[[X:.*]] = py.getGlobalHandle @x
-# CHECK: py.store %[[VALUE]] into %[[X]]
+# CHECK: py.store %[[VALUE]] into @x
 
 x
 
 
-# CHECK: %[[X:.*]] = py.getGlobalHandle @x
-# CHECK: py.load %[[X]]
+# CHECK: py.load @x
 
 def foo():
     global y
@@ -25,10 +23,8 @@ def foo():
 (z := 3)
 
 # CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<3>
-# CHECK-DAG: %[[Z:.*]] = py.getGlobalHandle @z
-# CHECK: py.store %[[VALUE]] into %[[Z]]
+# CHECK: py.store %[[VALUE]] into @z
 
 # CHECK-LABEL: func private @"foo$impl[0]"
 # CHECK: %[[VALUE:.*]] = py.constant #py.int<3>
-# CHECK: %[[Y:.*]] = py.getGlobalHandle @y
-# CHECK: py.store %[[VALUE]] into %[[Y]]
+# CHECK: py.store %[[VALUE]] into @y
