@@ -223,6 +223,34 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return constant();
 }
 
+mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                               ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    if (!operands[0])
+    {
+        return mlir::failure();
+    }
+    auto object = operands[0].dyn_cast<Py::ObjectAttr>();
+    if (!object)
+    {
+        // Is this where poison values would go lol
+        results.emplace_back(Py::UnboundAttr::get(getContext()));
+        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+        return mlir::success();
+    }
+    auto array = object.getAttributes().getValue();
+    auto result = std::find_if(array.begin(), array.end(), [&](auto pair) { return pair.first == attributeAttr(); });
+    if (result == array.end())
+    {
+        results.emplace_back(Py::UnboundAttr::get(getContext()));
+        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+        return mlir::success();
+    }
+    results.emplace_back(result->second);
+    results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+    return mlir::success();
+}
+
 namespace
 {
 template <class Attr>

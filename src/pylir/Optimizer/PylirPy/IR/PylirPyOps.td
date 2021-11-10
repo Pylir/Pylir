@@ -69,6 +69,8 @@ def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {
         and failure is indicated by `$success`. The result of the operation is put into `$result`. `$success` is 1
         if the attribute was found, 0 else. Reading `$result` is undefined behaviour if `$success` is 0.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
