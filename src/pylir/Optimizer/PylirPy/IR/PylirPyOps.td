@@ -99,6 +99,9 @@ def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect]> {
     let description = [{
         Retrieves the type of the object. This will always be an instance of `builtins.type` or a subclass.
     }];
+
+    let hasFolder = 1;
+    let hasCanonicalizeMethod = 1;
 }
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {

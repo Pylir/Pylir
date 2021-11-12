@@ -8,6 +8,7 @@
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Text.hpp>
 #include <pylir/Support/Variant.hpp>
@@ -248,6 +249,49 @@ mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribut
     }
     results.emplace_back(result->second);
     results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+    return mlir::success();
+}
+
+mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
+{
+    if (auto objectAttr = operands[0].dyn_cast<Py::ObjectAttr>())
+    {
+        return objectAttr.getType();
+    }
+    if (auto makeObjectOp = object().getDefiningOp<Py::MakeObjectOp>())
+    {
+        return makeObjectOp.typeObj();
+    }
+    return nullptr;
+}
+
+mlir::LogicalResult pylir::Py::TypeOfOp::canonicalize(TypeOfOp op, ::mlir::PatternRewriter& rewriter)
+{
+    auto* defOp = op.object().getDefiningOp();
+    if (!defOp)
+    {
+        return mlir::failure();
+    }
+    auto symbol = llvm::TypeSwitch<mlir::Operation*, mlir::FlatSymbolRefAttr>(op)
+                      .Case(
+                          [&](Py::ConstantOp constantOp)
+                          {
+                              return llvm::TypeSwitch<mlir::Attribute, mlir::FlatSymbolRefAttr>(constantOp.constant())
+                                  .Case([&](Py::IntAttr) { return rewriter.getSymbolRefAttr(Builtins::Int.name); })
+                                  .Case([&](Py::BoolAttr) { return rewriter.getSymbolRefAttr(Builtins::Bool.name); })
+                                  .Case([&](Py::TupleAttr) { return rewriter.getSymbolRefAttr(Builtins::Tuple.name); })
+                                  .Case([&](Py::ListAttr) { return rewriter.getSymbolRefAttr(Builtins::List.name); })
+                                  //TODO: .Case([&](Py::SetAttr) { return rewriter.getSymbolRefAttr(Builtins::Set.name); })
+                                  .Case([&](Py::DictAttr) { return rewriter.getSymbolRefAttr(Builtins::Dict.name); })
+                                  .Case([&](mlir::FloatAttr) { return rewriter.getSymbolRefAttr(Builtins::Float.name); })
+                                  .Default({});
+                          })
+                      .Default({});
+    if (!symbol)
+    {
+        return mlir::failure();
+    }
+    rewriter.replaceOpWithNewOp<Py::GetGlobalValueOp>(op, symbol);
     return mlir::success();
 }
 
