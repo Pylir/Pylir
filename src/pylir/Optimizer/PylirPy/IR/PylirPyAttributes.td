@@ -5,7 +5,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "mlir/IR/SubElementInterfaces.td"
 
-class AnyAttrOf<list<Attr> allowedAttrs, string summary = "", string cppClassName = "::mlir::Attribute"> : Attr<
+class AnyAttrOf<list<AttrConstraint> allowedAttrs, string summary = "", string cppClassName = "::mlir::Attribute"> : Attr<
     Or<!foreach(allowedAttr,allowedAttrs,allowedAttr.predicate)>,
     !if(!eq(summary, ""),
             !interleave(!foreach(t, allowedAttrs, t.summary), " or "),
@@ -102,6 +102,7 @@ def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
 }
 
 def AnyPyAttribute : AnyAttrOf<[PylirPy_IntAttr, PylirPy_BoolAttr, F64Attr, PylirPy_ListAttr, PylirPy_TupleAttr,
-                                PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, PylirPy_ObjectAttr, PylirPy_UnboundAttr]>;
+                                PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, PylirPy_ObjectAttr, PylirPy_UnboundAttr,
+                                ReferToOp<"::pylir::Py::GlobalValueOp">]>;
 
 #endif

@@ -9,7 +9,7 @@ func @get_function(%callable : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @get_function
 // CHECK-SAME: %[[CALLABLE:[[:alnum:]]+]]
-// CHECK: %[[FUNCTION:.*]] = py.getGlobalValue @builtins.function
+// CHECK: %[[FUNCTION:.*]] = py.constant @builtins.function
 // CHECK: br ^[[CONDITION:[[:alnum:]]+]]
 // CHECK-SAME: %[[CALLABLE]]
 

@@ -7,6 +7,8 @@
 #include "PylirPyOps.hpp"
 #include "PylirPyTypes.hpp"
 
+#include <mlir/Dialect/StandardOps/IR/Ops.h>
+
 void pylir::Py::PylirPyDialect::initialize()
 {
     addOperations<
@@ -23,10 +25,13 @@ void pylir::Py::PylirPyDialect::initialize()
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
                                                                 ::mlir::Type type, ::mlir::Location loc)
 {
-    if (&value.getDialect() == this || (value.isa<mlir::FloatAttr>() && value.getType().isa<mlir::Float64Type>())
-        || value.isa<mlir::StringAttr>())
+    if (type.isa<Py::DynamicType>())
     {
         return builder.create<Py::ConstantOp>(loc, type, value);
+    }
+    else if (mlir::ConstantOp::isBuildableWith(value, type))
+    {
+        return builder.create<mlir::ConstantOp>(loc, type, value);
     }
     return nullptr;
 }

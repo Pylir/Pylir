@@ -21,7 +21,7 @@ def bar(param):
         return 0
 
 # CHECK-LABEL: func private @"bar$impl[0]"
-# CHECK: %[[TYPE_ERROR:.*]] = py.getGlobalValue @builtins.TypeError
+# CHECK: %[[TYPE_ERROR:.*]] = py.constant @builtins.TypeError
 # CHECK: %[[NEW_METHOD:.*]], %{{.*}} = py.getAttr "__new__" from %[[TYPE_ERROR]]
 # CHECK: %[[NEW_METHOD_PTR:.*]] = py.function.getFunction %[[NEW_METHOD]]
 # CHECK: %[[EXCEPTION:.*]] = call_indirect %[[NEW_METHOD_PTR]]
@@ -31,8 +31,8 @@ def bar(param):
 # CHECK: ^[[EXCEPTION_HANDLER]](
 # CHECK-SAME: %[[EXCEPTION:[[:alnum:]]+]]
 
-# CHECK: %[[MATCHING:.*]] = py.getGlobalValue @builtins.TypeError
-# CHECK: %[[TUPLE_TYPE:.*]] = py.getGlobalValue @builtins.tuple
+# CHECK: %[[MATCHING:.*]] = py.constant @builtins.TypeError
+# CHECK: %[[TUPLE_TYPE:.*]] = py.constant @builtins.tuple
 # CHECK: %[[MATCHING_TYPE:.*]] = py.typeOf %[[MATCHING]]
 # CHECK: %[[IS_TUPLE:.*]] = py.is %[[MATCHING_TYPE]], %[[TUPLE_TYPE]]
 # CHECK: cond_br %[[IS_TUPLE]], ^[[TUPLE_BLOCK:.*]], ^[[EXCEPTION_BLOCK:[[:alnum:]]+]]

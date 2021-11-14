@@ -7,11 +7,11 @@
 # CHECK: py.setAttr "__name__" of %[[RES]] to %[[NAME]]
 # CHECK: %[[NAME:.*]] = py.constant "foo"
 # CHECK: py.setAttr "__qualname__" of %[[RES]] to %[[NAME]]
-# CHECK: %[[DEFAULTS:.*]] = py.getGlobalValue @builtins.None
+# CHECK: %[[DEFAULTS:.*]] = py.constant @builtins.None
 # CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
-# CHECK: %[[KWDEFAULTS:.*]] = py.getGlobalValue @builtins.None
+# CHECK: %[[KWDEFAULTS:.*]] = py.constant @builtins.None
 # CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
-# CHECK: %[[CLOSURE:.*]] = py.getGlobalValue @builtins.None
+# CHECK: %[[CLOSURE:.*]] = py.constant @builtins.None
 # CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
 # CHECK: py.store %[[RES]] into @foo
 
@@ -36,7 +36,7 @@ def foo():
 # CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
 # CHECK: %[[KWDEFAULTS:.*]] = py.makeDict (%[[C]] : %[[ONE]])
 # CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
-# CHECK: %[[CLOSURE:.*]] = py.getGlobalValue @builtins.None
+# CHECK: %[[CLOSURE:.*]] = py.constant @builtins.None
 # CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
 
 # CHECK: func private @"foo.<locals>.bar$impl[0]"

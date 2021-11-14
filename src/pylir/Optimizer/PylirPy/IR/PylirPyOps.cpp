@@ -254,45 +254,49 @@ mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribut
 
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
-    if (auto objectAttr = operands[0].dyn_cast<Py::ObjectAttr>())
+    if (operands[0])
     {
-        return objectAttr.getType();
+        auto result =
+            llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(operands[0])
+                .Case([&](Py::IntAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Int.name); })
+                .Case([&](Py::BoolAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
+                .Case([&](Py::TupleAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name); })
+                .Case([&](Py::ListAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::List.name); })
+                // TODO: .Case([&](Py::SetAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name);
+                // })
+                .Case([&](Py::DictAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Dict.name); })
+                .Case([&](mlir::FloatAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Float.name); })
+                .Case([&](Py::ObjectAttr attr) { return attr.getType(); })
+                .Default({});
+        if (result)
+        {
+            return result;
+        }
     }
-    if (auto makeObjectOp = object().getDefiningOp<Py::MakeObjectOp>())
-    {
-        return makeObjectOp.typeObj();
-    }
-    return nullptr;
-}
-
-mlir::LogicalResult pylir::Py::TypeOfOp::canonicalize(TypeOfOp op, ::mlir::PatternRewriter& rewriter)
-{
-    auto* defOp = op.object().getDefiningOp();
+    auto* defOp = object().getDefiningOp();
     if (!defOp)
     {
-        return mlir::failure();
+        return nullptr;
     }
-    auto symbol = llvm::TypeSwitch<mlir::Operation*, mlir::FlatSymbolRefAttr>(op)
-                      .Case(
-                          [&](Py::ConstantOp constantOp)
-                          {
-                              return llvm::TypeSwitch<mlir::Attribute, mlir::FlatSymbolRefAttr>(constantOp.constant())
-                                  .Case([&](Py::IntAttr) { return rewriter.getSymbolRefAttr(Builtins::Int.name); })
-                                  .Case([&](Py::BoolAttr) { return rewriter.getSymbolRefAttr(Builtins::Bool.name); })
-                                  .Case([&](Py::TupleAttr) { return rewriter.getSymbolRefAttr(Builtins::Tuple.name); })
-                                  .Case([&](Py::ListAttr) { return rewriter.getSymbolRefAttr(Builtins::List.name); })
-                                  //TODO: .Case([&](Py::SetAttr) { return rewriter.getSymbolRefAttr(Builtins::Set.name); })
-                                  .Case([&](Py::DictAttr) { return rewriter.getSymbolRefAttr(Builtins::Dict.name); })
-                                  .Case([&](mlir::FloatAttr) { return rewriter.getSymbolRefAttr(Builtins::Float.name); })
-                                  .Default({});
-                          })
-                      .Default({});
+    auto symbol =
+        llvm::TypeSwitch<mlir::Operation*, mlir::OpFoldResult>(defOp)
+            .Case([&](Py::MakeObjectOp op) { return op.typeObj(); })
+            .Case<Py::ListToTupleOp, Py::MakeTupleOp, Py::MakeTupleExOp>(
+                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name); })
+            .Case<Py::MakeListOp, Py::MakeListExOp>(
+                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::List.name); })
+            //.Case<Py::MakeSetOp, Py::MakeSetExOp>(
+            //    [](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name); })
+            .Case<Py::MakeDictOp, Py::MakeDictExOp>(
+                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Dict.name); })
+            .Case([&](Py::MakeFuncOp) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
+            .Case([&](Py::BoolFromI1Op) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
+            .Default({});
     if (!symbol)
     {
-        return mlir::failure();
+        return nullptr;
     }
-    rewriter.replaceOpWithNewOp<Py::GetGlobalValueOp>(op, symbol);
-    return mlir::success();
+    return symbol;
 }
 
 namespace
@@ -398,20 +402,15 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     return nullptr;
 }
 
-mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
+mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (operands[0] && operands[1] && operands[0] == operands[1])
     {
-        auto lhsGlobal = lhs().getDefiningOp<Py::GetGlobalValueOp>();
-        auto rhsGlobal = rhs().getDefiningOp<Py::GetGlobalValueOp>();
-        if (lhsGlobal && rhsGlobal)
-        {
-            return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1),
-                                          rhsGlobal.name() == lhsGlobal.name());
-        }
+        return mlir::BoolAttr::get(getContext(), true);
     }
     if (lhs() == rhs())
     {
-        return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1), true);
+        return mlir::BoolAttr::get(getContext(), true);
     }
     {
         auto lhsEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(lhs().getDefiningOp());
@@ -419,7 +418,7 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
         if (lhsEffect && rhsEffect && lhsEffect.hasEffect<mlir::MemoryEffects::Allocate>()
             && rhsEffect.hasEffect<mlir::MemoryEffects::Allocate>())
         {
-            return mlir::IntegerAttr::get(mlir::IntegerType::get(getContext(), 1), false);
+            return mlir::BoolAttr::get(getContext(), false);
         }
     }
     return nullptr;
@@ -655,11 +654,6 @@ mlir::LogicalResult verifySymbolUse(mlir::Operation* op, llvm::StringRef name, m
     return mlir::success();
 }
 } // namespace
-
-mlir::LogicalResult pylir::Py::GetGlobalValueOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
-{
-    return verifySymbolUse<Py::GlobalValueOp>(*this, name(), symbolTable);
-}
 
 mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {

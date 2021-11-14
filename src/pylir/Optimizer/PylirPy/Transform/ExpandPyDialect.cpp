@@ -27,7 +27,8 @@ struct GetFunctionPattern : mlir::OpRewritePattern<pylir::Py::GetFunctionOp>
         endBlock->addArgument(rewriter.getI1Type(), loc);
 
         rewriter.setInsertionPointToEnd(block);
-        auto func = rewriter.create<pylir::Py::GetGlobalValueOp>(loc, pylir::Py::Builtins::Function.name);
+        auto func =
+            rewriter.create<pylir::Py::ConstantOp>(loc, rewriter.getSymbolRefAttr(pylir::Py::Builtins::Function.name));
         auto condition = new mlir::Block;
         condition->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
         rewriter.create<mlir::BranchOp>(loc, condition, mlir::ValueRange{op.callable()});
@@ -263,8 +264,8 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             rewriter.setInsertionPointToStart(exceptionHandler);
             auto exception = exceptionHandler->getArgument(0);
             auto exceptionType = rewriter.create<pylir::Py::TypeOfOp>(loc, exception);
-            auto stopIteration =
-                rewriter.create<pylir::Py::GetGlobalValueOp>(loc, pylir::Py::Builtins::StopIteration.name);
+            auto stopIteration = rewriter.create<pylir::Py::ConstantOp>(
+                loc, rewriter.getSymbolRefAttr(pylir::Py::Builtins::StopIteration.name));
             auto mro = rewriter.create<pylir::Py::GetAttrOp>(loc, exceptionType, "__mro__").result();
             auto isStopIteration = rewriter.create<pylir::Py::LinearContainsOp>(loc, mro, stopIteration);
             auto reraiseBlock = new mlir::Block;

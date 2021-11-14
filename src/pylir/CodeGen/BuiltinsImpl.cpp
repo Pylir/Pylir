@@ -48,8 +48,8 @@ void pylir::CodeGen::createBuiltinsImpl()
             auto reset = implementFunction(initCall);
 
             // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
-            m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{m_builder.create<Py::ConstantOp>(
+                                                      loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name))});
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
@@ -113,8 +113,8 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             m_builder.create<Py::SetAttrOp>(loc, args, self, "args");
             // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
-            m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{m_builder.create<Py::ConstantOp>(
+                                                      loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name))});
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
@@ -195,14 +195,14 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_builder.create<mlir::BranchOp>(loc, continueBlock, mlir::ValueRange{firstElement});
 
             implementBlock(noneBlock);
-            auto none = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name);
+            auto none = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
             m_builder.create<mlir::BranchOp>(loc, continueBlock, mlir::ValueRange{none});
 
             implementBlock(continueBlock);
             m_builder.create<Py::SetAttrOp>(loc, continueBlock->getArgument(0), self, "value");
             // __init__ may only return None: https://docs.python.org/3/reference/datamodel.html#object.__init__
-            m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{m_builder.create<Py::ConstantOp>(
+                                                      loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name))});
 
             members.emplace_back(
                 m_builder.getStringAttr("__init__"),
@@ -237,8 +237,8 @@ void pylir::CodeGen::createBuiltinsImpl()
             auto reset = implementFunction(newCall);
 
             // TODO: probably disallow subclassing NoneType here
-            m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{m_builder.create<Py::ConstantOp>(
+                                                      loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name))});
 
             members.emplace_back(
                 m_builder.getStringAttr("__new__"),

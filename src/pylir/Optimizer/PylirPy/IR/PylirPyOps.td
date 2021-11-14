@@ -101,7 +101,6 @@ def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect]> {
     }];
 
     let hasFolder = 1;
-    let hasCanonicalizeMethod = 1;
 }
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
@@ -585,18 +584,6 @@ def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
 
     let description = [{
         This op creates a global handle to which objects can be bound. By default it is unbound.
-    }];
-}
-
-def PylirPy_GetGlobalValueOp : PylirPy_Op<"getGlobalValue", [NoSideEffect,
-                                                             DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-    let arguments = (ins FlatSymbolRefAttr:$name);
-    let results = (outs DynamicType:$value);
-
-    let assemblyFormat = "$name attr-dict";
-
-    let description = [{
-        This op converts a `globalValue` op referenced by the symbol into a value usable by normal instructions
     }];
 }
 

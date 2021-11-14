@@ -4,7 +4,7 @@
 
 object
 
-# CHECK: py.getGlobalValue @builtins.object
+# CHECK: py.constant @builtins.object
 
 # CHECK: %[[VALUE:.*]] = py.load @BaseException
 # CHECK: py.store %[[VALUE]] into @x

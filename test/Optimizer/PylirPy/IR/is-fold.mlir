@@ -31,8 +31,8 @@ py.globalValue const @one = #py.int<0>
 // CHECK: %[[RES:.*]] = py.constant #py.bool<True>
 // CHECK: return %[[RES]]
 func @singletons() -> !py.dynamic {
-    %0 = py.getGlobalValue @one
-    %1 = py.getGlobalValue @one
+    %0 = py.constant @one
+    %1 = py.constant @one
     %2 = py.is %0, %1
     %3 = py.bool.fromI1 %2
     return %3 : !py.dynamic

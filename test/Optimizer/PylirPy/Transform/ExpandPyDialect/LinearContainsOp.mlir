@@ -3,7 +3,7 @@
 py.globalValue const @one = #py.int<1>
 
 func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
-    %0 = py.getGlobalValue @one
+    %0 = py.constant @one
     %1 = py.linearContains %0 in %tuple
     %2 = py.bool.fromI1 %1
     return %2 : !py.dynamic
@@ -11,7 +11,7 @@ func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @linear_search
 // CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
-// CHECK: %[[ONE:.*]] = py.getGlobalValue @one
+// CHECK: %[[ONE:.*]] = py.constant @one
 // CHECK: %[[TUPLE_LEN:.*]] = py.tuple.integer.len %[[TUPLE]]
 // CHECK: %[[ZERO:.*]] = constant 0
 // CHECK: br ^[[CONDITION:[[:alnum:]]+]]

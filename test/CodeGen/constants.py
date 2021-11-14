@@ -18,4 +18,4 @@ False
 # CHECK: constant #py.bool<False>
 
 None
-# CHECK: py.getGlobalValue @builtins.None
+# CHECK: py.constant @builtins.None

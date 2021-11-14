@@ -136,7 +136,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO: attach __cause__ and __context__
             auto loc = getLoc(raiseStmt, raiseStmt.raise);
             auto typeOf = m_builder.create<Py::TypeOfOp>(loc, expression);
-            auto typeObject = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::Type.name);
+            auto typeObject =
+                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Type.name));
             auto isTypeSubclass = buildSubclassCheck(loc, typeOf, typeObject);
             BlockPtr isType, instanceBlock;
             instanceBlock->addArgument(m_builder.getType<Py::DynamicType>());
@@ -145,7 +146,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
 
             {
                 implementBlock(isType);
-                auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::BaseException.name);
+                auto baseException =
+                    m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
                 auto isBaseException = buildSubclassCheck(loc, expression, baseException);
                 BlockPtr typeError, createException;
                 m_builder.create<mlir::CondBranchOp>(loc, isBaseException, createException, typeError);
@@ -166,7 +168,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
 
             implementBlock(instanceBlock);
             typeOf = m_builder.create<Py::TypeOfOp>(loc, instanceBlock->getArgument(0));
-            auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::BaseException.name);
+            auto baseException =
+                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
             auto isBaseException = buildSubclassCheck(loc, typeOf, baseException);
             BlockPtr typeError, raiseBlock;
             m_builder.create<mlir::CondBranchOp>(loc, isBaseException, raiseBlock, typeError);
@@ -187,7 +190,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             if (!returnStmt.expressions)
             {
                 executeFinallyBlocks(false);
-                auto none = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name);
+                auto none = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
                 m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{none});
                 m_builder.clearInsertionPoint();
                 return;
@@ -911,7 +914,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     {
         if (auto builtin = m_builtinNamespace.find(identifierToken.getValue()); builtin != m_builtinNamespace.end())
         {
-            auto builtinValue = m_builder.create<Py::GetGlobalValueOp>(loc, builtin->second);
+            auto builtinValue = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(builtin->second));
             if (!m_classNamespace)
             {
                 return builtinValue;
@@ -1033,7 +1036,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     return m_builder.create<Py::ConstantOp>(location, Py::BoolAttr::get(m_builder.getContext(), false));
                 }
                 case TokenType::NoneKeyword:
-                    return m_builder.create<Py::GetGlobalValueOp>(location, Py::Builtins::None.name);
+                    return m_builder.create<Py::ConstantOp>(location,
+                                                            m_builder.getSymbolRefAttr(Py::Builtins::None.name));
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -1075,7 +1079,7 @@ mlir::Value pylir::CodeGen::toBool(mlir::Location loc, mlir::Value value)
         loc, m_builder, "__bool__", type, tuple,
         m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})), m_currentExceptBlock);
     auto typeOfResult = m_builder.create<Py::TypeOfOp>(loc, maybeBool);
-    auto booleanType = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::Bool.name);
+    auto booleanType = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Bool.name));
     auto isBool = m_builder.create<Py::IsOp>(loc, typeOfResult, booleanType);
     BlockPtr isBoolBlock, typeErrorBlock;
     m_builder.create<mlir::CondBranchOp>(loc, isBool, isBoolBlock, typeErrorBlock);
@@ -1419,7 +1423,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
         implementBlock(exceptionHandler);
         auto exception = exceptionHandler->getArgument(0);
         auto exceptionType = m_builder.create<Py::TypeOfOp>(loc, exception);
-        auto stopIteration = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::StopIteration.name);
+        auto stopIteration =
+            m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::StopIteration.name));
         auto isStopIteration = buildSubclassCheck(loc, exceptionType, stopIteration);
         BlockPtr reraiseBlock, exitBlock;
         m_builder.create<mlir::CondBranchOp>(loc, isStopIteration, exitBlock, reraiseBlock);
@@ -1540,7 +1545,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             //       a finally section
             writeIdentifier(iter.expression->second->second, exceptionHandler->getArgument(0));
         }
-        auto tupleType = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::Tuple.name);
+        auto tupleType = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Tuple.name));
         auto isTuple = m_builder.create<Py::IsOp>(loc, m_builder.create<Py::TypeOfOp>(loc, value), tupleType);
         auto tupleBlock = BlockPtr{};
         auto exceptionBlock = BlockPtr{};
@@ -1551,7 +1556,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         {
             implementBlock(exceptionBlock);
             // TODO: check value is a type
-            auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::BaseException.name);
+            auto baseException =
+                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
             auto isSubclass = buildSubclassCheck(loc, value, baseException);
             BlockPtr raiseBlock;
             BlockPtr noTypeErrorBlock;
@@ -1568,7 +1574,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         }
         {
             implementBlock(tupleBlock);
-            auto baseException = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::BaseException.name);
+            auto baseException =
+                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
             BlockPtr noTypeErrorsBlock;
             buildTupleForEach(loc, value, noTypeErrorsBlock, {},
                               [&](mlir::Value entry)
@@ -1803,7 +1810,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         {
             if (funcDef.closures.count(name))
             {
-                auto closureType = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::Cell.name);
+                auto closureType =
+                    m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Cell.name));
                 auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType, value});
                 auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
                 auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
@@ -1828,7 +1836,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
         for (auto& iter : closures)
         {
-            auto closureType = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::Cell.name);
+            auto closureType =
+                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Cell.name));
             auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType});
             auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
             auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
@@ -1855,8 +1864,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         visit(*funcDef.suite);
         if (needsTerminator())
         {
-            m_builder.create<mlir::ReturnOp>(
-                loc, mlir::ValueRange{m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name)});
+            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{m_builder.create<Py::ConstantOp>(
+                                                      loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name))});
         }
         func = buildFunctionCC(loc, formImplName(qualifiedName + "$cc"), func, functionParameters);
     }
@@ -1870,7 +1879,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         mlir::Value defaults;
         if (defaultParameters.empty())
         {
-            defaults = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name);
+            defaults = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
         }
         else
         {
@@ -1882,7 +1891,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         mlir::Value kwDefaults;
         if (keywordOnlyDefaultParameters.empty())
         {
-            kwDefaults = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name);
+            kwDefaults = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
         }
         else
         {
@@ -1894,7 +1903,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         mlir::Value closure;
         if (usedClosures.empty())
         {
-            closure = m_builder.create<Py::GetGlobalValueOp>(loc, Py::Builtins::None.name);
+            closure = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
         }
         else
         {
