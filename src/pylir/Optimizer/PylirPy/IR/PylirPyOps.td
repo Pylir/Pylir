@@ -169,6 +169,8 @@ def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len", [NoSideEffect]> 
         This op returns the length of `$tuple` as the given integer type. If `$tuple` is not really a tuple (or a
         subclass of) then the behaviour of is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
