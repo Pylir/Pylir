@@ -7,8 +7,8 @@ global x
 x()
 
 # CHECK: %[[X_LOADED:.*]] = py.load @x
-# CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple ()
-# CHECK-DAG: %[[DICT:.*]] = py.makeDict ()
+# CHECK: %[[TUPLE:.*]] = py.makeTuple ()
+# CHECK: %[[DICT:.*]] = py.constant #py.dict<{}>
 # CHECK: call_indirect %{{.*}}(%{{.*}}, %[[TUPLE]], %[[DICT]])
 
 x(5, k=3)

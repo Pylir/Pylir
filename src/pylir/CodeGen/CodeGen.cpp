@@ -843,15 +843,24 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
             }
             auto [tuple, keywords] = pylir::match(
                 call.variant,
-                [&](std::monostate) -> std::pair<mlir::Value, mlir::Value> {
-                    return {m_builder.create<Py::MakeTupleOp>(loc), m_builder.create<Py::MakeDictOp>(loc)};
+                [&](std::monostate) -> std::pair<mlir::Value, mlir::Value>
+                {
+                    return {m_builder.create<Py::MakeTupleOp>(loc),
+                            m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}))};
                 },
                 [&](const std::pair<Syntax::ArgumentList, std::optional<BaseToken>>& pair)
                     -> std::pair<mlir::Value, mlir::Value> { return visit(pair.first); },
                 [&](const std::unique_ptr<Syntax::Comprehension>& comprehension) -> std::pair<mlir::Value, mlir::Value>
                 {
-                    // TODO:
-                    PYLIR_UNREACHABLE;
+                    auto list = m_builder.create<Py::MakeListOp>(loc);
+                    visit<Py::ListAppendOp>(list, *comprehension);
+                    if (!m_builder.getInsertionBlock())
+                    {
+                        return {};
+                    }
+                    auto tuple = m_builder.create<Py::ListToTupleOp>(loc, list);
+                    return {tuple,
+                            m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}))};
                 });
             if (!tuple || !keywords)
             {
@@ -1112,10 +1121,16 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
                 listDisplay.variant,
                 [&](std::monostate) -> mlir::Value { return m_builder.create<Py::MakeListOp>(loc); },
                 [&](const Syntax::StarredList& list) -> mlir::Value { return visit<&CodeGen::makeList>(list); },
-                [&](const Syntax::Comprehension&) -> mlir::Value
+                [&](const Syntax::Comprehension& comprehension) -> mlir::Value
                 {
-                    // TODO:
-                    PYLIR_UNREACHABLE;
+                    auto loc = getLoc(comprehension, comprehension.assignmentExpression);
+                    auto list = m_builder.create<Py::MakeListOp>(loc);
+                    visit<Py::ListAppendOp>(list, comprehension);
+                    if (!m_builder.getInsertionBlock())
+                    {
+                        return {};
+                    }
+                    return list;
                 });
         },
         [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> mlir::Value
@@ -1350,14 +1365,10 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     }
 }
 
-void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
+void pylir::CodeGen::visitForConstruct(mlir::Location loc, const Syntax::TargetList& targets, mlir::Value iterable,
+                                       llvm::function_ref<void()> execSuite,
+                                       const std::optional<Syntax::IfStmt::Else>& elseSection)
 {
-    auto iterable = visit(forStmt.expressionList);
-    if (!iterable)
-    {
-        return;
-    }
-    auto loc = getLoc(forStmt, forStmt.forKeyword);
     auto type = m_builder.create<Py::TypeOfOp>(loc, iterable);
 
     auto iterObject = Py::buildSpecialMethodCall(
@@ -1395,9 +1406,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
                               m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})),
                               m_currentExceptBlock);
     reset.reset();
-    assignTarget(forStmt.targetList, next);
+    assignTarget(targets, next);
     mlir::Block* elseBlock;
-    if (forStmt.elseSection)
+    if (elseSection)
     {
         elseBlock = new mlir::Block;
     }
@@ -1411,7 +1422,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
     implementBlock(body);
     std::optional exit = pylir::ValueReset(m_currentLoop);
     m_currentLoop = {thenBlock, condition};
-    visit(*forStmt.suite);
+    execSuite();
     if (needsTerminator())
     {
         m_builder.create<mlir::BranchOp>(loc, condition);
@@ -1440,11 +1451,83 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
         return;
     }
     implementBlock(elseBlock);
-    visit(*forStmt.elseSection->suite);
+    visit(*elseSection->suite);
     if (needsTerminator())
     {
         m_builder.create<mlir::BranchOp>(loc, thenBlock);
     }
+}
+
+void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
+{
+    auto iterable = visit(forStmt.expressionList);
+    if (!iterable)
+    {
+        return;
+    }
+    auto loc = getLoc(forStmt, forStmt.forKeyword);
+    visitForConstruct(
+        loc, forStmt.targetList, iterable, [&] { visit(*forStmt.suite); }, forStmt.elseSection);
+}
+
+template <class InsertOp>
+void pylir::CodeGen::visit(mlir::Value container, const Syntax::AssignmentExpression& iteration,
+                           const Syntax::CompFor& compFor)
+{
+    auto loc = getLoc(compFor, compFor.forToken);
+    auto iterable = visit(compFor.orTest);
+    if (!iterable)
+    {
+        return;
+    }
+    visitForConstruct(loc, compFor.targets, iterable,
+                      [&]
+                      {
+                          pylir::match(
+                              compFor.compIter,
+                              [&](std::monostate)
+                              {
+                                  auto value = visit(iteration);
+                                  m_builder.create<InsertOp>(value.getLoc(), container, value);
+                              },
+                              [&](const std::unique_ptr<Syntax::CompFor>& compFor)
+                              { visit<InsertOp>(container, iteration, *compFor); },
+                              [&](const std::unique_ptr<Syntax::CompIf>& compIf)
+                              { visit<InsertOp>(container, iteration, *compIf); });
+                      });
+}
+
+template <class InsertOp>
+void pylir::CodeGen::visit(mlir::Value container, const Syntax::AssignmentExpression& iteration,
+                           const Syntax::CompIf& compIf)
+{
+    auto condition = visit(compIf.orTest);
+    if (!condition)
+    {
+        return;
+    }
+    auto trueBlock = BlockPtr{};
+    auto thenBlock = BlockPtr{};
+    auto loc = getLoc(compIf, compIf.ifToken);
+    m_builder.create<mlir::CondBranchOp>(loc, toI1(loc, condition), trueBlock, thenBlock);
+
+    implementBlock(trueBlock);
+    pylir::match(
+        compIf.compIter,
+        [&](std::monostate)
+        {
+            auto value = visit(iteration);
+            m_builder.create<InsertOp>(value.getLoc(), container, value);
+        },
+        [&](const Syntax::CompFor& compFor) { visit<InsertOp>(container, iteration, compFor); },
+        [&](const std::unique_ptr<Syntax::CompIf>& compIf) { visit<InsertOp>(container, iteration, *compIf); });
+    implementBlock(thenBlock);
+}
+
+template <class InsertOp>
+void pylir::CodeGen::visit(mlir::Value container, const Syntax::Comprehension& comprehension)
+{
+    visit<InsertOp>(container, comprehension.assignmentExpression, comprehension.compFor);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)

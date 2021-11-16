@@ -222,6 +222,15 @@ class CodeGen
     template <mlir::Value (CodeGen::*op)(mlir::Location, const std::vector<Py::IterArg>&)>
     mlir::Value visit(const Syntax::StarredList& starredList);
 
+    template <class InsertOp>
+    void visit(mlir::Value container, const Syntax::AssignmentExpression& iteration, const Syntax::CompFor& compFor);
+
+    template <class InsertOp>
+    void visit(mlir::Value container, const Syntax::AssignmentExpression& iteration, const Syntax::CompIf& compIf);
+
+    template <class InsertOp>
+    void visit(mlir::Value container, const Syntax::Comprehension& comprehension);
+
     bool needsTerminator()
     {
         return m_builder.getBlock()
@@ -256,6 +265,10 @@ class CodeGen
     {
         implementBlock(blockPtr.get());
     }
+
+    void visitForConstruct(mlir::Location loc, const Syntax::TargetList& targets, mlir::Value iterable,
+                           llvm::function_ref<void()> execSuite,
+                           const std::optional<Syntax::IfStmt::Else>& elseSection = {});
 
 public:
     CodeGen(mlir::MLIRContext* context, Diag::Document& document);
