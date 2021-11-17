@@ -289,7 +289,8 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
             //    [](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name); })
             .Case<Py::MakeDictOp, Py::MakeDictExOp>(
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Dict.name); })
-            .Case([&](Py::MakeFuncOp) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
+            .Case<Py::MakeFuncOp, Py::GetFunctionOp>(
+                [&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
             .Case([&](Py::BoolFromI1Op) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
             .Default({});
     if (!symbol)

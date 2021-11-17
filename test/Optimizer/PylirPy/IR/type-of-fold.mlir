@@ -264,3 +264,22 @@ func @bool_from_I1(%arg0 : i1) -> !py.dynamic {
 // CHECK-LABEL: @bool_from_I1
 // CHECK: %[[RESULT:.*]] = py.constant @builtins.bool
 // CHECK: return %[[RESULT]]
+
+// -----
+
+func private @test(%self : !py.dynamic, %tuple : !py.dynamic, %dict : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant #py.int<0>
+    return %0 : !py.dynamic
+}
+
+py.globalValue @builtins.function = #py.int<0>
+
+func @get_function(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0, %1 = py.getFunction %arg0
+    %2 = py.typeOf %0
+    return %2 : !py.dynamic
+}
+
+// CHECK-LABEL: @get_function
+// CHECK: %[[RESULT:.*]] = py.constant @builtins.function
+// CHECK: return %[[RESULT]]
