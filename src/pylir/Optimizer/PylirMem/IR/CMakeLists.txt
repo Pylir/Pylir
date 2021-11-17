@@ -16,7 +16,6 @@ add_dependencies(mlir-headers PylirMemOpsIncGen)
 add_mlir_dialect_library(PylirMemDialect
         PylirMemDialect.cpp
         PylirMemOps.cpp
-        PylirMemTypeObjects.cpp
 
         DEPENDS
         PylirMemOpsIncGen

@@ -31,6 +31,7 @@ void pylir::Mem::PylirDialect::initialize()
         >();
 }
 
+/*
 mlir::Type pylir::Mem::PylirDialect::parseType(::mlir::DialectAsmParser& parser) const
 {
     llvm::StringRef ref;
@@ -66,35 +67,6 @@ void pylir::Mem::PylirDialect::printAttribute(::mlir::Attribute attr, ::mlir::Di
     auto result = generatedAttributePrinter(attr, os);
     PYLIR_ASSERT(mlir::succeeded(result));
 }
-
-void pylir::Mem::PointerType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)>,
-                                                       llvm::function_ref<void(mlir::Type)> walkTypeFn) const
-{
-    walkTypeFn(getElementType());
-}
-
-pylir::Mem::DictAttr
-    pylir::Mem::DictAttr::getAlreadySorted(mlir::MLIRContext* context,
-                                           llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
-{
-    return Base::get(context, value);
-}
-
-void pylir::Mem::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-                                                   llvm::function_ref<void(mlir::Type)>) const
-{
-    std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
-}
-
-void pylir::Mem::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-                                                    llvm::function_ref<void(mlir::Type)>) const
-{
-    std::for_each(getValue().begin(), getValue().end(),
-                  [&](const auto& pair)
-                  {
-                      walkAttrsFn(pair.first);
-                      walkAttrsFn(pair.second);
-                  });
-}
+*/
 
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOpsDialect.cpp.inc>
