@@ -15,7 +15,7 @@
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirMem/IR/PylirMemOpsAttributes.cpp.inc"
 
-void pylir::Mem::PylirDialect::initialize()
+void pylir::Mem::PylirMemDialect::initialize()
 {
     addOperations<
 #define GET_OP_LIST
@@ -32,7 +32,7 @@ void pylir::Mem::PylirDialect::initialize()
 }
 
 /*
-mlir::Type pylir::Mem::PylirDialect::parseType(::mlir::DialectAsmParser& parser) const
+mlir::Type pylir::Mem::PylirMemDialect::parseType(::mlir::DialectAsmParser& parser) const
 {
     llvm::StringRef ref;
     if (parser.parseKeyword(&ref))
@@ -44,13 +44,13 @@ mlir::Type pylir::Mem::PylirDialect::parseType(::mlir::DialectAsmParser& parser)
     return type;
 }
 
-void pylir::Mem::PylirDialect::printType(::mlir::Type type, ::mlir::DialectAsmPrinter& os) const
+void pylir::Mem::PylirMemDialect::printType(::mlir::Type type, ::mlir::DialectAsmPrinter& os) const
 {
     auto result = generatedTypePrinter(type, os);
     PYLIR_ASSERT(mlir::succeeded(result));
 }
 
-mlir::Attribute pylir::Mem::PylirDialect::parseAttribute(::mlir::DialectAsmParser& parser, ::mlir::Type type) const
+mlir::Attribute pylir::Mem::PylirMemDialect::parseAttribute(::mlir::DialectAsmParser& parser, ::mlir::Type type) const
 {
     llvm::StringRef ref;
     if (parser.parseKeyword(&ref))
@@ -62,7 +62,7 @@ mlir::Attribute pylir::Mem::PylirDialect::parseAttribute(::mlir::DialectAsmParse
     return attribute;
 }
 
-void pylir::Mem::PylirDialect::printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const
+void pylir::Mem::PylirMemDialect::printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const
 {
     auto result = generatedAttributePrinter(attr, os);
     PYLIR_ASSERT(mlir::succeeded(result));

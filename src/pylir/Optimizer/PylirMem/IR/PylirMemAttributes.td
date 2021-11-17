@@ -4,7 +4,7 @@
 
 include "pylir/Optimizer/PylirMem/IR/PylirMemBase.td"
 
-class Pylir_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
-    AttrDef<Pylir_Dialect, name, traits, baseCppClass>;
+class PylirMem_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
+    AttrDef<PylirMem_Dialect, name, traits, baseCppClass>;
 
 #endif

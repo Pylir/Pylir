@@ -2,7 +2,18 @@
 
 #include <mlir/Pass/Pass.h>
 
-#include "PylirMemToLLVMIR/PylirMemToLLVMIR.hpp"
+#include <memory>
+
+namespace pylir
+{
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirPyToPylirMemPass();
+}
+
+namespace pylir::Mem
+{
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirToLLVMPass();
+
+}
 
 namespace pylir
 {

@@ -11,8 +11,8 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
-class Pylir_Op<string mneomic, list<OpTrait> traits = []> :
-    Op<Pylir_Dialect, mneomic, traits>;
+class PylirMem_Op<string mneomic, list<OpTrait> traits = []> :
+    Op<PylirMem_Dialect, mneomic, traits>;
 
 // Global memory operations
 

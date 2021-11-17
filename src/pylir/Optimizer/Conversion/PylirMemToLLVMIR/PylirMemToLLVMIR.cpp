@@ -1,6 +1,3 @@
-
-#include "PylirMemToLLVMIR.hpp"
-
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/Pattern.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
@@ -14,6 +11,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Conversion/PassDetail.hpp>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 
 #include <optional>
 
@@ -22,7 +20,7 @@
 
 namespace
 {
-struct ConvertPylirToLLVMPass : public pylir::Mem::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
+struct ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
     void runOnOperation() override;

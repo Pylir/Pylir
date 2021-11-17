@@ -27,7 +27,7 @@
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Main/Opts.inc>
-#include <pylir/Optimizer/Conversion/PylirMemToLLVMIR/PylirMemToLLVMIR.hpp>
+#include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/Transform/Passes.hpp>
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
