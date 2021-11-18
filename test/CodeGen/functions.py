@@ -52,8 +52,8 @@ def foo():
 # CHECK: %[[DEFAULT_DICT:.*]], %{{.*}} = py.getAttr "__kwdefaults__" from %[[SELF]]
 # CHECK: %[[TUPLE_LEN:.*]] = py.tuple.integer.len %[[TUPLE]]
 
-# CHECK: %[[INDEX:.*]] = constant 0
-# CHECK: %[[IS_LESS:.*]] = cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
+# CHECK: %[[INDEX:.*]] = arith.constant 0
+# CHECK: %[[IS_LESS:.*]] = arith.cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
 # CHECK: cond_br %[[IS_LESS]], ^[[LESS_BLOCK:.*]], ^[[UNBOUND_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
@@ -105,7 +105,7 @@ def foo():
 # CHECK-SAME: )
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[INDEX:.*]] = constant 0
+# CHECK: %[[INDEX:.*]] = arith.constant 0
 # CHECK: %[[DEFAULT_ARG:.*]] = py.tuple.integer.getItem %[[DEFAULT_TUPLE]][
 # CHECK-SAME: %[[INDEX]]
 # CHECK-SAME: ]
@@ -117,7 +117,7 @@ def foo():
 # CHECK-SAME: %{{[[:alnum:]]+}}
 # CHECK-SAME: )
 
-# CHECK-NOT: constant 1
+# CHECK-NOT: arith.constant 1
 
 # CHECK: %[[INDEX:.*]] = py.constant "c"
 # CHECK: %[[VALUE:.*]], %[[FOUND:.*]] = py.dict.tryGetItem %[[DICT]][%[[INDEX]]]

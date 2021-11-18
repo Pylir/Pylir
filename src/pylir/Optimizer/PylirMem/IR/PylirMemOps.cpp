@@ -11,8 +11,5 @@
 
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOpsEnums.cpp.inc>
 
-// TODO: Remove in MLIR 14
-using namespace mlir;
-
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.cpp.inc>

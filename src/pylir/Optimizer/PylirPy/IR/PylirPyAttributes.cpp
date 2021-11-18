@@ -58,10 +58,10 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
     }
     if (keyword == Py::BoolAttr::getMnemonic())
     {
-        return Py::BoolAttr::parse(getContext(), parser, type);
+        return Py::BoolAttr::parse(parser, type);
     }
     mlir::Attribute result;
-    (void)generatedAttributeParser(getContext(), parser, keyword, type, result);
+    (void)generatedAttributeParser(parser, keyword, type, result);
     return result;
 }
 
@@ -69,6 +69,7 @@ void pylir::Py::PylirPyDialect::printAttribute(::mlir::Attribute attr, ::mlir::D
 {
     if (auto boolean = attr.dyn_cast_or_null<BoolAttr>())
     {
+        os << boolean.getMnemonic();
         return boolean.print(os);
     }
     (void)generatedAttributePrinter(attr, os);
@@ -79,12 +80,12 @@ pylir::BigInt pylir::Py::IntAttr::getValue() const
     return getImpl()->value;
 }
 
-void pylir::Py::IntAttr::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Py::IntAttr::print(::mlir::AsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<" << getValue().toString() << ">";
+    printer << "<" << getValue().toString() << ">";
 }
 
-mlir::Attribute pylir::Py::IntAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type)
+mlir::Attribute pylir::Py::IntAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
     llvm::APInt apInt;
     if (parser.parseLess() || parser.parseInteger(apInt) || parser.parseGreater())
@@ -93,170 +94,92 @@ mlir::Attribute pylir::Py::IntAttr::parse(::mlir::MLIRContext* context, ::mlir::
     }
     llvm::SmallString<10> str;
     apInt.toStringSigned(str);
-    return IntAttr::get(context, BigInt(std::string{str.data(), str.size()}));
+    return IntAttr::get(parser.getContext(), BigInt(std::string{str.data(), str.size()}));
 }
 
-void pylir::Py::ListAttr::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Py::ListAttr::print(::mlir::AsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<[";
+    printer << "<[";
     llvm::interleaveComma(getValue(), printer);
     printer << "]>";
 }
 
-mlir::Attribute pylir::Py::ListAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type)
+mlir::Attribute pylir::Py::ListAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
-    if (parser.parseLess() || parser.parseLSquare())
-    {
-        return {};
-    }
-    if (!parser.parseOptionalRSquare())
-    {
-        if (parser.parseGreater())
-        {
-            return {};
-        }
-        return get(context, {});
-    }
     llvm::SmallVector<mlir::Attribute> attrs;
-    if (parser.parseAttribute(attrs.emplace_back()))
+    if (parser.parseLess()
+        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Square,
+                                          [&] { return parser.parseAttribute(attrs.emplace_back()); })
+        || parser.parseGreater())
     {
         return {};
     }
-    while (!parser.parseOptionalComma())
-    {
-        if (parser.parseAttribute(attrs.emplace_back()))
-        {
-            return {};
-        }
-    }
-    if (parser.parseRSquare() || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(context, attrs);
+    return get(parser.getContext(), attrs);
 }
 
-void pylir::Py::TupleAttr::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Py::TupleAttr::print(::mlir::AsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<(";
+    printer << "<(";
     llvm::interleaveComma(getValue(), printer);
     printer << ")>";
 }
 
-mlir::Attribute pylir::Py::TupleAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser,
-                                            ::mlir::Type)
+mlir::Attribute pylir::Py::TupleAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
-    if (parser.parseLess() || parser.parseLParen())
-    {
-        return {};
-    }
-    if (!parser.parseOptionalRParen())
-    {
-        if (parser.parseGreater())
-        {
-            return {};
-        }
-        return get(context, {});
-    }
     llvm::SmallVector<mlir::Attribute> attrs;
-    if (parser.parseAttribute(attrs.emplace_back()))
+    if (parser.parseLess()
+        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Paren,
+                                          [&] { return parser.parseAttribute(attrs.emplace_back()); })
+        || parser.parseGreater())
     {
         return {};
     }
-    while (!parser.parseOptionalComma())
-    {
-        if (parser.parseAttribute(attrs.emplace_back()))
-        {
-            return {};
-        }
-    }
-    if (parser.parseRParen() || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(context, attrs);
+    return get(parser.getContext(), attrs);
 }
 
-void pylir::Py::SetAttr::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Py::SetAttr::print(::mlir::AsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<{";
+    printer << "<{";
     llvm::interleaveComma(getValue(), printer);
     printer << "}>";
 }
 
-mlir::Attribute pylir::Py::SetAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type)
+mlir::Attribute pylir::Py::SetAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
-    if (parser.parseLess() || parser.parseLBrace())
-    {
-        return {};
-    }
-    if (!parser.parseOptionalRBrace())
-    {
-        if (parser.parseGreater())
-        {
-            return {};
-        }
-        return get(context, {});
-    }
     llvm::SmallVector<mlir::Attribute> attrs;
-    if (parser.parseAttribute(attrs.emplace_back()))
+    if (parser.parseLess()
+        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
+                                          [&] { return parser.parseAttribute(attrs.emplace_back()); })
+        || parser.parseGreater())
     {
         return {};
     }
-    while (!parser.parseOptionalComma())
-    {
-        if (parser.parseAttribute(attrs.emplace_back()))
-        {
-            return {};
-        }
-    }
-    if (parser.parseRBrace() || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(context, attrs);
+    return get(parser.getContext(), attrs);
 }
 
-void pylir::Py::DictAttr::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Py::DictAttr::print(::mlir::AsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<{";
+    printer << "<{";
     llvm::interleaveComma(getValue(), printer, [&](auto&& pair) { printer << pair.first << " to " << pair.second; });
     printer << "}>";
 }
 
-mlir::Attribute pylir::Py::DictAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type)
+mlir::Attribute pylir::Py::DictAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
-    if (parser.parseLess() || parser.parseLBrace())
-    {
-        return {};
-    }
-    if (!parser.parseOptionalRBrace())
-    {
-        if (parser.parseGreater())
-        {
-            return {};
-        }
-        return get(context, {});
-    }
     llvm::SmallVector<std::pair<mlir::Attribute, mlir::Attribute>> attrs;
-    if (parser.parseAttribute(attrs.emplace_back().first) || parser.parseKeyword("to")
-        || parser.parseAttribute(attrs.back().second))
+    if (parser.parseLess()
+        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
+                                          [&]
+                                          {
+                                              return mlir::failure(parser.parseAttribute(attrs.emplace_back().first)
+                                                                   || parser.parseKeyword("to")
+                                                                   || parser.parseAttribute(attrs.back().second));
+                                          })
+        || parser.parseGreater())
     {
         return {};
     }
-    while (!parser.parseOptionalComma())
-    {
-        if (parser.parseAttribute(attrs.emplace_back().first) || parser.parseKeyword("to")
-            || parser.parseAttribute(attrs.back().second))
-        {
-            return {};
-        }
-    }
-    if (parser.parseRBrace() || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(context, attrs);
+    return get(parser.getContext(), attrs);
 }
 
 pylir::Py::BoolAttr pylir::Py::BoolAttr::get(::mlir::MLIRContext* context, bool value)
@@ -264,7 +187,7 @@ pylir::Py::BoolAttr pylir::Py::BoolAttr::get(::mlir::MLIRContext* context, bool 
     return Base::get(context, BigInt(value ? 1 : 0));
 }
 
-mlir::Attribute pylir::Py::BoolAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type)
+mlir::Attribute pylir::Py::BoolAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
     if (parser.parseLess())
     {
@@ -285,12 +208,12 @@ mlir::Attribute pylir::Py::BoolAttr::parse(::mlir::MLIRContext* context, ::mlir:
     {
         return {};
     }
-    return get(context, keyword == "True");
+    return get(parser.getContext(), keyword == "True");
 }
 
-void pylir::Py::BoolAttr::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Py::BoolAttr::print(::mlir::AsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<" << (getValue() ? "True" : "False") << ">";
+    printer << "<" << (getValue() ? "True" : "False") << ">";
 }
 
 bool pylir::Py::BoolAttr::getValue() const
@@ -298,9 +221,9 @@ bool pylir::Py::BoolAttr::getValue() const
     return !getImpl()->value.isZero();
 }
 
-void pylir::Py::ObjectAttr::print(::mlir::DialectAsmPrinter& printer) const
+void pylir::Py::ObjectAttr::print(::mlir::AsmPrinter& printer) const
 {
-    printer << getMnemonic() << "<type: " << getType();
+    printer << "<type: " << getType();
     if (getBuiltinValue())
     {
         printer << ", value: " << *getBuiltinValue();
@@ -308,8 +231,7 @@ void pylir::Py::ObjectAttr::print(::mlir::DialectAsmPrinter& printer) const
     printer << ", __dict__: " << getAttributes() << ">";
 }
 
-mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser,
-                                             ::mlir::Type)
+mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
     mlir::Attribute type;
     Py::DictAttr dictAttr;
@@ -332,7 +254,7 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::MLIRContext* context, ::mli
     {
         return {};
     }
-    return get(context, type, dictAttr, builtinValue);
+    return get(parser.getContext(), type, dictAttr, builtinValue);
 }
 
 void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -341,16 +263,49 @@ void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
     std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
 }
 
+mlir::SubElementAttrInterface pylir::Py::ListAttr::replaceImmediateSubAttribute(
+    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+{
+    auto vector = getValue().vec();
+    for (auto [index, attr] : replacements)
+    {
+        vector[index] = attr;
+    }
+    return get(getContext(), vector);
+}
+
 void pylir::Py::TupleAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                     llvm::function_ref<void(mlir::Type)>) const
 {
     std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
 }
 
+mlir::SubElementAttrInterface pylir::Py::TupleAttr::replaceImmediateSubAttribute(
+    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+{
+    auto vector = getValue().vec();
+    for (auto [index, attr] : replacements)
+    {
+        vector[index] = attr;
+    }
+    return get(getContext(), vector);
+}
+
 void pylir::Py::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                   llvm::function_ref<void(mlir::Type)>) const
 {
     std::for_each(getValue().begin(), getValue().end(), walkAttrsFn);
+}
+
+mlir::SubElementAttrInterface pylir::Py::SetAttr::replaceImmediateSubAttribute(
+    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+{
+    auto vector = getValue().vec();
+    for (auto [index, attr] : replacements)
+    {
+        vector[index] = attr;
+    }
+    return get(getContext(), vector);
 }
 
 void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -364,6 +319,24 @@ void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
                   });
 }
 
+mlir::SubElementAttrInterface pylir::Py::DictAttr::replaceImmediateSubAttribute(
+    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+{
+    auto vector = getValue().vec();
+    for (auto [index, attr] : replacements)
+    {
+        if (index & 1)
+        {
+            vector[index / 2].second = attr;
+        }
+        else
+        {
+            vector[index / 2].first = attr;
+        }
+    }
+    return get(getContext(), vector);
+}
+
 void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                      llvm::function_ref<void(mlir::Type)>) const
 {
@@ -373,4 +346,23 @@ void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mli
     {
         walkAttrsFn(*getBuiltinValue());
     }
+}
+
+mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribute(
+    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+{
+    auto type = getType();
+    auto attributes = getAttributes();
+    auto builtinValue = getBuiltinValue();
+    for (auto [index, attr] : replacements)
+    {
+        switch (index)
+        {
+            case 0: type = attr; break;
+            case 1: attributes = attr.cast<Py::DictAttr>(); break;
+            case 2: builtinValue = attr; break;
+            default: PYLIR_UNREACHABLE;
+        }
+    }
+    return get(getContext(), type, attributes, builtinValue);
 }

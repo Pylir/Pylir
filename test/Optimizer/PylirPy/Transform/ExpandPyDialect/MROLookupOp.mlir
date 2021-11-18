@@ -8,16 +8,16 @@ func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @linear_search
 // CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 // CHECK: %[[TUPLE_LEN:.*]] = py.tuple.integer.len %[[TUPLE]]
-// CHECK: %[[ZERO:.*]] = constant 0
+// CHECK: %[[ZERO:.*]] = arith.constant 0
 // CHECK: br ^[[CONDITION:[[:alnum:]]+]]
 // CHECK-SAME: %[[ZERO]]
 
 // CHECK: ^[[CONDITION]]
 // CHECK-SAME: %[[INDEX:[[:alnum:]]+]]
 
-// CHECK: %[[LESS:.*]] = cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
+// CHECK: %[[LESS:.*]] = arith.cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
 // CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
-// CHECK: %[[FALSE:.*]] = constant false
+// CHECK: %[[FALSE:.*]] = arith.constant false
 // CHECK: cond_br %[[LESS]], ^[[BODY:[[:alnum:]]+]], ^[[END:[[:alnum:]]+]]
 // CHECK-SAME: %[[UNBOUND]]
 // CHECK-SAME: %[[FALSE]]
@@ -32,8 +32,8 @@ func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: ^[[NOT_FOUND:[[:alnum:]]+]]
 
 // CHECK: ^[[NOT_FOUND]]
-// CHECK: %[[ONE:.*]] = constant 1
-// CHECK: %[[NEXT:.*]] = addi %[[INDEX]], %[[ONE]]
+// CHECK: %[[ONE:.*]] = arith.constant 1
+// CHECK: %[[NEXT:.*]] = arith.addi %[[INDEX]], %[[ONE]]
 // CHECK: br ^[[CONDITION]]
 // CHECK-SAME: %[[NEXT]]
 

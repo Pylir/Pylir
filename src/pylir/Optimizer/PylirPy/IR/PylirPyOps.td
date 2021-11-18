@@ -673,10 +673,10 @@ def PylirPy_InvokeOp : PylirPy_InvokeBase<"invoke",[DeclareOpInterfaceMethods<Sy
 def PylirPy_InvokeIndirectOp : PylirPy_InvokeBase<"invoke_indirect",
                                        [TypesMatchWith<"callee input types match argument types",
                                                         "callee", "operands",
-                                                        "$_self.cast<FunctionType>().getInputs()">,
+                                                        "$_self.cast<::mlir::FunctionType>().getInputs()">,
                                         TypesMatchWith<"callee result types match result types",
                                                         "callee", "result",
-                                                        "$_self.cast<FunctionType>().getResults()[0]">]> {
+                                                        "$_self.cast<::mlir::FunctionType>().getResults()[0]">]> {
     let arguments = (ins FunctionType:$callee,
                          Variadic<DynamicType>:$operands,
                          Variadic<DynamicType>:$normalDestOperands,

@@ -1,13 +1,13 @@
 
 #include "PylirPyDialect.hpp"
 
+#include <mlir/Dialect/StandardOps/IR/Ops.h>
+
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsDialect.cpp.inc"
 
 #include "PylirPyAttributes.hpp"
 #include "PylirPyOps.hpp"
 #include "PylirPyTypes.hpp"
-
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
 
 void pylir::Py::PylirPyDialect::initialize()
 {
@@ -28,6 +28,10 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
     if (type.isa<Py::DynamicType>())
     {
         return builder.create<Py::ConstantOp>(loc, type, value);
+    }
+    else if (mlir::arith::ConstantOp::isBuildableWith(value, type))
+    {
+        return builder.create<mlir::arith::ConstantOp>(loc, type, value);
     }
     else if (mlir::ConstantOp::isBuildableWith(value, type))
     {

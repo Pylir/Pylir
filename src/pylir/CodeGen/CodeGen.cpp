@@ -136,8 +136,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             // TODO: attach __cause__ and __context__
             auto loc = getLoc(raiseStmt, raiseStmt.raise);
             auto typeOf = m_builder.create<Py::TypeOfOp>(loc, expression);
-            auto typeObject =
-                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Type.name));
+            auto typeObject = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Type.name));
             auto isTypeSubclass = buildSubclassCheck(loc, typeOf, typeObject);
             BlockPtr isType, instanceBlock;
             instanceBlock->addArgument(m_builder.getType<Py::DynamicType>());
@@ -146,8 +146,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
 
             {
                 implementBlock(isType);
-                auto baseException =
-                    m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
+                auto baseException = m_builder.create<Py::ConstantOp>(
+                    loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::BaseException.name));
                 auto isBaseException = buildSubclassCheck(loc, expression, baseException);
                 BlockPtr typeError, createException;
                 m_builder.create<mlir::CondBranchOp>(loc, isBaseException, createException, typeError);
@@ -168,8 +168,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
 
             implementBlock(instanceBlock);
             typeOf = m_builder.create<Py::TypeOfOp>(loc, instanceBlock->getArgument(0));
-            auto baseException =
-                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
+            auto baseException = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::BaseException.name));
             auto isBaseException = buildSubclassCheck(loc, typeOf, baseException);
             BlockPtr typeError, raiseBlock;
             m_builder.create<mlir::CondBranchOp>(loc, isBaseException, raiseBlock, typeError);
@@ -190,7 +190,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             if (!returnStmt.expressions)
             {
                 executeFinallyBlocks(false);
-                auto none = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
+                auto none = m_builder.create<Py::ConstantOp>(
+                    loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::None.name));
                 m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{none});
                 m_builder.clearInsertionPoint();
                 return;
@@ -576,8 +577,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::NotTest& expression)
         {
             auto loc = getLoc(expression, pair.first);
             auto value = toI1(loc, visit(*pair.second));
-            auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getBoolAttr(true));
-            auto inverse = m_builder.create<mlir::XOrOp>(loc, one, value);
+            auto one = m_builder.create<mlir::arith::ConstantOp>(loc, m_builder.getBoolAttr(true));
+            auto inverse = m_builder.create<mlir::arith::XOrIOp>(loc, one, value);
             return m_builder.create<Py::BoolFromI1Op>(loc, inverse);
         });
 }
@@ -891,7 +892,8 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
 
     pylir::match(
         result->second.kind,
-        [&](mlir::Operation* global) { m_builder.create<Py::StoreOp>(loc, value, m_builder.getSymbolRefAttr(global)); },
+        [&](mlir::Operation* global)
+        { m_builder.create<Py::StoreOp>(loc, value, mlir::FlatSymbolRefAttr::get(global)); },
         [&](mlir::Value cell) { m_builder.create<Py::SetAttrOp>(loc, value, cell, "cell_contents"); },
         [&](Identifier::DefinitionMap& localMap) { localMap[m_builder.getBlock()] = value; });
 }
@@ -923,7 +925,8 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     {
         if (auto builtin = m_builtinNamespace.find(identifierToken.getValue()); builtin != m_builtinNamespace.end())
         {
-            auto builtinValue = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(builtin->second));
+            auto builtinValue = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), builtin->second));
             if (!m_classNamespace)
             {
                 return builtinValue;
@@ -950,7 +953,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     {
         case Identifier::Global:
             loadedValue = m_builder.create<Py::LoadOp>(
-                loc, m_builder.getSymbolRefAttr(pylir::get<mlir::Operation*>(result->second.kind)));
+                loc, mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(result->second.kind)));
             break;
         case Identifier::StackAlloc:
             loadedValue =
@@ -1045,8 +1048,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                     return m_builder.create<Py::ConstantOp>(location, Py::BoolAttr::get(m_builder.getContext(), false));
                 }
                 case TokenType::NoneKeyword:
-                    return m_builder.create<Py::ConstantOp>(location,
-                                                            m_builder.getSymbolRefAttr(Py::Builtins::None.name));
+                    return m_builder.create<Py::ConstantOp>(
+                        location, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::None.name));
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -1088,7 +1091,8 @@ mlir::Value pylir::CodeGen::toBool(mlir::Location loc, mlir::Value value)
         loc, m_builder, "__bool__", type, tuple,
         m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})), m_currentExceptBlock);
     auto typeOfResult = m_builder.create<Py::TypeOfOp>(loc, maybeBool);
-    auto booleanType = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Bool.name));
+    auto booleanType = m_builder.create<Py::ConstantOp>(
+        loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Bool.name));
     auto isBool = m_builder.create<Py::IsOp>(loc, typeOfResult, booleanType);
     BlockPtr isBoolBlock, typeErrorBlock;
     m_builder.create<mlir::CondBranchOp>(loc, isBool, isBoolBlock, typeErrorBlock);
@@ -1434,8 +1438,8 @@ void pylir::CodeGen::visitForConstruct(mlir::Location loc, const Syntax::TargetL
         implementBlock(exceptionHandler);
         auto exception = exceptionHandler->getArgument(0);
         auto exceptionType = m_builder.create<Py::TypeOfOp>(loc, exception);
-        auto stopIteration =
-            m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::StopIteration.name));
+        auto stopIteration = m_builder.create<Py::ConstantOp>(
+            loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::StopIteration.name));
         auto isStopIteration = buildSubclassCheck(loc, exceptionType, stopIteration);
         BlockPtr reraiseBlock, exitBlock;
         m_builder.create<mlir::CondBranchOp>(loc, isStopIteration, exitBlock, reraiseBlock);
@@ -1628,7 +1632,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             //       a finally section
             writeIdentifier(iter.expression->second->second, exceptionHandler->getArgument(0));
         }
-        auto tupleType = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Tuple.name));
+        auto tupleType = m_builder.create<Py::ConstantOp>(
+            loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Tuple.name));
         auto isTuple = m_builder.create<Py::IsOp>(loc, m_builder.create<Py::TypeOfOp>(loc, value), tupleType);
         auto tupleBlock = BlockPtr{};
         auto exceptionBlock = BlockPtr{};
@@ -1639,8 +1644,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         {
             implementBlock(exceptionBlock);
             // TODO: check value is a type
-            auto baseException =
-                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
+            auto baseException = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::BaseException.name));
             auto isSubclass = buildSubclassCheck(loc, value, baseException);
             BlockPtr raiseBlock;
             BlockPtr noTypeErrorBlock;
@@ -1657,8 +1662,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         }
         {
             implementBlock(tupleBlock);
-            auto baseException =
-                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::BaseException.name));
+            auto baseException = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::BaseException.name));
             BlockPtr noTypeErrorsBlock;
             buildTupleForEach(loc, value, noTypeErrorsBlock, {},
                               [&](mlir::Value entry)
@@ -1893,8 +1898,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         {
             if (funcDef.closures.count(name))
             {
-                auto closureType =
-                    m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Cell.name));
+                auto closureType = m_builder.create<Py::ConstantOp>(
+                    loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
                 auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType, value});
                 auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
                 auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
@@ -1919,8 +1924,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
         for (auto& iter : closures)
         {
-            auto closureType =
-                m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::Cell.name));
+            auto closureType = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
             auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType});
             auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
             auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
@@ -1937,7 +1942,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             auto closureTuple = m_builder.create<Py::GetAttrOp>(loc, self, "__closure__");
             for (auto& iter : llvm::enumerate(funcDef.nonLocalVariables))
             {
-                auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(iter.index()));
+                auto constant = m_builder.create<mlir::arith::ConstantIndexOp>(loc, iter.index());
                 auto cell = m_builder.create<Py::TupleIntegerGetItemOp>(loc, closureTuple.result(), constant);
                 m_scope.top().identifiers.emplace(iter.value().getValue(), Identifier{mlir::Value{cell}});
                 usedClosures.push_back(iter.value());
@@ -1947,12 +1952,13 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         visit(*funcDef.suite);
         if (needsTerminator())
         {
-            m_builder.create<mlir::ReturnOp>(loc, mlir::ValueRange{m_builder.create<Py::ConstantOp>(
-                                                      loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name))});
+            m_builder.create<mlir::ReturnOp>(
+                loc, mlir::ValueRange{m_builder.create<Py::ConstantOp>(
+                         loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::None.name))});
         }
         func = buildFunctionCC(loc, formImplName(qualifiedName + "$cc"), func, functionParameters);
     }
-    mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, m_builder.getSymbolRefAttr(func));
+    mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, mlir::FlatSymbolRefAttr::get(func));
     m_builder.create<Py::SetAttrOp>(
         loc, m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(funcDef.funcName.getValue())), value,
         m_builder.getStringAttr("__name__"));
@@ -1962,7 +1968,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         mlir::Value defaults;
         if (defaultParameters.empty())
         {
-            defaults = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
+            defaults = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::None.name));
         }
         else
         {
@@ -1974,7 +1981,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         mlir::Value kwDefaults;
         if (keywordOnlyDefaultParameters.empty())
         {
-            kwDefaults = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
+            kwDefaults = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::None.name));
         }
         else
         {
@@ -1986,7 +1994,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         mlir::Value closure;
         if (usedClosures.empty())
         {
-            closure = m_builder.create<Py::ConstantOp>(loc, m_builder.getSymbolRefAttr(Py::Builtins::None.name));
+            closure = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::None.name));
         }
         else
         {
@@ -2057,7 +2066,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         visit(*classDef.suite);
         m_builder.create<mlir::ReturnOp>(loc, m_classNamespace);
     }
-    auto value = m_builder.create<Py::MakeClassOp>(loc, m_builder.getSymbolRefAttr(func), name, bases, keywords);
+    auto value = m_builder.create<Py::MakeClassOp>(loc, mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
     writeIdentifier(classDef.className, value);
 }
 
@@ -2259,8 +2268,9 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
             case FunctionParameter::Normal:
             case FunctionParameter::PosOnly:
             {
-                auto constant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posIndex++));
-                auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, constant, tupleLen);
+                auto constant = m_builder.create<mlir::arith::ConstantIndexOp>(loc, posIndex++);
+                auto isLess =
+                    m_builder.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult, constant, tupleLen);
                 auto lessBlock = BlockPtr{};
                 auto unboundBlock = BlockPtr{};
                 m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, unboundBlock);
@@ -2331,14 +2341,14 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                     break;
                 }
                 auto list = m_builder.create<Py::MakeListOp>(loc);
-                auto start = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posIndex));
+                auto start = m_builder.create<mlir::arith::ConstantIndexOp>(loc, posIndex);
                 auto conditionBlock = BlockPtr{};
                 conditionBlock->addArgument(m_builder.getIndexType());
                 m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{start});
 
                 implementBlock(conditionBlock);
-                auto isLess = m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult,
-                                                             conditionBlock->getArgument(0), tupleLen);
+                auto isLess = m_builder.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
+                                                                    conditionBlock->getArgument(0), tupleLen);
                 auto lessBlock = BlockPtr{};
                 auto endBlock = BlockPtr{};
                 m_builder.create<mlir::CondBranchOp>(loc, isLess, lessBlock, endBlock);
@@ -2346,8 +2356,8 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                 implementBlock(lessBlock);
                 auto fetched = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
                 m_builder.create<Py::ListAppendOp>(loc, list, fetched);
-                auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(1));
-                auto incremented = m_builder.create<mlir::AddIOp>(loc, conditionBlock->getArgument(0), one);
+                auto one = m_builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
+                auto incremented = m_builder.create<mlir::arith::AddIOp>(loc, conditionBlock->getArgument(0), one);
                 m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{incremented});
 
                 implementBlock(endBlock);
@@ -2384,8 +2394,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                         case FunctionParameter::Normal:
                         case FunctionParameter::PosOnly:
                         {
-                            auto index =
-                                m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(posDefaultsIndex++));
+                            auto index = m_builder.create<mlir::arith::ConstantIndexOp>(loc, posDefaultsIndex++);
                             defaultArg = m_builder.create<Py::TupleIntegerGetItemOp>(loc, defaultTuple, index);
                             break;
                         }
@@ -2547,15 +2556,15 @@ void pylir::CodeGen::buildTupleForEach(mlir::Location loc, mlir::Value tuple, ml
                                        llvm::function_ref<void(mlir::Value)> iterationCallback)
 {
     auto tupleSize = m_builder.create<Py::TupleIntegerLenOp>(loc, m_builder.getIndexType(), tuple);
-    auto startConstant = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(0));
+    auto startConstant = m_builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
     auto conditionBlock = BlockPtr{};
     conditionBlock->addArgument(m_builder.getIndexType());
     markOpenBlock(conditionBlock);
     m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
 
     implementBlock(conditionBlock);
-    auto isLess =
-        m_builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ult, conditionBlock->getArgument(0), tupleSize);
+    auto isLess = m_builder.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
+                                                        conditionBlock->getArgument(0), tupleSize);
     auto body = BlockPtr{};
     m_builder.create<mlir::CondBranchOp>(loc, isLess, body, endBlock, endArgs);
 
@@ -2563,8 +2572,8 @@ void pylir::CodeGen::buildTupleForEach(mlir::Location loc, mlir::Value tuple, ml
     auto entry = m_builder.create<Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
     iterationCallback(entry);
     PYLIR_ASSERT(needsTerminator());
-    auto one = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(1));
-    auto nextIter = m_builder.create<mlir::AddIOp>(loc, conditionBlock->getArgument(0), one);
+    auto one = m_builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    auto nextIter = m_builder.create<mlir::arith::AddIOp>(loc, conditionBlock->getArgument(0), one);
     m_builder.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{nextIter});
     sealBlock(conditionBlock);
 }

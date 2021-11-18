@@ -12,7 +12,12 @@ def PylirPy_Dialect : Dialect {
     }];
     let cppNamespace = "::pylir::Py";
 
+    let dependentDialects = ["::mlir::arith::ArithmeticDialect", "::mlir::StandardOpsDialect"];
+
     let hasConstantMaterializer = 1;
+
+    // TODO: use once it prepends namespace
+    let useDefaultTypePrinterParser = 0;
 
     let extraClassDeclaration = [{
         void initializeAttributes();

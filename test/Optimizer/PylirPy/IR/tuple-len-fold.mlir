@@ -7,7 +7,7 @@ func @constant_tuple() -> index {
 }
 
 // CHECK-LABEL: @constant_tuple
-// CHECK: %[[RESULT:.*]] = constant 3 : index
+// CHECK: %[[RESULT:.*]] = arith.constant 3 : index
 // CHECK: return %[[RESULT]]
 
 // -----

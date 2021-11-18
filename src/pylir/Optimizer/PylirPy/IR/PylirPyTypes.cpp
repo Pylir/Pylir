@@ -17,7 +17,7 @@ mlir::Type pylir::Py::PylirPyDialect::parseType(::mlir::DialectAsmParser& parser
         return {};
     }
     mlir::Type result;
-    (void)generatedTypeParser(getContext(), parser, keyword, result);
+    (void)generatedTypeParser(parser, keyword, result);
     return result;
 }
 

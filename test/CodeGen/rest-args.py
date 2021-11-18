@@ -25,22 +25,22 @@ def bar(a, *args, k, **kwd):
 
 # list created first
 # CHECK: %[[LIST:.*]] = py.makeList ()
-# CHECK: %[[START:.*]] = constant 1
+# CHECK: %[[START:.*]] = arith.constant 1
 # CHECK: br ^[[CONDITION:[[:alnum:]]+]]
 # CHEK-SAME: %[[START]]
 
 # CHECK: ^[[CONDITION]]
 # CHECK-SAME: %[[ITERATOR:[[:alnum:]]+]]
 
-# CHECK: %[[CHECK:.*]] = cmpi ult, %[[ITERATOR]], %[[TUPLE_LEN]]
+# CHECK: %[[CHECK:.*]] = arith.cmpi ult, %[[ITERATOR]], %[[TUPLE_LEN]]
 # CHECK: cond_br %[[CHECK]], ^[[BODY:[[:alnum:]]+]], ^[[END:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:
 # CHECK: %[[FETCHED:.*]] = py.tuple.integer.getItem %[[TUPLE]][
 # CHECK-SAME: %[[ITERATOR]]
 # CHECK: py.list.append %[[LIST]], %[[FETCHED]]
-# CHECK: %[[ONE:.*]] = constant 1
-# CHECK: %[[INCREMENTED:.*]] = addi %[[ITERATOR]], %[[ONE]]
+# CHECK: %[[ONE:.*]] = arith.constant 1
+# CHECK: %[[INCREMENTED:.*]] = arith.addi %[[ITERATOR]], %[[ONE]]
 # CHECK: br ^[[CONDITION]]
 # CHECK-SAME: %[[INCREMENTED]]
 

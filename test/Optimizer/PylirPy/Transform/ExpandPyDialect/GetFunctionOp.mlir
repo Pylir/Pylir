@@ -17,7 +17,7 @@ func @get_function(%callable : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %[[CURRENT:[[:alnum:]]+]]
 // CHECK: %[[TYPE:.*]] = py.typeOf %[[CURRENT]]
 // CHECK: %[[IS:.*]] = py.is %[[TYPE]], %[[FUNCTION]]
-// CHECK: %[[TRUE:.*]] = constant true
+// CHECK: %[[TRUE:.*]] = arith.constant true
 // CHECK: cond_br %[[IS]], ^[[END_BLOCK:[[:alnum:]]+]]
 // CHECK-SAME: %[[CURRENT]]
 // CHECK-SAME: %[[TRUE]]
@@ -34,7 +34,7 @@ func @get_function(%callable : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %[[RESULT:[[:alnum:]]+]]
 // CHECK-SAME: %[[SUCCESS:[[:alnum:]]+]]
 // CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
-// CHECK: %[[FALSE:.*]] = constant false
+// CHECK: %[[FALSE:.*]] = arith.constant false
 // CHECK: cond_br %[[SUCCESS]], ^[[CONDITION]]
 // CHECK-SAME: %[[RESULT]]
 // CHECK-SAME: ^[[END_BLOCK]]

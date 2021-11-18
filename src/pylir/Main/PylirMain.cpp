@@ -14,12 +14,12 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Option/Arg.h>
 #include <llvm/Option/ArgList.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Path.h>
-#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
@@ -226,8 +226,8 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         return false;
     }
 
-    manager.addPass(mlir::LLVM::createLegalizeForExportPass());
     manager.addPass(std::move(pass));
+    manager.addPass(mlir::LLVM::createLegalizeForExportPass());
     if (mlir::failed(manager.run(*module)))
     {
         return false;
@@ -253,17 +253,16 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     llvm::ModulePassManager mpm;
     if (options.getLastArgValue(OPT_O, "0") == "0")
     {
-        mpm = passBuilder.buildO0DefaultPipeline(llvm::PassBuilder::OptimizationLevel::O0);
+        mpm = passBuilder.buildO0DefaultPipeline(llvm::OptimizationLevel::O0);
     }
     else
     {
-        llvm::PassBuilder::OptimizationLevel level =
-            llvm::StringSwitch<llvm::PassBuilder::OptimizationLevel>(options.getLastArgValue(OPT_O))
-                .Case("1", llvm::PassBuilder::OptimizationLevel::O1)
-                .Case("2", llvm::PassBuilder::OptimizationLevel::O2)
-                .Case("3", llvm::PassBuilder::OptimizationLevel::O3)
-                .Case("s", llvm::PassBuilder::OptimizationLevel::Os)
-                .Case("z", llvm::PassBuilder::OptimizationLevel::Oz);
+        llvm::OptimizationLevel level = llvm::StringSwitch<llvm::OptimizationLevel>(options.getLastArgValue(OPT_O))
+                                            .Case("1", llvm::OptimizationLevel::O1)
+                                            .Case("2", llvm::OptimizationLevel::O2)
+                                            .Case("3", llvm::OptimizationLevel::O3)
+                                            .Case("s", llvm::OptimizationLevel::Os)
+                                            .Case("z", llvm::OptimizationLevel::Oz);
         mpm = passBuilder.buildPerModuleDefaultPipeline(level);
     }
 

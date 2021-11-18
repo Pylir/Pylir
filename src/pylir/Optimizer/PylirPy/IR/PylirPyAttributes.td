@@ -5,22 +5,8 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "mlir/IR/SubElementInterfaces.td"
 
-class AnyAttrOf<list<AttrConstraint> allowedAttrs, string summary = "", string cppClassName = "::mlir::Attribute"> : Attr<
-    Or<!foreach(allowedAttr,allowedAttrs,allowedAttr.predicate)>,
-    !if(!eq(summary, ""),
-            !interleave(!foreach(t, allowedAttrs, t.summary), " or "),
-            summary)
-> {
-    let storageType = "::mlir::Attribute";
-    let returnType = "::mlir::Attribute";
-    let convertFromStorage = "$_self";
-    let constBuilderCall = "$0";
-}
-
 class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
-    AttrDef<PylirPy_Dialect, name, traits, baseCppClass> {
-    let storageType = dialect.cppNamespace # "::" # cppClassName;
-}
+    AttrDef<PylirPy_Dialect, name, traits, baseCppClass>;
 
 def PylirPy_IntAttr : PylirPy_Attr<"Int"> {
     let mnemonic = "int";
@@ -36,7 +22,8 @@ def PylirPy_IntAttr : PylirPy_Attr<"Int"> {
 
 }
 
-def PylirPy_ListAttr : PylirPy_Attr<"List", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
+def PylirPy_ListAttr : PylirPy_Attr<"List", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+                                                                            ["replaceImmediateSubAttribute"]>]> {
     let mnemonic = "list";
     let summary = "python list";
 
@@ -47,7 +34,8 @@ def PylirPy_ListAttr : PylirPy_Attr<"List", [DeclareAttrInterfaceMethods<SubElem
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
 
-def PylirPy_TupleAttr : PylirPy_Attr<"Tuple", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
+def PylirPy_TupleAttr : PylirPy_Attr<"Tuple", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+                                                                            ["replaceImmediateSubAttribute"]>]> {
     let mnemonic = "tuple";
     let summary = "python tuple";
 
@@ -58,7 +46,8 @@ def PylirPy_TupleAttr : PylirPy_Attr<"Tuple", [DeclareAttrInterfaceMethods<SubEl
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
 
-def PylirPy_SetAttr : PylirPy_Attr<"Set", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
+def PylirPy_SetAttr : PylirPy_Attr<"Set", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+                                                                        ["replaceImmediateSubAttribute"]>]> {
     let mnemonic = "set";
     let summary = "python set";
 
@@ -69,7 +58,8 @@ def PylirPy_SetAttr : PylirPy_Attr<"Set", [DeclareAttrInterfaceMethods<SubElemen
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+                                                                            ["replaceImmediateSubAttribute"]>]> {
     let mnemonic = "dict";
     let summary = "python dictionary";
 
@@ -89,7 +79,8 @@ def PylirPy_BoolAttr : Attr<CPred<"$_self.isa<::pylir::Py::BoolAttr>()">> {
     let constBuilderCall = "::pylir::Py::BoolAttr::get($_builder.getContext(),$0)";
 }
 
-def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
+def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+                                                                                ["replaceImmediateSubAttribute"]>]> {
     let mnemonic = "obj";
     let summary = "python object";
 
@@ -103,6 +94,6 @@ def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
 
 def AnyPyAttribute : AnyAttrOf<[PylirPy_IntAttr, PylirPy_BoolAttr, F64Attr, PylirPy_ListAttr, PylirPy_TupleAttr,
                                 PylirPy_SetAttr, PylirPy_DictAttr, StrAttr, PylirPy_ObjectAttr, PylirPy_UnboundAttr,
-                                ReferToOp<"::pylir::Py::GlobalValueOp">]>;
+                                FlatSymbolRefAttr]>;
 
 #endif

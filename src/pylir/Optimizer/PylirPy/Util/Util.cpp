@@ -39,7 +39,7 @@ mlir::Block* raiseException(mlir::Location loc, mlir::OpBuilder& builder, mlir::
 mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& builder, std::string_view kind,
                                       std::vector<Py::IterArg> args, mlir::Block* exceptionPath)
 {
-    auto typeObj = builder.create<Py::ConstantOp>(loc, builder.getSymbolRefAttr(kind));
+    auto typeObj = builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
     args.emplace(args.begin(), typeObj);
     mlir::Value tuple;
     if (!exceptionPath)
@@ -60,9 +60,11 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
                    .create<mlir::CallIndirectOp>(loc, builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
                                                  mlir::ValueRange{newMethod, tuple, dict})
                    ->getResult(0);
-    auto context = builder.create<Py::ConstantOp>(loc, builder.getSymbolRefAttr(Builtins::None.name));
+    auto context =
+        builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
     builder.create<Py::SetAttrOp>(loc, context, obj, "__context__");
-    auto cause = builder.create<Py::ConstantOp>(loc, builder.getSymbolRefAttr(Builtins::None.name));
+    auto cause =
+        builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
     builder.create<Py::SetAttrOp>(loc, cause, obj, "__cause__");
     return obj;
 }

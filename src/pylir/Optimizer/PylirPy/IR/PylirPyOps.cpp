@@ -655,7 +655,8 @@ mlir::LogicalResult pylir::Py::MakeDictOp::inferReturnTypes(::mlir::MLIRContext*
 namespace
 {
 template <class SymbolOp>
-mlir::LogicalResult verifySymbolUse(mlir::Operation* op, llvm::StringRef name, mlir::SymbolTableCollection& symbolTable)
+mlir::LogicalResult verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
+                                    mlir::SymbolTableCollection& symbolTable)
 {
     if (!symbolTable.lookupNearestSymbolFrom<SymbolOp>(op, name))
     {
@@ -667,22 +668,22 @@ mlir::LogicalResult verifySymbolUse(mlir::Operation* op, llvm::StringRef name, m
 
 mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, handle(), symbolTable);
+    return verifySymbolUse<Py::GlobalHandleOp>(*this, handleAttr(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, handle(), symbolTable);
+    return verifySymbolUse<Py::GlobalHandleOp>(*this, handleAttr(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::FuncOp>(*this, function(), symbolTable);
+    return verifySymbolUse<mlir::FuncOp>(*this, functionAttr(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::MakeClassOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::FuncOp>(*this, initFunc(), symbolTable);
+    return verifySymbolUse<mlir::FuncOp>(*this, initFuncAttr(), symbolTable);
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -764,7 +765,7 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
 
 mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, callee()));
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, calleeAttr()));
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeOp::getMutableSuccessorOperands(unsigned int index)
@@ -1048,14 +1049,12 @@ mlir::LogicalResult verify(pylir::Py::ConstantOp op)
             return uses.getOwner()->emitError("Write to a constant value is not allowed");
         }
     }
+
     return mlir::success();
 }
 } // namespace
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
-
-// TODO remove MLIR 14
-using namespace mlir;
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>

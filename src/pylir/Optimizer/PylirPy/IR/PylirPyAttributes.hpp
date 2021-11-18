@@ -23,9 +23,9 @@ public:
         return ::llvm::StringLiteral("bool");
     }
 
-    static ::mlir::Attribute parse(::mlir::MLIRContext* context, ::mlir::DialectAsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::DialectAsmPrinter& printer) const;
+    void print(::mlir::AsmPrinter& printer) const;
 
     bool getValue() const;
 };
