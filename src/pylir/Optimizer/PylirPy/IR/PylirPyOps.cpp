@@ -227,7 +227,7 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
 mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
                                                ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
-    if (!operands[0])
+    if (!operands[0] || operands[0].isa<mlir::SymbolRefAttr>())
     {
         return mlir::failure();
     }

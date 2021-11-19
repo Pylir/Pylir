@@ -37,3 +37,20 @@ func @contained() -> (!py.dynamic, !py.dynamic) {
 // CHECK-DAG: %[[CONST1:.*]] = py.constant #py.int<3>
 // CHECK-DAG: %[[CONST2:.*]] = py.constant #py.bool<True>
 // CHECK: return %[[CONST1]], %[[CONST2]]
+
+// -----
+
+py.globalValue @a = #py.int<0>
+
+func @global_value() -> !py.dynamic {
+    %0 = py.constant @a
+    %result, %success = py.getAttr "__new__" from %0
+    %1 = py.bool.fromI1 %success
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @global_value
+// CHECK: %[[CONSTANT:.*]] = py.constant @a
+// CHECK: %[[RESULT:.*]], %[[SUCCESS:.*]] = py.getAttr "__new__" from %[[CONSTANT]]
+// CHECK: %[[BOOL:.*]] = py.bool.fromI1 %[[SUCCESS]]
+// CHECK: return %[[BOOL]]
