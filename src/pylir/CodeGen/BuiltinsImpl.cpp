@@ -198,7 +198,7 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_builder.create<Py::SetAttrOp>(loc, args, self, "args");
 
             auto len = m_builder.create<Py::TupleIntegerLenOp>(loc, m_builder.getIndexType(), args);
-            auto zero = m_builder.create<mlir::ConstantOp>(loc, m_builder.getIndexAttr(0));
+            auto zero = m_builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
             auto greaterZero = m_builder.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ugt, len, zero);
             BlockPtr greaterZeroBlock, noneBlock, continueBlock;
             continueBlock->addArgument(m_builder.getType<Py::DynamicType>());

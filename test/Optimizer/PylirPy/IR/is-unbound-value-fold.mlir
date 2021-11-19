@@ -46,3 +46,23 @@ func @normal_op(%arg0 : () -> !py.dynamic) -> !py.dynamic {
 // CHECK: %[[C:.*]] = py.constant #py.bool<False>
 // CHECK: call_indirect %arg0
 // CHECK: return %[[C]]
+
+// -----
+
+py.globalHandle @a
+
+func @load_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    py.store %arg0 into @a
+    %0 = py.load @a
+    %1 = py.isUnboundValue %0
+    %2 = py.bool.fromI1 %1
+    return %2 : !py.dynamic
+}
+
+// CHECK-LABEL: @load_op
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK: py.store %[[ARG0]] into @a
+// CHECK: %[[LOADED:.*]] = py.load @a
+// CHECK: %[[UNBOUND:.*]] = py.isUnboundValue %[[LOADED]]
+// CHECK: %[[RESULT:.*]] = py.bool.fromI1 %[[UNBOUND]]
+// CHECK: return %[[RESULT]]
