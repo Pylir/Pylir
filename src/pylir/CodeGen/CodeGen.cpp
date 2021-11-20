@@ -583,6 +583,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::NotTest& expression)
         });
 }
 
+mlir::Value pylir::CodeGen::binOp(mlir::Location loc, llvm::Twine method, mlir::Value lhs, mlir::Value rhs)
+{
+    auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{lhs, rhs});
+    auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+    auto type = m_builder.create<Py::TypeOfOp>(loc, lhs);
+    return Py::buildSpecialMethodCall(loc, m_builder, method, type, tuple, dict, m_currentExceptBlock);
+}
+
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
 {
     if (comparison.rest.empty())
@@ -642,25 +650,26 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         if (other)
         {
             mlir::Value cmp;
-            /* TODO:
             switch (comp)
             {
-                case Comp::Lt: cmp = m_builder.create<Py::LessOp>(loc, previousRHS, other); break;
-                case Comp::Gt: cmp = m_builder.create<Py::GreaterOp>(loc, previousRHS, other); break;
-                case Comp::Eq: cmp = m_builder.create<Py::EqualOp>(loc, previousRHS, other); break;
-                case Comp::Ne: cmp = m_builder.create<Py::NotEqualOp>(loc, previousRHS, other); break;
-                case Comp::Ge: cmp = m_builder.create<Py::GreaterEqualOp>(loc, previousRHS, other); break;
-                case Comp::Le: cmp = m_builder.create<Py::LessEqualOp>(loc, previousRHS, other); break;
+                case Comp::Lt: cmp = binOp(loc, "__lt__", previousRHS, other); break;
+                case Comp::Gt: cmp = binOp(loc, "__gt__", previousRHS, other); break;
+                case Comp::Eq: cmp = binOp(loc, "__eq__", previousRHS, other); break;
+                case Comp::Ne: cmp = binOp(loc, "__ne__", previousRHS, other); break;
+                case Comp::Ge: cmp = binOp(loc, "__ge__", previousRHS, other); break;
+                case Comp::Le: cmp = binOp(loc, "__le__", previousRHS, other); break;
+                case Comp::In: cmp = binOp(loc, "__contains__", previousRHS, other); break;
                 case Comp::Is:
                     cmp = m_builder.create<Py::BoolFromI1Op>(loc, m_builder.create<Py::IsOp>(loc, previousRHS, other));
                     break;
-                case Comp::In: cmp = m_builder.create<Py::InOp>(loc, previousRHS, other); break;
             }
             if (invert)
             {
-                cmp = m_builder.create<Py::InvertOp>(loc, toBool(cmp));
+                auto i1 = toI1(loc, cmp);
+                auto one = m_builder.create<mlir::arith::ConstantOp>(loc, m_builder.getBoolAttr(true));
+                auto inverse = m_builder.create<mlir::arith::XOrIOp>(loc, one, i1);
+                cmp = m_builder.create<Py::BoolFromI1Op>(loc, inverse);
             }
-             */
             previousRHS = other;
             if (!result)
             {
@@ -689,8 +698,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::OrExpr& orExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(orExpr, binOp->bitOrToken);
-            // TODO: return m_builder.create<Py::OrOp>(loc, lhs, rhs);
-            PYLIR_UNREACHABLE;
+            return this->binOp(loc, "__or__", lhs, rhs);
         });
 }
 
@@ -703,8 +711,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::XorExpr& xorExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(xorExpr, binOp->bitXorToken);
-            // TODO: return m_builder.create<Py::XorOp>(loc, lhs, rhs);
-            PYLIR_UNREACHABLE;
+            return this->binOp(loc, "__xor__", lhs, rhs);
         });
 }
 
@@ -717,8 +724,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AndExpr& andExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             auto loc = getLoc(andExpr, binOp->bitAndToken);
-            // TODO: return m_builder.create<Py::AndOp>(loc, lhs, rhs);
-            PYLIR_UNREACHABLE;
+            return this->binOp(loc, "__and__", lhs, rhs);
         });
 }
 
@@ -733,8 +739,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ShiftExpr& shiftExpr)
             auto loc = getLoc(shiftExpr, binOp->binToken);
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::ShiftLeft:  // TODO: return m_builder.create<Py::LShiftOp>(loc, lhs, rhs);
-                case TokenType::ShiftRight: // TODO: return m_builder.create<Py::RShiftOp>(loc, lhs, rhs);
+                case TokenType::ShiftLeft: return this->binOp(loc, "__lshift__", lhs, rhs);
+                case TokenType::ShiftRight: return this->binOp(loc, "__rshift__", lhs, rhs);
                 default: PYLIR_UNREACHABLE;
             }
         });
@@ -751,8 +757,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AExpr& aExpr)
             auto loc = getLoc(aExpr, binOp->binToken);
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::Plus:  // TODO: return m_builder.create<Py::AddOp>(loc, lhs, rhs);
-                case TokenType::Minus: // TODO: return m_builder.create<Py::SubOp>(loc, lhs, rhs);
+                case TokenType::Plus: return this->binOp(loc, "__add__", lhs, rhs);
+                case TokenType::Minus: return this->binOp(loc, "__sub__", lhs, rhs);
                 default: PYLIR_UNREACHABLE;
             }
         });
@@ -769,10 +775,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
             auto loc = getLoc(mExpr, binOp->binToken);
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::Star:      // TODO: return m_builder.create<Py::MulOp>(loc, lhs, rhs);
-                case TokenType::Divide:    // TODO: return m_builder.create<Py::TrueDivOp>(loc, lhs, rhs);
-                case TokenType::IntDivide: // TODO: return m_builder.create<Py::FloorDivOp>(loc, lhs, rhs);
-                case TokenType::Remainder: // TODO: return m_builder.create<Py::ModuloOp>(loc, lhs, rhs);
+                case TokenType::Star: return this->binOp(loc, "__mul__", lhs, rhs);
+                case TokenType::Divide: return this->binOp(loc, "__truediv__", lhs, rhs);
+                case TokenType::IntDivide: return this->binOp(loc, "__floordiv__", lhs, rhs);
+                case TokenType::Remainder: return this->binOp(loc, "__mod__", lhs, rhs);
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -781,8 +787,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
             auto lhs = visit(*atBin->lhs);
             auto rhs = visit(*atBin->rhs);
             auto loc = getLoc(mExpr, atBin->atToken);
-            // TODO: return m_builder.create<Py::MatMulOp>(loc, lhs, rhs);
-            PYLIR_UNREACHABLE;
+            return this->binOp(loc, "__matmul__", lhs, rhs);
         });
 }
 
@@ -815,12 +820,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::UExpr& uExpr)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Power& power)
 {
+    auto lhs = pylir::match(power.variant, [&](const auto& value) { return visit(value); });
     if (!power.rightHand)
     {
-        return pylir::match(power.variant, [&](const auto& value) { return visit(value); });
+        return lhs;
     }
-    // TODO
-    PYLIR_UNREACHABLE;
+    auto loc = getLoc(power, power.rightHand->first);
+    auto rhs = visit(*power.rightHand->second);
+    return binOp(loc, "__pow__", lhs, rhs);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AwaitExpr& awaitExpr)

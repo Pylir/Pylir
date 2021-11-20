@@ -219,6 +219,8 @@ class CodeGen
 
     void assignTarget(const Syntax::Target& target, mlir::Value value);
 
+    mlir::Value binOp(mlir::Location loc, llvm::Twine method, mlir::Value lhs, mlir::Value rhs);
+
     template <mlir::Value (CodeGen::*op)(mlir::Location, const std::vector<Py::IterArg>&)>
     mlir::Value visit(const Syntax::StarredList& starredList);
 
