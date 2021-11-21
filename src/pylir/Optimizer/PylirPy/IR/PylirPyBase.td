@@ -16,8 +16,7 @@ def PylirPy_Dialect : Dialect {
 
     let hasConstantMaterializer = 1;
 
-    // TODO: use once it prepends namespace
-    let useDefaultTypePrinterParser = 0;
+    let useDefaultTypePrinterParser = 1;
 
     let extraClassDeclaration = [{
         void initializeAttributes();
