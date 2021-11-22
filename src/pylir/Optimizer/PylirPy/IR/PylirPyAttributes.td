@@ -31,6 +31,8 @@ def PylirPy_ListAttr : PylirPy_Attr<"List", [DeclareAttrInterfaceMethods<SubElem
     let convertFromStorage = "$_self.getValue()";
     let constBuilderCall = storageType # "::get($_builder.getContext(), $0)";
 
+    let builders = [AttrBuilder<(ins ), "return get($_ctxt, {});">];
+
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
 
@@ -42,6 +44,8 @@ def PylirPy_TupleAttr : PylirPy_Attr<"Tuple", [DeclareAttrInterfaceMethods<SubEl
     let returnType = "llvm::ArrayRef<mlir::Attribute>";
     let convertFromStorage = "$_self.getValue()";
     let constBuilderCall = storageType # "::get($_builder.getContext(), $0)";
+
+    let builders = [AttrBuilder<(ins ), "return get($_ctxt, {});">];
 
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
 }
@@ -56,6 +60,14 @@ def PylirPy_SetAttr : PylirPy_Attr<"Set", [DeclareAttrInterfaceMethods<SubElemen
     let constBuilderCall = storageType # "::get($_builder.getContext(), $0)";
 
     let parameters = (ins ArrayRefParameter<"::mlir::Attribute">:$value);
+
+    let skipDefaultBuilders = 1;
+
+    let extraClassDeclaration = [{
+        static ::pylir::Py::SetAttr get(::mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> attributes = {});
+
+        static ::pylir::Py::SetAttr getUniqued(::mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> attributes = {});
+    }];
 }
 
 def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
@@ -68,6 +80,14 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElem
     let constBuilderCall = storageType # "::get($_builder.getContext(), $0)";
 
     let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>">:$value);
+
+    let skipDefaultBuilders = 1;
+
+    let extraClassDeclaration = [{
+        static ::pylir::Py::DictAttr get(::mlir::MLIRContext* context, llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> attributes = {});
+
+        static ::pylir::Py::DictAttr getUniqued(::mlir::MLIRContext* context, llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> attributes = {});
+    }];
 }
 
 def PylirPy_BoolAttr : Attr<CPred<"$_self.isa<::pylir::Py::BoolAttr>()">> {

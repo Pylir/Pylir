@@ -160,8 +160,8 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
                 }
 
                 implementBlock(createException);
-                auto tuple = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext(), {}));
-                auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+                auto tuple = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext()));
+                auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
                 auto exception = Py::buildCall(loc, m_builder, expression, tuple, dict, m_currentExceptBlock);
                 m_builder.create<mlir::BranchOp>(loc, instanceBlock, mlir::ValueRange{exception});
             }
@@ -586,7 +586,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::NotTest& expression)
 mlir::Value pylir::CodeGen::binOp(mlir::Location loc, llvm::Twine method, mlir::Value lhs, mlir::Value rhs)
 {
     auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{lhs, rhs});
-    auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+    auto dict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
     auto type = m_builder.create<Py::TypeOfOp>(loc, lhs);
     return Py::buildSpecialMethodCall(loc, m_builder, method, type, tuple, dict, m_currentExceptBlock);
 }
@@ -854,7 +854,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
                 [&](std::monostate) -> std::pair<mlir::Value, mlir::Value>
                 {
                     return {m_builder.create<Py::MakeTupleOp>(loc),
-                            m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}))};
+                            m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()))};
                 },
                 [&](const std::pair<Syntax::ArgumentList, std::optional<BaseToken>>& pair)
                     -> std::pair<mlir::Value, mlir::Value> { return visit(pair.first); },
@@ -868,7 +868,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
                     }
                     auto tuple = m_builder.create<Py::ListToTupleOp>(loc, list);
                     return {tuple,
-                            m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}))};
+                            m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()))};
                 });
             if (!tuple || !keywords)
             {
@@ -1096,7 +1096,7 @@ mlir::Value pylir::CodeGen::toBool(mlir::Location loc, mlir::Value value)
     auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{value});
     auto maybeBool = Py::buildSpecialMethodCall(
         loc, m_builder, "__bool__", type, tuple,
-        m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})), m_currentExceptBlock);
+        m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext())), m_currentExceptBlock);
     auto typeOfResult = m_builder.create<Py::TypeOfOp>(loc, maybeBool);
     auto booleanType = m_builder.create<Py::ConstantOp>(
         loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Bool.name));
@@ -1384,7 +1384,7 @@ void pylir::CodeGen::visitForConstruct(mlir::Location loc, const Syntax::TargetL
 
     auto iterObject = Py::buildSpecialMethodCall(
         loc, m_builder, "__iter__", type, m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{iterable}),
-        m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})), m_currentExceptBlock);
+        m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext())), m_currentExceptBlock);
 
     auto typeMRO = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
     auto nextMethod = m_builder.create<Py::MROLookupOp>(loc, typeMRO, "__next__");
@@ -1414,7 +1414,7 @@ void pylir::CodeGen::visitForConstruct(mlir::Location loc, const Syntax::TargetL
     m_currentExceptBlock = exceptionHandler;
     auto next = Py::buildCall(loc, m_builder, nextMethod.result(),
                               m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{iterObject}),
-                              m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {})),
+                              m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext())),
                               m_currentExceptBlock);
     reset.reset();
     assignTarget(targets, next);
@@ -1908,7 +1908,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 auto closureType = m_builder.create<Py::ConstantOp>(
                     loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
                 auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType, value});
-                auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+                auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
                 auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
                 auto cell =
                     m_builder
@@ -1934,7 +1934,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             auto closureType = m_builder.create<Py::ConstantOp>(
                 loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
             auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType});
-            auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+            auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
             auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
             auto cell =
                 m_builder
@@ -2028,7 +2028,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
         value = Py::buildCall(decLoc, m_builder, decorator,
                               m_builder.create<Py::MakeTupleOp>(decLoc, std::vector<Py::IterArg>{value}),
-                              m_builder.create<Py::ConstantOp>(decLoc, Py::DictAttr::get(m_builder.getContext(), {})),
+                              m_builder.create<Py::ConstantOp>(decLoc, Py::DictAttr::get(m_builder.getContext())),
                               m_currentExceptBlock);
     }
     writeIdentifier(funcDef.funcName, value);
@@ -2044,8 +2044,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     }
     else
     {
-        bases = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext(), {}));
-        keywords = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext(), {}));
+        bases = m_builder.create<Py::ConstantOp>(loc, Py::TupleAttr::get(m_builder.getContext()));
+        keywords = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
     }
     auto qualifiedName = formQualifiedName(classDef.className.getValue());
     auto name = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(qualifiedName));

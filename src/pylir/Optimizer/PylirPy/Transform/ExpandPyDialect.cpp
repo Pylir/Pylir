@@ -222,7 +222,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             auto iterObject = pylir::Py::buildSpecialMethodCall(
                 loc, rewriter, "__iter__", type,
                 rewriter.create<pylir::Py::MakeTupleOp>(loc, std::vector<pylir::Py::IterArg>{iter.value()}),
-                rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext(), {})),
+                rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext())),
                 exceptionPath);
 
             auto typeMRO = rewriter.create<pylir::Py::GetAttrOp>(loc, type, "__mro__").result();
@@ -253,7 +253,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             auto next = pylir::Py::buildCall(
                 loc, rewriter, nextMethod.result(),
                 rewriter.create<pylir::Py::MakeTupleOp>(loc, std::vector<pylir::Py::IterArg>{iterObject}),
-                rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext(), {})),
+                rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext())),
                 exceptionHandler);
 
             rewriter.create<InsertOp>(loc, list, next);

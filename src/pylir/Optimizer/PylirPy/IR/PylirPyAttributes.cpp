@@ -291,6 +291,21 @@ mlir::SubElementAttrInterface pylir::Py::TupleAttr::replaceImmediateSubAttribute
     return get(getContext(), vector);
 }
 
+::pylir::Py::SetAttr pylir::Py::SetAttr::get(::mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> attributes)
+{
+    // TODO: The order of a set iteration might be undefined, but it ought to still match up at compile time with
+    //       runtime probably
+    auto vector = attributes.vec();
+    vector.erase(std::unique(vector.begin(), vector.end()), vector.end());
+    return getUniqued(context, vector);
+}
+
+::pylir::Py::SetAttr pylir::Py::SetAttr::getUniqued(::mlir::MLIRContext* context,
+                                                    llvm::ArrayRef<mlir::Attribute> attributes)
+{
+    return Base::get(context, attributes);
+}
+
 void pylir::Py::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                   llvm::function_ref<void(mlir::Type)>) const
 {
@@ -308,6 +323,23 @@ mlir::SubElementAttrInterface pylir::Py::SetAttr::replaceImmediateSubAttribute(
     return get(getContext(), vector);
 }
 
+pylir::Py::DictAttr pylir::Py::DictAttr::get(::mlir::MLIRContext* context,
+                                             llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> attributes)
+{
+    auto vector = attributes.vec();
+    vector.erase(std::unique(vector.begin(), vector.end(),
+                             [](const auto& lhs, const auto& rhs) { return lhs.first == rhs.first; }),
+                 vector.end());
+    return getUniqued(context, vector);
+}
+
+pylir::Py::DictAttr
+    pylir::Py::DictAttr::getUniqued(::mlir::MLIRContext* context,
+                                    llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> attributes)
+{
+    return Base::get(context, attributes);
+}
+
 void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                    llvm::function_ref<void(mlir::Type)>) const
 {
@@ -322,6 +354,7 @@ void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
 mlir::SubElementAttrInterface pylir::Py::DictAttr::replaceImmediateSubAttribute(
     ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
 {
+    bool changedOrder = false;
     auto vector = getValue().vec();
     for (auto [index, attr] : replacements)
     {
@@ -331,10 +364,15 @@ mlir::SubElementAttrInterface pylir::Py::DictAttr::replaceImmediateSubAttribute(
         }
         else
         {
+            changedOrder = true;
             vector[index / 2].first = attr;
         }
     }
-    return get(getContext(), vector);
+    if (changedOrder)
+    {
+        return get(getContext(), vector);
+    }
+    return getUniqued(getContext(), vector);
 }
 
 void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
