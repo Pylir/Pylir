@@ -239,7 +239,14 @@ mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribut
         results.emplace_back(mlir::BoolAttr::get(getContext(), false));
         return mlir::success();
     }
-    auto array = object.getAttributes().getValue();
+    auto attributes = object.getAttributes();
+    if (!attributes)
+    {
+        results.emplace_back(Py::UnboundAttr::get(getContext()));
+        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+        return mlir::success();
+    }
+    auto array =attributes->getValue();
     auto result = std::find_if(array.begin(), array.end(), [&](auto pair) { return pair.first == attributeAttr(); });
     if (result == array.end())
     {

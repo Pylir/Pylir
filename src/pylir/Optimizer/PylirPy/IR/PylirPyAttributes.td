@@ -104,7 +104,7 @@ def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [DeclareAttrInterfaceMethods<Sub
     let mnemonic = "obj";
     let summary = "python object";
 
-    let parameters = (ins "mlir::Attribute":$type, "::pylir::Py::DictAttr":$attributes, "::llvm::Optional<mlir::Attribute>":$builtinValue);
+    let parameters = (ins "mlir::Attribute":$type, "::llvm::Optional<::pylir::Py::DictAttr>":$attributes, "::llvm::Optional<mlir::Attribute>":$builtinValue);
 }
 
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {

@@ -221,42 +221,6 @@ bool pylir::Py::BoolAttr::getValue() const
     return !getImpl()->value.isZero();
 }
 
-void pylir::Py::ObjectAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<type: " << getType();
-    if (getBuiltinValue())
-    {
-        printer << ", value: " << *getBuiltinValue();
-    }
-    printer << ", __dict__: " << getAttributes() << ">";
-}
-
-mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    mlir::Attribute type;
-    Py::DictAttr dictAttr;
-    if (parser.parseLess() || parser.parseKeyword("type") || parser.parseColon() || parser.parseAttribute(type)
-        || parser.parseComma())
-    {
-        return {};
-    }
-    llvm::Optional<mlir::Attribute> builtinValue;
-    if (!parser.parseOptionalKeyword("value"))
-    {
-        builtinValue.emplace();
-        if (parser.parseColon() || parser.parseAttribute(*builtinValue) || parser.parseComma())
-        {
-            return {};
-        }
-    }
-    if (parser.parseKeyword("__dict__") || parser.parseColon() || parser.parseAttribute(dictAttr)
-        || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), type, dictAttr, builtinValue);
-}
-
 void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                    llvm::function_ref<void(mlir::Type)>) const
 {
@@ -375,11 +339,84 @@ mlir::SubElementAttrInterface pylir::Py::DictAttr::replaceImmediateSubAttribute(
     return getUniqued(getContext(), vector);
 }
 
+void pylir::Py::ObjectAttr::print(::mlir::AsmPrinter& printer) const
+{
+    printer << "<type: " << getType();
+    if (getAttributes())
+    {
+        printer << ", __dict__: " << getAttributes();
+    }
+    if (getBuiltinValue())
+    {
+        printer << ", value: " << *getBuiltinValue();
+    }
+    printer << ">";
+}
+
+mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
+{
+    mlir::Attribute type;
+    if (parser.parseLess() || parser.parseKeyword("type") || parser.parseColon() || parser.parseAttribute(type))
+    {
+        return {};
+    }
+    llvm::Optional<Py::DictAttr> dictAttr;
+    llvm::Optional<mlir::Attribute> builtinValue;
+    while (!parser.parseOptionalComma())
+    {
+        llvm::StringRef keyword;
+        auto loc = parser.getCurrentLocation();
+        if (parser.parseKeyword(&keyword))
+        {
+            return {};
+        }
+        if (keyword == "__dict__")
+        {
+            if (dictAttr)
+            {
+                parser.emitError(loc, "`__dict__` can only appear once");
+                return {};
+            }
+            dictAttr.emplace();
+            if (parser.parseColon() || parser.parseAttribute(*dictAttr))
+            {
+                return {};
+            }
+        }
+        else if (keyword == "value")
+        {
+            if (builtinValue)
+            {
+                parser.emitError(loc, "`value` can only appear once");
+                return {};
+            }
+            builtinValue.emplace();
+            if (parser.parseColon() || parser.parseAttribute(*builtinValue))
+            {
+                return {};
+            }
+        }
+        else
+        {
+            parser.emitError(loc, "Unexpected keyword `") << keyword << "`. Expected one of `__dict__` or `value`";
+            return {};
+        }
+    }
+    if (parser.parseGreater())
+    {
+        return {};
+    }
+    return get(parser.getContext(), type, dictAttr, builtinValue);
+}
+
 void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                      llvm::function_ref<void(mlir::Type)>) const
 {
     walkAttrsFn(getType());
-    walkAttrsFn(getAttributes());
+    if (getAttributes())
+    {
+        walkAttrsFn(*getAttributes());
+    }
     if (getBuiltinValue())
     {
         walkAttrsFn(*getBuiltinValue());
@@ -397,7 +434,16 @@ mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribut
         switch (index)
         {
             case 0: type = attr; break;
-            case 1: attributes = attr.cast<Py::DictAttr>(); break;
+            case 1:
+                if (attributes)
+                {
+                    attributes = attr.cast<Py::DictAttr>();
+                }
+                else
+                {
+                    builtinValue = attr;
+                }
+                break;
             case 2: builtinValue = attr; break;
             default: PYLIR_UNREACHABLE;
         }

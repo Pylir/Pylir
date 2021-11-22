@@ -53,3 +53,13 @@ func @test_constant_dict() -> !py.dynamic {
     %empty = py.constant #py.dict<{}>
     return %0 : !py.dynamic
 }
+
+// CHECK-LABEL: test_objects
+func @test_objects() -> !py.dynamic {
+    %0 = py.constant #py.obj<type: #py.int<0>>
+    %1 = py.constant #py.obj<type: #py.int<0>, value: #py.int<1>>
+    %2 = py.constant #py.obj<type: #py.int<0>, value: #py.int<1>, __dict__: #py.dict<{}>>
+    %3 = py.constant #py.obj<type: #py.int<0>, __dict__: #py.dict<{}>, value: #py.int<1>>
+    %4 = py.constant #py.obj<type: #py.int<0>, __dict__: #py.dict<{}>>
+    return %4 : !py.dynamic
+}
