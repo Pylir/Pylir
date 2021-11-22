@@ -23,5 +23,5 @@ def a():
     class Foo:
         pass
 
-# CHECK: %[[NAME:.*]] = py.constant "a.<locals>.Foo"
+# CHECK: %[[NAME:.*]] = py.constant #py.str<"a.<locals>.Foo">
 # CHECK: py.makeClass %[[NAME]]

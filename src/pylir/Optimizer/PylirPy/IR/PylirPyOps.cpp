@@ -246,7 +246,7 @@ mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribut
         results.emplace_back(mlir::BoolAttr::get(getContext(), false));
         return mlir::success();
     }
-    auto array =attributes->getValue();
+    auto array = attributes->getValue();
     auto result = std::find_if(array.begin(), array.end(), [&](auto pair) { return pair.first == attributeAttr(); });
     if (result == array.end())
     {
@@ -263,21 +263,9 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
 {
     if (operands[0])
     {
-        auto result =
-            llvm::TypeSwitch<mlir::Attribute, mlir::OpFoldResult>(operands[0])
-                .Case([&](Py::IntAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Int.name); })
-                .Case([&](Py::BoolAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
-                .Case([&](Py::TupleAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name); })
-                .Case([&](Py::ListAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::List.name); })
-                // TODO: .Case([&](Py::SetAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name);
-                // })
-                .Case([&](Py::DictAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Dict.name); })
-                .Case([&](mlir::FloatAttr) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Float.name); })
-                .Case([&](Py::ObjectAttr attr) { return attr.getType(); })
-                .Default({});
-        if (result)
+        if (auto obj = operands[0].dyn_cast<Py::ObjectAttr>())
         {
-            return result;
+            return obj.getType();
         }
     }
     auto* defOp = object().getDefiningOp();
@@ -292,8 +280,8 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name); })
             .Case<Py::MakeListOp, Py::MakeListExOp>(
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::List.name); })
-            //.Case<Py::MakeSetOp, Py::MakeSetExOp>(
-            //    [](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name); })
+            .Case<Py::MakeSetOp, Py::MakeSetExOp>(
+                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name); })
             .Case<Py::MakeDictOp, Py::MakeDictExOp>(
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Dict.name); })
             .Case<Py::MakeFuncOp, Py::GetFunctionOp>(

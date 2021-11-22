@@ -3,9 +3,9 @@
 # CHECK-LABEL: __init__
 
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo$cc[0]"
-# CHECK: %[[NAME:.*]] = py.constant "foo"
+# CHECK: %[[NAME:.*]] = py.constant #py.str<"foo">
 # CHECK: py.setAttr "__name__" of %[[RES]] to %[[NAME]]
-# CHECK: %[[NAME:.*]] = py.constant "foo"
+# CHECK: %[[NAME:.*]] = py.constant #py.str<"foo">
 # CHECK: py.setAttr "__qualname__" of %[[RES]] to %[[NAME]]
 # CHECK: %[[DEFAULTS:.*]] = py.constant @builtins.None
 # CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
@@ -26,11 +26,11 @@ def foo():
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK: %[[ONE:.*]] = py.constant #py.int<1>
-# CHECK: %[[C:.*]] = py.constant "c"
+# CHECK: %[[C:.*]] = py.constant #py.str<"c">
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo.<locals>.bar$cc[0]"
-# CHECK: %[[NAME:.*]] = py.constant "bar"
+# CHECK: %[[NAME:.*]] = py.constant #py.str<"bar">
 # CHECK: py.setAttr "__name__" of %[[RES]] to %[[NAME]]
-# CHECK: %[[NAME:.*]] = py.constant "foo.<locals>.bar"
+# CHECK: %[[NAME:.*]] = py.constant #py.str<"foo.<locals>.bar">
 # CHECK: py.setAttr "__qualname__" of %[[RES]] to %[[NAME]]
 # CHECK: %[[DEFAULTS:.*]] = py.makeTuple (%[[THREE]])
 # CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
@@ -74,7 +74,7 @@ def foo():
 # CHECK-SAME: %[[ARG_VALUE:[[:alnum:]]+]]
 # CHECK-SAME: )
 
-# CHECK: %[[INDEX:.*]] = py.constant "a"
+# CHECK: %[[INDEX:.*]] = py.constant #py.str<"a">
 # CHECK: %[[VALUE:.*]], %[[FOUND:.*]] = py.dict.tryGetItem %[[DICT]][%[[INDEX]]]
 # CHECK: cond_br %[[FOUND]], ^[[FOUND_BLOCK:.*]], ^[[NOT_FOUND_BLOCK:[[:alnum:]]+]]
 
@@ -119,7 +119,7 @@ def foo():
 
 # CHECK-NOT: arith.constant 1
 
-# CHECK: %[[INDEX:.*]] = py.constant "c"
+# CHECK: %[[INDEX:.*]] = py.constant #py.str<"c">
 # CHECK: %[[VALUE:.*]], %[[FOUND:.*]] = py.dict.tryGetItem %[[DICT]][%[[INDEX]]]
 # CHECK: cond_br %[[FOUND]], ^[[FOUND_BLOCK:.*]], ^[[NOT_FOUND_BLOCK:[[:alnum:]]+]]
 
@@ -147,7 +147,7 @@ def foo():
 # CHECK-SAME: )
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[INDEX:.*]] = py.constant "c"
+# CHECK: %[[INDEX:.*]] = py.constant #py.str<"c">
 # CHECK: %[[DEFAULT_ARG:.*]], %{{.*}} = py.dict.tryGetItem %[[DEFAULT_DICT]][%[[INDEX]]]
 # CHECK: br ^[[BOUND_BLOCK]](
 # CHECK-SAME: %[[DEFAULT_ARG]]

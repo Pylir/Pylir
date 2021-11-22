@@ -4,10 +4,10 @@
 # CHECK: py.constant #py.int<5>
 
 6.5
-# CHECK: py.constant 6.5
+# CHECK: py.constant #py.float<6.500000e+00>
 
 'text'
-# CHECK: py.constant "text"
+# CHECK: py.constant #py.str<"text">
 
 True
 

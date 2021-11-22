@@ -28,7 +28,7 @@ x(5, k=3)
 
 # CHECK: ^[[HAPPY_PATH]]:
 # CHECK: %[[FIVE:.*]] = py.constant #py.int<5>
-# CHECK: %[[K:.*]] = py.constant "k"
+# CHECK: %[[K:.*]] = py.constant #py.str<"k">
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
 # CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (%[[FIVE]])
 # CHECK-DAG: %[[DICT:.*]] = py.makeDict (%[[K]] : %[[THREE]])

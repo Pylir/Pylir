@@ -14,7 +14,7 @@ func @not_object() -> !py.dynamic {
 // -----
 
 func @not_contained() -> !py.dynamic {
-    %0 = py.constant #py.obj<type: #py.int<0>, __dict__: #py.dict<{"test" to 3}>>
+    %0 = py.constant #py.obj<type: @type, __dict__: #py.dict<{"test" to 3}>>
     %result, %success = py.getAttr "size" from %0
     %1 = py.bool.fromI1 %success
     return %1 : !py.dynamic
@@ -27,7 +27,7 @@ func @not_contained() -> !py.dynamic {
 // -----
 
 func @contained() -> (!py.dynamic, !py.dynamic) {
-    %0 = py.constant #py.obj<type: #py.int<0>, __dict__: #py.dict<{"size" to #py.int<3>}>>
+    %0 = py.constant #py.obj<type: @type, __dict__: #py.dict<{"size" to #py.int<3>}>>
     %result, %success = py.getAttr "size" from %0
     %1 = py.bool.fromI1 %success
     return %result, %1 : !py.dynamic, !py.dynamic

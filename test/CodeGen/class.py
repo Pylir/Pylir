@@ -13,7 +13,7 @@ def outer():
 
 # CHECK-DAG: %[[BASES:.*]] = py.constant #py.tuple<()>
 # CHECK-DAG: %[[KEYWORDS:.*]] = py.constant #py.dict<{}>
-# CHECK-DAG: %[[NAME:.*]] = py.constant "outer.<locals>.Foo"
+# CHECK-DAG: %[[NAME:.*]] = py.constant #py.str<"outer.<locals>.Foo">
 # CHECK: py.makeClass %[[NAME]], @[[FUNC:.*]], %[[BASES]], %[[KEYWORDS]]
 
 # CHECK: func private @[[FUNC]]
@@ -25,11 +25,11 @@ def outer():
 
 # CHECK: ^[[TRUE]]:
 # CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: %[[X:.*]] = py.constant "x"
+# CHECK: %[[X:.*]] = py.constant #py.str<"x">
 # CHECK: py.dict.setItem %[[DICT]][%[[X]]] to %[[THREE]]
 
 # CHECK: ^[[FALSE]]:
-# CHECK: %[[X:.*]] = py.constant "x"
+# CHECK: %[[X:.*]] = py.constant #py.str<"x">
 # CHECK: %[[ITEM:.*]], %[[FOUND:.*]] = py.dict.tryGetItem %[[DICT]][%[[X]]]
 # CHECK: cond_br %[[FOUND]], ^[[DICT_FOUND:.*]](%[[ITEM]] : !py.dynamic), ^[[ELSE:[[:alnum:]]+]]
 
@@ -39,7 +39,7 @@ def outer():
 # CHECK: br ^[[DICT_FOUND]]
 
 # CHECK: ^[[DICT_FOUND]](%[[RESULT:[[:alnum:]]+]]: !py.dynamic {{.*}}):
-# CHECK: %[[Y:.*]] = py.constant "y"
+# CHECK: %[[Y:.*]] = py.constant #py.str<"y">
 # CHECK: py.dict.setItem %[[DICT]][%[[Y]]] to %[[RESULT]]
 
 # CHECK: return %[[DICT]]

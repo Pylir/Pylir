@@ -888,7 +888,8 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
     auto loc = getLoc(identifierToken, identifierToken);
     if (m_classNamespace)
     {
-        auto str = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(identifierToken.getValue()));
+        auto str = m_builder.create<Py::ConstantOp>(
+            loc, Py::StringAttr::get(m_builder.getContext(), identifierToken.getValue()));
         m_builder.create<Py::DictSetItemOp>(loc, m_classNamespace, str, value);
         return;
     }
@@ -913,7 +914,8 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     if (m_classNamespace)
     {
         classNamespaceFound->addArgument(m_builder.getType<Py::DynamicType>());
-        auto str = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(identifierToken.getValue()));
+        auto str = m_builder.create<Py::ConstantOp>(
+            loc, Py::StringAttr::get(m_builder.getContext(), identifierToken.getValue()));
         auto tryGet = m_builder.create<Py::DictTryGetItemOp>(loc, m_classNamespace, str);
         auto elseBlock = BlockPtr{};
         m_builder.create<mlir::CondBranchOp>(loc, tryGet.found(), classNamespaceFound, tryGet.result(), elseBlock,
@@ -1031,7 +1033,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 case TokenType::FloatingPointLiteral:
                 {
                     return m_builder.create<Py::ConstantOp>(
-                        location, m_builder.getF64FloatAttr(pylir::get<double>(literal.token.getValue())));
+                        location,
+                        Py::FloatAttr::get(m_builder.getContext(), pylir::get<double>(literal.token.getValue())));
                 }
                 case TokenType::ComplexLiteral:
                 {
@@ -1041,7 +1044,8 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
                 case TokenType::StringLiteral:
                 {
                     return m_builder.create<Py::ConstantOp>(
-                        location, m_builder.getStringAttr(pylir::get<std::string>(literal.token.getValue())));
+                        location,
+                        Py::StringAttr::get(m_builder.getContext(), pylir::get<std::string>(literal.token.getValue())));
                 }
                 case TokenType::ByteLiteral:
                     // TODO:
@@ -1790,9 +1794,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                     defaultParameters.push_back(value);
                     return;
                 }
-                auto name =
-                    builder.create<Py::ConstantOp>(locCallback(defParameter.parameter.identifier),
-                                                   builder.getStringAttr(defParameter.parameter.identifier.getValue()));
+                auto name = builder.create<Py::ConstantOp>(
+                    locCallback(defParameter.parameter.identifier),
+                    Py::StringAttr::get(builder.getContext(), defParameter.parameter.identifier.getValue()));
                 keywordOnlyDefaultParameters.push_back(std::pair{name, value});
             }
 
@@ -1967,10 +1971,12 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     }
     mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, mlir::FlatSymbolRefAttr::get(func));
     m_builder.create<Py::SetAttrOp>(
-        loc, m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(funcDef.funcName.getValue())), value,
-        m_builder.getStringAttr("__name__"));
-    m_builder.create<Py::SetAttrOp>(loc, m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(qualifiedName)),
-                                    value, "__qualname__");
+        loc,
+        m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), funcDef.funcName.getValue())),
+        value, "__name__");
+    m_builder.create<Py::SetAttrOp>(
+        loc, m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), qualifiedName)), value,
+        "__qualname__");
     {
         mlir::Value defaults;
         if (defaultParameters.empty())
@@ -2048,7 +2054,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         keywords = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
     }
     auto qualifiedName = formQualifiedName(classDef.className.getValue());
-    auto name = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(qualifiedName));
+    auto name = m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), qualifiedName));
 
     mlir::FuncOp func;
     {
@@ -2141,8 +2147,9 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
     }
     auto handleKeywordItem = [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
     {
-        auto key = m_builder.create<Py::ConstantOp>(getLoc(keywordItem.identifier, keywordItem.identifier),
-                                                    m_builder.getStringAttr(keywordItem.identifier.getValue()));
+        auto key = m_builder.create<Py::ConstantOp>(
+            getLoc(keywordItem.identifier, keywordItem.identifier),
+            Py::StringAttr::get(m_builder.getContext(), keywordItem.identifier.getValue()));
         auto value = visit(*keywordItem.expression);
         if (!value)
         {
@@ -2302,7 +2309,8 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
             }
             case FunctionParameter::KeywordOnly:
             {
-                auto constant = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.name));
+                auto constant =
+                    m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), iter.name));
                 auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, dict, constant);
                 auto foundBlock = BlockPtr{};
                 auto notFoundBlock = BlockPtr{};
@@ -2407,7 +2415,8 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                         }
                         case FunctionParameter::KeywordOnly:
                         {
-                            auto index = m_builder.create<Py::ConstantOp>(loc, m_builder.getStringAttr(iter.name));
+                            auto index = m_builder.create<Py::ConstantOp>(
+                                loc, Py::StringAttr::get(m_builder.getContext(), iter.name));
                             auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, kwDefaultDict, index);
                             // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this
                             // also
