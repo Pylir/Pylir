@@ -559,7 +559,7 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [Symbol]> {
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility,
             UnitAttr:$constant,
-            AnyPyAttribute:$initializer);
+            PylirPy_ObjectAttr:$initializer);
 
     let results = (outs);
 

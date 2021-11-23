@@ -40,6 +40,6 @@ def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let summary = "python unbound value";
 }
 
-def AnyPyAttribute : AnyAttrOf<[PylirPy_ObjectAttr, PylirPy_UnboundAttr, FlatSymbolRefAttr]>;
+def AnyPyAttribute : AnyAttrOf<[PylirPy_ObjectAttr, PylirPy_UnboundAttr, SymbolRefAttr]>;
 
 #endif

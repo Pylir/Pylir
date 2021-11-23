@@ -89,6 +89,10 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
     {
         return Py::DictAttr::parse(parser, type);
     }
+    if (keyword == Py::FunctionAttr::getMnemonic())
+    {
+        return Py::FunctionAttr::parse(parser, type);
+    }
     mlir::Attribute result;
     (void)generatedAttributeParser(parser, keyword, type, result);
     return result;
@@ -97,7 +101,7 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
 void pylir::Py::PylirPyDialect::printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const
 {
     llvm::TypeSwitch<mlir::Attribute>(attr)
-        .Case<BoolAttr, IntAttr, FloatAttr, StringAttr, TupleAttr, ListAttr, SetAttr, DictAttr>(
+        .Case<BoolAttr, IntAttr, FloatAttr, StringAttr, TupleAttr, ListAttr, SetAttr, DictAttr, FunctionAttr>(
             [&](auto attr)
             {
                 os << attr.getMnemonic();
@@ -382,6 +386,51 @@ mlir::Attribute pylir::Py::SetAttr::parse(::mlir::AsmParser& parser, ::mlir::Typ
         return {};
     }
     return get(parser.getContext(), attrs);
+}
+
+pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(::mlir::MLIRContext* context, mlir::SymbolRefAttr value,
+                                                     llvm::Optional<Py::DictAttr> dict)
+{
+    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Function.name), dict, value)
+        .cast<FunctionAttr>();
+}
+
+mlir::Attribute pylir::Py::FunctionAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
+{
+    mlir::FlatSymbolRefAttr symbol;
+    llvm::Optional<Py::DictAttr> dictAttr;
+    if (parser.parseLess() || parser.parseAttribute(symbol))
+    {
+        return {};
+    }
+    if (!parser.parseOptionalComma())
+    {
+        dictAttr.emplace();
+        if (parser.parseKeyword("__dict__") || parser.parseColon() || parser.parseAttribute(*dictAttr))
+        {
+            return {};
+        }
+    }
+    if (parser.parseGreater())
+    {
+        return {};
+    }
+    return get(parser.getContext(), symbol, dictAttr);
+}
+
+void pylir::Py::FunctionAttr::print(::mlir::AsmPrinter& printer) const
+{
+    printer << "<" << getValue();
+    if (getAttributes())
+    {
+        printer << ", __dict__: " << *getAttributes();
+    }
+    printer << ">";
+}
+
+mlir::SymbolRefAttr pylir::Py::FunctionAttr::getValue() const
+{
+    return getBuiltinValue()->cast<mlir::SymbolRefAttr>();
 }
 
 pylir::BigInt pylir::Py::IntImplAttr::getValue() const

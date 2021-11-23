@@ -258,4 +258,34 @@ public:
 
     llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> getValue() const;
 };
+
+class FunctionAttr : public ObjectAttr
+{
+public:
+    using ObjectAttr::ObjectAttr;
+
+    static bool classof(mlir::Attribute attribute)
+    {
+        auto objectAttr = attribute.dyn_cast<ObjectAttr>();
+        if (!objectAttr)
+        {
+            return false;
+        }
+        return objectAttr.getType().getValue() == llvm::StringRef{Builtins::Function.name};
+    }
+
+    static FunctionAttr get(::mlir::MLIRContext* context, mlir::SymbolRefAttr value,
+                            llvm::Optional<Py::DictAttr> attributes = {});
+
+    static constexpr ::llvm::StringLiteral getMnemonic()
+    {
+        return ::llvm::StringLiteral("function");
+    }
+
+    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+
+    void print(::mlir::AsmPrinter& printer) const;
+
+    mlir::SymbolRefAttr getValue() const;
+};
 } // namespace pylir::Py

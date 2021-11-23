@@ -261,12 +261,9 @@ mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribut
 
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
-    if (operands[0])
+    if (auto obj = operands[0].dyn_cast_or_null<Py::ObjectAttr>())
     {
-        if (auto obj = operands[0].dyn_cast<Py::ObjectAttr>())
-        {
-            return obj.getType();
-        }
+        return obj.getType();
     }
     auto* defOp = object().getDefiningOp();
     if (!defOp)
