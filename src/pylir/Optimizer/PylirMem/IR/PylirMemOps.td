@@ -44,35 +44,42 @@ def PylirMem_InitIntOp : PylirMem_Op<"initInt"> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, AnySignlessInteger:$initializer);
 
-    let assemblyFormat = "$memory `=` $initializer `:` type($initializer) attr-dict";
+    let assemblyFormat = "$memory `to` $initializer `:` type($initializer) attr-dict";
 }
 
 def PylirMem_InitFloatOp : PylirMem_Op<"initFloat"> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, F64:$initializer);
 
-    let assemblyFormat = "$memory `=` $initializer attr-dict";
+    let assemblyFormat = "$memory `to` $initializer attr-dict";
 }
 
 def PylirMem_InitTupleOp : PylirMem_Op<"initTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AttrSizedOperandSegments]> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer, Arg<Optional<DynamicType>, "", [MemWrite]>:$reuse);
 
-    let assemblyFormat = "$memory `=` `(` $initializer `)` (`reuse` $reuse^)? attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `(` $initializer `)` (`reuse` $reuse^)? attr-dict";
+}
+
+def PylirMem_InitTupleFromListOp : PylirMem_Op<"initTupleFromList"> {
+    let results = (outs DynamicType:$result);
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$initializer, Arg<Optional<DynamicType>, "", [MemWrite]>:$reuse);
+
+    let assemblyFormat = "$memory `to` ` ` `(` `*` $initializer `)` (`reuse` $reuse^)? attr-dict";
 }
 
 def PylirMem_InitListOp : PylirMem_Op<"initList", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AttrSizedOperandSegments]> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer, Arg<Optional<DynamicType>, "", [MemWrite]>:$reuse);
 
-    let assemblyFormat = "$memory `=` `[` $initializer `]` (`reuse` $reuse^)? attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `[` $initializer `]` (`reuse` $reuse^)? attr-dict";
 }
 
 def PylirMem_InitSetOp : PylirMem_Op<"initSet", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AttrSizedOperandSegments]> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer, Arg<Optional<DynamicType>, "", [MemWrite]>:$reuse);
 
-    let assemblyFormat = "$memory `=` `{` $initializer `}` (`reuse` $reuse^)? attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `{` $initializer `}` (`reuse` $reuse^)? attr-dict";
 }
 
 def PylirMem_InitDictOp : PylirMem_Op<"initDict"> {
@@ -82,11 +89,11 @@ def PylirMem_InitDictOp : PylirMem_Op<"initDict"> {
     let assemblyFormat = "$memory attr-dict";
 }
 
-def PylirMem_InitFunctionOp : PylirMem_Op<"initFunction"> {
+def PylirMem_InitFuncOp : PylirMem_Op<"initFunc"> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, SymbolRefAttr:$initializer);
 
-    let assemblyFormat = "$memory `=` $initializer attr-dict";
+    let assemblyFormat = "$memory `to` $initializer attr-dict";
 }
 
 def PylirMem_InitObjectOp : PylirMem_Op<"initObject"> {
