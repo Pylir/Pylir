@@ -31,42 +31,4 @@ void pylir::Mem::PylirMemDialect::initialize()
         >();
 }
 
-/*
-mlir::Type pylir::Mem::PylirMemDialect::parseType(::mlir::DialectAsmParser& parser) const
-{
-    llvm::StringRef ref;
-    if (parser.parseKeyword(&ref))
-    {
-        return {};
-    }
-    mlir::Type type;
-    generatedTypeParser(getContext(), parser, ref, type);
-    return type;
-}
-
-void pylir::Mem::PylirMemDialect::printType(::mlir::Type type, ::mlir::DialectAsmPrinter& os) const
-{
-    auto result = generatedTypePrinter(type, os);
-    PYLIR_ASSERT(mlir::succeeded(result));
-}
-
-mlir::Attribute pylir::Mem::PylirMemDialect::parseAttribute(::mlir::DialectAsmParser& parser, ::mlir::Type type) const
-{
-    llvm::StringRef ref;
-    if (parser.parseKeyword(&ref))
-    {
-        return {};
-    }
-    mlir::Attribute attribute;
-    generatedAttributeParser(getContext(), parser, ref, type, attribute);
-    return attribute;
-}
-
-void pylir::Mem::PylirMemDialect::printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const
-{
-    auto result = generatedAttributePrinter(attr, os);
-    PYLIR_ASSERT(mlir::succeeded(result));
-}
-*/
-
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOpsDialect.cpp.inc>

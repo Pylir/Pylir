@@ -11,6 +11,10 @@ def PylirMem_Dialect : Dialect {
         TODO
     }];
     let cppNamespace = "::pylir::Mem";
+
+    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+    let useDefaultTypePrinterParser = 1;
 }
 
 #endif

@@ -170,6 +170,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         return true;
     }
     manager.addNestedPass<mlir::FuncOp>(pylir::Py::createExpandPyDialectPass());
+    manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
 
     auto triple = llvm::Triple(options.getLastArgValue(OPT_target, LLVM_DEFAULT_TARGET_TRIPLE));
     std::string error;

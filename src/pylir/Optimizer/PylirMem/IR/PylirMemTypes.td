@@ -9,4 +9,9 @@ include "mlir/IR/BuiltinTypeInterfaces.td"
 class PylirMem_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type"> :
     TypeDef<PylirMem_Dialect, name, traits, baseCppClass>;
 
+def PylirMem_MemoryType : PylirMem_Type<"Memory"> {
+    let mnemonic = "memory";
+    let summary = "python memory type";
+}
+
 #endif
