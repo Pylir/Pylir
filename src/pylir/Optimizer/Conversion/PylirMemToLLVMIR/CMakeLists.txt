@@ -8,7 +8,7 @@ add_mlir_conversion_library(PylirMemToLLVMIR
         DEPENDS
         PylirConversionPassIncGen
 
-        LINK_LIBS PUBLIC PylirMemDialect MLIRLLVMIR MLIRPass MLIRTransforms)
+        LINK_LIBS PUBLIC PylirMemDialect MLIRLLVMIR MLIRPass MLIRTransforms MLIRStandardToLLVM MLIRArithmeticToLLVM MLIRReconcileUnrealizedCasts)
 
 if (PYLIR_USE_PCH)
     target_link_libraries(PylirMemToLLVMIR PRIVATE COMMON_PCH)

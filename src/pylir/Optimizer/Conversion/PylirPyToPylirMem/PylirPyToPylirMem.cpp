@@ -11,43 +11,6 @@
 namespace
 {
 
-struct ConstantOpConversion : mlir::OpRewritePattern<pylir::Py::ConstantOp>
-{
-    ConstantOpConversion(mlir::ModuleOp moduleOp)
-        : mlir::OpRewritePattern<pylir::Py::ConstantOp>(moduleOp.getContext()), symbolTable(moduleOp)
-    {
-    }
-
-    mutable llvm::DenseMap<mlir::Attribute, pylir::Py::GlobalValueOp> globalValues;
-    mutable mlir::SymbolTable symbolTable;
-
-    void rewrite(pylir::Py::ConstantOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        if (auto global = globalValues.lookup(op.constant()))
-        {
-            rewriter.replaceOpWithNewOp<pylir::Py::ConstantOp>(op, mlir::FlatSymbolRefAttr::get(global));
-            return;
-        }
-        mlir::OpBuilder::InsertionGuard guard{rewriter};
-        pylir::Py::GlobalValueOp globalValueOp;
-        {
-            mlir::OpBuilder builder{getContext()};
-            mlir::OperationState state(rewriter.getUnknownLoc(), pylir::Py::GlobalValueOp::getOperationName());
-            pylir::Py::GlobalValueOp::build(builder, state, "const$", rewriter.getStringAttr("private"), true,
-                                            op.constant().cast<pylir::Py::ObjectAttr>());
-            globalValueOp = mlir::cast<pylir::Py::GlobalValueOp>(mlir::Operation::create(state));
-        }
-        symbolTable.insert(globalValueOp, mlir::Block::iterator{op->getParentOfType<mlir::FuncOp>()});
-        globalValues.insert({op.constant(), globalValueOp});
-        rewriter.replaceOpWithNewOp<pylir::Py::ConstantOp>(op, mlir::FlatSymbolRefAttr::get(globalValueOp));
-    }
-
-    mlir::LogicalResult match(pylir::Py::ConstantOp op) const override
-    {
-        return mlir::success(op.constant().isa<pylir::Py::ObjectAttr>());
-    }
-};
-
 struct MakeTupleOpConversion : mlir::OpRewritePattern<pylir::Py::MakeTupleOp>
 {
     using mlir::OpRewritePattern<pylir::Py::MakeTupleOp>::OpRewritePattern;
@@ -182,7 +145,6 @@ void ConvertPylirPyToPylirMem::runOnOperation()
         { return constantOp.constant().isa<pylir::Py::UnboundAttr, mlir::SymbolRefAttr>(); });
 
     mlir::RewritePatternSet patterns(&getContext());
-    patterns.insert<ConstantOpConversion>(getOperation());
     patterns.insert<MakeTupleOpConversion>(&getContext());
     patterns.insert<MakeListOpConversion>(&getContext());
     patterns.insert<MakeSetOpConversion>(&getContext());

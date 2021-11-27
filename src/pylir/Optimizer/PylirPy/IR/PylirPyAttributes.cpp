@@ -146,9 +146,14 @@ pylir::Py::ListAttr pylir::Py::ListAttr::get(::mlir::MLIRContext* context, llvm:
         .cast<ListAttr>();
 }
 
+mlir::ArrayAttr pylir::Py::ListAttr::getValueAttr() const
+{
+    return getBuiltinValue()->cast<mlir::ArrayAttr>();
+}
+
 llvm::ArrayRef<mlir::Attribute> pylir::Py::ListAttr::getValue() const
 {
-    return getBuiltinValue()->cast<mlir::ArrayAttr>().getValue();
+    return getValueAttr().getValue();
 }
 
 void pylir::Py::ListAttr::print(::mlir::AsmPrinter& printer) const
@@ -178,9 +183,14 @@ pylir::Py::TupleAttr pylir::Py::TupleAttr::get(::mlir::MLIRContext* context, llv
         .cast<TupleAttr>();
 }
 
+mlir::ArrayAttr pylir::Py::TupleAttr::getValueAttr() const
+{
+    return getBuiltinValue()->cast<mlir::ArrayAttr>();
+}
+
 llvm::ArrayRef<mlir::Attribute> pylir::Py::TupleAttr::getValue() const
 {
-    return getBuiltinValue()->cast<mlir::ArrayAttr>().getValue();
+    return getValueAttr().getValue();
 }
 
 void pylir::Py::TupleAttr::print(::mlir::AsmPrinter& printer) const
@@ -297,9 +307,14 @@ pylir::Py::FloatAttr pylir::Py::FloatAttr::get(::mlir::MLIRContext* context, dou
         .cast<FloatAttr>();
 }
 
+mlir::FloatAttr pylir::Py::FloatAttr::getValueAttr() const
+{
+    return getBuiltinValue()->cast<mlir::FloatAttr>();
+}
+
 double pylir::Py::FloatAttr::getValue() const
 {
-    return getBuiltinValue()->cast<mlir::FloatAttr>().getValueAsDouble();
+    return getValueAttr().getValueAsDouble();
 }
 
 mlir::Attribute pylir::Py::FloatAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
@@ -363,9 +378,14 @@ void pylir::Py::StringAttr::print(::mlir::AsmPrinter& printer) const
         .cast<SetAttr>();
 }
 
+mlir::ArrayAttr pylir::Py::SetAttr::getValueAttr() const
+{
+    return getBuiltinValue()->cast<mlir::ArrayAttr>();
+}
+
 llvm::ArrayRef<mlir::Attribute> pylir::Py::SetAttr::getValue() const
 {
-    return getBuiltinValue()->cast<mlir::ArrayAttr>().getValue();
+    return getValueAttr().getValue();
 }
 
 void pylir::Py::SetAttr::print(::mlir::AsmPrinter& printer) const

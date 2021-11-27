@@ -106,6 +106,8 @@ public:
     void print(::mlir::AsmPrinter& printer) const;
 
     double getValue() const;
+
+    mlir::FloatAttr getValueAttr() const;
 };
 
 class StringAttr : public ObjectAttr
@@ -164,6 +166,8 @@ public:
     void print(::mlir::AsmPrinter& printer) const;
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
+
+    mlir::ArrayAttr getValueAttr() const;
 };
 
 class ListAttr : public ObjectAttr
@@ -193,6 +197,8 @@ public:
     void print(::mlir::AsmPrinter& printer) const;
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
+
+    mlir::ArrayAttr getValueAttr() const;
 };
 
 class SetAttr : public ObjectAttr
@@ -224,6 +230,8 @@ public:
     void print(::mlir::AsmPrinter& printer) const;
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
+
+    mlir::ArrayAttr getValueAttr() const;
 };
 
 class DictAttr : public ObjectAttr
