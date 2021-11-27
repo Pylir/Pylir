@@ -254,11 +254,76 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
         {
             case mlir::SymbolTable::Visibility::Public: linkage = mlir::LLVM::linkage::Linkage::External; break;
             case mlir::SymbolTable::Visibility::Private: linkage = mlir::LLVM::linkage::Linkage::Private; break;
-            case mlir::SymbolTable::Visibility::Nested: break;
+            case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
         }
         auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, op.constant(), linkage, op.getName(),
                                                                         mlir::Attribute{});
         getTypeConverter()->initializeGlobal(global, op.initializer(), rewriter);
+    }
+};
+
+struct GlobalHandleOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GlobalHandleOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::GlobalHandleOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::GlobalHandleOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::GlobalHandleOp op, OpAdaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        mlir::LLVM::Linkage linkage;
+        switch (op.getVisibility())
+        {
+            case mlir::SymbolTable::Visibility::Public: linkage = mlir::LLVM::linkage::Linkage::External; break;
+            case mlir::SymbolTable::Visibility::Private: linkage = mlir::LLVM::linkage::Linkage::Private; break;
+            case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
+        }
+        auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(
+            op, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()), false, linkage, op.getName(),
+            mlir::Attribute{});
+        rewriter.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
+        auto null = rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), global.getType());
+        rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), mlir::ValueRange{null});
+    }
+};
+
+struct LoadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::LoadOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::LoadOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::LoadOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::LoadOp op, OpAdaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto address = rewriter.create<mlir::LLVM::AddressOfOp>(
+            op.getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
+            op.handleAttr());
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, address);
+    }
+};
+
+struct StoreOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StoreOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::StoreOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::StoreOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::StoreOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto address = rewriter.create<mlir::LLVM::AddressOfOp>(
+            op.getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
+            adaptor.handle());
+        rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.value(), address);
     }
 };
 
@@ -291,6 +356,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
     mlir::populateReconcileUnrealizedCastsPatterns(patternSet);
     patternSet.insert<ConstantOpConversion>(converter);
     patternSet.insert<GlobalValueOpConversion>(converter);
+    patternSet.insert<GlobalHandleOpConversion>(converter);
+    patternSet.insert<StoreOpConversion>(converter);
+    patternSet.insert<LoadOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
