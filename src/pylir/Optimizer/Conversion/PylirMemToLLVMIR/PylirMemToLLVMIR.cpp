@@ -360,6 +360,27 @@ struct IsUnboundValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py
     }
 };
 
+struct TypeOfOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TypeOfOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::TypeOfOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::TypeOfOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::TypeOfOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
+            adaptor.object(), mlir::ValueRange{zero, zero});
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep);
+    }
+};
+
 struct ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -394,6 +415,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<LoadOpConversion>(converter);
     patternSet.insert<IsOpConversion>(converter);
     patternSet.insert<IsUnboundValueOpConversion>(converter);
+    patternSet.insert<TypeOfOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
