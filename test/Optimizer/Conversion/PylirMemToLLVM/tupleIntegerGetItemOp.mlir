@@ -11,7 +11,8 @@ func @test(%arg : !py.dynamic, %index : index) -> !py.dynamic {
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
 // CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
 // CHECK-NEXT: %[[TWO:.*]] = llvm.mlir.constant(2 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARG]][%[[ZERO]], %[[ONE]], %[[TWO]]]
+// CHECK-NEXT: %[[BITCAST:.*]] = llvm.bitcast %[[ARG]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BITCAST]][%[[ZERO]], %[[ONE]], %[[TWO]]]
 // CHECK-NEXT: %[[BUFFER:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER]][%[[INDEX]]]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.load %[[GEP]]

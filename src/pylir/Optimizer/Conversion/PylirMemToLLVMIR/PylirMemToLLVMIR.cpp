@@ -399,11 +399,13 @@ struct TupleIntegerGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pyli
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto two =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        auto tuple = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyTupleType()), adaptor.tuple());
         auto bufferStartPtr = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(
                 mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()))),
-            adaptor.tuple(), mlir::ValueRange{zero, one, two});
+            tuple, mlir::ValueRange{zero, one, two});
         auto bufferStart = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), bufferStartPtr);
         auto offset =
             rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), bufferStart.getType(), bufferStart, adaptor.index());
