@@ -381,6 +381,36 @@ struct TypeOfOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TypeOf
     }
 };
 
+struct TupleIntegerGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerGetItemOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerGetItemOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::TupleIntegerGetItemOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::TupleIntegerGetItemOp op, OpAdaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto two =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        auto bufferStartPtr = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(
+                mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()))),
+            adaptor.tuple(), mlir::ValueRange{zero, one, two});
+        auto bufferStart = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), bufferStartPtr);
+        auto offset =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), bufferStart.getType(), bufferStart, adaptor.index());
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, offset);
+    }
+};
+
 struct ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -416,6 +446,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<IsOpConversion>(converter);
     patternSet.insert<IsUnboundValueOpConversion>(converter);
     patternSet.insert<TypeOfOpConversion>(converter);
+    patternSet.insert<TupleIntegerGetItemOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
