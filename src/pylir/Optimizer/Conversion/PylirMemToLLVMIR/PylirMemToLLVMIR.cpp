@@ -413,6 +413,30 @@ struct TupleIntegerGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pyli
     }
 };
 
+struct TupleIntegerLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerLenOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerLenOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::TupleIntegerLenOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::TupleIntegerLenOp op, OpAdaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto tuple = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyTupleType()), adaptor.tuple());
+        auto sizePtr = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
+                                                          tuple, mlir::ValueRange{zero, one, zero});
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, sizePtr);
+    }
+};
+
 struct ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -449,6 +473,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<IsUnboundValueOpConversion>(converter);
     patternSet.insert<TypeOfOpConversion>(converter);
     patternSet.insert<TupleIntegerGetItemOpConversion>(converter);
+    patternSet.insert<TupleIntegerLenOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
