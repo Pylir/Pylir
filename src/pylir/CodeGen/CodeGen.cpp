@@ -902,7 +902,12 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
         result->second.kind,
         [&](mlir::Operation* global)
         { m_builder.create<Py::StoreOp>(loc, value, mlir::FlatSymbolRefAttr::get(global)); },
-        [&](mlir::Value cell) { m_builder.create<Py::SetAttrOp>(loc, value, cell, "cell_contents"); },
+        [&](mlir::Value cell)
+        {
+            auto cellType = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
+            m_builder.create<Py::SetSlotOp>(loc, value, cellType, "cell_contents", cell);
+        },
         [&](Identifier::DefinitionMap& localMap) { localMap[m_builder.getBlock()] = value; });
 }
 
@@ -970,19 +975,22 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             break;
         case Identifier::Cell:
         {
-            auto getAttrOp =
-                m_builder.create<Py::GetAttrOp>(loc, pylir::get<mlir::Value>(result->second.kind), "cell_contents");
-            auto success = BlockPtr{};
-            auto failure = BlockPtr{};
-            m_builder.create<mlir::CondBranchOp>(loc, getAttrOp.success(), success, failure);
+            auto cellType = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
+            auto getAttrOp = m_builder.create<Py::GetSlotOp>(loc, pylir::get<mlir::Value>(result->second.kind),
+                                                             cellType, "cell_contents");
+            auto successBlock = BlockPtr{};
+            auto failureBlock = BlockPtr{};
+            auto success = m_builder.create<Py::IsUnboundValueOp>(loc, getAttrOp);
+            m_builder.create<mlir::CondBranchOp>(loc, success, successBlock, failureBlock);
 
-            implementBlock(failure);
+            implementBlock(failureBlock);
             auto exception = Py::buildException(loc, m_builder, Py::Builtins::UnboundLocalError.name,
                                                 /*TODO: string arg*/ {}, m_currentExceptBlock);
             raiseException(exception);
 
-            implementBlock(success);
-            return getAttrOp.result();
+            implementBlock(successBlock);
+            return getAttrOp;
         }
     }
     auto condition = m_builder.create<Py::IsUnboundValueOp>(loc, loadedValue);
@@ -1390,7 +1398,8 @@ void pylir::CodeGen::visitForConstruct(mlir::Location loc, const Syntax::TargetL
         loc, m_builder, "__iter__", type, m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{iterable}),
         m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext())), m_currentExceptBlock);
 
-    auto typeMRO = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
+    auto metaType = m_builder.create<Py::TypeOfOp>(loc, type);
+    auto typeMRO = m_builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__");
     auto nextMethod = m_builder.create<Py::MROLookupOp>(loc, typeMRO, "__next__");
     BlockPtr notNextBlock, condition;
     m_builder.create<mlir::CondBranchOp>(loc, nextMethod.success(), condition, notNextBlock);
@@ -1913,7 +1922,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                     loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
                 auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType, value});
                 auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
-                auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
+                auto metaType = m_builder.create<Py::TypeOfOp>(loc, closureType);
+                auto newMethod = m_builder.create<Py::GetSlotOp>(loc, closureType, metaType, "__new__");
                 auto cell =
                     m_builder
                         .create<mlir::CallIndirectOp>(loc, m_builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
@@ -1939,7 +1949,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name));
             auto tuple = m_builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{closureType});
             auto emptyDict = m_builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(m_builder.getContext()));
-            auto newMethod = m_builder.create<Py::GetAttrOp>(loc, closureType, "__new__").result();
+            auto metaType = m_builder.create<Py::TypeOfOp>(loc, closureType);
+            auto newMethod = m_builder.create<Py::GetSlotOp>(loc, closureType, metaType, "__new__");
             auto cell =
                 m_builder
                     .create<mlir::CallIndirectOp>(loc, m_builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
@@ -1950,11 +1961,13 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         if (!funcDef.nonLocalVariables.empty())
         {
             auto self = func.getArgument(0);
-            auto closureTuple = m_builder.create<Py::GetAttrOp>(loc, self, "__closure__");
+            auto metaType = m_builder.create<Py::ConstantOp>(
+                loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Function.name));
+            auto closureTuple = m_builder.create<Py::GetSlotOp>(loc, self, metaType, "__closure__");
             for (auto& iter : llvm::enumerate(funcDef.nonLocalVariables))
             {
                 auto constant = m_builder.create<mlir::arith::ConstantIndexOp>(loc, iter.index());
-                auto cell = m_builder.create<Py::TupleIntegerGetItemOp>(loc, closureTuple.result(), constant);
+                auto cell = m_builder.create<Py::TupleIntegerGetItemOp>(loc, closureTuple, constant);
                 m_scope.top().identifiers.emplace(iter.value().getValue(), Identifier{mlir::Value{cell}});
                 usedClosures.push_back(iter.value());
             }
@@ -1970,13 +1983,13 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         func = buildFunctionCC(loc, formImplName(qualifiedName + "$cc"), func, functionParameters);
     }
     mlir::Value value = m_builder.create<Py::MakeFuncOp>(loc, mlir::FlatSymbolRefAttr::get(func));
-    m_builder.create<Py::SetAttrOp>(
-        loc,
-        m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), funcDef.funcName.getValue())),
-        value, "__name__");
-    m_builder.create<Py::SetAttrOp>(
-        loc, m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), qualifiedName)), value,
-        "__qualname__");
+    auto type = m_builder.create<Py::TypeOfOp>(loc, value);
+    m_builder.create<Py::SetSlotOp>(loc, value, type, "__name__",
+                                    m_builder.create<Py::ConstantOp>(
+                                        loc, Py::StringAttr::get(m_builder.getContext(), funcDef.funcName.getValue())));
+    m_builder.create<Py::SetSlotOp>(
+        loc, value, type, "__qualname__",
+        m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), qualifiedName)));
     {
         mlir::Value defaults;
         if (defaultParameters.empty())
@@ -1988,7 +2001,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         {
             defaults = m_builder.create<Py::MakeTupleOp>(loc, defaultParameters);
         }
-        m_builder.create<Py::SetAttrOp>(loc, defaults, value, "__defaults__");
+        m_builder.create<Py::SetSlotOp>(loc, value, type, "__defaults__", defaults);
     }
     {
         mlir::Value kwDefaults;
@@ -2001,7 +2014,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         {
             kwDefaults = m_builder.create<Py::MakeDictOp>(loc, keywordOnlyDefaultParameters);
         }
-        m_builder.create<Py::SetAttrOp>(loc, kwDefaults, value, "__kwdefaults__");
+        m_builder.create<Py::SetSlotOp>(loc, value, type, "__kwdefaults__", kwDefaults);
     }
     {
         mlir::Value closure;
@@ -2022,7 +2035,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                            });
             closure = m_builder.create<Py::MakeTupleOp>(loc, args);
         }
-        m_builder.create<Py::SetAttrOp>(loc, closure, value, "__closure__");
+        m_builder.create<Py::SetSlotOp>(loc, value, type, "__closure__", closure);
     }
     for (auto& iter : llvm::reverse(funcDef.decorators))
     {
@@ -2252,26 +2265,14 @@ void pylir::CodeGen::raiseException(mlir::Value exceptionObject)
     m_builder.clearInsertionPoint();
 }
 
-mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
-                                             const std::vector<FunctionParameter>& parameters)
+std::vector<mlir::Value> pylir::CodeGen::unpackArgsKeywords(mlir::Location loc, mlir::Value tuple, mlir::Value dict,
+                                                            const std::vector<FunctionParameter>& parameters,
+                                                            llvm::function_ref<mlir::Value(std::size_t)> posDefault,
+                                                            llvm::function_ref<mlir::Value(std::string_view)> kwDefault)
 {
-    auto cc = mlir::FuncOp::create(
-        loc, name.str(),
-        m_builder.getFunctionType({m_builder.getType<Py::DynamicType>(), m_builder.getType<Py::DynamicType>(),
-                                   m_builder.getType<Py::DynamicType>()},
-                                  {m_builder.getType<Py::DynamicType>()}));
-    cc.setVisibility(mlir::SymbolTable::Visibility::Private);
-    auto reset = implementFunction(cc);
-
-    auto self = cc.getArgument(0);
-    auto tuple = cc.getArgument(1);
-    auto dict = cc.getArgument(2);
-
-    auto defaultTuple = m_builder.create<Py::GetAttrOp>(loc, self, "__defaults__").result();
-    auto kwDefaultDict = m_builder.create<Py::GetAttrOp>(loc, self, "__kwdefaults__").result();
     auto tupleLen = m_builder.create<Py::TupleIntegerLenOp>(loc, m_builder.getIndexType(), tuple);
 
-    std::vector<mlir::Value> args{self};
+    std::vector<mlir::Value> args;
     std::size_t posIndex = 0;
     std::size_t posDefaultsIndex = 0;
     for (auto& iter : parameters)
@@ -2409,19 +2410,14 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
                         case FunctionParameter::Normal:
                         case FunctionParameter::PosOnly:
                         {
-                            auto index = m_builder.create<mlir::arith::ConstantIndexOp>(loc, posDefaultsIndex++);
-                            defaultArg = m_builder.create<Py::TupleIntegerGetItemOp>(loc, defaultTuple, index);
+                            PYLIR_ASSERT(posDefault);
+                            defaultArg = posDefault(posDefaultsIndex++);
                             break;
                         }
                         case FunctionParameter::KeywordOnly:
                         {
-                            auto index = m_builder.create<Py::ConstantOp>(
-                                loc, Py::StringAttr::get(m_builder.getContext(), iter.name));
-                            auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, kwDefaultDict, index);
-                            // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this
-                            // also
-                            //      affects __defaults__
-                            defaultArg = lookup.result();
+                            PYLIR_ASSERT(kwDefault);
+                            defaultArg = kwDefault(iter.name);
                             break;
                         }
                         default: PYLIR_UNREACHABLE;
@@ -2437,6 +2433,42 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine nam
             case FunctionParameter::KeywordRest: args.push_back(argValue); break;
         }
     }
+    return args;
+}
+
+mlir::FuncOp pylir::CodeGen::buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
+                                             const std::vector<FunctionParameter>& parameters)
+{
+    auto cc = mlir::FuncOp::create(loc, name.str(), Py::getUniversalFunctionType(m_builder.getContext()));
+    cc.setVisibility(mlir::SymbolTable::Visibility::Private);
+    auto reset = implementFunction(cc);
+
+    auto self = cc.getArgument(0);
+    auto tuple = cc.getArgument(1);
+    auto dict = cc.getArgument(2);
+
+    auto functionType = m_builder.create<Py::ConstantOp>(
+        loc, mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Function.name));
+    auto defaultTuple = m_builder.create<Py::GetSlotOp>(loc, self, functionType, "__defaults__");
+    auto kwDefaultDict = m_builder.create<Py::GetSlotOp>(loc, self, functionType, "__kwdefaults__");
+
+    auto args = unpackArgsKeywords(
+        loc, tuple, dict, parameters,
+        [&](std::size_t posIndex) -> mlir::Value
+        {
+            auto index = m_builder.create<mlir::arith::ConstantIndexOp>(loc, posIndex);
+            return m_builder.create<Py::TupleIntegerGetItemOp>(loc, defaultTuple, index);
+        },
+        [&](std::string_view keyword) -> mlir::Value
+        {
+            auto index = m_builder.create<Py::ConstantOp>(loc, Py::StringAttr::get(m_builder.getContext(), keyword));
+            auto lookup = m_builder.create<Py::DictTryGetItemOp>(loc, kwDefaultDict, index);
+            // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this
+            // also
+            //      affects __defaults__
+            return lookup.result();
+        });
+    args.insert(args.begin(), self);
 
     auto result = m_builder.create<mlir::CallOp>(loc, implementation, args);
     m_builder.create<mlir::ReturnOp>(loc, result->getResults());
@@ -2563,7 +2595,8 @@ mlir::Value pylir::CodeGen::makeDict(mlir::Location loc, const std::vector<Py::D
 
 mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Location loc, mlir::Value type, mlir::Value base)
 {
-    auto mro = m_builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
+    auto metaType = m_builder.create<Py::TypeOfOp>(loc, type);
+    auto mro = m_builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__");
     return m_builder.create<Py::LinearContainsOp>(loc, mro, base);
 }
 

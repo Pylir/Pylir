@@ -224,41 +224,6 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return constant();
 }
 
-mlir::LogicalResult pylir::Py::GetAttrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                               ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
-{
-    if (!operands[0] || operands[0].isa<mlir::SymbolRefAttr>())
-    {
-        return mlir::failure();
-    }
-    auto object = operands[0].dyn_cast<Py::ObjectAttr>();
-    if (!object)
-    {
-        // Is this where poison values would go lol
-        results.emplace_back(Py::UnboundAttr::get(getContext()));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
-    }
-    auto attributes = object.getAttributes();
-    if (!attributes)
-    {
-        results.emplace_back(Py::UnboundAttr::get(getContext()));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
-    }
-    auto array = attributes->getValue();
-    auto result = std::find_if(array.begin(), array.end(), [&](auto pair) { return pair.first == attributeAttr(); });
-    if (result == array.end())
-    {
-        results.emplace_back(Py::UnboundAttr::get(getContext()));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
-    }
-    results.emplace_back(result->second);
-    results.emplace_back(mlir::BoolAttr::get(getContext(), true));
-    return mlir::success();
-}
-
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
     if (auto obj = operands[0].dyn_cast_or_null<Py::ObjectAttr>())

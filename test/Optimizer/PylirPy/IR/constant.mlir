@@ -58,8 +58,8 @@ func @test_constant_dict() -> !py.dynamic {
 func @test_objects() -> !py.dynamic {
     %0 = py.constant #py.obj<type: @a>
     %1 = py.constant #py.obj<type: @a, value: #py.int<1>>
-    %2 = py.constant #py.obj<type: @a, value: #py.int<1>, __dict__: #py.dict<{}>>
-    %3 = py.constant #py.obj<type: @a, __dict__: #py.dict<{}>, value: #py.int<1>>
-    %4 = py.constant #py.obj<type: @a, __dict__: #py.dict<{}>>
+    %2 = py.constant #py.obj<type: @a, value: #py.int<1>, slots: #py.slots<{"__dict__" to #py.dict<{}>}>>
+    %3 = py.constant #py.obj<type: @a, slots: #py.slots<{"__dict__" to #py.dict<{}>}>, value: #py.int<1>>
+    %4 = py.constant #py.obj<type: @a, slots: #py.slots<{"__dict__" to #py.dict<{}>}>>
     return %4 : !py.dynamic
 }

@@ -15,7 +15,7 @@ func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @a = #py.int<0>
 
 func @constant_obj() -> !py.dynamic {
-    %0 = py.constant #py.obj<type: @type, __dict__: #py.dict<{}>>
+    %0 = py.constant #py.obj<type: @type>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }

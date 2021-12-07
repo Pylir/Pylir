@@ -27,12 +27,27 @@ def PylirPy_DictImplAttr : PylirPy_Attr<"DictImpl", [DeclareAttrInterfaceMethods
     }];
 }
 
+def PylirPy_SlotsAttr : PylirPy_Attr<"Slots", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+                                                                            ["replaceImmediateSubAttribute"]>]> {
+    let mnemonic = "slots";
+    let parameters = (ins ArrayRefParameter<"std::pair<mlir::StringAttr, mlir::Attribute>">:$value);
+}
+
 def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
                                                                                 ["replaceImmediateSubAttribute"]>]> {
     let mnemonic = "obj";
     let summary = "python object";
 
-    let parameters = (ins "mlir::FlatSymbolRefAttr":$type, "::llvm::Optional<::pylir::Py::DictAttr>":$attributes, "::llvm::Optional<mlir::Attribute>":$builtinValue);
+    let parameters = (ins "mlir::FlatSymbolRefAttr":$type, "::pylir::Py::SlotsAttr":$slots, "mlir::Attribute":$builtinValue);
+
+    let skipDefaultBuilders = 1;
+
+    let builders = [
+        AttrBuilderWithInferredContext<(ins "mlir::FlatSymbolRefAttr":$type)>,
+        AttrBuilderWithInferredContext<(ins "mlir::FlatSymbolRefAttr":$type,
+                                            "::pylir::Py::SlotsAttr":$slots,
+                                            CArg<"::mlir::Attribute", "{}">:$builtinValue)>,
+    ];
 }
 
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {

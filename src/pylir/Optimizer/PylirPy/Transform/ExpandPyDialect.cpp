@@ -44,7 +44,8 @@ struct GetFunctionPattern : mlir::OpRewritePattern<pylir::Py::GetFunctionOp>
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
-        auto mroTuple = rewriter.create<pylir::Py::GetAttrOp>(loc, type, "__mro__").result();
+        auto metaType = rewriter.create<pylir::Py::TypeOfOp>(loc, type);
+        auto mroTuple = rewriter.create<pylir::Py::GetSlotOp>(loc, type, metaType, "__mro__");
         auto lookup = rewriter.create<pylir::Py::MROLookupOp>(loc, mroTuple, "__call__");
         auto unboundValue = rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::UnboundAttr::get(getContext()));
         auto falseConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
@@ -88,9 +89,11 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
         auto entry = rewriter.create<pylir::Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
-        auto fetch = rewriter.create<pylir::Py::GetAttrOp>(loc, entry, op.attribute());
+        auto entryType = rewriter.create<pylir::Py::TypeOfOp>(loc, entry);
+        auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.attribute());
+        auto success = rewriter.create<pylir::Py::IsUnboundValueOp>(loc, fetch);
         auto notFound = new mlir::Block;
-        rewriter.create<mlir::CondBranchOp>(loc, fetch.success(), endBlock, fetch->getResults(), notFound,
+        rewriter.create<mlir::CondBranchOp>(loc, success, endBlock, mlir::ValueRange{fetch, success}, notFound,
                                             mlir::ValueRange{});
 
         notFound->insertBefore(endBlock);
@@ -225,7 +228,8 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
                 rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext())),
                 exceptionPath);
 
-            auto typeMRO = rewriter.create<pylir::Py::GetAttrOp>(loc, type, "__mro__").result();
+            auto metaType = rewriter.create<pylir::Py::TypeOfOp>(loc, type);
+            auto typeMRO = rewriter.create<pylir::Py::GetSlotOp>(loc, type, metaType, "__mro__");
             auto nextMethod = rewriter.create<pylir::Py::MROLookupOp>(loc, typeMRO, "__next__");
             auto notNextBlock = new mlir::Block;
             auto condition = new mlir::Block;
@@ -265,7 +269,8 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             auto exceptionType = rewriter.create<pylir::Py::TypeOfOp>(loc, exception);
             auto stopIteration = rewriter.create<pylir::Py::ConstantOp>(
                 loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
-            auto mro = rewriter.create<pylir::Py::GetAttrOp>(loc, exceptionType, "__mro__").result();
+            metaType = rewriter.create<pylir::Py::TypeOfOp>(loc, exceptionType);
+            auto mro = rewriter.create<pylir::Py::GetSlotOp>(loc, exceptionType, metaType, "__mro__");
             auto isStopIteration = rewriter.create<pylir::Py::LinearContainsOp>(loc, mro, stopIteration);
             auto reraiseBlock = new mlir::Block;
             auto exitBlock = new mlir::Block;

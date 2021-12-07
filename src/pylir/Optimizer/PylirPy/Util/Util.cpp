@@ -54,18 +54,20 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
         implementBlock(builder, happyPath);
     }
     auto dict = builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(builder.getContext(), {}));
-    auto newMethod = builder.create<Py::GetAttrOp>(loc, typeObj, "__new__").result();
+    auto metaType = builder.create<Py::TypeOfOp>(loc, typeObj);
+    auto newMethod = builder.create<Py::GetSlotOp>(loc, typeObj, metaType, "__new__");
 
     auto obj = builder
                    .create<mlir::CallIndirectOp>(loc, builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
                                                  mlir::ValueRange{newMethod, tuple, dict})
                    ->getResult(0);
+    auto objType = builder.create<Py::TypeOfOp>(loc, obj);
     auto context =
         builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
-    builder.create<Py::SetAttrOp>(loc, context, obj, "__context__");
+    builder.create<Py::SetSlotOp>(loc, obj, objType, "__context__", context);
     auto cause =
         builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
-    builder.create<Py::SetAttrOp>(loc, cause, obj, "__cause__");
+    builder.create<Py::SetSlotOp>(loc, obj, objType, "__cause__", cause);
     return obj;
 }
 
@@ -93,14 +95,15 @@ mlir::Value pylir::Py::buildCall(mlir::Location loc, mlir::OpBuilder& builder, m
         builder.create<Py::InvokeIndirectOp>(loc, function, mlir::ValueRange{functionObj.result(), tuple, dict},
                                              mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptionPath);
     implementBlock(builder, happyPath);
-    return result;
+    return result.getResult(0);
 }
 
 mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder, llvm::Twine methodName,
                                               mlir::Value type, mlir::Value tuple, mlir::Value dict,
                                               mlir::Block* exceptionPath)
 {
-    auto mroTuple = builder.create<Py::GetAttrOp>(loc, type, "__mro__").result();
+    auto metaType = builder.create<Py::TypeOfOp>(loc, type);
+    auto mroTuple = builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__").result();
     auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
     auto notFound = new mlir::Block;
     auto exec = new mlir::Block;
@@ -112,4 +115,10 @@ mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilde
 
     implementBlock(builder, exec);
     return Py::buildCall(loc, builder, lookup.result(), tuple, dict, exceptionPath);
+}
+
+mlir::FunctionType pylir::Py::getUniversalFunctionType(mlir::MLIRContext* context)
+{
+    auto dynamic = Py::DynamicType::get(context);
+    return mlir::FunctionType::get(context, {/*closure=*/dynamic, /* *args=*/dynamic, /* **kw=*/dynamic}, {dynamic});
 }

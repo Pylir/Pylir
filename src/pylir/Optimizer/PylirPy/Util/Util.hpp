@@ -14,4 +14,7 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
 mlir::Value buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder, llvm::Twine methodName,
                                    mlir::Value type, mlir::Value tuple, mlir::Value dict,
                                    mlir::Block* PYLIR_NULLABLE exceptionPath);
+
+mlir::FunctionType getUniversalFunctionType(mlir::MLIRContext* context);
+
 } // namespace pylir::Py

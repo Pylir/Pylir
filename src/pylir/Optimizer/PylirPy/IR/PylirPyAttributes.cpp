@@ -112,14 +112,14 @@ void pylir::Py::PylirPyDialect::printAttribute(::mlir::Attribute attr, ::mlir::D
 
 pylir::Py::IntAttr pylir::Py::IntAttr::get(::mlir::MLIRContext* context, BigInt value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Int.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Int.name), {},
                            IntImplAttr::get(context, value))
         .cast<IntAttr>();
 }
 
 pylir::BigInt pylir::Py::IntAttr::getValue() const
 {
-    return this->getBuiltinValue().getValue().cast<IntImplAttr>().getValue();
+    return this->getBuiltinValue().cast<IntImplAttr>().getValue();
 }
 
 void pylir::Py::IntAttr::print(::mlir::AsmPrinter& printer) const
@@ -141,14 +141,14 @@ mlir::Attribute pylir::Py::IntAttr::parse(::mlir::AsmParser& parser, ::mlir::Typ
 
 pylir::Py::ListAttr pylir::Py::ListAttr::get(::mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::List.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::List.name), {},
                            mlir::ArrayAttr::get(context, value))
         .cast<ListAttr>();
 }
 
 mlir::ArrayAttr pylir::Py::ListAttr::getValueAttr() const
 {
-    return getBuiltinValue()->cast<mlir::ArrayAttr>();
+    return getBuiltinValue().cast<mlir::ArrayAttr>();
 }
 
 llvm::ArrayRef<mlir::Attribute> pylir::Py::ListAttr::getValue() const
@@ -178,14 +178,14 @@ mlir::Attribute pylir::Py::ListAttr::parse(::mlir::AsmParser& parser, ::mlir::Ty
 
 pylir::Py::TupleAttr pylir::Py::TupleAttr::get(::mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Tuple.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Tuple.name), {},
                            mlir::ArrayAttr::get(context, value))
         .cast<TupleAttr>();
 }
 
 mlir::ArrayAttr pylir::Py::TupleAttr::getValueAttr() const
 {
-    return getBuiltinValue()->cast<mlir::ArrayAttr>();
+    return getBuiltinValue().cast<mlir::ArrayAttr>();
 }
 
 llvm::ArrayRef<mlir::Attribute> pylir::Py::TupleAttr::getValue() const
@@ -216,7 +216,7 @@ mlir::Attribute pylir::Py::TupleAttr::parse(::mlir::AsmParser& parser, ::mlir::T
 pylir::Py::DictAttr pylir::Py::DictAttr::get(::mlir::MLIRContext* context,
                                              llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Dict.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Dict.name), {},
                            Py::DictImplAttr::get(context, value))
         .cast<DictAttr>();
 }
@@ -224,14 +224,14 @@ pylir::Py::DictAttr pylir::Py::DictAttr::get(::mlir::MLIRContext* context,
 pylir::Py::DictAttr pylir::Py::DictAttr::getUniqued(::mlir::MLIRContext* context,
                                                     llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Dict.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Dict.name), {},
                            Py::DictImplAttr::getUniqued(context, value))
         .cast<DictAttr>();
 }
 
 llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> pylir::Py::DictAttr::getValue() const
 {
-    return getBuiltinValue()->cast<DictImplAttr>().getValue();
+    return getBuiltinValue().cast<DictImplAttr>().getValue();
 }
 
 void pylir::Py::DictAttr::print(::mlir::AsmPrinter& printer) const
@@ -261,7 +261,7 @@ mlir::Attribute pylir::Py::DictAttr::parse(::mlir::AsmParser& parser, ::mlir::Ty
 
 pylir::Py::BoolAttr pylir::Py::BoolAttr::get(::mlir::MLIRContext* context, bool value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Bool.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Bool.name), {},
                            IntImplAttr::get(context, BigInt(value ? 1 : 0)))
         .cast<BoolAttr>();
 }
@@ -302,14 +302,14 @@ bool pylir::Py::BoolAttr::getValue() const
 
 pylir::Py::FloatAttr pylir::Py::FloatAttr::get(::mlir::MLIRContext* context, double value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Float.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Float.name), {},
                            mlir::FloatAttr::get(mlir::Float64Type::get(context), value))
         .cast<FloatAttr>();
 }
 
 mlir::FloatAttr pylir::Py::FloatAttr::getValueAttr() const
 {
-    return getBuiltinValue()->cast<mlir::FloatAttr>();
+    return getBuiltinValue().cast<mlir::FloatAttr>();
 }
 
 double pylir::Py::FloatAttr::getValue() const
@@ -334,14 +334,14 @@ void pylir::Py::FloatAttr::print(::mlir::AsmPrinter& printer) const
 
 pylir::Py::StringAttr pylir::Py::StringAttr::get(::mlir::MLIRContext* context, llvm::StringRef value)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Str.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Str.name), {},
                            mlir::StringAttr::get(context, value))
         .cast<StringAttr>();
 }
 
 llvm::StringRef pylir::Py::StringAttr::getValue() const
 {
-    return getBuiltinValue()->cast<mlir::StringAttr>().getValue();
+    return getBuiltinValue().cast<mlir::StringAttr>().getValue();
 }
 
 mlir::Attribute pylir::Py::StringAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
@@ -373,14 +373,14 @@ void pylir::Py::StringAttr::print(::mlir::AsmPrinter& printer) const
 ::pylir::Py::SetAttr pylir::Py::SetAttr::getUniqued(::mlir::MLIRContext* context,
                                                     llvm::ArrayRef<mlir::Attribute> attributes)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Set.name), {},
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Set.name), {},
                            mlir::ArrayAttr::get(context, attributes))
         .cast<SetAttr>();
 }
 
 mlir::ArrayAttr pylir::Py::SetAttr::getValueAttr() const
 {
-    return getBuiltinValue()->cast<mlir::ArrayAttr>();
+    return getBuiltinValue().cast<mlir::ArrayAttr>();
 }
 
 llvm::ArrayRef<mlir::Attribute> pylir::Py::SetAttr::getValue() const
@@ -408,25 +408,56 @@ mlir::Attribute pylir::Py::SetAttr::parse(::mlir::AsmParser& parser, ::mlir::Typ
     return get(parser.getContext(), attrs);
 }
 
-pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(::mlir::MLIRContext* context, mlir::SymbolRefAttr value,
-                                                     llvm::Optional<Py::DictAttr> dict)
+pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::SymbolRefAttr value, mlir::Attribute defaults,
+                                                     mlir::Attribute kwDefaults, mlir::Attribute dict)
 {
-    return ObjectAttr::get(context, mlir::FlatSymbolRefAttr::get(context, Builtins::Function.name), dict, value)
+    if (!defaults)
+    {
+        defaults = mlir::SymbolRefAttr::get(value.getContext(), Builtins::None.name);
+    }
+    if (!kwDefaults)
+    {
+        kwDefaults = mlir::SymbolRefAttr::get(value.getContext(), Builtins::None.name);
+    }
+    llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> slots = {
+        {mlir::StringAttr::get(value.getContext(), "__defaults__"), defaults},
+        {mlir::StringAttr::get(value.getContext(), "__kwdefaults__"), kwDefaults}};
+    if (dict)
+    {
+        slots.emplace_back(mlir::StringAttr::get(value.getContext(), "__dict__"), dict);
+    }
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(value.getContext(), Builtins::Function.name),
+                           Py::SlotsAttr::get(value.getContext(), slots), value)
         .cast<FunctionAttr>();
 }
 
 mlir::Attribute pylir::Py::FunctionAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
     mlir::FlatSymbolRefAttr symbol;
-    llvm::Optional<Py::DictAttr> dictAttr;
     if (parser.parseLess() || parser.parseAttribute(symbol))
     {
         return {};
     }
+    mlir::Attribute defaults;
+    mlir::Attribute kwDefaults;
+    mlir::Attribute dict;
     if (!parser.parseOptionalComma())
     {
-        dictAttr.emplace();
-        if (parser.parseKeyword("__dict__") || parser.parseColon() || parser.parseAttribute(*dictAttr))
+        if (parser.parseKeyword("__defaults__") || parser.parseColon() || parser.parseAttribute(defaults))
+        {
+            return {};
+        }
+    }
+    if (!parser.parseOptionalComma())
+    {
+        if (parser.parseKeyword("__kwdefaults__") || parser.parseColon() || parser.parseAttribute(kwDefaults))
+        {
+            return {};
+        }
+    }
+    if (!parser.parseOptionalComma())
+    {
+        if (parser.parseKeyword("__dict__") || parser.parseColon() || parser.parseAttribute(dict))
         {
             return {};
         }
@@ -435,22 +466,56 @@ mlir::Attribute pylir::Py::FunctionAttr::parse(::mlir::AsmParser& parser, ::mlir
     {
         return {};
     }
-    return get(parser.getContext(), symbol, dictAttr);
+    return get(symbol, defaults, kwDefaults, dict);
 }
 
 void pylir::Py::FunctionAttr::print(::mlir::AsmPrinter& printer) const
 {
     printer << "<" << getValue();
-    if (getAttributes())
+    if (auto defaults = getDefaults(); defaults != mlir::FlatSymbolRefAttr::get(getContext(), Builtins::None.name))
     {
-        printer << ", __dict__: " << *getAttributes();
+        printer << ", __defaults__: " << defaults;
+    }
+    if (auto kwDefaults = getKWDefaults();
+        kwDefaults != mlir::FlatSymbolRefAttr::get(getContext(), Builtins::None.name))
+    {
+        printer << ", __kwdefaults__: " << kwDefaults;
+    }
+    if (auto dict = getDict())
+    {
+        printer << ", __dict__: " << dict;
     }
     printer << ">";
 }
 
 mlir::SymbolRefAttr pylir::Py::FunctionAttr::getValue() const
 {
-    return getBuiltinValue()->cast<mlir::SymbolRefAttr>();
+    return getBuiltinValue().cast<mlir::SymbolRefAttr>();
+}
+
+mlir::Attribute pylir::Py::FunctionAttr::getDefaults() const
+{
+    return std::find_if(getSlots().getValue().begin(), getSlots().getValue().end(),
+                        [](auto pair) { return pair.first.getValue() == "__defaults__"; })
+        ->second;
+}
+
+mlir::Attribute pylir::Py::FunctionAttr::getKWDefaults() const
+{
+    return std::find_if(getSlots().getValue().begin(), getSlots().getValue().end(),
+                        [](auto pair) { return pair.first.getValue() == "__kwdefaults__"; })
+        ->second;
+}
+
+mlir::Attribute pylir::Py::FunctionAttr::getDict() const
+{
+    auto result = std::find_if(getSlots().getValue().begin(), getSlots().getValue().end(),
+                               [](auto pair) { return pair.first.getValue() == "__defaults__"; });
+    if (result == getSlots().getValue().end())
+    {
+        return {};
+    }
+    return result->second;
 }
 
 pylir::BigInt pylir::Py::IntImplAttr::getValue() const
@@ -511,16 +576,85 @@ mlir::SubElementAttrInterface pylir::Py::DictImplAttr::replaceImmediateSubAttrib
     return getUniqued(getContext(), vector);
 }
 
+void pylir::Py::SlotsAttr::print(::mlir::AsmPrinter& printer) const
+{
+    printer << "<{";
+    llvm::interleaveComma(getValue(), printer.getStream(),
+                          [&](auto pair) { printer << pair.first << " to " << pair.second; });
+    printer << "}>";
+}
+
+mlir::Attribute pylir::Py::SlotsAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
+{
+    llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> attrs;
+    if (parser.parseLess()
+        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
+                                          [&]
+                                          {
+                                              return mlir::failure(parser.parseAttribute(attrs.emplace_back().first)
+                                                                   || parser.parseKeyword("to")
+                                                                   || parser.parseAttribute(attrs.back().second));
+                                          })
+        || parser.parseGreater())
+    {
+        return {};
+    }
+    return get(parser.getContext(), attrs);
+}
+
+void pylir::Py::SlotsAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                    llvm::function_ref<void(mlir::Type)>) const
+{
+    for (auto [str, attr] : getValue())
+    {
+        walkAttrsFn(str);
+        walkAttrsFn(attr);
+    }
+}
+
+mlir::SubElementAttrInterface pylir::Py::SlotsAttr::replaceImmediateSubAttribute(
+    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+{
+    auto vector = getValue().vec();
+    for (auto [index, attr] : replacements)
+    {
+        if (index & 1)
+        {
+            vector[index / 2].second = attr;
+        }
+        else
+        {
+            vector[index / 2].first = attr.cast<mlir::StringAttr>();
+        }
+    }
+    return get(getContext(), vector);
+}
+
+pylir::Py::ObjectAttr pylir::Py::ObjectAttr::get(mlir::FlatSymbolRefAttr type)
+{
+    return get(type, {}, {});
+}
+
+pylir::Py::ObjectAttr pylir::Py::ObjectAttr::get(mlir::FlatSymbolRefAttr type, pylir::Py::SlotsAttr slots,
+                                                 mlir::Attribute builtinValue)
+{
+    if (slots && slots.getValue().empty())
+    {
+        slots = {};
+    }
+    return Base::get(type.getContext(), type, slots, builtinValue);
+}
+
 void pylir::Py::ObjectAttr::print(::mlir::AsmPrinter& printer) const
 {
     printer << "<type: " << getType();
-    if (getAttributes())
+    if (getSlots() && !getSlots().getValue().empty())
     {
-        printer << ", __dict__: " << getAttributes();
+        printer << ", slots: " << getSlots();
     }
     if (getBuiltinValue())
     {
-        printer << ", value: " << *getBuiltinValue();
+        printer << ", value: " << getBuiltinValue();
     }
     printer << ">";
 }
@@ -532,8 +666,8 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::
     {
         return {};
     }
-    llvm::Optional<pylir::Py::DictAttr> dictAttr;
-    llvm::Optional<mlir::Attribute> builtinValue;
+    pylir::Py::SlotsAttr slots;
+    mlir::Attribute builtinValue;
     while (!parser.parseOptionalComma())
     {
         llvm::StringRef keyword;
@@ -542,15 +676,14 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::
         {
             return {};
         }
-        if (keyword == "__dict__")
+        if (keyword == "slots")
         {
-            if (dictAttr)
+            if (slots)
             {
-                parser.emitError(loc, "`__dict__` can only appear once");
+                parser.emitError(loc, "`slots` can only appear once");
                 return {};
             }
-            dictAttr.emplace();
-            if (parser.parseColon() || parser.parseAttribute(*dictAttr))
+            if (parser.parseColon() || parser.parseAttribute(slots))
             {
                 return {};
             }
@@ -562,15 +695,14 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::
                 parser.emitError(loc, "`value` can only appear once");
                 return {};
             }
-            builtinValue.emplace();
-            if (parser.parseColon() || parser.parseAttribute(*builtinValue))
+            if (parser.parseColon() || parser.parseAttribute(builtinValue))
             {
                 return {};
             }
         }
         else
         {
-            parser.emitError(loc, "Unexpected keyword `") << keyword << "`. Expected one of `__dict__` or `value`";
+            parser.emitError(loc, "Unexpected keyword `") << keyword << "`. Expected one of `slots` or `value`";
             return {};
         }
     }
@@ -578,20 +710,24 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::
     {
         return {};
     }
-    return get(parser.getContext(), type, dictAttr, builtinValue);
+    if (slots && slots.getValue().empty())
+    {
+        slots = {};
+    }
+    return get(type, slots, builtinValue);
 }
 
 void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                      llvm::function_ref<void(mlir::Type)>) const
 {
     walkAttrsFn(getType());
-    if (getAttributes())
+    if (getSlots())
     {
-        walkAttrsFn(*getAttributes());
+        walkAttrsFn(getSlots());
     }
     if (getBuiltinValue())
     {
-        walkAttrsFn(*getBuiltinValue());
+        walkAttrsFn(getBuiltinValue());
     }
 }
 
@@ -599,7 +735,7 @@ mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribut
     ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
 {
     auto type = getType();
-    auto attributes = getAttributes();
+    auto slots = getSlots();
     auto builtinValue = getBuiltinValue();
     for (auto [index, attr] : replacements)
     {
@@ -607,9 +743,9 @@ mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribut
         {
             case 0: type = attr.cast<mlir::FlatSymbolRefAttr>(); break;
             case 1:
-                if (attributes)
+                if (slots)
                 {
-                    attributes = attr.cast<Py::DictAttr>();
+                    slots = attr.cast<Py::SlotsAttr>();
                 }
                 else
                 {
@@ -620,5 +756,5 @@ mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribut
             default: PYLIR_UNREACHABLE;
         }
     }
-    return get(getContext(), type, attributes, builtinValue);
+    return get(type, slots, builtinValue);
 }

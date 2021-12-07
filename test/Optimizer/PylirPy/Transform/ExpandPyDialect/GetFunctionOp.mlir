@@ -25,7 +25,8 @@ func @get_function(%callable : !py.dynamic) -> !py.dynamic {
 
 // CHECK: ^[[BODY]]
 // mro lookup...
-// CHECK: %[[RESULT:.*]], %[[SUCCESS:.*]] = py.getAttr "__call__" from %{{[[:alnum:]]+}}
+// CHECK: %[[RESULT:.*]] = py.getSlot "__call__" from %{{[[:alnum:]]+}}
+// CHECK: %[[SUCCESS:.*]] = py.isUnboundValue %[[RESULT]]
 // CHECK: cond_br %[[SUCCESS]], ^[[RESULT_BLOCK:[[:alnum:]]+]]
 // CHECK-SAME: %[[RESULT]]
 // CHECK-SAME: %[[SUCCESS]]

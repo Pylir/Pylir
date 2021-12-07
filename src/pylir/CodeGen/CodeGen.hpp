@@ -200,6 +200,11 @@ class CodeGen
         bool hasDefaultParam;
     };
 
+    std::vector<mlir::Value> unpackArgsKeywords(mlir::Location loc, mlir::Value tuple, mlir::Value dict,
+                                                const std::vector<FunctionParameter>& parameters,
+                                                llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
+                                                llvm::function_ref<mlir::Value(std::string_view)> kwDefault = {});
+
     mlir::FuncOp buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
                                  const std::vector<FunctionParameter>& parameters);
 

@@ -55,44 +55,8 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
     let verifier = "return ::verify(*this);";
 }
 
-def PylirPy_GetAttrOp : PylirPy_Op<"getAttr"> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$object, StrAttr:$attribute);
-    let results = (outs DynamicType:$result, I1:$success);
-
-    let assemblyFormat = [{
-        $attribute `from` $object attr-dict
-    }];
-
-    let description = [{
-        Gets the attribute from `$object` called `$attribute`. This is NOT equal to pythons `__getattr__` or
-        `__getattribute__` but more akin to `object.__dict__[attribute]` except that `$attribute` has to be a constant
-        and failure is indicated by `$success`. The result of the operation is put into `$result`. `$success` is 1
-        if the attribute was found, 0 else. Reading `$result` is undefined behaviour if `$success` is 0.
-    }];
-
-    let hasFolder = 1;
-}
-
-def PylirPy_SetAttrOp : PylirPy_Op<"setAttr"> {
-    let arguments = (ins DynamicType:$value, Arg<DynamicType, "", [MemWrite]>:$object, StrAttr:$attribute);
-    let results = (outs I1:$success);
-
-    let assemblyFormat = [{
-        $attribute `of` $object `to` $value attr-dict
-    }];
-
-    let description = [{
-        Sets the attribute called `$attribute` of `$object` to `$value`. This is NOT equal to pythons `__setattr__` but
-        more akin to `object.__dict__[attribute] = value` for an object with a dict object. This operation does however
-        not require the object to have a dictionary (eg. if it has slots). If setting the attribute was unsuccessful,
-        due to the object having neither a dictionary nor a slot of the given name, then `$success` is set to 0. On
-        success it is set to 1
-    }];
-}
-
 def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect]> {
     let arguments = (ins DynamicType:$object);
-    let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$object attr-dict";
 
@@ -101,6 +65,31 @@ def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect]> {
     }];
 
     let hasFolder = 1;
+}
+
+def PylirPy_GetSlotOp : PylirPy_Op<"getSlot"> {
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$object, DynamicType:$typeObject, StrAttr:$slot);
+
+    let assemblyFormat = "$slot `from` $object `:` $typeObject attr-dict";
+
+    let description = [{
+        Retrieves the value stored in the slot named `$slot` inside of `$object`. The `$slot` has to be one of the slots
+        that were defined in `$typeObject`. If `$object` is not of type `$typeObject` the result is undefined.
+        `$result` will contain the value in the slot, or unbound value if it was never assigned to or not part of the
+        type.
+    }];
+}
+
+def PylirPy_SetSlotOp : PylirPy_Op<"setSlot"> {
+    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$object, DynamicType:$typeObject, StrAttr:$slot, DynamicType:$value);
+    let results = (outs);
+
+    let assemblyFormat = "$slot `of` $object `:` $typeObject `to` $value attr-dict";
+
+    let description = [{
+        Sets the value of the slot named `$slot` inside of `$object` to `$value`. The `$slot` has to be one of the slots
+        that were defined in `$typeObject`. If `$object` is not of type `$typeObject` the result is undefined.
+    }];
 }
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
@@ -234,7 +223,7 @@ def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction"> {
 
     let description = [{
         This op does a recursive search through the `__call__` operators results of `$callable` until a result of type
-        `@builtins.function` is found, or the current item has no `__call__` operator exists. If successful `$success`
+        `@builtins.function` is found, or the current item has no `__call__` operator. If successful `$success`
         returns `true` and `$result` is guaranteed to be of type `@builtins.function`. Otherwise `$success` is false
         and using `$result` is undefined behaviour.
     }];
@@ -675,13 +664,14 @@ def PylirPy_InvokeIndirectOp : PylirPy_InvokeBase<"invoke_indirect",
                                                         "callee", "operands",
                                                         "$_self.cast<::mlir::FunctionType>().getInputs()">,
                                         TypesMatchWith<"callee result types match result types",
-                                                        "callee", "result",
-                                                        "$_self.cast<::mlir::FunctionType>().getResults()[0]">]> {
+                                                        "callee", "results",
+                                                        "$_self.cast<::mlir::FunctionType>().getResults()">]> {
     let arguments = (ins FunctionType:$callee,
                          Variadic<DynamicType>:$operands,
                          Variadic<DynamicType>:$normalDestOperands,
                          Variadic<DynamicType>:$unwindDestOperands);
 
+    let results = (outs Variadic<AnyType>:$results);
 
     let assemblyFormat = [{
         $callee `(` $operands `)` attr-dict `:` type($callee) `\n`

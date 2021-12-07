@@ -25,7 +25,8 @@ func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 // CHECK: ^[[BODY]]:
 // CHECK: %[[ENTRY:.*]] = py.tuple.integer.getItem %[[TUPLE]]
 // CHECK-SAME: %[[INDEX]]
-// CHECK: %[[RESULT:.*]], %[[SUCCESS:.*]] = py.getAttr "__call__" from %[[ENTRY]]
+// CHECK: %[[RESULT:.*]] = py.getSlot "__call__" from %[[ENTRY]]
+// CHECK: %[[SUCCESS:.*]] = py.isUnboundValue %[[RESULT]]
 // CHECK: cond_br %[[SUCCESS]], ^[[END]]
 // CHECK-SAME: %[[RESULT]]
 // CHECK-SAME: %[[SUCCESS]]

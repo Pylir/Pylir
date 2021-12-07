@@ -4,15 +4,15 @@
 
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo$cc[0]"
 # CHECK: %[[NAME:.*]] = py.constant #py.str<"foo">
-# CHECK: py.setAttr "__name__" of %[[RES]] to %[[NAME]]
+# CHECK: py.setSlot "__name__" of %[[RES]] : %{{.*}} to %[[NAME]]
 # CHECK: %[[NAME:.*]] = py.constant #py.str<"foo">
-# CHECK: py.setAttr "__qualname__" of %[[RES]] to %[[NAME]]
+# CHECK: py.setSlot "__qualname__" of %[[RES]] : %{{.*}} to %[[NAME]]
 # CHECK: %[[DEFAULTS:.*]] = py.constant @builtins.None
-# CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
+# CHECK: py.setSlot "__defaults__" of %[[RES]] : %{{.*}} to %[[DEFAULTS]]
 # CHECK: %[[KWDEFAULTS:.*]] = py.constant @builtins.None
-# CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
+# CHECK: py.setSlot "__kwdefaults__" of %[[RES]] : %{{.*}} to %[[KWDEFAULTS]]
 # CHECK: %[[CLOSURE:.*]] = py.constant @builtins.None
-# CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
+# CHECK: py.setSlot "__closure__" of %[[RES]] : %{{.*}} to %[[CLOSURE]]
 # CHECK: py.store %[[RES]] into @foo
 
 def foo():
@@ -29,15 +29,15 @@ def foo():
 # CHECK: %[[C:.*]] = py.constant #py.str<"c">
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo.<locals>.bar$cc[0]"
 # CHECK: %[[NAME:.*]] = py.constant #py.str<"bar">
-# CHECK: py.setAttr "__name__" of %[[RES]] to %[[NAME]]
+# CHECK: py.setSlot "__name__" of %[[RES]] : %{{.*}} to %[[NAME]]
 # CHECK: %[[NAME:.*]] = py.constant #py.str<"foo.<locals>.bar">
-# CHECK: py.setAttr "__qualname__" of %[[RES]] to %[[NAME]]
+# CHECK: py.setSlot "__qualname__" of %[[RES]] : %{{.*}} to %[[NAME]]
 # CHECK: %[[DEFAULTS:.*]] = py.makeTuple (%[[THREE]])
-# CHECK: py.setAttr "__defaults__" of %[[RES]] to %[[DEFAULTS]]
+# CHECK: py.setSlot "__defaults__" of %[[RES]] : %{{.*}} to %[[DEFAULTS]]
 # CHECK: %[[KWDEFAULTS:.*]] = py.makeDict (%[[C]] : %[[ONE]])
-# CHECK: py.setAttr "__kwdefaults__" of %[[RES]] to %[[KWDEFAULTS]]
+# CHECK: py.setSlot "__kwdefaults__" of %[[RES]] : %{{.*}} to %[[KWDEFAULTS]]
 # CHECK: %[[CLOSURE:.*]] = py.constant @builtins.None
-# CHECK: py.setAttr "__closure__" of %[[RES]] to %[[CLOSURE]]
+# CHECK: py.setSlot "__closure__" of %[[RES]] : %{{.*}} to %[[CLOSURE]]
 
 # CHECK: func private @"foo.<locals>.bar$impl[0]"
 # CHECK-SAME: %{{[[:alnum:]]+}}
@@ -48,8 +48,8 @@ def foo():
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
 # CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]
-# CHECK: %[[DEFAULT_TUPLE:.*]], %{{.*}} = py.getAttr "__defaults__" from %[[SELF]]
-# CHECK: %[[DEFAULT_DICT:.*]], %{{.*}} = py.getAttr "__kwdefaults__" from %[[SELF]]
+# CHECK: %[[DEFAULT_TUPLE:.*]] = py.getSlot "__defaults__" from %[[SELF]]
+# CHECK: %[[DEFAULT_DICT:.*]] = py.getSlot "__kwdefaults__" from %[[SELF]]
 # CHECK: %[[TUPLE_LEN:.*]] = py.tuple.integer.len %[[TUPLE]]
 
 # CHECK: %[[INDEX:.*]] = arith.constant 0
