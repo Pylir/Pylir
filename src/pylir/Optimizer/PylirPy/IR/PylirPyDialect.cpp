@@ -4,6 +4,8 @@
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/Transforms/InliningUtils.h>
 
+#include <llvm/ADT/TypeSwitch.h>
+
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsDialect.cpp.inc"
 
 #include "PylirPyAttributes.hpp"
@@ -63,4 +65,77 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
         return builder.create<mlir::ConstantOp>(loc, type, value);
     }
     return nullptr;
+}
+
+mlir::LogicalResult pylir::Py::PylirPyDialect::verifyOperationAttribute(::mlir::Operation* op,
+                                                                        ::mlir::NamedAttribute attribute)
+{
+    return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(attribute.getValue())
+        .Case(
+            [&](Py::FunctionAttr functionAttr) -> mlir::LogicalResult
+            {
+                if (!functionAttr.getValue())
+                {
+                    return op->emitOpError("Expected function attribute to contain a symbol reference");
+                }
+                auto table = mlir::SymbolTable(mlir::SymbolTable::getNearestSymbolTable(op));
+                if (!table.lookup<mlir::FuncOp>(functionAttr.getValue().getValue()))
+                {
+                    return op->emitOpError("Expected function attribute to refer to a function");
+                }
+                if (!functionAttr.getKWDefaults())
+                {
+                    return op->emitOpError("Expected __kwdefaults__ in function attribute");
+                }
+                if (!functionAttr.getKWDefaults().isa<Py::DictAttr, mlir::FlatSymbolRefAttr>())
+                {
+                    return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference");
+                }
+                else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
+                         ref && ref.getValue() != llvm::StringRef{Py::Builtins::None.name})
+                {
+                    auto lookup = table.lookup<Py::GlobalValueOp>(ref.getValue());
+                    if (!lookup)
+                    {
+                        return op->emitOpError("Expected __kwdefaults__ to refer to a dictionary");
+                    }
+                    // TODO: Check its dict or inherits from dict
+                }
+                if (!functionAttr.getDefaults())
+                {
+                    return op->emitOpError("Expected __defaults__ in function attribute");
+                }
+                if (!functionAttr.getDefaults().isa<Py::TupleAttr, mlir::FlatSymbolRefAttr>())
+                {
+                    return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference");
+                }
+                else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
+                         ref && ref.getValue() != llvm::StringRef{Py::Builtins::None.name})
+                {
+                    auto lookup = table.lookup<Py::GlobalValueOp>(ref.getValue());
+                    if (!lookup)
+                    {
+                        return op->emitOpError("Expected __defaults__ to refer to a tuple");
+                    }
+                    // TODO: Check its tuple or inherits from tuple
+                }
+                if (functionAttr.getDict())
+                {
+                    if (!functionAttr.getDict().isa<Py::DictAttr, mlir::FlatSymbolRefAttr>())
+                    {
+                        return op->emitOpError("Expected __dict__ to be a dict or symbol reference");
+                    }
+                    else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>())
+                    {
+                        auto lookup = table.lookup<Py::GlobalValueOp>(ref.getValue());
+                        if (!lookup)
+                        {
+                            return op->emitOpError("Expected __dict__ to refer to a dict");
+                        }
+                        // TODO: Check its dict or inherits from dict
+                    }
+                }
+                return mlir::success();
+            })
+        .Default(mlir::success());
 }

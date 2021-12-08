@@ -282,7 +282,7 @@ public:
         return objectAttr.getType().getValue() == llvm::StringRef{Builtins::Function.name};
     }
 
-    static FunctionAttr get(mlir::SymbolRefAttr value, mlir::Attribute defaults = {},
+    static FunctionAttr get(mlir::FlatSymbolRefAttr value, mlir::Attribute defaults = {},
                             mlir::Attribute kwDefaults = {}, mlir::Attribute dict = {});
 
     static constexpr ::llvm::StringLiteral getMnemonic()
@@ -294,7 +294,7 @@ public:
 
     void print(::mlir::AsmPrinter& printer) const;
 
-    mlir::SymbolRefAttr getValue() const;
+    mlir::FlatSymbolRefAttr getValue() const;
 
     // If its a SymbolRefAttr it must refer to a dictionary or builtins.None
     // Otherwise it must be a Py::DictAttr

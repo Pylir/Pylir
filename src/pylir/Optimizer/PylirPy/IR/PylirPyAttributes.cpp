@@ -408,7 +408,7 @@ mlir::Attribute pylir::Py::SetAttr::parse(::mlir::AsmParser& parser, ::mlir::Typ
     return get(parser.getContext(), attrs);
 }
 
-pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::SymbolRefAttr value, mlir::Attribute defaults,
+pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::FlatSymbolRefAttr value, mlir::Attribute defaults,
                                                      mlir::Attribute kwDefaults, mlir::Attribute dict)
 {
     if (!defaults)
@@ -488,9 +488,9 @@ void pylir::Py::FunctionAttr::print(::mlir::AsmPrinter& printer) const
     printer << ">";
 }
 
-mlir::SymbolRefAttr pylir::Py::FunctionAttr::getValue() const
+mlir::FlatSymbolRefAttr pylir::Py::FunctionAttr::getValue() const
 {
-    return getBuiltinValue().cast<mlir::SymbolRefAttr>();
+    return getBuiltinValue().cast<mlir::FlatSymbolRefAttr>();
 }
 
 mlir::Attribute pylir::Py::FunctionAttr::getDefaults() const
