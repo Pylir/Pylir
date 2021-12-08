@@ -108,6 +108,11 @@ void pylir::CodeGen::createBuiltinsImpl()
             Py::TupleAttr::get(m_builder.getContext(),
                                {mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::BaseException.name),
                                 mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Object.name)}));
+        members.emplace_back(
+            m_builder.getStringAttr("__slots__"),
+            Py::TupleAttr::get(m_builder.getContext(), {Py::StringAttr::get(m_builder.getContext(), "args"),
+                                                        Py::StringAttr::get(m_builder.getContext(), "__context__"),
+                                                        Py::StringAttr::get(m_builder.getContext(), "__cause__")}));
 
         m_builder.create<Py::GlobalValueOp>(
             loc, Py::Builtins::BaseException.name, mlir::StringAttr{}, true,
@@ -193,6 +198,9 @@ void pylir::CodeGen::createBuiltinsImpl()
                                {mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Exception.name),
                                 mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::BaseException.name),
                                 mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Object.name)}));
+        members.emplace_back(
+            m_builder.getStringAttr("__slots__"),
+            Py::TupleAttr::get(m_builder.getContext(), {Py::StringAttr::get(m_builder.getContext(), "value")}));
 
         m_builder.create<Py::GlobalValueOp>(
             loc, Py::Builtins::StopIteration.name, mlir::StringAttr{}, true,
@@ -271,6 +279,9 @@ void pylir::CodeGen::createBuiltinsImpl()
             Py::TupleAttr::get(m_builder.getContext(),
                                {mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Cell.name),
                                 mlir::FlatSymbolRefAttr::get(m_builder.getContext(), Py::Builtins::Object.name)}));
+        members.emplace_back(
+            m_builder.getStringAttr("__slots__"),
+            Py::TupleAttr::get(m_builder.getContext(), {Py::StringAttr::get(m_builder.getContext(), "cell_contents")}));
 
         m_builder.create<Py::GlobalValueOp>(
             loc, Py::Builtins::Cell.name, mlir::StringAttr{}, true,
