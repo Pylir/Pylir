@@ -209,6 +209,17 @@ class CodeGen
     mlir::FuncOp buildFunctionCC(llvm::Twine name, mlir::FuncOp implementation,
                                  const std::vector<FunctionParameter>& parameters);
 
+    Py::GlobalValueOp createGlobalConstant(Py::ObjectAttr value);
+
+    using SlotMapImpl = std::unordered_map<std::string_view, std::variant<mlir::FlatSymbolRefAttr, mlir::Operation*>>;
+
+    Py::GlobalValueOp createClass(mlir::FlatSymbolRefAttr className,
+                                  llvm::MutableArrayRef<Py::GlobalValueOp> bases = {},
+                                  llvm::function_ref<void(SlotMapImpl&)> implementation = {});
+
+    mlir::FuncOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
+                                llvm::function_ref<void(mlir::ValueRange)> implementation = {});
+
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
     {
@@ -252,8 +263,7 @@ class CodeGen
     {
         // We are putting InsertionGuard into a unique_ptr to make it moveable and not call its destructor early
         // when compiling with MSVC
-        auto tuple = std::make_tuple(pylir::ValueReset(m_currentFunc),
-                                     std::make_unique<mlir::OpBuilder::InsertionGuard>(m_builder),
+        auto tuple = std::make_tuple(pylir::ValueReset(m_currentFunc), mlir::OpBuilder::InsertionGuard(m_builder),
                                      pylir::ValueReset(m_currentLoop), pylir::ValueReset(m_currentExceptBlock));
         m_currentLoop = {nullptr, nullptr};
         m_currentExceptBlock = nullptr;
