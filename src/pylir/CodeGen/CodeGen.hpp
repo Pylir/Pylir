@@ -4,17 +4,18 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OwningOpRef.h>
 
-#include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/SmallPtrSet.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
 #include <pylir/Parser/Syntax.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/ValueReset.hpp>
 
-#include <tuple>
 #include <stack>
+#include <tuple>
 #include <unordered_map>
 
 namespace pylir
@@ -22,7 +23,7 @@ namespace pylir
 
 class CodeGen
 {
-    mlir::OpBuilder m_builder;
+    Py::PyBuilder m_builder;
     mlir::ModuleOp m_module;
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
@@ -163,9 +164,9 @@ class CodeGen
         }
     };
 
-    mlir::Value toI1(mlir::Location loc, mlir::Value value);
+    mlir::Value toI1(mlir::Value value);
 
-    mlir::Value toBool(mlir::Location loc, mlir::Value value);
+    mlir::Value toBool(mlir::Value value);
 
     mlir::Value readIdentifier(const IdentifierToken& token);
 
@@ -173,18 +174,18 @@ class CodeGen
 
     void raiseException(mlir::Value exceptionObject);
 
-    mlir::Value buildSubclassCheck(mlir::Location loc, mlir::Value type, mlir::Value base);
+    mlir::Value buildSubclassCheck(mlir::Value type, mlir::Value base);
 
-    void buildTupleForEach(mlir::Location loc, mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,
+    void buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,
                            llvm::function_ref<void(mlir::Value)> iterationCallback);
 
-    mlir::Value makeTuple(mlir::Location loc, const std::vector<Py::IterArg>& args);
+    mlir::Value makeTuple(const std::vector<Py::IterArg>& args);
 
-    mlir::Value makeList(mlir::Location loc, const std::vector<Py::IterArg>& args);
+    mlir::Value makeList(const std::vector<Py::IterArg>& args);
 
-    mlir::Value makeSet(mlir::Location loc, const std::vector<Py::IterArg>& args);
+    mlir::Value makeSet(const std::vector<Py::IterArg>& args);
 
-    mlir::Value makeDict(mlir::Location loc, const std::vector<Py::DictArg>& args);
+    mlir::Value makeDict(const std::vector<Py::DictArg>& args);
 
     struct FunctionParameter
     {
@@ -200,12 +201,12 @@ class CodeGen
         bool hasDefaultParam;
     };
 
-    std::vector<mlir::Value> unpackArgsKeywords(mlir::Location loc, mlir::Value tuple, mlir::Value dict,
+    std::vector<mlir::Value> unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
                                                 const std::vector<FunctionParameter>& parameters,
                                                 llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
                                                 llvm::function_ref<mlir::Value(std::string_view)> kwDefault = {});
 
-    mlir::FuncOp buildFunctionCC(mlir::Location loc, llvm::Twine name, mlir::FuncOp implementation,
+    mlir::FuncOp buildFunctionCC(llvm::Twine name, mlir::FuncOp implementation,
                                  const std::vector<FunctionParameter>& parameters);
 
     template <class AST, class FallBackLocation>
@@ -224,9 +225,9 @@ class CodeGen
 
     void assignTarget(const Syntax::Target& target, mlir::Value value);
 
-    mlir::Value binOp(mlir::Location loc, llvm::Twine method, mlir::Value lhs, mlir::Value rhs);
+    mlir::Value binOp(llvm::Twine method, mlir::Value lhs, mlir::Value rhs);
 
-    template <mlir::Value (CodeGen::*op)(mlir::Location, const std::vector<Py::IterArg>&)>
+    template <mlir::Value (CodeGen::*op)(const std::vector<Py::IterArg>&)>
     mlir::Value visit(const Syntax::StarredList& starredList);
 
     template <class InsertOp>
@@ -273,7 +274,7 @@ class CodeGen
         implementBlock(blockPtr.get());
     }
 
-    void visitForConstruct(mlir::Location loc, const Syntax::TargetList& targets, mlir::Value iterable,
+    void visitForConstruct(const Syntax::TargetList& targets, mlir::Value iterable,
                            llvm::function_ref<void()> execSuite,
                            const std::optional<Syntax::IfStmt::Else>& elseSection = {});
 

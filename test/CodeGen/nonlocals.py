@@ -22,6 +22,6 @@ def foo():
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
 # CHECK: %[[TUPLE:.*]] = py.getSlot "__closure__" from %[[SELF]]
 # CHECK: %[[ZERO:.*]] = arith.constant 0 : index
-# CHECK: %[[X:.*]] = py.tuple.integer.getItem %[[TUPLE]][%[[ZERO]] : index]
+# CHECK: %[[X:.*]] = py.tuple.getItem %[[TUPLE]][%[[ZERO]] : index]
 # CHECK: %[[VALUE:.*]] = py.getSlot "cell_contents" from %[[X]]
 # CHECK: return %[[VALUE]]

@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylirMem-to-llvm --split-input-file | FileCheck %s
 
 func @test(%arg : !py.dynamic) -> index {
-    %0 = py.tuple.integer.len %arg : index
+    %0 = py.tuple.len %arg : index
     return %0 : index
 }
 

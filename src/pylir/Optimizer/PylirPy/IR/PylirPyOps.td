@@ -132,7 +132,7 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
     }];
 }
 
-def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem", [NoSideEffect]> {
+def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple, IntegerLike:$index);
     let results = (outs DynamicType:$result);
 
@@ -146,7 +146,7 @@ def PylirPy_TupleIntegerGetItemOp : PylirPy_Op<"tuple.integer.getItem", [NoSideE
     }];
 }
 
-def PylirPy_TupleIntegerLenOp : PylirPy_Op<"tuple.integer.len", [NoSideEffect]> {
+def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple);
     let results = (outs IntegerLike:$result);
 
@@ -485,6 +485,11 @@ def PylirPy_MakeClassOp : PylirPy_MakeOp<"makeClass", [DeclareOpInterfaceMethods
 
 def PylirPy_MakeObjectOp : PylirPy_MakeOp<"makeObject"> {
     let arguments = (ins DynamicType:$typeObj);
+
+    let description = [{
+        Creates a new object of the type of the given type object. If `$typeObj` is not an instance of `builtins.type`
+        the behaviour is undefined.
+    }];
 
     let assemblyFormat = "$typeObj attr-dict";
 }

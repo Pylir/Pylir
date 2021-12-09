@@ -12,7 +12,7 @@ func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @linear_search
 // CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 // CHECK: %[[ONE:.*]] = py.constant @one
-// CHECK: %[[TUPLE_LEN:.*]] = py.tuple.integer.len %[[TUPLE]]
+// CHECK: %[[TUPLE_LEN:.*]] = py.tuple.len %[[TUPLE]]
 // CHECK: %[[ZERO:.*]] = arith.constant 0
 // CHECK: br ^[[CONDITION:[[:alnum:]]+]]
 // CHECK-SAME: %[[ZERO]]
@@ -25,7 +25,7 @@ func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %[[FALSE]]
 
 // CHECK: ^[[BODY]]:
-// CHECK: %[[ENTRY:.*]] = py.tuple.integer.getItem %[[TUPLE]]
+// CHECK: %[[ENTRY:.*]] = py.tuple.getItem %[[TUPLE]]
 // CHECK-SAME: %[[INDEX]]
 // CHECK: %[[IS:.*]] = py.is %[[ENTRY]], %[[ONE]]
 // CHECK: %[[TRUE:.*]] = arith.constant true

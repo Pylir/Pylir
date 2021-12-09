@@ -71,7 +71,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         endBlock->addArgument(rewriter.getI1Type(), loc);
 
         rewriter.setInsertionPointToEnd(block);
-        auto tupleSize = rewriter.create<pylir::Py::TupleIntegerLenOp>(loc, rewriter.getIndexType(), tuple);
+        auto tupleSize = rewriter.create<pylir::Py::TupleLenOp>(loc, rewriter.getIndexType(), tuple);
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
         auto conditionBlock = new mlir::Block;
         conditionBlock->addArgument(rewriter.getIndexType());
@@ -88,7 +88,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
-        auto entry = rewriter.create<pylir::Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
+        auto entry = rewriter.create<pylir::Py::TupleGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
         auto entryType = rewriter.create<pylir::Py::TypeOfOp>(loc, entry);
         auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.attribute());
         auto success = rewriter.create<pylir::Py::IsUnboundValueOp>(loc, fetch);
@@ -119,7 +119,7 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
         auto endBlock = block->splitBlock(op);
         endBlock->addArgument(rewriter.getI1Type(), loc);
         rewriter.setInsertionPointToEnd(block);
-        auto tupleSize = rewriter.create<pylir::Py::TupleIntegerLenOp>(loc, rewriter.getIndexType(), tuple);
+        auto tupleSize = rewriter.create<pylir::Py::TupleLenOp>(loc, rewriter.getIndexType(), tuple);
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
         auto conditionBlock = new mlir::Block;
         conditionBlock->addArgument(rewriter.getIndexType());
@@ -135,7 +135,7 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
-        auto entry = rewriter.create<pylir::Py::TupleIntegerGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
+        auto entry = rewriter.create<pylir::Py::TupleGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
         auto isType = rewriter.create<pylir::Py::IsOp>(loc, entry, op.element());
         auto notFound = new mlir::Block;
         auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));

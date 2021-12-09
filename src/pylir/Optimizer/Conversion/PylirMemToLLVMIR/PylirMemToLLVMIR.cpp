@@ -381,16 +381,16 @@ struct TypeOfOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TypeOf
     }
 };
 
-struct TupleIntegerGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerGetItemOp>
+struct TupleGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleGetItemOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerGetItemOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::TupleGetItemOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult match(pylir::Py::TupleIntegerGetItemOp) const override
+    mlir::LogicalResult match(pylir::Py::TupleGetItemOp) const override
     {
         return mlir::success();
     }
 
-    void rewrite(pylir::Py::TupleIntegerGetItemOp op, OpAdaptor adaptor,
+    void rewrite(pylir::Py::TupleGetItemOp op, OpAdaptor adaptor,
                  mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto zero =
@@ -413,17 +413,16 @@ struct TupleIntegerGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pyli
     }
 };
 
-struct TupleIntegerLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerLenOp>
+struct TupleLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleLenOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::TupleIntegerLenOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::TupleLenOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult match(pylir::Py::TupleIntegerLenOp) const override
+    mlir::LogicalResult match(pylir::Py::TupleLenOp) const override
     {
         return mlir::success();
     }
 
-    void rewrite(pylir::Py::TupleIntegerLenOp op, OpAdaptor adaptor,
-                 mlir::ConversionPatternRewriter& rewriter) const override
+    void rewrite(pylir::Py::TupleLenOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto zero =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
@@ -472,8 +471,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<IsOpConversion>(converter);
     patternSet.insert<IsUnboundValueOpConversion>(converter);
     patternSet.insert<TypeOfOpConversion>(converter);
-    patternSet.insert<TupleIntegerGetItemOpConversion>(converter);
-    patternSet.insert<TupleIntegerLenOpConversion>(converter);
+    patternSet.insert<TupleGetItemOpConversion>(converter);
+    patternSet.insert<TupleLenOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

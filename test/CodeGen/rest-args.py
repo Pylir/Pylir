@@ -19,7 +19,7 @@ def bar(a, *args, k, **kwd):
 # CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 
-# CHECK: %[[TUPLE_LEN:.*]] = py.tuple.integer.len %[[TUPLE]]
+# CHECK: %[[TUPLE_LEN:.*]] = py.tuple.len %[[TUPLE]]
 
 # ... processing of a
 
@@ -36,7 +36,7 @@ def bar(a, *args, k, **kwd):
 # CHECK: cond_br %[[CHECK]], ^[[BODY:[[:alnum:]]+]], ^[[END:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:
-# CHECK: %[[FETCHED:.*]] = py.tuple.integer.getItem %[[TUPLE]][
+# CHECK: %[[FETCHED:.*]] = py.tuple.getItem %[[TUPLE]][
 # CHECK-SAME: %[[ITERATOR]]
 # CHECK: py.list.append %[[LIST]], %[[FETCHED]]
 # CHECK: %[[ONE:.*]] = arith.constant 1

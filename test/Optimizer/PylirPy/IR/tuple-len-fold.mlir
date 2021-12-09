@@ -2,7 +2,7 @@
 
 func @constant_tuple() -> index {
     %0 = py.constant #py.tuple<(#py.int<0>, "text", 5.0)>
-    %1 = py.tuple.integer.len %0 : index
+    %1 = py.tuple.len %0 : index
     return %1 : index
 }
 

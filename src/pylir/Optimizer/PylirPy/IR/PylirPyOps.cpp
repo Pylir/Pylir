@@ -257,7 +257,7 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     return symbol;
 }
 
-mlir::OpFoldResult pylir::Py::TupleIntegerLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
     if (auto tuple = operands[0].dyn_cast_or_null<Py::TupleAttr>())
     {

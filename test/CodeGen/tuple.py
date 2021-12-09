@@ -4,8 +4,7 @@
 
 ()
 
-# CHECK: makeTuple
-# CHECK-SAME: ()
+# CHECK: py.constant #py.tuple<()>
 
 (7,)
 
@@ -22,7 +21,7 @@
 
 (*(), 3)
 
-# CHECK: %[[OP1:.*]] = py.makeTuple ()
+# CHECK: %[[OP1:.*]] = py.constant #py.tuple<()>
 # CHECK: %[[OP2:.*]] = py.constant #py.int<3>
 # CHECK: makeTuple
 # CHECK-SAME: *%[[OP1]], %[[OP2]]

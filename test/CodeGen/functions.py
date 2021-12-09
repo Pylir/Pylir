@@ -50,7 +50,7 @@ def foo():
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 # CHECK: %[[DEFAULT_TUPLE:.*]] = py.getSlot "__defaults__" from %[[SELF]]
 # CHECK: %[[DEFAULT_DICT:.*]] = py.getSlot "__kwdefaults__" from %[[SELF]]
-# CHECK: %[[TUPLE_LEN:.*]] = py.tuple.integer.len %[[TUPLE]]
+# CHECK: %[[TUPLE_LEN:.*]] = py.tuple.len %[[TUPLE]]
 
 # CHECK: %[[INDEX:.*]] = arith.constant 0
 # CHECK: %[[IS_LESS:.*]] = arith.cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
@@ -63,7 +63,7 @@ def foo():
 # CHECK-SAME: )
 
 # CHECK: ^[[LESS_BLOCK]]:
-# CHECK: %[[VALUE:.*]] = py.tuple.integer.getItem %[[TUPLE]][
+# CHECK: %[[VALUE:.*]] = py.tuple.getItem %[[TUPLE]][
 # CHECK-SAME: %[[INDEX]]
 # CHECK-SAME: ]
 # CHECK: br ^[[RESULT_BLOCK]](
@@ -106,7 +106,7 @@ def foo():
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[INDEX:.*]] = arith.constant 0
-# CHECK: %[[DEFAULT_ARG:.*]] = py.tuple.integer.getItem %[[DEFAULT_TUPLE]][
+# CHECK: %[[DEFAULT_ARG:.*]] = py.tuple.getItem %[[DEFAULT_TUPLE]][
 # CHECK-SAME: %[[INDEX]]
 # CHECK-SAME: ]
 # CHECK: br ^[[BOUND_BLOCK]](

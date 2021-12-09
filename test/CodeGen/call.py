@@ -11,7 +11,7 @@ x()
 # CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
 
 # CHECK: ^[[HAPPY_PATH]]:
-# CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple ()
+# CHECK-DAG: %[[TUPLE:.*]] = py.constant #py.tuple<()>
 # CHECK-DAG: %[[DICT:.*]] = py.constant #py.dict<{}>
 # CHECK: %[[RESULT:.*]], %[[SUCCESS:.*]] = py.getFunction %[[X_LOADED]]
 # CHECK: cond_br %[[SUCCESS]], ^[[HAPPY_PATH:[[:alnum:]]+]]
@@ -46,7 +46,7 @@ x(*(), **{})
 # CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
 
 # CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[ARG1:.*]] = py.makeTuple ()
+# CHECK: %[[ARG1:.*]] = py.constant #py.tuple<()>
 # CHECK: %[[ARG2:.*]] = py.makeDict ()
 # CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (*%[[ARG1]])
 # CHECK-DAG: %[[DICT:.*]] = py.makeDict (**%[[ARG2]])
