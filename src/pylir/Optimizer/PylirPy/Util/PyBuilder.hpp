@@ -213,6 +213,11 @@ public:
         return create<Py::FunctionGetFunctionOp>(function);
     }
 
+    Py::ObjectHash createObjectHash(mlir::Value object)
+    {
+        return create<Py::ObjectHash>(object);
+    }
+
     Py::MROLookupOp createMROLookup(mlir::Value mroTuple, llvm::StringRef attribute)
     {
         return create<Py::MROLookupOp>(mroTuple, attribute);
@@ -374,6 +379,16 @@ public:
     Py::BoolFromI1Op createBoolFromI1(mlir::Value input)
     {
         return create<Py::BoolFromI1Op>(input);
+    }
+
+    Py::IntFromIntegerOp createIntFromInteger(mlir::Value integer)
+    {
+        return create<Py::IntFromIntegerOp>(integer);
+    }
+
+    Py::IntToIntegerOp createIntToInteger(mlir::Type integerLike, mlir::Value object)
+    {
+        return create<Py::IntToIntegerOp>(integerLike, object);
     }
 
     // TODO: linkage

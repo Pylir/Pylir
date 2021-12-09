@@ -200,6 +200,13 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEf
     }];
 }
 
+def PylirPy_ObjectHash : PylirPy_Op<"object.hash", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$object);
+    let results = (outs Index:$hash);
+
+    let assemblyFormat = "$object attr-dict";
+}
+
 // linear searches
 
 def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect]> {
@@ -544,6 +551,19 @@ def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [NoSideEffect]> {
     let description = [{
         This op converts an `I1` given by `$input` into a python bool object.
     }];
+}
+
+def PylirPy_IntFromIntegerOp : PylirPy_Op<"int.fromInteger", [NoSideEffect]> {
+    let arguments = (ins IntegerLike:$input);
+
+    let assemblyFormat = "$input `:` type($input) attr-dict";
+}
+
+def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$input);
+    let results = (outs IntegerLike:$result);
+
+    let assemblyFormat = "$input `:` type($result) attr-dict";
 }
 
 // Memory operations

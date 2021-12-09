@@ -86,6 +86,19 @@ mlir::FuncOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
 
 void pylir::CodeGen::createBuiltinsImpl()
 {
+    createClass(m_builder.getTypeBuiltin(), {},
+                [this](SlotMapImpl& slots)
+                {
+                    slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
+                        m_builder.getPyStringAttr("__new__"),
+                        m_builder.getPyStringAttr("__init__"),
+                        m_builder.getPyStringAttr("__slots__"),
+                        m_builder.getPyStringAttr("__eq__"),
+                        m_builder.getPyStringAttr("__hash__"),
+                        m_builder.getPyStringAttr("__bool__"),
+                    }));
+                });
+
     createClass(m_builder.getObjectBuiltin(), {},
                 [this](SlotMapImpl& slots)
                 {
@@ -104,6 +117,26 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                       });
                     slots["__init__"] = createFunction("builtins.object.__init__",
                                                        {FunctionParameter{"", FunctionParameter::PosOnly, false}}, {});
+                    slots["__eq__"] = createFunction("builtins.object.__eq__",
+                                                     {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                                                      FunctionParameter{"", FunctionParameter::PosOnly, false}},
+                                                     [&](mlir::ValueRange functionArgs)
+                                                     {
+                                                         auto lhs = functionArgs[0];
+                                                         auto rhs = functionArgs[1];
+                                                         auto equal = m_builder.createIs(lhs, rhs);
+                                                         auto boolean = m_builder.createBoolFromI1(equal);
+                                                         m_builder.create<mlir::ReturnOp>(mlir::ValueRange{boolean});
+                                                     });
+                    slots["__hash__"] = createFunction("builtins.object.__hash__",
+                                                       {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+                                                       [&](mlir::ValueRange functionArgs)
+                                                       {
+                                                           auto self = functionArgs[0];
+                                                           auto hash = m_builder.createObjectHash(self);
+                                                           auto result = m_builder.createIntFromInteger(hash);
+                                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                                                       });
                 });
     auto baseException =
         createClass(m_builder.getBaseExceptionBuiltin(), {},
