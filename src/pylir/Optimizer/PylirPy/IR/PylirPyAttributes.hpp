@@ -5,9 +5,8 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/SubElementInterfaces.h>
 
-#include <pylir/Support/BigInt.hpp>
-
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Support/BigInt.hpp>
 
 namespace pylir::Py
 {
@@ -308,5 +307,32 @@ public:
     // If its a SymbolRefAttr it must refer to a dictionary
     // Otherwise it must be a Py::DictAttr
     mlir::Attribute getDict() const;
+};
+
+class TypeAttr : public ObjectAttr
+{
+public:
+    using ObjectAttr::ObjectAttr;
+
+    static bool classof(mlir::Attribute attribute)
+    {
+        auto objectAttr = attribute.dyn_cast<ObjectAttr>();
+        if (!objectAttr)
+        {
+            return false;
+        }
+        return objectAttr.getType().getValue() == llvm::StringRef{Builtins::Type.name};
+    }
+
+    static TypeAttr get(mlir::MLIRContext* context, ::pylir::Py::SlotsAttr slots = {});
+
+    static constexpr ::llvm::StringLiteral getMnemonic()
+    {
+        return ::llvm::StringLiteral("type");
+    }
+
+    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+
+    void print(::mlir::AsmPrinter& printer) const;
 };
 } // namespace pylir::Py

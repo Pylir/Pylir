@@ -30,21 +30,9 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     llvm::DenseMap<mlir::ArrayAttr, mlir::LLVM::GlobalOp> m_globalBuffers;
     mlir::SymbolTable m_symbolTable;
 
-public:
-    PylirTypeConverter(mlir::MLIRContext* context, const mlir::LowerToLLVMOptions& options, mlir::SymbolTable table)
-        : mlir::LLVMTypeConverter(context, options), m_symbolTable(std::move(table))
+    mlir::LLVM::LLVMArrayType getSlotEpilogue(unsigned slotSize = 0)
     {
-    }
-
-    mlir::LLVM::LLVMStructType getPyObjectType()
-    {
-        auto pyObject = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyObject");
-        if (!pyObject.isInitialized())
-        {
-            [[maybe_unused]] auto result = pyObject.setBody({mlir::LLVM::LLVMPointerType::get(pyObject)}, false);
-            PYLIR_ASSERT(mlir::succeeded(result));
-        }
-        return pyObject;
+        return mlir::LLVM::LLVMArrayType::get(mlir::LLVM::LLVMPointerType::get(getPyObjectType()), slotSize);
     }
 
     mlir::LLVM::LLVMStructType getBufferComponent()
@@ -61,34 +49,92 @@ public:
         return component;
     }
 
-    mlir::LLVM::LLVMStructType getPyTupleType()
+public:
+    PylirTypeConverter(mlir::MLIRContext* context, const mlir::LowerToLLVMOptions& options, mlir::SymbolTable table)
+        : mlir::LLVMTypeConverter(context, options), m_symbolTable(std::move(table))
     {
+    }
+
+    mlir::LLVM::LLVMStructType getPyObjectType(llvm::Optional<unsigned> slotSize = {})
+    {
+        if (slotSize)
+        {
+            return mlir::LLVM::LLVMStructType::getLiteral(
+                &getContext(), {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getSlotEpilogue(*slotSize)});
+        }
+        auto pyObject = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyObject");
+        if (!pyObject.isInitialized())
+        {
+            [[maybe_unused]] auto result =
+                pyObject.setBody({mlir::LLVM::LLVMPointerType::get(pyObject),
+                                  mlir::LLVM::LLVMArrayType::get(mlir::LLVM::LLVMPointerType::get(pyObject), 0)},
+                                 false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return pyObject;
+    }
+
+    mlir::LLVM::LLVMStructType getPyTupleType(llvm::Optional<unsigned> slotSize = {})
+    {
+        if (slotSize)
+        {
+            return mlir::LLVM::LLVMStructType::getLiteral(&getContext(),
+                                                          {mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
+                                                           getBufferComponent(), getSlotEpilogue(*slotSize)});
+        }
         auto pyTuple = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyTuple");
         if (!pyTuple.isInitialized())
         {
-            [[maybe_unused]] auto result =
-                pyTuple.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getBufferComponent()}, false);
+            [[maybe_unused]] auto result = pyTuple.setBody(
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getBufferComponent(), getSlotEpilogue()}, false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return pyTuple;
     }
 
+    mlir::LLVM::LLVMStructType getPyTypeType(llvm::Optional<unsigned> slotSize = {})
+    {
+        if (slotSize)
+        {
+            return mlir::LLVM::LLVMStructType::getLiteral(
+                &getContext(),
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getIndexType(), getSlotEpilogue(*slotSize)});
+        }
+        auto pyType = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyType");
+        if (!pyType.isInitialized())
+        {
+            [[maybe_unused]] auto result = pyType.setBody(
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getIndexType(), getSlotEpilogue()}, false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return pyType;
+    }
+
     mlir::LLVM::LLVMStructType typeOf(pylir::Py::ObjectAttr objectAttr)
     {
+        auto typeObject = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getType().getAttr());
+        PYLIR_ASSERT(typeObject);
+        auto slots = typeObject.initializer().getSlots();
+        unsigned count = 0;
+        auto result = llvm::find_if(slots.getValue(), [](auto pair) { return pair.first.getValue() == "__slots__"; });
+        if (result != slots.getValue().end())
+        {
+            count = result->second.cast<pylir::Py::TupleAttr>().getValue().size();
+        }
         return llvm::TypeSwitch<pylir::Py::ObjectAttr, mlir::LLVM::LLVMStructType>(objectAttr)
-            .Case([&](pylir::Py::TupleAttr) { return getPyTupleType(); })
-            .Default([&](auto) { return getPyObjectType(); });
+            .Case([&](pylir::Py::TupleAttr) { return getPyTupleType(count); })
+            .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
+            .Default([&](auto) { return getPyObjectType(count); });
     }
 
     void initializeGlobal(mlir::LLVM::GlobalOp global, pylir::Py::ObjectAttr objectAttr, mlir::OpBuilder& builder)
     {
         builder.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
         mlir::Value undef = builder.create<mlir::LLVM::UndefOp>(global.getLoc(), global.getType());
+        auto typeObjectAttr =
+            m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getType().getValue()).initializer();
         auto typeObj = builder.create<mlir::LLVM::AddressOfOp>(
-            global.getLoc(),
-            mlir::LLVM::LLVMPointerType::get(
-                typeOf(m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getType().getValue()).initializer())),
-            objectAttr.getType());
+            global.getLoc(), mlir::LLVM::LLVMPointerType::get(typeOf(typeObjectAttr)), objectAttr.getType());
         auto bitcast = builder.create<mlir::LLVM::BitcastOp>(
             global.getLoc(), mlir::LLVM::LLVMPointerType::get(getPyObjectType()), typeObj);
         undef =
@@ -123,25 +169,9 @@ public:
                             builder.create<mlir::LLVM::UndefOp>(global.getLoc(), bufferObject.getType());
                         for (auto element : llvm::enumerate(values))
                         {
-                            mlir::LLVM::AddressOfOp address;
-                            if (auto ref = element.value().template dyn_cast<mlir::FlatSymbolRefAttr>())
-                            {
-                                address = builder.create<mlir::LLVM::AddressOfOp>(
-                                    global.getLoc(),
-                                    mlir::LLVM::LLVMPointerType::get(typeOf(
-                                        m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getValue()).initializer())),
-                                    ref);
-                            }
-                            else
-                            {
-                                address = builder.create<mlir::LLVM::AddressOfOp>(
-                                    global.getLoc(),
-                                    getConstant(element.value().template cast<pylir::Py::ObjectAttr>(), builder));
-                            }
-                            auto bitCast = builder.create<mlir::LLVM::BitcastOp>(
-                                global.getLoc(), mlir::LLVM::LLVMPointerType::get(getPyObjectType()), address);
+                            auto constant = getConstant(global.getLoc(), element.value(), builder);
                             arrayUndef = builder.create<mlir::LLVM::InsertValueOp>(
-                                global.getLoc(), arrayUndef, bitCast,
+                                global.getLoc(), arrayUndef, constant,
                                 builder.getI32ArrayAttr({static_cast<std::int32_t>(element.index())}));
                         }
                         builder.create<mlir::LLVM::ReturnOp>(global.getLoc(), arrayUndef);
@@ -164,17 +194,88 @@ public:
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, constant,
                                                                       builder.getI32ArrayAttr({1}));
                 })
-            .Default(
-                [](auto)
+            .Case(
+                [&](pylir::Py::TypeAttr)
                 {
-                    // TODO: Not implemented yet
-                    PYLIR_UNREACHABLE;
+                    mlir::Type instanceType;
+                    if (global.getName() == llvm::StringRef{pylir::Py::Builtins::Tuple.name})
+                    {
+                        instanceType = getPyTupleType();
+                    }
+                    else if (global.getName() == llvm::StringRef{pylir::Py::Builtins::Type.name})
+                    {
+                        instanceType = getPyTypeType();
+                    }
+                    else
+                    {
+                        instanceType = getPyObjectType();
+                    }
+
+                    auto null = builder.create<mlir::LLVM::NullOp>(global.getLoc(),
+                                                                   mlir::LLVM::LLVMPointerType::get(instanceType));
+                    auto one = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), builder.getI32Type(),
+                                                                      builder.getI32IntegerAttr(1));
+                    auto gep =
+                        builder.create<mlir::LLVM::GEPOp>(global.getLoc(), null.getType(), null, mlir::ValueRange{one});
+                    auto ptrToInt = builder.create<mlir::LLVM::PtrToIntOp>(global.getLoc(), getIndexType(), gep);
+                    auto three = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
+                                                                        builder.getI32IntegerAttr(3));
+                    auto asCount = builder.create<mlir::LLVM::LShrOp>(global.getLoc(), ptrToInt, three);
+                    auto oneI = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
+                                                                       builder.getI32IntegerAttr(1));
+                    auto asOffset = builder.create<mlir::LLVM::SubOp>(global.getLoc(), asCount, oneI);
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asOffset,
+                                                                      builder.getI32ArrayAttr({1}));
                 });
+        auto result = llvm::find_if(typeObjectAttr.getSlots().getValue(),
+                                    [](auto pair) { return pair.first.getValue() == "__slots__"; });
+        if (result != typeObjectAttr.getSlots().getValue().end())
+        {
+            for (auto slot : llvm::enumerate(result->second.cast<pylir::Py::TupleAttr>().getValue()))
+            {
+                auto element = llvm::find_if(
+                    objectAttr.getSlots().getValue(), [&](auto pair)
+                    { return pair.first.getValue() == slot.value().cast<pylir::Py::StringAttr>().getValue(); });
+                mlir::Value value;
+                if (element == objectAttr.getSlots().getValue().end())
+                {
+                    value = builder.create<mlir::LLVM::NullOp>(global.getLoc(),
+                                                               mlir::LLVM::LLVMPointerType::get(getPyObjectType()));
+                }
+                else
+                {
+                    value = getConstant(global.getLoc(), element->second, builder);
+                }
+                auto indices = builder.getI32ArrayAttr(
+                    {static_cast<int>(global.getType().cast<mlir::LLVM::LLVMStructType>().getBody().size() - 1),
+                     static_cast<int>(slot.index())});
+                undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, value, indices);
+            }
+        }
 
         builder.create<mlir::LLVM::ReturnOp>(global.getLoc(), undef);
     }
 
-    mlir::LLVM::GlobalOp getConstant(pylir::Py::ObjectAttr objectAttr, mlir::OpBuilder& builder)
+    mlir::Value getConstant(mlir::Location loc, mlir::Attribute attribute, mlir::OpBuilder& builder)
+    {
+        mlir::LLVM::AddressOfOp address;
+        if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            address = builder.create<mlir::LLVM::AddressOfOp>(
+                loc,
+                mlir::LLVM::LLVMPointerType::get(
+                    typeOf(m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getValue()).initializer())),
+                ref);
+        }
+        else
+        {
+            address = builder.create<mlir::LLVM::AddressOfOp>(
+                loc, createConstant(attribute.cast<pylir::Py::ObjectAttr>(), builder));
+        }
+        return builder.create<mlir::LLVM::BitcastOp>(loc, mlir::LLVM::LLVMPointerType::get(getPyObjectType()), address);
+    }
+
+    mlir::LLVM::GlobalOp createConstant(pylir::Py::ObjectAttr objectAttr, mlir::OpBuilder& builder)
     {
         if (auto globalOp = m_globalConstants.lookup(objectAttr))
         {
@@ -231,7 +332,7 @@ struct ConstantOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Cons
         }
         mlir::OpBuilder::InsertionGuard guard{rewriter};
         mlir::LLVM::GlobalOp globalOp =
-            getTypeConverter()->getConstant(adaptor.constant().cast<pylir::Py::ObjectAttr>(), rewriter);
+            getTypeConverter()->createConstant(adaptor.constant().cast<pylir::Py::ObjectAttr>(), rewriter);
         auto addressOf = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), globalOp);
         rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), addressOf);
     }

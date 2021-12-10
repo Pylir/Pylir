@@ -3,8 +3,8 @@
 #include <mlir/IR/DialectImplementation.h>
 
 #include <llvm/ADT/SmallString.h>
-#include <llvm/ADT/TypeSwitch.h>
 #include <llvm/ADT/StringExtras.h>
+#include <llvm/ADT/TypeSwitch.h>
 
 #include "PylirPyDialect.hpp"
 
@@ -92,6 +92,10 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
     if (keyword == Py::FunctionAttr::getMnemonic())
     {
         return Py::FunctionAttr::parse(parser, type);
+    }
+    if (keyword == Py::TypeAttr::getMnemonic())
+    {
+        return Py::TypeAttr::parse(parser, type);
     }
     mlir::Attribute result;
     (void)generatedAttributeParser(parser, keyword, type, result);
@@ -518,6 +522,34 @@ mlir::Attribute pylir::Py::FunctionAttr::getDict() const
     return result->second;
 }
 
+pylir::Py::TypeAttr pylir::Py::TypeAttr::get(mlir::MLIRContext* context, ::pylir::Py::SlotsAttr slots)
+{
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Type.name), slots).cast<TypeAttr>();
+}
+
+mlir::Attribute pylir::Py::TypeAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
+{
+    if (parser.parseOptionalLess())
+    {
+        return get(parser.getContext());
+    }
+    Py::SlotsAttr slots;
+    if (parser.parseKeyword("slots") || parser.parseColon() || parser.parseAttribute(slots) || parser.parseGreater())
+    {
+        return {};
+    }
+    return get(parser.getContext(), slots);
+}
+
+void pylir::Py::TypeAttr::print(::mlir::AsmPrinter& printer) const
+{
+    if (getSlots().getValue().empty())
+    {
+        return;
+    }
+    printer << "<slots: " << getSlots() << ">";
+}
+
 pylir::BigInt pylir::Py::IntImplAttr::getValue() const
 {
     return getImpl()->value;
@@ -638,9 +670,9 @@ pylir::Py::ObjectAttr pylir::Py::ObjectAttr::get(mlir::FlatSymbolRefAttr type)
 pylir::Py::ObjectAttr pylir::Py::ObjectAttr::get(mlir::FlatSymbolRefAttr type, pylir::Py::SlotsAttr slots,
                                                  mlir::Attribute builtinValue)
 {
-    if (slots && slots.getValue().empty())
+    if (!slots)
     {
-        slots = {};
+        slots = Py::SlotsAttr::get(type.getContext(), {});
     }
     return Base::get(type.getContext(), type, slots, builtinValue);
 }
@@ -648,7 +680,7 @@ pylir::Py::ObjectAttr pylir::Py::ObjectAttr::get(mlir::FlatSymbolRefAttr type, p
 void pylir::Py::ObjectAttr::print(::mlir::AsmPrinter& printer) const
 {
     printer << "<type: " << getType();
-    if (getSlots() && !getSlots().getValue().empty())
+    if (!getSlots().getValue().empty())
     {
         printer << ", slots: " << getSlots();
     }
@@ -710,9 +742,9 @@ mlir::Attribute pylir::Py::ObjectAttr::parse(::mlir::AsmParser& parser, ::mlir::
     {
         return {};
     }
-    if (slots && slots.getValue().empty())
+    if (!slots)
     {
-        slots = {};
+        slots = Py::SlotsAttr::get(parser.getContext(), {});
     }
     return get(type, slots, builtinValue);
 }
@@ -721,10 +753,7 @@ void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mli
                                                      llvm::function_ref<void(mlir::Type)>) const
 {
     walkAttrsFn(getType());
-    if (getSlots())
-    {
-        walkAttrsFn(getSlots());
-    }
+    walkAttrsFn(getSlots());
     if (getBuiltinValue())
     {
         walkAttrsFn(getBuiltinValue());
@@ -742,16 +771,7 @@ mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribut
         switch (index)
         {
             case 0: type = attr.cast<mlir::FlatSymbolRefAttr>(); break;
-            case 1:
-                if (slots)
-                {
-                    slots = attr.cast<Py::SlotsAttr>();
-                }
-                else
-                {
-                    builtinValue = attr;
-                }
-                break;
+            case 1: slots = attr.cast<Py::SlotsAttr>(); break;
             case 2: builtinValue = attr; break;
             default: PYLIR_UNREACHABLE;
         }
