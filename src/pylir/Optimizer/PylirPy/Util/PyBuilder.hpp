@@ -218,6 +218,16 @@ public:
         return create<Py::ObjectHash>(object);
     }
 
+    Py::StrHash createStrHash(mlir::Value string)
+    {
+        return create<Py::StrHash>(string);
+    }
+
+    Py::StrEqual createStrEqual(mlir::Value lhs, mlir::Value rhs)
+    {
+        return create<Py::StrEqual>(lhs, rhs);
+    }
+
     Py::MROLookupOp createMROLookup(mlir::Value mroTuple, llvm::StringRef attribute)
     {
         return create<Py::MROLookupOp>(mroTuple, attribute);

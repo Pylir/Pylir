@@ -254,4 +254,30 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
                                                       });
                 });
+    createClass(m_builder.getStrBuiltin(), {},
+                [&](SlotMapImpl& slots)
+                {
+                    slots["__hash__"] =
+                        createFunction("builtins.str.__hash__", {{"", FunctionParameter::PosOnly, false}},
+                                       [&](mlir::ValueRange functionArguments)
+                                       {
+                                           auto self = functionArguments[0];
+                                           // TODO: check its str or subclass
+                                           auto hash = m_builder.createStrHash(self);
+                                           auto result = m_builder.createIntFromInteger(hash);
+                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                                       });
+                    slots["__eq__"] = createFunction(
+                        "builtins.str.__eq__",
+                        {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                        [&](mlir::ValueRange functionArguments)
+                        {
+                            auto lhs = functionArguments[0];
+                            auto rhs = functionArguments[1];
+                            // TODO: check both are str or subclass
+                            auto equal = m_builder.createStrEqual(lhs, rhs);
+                            auto result = m_builder.createBoolFromI1(equal);
+                            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                        });
+                });
 }
