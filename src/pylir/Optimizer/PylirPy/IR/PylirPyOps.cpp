@@ -996,6 +996,103 @@ llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetExOp::getIterArgs()
 
 namespace
 {
+
+mlir::LogicalResult verify(mlir::Operation* op, pylir::Py::ObjectAttr attribute)
+{
+    return mlir::success();
+    /*TODO: Enable once all types referenced are implemented (at least as stubs)
+    if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, attribute.getType()))
+    {
+        return op->emitOpError("Type of attribute '") << attribute.getType() << "' not found";
+    }
+    for (auto [name, value] : attribute.getSlots().getValue())
+    {
+        if (auto object = value.dyn_cast<pylir::Py::ObjectAttr>())
+        {
+            if (mlir::failed(verify(op, object)))
+            {
+                return mlir::failure();
+            }
+        }
+        else if (auto ref = value.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref))
+            {
+                return op->emitOpError("Undefined reference to '") << ref << "' ";
+            }
+        }
+    }
+    return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(attribute)
+        .Case(
+            [&](pylir::Py::FunctionAttr functionAttr) -> mlir::LogicalResult
+            {
+                if (!functionAttr.getValue())
+                {
+                    return op->emitOpError("Expected function attribute to contain a symbol reference");
+                }
+                auto table = mlir::SymbolTable(mlir::SymbolTable::getNearestSymbolTable(op));
+                if (!table.lookup<mlir::FuncOp>(functionAttr.getValue().getValue()))
+                {
+                    return op->emitOpError("Expected function attribute to refer to a function");
+                }
+                if (!functionAttr.getKWDefaults())
+                {
+                    return op->emitOpError("Expected __kwdefaults__ in function attribute");
+                }
+                if (!functionAttr.getKWDefaults().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
+                {
+                    return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference");
+                }
+                else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
+                         ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
+                {
+                    auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
+                    if (!lookup)
+                    {
+                        return op->emitOpError("Expected __kwdefaults__ to refer to a dictionary");
+                    }
+                    // TODO: Check its dict or inherits from dict
+                }
+                if (!functionAttr.getDefaults())
+                {
+                    return op->emitOpError("Expected __defaults__ in function attribute");
+                }
+                if (!functionAttr.getDefaults().isa<pylir::Py::TupleAttr, mlir::FlatSymbolRefAttr>())
+                {
+                    return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference");
+                }
+                else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
+                         ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
+                {
+                    auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
+                    if (!lookup)
+                    {
+                        return op->emitOpError("Expected __defaults__ to refer to a tuple");
+                    }
+                    // TODO: Check its tuple or inherits from tuple
+                }
+                if (functionAttr.getDict())
+                {
+                    if (!functionAttr.getDict().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
+                    {
+                        return op->emitOpError("Expected __dict__ to be a dict or symbol reference");
+                    }
+                    else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>())
+                    {
+                        auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
+                        if (!lookup)
+                        {
+                            return op->emitOpError("Expected __dict__ to refer to a dict");
+                        }
+                        // TODO: Check its dict or inherits from dict
+                    }
+                }
+                return mlir::success();
+            })
+        .Default(mlir::success());
+        */
+}
+
 mlir::LogicalResult verify(pylir::Py::ConstantOp op)
 {
     for (auto& uses : op->getUses())
@@ -1006,7 +1103,10 @@ mlir::LogicalResult verify(pylir::Py::ConstantOp op)
             return uses.getOwner()->emitError("Write to a constant value is not allowed");
         }
     }
-
+    if (auto object = op.constant().dyn_cast<pylir::Py::ObjectAttr>())
+    {
+        return verify(op, object);
+    }
     return mlir::success();
 }
 } // namespace

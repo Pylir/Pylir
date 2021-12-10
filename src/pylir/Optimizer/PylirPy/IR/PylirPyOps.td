@@ -599,6 +599,8 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [Symbol]> {
         This op creates a global value whose lifetime is global. If marked as constant, operations that write to it
         are undefined behaviour.
     }];
+
+    let verifier = [{ return ::verify(*this, initializer()); }];
 }
 
 def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
