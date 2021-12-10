@@ -52,6 +52,7 @@ void pylir::Py::PylirPyDialect::initializeAttributes()
 
 mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmParser& parser, ::mlir::Type type) const
 {
+    auto loc = parser.getCurrentLocation();
     llvm::StringRef keyword;
     if (parser.parseKeyword(&keyword))
     {
@@ -98,7 +99,10 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
         return Py::TypeAttr::parse(parser, type);
     }
     mlir::Attribute result;
-    (void)generatedAttributeParser(parser, keyword, type, result);
+    if (!generatedAttributeParser(parser, keyword, type, result).hasValue())
+    {
+        parser.emitError(loc) << "unknown  type `" << keyword << "` in dialect `" << getNamespace() << "`";
+    }
     return result;
 }
 

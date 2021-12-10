@@ -74,6 +74,26 @@ public:
         return pyObject;
     }
 
+    mlir::LLVM::LLVMStructType getPyFunctionType(llvm::Optional<unsigned> slotSize = {})
+    {
+        if (slotSize)
+        {
+            return mlir::LLVM::LLVMStructType::getLiteral(
+                &getContext(), {mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
+                                convertType(pylir::Py::getUniversalCCType(&getContext())), getSlotEpilogue(*slotSize)});
+        }
+        auto pyFunction = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyFunction");
+        if (!pyFunction.isInitialized())
+        {
+            [[maybe_unused]] auto result =
+                pyFunction.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
+                                    convertType(pylir::Py::getUniversalCCType(&getContext())), getSlotEpilogue()},
+                                   false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return pyFunction;
+    }
+
     mlir::LLVM::LLVMStructType getPyTupleType(llvm::Optional<unsigned> slotSize = {})
     {
         if (slotSize)
@@ -124,6 +144,7 @@ public:
         return llvm::TypeSwitch<pylir::Py::ObjectAttr, mlir::LLVM::LLVMStructType>(objectAttr)
             .Case([&](pylir::Py::TupleAttr) { return getPyTupleType(count); })
             .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
+            .Case([&](pylir::Py::FunctionAttr) { return getPyFunctionType(count); })
             .Default([&](auto) { return getPyObjectType(count); });
     }
 
@@ -225,6 +246,15 @@ public:
                                                                        builder.getI32IntegerAttr(1));
                     auto asOffset = builder.create<mlir::LLVM::SubOp>(global.getLoc(), asCount, oneI);
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asOffset,
+                                                                      builder.getI32ArrayAttr({1}));
+                })
+            .Case(
+                [&](pylir::Py::FunctionAttr function)
+                {
+                    auto address = builder.create<mlir::LLVM::AddressOfOp>(
+                        global.getLoc(), convertType(pylir::Py::getUniversalCCType(&getContext())),
+                        function.getValue());
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, address,
                                                                       builder.getI32ArrayAttr({1}));
                 });
         auto result = llvm::find_if(typeObjectAttr.getSlots().getValue(),
