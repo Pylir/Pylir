@@ -140,9 +140,6 @@ void ConvertPylirPyToPylirMem::runOnOperation()
     target.addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
                         pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp,
                         pylir::Py::BoolFromI1Op>();
-    target.addDynamicallyLegalOp<pylir::Py::ConstantOp>(
-        [](pylir::Py::ConstantOp constantOp) -> bool
-        { return constantOp.constant().isa<pylir::Py::UnboundAttr, mlir::SymbolRefAttr>(); });
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.insert<MakeTupleOpConversion>(&getContext());
