@@ -997,32 +997,64 @@ llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetExOp::getIterArgs()
 namespace
 {
 
-mlir::LogicalResult verify(mlir::Operation* op, pylir::Py::ObjectAttr attribute)
+mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
 {
-    return mlir::success();
-    /*TODO: Enable once all types referenced are implemented (at least as stubs)
-    if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, attribute.getType()))
+    auto object = attribute.dyn_cast<pylir::Py::ObjectAttr>();
+    if (!object)
     {
-        return op->emitOpError("Type of attribute '") << attribute.getType() << "' not found";
-    }
-    for (auto [name, value] : attribute.getSlots().getValue())
-    {
-        if (auto object = value.dyn_cast<pylir::Py::ObjectAttr>())
-        {
-            if (mlir::failed(verify(op, object)))
-            {
-                return mlir::failure();
-            }
-        }
-        else if (auto ref = value.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
         {
             if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref))
             {
                 return op->emitOpError("Undefined reference to '") << ref << "' ";
             }
         }
+        else if (!attribute.isa<pylir::Py::UnboundAttr>())
+        {
+            return op->emitError("Not allowed attribute '") << attribute << "' found";
+        }
+        return mlir::success();
     }
-    return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(attribute)
+    if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, object.getType()))
+    {
+        return op->emitOpError("Type of attribute '") << object.getType() << "' not found";
+    }
+    for (auto [name, value] : object.getSlots().getValue())
+    {
+        if (mlir::failed(verify(op, value)))
+        {
+            return mlir::failure();
+        }
+    }
+    return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(object)
+        .Case<pylir::Py::TupleAttr, pylir::Py::SetAttr, pylir::Py::ListAttr>(
+            [&](auto sequence)
+            {
+                for (auto iter : sequence.getValue())
+                {
+                    if (mlir::failed(verify(op, iter)))
+                    {
+                        return mlir::failure();
+                    }
+                }
+                return mlir::success();
+            })
+        .Case(
+            [&](pylir::Py::DictAttr dict)
+            {
+                for (auto [key, value] : dict.getValue())
+                {
+                    if (mlir::failed(verify(op, key)))
+                    {
+                        return mlir::failure();
+                    }
+                    if (mlir::failed(verify(op, value)))
+                    {
+                        return mlir::failure();
+                    }
+                }
+                return mlir::success();
+            })
         .Case(
             [&](pylir::Py::FunctionAttr functionAttr) -> mlir::LogicalResult
             {
@@ -1090,7 +1122,6 @@ mlir::LogicalResult verify(mlir::Operation* op, pylir::Py::ObjectAttr attribute)
                 return mlir::success();
             })
         .Default(mlir::success());
-        */
 }
 
 mlir::LogicalResult verify(pylir::Py::ConstantOp op)
@@ -1103,11 +1134,7 @@ mlir::LogicalResult verify(pylir::Py::ConstantOp op)
             return uses.getOwner()->emitError("Write to a constant value is not allowed");
         }
     }
-    if (auto object = op.constant().dyn_cast<pylir::Py::ObjectAttr>())
-    {
-        return verify(op, object);
-    }
-    return mlir::success();
+    return verify(op, op.constant());
 }
 } // namespace
 

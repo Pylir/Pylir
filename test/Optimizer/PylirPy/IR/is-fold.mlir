@@ -1,5 +1,9 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
+// Stubs
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
+
 // CHECK-LABEL: @same_value
 // CHECK: %[[RES:.*]] = py.constant #py.bool<True>
 // CHECK: return %[[RES]]
@@ -11,6 +15,10 @@ func @same_value() -> !py.dynamic {
 }
 
 // -----
+
+// Stubs
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
 // CHECK-LABEL: @two_allocs
 // CHECK: %[[RES:.*]] = py.constant #py.bool<False>
@@ -25,14 +33,16 @@ func @two_allocs(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue const @one = #py.int<0>
+// Stubs
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
 // CHECK-LABEL: @singletons
 // CHECK: %[[RES:.*]] = py.constant #py.bool<True>
 // CHECK: return %[[RES]]
 func @singletons() -> !py.dynamic {
-    %0 = py.constant @one
-    %1 = py.constant @one
+    %0 = py.constant @builtins.bool
+    %1 = py.constant @builtins.bool
     %2 = py.is %0, %1
     %3 = py.bool.fromI1 %2
     return %3 : !py.dynamic

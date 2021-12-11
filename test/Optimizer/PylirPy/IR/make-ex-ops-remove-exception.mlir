@@ -1,5 +1,8 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
 func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant #py.int<3>
@@ -20,6 +23,9 @@ func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[TUPLE]]
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
 func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
@@ -42,6 +48,9 @@ func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
 func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant #py.int<3>
@@ -62,6 +71,9 @@ func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[LIST]]
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
 func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
@@ -84,6 +96,9 @@ func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
 func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant #py.int<3>
@@ -104,6 +119,9 @@ func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[SET]]
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
 func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
@@ -126,6 +144,9 @@ func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
 func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.constant #py.int<3>
     %2 = py.makeDictEx (%1 : %arg0)
@@ -145,6 +166,9 @@ func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[DICT]]
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
 func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.constant #py.int<3>

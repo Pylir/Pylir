@@ -1,5 +1,8 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
+
 func @entry_block(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.isUnboundValue %arg0
     %1 = py.bool.fromI1 %0
@@ -11,6 +14,9 @@ func @entry_block(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[CONST]]
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
 func @block_argument(%arg0 : i1) -> !py.dynamic {
     %c = py.constant #py.bool<False>
@@ -34,6 +40,9 @@ func @block_argument(%arg0 : i1) -> !py.dynamic {
 
 // -----
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
+
 func @normal_op(%arg0 : () -> !py.dynamic) -> !py.dynamic {
     %0 = call_indirect %arg0() : () -> !py.dynamic
     %1 = py.isUnboundValue %0
@@ -48,6 +57,9 @@ func @normal_op(%arg0 : () -> !py.dynamic) -> !py.dynamic {
 // CHECK: return %[[C]]
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
 py.globalHandle @a
 

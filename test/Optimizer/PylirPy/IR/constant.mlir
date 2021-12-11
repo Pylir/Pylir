@@ -1,6 +1,17 @@
 // RUN: pylir-opt %s | pylir-opt | FileCheck %s
 // RUN: pylir-opt %s --mlir-print-op-generic | pylir-opt | FileCheck %s
 
+// Stubs
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.list = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.set = #py.type
+py.globalValue @builtins.dict = #py.type
+
 // CHECK-LABEL: test_constant_integer
 func @test_constant_integer() -> !py.dynamic {
     %0 = py.constant #py.int<50>
@@ -53,6 +64,8 @@ func @test_constant_dict() -> !py.dynamic {
     %empty = py.constant #py.dict<{}>
     return %0 : !py.dynamic
 }
+
+py.globalValue @a = #py.type
 
 // CHECK-LABEL: test_objects
 func @test_objects() -> !py.dynamic {

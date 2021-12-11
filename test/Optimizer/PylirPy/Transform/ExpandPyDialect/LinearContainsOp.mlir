@@ -1,6 +1,8 @@
 // RUN: pylir-opt %s -expand-py-dialect --split-input-file | FileCheck %s
 
-py.globalValue const @one = #py.int<1>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
+py.globalValue @one = #py.type
 
 func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
     %0 = py.constant @one

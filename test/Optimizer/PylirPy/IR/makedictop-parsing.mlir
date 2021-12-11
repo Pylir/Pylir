@@ -1,5 +1,12 @@
 // RUN: pylir-opt %s | pylir-opt | FileCheck %s
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.list = #py.type
+
 // CHECK-LABEL: @makedictop_test
 func @makedictop_test() -> !py.dynamic {
     %0 = py.constant #py.int<0>

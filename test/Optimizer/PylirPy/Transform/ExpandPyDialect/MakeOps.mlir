@@ -1,9 +1,12 @@
 // RUN: pylir-opt %s -expand-py-dialect --split-input-file | FileCheck %s
 
-py.globalValue @builtins.TypeError = #py.int<0>
-py.globalValue @builtins.None = #py.int<1>
-py.globalValue @builtins.function = #py.int<2>
-py.globalValue @builtins.StopIteration = #py.int<3>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.TypeError =  #py.type
+py.globalValue @builtins.None = #py.type
+py.globalValue @builtins.function =  #py.type
+py.globalValue @builtins.StopIteration = #py.type
 
 func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant #py.int<3>
@@ -32,10 +35,13 @@ func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.TypeError = #py.int<0>
-py.globalValue @builtins.None = #py.int<1>
-py.globalValue @builtins.function = #py.int<2>
-py.globalValue @builtins.StopIteration = #py.int<3>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.TypeError =  #py.type
+py.globalValue @builtins.None = #py.type
+py.globalValue @builtins.function =  #py.type
+py.globalValue @builtins.StopIteration = #py.type
 
 func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant #py.int<3>

@@ -1,6 +1,8 @@
 // RUN: pylir-opt %s -expand-py-dialect --split-input-file | FileCheck %s
 
-py.globalValue const @builtins.function = #py.int<1>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.None = #py.type
+py.globalValue @builtins.function = #py.type
 
 func @get_function(%callable : !py.dynamic) -> !py.dynamic {
     %0, %1 = py.getFunction %callable

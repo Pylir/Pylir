@@ -1,5 +1,11 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.float = #py.type
+py.globalValue @builtins.tuple = #py.type
+
 // CHECK-LABEL: @maketuple_simple
 // CHECK: %[[RES:.*]] = py.constant #py.tuple
 // CHECK-SAME: #py.str<"text">
@@ -15,6 +21,13 @@ func @maketuple_simple() -> !py.dynamic {
 }
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.float = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.list = #py.type
 
 // CHECK-LABEL: @maketuple_expansion
 // CHECK: %[[RES:.*]] = py.constant #py.tuple

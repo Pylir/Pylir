@@ -280,4 +280,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
                         });
                 });
+    //Stubs
+    createClass(m_builder.getDictBuiltin());
+    createClass(m_builder.getTupleBuiltin());
+    createClass(m_builder.getIntBuiltin());
 }
