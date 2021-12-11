@@ -136,6 +136,8 @@ public:
     void print(::mlir::AsmPrinter& printer) const;
 
     llvm::StringRef getValue() const;
+
+    mlir::StringAttr getValueAttr() const;
 };
 
 class TupleAttr : public ObjectAttr

@@ -347,9 +347,14 @@ pylir::Py::StringAttr pylir::Py::StringAttr::get(::mlir::MLIRContext* context, l
         .cast<StringAttr>();
 }
 
+mlir::StringAttr pylir::Py::StringAttr::getValueAttr() const
+{
+    return getBuiltinValue().cast<mlir::StringAttr>();
+}
+
 llvm::StringRef pylir::Py::StringAttr::getValue() const
 {
-    return getBuiltinValue().cast<mlir::StringAttr>().getValue();
+    return getValueAttr().getValue();
 }
 
 mlir::Attribute pylir::Py::StringAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
