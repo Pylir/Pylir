@@ -402,16 +402,8 @@ struct ConstantOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Cons
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
             return;
         }
-        if (auto ref = adaptor.constant().dyn_cast<mlir::FlatSymbolRefAttr>())
-        {
-            rewriter.replaceOpWithNewOp<mlir::LLVM::AddressOfOp>(op, typeConverter->convertType(op.getType()), ref);
-            return;
-        }
-        mlir::OpBuilder::InsertionGuard guard{rewriter};
-        mlir::LLVM::GlobalOp globalOp =
-            getTypeConverter()->createConstant(adaptor.constant().cast<pylir::Py::ObjectAttr>(), rewriter);
-        auto addressOf = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), globalOp);
-        rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), addressOf);
+        auto value = getTypeConverter()->getConstant(op.getLoc(), op.constant(), rewriter);
+        rewriter.replaceOp(op, {value});
     }
 };
 
@@ -614,6 +606,31 @@ struct TupleLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Tupl
     }
 };
 
+struct FunctionGetFunctionOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::FunctionGetFunctionOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::FunctionGetFunctionOp op, OpAdaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto function = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyFunctionType()), adaptor.function());
+        auto funcPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(typeConverter->convertType(op.getType())), function,
+            mlir::ValueRange{zero, one});
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, funcPtrPtr);
+    }
+};
+
 struct ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -651,6 +668,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<TypeOfOpConversion>(converter);
     patternSet.insert<TupleGetItemOpConversion>(converter);
     patternSet.insert<TupleLenOpConversion>(converter);
+    patternSet.insert<FunctionGetFunctionOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
