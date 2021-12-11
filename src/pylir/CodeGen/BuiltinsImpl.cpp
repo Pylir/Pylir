@@ -34,13 +34,44 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
     else
     {
         PYLIR_ASSERT(bases.size() == 1 && "Multiply inheritance not yet implemented");
-        auto result = llvm::find_if(bases[0].initializer().getSlots().getValue(),
-                                    [](auto pair) { return pair.first == "__mro__"; });
-        auto array = m_module.lookupSymbol<Py::GlobalValueOp>(result->second.cast<mlir::FlatSymbolRefAttr>())
-                         .initializer()
-                         .cast<Py::TupleAttr>()
-                         .getValue();
-        mro.insert(mro.end(), array.begin(), array.end());
+
+        {
+            auto result = llvm::find_if(bases[0].initializer().getSlots().getValue(),
+                                        [](auto pair) { return pair.first == "__mro__"; });
+            auto array = m_module.lookupSymbol<Py::GlobalValueOp>(result->second.cast<mlir::FlatSymbolRefAttr>())
+                             .initializer()
+                             .cast<Py::TupleAttr>()
+                             .getValue();
+            mro.insert(mro.end(), array.begin(), array.end());
+        }
+        {
+            auto result = llvm::find_if(bases[0].initializer().getSlots().getValue(),
+                                        [](auto pair) { return pair.first == "__slots__"; });
+            if (result != bases[0].initializer().getSlots().getValue().end())
+            {
+                auto refAttr = result->second.cast<mlir::FlatSymbolRefAttr>();
+                if (auto iter = slots.find("__slots__"); iter != slots.end())
+                {
+                    auto array = m_module.lookupSymbol<Py::GlobalValueOp>(refAttr)
+                                     .initializer()
+                                     .cast<Py::TupleAttr>()
+                                     .getValue();
+                    llvm::SmallVector<mlir::Attribute> currentSlots{array.begin(), array.end()};
+                    auto thisSlots = pylir::match(
+                        iter->second,
+                        [](mlir::Operation* op)
+                        { return mlir::cast<Py::GlobalValueOp>(op).initializer().cast<Py::TupleAttr>(); },
+                        [&](mlir::FlatSymbolRefAttr ref)
+                        { return m_module.lookupSymbol<Py::GlobalValueOp>(ref).initializer().cast<Py::TupleAttr>(); });
+                    currentSlots.insert(currentSlots.end(), thisSlots.getValue().begin(), thisSlots.getValue().end());
+                    slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr(currentSlots));
+                }
+                else
+                {
+                    slots["__slots__"] = refAttr;
+                }
+            }
+        }
     }
     slots["__mro__"] = mlir::FlatSymbolRefAttr::get(createGlobalConstant(m_builder.getTupleAttr(mro)));
     llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> converted(slots.size());
@@ -140,7 +171,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                 });
     auto baseException =
         createClass(m_builder.getBaseExceptionBuiltin(), {},
-                    [&](SlotMapImpl slots)
+                    [&](SlotMapImpl& slots)
                     {
                         slots["__new__"] = createFunction("builtins.BaseException.__new__",
                                                           {FunctionParameter{"", FunctionParameter::PosOnly, false},
@@ -175,7 +206,7 @@ void pylir::CodeGen::createBuiltinsImpl()
     createClass(m_builder.getUnboundLocalErrorBuiltin(), {nameError});
 
     createClass(m_builder.getStopIterationBuiltin(), {exception},
-                [&](SlotMapImpl slots)
+                [&](SlotMapImpl& slots)
                 {
                     slots["__new__"] = createFunction(
                         "builtins.StopIteration.__init__",
@@ -215,7 +246,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                         createGlobalConstant(m_builder.getTupleAttr({m_builder.getPyStringAttr("value")}));
                 });
     createClass(m_builder.getNoneTypeBuiltin(), {},
-                [&](SlotMapImpl slots)
+                [&](SlotMapImpl& slots)
                 {
                     slots["__new__"] = createFunction(
                         "builtins.NoneType.__new__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
