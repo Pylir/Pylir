@@ -29,6 +29,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     llvm::DenseMap<pylir::Py::ObjectAttr, mlir::LLVM::GlobalOp> m_globalConstants;
     llvm::DenseMap<mlir::Attribute, mlir::LLVM::GlobalOp> m_globalBuffers;
     mlir::SymbolTable m_symbolTable;
+    std::unique_ptr<pylir::CABI> m_cabi;
 
     mlir::LLVM::LLVMArrayType getSlotEpilogue(unsigned slotSize = 0)
     {
@@ -42,9 +43,34 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     }
 
 public:
-    PylirTypeConverter(mlir::MLIRContext* context, const mlir::LowerToLLVMOptions& options, mlir::SymbolTable table)
-        : mlir::LLVMTypeConverter(context, options), m_symbolTable(std::move(table))
+    PylirTypeConverter(mlir::MLIRContext* context, llvm::Triple triple, llvm::DataLayout dataLayout,
+                       mlir::ModuleOp moduleOp)
+        : mlir::LLVMTypeConverter(context,
+                                  [&]
+                                  {
+                                      mlir::LowerToLLVMOptions options(context);
+                                      options.allocLowering = mlir::LowerToLLVMOptions::AllocLowering::None;
+                                      options.dataLayout = dataLayout;
+                                      return options;
+                                  }()),
+          m_symbolTable(moduleOp)
     {
+        switch (triple.getArch())
+        {
+            case llvm::Triple::x86_64:
+            {
+                if (triple.isOSWindows())
+                {
+                    m_cabi = std::make_unique<pylir::WinX64>(mlir::DataLayout{moduleOp});
+                }
+                else
+                {
+                    m_cabi = std::make_unique<pylir::X86_64>(mlir::DataLayout{moduleOp});
+                }
+                break;
+            }
+            default: llvm::errs() << triple.str() << " not yet implemented";
+        }
     }
 
     mlir::LLVM::LLVMStructType getPyObjectType(llvm::Optional<unsigned> slotSize = {})
@@ -709,10 +735,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
 {
     auto module = getOperation();
 
-    mlir::LowerToLLVMOptions options(&getContext());
-    options.allocLowering = mlir::LowerToLLVMOptions::AllocLowering::None;
-    options.dataLayout = llvm::DataLayout(dataLayout.getValue());
-    PylirTypeConverter converter(&getContext(), options, mlir::SymbolTable(module));
+    PylirTypeConverter converter(&getContext(), llvm::Triple(targetTriple.getValue()),
+                                 llvm::DataLayout(dataLayout.getValue()), module);
     converter.addConversion([&](pylir::Py::DynamicType)
                             { return mlir::LLVM::LLVMPointerType::get(converter.getPyObjectType()); });
     converter.addConversion([&](pylir::Mem::MemoryType)

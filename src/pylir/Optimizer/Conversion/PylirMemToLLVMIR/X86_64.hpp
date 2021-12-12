@@ -6,7 +6,7 @@
 
 #include "CABI.hpp"
 
-namespace pylir::Mem
+namespace pylir
 {
 class X86_64 final : public CABI
 {

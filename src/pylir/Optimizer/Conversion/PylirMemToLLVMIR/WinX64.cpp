@@ -13,9 +13,8 @@ bool isLegalIntegerSize(std::size_t size)
 }
 } // namespace
 
-mlir::LLVM::LLVMFuncOp pylir::Mem::WinX64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
-                                                       mlir::Type returnType, llvm::StringRef name,
-                                                       mlir::TypeRange inputTypes)
+mlir::LLVM::LLVMFuncOp pylir::WinX64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type returnType,
+                                                  llvm::StringRef name, mlir::TypeRange inputTypes)
 {
     mlir::Type retType = returnType;
     llvm::SmallVector<mlir::Type> argumentTypes;
@@ -73,8 +72,8 @@ mlir::LLVM::LLVMFuncOp pylir::Mem::WinX64::declareFunc(mlir::OpBuilder& builder,
     return funcOp;
 }
 
-mlir::Value pylir::Mem::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
-                                         mlir::ValueRange operands)
+mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
+                                    mlir::ValueRange operands)
 {
     auto result = m_adjustments.find(func);
     PYLIR_ASSERT(result != m_adjustments.end());
@@ -163,6 +162,7 @@ mlir::Value pylir::Mem::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Locatio
         }
         case PointerToTemporary: return builder.create<mlir::LLVM::LoadOp>(loc, returnSlot);
     }
+    PYLIR_UNREACHABLE;
 }
 
-pylir::Mem::WinX64::WinX64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}
+pylir::WinX64::WinX64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}

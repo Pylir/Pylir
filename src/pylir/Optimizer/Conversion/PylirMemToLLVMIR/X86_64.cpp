@@ -37,8 +37,8 @@ llvm::SmallVector<mlir::Type> flatten(mlir::Type type)
 
 } // namespace
 
-std::tuple<pylir::Mem::X86_64::Adjustments::Arg, mlir::Type, mlir::Type>
-    pylir::Mem::X86_64::flattenSingleArg(mlir::Type type, std::uint8_t* takenIntegers, std::uint8_t* takenFloats)
+std::tuple<pylir::X86_64::Adjustments::Arg, mlir::Type, mlir::Type>
+    pylir::X86_64::flattenSingleArg(mlir::Type type, std::uint8_t* takenIntegers, std::uint8_t* takenFloats)
 {
     constexpr std::uint8_t availableIntegerRegisters = 6;
     constexpr std::uint8_t availableFloatingPointRegisters = 8;
@@ -162,7 +162,7 @@ std::tuple<pylir::Mem::X86_64::Adjustments::Arg, mlir::Type, mlir::Type>
     return {dest, ret[0], ret[1]};
 }
 
-mlir::LLVM::LLVMFuncOp pylir::Mem::X86_64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
+mlir::LLVM::LLVMFuncOp pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc,
                                                        mlir::Type returnType, llvm::StringRef name,
                                                        mlir::TypeRange inputTypes)
 {
@@ -262,7 +262,7 @@ mlir::LLVM::LLVMFuncOp pylir::Mem::X86_64::declareFunc(mlir::OpBuilder& builder,
     return funcOp;
 }
 
-mlir::Value pylir::Mem::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
+mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
                                          mlir::ValueRange operands)
 {
     auto result = m_adjustments.find(func);
@@ -347,4 +347,4 @@ mlir::Value pylir::Mem::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Locatio
         });
 }
 
-pylir::Mem::X86_64::X86_64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}
+pylir::X86_64::X86_64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}
