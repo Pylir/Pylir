@@ -671,6 +671,10 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
             return mlir::success();
         }
+        // I could create GEP here to read the offset component of the type object, but LLVM is not aware that the size
+        // component is const, even if the rest of the type isn't. So instead we calculate the size here again to have
+        // it be a constant. This allows LLVM to lower the whole access to a single GEP + load, which is equal to member
+        // access in eg. C or C++
         mlir::Type instanceType;
         if (ref)
         {
