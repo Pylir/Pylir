@@ -362,7 +362,7 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     if (auto* op = value().getDefiningOp();
         op
         && (op->getDialect() == this->getOperation()->getDialect() || mlir::isa<mlir::CallOp, mlir::CallIndirectOp>(op))
-        && !mlir::isa<Py::LoadOp>(op))
+        && !mlir::isa<Py::LoadOp>(op) && !mlir::isa<Py::GetSlotOp>(op))
     {
         return mlir::BoolAttr::get(getContext(), false);
     }
