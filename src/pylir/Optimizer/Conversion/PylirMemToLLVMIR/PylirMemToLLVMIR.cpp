@@ -43,6 +43,15 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
             &getContext(), {getIndexType(), getIndexType(), mlir::LLVM::LLVMPointerType::get(elementType)});
     }
 
+    pylir::Py::ObjectAttr dereference(mlir::Attribute attr)
+    {
+        if (auto ref = attr.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            return m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).initializer();
+        }
+        return attr.cast<pylir::Py::ObjectAttr>();
+    }
+
 public:
     PylirTypeConverter(mlir::MLIRContext* context, llvm::Triple triple, llvm::DataLayout dataLayout,
                        mlir::ModuleOp moduleOp)
@@ -206,7 +215,8 @@ public:
         auto result = llvm::find_if(slots.getValue(), [](auto pair) { return pair.first.getValue() == "__slots__"; });
         if (result != slots.getValue().end())
         {
-            count = result->second.cast<pylir::Py::TupleAttr>().getValue().size();
+            auto tuple = dereference(result->second).cast<pylir::Py::TupleAttr>();
+            count = tuple.getValue().size();
         }
         return llvm::TypeSwitch<pylir::Py::ObjectAttr, mlir::LLVM::LLVMStructType>(objectAttr)
             .Case([&](pylir::Py::TupleAttr) { return getPyTupleType(count); })
@@ -378,7 +388,7 @@ public:
                                     [](auto pair) { return pair.first.getValue() == "__slots__"; });
         if (result != typeObjectAttr.getSlots().getValue().end())
         {
-            for (auto slot : llvm::enumerate(result->second.cast<pylir::Py::TupleAttr>().getValue()))
+            for (auto slot : llvm::enumerate(dereference(result->second).cast<pylir::Py::TupleAttr>().getValue()))
             {
                 auto element = llvm::find_if(
                     objectAttr.getSlots().getValue(), [&](auto pair)
@@ -913,7 +923,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocObjectOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Mem::GCAllocObjectOp op, OpAdaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::GCAllocObjectOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto constant = op.typeObj().getDefiningOp<pylir::Py::ConstantOp>();
@@ -944,8 +954,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         }
         // I could create GEP here to read the offset component of the type object, but LLVM is not aware that the size
         // component is const, even if the rest of the type isn't. So instead we calculate the size here again to have
-        // it be a constant. This allows LLVM to lower the whole access to a single GEP + load, which is equal to member
-        // access in eg. C or C++
+        // it be a constant.
         mlir::Type instanceType;
         if (ref)
         {
@@ -961,7 +970,15 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         auto inBytes = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), sizeOf, slotSize);
         auto memory = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
                                                             PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
-        rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), memory);
+        auto object =
+            rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), memory);
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
+            object, mlir::ValueRange{zero, zero});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.typeObj(), gep);
         return mlir::success();
     }
 };
@@ -1013,7 +1030,25 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, pointerSize);
         auto memory = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
                                                             PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
-        rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), memory);
+        auto object =
+            rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), memory);
+        gep = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
+            object, mlir::ValueRange{zero, zero});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.typeObj(), gep);
+    }
+};
+
+struct InitObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitObjectOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitObjectOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitObjectOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOp(op, adaptor.memory());
+        return mlir::success();
     }
 };
 
@@ -1058,11 +1093,16 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<StrEqualOpConversion>(converter);
     patternSet.insert<GCAllocObjectOpConversion>(converter);
     patternSet.insert<GCAllocObjectConstTypeConversion>(converter, 2);
+    patternSet.insert<InitObjectOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
         return;
     }
+    module->setAttr(mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
+                    mlir::StringAttr::get(&getContext(), dataLayout.getValue()));
+    module->setAttr(mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
+                    mlir::StringAttr::get(&getContext(), targetTriple.getValue()));
 }
 } // namespace
 

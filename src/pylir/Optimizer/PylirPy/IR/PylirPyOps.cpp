@@ -1004,20 +1004,21 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
     {
         if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
         {
-            if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref))
+            if (!mlir::isa_and_nonnull<pylir::Py::GlobalValueOp, mlir::FuncOp>(
+                    mlir::SymbolTable::lookupNearestSymbolFrom(op, ref)))
             {
-                return op->emitOpError("Undefined reference to '") << ref << "' ";
+                return op->emitOpError("Undefined reference to '") << ref << "'\n";
             }
         }
         else if (!attribute.isa<pylir::Py::UnboundAttr>())
         {
-            return op->emitError("Not allowed attribute '") << attribute << "' found";
+            return op->emitOpError("Not allowed attribute '") << attribute << "' found\n";
         }
         return mlir::success();
     }
     if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, object.getType()))
     {
-        return op->emitOpError("Type of attribute '") << object.getType() << "' not found";
+        return op->emitOpError("Type of attribute '") << object.getType() << "' not found\n";
     }
     for (auto [name, value] : object.getSlots().getValue())
     {
@@ -1060,20 +1061,20 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
             {
                 if (!functionAttr.getValue())
                 {
-                    return op->emitOpError("Expected function attribute to contain a symbol reference");
+                    return op->emitOpError("Expected function attribute to contain a symbol reference\n");
                 }
                 auto table = mlir::SymbolTable(mlir::SymbolTable::getNearestSymbolTable(op));
                 if (!table.lookup<mlir::FuncOp>(functionAttr.getValue().getValue()))
                 {
-                    return op->emitOpError("Expected function attribute to refer to a function");
+                    return op->emitOpError("Expected function attribute to refer to a function\n");
                 }
                 if (!functionAttr.getKWDefaults())
                 {
-                    return op->emitOpError("Expected __kwdefaults__ in function attribute");
+                    return op->emitOpError("Expected __kwdefaults__ in function attribute\n");
                 }
                 if (!functionAttr.getKWDefaults().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
                 {
-                    return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference");
+                    return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference\n");
                 }
                 else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
                          ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
@@ -1081,17 +1082,17 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                     if (!lookup)
                     {
-                        return op->emitOpError("Expected __kwdefaults__ to refer to a dictionary");
+                        return op->emitOpError("Expected __kwdefaults__ to refer to a dictionary\n");
                     }
                     // TODO: Check its dict or inherits from dict
                 }
                 if (!functionAttr.getDefaults())
                 {
-                    return op->emitOpError("Expected __defaults__ in function attribute");
+                    return op->emitOpError("Expected __defaults__ in function attribute\n");
                 }
                 if (!functionAttr.getDefaults().isa<pylir::Py::TupleAttr, mlir::FlatSymbolRefAttr>())
                 {
-                    return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference");
+                    return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference\n");
                 }
                 else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
                          ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
@@ -1099,7 +1100,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                     if (!lookup)
                     {
-                        return op->emitOpError("Expected __defaults__ to refer to a tuple");
+                        return op->emitOpError("Expected __defaults__ to refer to a tuple\n");
                     }
                     // TODO: Check its tuple or inherits from tuple
                 }
@@ -1107,16 +1108,38 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                 {
                     if (!functionAttr.getDict().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
                     {
-                        return op->emitOpError("Expected __dict__ to be a dict or symbol reference");
+                        return op->emitOpError("Expected __dict__ to be a dict or symbol reference\n");
                     }
                     else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>())
                     {
                         auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                         if (!lookup)
                         {
-                            return op->emitOpError("Expected __dict__ to refer to a dict");
+                            return op->emitOpError("Expected __dict__ to refer to a dict\n");
                         }
                         // TODO: Check its dict or inherits from dict
+                    }
+                }
+                return mlir::success();
+            })
+        .Case(
+            [&](pylir::Py::TypeAttr typeAttr) -> mlir::LogicalResult
+            {
+                auto result = llvm::find_if(typeAttr.getSlots().getValue(),
+                                            [](auto pair) { return pair.first.getValue() == "__slots__"; });
+                if (result != typeAttr.getSlots().getValue().end())
+                {
+                    if (auto ref = result->second.dyn_cast<mlir::FlatSymbolRefAttr>())
+                    {
+                        auto lookup = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
+                        if (!lookup || !lookup.initializer().isa<pylir::Py::TupleAttr>())
+                        {
+                            return op->emitOpError("Expected __slots__ to refer to a tuple\n");
+                        }
+                    }
+                    else if (!result->second.isa<pylir::Py::TupleAttr>())
+                    {
+                        return op->emitOpError("Expected __slots__ to be a tuple or symbol reference\n");
                     }
                 }
                 return mlir::success();
@@ -1131,7 +1154,7 @@ mlir::LogicalResult verify(pylir::Py::ConstantOp op)
         if (auto interface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(uses.getOwner());
             interface && interface.getEffectOnValue<mlir::MemoryEffects::Write>(op))
         {
-            return uses.getOwner()->emitError("Write to a constant value is not allowed");
+            return uses.getOwner()->emitOpError("Write to a constant value is not allowed\n");
         }
     }
     return verify(op, op.constant());

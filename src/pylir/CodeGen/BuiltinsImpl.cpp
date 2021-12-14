@@ -311,8 +311,10 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
                         });
                 });
-    //Stubs
+    // Stubs
     createClass(m_builder.getDictBuiltin());
     createClass(m_builder.getTupleBuiltin());
-    createClass(m_builder.getIntBuiltin());
+    auto integer = createClass(m_builder.getIntBuiltin());
+    createClass(m_builder.getListBuiltin());
+    createClass(m_builder.getBoolBuiltin(), {integer});
 }
