@@ -213,19 +213,19 @@ public:
         return create<Py::FunctionGetFunctionOp>(function);
     }
 
-    Py::ObjectHash createObjectHash(mlir::Value object)
+    Py::ObjectHashOp createObjectHash(mlir::Value object)
     {
-        return create<Py::ObjectHash>(object);
+        return create<Py::ObjectHashOp>(object);
     }
 
-    Py::StrHash createStrHash(mlir::Value string)
+    Py::StrHashOp createStrHash(mlir::Value string)
     {
-        return create<Py::StrHash>(string);
+        return create<Py::StrHashOp>(string);
     }
 
-    Py::StrEqual createStrEqual(mlir::Value lhs, mlir::Value rhs)
+    Py::StrEqualOp createStrEqual(mlir::Value lhs, mlir::Value rhs)
     {
-        return create<Py::StrEqual>(lhs, rhs);
+        return create<Py::StrEqualOp>(lhs, rhs);
     }
 
     Py::MROLookupOp createMROLookup(mlir::Value mroTuple, llvm::StringRef attribute)

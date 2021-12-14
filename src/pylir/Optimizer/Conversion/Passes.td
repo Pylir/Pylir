@@ -10,7 +10,7 @@ def ConvertPylirToLLVM : Pass<"convert-pylirMem-to-llvm","::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::Mem::PylirMemDialect", "::mlir::LLVM::LLVMDialect"];
 
     let options = [
-        Option<"targetTriple", "target-triple", "std::string", /*default=*/"\"\"", "LLVM target triple">,
+        Option<"targetTriple", "target-triple", "std::string", /*default=*/"LLVM_DEFAULT_TARGET_TRIPLE", "LLVM target triple">,
         Option<"dataLayout", "data-layout", "std::string", /*default=*/"\"\"", "LLVM data layout">
     ];
 }

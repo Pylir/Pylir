@@ -200,21 +200,21 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEf
     }];
 }
 
-def PylirPy_ObjectHash : PylirPy_Op<"object.hash", [NoSideEffect]> {
+def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoSideEffect]> {
     let arguments = (ins DynamicType:$object);
     let results = (outs Index:$hash);
 
     let assemblyFormat = "$object attr-dict";
 }
 
-def PylirPy_StrHash : PylirPy_Op<"str.hash", [NoSideEffect]> {
+def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect]> {
     let arguments = (ins DynamicType:$object);
     let results = (outs Index:$hash);
 
     let assemblyFormat = "$object attr-dict";
 }
 
-def PylirPy_StrEqual : PylirPy_Op<"str.equal", [NoSideEffect]> {
+def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
     let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
     let results = (outs I1:$result);
 

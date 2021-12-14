@@ -27,3 +27,16 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[OBJECT_PTR]][%[[ZERO]]]
 // CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: llvm.return %[[LOAD]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type<slots: #py.slots<{"__slots__" to #py.tuple<(#py.str<"__slots__">)>}>>
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.str = #py.type
+
+func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.getSlot "__slots__" from %arg0 : %arg1
+    return %0 : !py.dynamic
+}
+
+// CHECK-LABEL: llvm.func @foo
