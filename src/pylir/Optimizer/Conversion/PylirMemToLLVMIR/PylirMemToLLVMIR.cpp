@@ -250,10 +250,9 @@ public:
         {
             mlir::OpBuilder::InsertionGuard guard{builder};
             builder.setInsertionPointToEnd(module.getBody());
-            llvmFunc = builder.create<mlir::LLVM::LLVMFuncOp>(
-                loc, functionName, mlir::LLVM::LLVMFunctionType::get(returnType, argumentTypes));
+            llvmFunc = m_cabi->declareFunc(builder, loc, returnType, functionName, argumentTypes);
         }
-        return builder.create<mlir::LLVM::CallOp>(loc, llvmFunc, args).getResult(0);
+        return m_cabi->callFunc(builder, loc, llvmFunc, args);
     }
 
     void initializeGlobal(mlir::LLVM::GlobalOp global, pylir::Py::ObjectAttr objectAttr, mlir::OpBuilder& builder)
