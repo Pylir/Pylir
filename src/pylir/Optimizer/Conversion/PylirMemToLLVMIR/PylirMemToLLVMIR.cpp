@@ -695,6 +695,89 @@ struct TupleLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Tupl
     }
 };
 
+struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListAppendOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::ListAppendOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::ListAppendOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::ListAppendOp op, OpAdaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto block = op->getBlock();
+        auto endBlock = op->getBlock()->splitBlock(op);
+        rewriter.setInsertionPointToEnd(block);
+
+        auto zeroI32 =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto oneI32 =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto list = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPySequenceType()), adaptor.list());
+        auto sizePtr = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
+                                                          list, mlir::ValueRange{zeroI32, oneI32, zeroI32});
+        auto size = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), sizePtr);
+        auto oneIndex = createIndexConstant(rewriter, op.getLoc(), 1);
+        auto incremented = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), size, oneIndex);
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), incremented, sizePtr);
+        auto capacityPtr =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), list,
+                                               mlir::ValueRange{zeroI32, oneI32, oneI32});
+        auto capacity = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), capacityPtr);
+        auto notEnoughCapacity =
+            rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::ult, capacity, incremented);
+        auto growBlock = new mlir::Block;
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), notEnoughCapacity, growBlock, endBlock);
+
+        growBlock->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(growBlock);
+        {
+            auto twoI32 = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
+                                                                  rewriter.getI32IntegerAttr(2));
+            mlir::Value newCapacity = rewriter.create<mlir::LLVM::ShlOp>(op.getLoc(), capacity, oneIndex);
+            // TODO: use UMinOp once available
+            newCapacity = rewriter.create<mlir::LLVM::SMinOp>(op.getLoc(), newCapacity, incremented);
+            auto arrayPtr = rewriter.create<mlir::LLVM::GEPOp>(
+                op.getLoc(),
+                mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(
+                    mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()))),
+                list, mlir::ValueRange{zeroI32, oneI32, twoI32});
+            auto array = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), arrayPtr);
+            auto pyObjectSize = getTypeConverter()->createSizeOf(
+                op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()));
+            auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), newCapacity, pyObjectSize);
+            auto newMemory = getTypeConverter()->createRuntimeCall(
+                op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
+            auto newArray = rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), array.getType(), newMemory);
+            auto arrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
+                op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), array);
+            auto newArrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
+                op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), newArray);
+            auto falseC =
+                rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
+            auto byteCount = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, pyObjectSize);
+            rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), newArrayI8, arrayI8, byteCount, falseC);
+            rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), newArray, arrayPtr);
+        }
+        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, endBlock);
+
+        rewriter.setInsertionPointToStart(endBlock);
+        auto twoI32 =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        auto arrayPtr = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(),
+            mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(
+                mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()))),
+            list, mlir::ValueRange{zeroI32, oneI32, twoI32});
+        auto array = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), arrayPtr);
+        auto offset = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), array.getType(), array, mlir::ValueRange{size});
+        rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.item(), offset);
+    }
+};
+
 struct FunctionGetFunctionOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>::ConvertPylirOpToLLVMPattern;
@@ -1209,6 +1292,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitObjectOpConversion>(converter);
     patternSet.insert<InitListOpConversion>(converter);
     patternSet.insert<InitTupleFromListOpConversion>(converter);
+    patternSet.insert<ListAppendOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
