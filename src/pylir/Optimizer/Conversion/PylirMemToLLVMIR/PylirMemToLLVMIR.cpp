@@ -43,15 +43,6 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
             &getContext(), {getIndexType(), getIndexType(), mlir::LLVM::LLVMPointerType::get(elementType)});
     }
 
-    pylir::Py::ObjectAttr dereference(mlir::Attribute attr)
-    {
-        if (auto ref = attr.dyn_cast<mlir::FlatSymbolRefAttr>())
-        {
-            return m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).initializer();
-        }
-        return attr.cast<pylir::Py::ObjectAttr>();
-    }
-
 public:
     PylirTypeConverter(mlir::MLIRContext* context, llvm::Triple triple, llvm::DataLayout dataLayout,
                        mlir::ModuleOp moduleOp)
@@ -216,7 +207,7 @@ public:
         auto result = llvm::find_if(slots.getValue(), [](auto pair) { return pair.first.getValue() == "__slots__"; });
         if (result != slots.getValue().end())
         {
-            auto tuple = dereference(result->second).cast<pylir::Py::TupleAttr>();
+            auto tuple = dereference<pylir::Py::TupleAttr>(result->second);
             count = tuple.getValue().size();
         }
         return llvm::TypeSwitch<pylir::Py::ObjectAttr, mlir::LLVM::LLVMStructType>(objectAttr)
@@ -389,7 +380,7 @@ public:
                                     [](auto pair) { return pair.first.getValue() == "__slots__"; });
         if (result != typeObjectAttr.getSlots().getValue().end())
         {
-            for (auto slot : llvm::enumerate(dereference(result->second).cast<pylir::Py::TupleAttr>().getValue()))
+            for (auto slot : llvm::enumerate(dereference<pylir::Py::TupleAttr>(result->second).getValue()))
             {
                 auto element = llvm::find_if(
                     objectAttr.getSlots().getValue(), [&](auto pair)
@@ -451,9 +442,14 @@ public:
         return globalOp;
     }
 
-    mlir::SymbolTable& getSymbolTable()
+    template <class T>
+    T dereference(mlir::Attribute attr)
     {
-        return m_symbolTable;
+        if (auto ref = attr.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            return m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).initializer().dyn_cast<T>();
+        }
+        return attr.dyn_cast<T>();
     }
 };
 
@@ -729,27 +725,36 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         {
             return mlir::failure();
         }
-        pylir::Py::ObjectAttr attr;
+        pylir::Py::ObjectAttr typeObject;
         auto ref = constant.constant().dyn_cast<mlir::FlatSymbolRefAttr>();
-        if (ref)
-        {
-            attr = getTypeConverter()->getSymbolTable().lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).initializer();
-        }
-        else if (auto obj = constant.constant().dyn_cast<pylir::Py::ObjectAttr>())
-        {
-            attr = obj;
-        }
-        else
+        typeObject = getTypeConverter()->dereference<pylir::Py::ObjectAttr>(constant.constant());
+        if (!typeObject)
         {
             return mlir::failure();
         }
-        auto iter =
-            llvm::find_if(attr.getSlots().getValue(), [](auto pair) { return pair.first.getValue() == "__slots__"; });
-        if (iter == attr.getSlots().getValue().end())
+
+        auto iter = llvm::find_if(typeObject.getSlots().getValue(),
+                                  [](auto pair) { return pair.first.getValue() == "__slots__"; });
+        if (iter == typeObject.getSlots().getValue().end())
         {
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
             return mlir::success();
         }
+        auto tupleAttr = getTypeConverter()->dereference<pylir::Py::TupleAttr>(iter->second);
+        PYLIR_ASSERT(tupleAttr);
+        auto result = llvm::find_if(tupleAttr.getValue(),
+                                    [&](mlir::Attribute attribute)
+                                    {
+                                        auto str = getTypeConverter()->dereference<pylir::Py::StringAttr>(attribute);
+                                        PYLIR_ASSERT(str);
+                                        return str.getValueAttr() == adaptor.slot();
+                                    });
+        if (result == tupleAttr.getValue().end())
+        {
+            rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
+            return mlir::success();
+        }
+
         // I could create GEP here to read the offset component of the type object, but LLVM is not aware that the size
         // component is const, even if the rest of the type isn't. So instead we calculate the size here again to have
         // it be a constant. This allows LLVM to lower the whole access to a single GEP + load, which is equal to member
@@ -771,7 +776,7 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
             i8Ptr);
-        auto index = createIndexConstant(rewriter, op.getLoc(), iter - attr.getSlots().getValue().begin());
+        auto index = createIndexConstant(rewriter, op.getLoc(), result - tupleAttr.getValue().begin());
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), objectPtrPtr.getType(), objectPtrPtr, index);
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep);
         return mlir::success();
@@ -932,26 +937,20 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         {
             return mlir::failure();
         }
-        pylir::Py::ObjectAttr attr;
+        pylir::Py::ObjectAttr typeAttr;
         auto ref = constant.constant().dyn_cast<mlir::FlatSymbolRefAttr>();
-        if (ref)
-        {
-            attr = getTypeConverter()->getSymbolTable().lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).initializer();
-        }
-        else if (auto obj = constant.constant().dyn_cast<pylir::Py::ObjectAttr>())
-        {
-            attr = obj;
-        }
-        else
+        typeAttr = getTypeConverter()->dereference<pylir::Py::ObjectAttr>(constant.constant());
+        if (!typeAttr)
         {
             return mlir::failure();
         }
+
         std::size_t slotLen = 0;
-        auto iter =
-            llvm::find_if(attr.getSlots().getValue(), [](auto pair) { return pair.first.getValue() == "__slots__"; });
-        if (iter != attr.getSlots().getValue().end())
+        auto iter = llvm::find_if(typeAttr.getSlots().getValue(),
+                                  [](auto pair) { return pair.first.getValue() == "__slots__"; });
+        if (iter != typeAttr.getSlots().getValue().end())
         {
-            slotLen = iter->second.cast<pylir::Py::TupleAttr>().getValue().size();
+            slotLen = getTypeConverter()->dereference<pylir::Py::TupleAttr>(iter->second).getValue().size();
         }
         // I could create GEP here to read the offset component of the type object, but LLVM is not aware that the size
         // component is const, even if the rest of the type isn't. So instead we calculate the size here again to have
