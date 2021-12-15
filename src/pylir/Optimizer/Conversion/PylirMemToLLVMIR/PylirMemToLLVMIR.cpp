@@ -508,7 +508,14 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
             case mlir::SymbolTable::Visibility::Private: linkage = mlir::LLVM::linkage::Linkage::Private; break;
             case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
         }
-        auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, op.constant(), linkage, op.getName(),
+        static llvm::DenseSet<llvm::StringRef> immutable = {
+            pylir::Py::Builtins::Tuple.name,
+            pylir::Py::Builtins::Int.name,
+            pylir::Py::Builtins::Float.name,
+            pylir::Py::Builtins::Str.name,
+        };
+        bool constant = op.constant() || immutable.contains(op.initializer().getType().getValue());
+        auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, constant, linkage, op.getName(),
                                                                         mlir::Attribute{});
         getTypeConverter()->initializeGlobal(global, op.initializer(), rewriter);
     }

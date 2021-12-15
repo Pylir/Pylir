@@ -1,12 +1,14 @@
 // RUN: pylir-opt %s -convert-pylirMem-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.tuple = #py.tuple<()>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @foo = #py.tuple<()>
 
 // CHECK: llvm.mlir.global private unnamed_addr constant @[[BUFFER:buffer\$[[:alnum:]]*]]()
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: llvm.return %[[UNDEF]]
 
-// CHECK-LABEL: llvm.mlir.global external @builtins.tuple
+// CHECK-LABEL: llvm.mlir.global external constant @foo
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[CAST:.*]] = llvm.bitcast %[[TYPE]]
@@ -30,7 +32,7 @@ py.globalValue @foo = #py.str<"test">
 
 // CHECK: llvm.mlir.global private unnamed_addr constant @[[BUFFER:buffer\$[[:alnum:]]*]]("test")
 
-// CHECK-LABEL: llvm.mlir.global external @foo
+// CHECK-LABEL: llvm.mlir.global external constant @foo
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.str
 // CHECK-NEXT: %[[CAST:.*]] = llvm.bitcast %[[TYPE]]
