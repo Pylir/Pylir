@@ -133,3 +133,20 @@ func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : i1
 // CHECK-NEXT: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+func @make_int_fromInteger(%arg0 : i32) -> !py.dynamic {
+    %0 = py.int.fromInteger %arg0 : i32
+    return %0 : !py.dynamic
+}
+
+// CHECK-LABEL: @make_int_fromInteger
+// CHECK-SAME: %[[ARG:[[:alnum:]]+]]
+// CHECK-NEXT: %[[BOOL:.*]] = py.constant @builtins.int
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : i32
+// CHECK-NEXT: return %[[RESULT]]

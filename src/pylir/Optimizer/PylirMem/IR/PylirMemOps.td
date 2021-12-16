@@ -17,6 +17,8 @@ def DynamicType : Type<CPred<"$_self.isa<::pylir::Py::DynamicType>()">, "python 
 
 def MemoryType : TypeAlias<PylirMem_MemoryType>;
 
+def IntegerLike : TypeConstraint<Or<[Index.predicate, AnySignlessInteger.predicate]>>;
+
 def ObjectAttr : Attr<CPred<"$_self.isa<::pylir::Py::ObjectAttr>()">, "python object attribute"> {
     let storageType = "::pylir::Py::ObjectAttr";
     let returnType = "::pylir::Py::ObjectAttr";
@@ -42,7 +44,7 @@ def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
 
 def PylirMem_InitIntOp : PylirMem_Op<"initInt"> {
     let results = (outs DynamicType:$result);
-    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, AnySignlessInteger:$initializer);
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, IntegerLike:$initializer);
 
     let assemblyFormat = "$memory `to` $initializer `:` type($initializer) attr-dict";
 }

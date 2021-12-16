@@ -1,12 +1,12 @@
+#include <mlir/Transforms/DialectConversion.h>
+
+#include <llvm/ADT/DenseMap.h>
+
 #include <pylir/Optimizer/Conversion/PassDetail.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-
-#include <llvm/ADT/DenseMap.h>
-
-#include <mlir/Transforms/DialectConversion.h>
 
 namespace
 {
@@ -125,6 +125,20 @@ struct BoolFromI1OpConversion : mlir::OpRewritePattern<pylir::Py::BoolFromI1Op>
     }
 };
 
+struct IntFromIntegerOpConversion : mlir::OpRewritePattern<pylir::Py::IntFromIntegerOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::IntFromIntegerOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::IntFromIntegerOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        auto integer = rewriter.create<pylir::Py::ConstantOp>(
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Int.name));
+        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), integer);
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitIntOp>(op, mem, op.input());
+        return mlir::success();
+    }
+};
+
 struct ConvertPylirPyToPylirMem : pylir::ConvertPylirPyToPylirMemBase<ConvertPylirPyToPylirMem>
 {
 protected:
@@ -139,7 +153,7 @@ void ConvertPylirPyToPylirMem::runOnOperation()
 
     target.addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
                         pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp,
-                        pylir::Py::BoolFromI1Op>();
+                        pylir::Py::BoolFromI1Op, pylir::Py::IntFromIntegerOp>();
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.insert<MakeTupleOpConversion>(&getContext());
@@ -150,6 +164,7 @@ void ConvertPylirPyToPylirMem::runOnOperation()
     patterns.insert<MakeObjectOpConversion>(&getContext());
     patterns.insert<ListToTupleOpConversion>(&getContext());
     patterns.insert<BoolFromI1OpConversion>(&getContext());
+    patterns.insert<IntFromIntegerOpConversion>(&getContext());
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target, std::move(patterns))))
     {
         signalPassFailure();
