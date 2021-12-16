@@ -271,6 +271,8 @@ public:
         Memcmp,
         pylir_gc_alloc,
         mp_init_u64,
+        pylir_str_hash,
+        abort,
     };
 
     mlir::Value createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder, Runtime func, mlir::ValueRange args)
@@ -296,6 +298,16 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()), builder.getI64Type()};
                 functionName = "mp_init_u64";
+                break;
+            case Runtime::pylir_str_hash:
+                returnType = builder.getI64Type();
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyStringType())};
+                functionName = "pylir_str_hash";
+                break;
+            case Runtime::abort:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {};
+                functionName = "abort";
                 break;
         }
         auto module = mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp());
@@ -869,6 +881,88 @@ struct ObjectHashOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Ob
     }
 };
 
+struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::StrEqualOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::StrEqualOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto block = op->getBlock();
+        auto endBlock = op->getBlock()->splitBlock(op);
+        endBlock->addArgument(rewriter.getI1Type());
+        rewriter.setInsertionPointToEnd(block);
+
+        auto sameObject = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, adaptor.lhs(),
+                                                              adaptor.rhs());
+        auto isNot = new mlir::Block;
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sameObject, endBlock, mlir::ValueRange{sameObject}, isNot,
+                                              mlir::ValueRange{});
+
+        isNot->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(isNot);
+        auto lhs = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyStringType()), adaptor.lhs());
+        auto rhs = rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), lhs.getType(), adaptor.rhs());
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto lhsGep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
+                                                         lhs, mlir::ValueRange{zero, one, zero});
+        auto lhsLen = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), lhsGep);
+        auto rhsGep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
+                                                         rhs, mlir::ValueRange{zero, one, zero});
+        auto rhsLen = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
+        auto sizeEqual =
+            rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, lhsLen, rhsLen);
+        auto bufferCmp = new mlir::Block;
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sizeEqual, bufferCmp, endBlock, mlir::ValueRange{sizeEqual});
+
+        bufferCmp->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(bufferCmp);
+        auto two =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        lhsGep = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type())), lhs,
+            mlir::ValueRange{zero, one, two});
+        auto lhsBuffer = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), lhsGep);
+        rhsGep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), lhsGep.getType(), rhs, mlir::ValueRange{zero, one, two});
+        auto rhsBuffer = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
+        auto result = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::Memcmp,
+                                                            {lhsBuffer, rhsBuffer, lhsLen});
+        auto isZero = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, result, zero);
+        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{isZero}, endBlock);
+
+        rewriter.setInsertionPointToStart(endBlock);
+        rewriter.replaceOp(op, {endBlock->getArgument(0)});
+    }
+};
+
+struct StrHashOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrHashOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::StrHashOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::StrHashOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::StrHashOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto str = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyStringType()), adaptor.object());
+        auto hash = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
+                                                          PylirTypeConverter::Runtime::pylir_str_hash, {str});
+        rewriter.replaceOp(op, hash);
+    }
+};
+
 struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSlotOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::GetSlotOp>::ConvertPylirOpToLLVMPattern;
@@ -1164,69 +1258,6 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
     }
 };
 
-struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>
-{
-    using ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>::ConvertPylirOpToLLVMPattern;
-
-    mlir::LogicalResult match(pylir::Py::StrEqualOp) const override
-    {
-        return mlir::success();
-    }
-
-    void rewrite(pylir::Py::StrEqualOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
-    {
-        auto block = op->getBlock();
-        auto endBlock = op->getBlock()->splitBlock(op);
-        endBlock->addArgument(rewriter.getI1Type());
-        rewriter.setInsertionPointToEnd(block);
-
-        auto sameObject = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, adaptor.lhs(),
-                                                              adaptor.rhs());
-        auto isNot = new mlir::Block;
-        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sameObject, endBlock, mlir::ValueRange{sameObject}, isNot,
-                                              mlir::ValueRange{});
-
-        isNot->insertBefore(endBlock);
-        rewriter.setInsertionPointToStart(isNot);
-        auto lhs = rewriter.create<mlir::LLVM::BitcastOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyStringType()), adaptor.lhs());
-        auto rhs = rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), lhs.getType(), adaptor.rhs());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
-        auto lhsGep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                         lhs, mlir::ValueRange{zero, one, zero});
-        auto lhsLen = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), lhsGep);
-        auto rhsGep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                         rhs, mlir::ValueRange{zero, one, zero});
-        auto rhsLen = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
-        auto sizeEqual =
-            rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, lhsLen, rhsLen);
-        auto bufferCmp = new mlir::Block;
-        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sizeEqual, bufferCmp, endBlock, mlir::ValueRange{sizeEqual});
-
-        bufferCmp->insertBefore(endBlock);
-        rewriter.setInsertionPointToStart(bufferCmp);
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
-        lhsGep = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type())), lhs,
-            mlir::ValueRange{zero, one, two});
-        auto lhsBuffer = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), lhsGep);
-        rhsGep =
-            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), lhsGep.getType(), rhs, mlir::ValueRange{zero, one, two});
-        auto rhsBuffer = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
-        auto result = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::Memcmp,
-                                                            {lhsBuffer, rhsBuffer, lhsLen});
-        auto isZero = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, result, zero);
-        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{isZero}, endBlock);
-
-        rewriter.setInsertionPointToStart(endBlock);
-        rewriter.replaceOp(op, {endBlock->getArgument(0)});
-    }
-};
-
 struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocObjectOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocObjectOp>::ConvertPylirOpToLLVMPattern;
@@ -1468,6 +1499,7 @@ struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         // TODO:
+        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::abort, {});
         rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
         return mlir::success();
     }
@@ -1496,6 +1528,29 @@ struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
         }
         getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_init_u64,
                                               {mpIntPointer, value});
+        rewriter.replaceOp(op, adaptor.memory());
+        return mlir::success();
+    }
+};
+
+struct InitFuncOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitFuncOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitFuncOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitFuncOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto casted = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyFunctionType()), adaptor.memory());
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto fpType = typeConverter->convertType(pylir::Py::getUniversalCCType(getContext()));
+        auto fp = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(fpType), casted,
+                                                     mlir::ValueRange{zero, one});
+        auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), fpType, adaptor.initializer());
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), address, fp);
         rewriter.replaceOp(op, adaptor.memory());
         return mlir::success();
     }
@@ -1551,6 +1606,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<RaiseOpConversion>(converter);
     patternSet.insert<InitIntOpConversion>(converter);
     patternSet.insert<ObjectHashOpConversion>(converter);
+    patternSet.insert<StrHashOpConversion>(converter);
+    patternSet.insert<InitFuncOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
