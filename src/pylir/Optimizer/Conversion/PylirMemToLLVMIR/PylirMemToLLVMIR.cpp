@@ -155,6 +155,40 @@ public:
         return pyString;
     }
 
+    mlir::LLVM::LLVMStructType getMPInt()
+    {
+        auto mpInt = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "mp_int");
+        if (!mpInt.isInitialized())
+        {
+            [[maybe_unused]] auto result =
+                mpInt.setBody({mlir::IntegerType::get(&getContext(), 8 * sizeof(int)),
+                               mlir::IntegerType::get(&getContext(), 8 * sizeof(int)),
+                               mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 8)),
+                               mlir::IntegerType::get(&getContext(), 8 * sizeof(mp_sign))},
+                              false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return mpInt;
+    }
+
+    mlir::LLVM::LLVMStructType getPyIntType(llvm::Optional<unsigned> slotSize = {})
+    {
+        if (slotSize)
+        {
+            return mlir::LLVM::LLVMStructType::getLiteral(
+                &getContext(),
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getMPInt(), getSlotEpilogue(*slotSize)});
+        }
+        auto pyType = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyInt");
+        if (!pyType.isInitialized())
+        {
+            [[maybe_unused]] auto result = pyType.setBody(
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getMPInt(), getSlotEpilogue()}, false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return pyType;
+    }
+
     mlir::LLVM::LLVMStructType getPyTypeType(llvm::Optional<unsigned> slotSize = {})
     {
         if (slotSize)
@@ -192,6 +226,11 @@ public:
         {
             return getPyStringType();
         }
+        else if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Int.name}
+                 || builtinsName == llvm::StringRef{pylir::Py::Builtins::Bool.name})
+        {
+            return getPyIntType();
+        }
         else
         {
             return getPyObjectType();
@@ -215,6 +254,7 @@ public:
             .Case([&](pylir::Py::StringAttr) { return getPyStringType(count); })
             .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
             .Case([&](pylir::Py::FunctionAttr) { return getPyFunctionType(count); })
+            .Case([&](pylir::Py::IntAttr) { return getPyIntType(count); })
             .Default([&](auto) { return getPyObjectType(count); });
     }
 
@@ -230,6 +270,7 @@ public:
     {
         Memcmp,
         pylir_gc_alloc,
+        mp_init_u64,
     };
 
     mlir::Value createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder, Runtime func, mlir::ValueRange args)
@@ -250,6 +291,11 @@ public:
                 returnType = mlir::LLVM::LLVMPointerType::get(builder.getI8Type());
                 argumentTypes = {builder.getI64Type()};
                 functionName = "pylir_gc_alloc";
+                break;
+            case Runtime::mp_init_u64:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()), builder.getI64Type()};
+                functionName = "mp_init_u64";
                 break;
         }
         auto module = mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp());
@@ -351,6 +397,12 @@ public:
                         global.getLoc(), floatAttr.getValueAttr().getType(), floatAttr.getValueAttr());
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, constant,
                                                                       builder.getI32ArrayAttr({1}));
+                })
+            .Case(
+                [&](pylir::Py::IntAttr)
+                {
+                    llvm::errs() << "Initializing a global integer is not yet supported";
+                    std::abort();
                 })
             .Case(
                 [&](pylir::Py::TypeAttr)
@@ -1407,6 +1459,34 @@ struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp
     }
 };
 
+struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitIntOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto casted = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyIntType()), adaptor.memory());
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto mpIntPointer = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getMPInt()), casted,
+            mlir::ValueRange{zero, one});
+        auto value = adaptor.initializer();
+        if (value.getType() != rewriter.getI64Type())
+        {
+            value = rewriter.create<mlir::LLVM::ZExtOp>(op.getLoc(), rewriter.getI64Type(), value);
+        }
+        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_init_u64,
+                                              {mpIntPointer, value});
+        rewriter.replaceOp(op, adaptor.memory());
+        return mlir::success();
+    }
+};
+
 struct ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -1455,6 +1535,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitTupleFromListOpConversion>(converter);
     patternSet.insert<ListAppendOpConversion>(converter);
     patternSet.insert<RaiseOpConversion>(converter);
+    patternSet.insert<InitIntOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
