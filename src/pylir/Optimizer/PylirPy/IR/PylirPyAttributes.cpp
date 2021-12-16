@@ -109,7 +109,7 @@ mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(::mlir::DialectAsmPars
 void pylir::Py::PylirPyDialect::printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const
 {
     llvm::TypeSwitch<mlir::Attribute>(attr)
-        .Case<BoolAttr, IntAttr, FloatAttr, StringAttr, TupleAttr, ListAttr, SetAttr, DictAttr, FunctionAttr>(
+        .Case<BoolAttr, IntAttr, FloatAttr, StringAttr, TupleAttr, ListAttr, SetAttr, DictAttr, FunctionAttr, TypeAttr>(
             [&](auto attr)
             {
                 os << attr.getMnemonic();
@@ -523,7 +523,7 @@ mlir::Attribute pylir::Py::FunctionAttr::getKWDefaults() const
 mlir::Attribute pylir::Py::FunctionAttr::getDict() const
 {
     auto result = std::find_if(getSlots().getValue().begin(), getSlots().getValue().end(),
-                               [](auto pair) { return pair.first.getValue() == "__defaults__"; });
+                               [](auto pair) { return pair.first.getValue() == "__dict__"; });
     if (result == getSlots().getValue().end())
     {
         return {};

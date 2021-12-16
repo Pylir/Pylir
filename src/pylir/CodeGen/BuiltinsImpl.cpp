@@ -80,8 +80,15 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                    {
                        return {m_builder.getStringAttr(pair.first),
                                pylir::match(
-                                   pair.second, [](mlir::FlatSymbolRefAttr attr) { return attr; },
-                                   [](mlir::Operation* op) { return mlir::FlatSymbolRefAttr::get(op); })};
+                                   pair.second, [](mlir::FlatSymbolRefAttr attr)-> mlir::Attribute { return attr; },
+                                   [&](mlir::SymbolOpInterface op) -> mlir::Attribute
+                                   {
+                                       if (auto func = mlir::dyn_cast<mlir::FuncOp>(op.getOperation()))
+                                       {
+                                           return m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(op));
+                                       }
+                                       return mlir::FlatSymbolRefAttr::get(op);
+                                   })};
                    });
     return m_builder.createGlobalValue(
         className.getValue(), true,

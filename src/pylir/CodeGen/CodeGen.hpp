@@ -211,7 +211,8 @@ class CodeGen
 
     Py::GlobalValueOp createGlobalConstant(Py::ObjectAttr value);
 
-    using SlotMapImpl = std::unordered_map<std::string_view, std::variant<mlir::FlatSymbolRefAttr, mlir::Operation*>>;
+    using SlotMapImpl =
+        std::unordered_map<std::string_view, std::variant<mlir::FlatSymbolRefAttr, mlir::SymbolOpInterface>>;
 
     Py::GlobalValueOp createClass(mlir::FlatSymbolRefAttr className,
                                   llvm::MutableArrayRef<Py::GlobalValueOp> bases = {},

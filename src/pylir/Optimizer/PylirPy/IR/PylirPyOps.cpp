@@ -1004,8 +1004,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
     {
         if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
         {
-            if (!mlir::isa_and_nonnull<pylir::Py::GlobalValueOp, mlir::FuncOp>(
-                    mlir::SymbolTable::lookupNearestSymbolFrom(op, ref)))
+            if (!mlir::isa_and_nonnull<pylir::Py::GlobalValueOp>(mlir::SymbolTable::lookupNearestSymbolFrom(op, ref)))
             {
                 return op->emitOpError("Undefined reference to '") << ref << "'\n";
             }
