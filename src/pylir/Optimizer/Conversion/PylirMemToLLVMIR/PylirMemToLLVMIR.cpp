@@ -855,6 +855,20 @@ struct FunctionGetFunctionOpConversion : public ConvertPylirOpToLLVMPattern<pyli
     }
 };
 
+struct ObjectHashOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ObjectHashOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::ObjectHashOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::ObjectHashOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        // TODO: proper hash
+        rewriter.replaceOpWithNewOp<mlir::LLVM::PtrToIntOp>(op, typeConverter->convertType(op.getType()),
+                                                            adaptor.object());
+        return mlir::success();
+    }
+};
+
 struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSlotOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::GetSlotOp>::ConvertPylirOpToLLVMPattern;
@@ -1536,6 +1550,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<ListAppendOpConversion>(converter);
     patternSet.insert<RaiseOpConversion>(converter);
     patternSet.insert<InitIntOpConversion>(converter);
+    patternSet.insert<ObjectHashOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
