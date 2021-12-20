@@ -30,6 +30,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     llvm::DenseMap<mlir::Attribute, mlir::LLVM::GlobalOp> m_globalBuffers;
     mlir::SymbolTable m_symbolTable;
     std::unique_ptr<pylir::CABI> m_cabi;
+    mlir::LLVM::LLVMFuncOp m_globalInit;
 
     mlir::LLVM::LLVMArrayType getSlotEpilogue(unsigned slotSize = 0)
     {
@@ -41,6 +42,22 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         // TODO: should this be 3 pointers ala std::vector?
         return mlir::LLVM::LLVMStructType::getLiteral(
             &getContext(), {getIndexType(), getIndexType(), mlir::LLVM::LLVMPointerType::get(elementType)});
+    }
+
+    void appendToGlobalInit(mlir::OpBuilder& builder, llvm::function_ref<void()> section)
+    {
+        mlir::OpBuilder::InsertionGuard guard{builder};
+        if (!m_globalInit)
+        {
+            builder.setInsertionPointToEnd(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
+            m_globalInit = builder.create<mlir::LLVM::LLVMFuncOp>(
+                builder.getUnknownLoc(), "$__GLOBAL_INIT__",
+                mlir::LLVM::LLVMFunctionType::get(builder.getType<mlir::LLVM::LLVMVoidType>(), {}),
+                mlir::LLVM::Linkage::Internal, true);
+            m_globalInit.addEntryBlock();
+        }
+        builder.setInsertionPointToEnd(&m_globalInit.back());
+        section();
     }
 
 public:
@@ -273,6 +290,8 @@ public:
         mp_init_u64,
         pylir_str_hash,
         abort,
+        mp_init,
+        mp_unpack,
     };
 
     mlir::Value createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder, Runtime func, mlir::ValueRange args)
@@ -308,6 +327,19 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {};
                 functionName = "abort";
+                break;
+            case Runtime::mp_init:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt())};
+                functionName = "mp_init";
+                break;
+            case Runtime::mp_unpack:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()),         getIndexType(),
+                                 builder.getIntegerType(sizeof(mp_order) * 8),         getIndexType(),
+                                 builder.getIntegerType(sizeof(mp_endian) * 8),        getIndexType(),
+                                 mlir::LLVM::LLVMPointerType::get(builder.getI8Type())};
+                functionName = "mp_unpack";
                 break;
         }
         auto module = mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp());
@@ -411,10 +443,78 @@ public:
                                                                       builder.getI32ArrayAttr({1}));
                 })
             .Case(
-                [&](pylir::Py::IntAttr)
+                [&](pylir::Py::IntAttr integer)
                 {
-                    llvm::errs() << "Initializing a global integer is not yet supported";
-                    std::abort();
+                    // TODO: Use host 'size_t'
+                    auto result = m_globalBuffers.lookup(integer);
+                    if (!result)
+                    {
+                        mlir::OpBuilder::InsertionGuard bufferGuard{builder};
+                        builder.setInsertionPointToStart(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
+                        auto bigInt = integer.getValue();
+                        auto size = mp_pack_count(&bigInt.getHandle(), 0, sizeof(std::size_t));
+                        llvm::SmallVector<std::size_t> data(size);
+                        (void)mp_pack(data.data(), data.size(), nullptr, mp_order::MP_LSB_FIRST, sizeof(std::size_t),
+                                      MP_BIG_ENDIAN, 0, &bigInt.getHandle());
+                        auto elementType = builder.getIntegerType(sizeof(std::size_t) * 8);
+                        result = builder.create<mlir::LLVM::GlobalOp>(
+                            global.getLoc(), mlir::LLVM::LLVMArrayType::get(elementType, size), true,
+                            mlir::LLVM::Linkage::Private, "buffer$", mlir::Attribute{}, 0, 0, true);
+                        result.setUnnamedAddrAttr(
+                            mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
+                        m_symbolTable.insert(result);
+                        m_globalBuffers.insert({integer, result});
+                        builder.setInsertionPointToStart(&result.getInitializerRegion().emplaceBlock());
+                        mlir::Value arrayUndef = builder.create<mlir::LLVM::UndefOp>(global.getLoc(), result.getType());
+                        for (auto element : llvm::enumerate(data))
+                        {
+                            auto constant = builder.create<mlir::LLVM::ConstantOp>(
+                                global.getLoc(), elementType, builder.getIntegerAttr(elementType, element.value()));
+                            arrayUndef = builder.create<mlir::LLVM::InsertValueOp>(
+                                global.getLoc(), arrayUndef, constant,
+                                builder.getI32ArrayAttr({static_cast<std::int32_t>(element.index())}));
+                        }
+                        builder.create<mlir::LLVM::ReturnOp>(global.getLoc(), arrayUndef);
+                    }
+                    auto numElements = result.getType().cast<mlir::LLVM::LLVMArrayType>().getNumElements();
+                    appendToGlobalInit(
+                        builder,
+                        [&]
+                        {
+                            mlir::Value mpIntPtr;
+                            {
+                                auto toInit = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), global);
+
+                                auto zero = builder.create<mlir::LLVM::ConstantOp>(
+                                    global.getLoc(), builder.getI32Type(), builder.getI32IntegerAttr(0));
+                                auto one = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), builder.getI32Type(),
+                                                                                  builder.getI32IntegerAttr(1));
+                                mpIntPtr = builder.create<mlir::LLVM::GEPOp>(
+                                    global.getLoc(), mlir::LLVM::LLVMPointerType::get(getMPInt()), toInit,
+                                    mlir::ValueRange{zero, one});
+                            }
+
+                            createRuntimeCall(global.getLoc(), builder, Runtime::mp_init, {mpIntPtr});
+                            auto count = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
+                                                                                builder.getIndexAttr(numElements));
+                            auto integerType = builder.getIntegerType(sizeof(mp_order) * 8);
+                            auto order = builder.create<mlir::LLVM::ConstantOp>(
+                                global.getLoc(), integerType,
+                                builder.getIntegerAttr(integerType, mp_order::MP_LSB_FIRST));
+                            auto size = builder.create<mlir::LLVM::ConstantOp>(
+                                global.getLoc(), getIndexType(), builder.getIndexAttr(sizeof(std::size_t)));
+                            integerType = builder.getIntegerType(sizeof(mp_endian) * 8);
+                            auto endian = builder.create<mlir::LLVM::ConstantOp>(
+                                global.getLoc(), integerType,
+                                builder.getIntegerAttr(integerType, mp_endian::MP_BIG_ENDIAN));
+                            auto zero = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
+                                                                               builder.getIndexAttr(0));
+                            auto buffer = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), result);
+                            auto i8 = builder.create<mlir::LLVM::BitcastOp>(
+                                global.getLoc(), mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), buffer);
+                            createRuntimeCall(global.getLoc(), builder, Runtime::mp_unpack,
+                                              {mpIntPtr, count, order, size, endian, zero, i8});
+                        });
                 })
             .Case(
                 [&](pylir::Py::TypeAttr)
@@ -497,8 +597,9 @@ public:
         mlir::OpBuilder::InsertionGuard guard{builder};
         builder.setInsertionPointToStart(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
         auto type = typeOf(objectAttr);
-        auto globalOp = builder.create<mlir::LLVM::GlobalOp>(
-            builder.getUnknownLoc(), type, true, mlir::LLVM::Linkage::Private, "const$", mlir::Attribute{}, 0, 0, true);
+        auto globalOp =
+            builder.create<mlir::LLVM::GlobalOp>(builder.getUnknownLoc(), type, !objectAttr.isa<pylir::Py::IntAttr>(),
+                                                 mlir::LLVM::Linkage::Private, "const$", mlir::Attribute{}, 0, 0, true);
         globalOp.setUnnamedAddrAttr(mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
         m_symbolTable.insert(globalOp);
         m_globalConstants.insert({objectAttr, globalOp});
@@ -514,6 +615,11 @@ public:
             return m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).initializer().dyn_cast<T>();
         }
         return attr.dyn_cast<T>();
+    }
+
+    mlir::LLVM::LLVMFuncOp getGlobalInit()
+    {
+        return m_globalInit;
     }
 };
 
@@ -574,11 +680,12 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
         }
         static llvm::DenseSet<llvm::StringRef> immutable = {
             pylir::Py::Builtins::Tuple.name,
-            pylir::Py::Builtins::Int.name,
             pylir::Py::Builtins::Float.name,
             pylir::Py::Builtins::Str.name,
         };
-        bool constant = op.constant() || immutable.contains(op.initializer().getType().getValue());
+        // Integer attrs currently need to be runtime init due to memory allocation in libtommath
+        bool constant = !op.initializer().isa<pylir::Py::IntAttr>()
+                        && (op.constant() || immutable.contains(op.initializer().getType().getValue()));
         auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, constant, linkage, op.getName(),
                                                                         mlir::Attribute{});
         getTypeConverter()->initializeGlobal(global, op.initializer(), rewriter);
@@ -1617,6 +1724,16 @@ void ConvertPylirToLLVMPass::runOnOperation()
                     mlir::StringAttr::get(&getContext(), dataLayout.getValue()));
     module->setAttr(mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
                     mlir::StringAttr::get(&getContext(), targetTriple.getValue()));
+    if (auto globalInit = converter.getGlobalInit())
+    {
+        auto builder = mlir::OpBuilder::atBlockEnd(&globalInit.back());
+        builder.create<mlir::LLVM::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{});
+
+        builder.setInsertionPointToEnd(module.getBody());
+        builder.create<mlir::LLVM::GlobalCtorsOp>(builder.getUnknownLoc(),
+                                                  builder.getArrayAttr({mlir::FlatSymbolRefAttr::get(globalInit)}),
+                                                  builder.getI32ArrayAttr({0}));
+    }
 }
 } // namespace
 
