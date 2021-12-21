@@ -12,14 +12,15 @@ id_start = unicode_category['Lu'] + unicode_category['Ll'] + unicode_category[
     'Lt'] + unicode_category['Lm'] + unicode_category['Lo'] + unicode_category[
                'Nl'] + unicode_category['Other_ID_Start'] + ['_']
 
-id_continue = sortedcontainers.SortedSet(
-    id_start + unicode_category['Mn'] + unicode_category['Mc'] +
-    unicode_category['Nd'] + unicode_category['Pc'] +
-    unicode_category['Other_ID_Continue'])
+id_continue = id_start + unicode_category['Mn'] + unicode_category['Mc'] + \
+              unicode_category['Nd'] + unicode_category['Pc'] + \
+              unicode_category['Other_ID_Continue']
 
-xid_continue = sortedcontainers.SortedSet([c for c in id_continue if
-                                           unicodedata.normalize('NFKC',
-                                                                 c) in id_continue])
+xid_continue = sortedcontainers.SortedSet()
+for c in id_continue:
+    normalized = unicodedata.normalize('NFKC', c)
+    if all([c2 in id_continue for c2 in normalized]):
+        xid_continue.add(c)
 
 xid_start = sortedcontainers.SortedSet()
 for c in id_start:
