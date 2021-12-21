@@ -134,6 +134,9 @@ void pylir::CodeGen::createBuiltinsImpl()
                         m_builder.getPyStringAttr("__eq__"),
                         m_builder.getPyStringAttr("__hash__"),
                         m_builder.getPyStringAttr("__bool__"),
+                        m_builder.getPyStringAttr("__getitem__"),
+                        m_builder.getPyStringAttr("__setitem__"),
+                        m_builder.getPyStringAttr("__mro__"),
                     }));
                 });
 
@@ -209,6 +212,9 @@ void pylir::CodeGen::createBuiltinsImpl()
 
     auto exception = createClass(m_builder.getExceptionBuiltin(), {baseException});
     createClass(m_builder.getTypeErrorBuiltin(), {exception});
+    auto lookupError = createClass(m_builder.getLookupErrorBuiltin(), {exception});
+    createClass(m_builder.getIndexErrorBuiltin(), {lookupError});
+    createClass(m_builder.getKeyErrorBuiltin(), {lookupError});
     auto nameError = createClass(m_builder.getNameErrorBuiltin(), {exception});
     createClass(m_builder.getUnboundLocalErrorBuiltin(), {nameError});
 
@@ -318,8 +324,45 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
                         });
                 });
+    createClass(m_builder.getDictBuiltin(), {},
+                [&](SlotMapImpl& slots)
+                {
+                    slots["__getitem__"] = createFunction(
+                        "builtins.dict.__getitem__",
+                        {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                        [&](mlir::ValueRange functionArguments)
+                        {
+                            auto dict = functionArguments[0];
+                            auto key = functionArguments[1];
+                            // TODO: check dict is dict or subclass
+                            auto lookup = m_builder.createDictTryGetItem(dict, key);
+                            auto exception = new mlir::Block;
+                            auto success = new mlir::Block;
+                            m_builder.create<mlir::CondBranchOp>(lookup.found(), success, exception);
+
+                            implementBlock(exception);
+                            auto object = Py::buildException(m_builder.getCurrentLoc(), m_builder,
+                                                             Py::Builtins::KeyError.name, {}, nullptr);
+                            m_builder.createRaise(object);
+
+                            implementBlock(success);
+                            m_builder.create<mlir::ReturnOp>(lookup.result());
+                        });
+
+                    slots["__setitem__"] = createFunction("builtins.dict.__setitem__",
+                                                          {{"", FunctionParameter::PosOnly, false},
+                                                           {"", FunctionParameter::PosOnly, false},
+                                                           {"", FunctionParameter::PosOnly, false}},
+                                                          [&](mlir::ValueRange functionArguments)
+                                                          {
+                                                              auto dict = functionArguments[0];
+                                                              auto key = functionArguments[1];
+                                                              auto value = functionArguments[2];
+                                                              // TODO: check dict is dict or subclass
+                                                              m_builder.createDictSetItem(dict, key, value);
+                                                          });
+                });
     // Stubs
-    createClass(m_builder.getDictBuiltin());
     createClass(m_builder.getTupleBuiltin());
     auto integer = createClass(m_builder.getIntBuiltin());
     createClass(m_builder.getListBuiltin());

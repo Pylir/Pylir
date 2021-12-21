@@ -316,6 +316,8 @@ public:
         abort,
         mp_init,
         mp_unpack,
+        pylir_dict_lookup,
+        pylir_dict_insert,
     };
 
     mlir::Value createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder, Runtime func, mlir::ValueRange args)
@@ -364,6 +366,18 @@ public:
                                  builder.getIntegerType(sizeof(mp_endian) * 8),        getIndexType(),
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type())};
                 functionName = "mp_unpack";
+                break;
+            case Runtime::pylir_dict_lookup:
+                returnType = mlir::LLVM::LLVMPointerType::get(getPyObjectType());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyDictType()), returnType};
+                functionName = "pylir_dict_lookup";
+                break;
+            case Runtime::pylir_dict_insert:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyDictType()),
+                                 mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
+                                 mlir::LLVM::LLVMPointerType::get(getPyObjectType())};
+                functionName = "pylir_dict_insert";
                 break;
         }
         auto module = mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp());
@@ -973,6 +987,48 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
     }
 };
 
+struct DictTryGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::DictTryGetItemOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::DictTryGetItemOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::DictTryGetItemOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::DictTryGetItemOp op, OpAdaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto dict = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyDictType()), adaptor.dict());
+        auto result = getTypeConverter()->createRuntimeCall(
+            op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_lookup, {dict, adaptor.index()});
+        auto null = rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), result.getType());
+        auto wasFound = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::ne, result, null);
+        rewriter.replaceOp(op, {result, wasFound});
+    }
+};
+
+struct DictSetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::DictSetItemOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::DictSetItemOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::DictSetItemOp) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::DictSetItemOp op, OpAdaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto dict = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyDictType()), adaptor.dict());
+        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_insert,
+                                              {dict, adaptor.key(), adaptor.value()});
+        rewriter.eraseOp(op);
+    }
+};
+
 struct FunctionGetFunctionOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>::ConvertPylirOpToLLVMPattern;
@@ -1389,6 +1445,20 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
     }
 };
 
+struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::RaiseOp op, OpAdaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        // TODO:
+        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::abort, {});
+        rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
+        return mlir::success();
+    }
+};
+
 struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocObjectOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocObjectOp>::ConvertPylirOpToLLVMPattern;
@@ -1627,20 +1697,6 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
     }
 };
 
-struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp>
-{
-    using ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp>::ConvertPylirOpToLLVMPattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::RaiseOp op, OpAdaptor,
-                                        mlir::ConversionPatternRewriter& rewriter) const override
-    {
-        // TODO:
-        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::abort, {});
-        rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
-        return mlir::success();
-    }
-};
-
 struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>::ConvertPylirOpToLLVMPattern;
@@ -1758,6 +1814,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<StrHashOpConversion>(converter);
     patternSet.insert<InitFuncOpConversion>(converter);
     patternSet.insert<InitDictOpConversion>(converter);
+    patternSet.insert<DictTryGetItemOpConversion>(converter);
+    patternSet.insert<DictSetItemOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
