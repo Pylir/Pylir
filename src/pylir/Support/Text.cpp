@@ -1,8 +1,6 @@
 
 #include "Text.hpp"
 
-#include <llvm/Support/ConvertUTF.h>
-
 #include <utf8proc/utf8proc.h>
 
 std::optional<pylir::Text::Encoding> pylir::Text::checkForBOM(std::string_view bytes)
@@ -67,10 +65,13 @@ std::array<char, 4> pylir::Text::toUTF8(std::string_view& utf8, bool* legal)
     {
         *legal = result > 0;
     }
-    if (result < 0)
+    if (result <= 0)
     {
-        // Consume just one byte on error
-        utf8.remove_prefix(1);
+        if (!utf8.empty())
+        {
+            // Consume just one byte on error
+            utf8.remove_prefix(1);
+        }
         return REPLACEMENT_CHARACTER_UTF8;
     }
     std::array<char, 4> array{};
@@ -78,39 +79,10 @@ std::array<char, 4> pylir::Text::toUTF8(std::string_view& utf8, bool* legal)
     return array;
 }
 
-namespace
-{
-template <class T>
-bool resultOk(llvm::ConversionResult result, T* targetBegin, T* targetNow)
-{
-    return result == llvm::conversionOK || result == llvm::targetExhausted
-           || (result == llvm::sourceExhausted && targetNow - targetBegin > 0);
-}
-} // namespace
-
 std::array<char, 4> pylir::Text::toUTF8(std::u16string_view& utf16, bool* legal)
 {
-    std::array<llvm::UTF8, 4> array{};
-    std::array<llvm::UTF16, 2> llvmUtf16;
-    std::copy(utf16.begin(), utf16.begin() + std::min<std::size_t>(2, utf16.size()), llvmUtf16.begin());
-    const auto* sourceBegin = llvmUtf16.data();
-    auto* targetBegin = array.data();
-    auto result = llvm::ConvertUTF16toUTF8(&sourceBegin, sourceBegin + std::min<std::size_t>(2, utf16.size()),
-                                           &targetBegin, array.data() + array.size(), llvm::strictConversion);
-    bool ok = resultOk(result, array.data(), targetBegin);
-    if (legal)
-    {
-        *legal = ok;
-    }
-    if (!ok)
-    {
-        utf16.remove_prefix(1);
-        return REPLACEMENT_CHARACTER_UTF8;
-    }
-    utf16.remove_prefix(sourceBegin - llvmUtf16.data());
-    std::array<char, 4> charArray;
-    std::copy(array.begin(), array.end(), charArray.begin());
-    return charArray;
+    char32_t codepoint = toUTF32(utf16, legal);
+    return toUTF8(codepoint, legal);
 }
 
 std::array<char, 4> pylir::Text::toUTF8(char32_t utf32, bool* legal)
@@ -140,7 +112,7 @@ std::array<char16_t, 2> pylir::Text::toUTF16(std::u16string_view& utf16, bool* l
     // Using the convert function, just for verification purposes
     bool ok;
     auto copy = utf16;
-    (void)toUTF8(utf16, &ok);
+    (void)toUTF32(utf16, &ok);
     if (legal)
     {
         *legal = ok;
@@ -156,49 +128,37 @@ std::array<char16_t, 2> pylir::Text::toUTF16(std::u16string_view& utf16, bool* l
 
 std::array<char16_t, 2> pylir::Text::toUTF16(std::string_view& utf8, bool* legal)
 {
-    std::array<llvm::UTF8, 4> llvmUtf8{};
-    std::copy(utf8.begin(), utf8.begin() + std::min<std::size_t>(4, utf8.size()), llvmUtf8.begin());
-    std::array<llvm::UTF16, 2> llvmUtf16;
-    const auto* sourceBegin = llvmUtf8.data();
-    auto* targetBegin = llvmUtf16.data();
-    auto result = llvm::ConvertUTF8toUTF16(&sourceBegin, sourceBegin + std::min<std::size_t>(4, utf8.size()),
-                                           &targetBegin, llvmUtf16.data() + llvmUtf16.size(), llvm::strictConversion);
-    bool ok = resultOk(result, llvmUtf16.data(), targetBegin);
-    if (legal)
-    {
-        *legal = ok;
-    }
-    if (!ok)
-    {
-        utf8.remove_prefix(1);
-        return REPLACEMENT_CHARACTER_UTF16;
-    }
-    std::array<char16_t, 2> charArray;
-    std::copy(llvmUtf16.begin(), llvmUtf16.end(), charArray.begin());
-    utf8.remove_prefix(sourceBegin - llvmUtf8.data());
-    return charArray;
+    char32_t codepoint = toUTF32(utf8, legal);
+    return toUTF16(codepoint, legal);
 }
 
 std::array<char16_t, 2> pylir::Text::toUTF16(char32_t utf32, bool* legal)
 {
-    std::array<llvm::UTF16, 2> llvmUtf16;
-    llvm::UTF32 source = utf32;
-    const auto* sourceBegin = &source;
-    auto* targetBegin = llvmUtf16.data();
-    auto result = llvm::ConvertUTF32toUTF16(&sourceBegin, sourceBegin + 1, &targetBegin,
-                                            llvmUtf16.data() + llvmUtf16.size(), llvm::strictConversion);
-    bool ok = resultOk(result, llvmUtf16.data(), targetBegin);
-    if (legal)
+    if (!utf8proc_codepoint_valid(utf32))
     {
-        *legal = ok;
-    }
-    if (!ok)
-    {
+        if (legal)
+        {
+            *legal = false;
+        }
         return REPLACEMENT_CHARACTER_UTF16;
     }
-    std::array<char16_t, 2> charArray;
-    std::copy(llvmUtf16.begin(), llvmUtf16.end(), charArray.begin());
-    return charArray;
+    if (legal)
+    {
+        *legal = true;
+    }
+
+    if (utf32 <= 0xFFFF)
+    {
+        return {static_cast<char16_t>(utf32), 0};
+    }
+
+    // https://unicode.org/faq/utf_bom.html
+    constexpr char32_t LEAD_OFFSET = 0xD800 - (0x10000 >> 10);
+
+    std::array<char16_t, 2> result;
+    result[0] = LEAD_OFFSET + (utf32 >> 10);
+    result[1] = 0xDC00 + (utf32 & 0x3FF);
+    return result;
 }
 
 constexpr static char32_t REPLACEMENT_CHARACTER_UTF32 = 0xFFFD;
@@ -211,9 +171,12 @@ char32_t pylir::Text::toUTF32(std::string_view& utf8, bool* legal)
     {
         *legal = result > 0;
     }
-    if (result < 0)
+    if (result <= 0)
     {
-        utf8.remove_prefix(1);
+        if (!utf8.empty())
+        {
+            utf8.remove_prefix(1);
+        }
         return REPLACEMENT_CHARACTER_UTF32;
     }
     utf8.remove_prefix(size);
@@ -222,25 +185,55 @@ char32_t pylir::Text::toUTF32(std::string_view& utf8, bool* legal)
 
 char32_t pylir::Text::toUTF32(std::u16string_view& utf16, bool* legal)
 {
-    std::array<llvm::UTF16, 2> llvmUtf16{};
-    std::copy(utf16.begin(), utf16.begin() + std::min<std::size_t>(2, utf16.size()), llvmUtf16.begin());
-    const auto* sourceBegin = llvmUtf16.data();
-    llvm::UTF32 llvmUTF32;
-    auto* targetBegin = &llvmUTF32;
-    auto result = llvm::ConvertUTF16toUTF32(&sourceBegin, sourceBegin + std::min<std::size_t>(2, utf16.size()),
-                                            &targetBegin, targetBegin + 1, llvm::strictConversion);
-    bool ok = resultOk(result, &llvmUTF32, targetBegin);
     if (legal)
     {
-        *legal = ok;
+        *legal = true;
     }
-    if (!ok)
+    if (utf16.empty())
     {
-        utf16.remove_prefix(1);
+        if (legal)
+        {
+            *legal = false;
+        }
         return REPLACEMENT_CHARACTER_UTF32;
     }
-    utf16.remove_prefix(sourceBegin - llvmUtf16.data());
-    return llvmUTF32;
+    char16_t first = utf16.front();
+    utf16.remove_prefix(1);
+    constexpr char32_t UTF16_LOW_SURROGATE_START = 0xDC00;
+    constexpr char32_t UTF16_LOW_SURROGATE_END = 0xDFFF;
+    constexpr char32_t UTF16_HIGH_SURROGATE_START = 0xD800;
+    constexpr char32_t UTF16_HIGH_SURROGATE_END = 0xDBFF;
+    if (first < UTF16_HIGH_SURROGATE_START || first > UTF16_HIGH_SURROGATE_END)
+    {
+        if (first >= UTF16_LOW_SURROGATE_START && first <= UTF16_LOW_SURROGATE_END)
+        {
+            if (legal)
+            {
+                *legal = false;
+            }
+            return REPLACEMENT_CHARACTER_UTF32;
+        }
+        return first;
+    }
+    if (utf16.empty())
+    {
+        if (legal)
+        {
+            *legal = false;
+        }
+        return REPLACEMENT_CHARACTER_UTF32;
+    }
+    char16_t second = utf16.front();
+    utf16.remove_prefix(1);
+    if (second < UTF16_LOW_SURROGATE_START || second > UTF16_LOW_SURROGATE_END)
+    {
+        if (legal)
+        {
+            *legal = false;
+        }
+        return REPLACEMENT_CHARACTER_UTF32;
+    }
+    return ((first - UTF16_HIGH_SURROGATE_START) << 10) + (second - UTF16_LOW_SURROGATE_START) + 0x0010000;
 }
 
 char32_t pylir::Text::toUTF32(char32_t utf32, bool* legal)
