@@ -408,6 +408,7 @@ bool pylir::Lexer::parseNext()
                 }
                 switch (*std::next(m_current))
                 {
+                        /*
                     case U'f':
                     case U'F':
                     {
@@ -420,6 +421,7 @@ bool pylir::Lexer::parseNext()
                         // TODO: parseFormatString
                         std::abort();
                     }
+                         */
                     case U'\'':
                     case U'"':
                     {
@@ -509,20 +511,21 @@ bool pylir::Lexer::parseNext()
                 }
                 break;
             }
-            case U'f':
-            case U'F':
-            {
-                if (std::next(m_current) != m_document->end()
-                    && (*std::next(m_current) == '"' || *std::next(m_current) == '\''))
-                {
-                    std::abort();
-                }
-                else
-                {
-                    parseIdentifier();
-                }
-                break;
-            }
+                //            case U'f':
+                //            case U'F':
+                //            {
+                //                if (std::next(m_current) != m_document->end()
+                //                    && (*std::next(m_current) == '"' || *std::next(m_current) == '\''))
+                //                {
+                //                    // TODO: parse format string
+                //                    std::abort();
+                //                }
+                //                else
+                //                {
+                //                    parseIdentifier();
+                //                }
+                //                break;
+                //            }
             case U'.':
             {
                 if (std::next(m_current) == m_document->end()
