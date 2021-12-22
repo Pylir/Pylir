@@ -151,20 +151,46 @@ public:
         return pySequence;
     }
 
+    mlir::LLVM::LLVMStructType getPairType()
+    {
+        auto pair = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "Pair");
+        if (!pair.isInitialized())
+        {
+            [[maybe_unused]] auto result = pair.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
+                                                         mlir::LLVM::LLVMPointerType::get(getPyObjectType())},
+                                                        false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return pair;
+    }
+
+    mlir::LLVM::LLVMStructType getBucketType()
+    {
+        auto bucket = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "Bucket");
+        if (!bucket.isInitialized())
+        {
+            [[maybe_unused]] auto result = bucket.setBody({getIndexType(), getIndexType()}, false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return bucket;
+    }
+
     mlir::LLVM::LLVMStructType getPyDictType(llvm::Optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
             return mlir::LLVM::LLVMStructType::getLiteral(
                 &getContext(),
-                {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), /*TODO*/ getSlotEpilogue(*slotSize)});
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getBufferComponent(getPairType()), getIndexType(),
+                 mlir::LLVM::LLVMPointerType::get(getBucketType()), getSlotEpilogue(*slotSize)});
         }
         auto pyDict = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyDict");
         if (!pyDict.isInitialized())
         {
-            [[maybe_unused]] auto result = pyDict.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
-                                                           /*TODO*/ getSlotEpilogue()},
-                                                          false);
+            [[maybe_unused]] auto result =
+                pyDict.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType()), getBufferComponent(getPairType()),
+                                getIndexType(), mlir::LLVM::LLVMPointerType::get(getBucketType())},
+                               false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return pyDict;
@@ -1624,8 +1650,7 @@ struct InitSequence : public ConvertPylirOpToLLVMPattern<T>
         auto two =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()),
-                                                 sequence,
-                                                 mlir::ValueRange{zero, one, two});
+                                                 sequence, mlir::ValueRange{zero, one, two});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
         rewriter.replaceOp(op, adaptor.memory());
         for (auto iter : llvm::enumerate(adaptor.initializer()))
@@ -1755,6 +1780,37 @@ struct InitDictOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
     mlir::LogicalResult matchAndRewrite(pylir::Mem::InitDictOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto two =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        auto three =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(3));
+        auto dict = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyDictType()), adaptor.memory());
+        auto zeroI = createIndexConstant(rewriter, op.getLoc(), 0);
+        auto nullPair = rewriter.create<mlir::LLVM::NullOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPairType()));
+        auto nullBuckets = rewriter.create<mlir::LLVM::NullOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getBucketType()));
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
+                                                      dict, mlir::ValueRange{zero, one, zero});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), zeroI, gep);
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), dict,
+                                                 mlir::ValueRange{zero, one, one});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), zeroI, gep);
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(nullPair.getType()),
+                                                 dict, mlir::ValueRange{zero, one, two});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), nullPair, gep);
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), dict,
+                                                 mlir::ValueRange{zero, two});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), zeroI, gep);
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(nullBuckets.getType()),
+                                                 dict, mlir::ValueRange{zero, three});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), nullBuckets, gep);
+
         rewriter.replaceOp(op, adaptor.memory());
         return mlir::success();
     }
