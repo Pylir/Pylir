@@ -7,37 +7,38 @@ func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @linear_search
 // CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
-// CHECK: %[[TUPLE_LEN:.*]] = py.tuple.len %[[TUPLE]]
-// CHECK: %[[ZERO:.*]] = arith.constant 0
-// CHECK: br ^[[CONDITION:[[:alnum:]]+]]
+// CHECK-NEXT: %[[TUPLE_LEN:.*]] = py.tuple.len %[[TUPLE]]
+// CHECK-NEXT: %[[ZERO:.*]] = arith.constant 0
+// CHECK-NEXT: br ^[[CONDITION:[[:alnum:]]+]]
 // CHECK-SAME: %[[ZERO]]
 
-// CHECK: ^[[CONDITION]]
+// CHECK-NEXT: ^[[CONDITION]]
 // CHECK-SAME: %[[INDEX:[[:alnum:]]+]]
 
-// CHECK: %[[LESS:.*]] = arith.cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
-// CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
-// CHECK: %[[FALSE:.*]] = arith.constant false
-// CHECK: cond_br %[[LESS]], ^[[BODY:[[:alnum:]]+]], ^[[END:[[:alnum:]]+]]
+// CHECK-NEXT: %[[LESS:.*]] = arith.cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
+// CHECK-NEXT: %[[UNBOUND:.*]] = py.constant #py.unbound
+// CHECK-NEXT: %[[FALSE:.*]] = arith.constant false
+// CHECK-NEXT: cond_br %[[LESS]], ^[[BODY:[[:alnum:]]+]], ^[[END:[[:alnum:]]+]]
 // CHECK-SAME: %[[UNBOUND]]
 // CHECK-SAME: %[[FALSE]]
 
-// CHECK: ^[[BODY]]:
-// CHECK: %[[ENTRY:.*]] = py.tuple.getItem %[[TUPLE]]
+// CHECK-NEXT: ^[[BODY]]:
+// CHECK-NEXT: %[[ENTRY:.*]] = py.tuple.getItem %[[TUPLE]]
 // CHECK-SAME: %[[INDEX]]
-// CHECK: %[[RESULT:.*]] = py.getSlot "__call__" from %[[ENTRY]]
-// CHECK: %[[SUCCESS:.*]] = py.isUnboundValue %[[RESULT]]
-// CHECK: cond_br %[[SUCCESS]], ^[[END]]
+// CHECK-NEXT: %[[METATYPE:.*]] = py.typeOf %[[ENTRY]]
+// CHECK-NEXT: %[[RESULT:.*]] = py.getSlot "__call__" from %[[ENTRY]] : %[[METATYPE]]
+// CHECK-NEXT: %[[FAILURE:.*]] = py.isUnboundValue %[[RESULT]]
+// CHECK-NEXT: %[[TRUE:.*]] = arith.constant true
+// CHECK-NEXT: cond_br %[[FAILURE]], ^[[NOT_FOUND:.*]], ^[[END]]
 // CHECK-SAME: %[[RESULT]]
-// CHECK-SAME: %[[SUCCESS]]
-// CHECK-SAME: ^[[NOT_FOUND:[[:alnum:]]+]]
+// CHECK-SAME: %[[TRUE]]
 
-// CHECK: ^[[NOT_FOUND]]
-// CHECK: %[[ONE:.*]] = arith.constant 1
-// CHECK: %[[NEXT:.*]] = arith.addi %[[INDEX]], %[[ONE]]
-// CHECK: br ^[[CONDITION]]
+// CHECK-NEXT: ^[[NOT_FOUND]]
+// CHECK-NEXT: %[[ONE:.*]] = arith.constant 1
+// CHECK-NEXT: %[[NEXT:.*]] = arith.addi %[[INDEX]], %[[ONE]]
+// CHECK-NEXT: br ^[[CONDITION]]
 // CHECK-SAME: %[[NEXT]]
 
-// CHECK: ^[[END]]
+// CHECK-NEXT: ^[[END]]
 // CHECK-SAME: %[[RESULT:[[:alnum:]]+]]
-// CHECK: return %[[RESULT]]
+// CHECK-NEXT: return %[[RESULT]]

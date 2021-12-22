@@ -28,10 +28,11 @@ func @get_function(%callable : !py.dynamic) -> !py.dynamic {
 // CHECK: ^[[BODY]]
 // mro lookup...
 // CHECK: %[[RESULT:.*]] = py.getSlot "__call__" from %{{[[:alnum:]]+}}
-// CHECK: %[[SUCCESS:.*]] = py.isUnboundValue %[[RESULT]]
-// CHECK: cond_br %[[SUCCESS]], ^[[RESULT_BLOCK:[[:alnum:]]+]]
+// CHECK: %[[FAILURE:.*]] = py.isUnboundValue %[[RESULT]]
+// CHECK: %[[TRUE:.*]] = arith.constant true
+// CHECK: cond_br %[[FAILURE]], ^{{.*}}, ^[[RESULT_BLOCK:[[:alnum:]]+]]
 // CHECK-SAME: %[[RESULT]]
-// CHECK-SAME: %[[SUCCESS]]
+// CHECK-SAME: %[[TRUE]]
 
 // CHECK: ^[[RESULT_BLOCK]]
 // CHECK-SAME: %[[RESULT:[[:alnum:]]+]]
