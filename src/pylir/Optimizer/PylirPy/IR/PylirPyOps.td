@@ -78,6 +78,8 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot"> {
         `$result` will contain the value in the slot, or unbound value if it was never assigned to or not part of the
         type.
     }];
+
+    let hasCanonicalizer = 1;
 }
 
 def PylirPy_SetSlotOp : PylirPy_Op<"setSlot"> {
@@ -90,6 +92,8 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot"> {
         Sets the value of the slot named `$slot` inside of `$object` to `$value`. The `$slot` has to be one of the slots
         that were defined in `$typeObject`. If `$object` is not of type `$typeObject` the result is undefined.
     }];
+
+    let hasCanonicalizer = 1;
 }
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {

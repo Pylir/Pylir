@@ -6,6 +6,7 @@
 #include <mlir/IR/OpImplementation.h>
 
 #include <llvm/ADT/ScopeExit.h>
+#include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
@@ -173,6 +174,38 @@ struct MakeDictExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeDictExOp>
     }
 };
 
+template <class T>
+struct SlotTypeSimplifier : mlir::OpRewritePattern<T>
+{
+    using mlir::OpRewritePattern<T>::OpRewritePattern;
+
+    mlir::LogicalResult match(T op) const override
+    {
+        static llvm::StringSet<> set = {
+#define TYPE_SLOT(x) #x,
+#include <pylir/Interfaces/Slots.def>
+        };
+        if (!set.contains(op.slot()))
+        {
+            return mlir::failure();
+        }
+        auto typeOf = op.typeObject().template getDefiningOp<pylir::Py::TypeOfOp>();
+        if (!typeOf)
+        {
+            return mlir::failure();
+        }
+        return mlir::success(typeOf.object().template getDefiningOp<pylir::Py::TypeOfOp>());
+    }
+
+    void rewrite(T op, mlir::PatternRewriter& rewriter) const override
+    {
+        rewriter.setInsertionPoint(op);
+        auto type = rewriter.create<pylir::Py::ConstantOp>(
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::Type.name));
+        op.typeObjectMutable().assign(type);
+    }
+};
+
 } // namespace
 
 void pylir::Py::MakeTupleOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
@@ -217,6 +250,16 @@ void pylir::Py::MakeDictExOp::getCanonicalizationPatterns(::mlir::RewritePattern
                                                           ::mlir::MLIRContext* context)
 {
     results.add<MakeDictExOpSimplifier>(context);
+}
+
+void pylir::Py::SetSlotOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results, ::mlir::MLIRContext* context)
+{
+    results.add<SlotTypeSimplifier<SetSlotOp>>(context);
+}
+
+void pylir::Py::GetSlotOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results, ::mlir::MLIRContext* context)
+{
+    results.add<SlotTypeSimplifier<GetSlotOp>>(context);
 }
 
 mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
