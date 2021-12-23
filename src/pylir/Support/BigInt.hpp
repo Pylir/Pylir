@@ -357,6 +357,8 @@ public:
     }
 };
 
+static_assert(std::is_standard_layout_v<BigInt>);
+
 inline BigInt pow(const BigInt& base, int expo)
 {
     BigInt result;

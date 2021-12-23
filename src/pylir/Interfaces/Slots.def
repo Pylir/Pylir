@@ -1,0 +1,38 @@
+#ifndef TYPE_SLOT
+#define TYPE_SLOT(x,...)
+#endif
+
+TYPE_SLOT(__new__)
+TYPE_SLOT(__init__)
+TYPE_SLOT(__slots__)
+TYPE_SLOT(__eq__)
+TYPE_SLOT(__hash__)
+TYPE_SLOT(__bool__)
+TYPE_SLOT(__call__)
+TYPE_SLOT(__getitem__)
+TYPE_SLOT(__setitem__)
+TYPE_SLOT(__mro__)
+
+#undef TYPE_SLOT
+
+#ifndef FUNCTION_SLOT
+#define FUNCTION_SLOT(x,...)
+#endif
+
+FUNCTION_SLOT(__name__)
+FUNCTION_SLOT(__qualname__)
+FUNCTION_SLOT(__defaults__)
+FUNCTION_SLOT(__kwdefaults__)
+FUNCTION_SLOT(__closure__)
+
+#undef FUNCTION_SLOT
+
+#ifndef BASEEXCEPTION_SLOT
+#define BASEEXCEPTION_SLOT(x,...)
+#endif
+
+BASEEXCEPTION_SLOT(args)
+BASEEXCEPTION_SLOT(__context__)
+BASEEXCEPTION_SLOT(__cause__)
+
+#undef BASEEXCEPTION_SLOT

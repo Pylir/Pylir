@@ -39,7 +39,6 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
 
     mlir::LLVM::LLVMStructType getBufferComponent(mlir::Type elementType)
     {
-        // TODO: should this be 3 pointers ala std::vector?
         return mlir::LLVM::LLVMStructType::getLiteral(
             &getContext(), {getIndexType(), getIndexType(), mlir::LLVM::LLVMPointerType::get(elementType)});
     }

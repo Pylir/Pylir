@@ -141,6 +141,8 @@ endif ()
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
+find_package(Python COMPONENTS Interpreter REQUIRED)
+
 include_directories(src)
 include_directories(SYSTEM 3rdParty)
 add_subdirectory(3rdParty)

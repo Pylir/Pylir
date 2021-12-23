@@ -127,7 +127,7 @@ public:
     {                                                             \
         return create<Py::ConstantOp>(get##name##Builtin());      \
     }
-#include "Builtins.def"
+#include <pylir/Interfaces/Builtins.def>
 
     Py::ConstantOp createConstant(mlir::Attribute constant)
     {

@@ -1,9 +1,9 @@
-#include "Pylir.h"
+#include "API.hpp"
 
-#include <stdlib.h>
+#include <cstdlib>
 
 void* pylir_gc_alloc(size_t size)
 {
     // TODO: GC :)
-    return malloc(size);
+    return std::malloc(size);
 }

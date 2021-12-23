@@ -80,7 +80,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                    {
                        return {m_builder.getStringAttr(pair.first),
                                pylir::match(
-                                   pair.second, [](mlir::FlatSymbolRefAttr attr)-> mlir::Attribute { return attr; },
+                                   pair.second, [](mlir::FlatSymbolRefAttr attr) -> mlir::Attribute { return attr; },
                                    [&](mlir::SymbolOpInterface op) -> mlir::Attribute
                                    {
                                        if (auto func = mlir::dyn_cast<mlir::FuncOp>(op.getOperation()))
@@ -99,6 +99,14 @@ mlir::FuncOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
                                             const std::vector<FunctionParameter>& parameters,
                                             llvm::function_ref<void(mlir::ValueRange)> implementation)
 {
+    return createFunction(functionName, parameters,
+                          [&](mlir::Value, mlir::ValueRange arguments) { implementation(arguments); });
+}
+
+mlir::FuncOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
+                                            const std::vector<FunctionParameter>& parameters,
+                                            llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation)
+{
     auto function = mlir::FuncOp::create(
         m_builder.getCurrentLoc(), (functionName + "$impl").str(),
         m_builder.getFunctionType(llvm::SmallVector<mlir::Type>(parameters.size() + 1, m_builder.getDynamicType()),
@@ -107,7 +115,8 @@ mlir::FuncOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
         auto reset = implementFunction(function);
         if (implementation)
         {
-            implementation(function.getArguments().drop_front());
+            auto self = function.getArguments().front();
+            implementation(self, function.getArguments().drop_front());
         }
         if (needsTerminator())
         {
@@ -128,15 +137,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                 [this](SlotMapImpl& slots)
                 {
                     slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
-                        m_builder.getPyStringAttr("__new__"),
-                        m_builder.getPyStringAttr("__init__"),
-                        m_builder.getPyStringAttr("__slots__"),
-                        m_builder.getPyStringAttr("__eq__"),
-                        m_builder.getPyStringAttr("__hash__"),
-                        m_builder.getPyStringAttr("__bool__"),
-                        m_builder.getPyStringAttr("__getitem__"),
-                        m_builder.getPyStringAttr("__setitem__"),
-                        m_builder.getPyStringAttr("__mro__"),
+#define TYPE_SLOT(x) m_builder.getPyStringAttr(#x),
+#include <pylir/Interfaces/Slots.def>
                     }));
                 });
 
@@ -157,7 +159,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
                                                       });
                     slots["__init__"] = createFunction("builtins.object.__init__",
-                                                       {FunctionParameter{"", FunctionParameter::PosOnly, false}}, {});
+                                                       {FunctionParameter{"", FunctionParameter::PosOnly, false}});
                     slots["__eq__"] = createFunction("builtins.object.__eq__",
                                                      {FunctionParameter{"", FunctionParameter::PosOnly, false},
                                                       FunctionParameter{"", FunctionParameter::PosOnly, false}},
@@ -205,9 +207,10 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                                auto selfType = m_builder.createTypeOf(self);
                                                                m_builder.createSetSlot(self, selfType, "args", args);
                                                            });
-                        slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr(
-                            {m_builder.getPyStringAttr("args"), m_builder.getPyStringAttr("__context__"),
-                             m_builder.getPyStringAttr("__cause__")}));
+                        slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
+#define BASEEXCEPTION_SLOT(name) m_builder.getPyStringAttr(#name),
+#include <pylir/Interfaces/Slots.def>
+                        }));
                     });
 
     auto exception = createClass(m_builder.getExceptionBuiltin(), {baseException});
@@ -270,14 +273,27 @@ void pylir::CodeGen::createBuiltinsImpl()
                         });
                 });
     m_builder.createGlobalValue(Py::Builtins::None.name, true, Py::ObjectAttr::get(m_builder.getNoneTypeBuiltin()));
-    createClass(m_builder.getFunctionBuiltin(), {},
-                [&](SlotMapImpl& slots)
+    createClass(
+        m_builder.getFunctionBuiltin(), {},
+        [&](SlotMapImpl& slots)
+        {
+            slots["__call__"] = createFunction(
+                "builtins.function.__call__",
+                {FunctionParameter{"", FunctionParameter::PosRest, false},
+                 FunctionParameter{"", FunctionParameter::KeywordRest, false}},
+                [&](mlir::Value self, mlir::ValueRange functionArguments)
                 {
-                    slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr(
-                        {m_builder.getPyStringAttr("__name__"), m_builder.getPyStringAttr("__qualname__"),
-                         m_builder.getPyStringAttr("__defaults__"), m_builder.getPyStringAttr("__kwdefaults__"),
-                         m_builder.getPyStringAttr("__closure__")}));
+                    auto args = functionArguments[0];
+                    auto kw = functionArguments[1];
+                    auto callable = m_builder.createFunctionGetFunction(self);
+                    auto result = m_builder.create<mlir::CallIndirectOp>(callable, mlir::ValueRange{self, args, kw});
+                    m_builder.create<mlir::ReturnOp>(result.getResults());
                 });
+            slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
+#define FUNCTION_SLOT(x) m_builder.getPyStringAttr(#x),
+#include <pylir/Interfaces/Slots.def>
+            }));
+        });
     createClass(m_builder.getCellBuiltin(), {},
                 [&](SlotMapImpl& slots)
                 {

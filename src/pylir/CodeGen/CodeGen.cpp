@@ -1137,6 +1137,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
         [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> mlir::Value
         {
             auto loc = getLoc(setDisplay, setDisplay.openBrace);
+            m_builder.setCurrentLoc(loc);
             return pylir::match(
                 setDisplay.variant,
                 [&](const Syntax::StarredList& list) -> mlir::Value { return visit<&CodeGen::makeSet>(list); },
@@ -1149,6 +1150,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
         [&](const Syntax::Enclosure::DictDisplay& dictDisplay) -> mlir::Value
         {
             auto loc = getLoc(dictDisplay, dictDisplay.openBrace);
+            m_builder.setCurrentLoc(loc);
             return pylir::match(
                 dictDisplay.variant, [&](std::monostate) -> mlir::Value { return m_builder.createMakeDict(); },
                 [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& list) -> mlir::Value

@@ -9,8 +9,6 @@ set(PYLIR_TEST_DEPENDS
         PylirRuntimeMain
         )
 
-find_package(Python COMPONENTS Interpreter)
-
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
         ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py

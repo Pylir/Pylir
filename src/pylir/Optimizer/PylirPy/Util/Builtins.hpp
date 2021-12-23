@@ -14,10 +14,10 @@ struct Builtin
 };
 
 #define BUILTIN(x, s, isPublic) constexpr Builtin x = {s, isPublic};
-#include "Builtins.def"
+#include <pylir/Interfaces/Builtins.def>
 
 constexpr std::array allBuiltins = {
 #define BUILTIN(x, ...) x,
-#include "Builtins.def"
+#include <pylir/Interfaces/Builtins.def>
 };
 } // namespace pylir::Py::Builtins

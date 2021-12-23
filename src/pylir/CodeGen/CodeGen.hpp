@@ -219,7 +219,10 @@ class CodeGen
                                   llvm::function_ref<void(SlotMapImpl&)> implementation = {});
 
     mlir::FuncOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
-                                llvm::function_ref<void(mlir::ValueRange)> implementation = {});
+                                llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation = {});
+
+    mlir::FuncOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
+                                llvm::function_ref<void(mlir::ValueRange)> implementation);
 
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
