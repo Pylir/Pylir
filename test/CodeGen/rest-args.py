@@ -1,4 +1,4 @@
-# RUN: pylir %s -emit-mlir -o - | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - | FileCheck %s
 
 def foo(*args, **kwd):
     pass

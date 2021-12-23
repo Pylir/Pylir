@@ -5,6 +5,7 @@
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Export.h>
+#include <mlir/Transforms/Passes.h>
 
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/Triple.h>
@@ -159,7 +160,29 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     #endif
     manager.enableIRPrinting(std::make_unique<mlir::PassManager::IRPrinterConfig>(false, false, true));
 #endif
-    // TODO add transformations
+    if (options.hasArg(OPT_emit_pylir))
+    {
+        if (mlir::failed(manager.run(*module)))
+        {
+            return false;
+        }
+        module->print(output, mlir::OpPrintingFlags{}.enableDebugInfo());
+        return true;
+    }
+    if (options.getLastArgValue(OPT_O, "0") != "0")
+    {
+        manager.addPass(mlir::createCanonicalizerPass());
+        manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+        manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
+    }
+    manager.addNestedPass<mlir::FuncOp>(pylir::Py::createExpandPyDialectPass());
+    if (options.getLastArgValue(OPT_O, "0") != "0")
+    {
+        manager.addPass(mlir::createCanonicalizerPass());
+        manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+        manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
+    }
+    manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
     if (options.hasArg(OPT_emit_mlir))
     {
         if (mlir::failed(manager.run(*module)))
@@ -169,8 +192,6 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         module->print(output, mlir::OpPrintingFlags{}.enableDebugInfo());
         return true;
     }
-    manager.addNestedPass<mlir::FuncOp>(pylir::Py::createExpandPyDialectPass());
-    manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
 
     auto triple = llvm::Triple(options.getLastArgValue(OPT_target, LLVM_DEFAULT_TARGET_TRIPLE));
     std::string error;
