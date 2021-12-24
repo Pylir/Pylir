@@ -1834,10 +1834,8 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
                                                  string, mlir::ValueRange{zero, one, one});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
-        auto memory = this->getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
-                                                                  PylirTypeConverter::Runtime::pylir_gc_alloc, {size});
-        auto array = rewriter.create<mlir::LLVM::BitcastOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), memory);
+        auto array = this->getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
+                                                                 PylirTypeConverter::Runtime::pylir_gc_alloc, {size});
         auto two =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), string,
