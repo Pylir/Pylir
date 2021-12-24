@@ -201,6 +201,11 @@ public:
     {
         m_table.insert_or_assign(key, value);
     }
+
+    void delItem(PyObject* key)
+    {
+        m_table.erase(key);
+    }
 };
 
 static_assert(std::is_standard_layout_v<PyDict>);
