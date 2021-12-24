@@ -454,24 +454,30 @@ mlir::Attribute pylir::Py::FunctionAttr::parse(::mlir::AsmParser& parser, ::mlir
     mlir::Attribute defaults;
     mlir::Attribute kwDefaults;
     mlir::Attribute dict;
-    if (!parser.parseOptionalComma())
+    while (!parser.parseOptionalComma())
     {
-        if (parser.parseKeyword("__defaults__") || parser.parseColon() || parser.parseAttribute(defaults))
+        mlir::Attribute attribute;
+        llvm::StringRef keyword;
+        auto loc = parser.getCurrentLocation();
+        if (parser.parseKeyword(&keyword) || parser.parseColon() || parser.parseAttribute(attribute))
         {
             return {};
         }
-    }
-    if (!parser.parseOptionalComma())
-    {
-        if (parser.parseKeyword("__kwdefaults__") || parser.parseColon() || parser.parseAttribute(kwDefaults))
+        if (keyword == "__defaults__")
         {
-            return {};
+            defaults = attribute;
         }
-    }
-    if (!parser.parseOptionalComma())
-    {
-        if (parser.parseKeyword("__dict__") || parser.parseColon() || parser.parseAttribute(dict))
+        else if (keyword == "__kwdefaults__")
         {
+            kwDefaults = attribute;
+        }
+        else if (keyword == "__dict__")
+        {
+            dict = attribute;
+        }
+        else
+        {
+            parser.emitError(loc, "Invalid keyword '") << keyword << "'";
             return {};
         }
     }

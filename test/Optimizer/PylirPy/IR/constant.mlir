@@ -11,6 +11,14 @@ py.globalValue @builtins.list = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.set = #py.type
 py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.function = #py.type
+py.globalValue @builtins.None = #py.type
+
+func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
+    return %arg0 : !py.dynamic
+}
+
+py.globalValue @test_function = #py.function<@foo, __kwdefaults__: #py.dict<{}>>
 
 // CHECK-LABEL: test_constant_integer
 func @test_constant_integer() -> !py.dynamic {
