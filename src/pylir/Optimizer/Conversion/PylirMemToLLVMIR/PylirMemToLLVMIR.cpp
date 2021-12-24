@@ -1840,7 +1840,8 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), memory);
         auto two =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
-        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), string, mlir::ValueRange{zero, one, two});
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), string,
+                                                 mlir::ValueRange{zero, one, two});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
 
         size = this->createIndexConstant(rewriter, op.getLoc(), 0);
@@ -1988,7 +1989,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitDictOpConversion>(converter);
     patternSet.insert<DictTryGetItemOpConversion>(converter);
     patternSet.insert<DictSetItemOpConversion>(converter);
+    patternSet.insert<DictDelItemOpConversion>(converter);
     patternSet.insert<InitStrOpConversion>(converter);
+    patternSet.insert<PrintOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
