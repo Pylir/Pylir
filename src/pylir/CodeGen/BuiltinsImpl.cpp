@@ -73,7 +73,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
             }
         }
     }
-    slots["__mro__"] = mlir::FlatSymbolRefAttr::get(createGlobalConstant(m_builder.getTupleAttr(mro)));
+    slots["__mro__"] = createGlobalConstant(m_builder.getTupleAttr(mro));
     llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> converted(slots.size());
     std::transform(slots.begin(), slots.end(), converted.begin(),
                    [this](auto pair) -> std::pair<mlir::StringAttr, mlir::Attribute>
@@ -82,30 +82,27 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                                pylir::match(
                                    pair.second, [](mlir::FlatSymbolRefAttr attr) -> mlir::Attribute { return attr; },
                                    [&](mlir::SymbolOpInterface op) -> mlir::Attribute
-                                   {
-                                       if (auto func = mlir::dyn_cast<mlir::FuncOp>(op.getOperation()))
-                                       {
-                                           return m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(op));
-                                       }
-                                       return mlir::FlatSymbolRefAttr::get(op);
-                                   })};
+                                   { return mlir::FlatSymbolRefAttr::get(op); })};
                    });
     return m_builder.createGlobalValue(
         className.getValue(), true,
         m_builder.getObjectAttr(m_builder.getTypeBuiltin(), Py::SlotsAttr::get(m_builder.getContext(), converted)));
 }
 
-mlir::FuncOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
-                                            const std::vector<FunctionParameter>& parameters,
-                                            llvm::function_ref<void(mlir::ValueRange)> implementation)
+pylir::Py::GlobalValueOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
+                                                        const std::vector<FunctionParameter>& parameters,
+                                                        llvm::function_ref<void(mlir::ValueRange)> implementation,
+                                                        Py::TupleAttr posArgs, Py::DictAttr kwArgs)
 {
-    return createFunction(functionName, parameters,
-                          [&](mlir::Value, mlir::ValueRange arguments) { implementation(arguments); });
+    return createFunction(
+        functionName, parameters, [&](mlir::Value, mlir::ValueRange arguments) { implementation(arguments); }, posArgs,
+        kwArgs);
 }
 
-mlir::FuncOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
-                                            const std::vector<FunctionParameter>& parameters,
-                                            llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation)
+pylir::Py::GlobalValueOp
+    pylir::CodeGen::createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
+                                   llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation,
+                                   Py::TupleAttr posArgs, Py::DictAttr kwArgs)
 {
     auto function = mlir::FuncOp::create(
         m_builder.getCurrentLoc(), (functionName + "$impl").str(),
@@ -123,12 +120,23 @@ mlir::FuncOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
             m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
         }
     }
-    if (parameters.size() == 2 && parameters[0].kind == FunctionParameter::PosRest
-        && parameters[1].kind == FunctionParameter::KeywordRest)
+    if (parameters.size() != 2 || parameters[0].kind != FunctionParameter::PosRest
+        || parameters[1].kind != FunctionParameter::KeywordRest)
     {
-        return function;
+        function = buildFunctionCC((functionName + "$cc").str(), function, parameters);
     }
-    return buildFunctionCC((functionName + "$cc").str(), function, parameters);
+    mlir::Attribute realPosArgs;
+    mlir::Attribute realKWArgs;
+    if (posArgs)
+    {
+        realPosArgs = mlir::FlatSymbolRefAttr::get(createGlobalConstant(posArgs));
+    }
+    if (kwArgs)
+    {
+        realKWArgs = mlir::FlatSymbolRefAttr::get(createGlobalConstant(kwArgs));
+    }
+    return m_builder.createGlobalValue(
+        functionName, true, m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(function), realPosArgs, realKWArgs));
 }
 
 void pylir::CodeGen::createBuiltinsImpl()
@@ -339,6 +347,12 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto result = m_builder.createBoolFromI1(equal);
                             m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
                         });
+                    slots["__str__"] = createFunction("builtins.str.__str__", {{"", FunctionParameter::PosOnly, false}},
+                                                      [&](mlir::ValueRange functionArguments)
+                                                      {
+                                                          auto self = functionArguments[0];
+                                                          m_builder.create<mlir::ReturnOp>(self);
+                                                      });
                 });
     createClass(m_builder.getDictBuiltin(), {},
                 [&](SlotMapImpl& slots)
@@ -383,4 +397,89 @@ void pylir::CodeGen::createBuiltinsImpl()
     auto integer = createClass(m_builder.getIntBuiltin());
     createClass(m_builder.getListBuiltin());
     createClass(m_builder.getBoolBuiltin(), {integer});
+
+    createFunction(
+        m_builder.getPrintBuiltin().getValue(),
+        {
+            {"objects", FunctionParameter::PosRest, false},
+            {"sep", FunctionParameter::KeywordOnly, true},
+            {"end", FunctionParameter::KeywordOnly, true},
+            // TODO: file & flush
+        },
+        [&](mlir::ValueRange functionArguments)
+        {
+            auto objects = functionArguments[0];
+            auto sep = functionArguments[1];
+            auto end = functionArguments[2];
+
+            // TODO: check sep & end are actually str if not None
+            {
+                auto isNone = m_builder.createIs(sep, m_builder.createNoneRef());
+                auto continueBlock = new mlir::Block;
+                continueBlock->addArgument(m_builder.getDynamicType());
+                auto str = m_builder.createConstant(" ");
+                m_builder.create<mlir::CondBranchOp>(isNone, continueBlock, mlir::ValueRange{str}, continueBlock,
+                                                     mlir::ValueRange{sep});
+                implementBlock(continueBlock);
+                sep = continueBlock->getArgument(0);
+            }
+            {
+                auto isNone = m_builder.createIs(end, m_builder.createNoneRef());
+                auto continueBlock = new mlir::Block;
+                continueBlock->addArgument(m_builder.getDynamicType());
+                auto str = m_builder.createConstant("\n");
+                m_builder.create<mlir::CondBranchOp>(isNone, continueBlock, mlir::ValueRange{str}, continueBlock,
+                                                     mlir::ValueRange{end});
+                implementBlock(continueBlock);
+                end = continueBlock->getArgument(0);
+            }
+
+            auto tupleLen = m_builder.createTupleLen(m_builder.getIndexType(), objects);
+            auto one = m_builder.create<mlir::arith::ConstantOp>(m_builder.getIndexType(), m_builder.getIndexAttr(1));
+            auto lessThanOne = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult, tupleLen, one);
+            auto exitBlock = new mlir::Block;
+            exitBlock->addArgument(m_builder.getDynamicType());
+            auto emptyStr = m_builder.createConstant("");
+            auto loopSetup = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(lessThanOne, exitBlock, mlir::ValueRange{emptyStr}, loopSetup,
+                                                 mlir::ValueRange{});
+
+            implementBlock(loopSetup);
+            auto zero = m_builder.create<mlir::arith::ConstantOp>(m_builder.getIndexType(), m_builder.getIndexAttr(0));
+            auto firstObj = m_builder.createTupleGetItem(objects, zero);
+            auto firstType = m_builder.createTypeOf(firstObj);
+            auto tuple = m_builder.createMakeTuple({firstObj});
+            auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
+            auto initialStr = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__str__", firstType,
+                                                         tuple, emptyDict, nullptr);
+            // TODO: check initialStr is actually a str
+            auto loopHeader = new mlir::Block;
+            loopHeader->addArguments({m_builder.getDynamicType(), m_builder.getIndexType()});
+            m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{initialStr, one});
+
+            implementBlock(loopHeader);
+            auto exit = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult,
+                                                              loopHeader->getArgument(1), tupleLen);
+            auto loopBody = new mlir::Block;
+            m_builder.create<mlir::CondBranchOp>(exit, exitBlock, mlir::ValueRange{loopHeader->getArgument(0)},
+                                                 loopBody, mlir::ValueRange{});
+
+            implementBlock(loopBody);
+            auto obj = m_builder.createTupleGetItem(objects, loopHeader->getArgument(1));
+            auto type = m_builder.createTypeOf(obj);
+            tuple = m_builder.createMakeTuple({obj});
+            auto nextStr = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__str__", type, tuple,
+                                                      emptyDict, nullptr);
+            // TODO: check nextStr is actually a str
+            auto concat = m_builder.createStrConcat({loopHeader->getArgument(0), sep, nextStr});
+            auto incremented = m_builder.create<mlir::arith::AddIOp>(loopHeader->getArgument(1), one);
+            m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{concat, incremented});
+
+            implementBlock(exitBlock);
+            concat = m_builder.createStrConcat({exitBlock->getArgument(0), end});
+            m_builder.create<Py::PrintOp>(concat);
+        },
+        {},
+        m_builder.getDictAttr({{m_builder.getPyStringAttr("sep"), m_builder.getPyStringAttr(" ")},
+                               {m_builder.getPyStringAttr("end"), m_builder.getPyStringAttr("\n")}}));
 }

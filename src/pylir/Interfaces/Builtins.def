@@ -27,5 +27,6 @@ BUILTIN(LookupError, "builtins.LookupError", true)
 BUILTIN(KeyError, "builtins.KeyError", true)
 BUILTIN(IndexError, "builtins.IndexError", true)
 BUILTIN(StopIteration, "builtins.StopIteration", true)
+BUILTIN(Print, "builtins.print", true)
 
 #undef BUILTIN

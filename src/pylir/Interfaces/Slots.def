@@ -5,13 +5,14 @@
 TYPE_SLOT(__new__)
 TYPE_SLOT(__init__)
 TYPE_SLOT(__slots__)
+TYPE_SLOT(__mro__)
 TYPE_SLOT(__eq__)
 TYPE_SLOT(__hash__)
 TYPE_SLOT(__bool__)
+TYPE_SLOT(__str__)
 TYPE_SLOT(__call__)
 TYPE_SLOT(__getitem__)
 TYPE_SLOT(__setitem__)
-TYPE_SLOT(__mro__)
 
 #undef TYPE_SLOT
 

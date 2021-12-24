@@ -239,6 +239,15 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
     let assemblyFormat = "$lhs `,` $rhs attr-dict";
 }
 
+// Intrinsics
+
+def PylirPy_PrintOp : PylirPy_Op<"intr.print"> {
+    let arguments = (ins DynamicType:$string);
+    let results = (outs);
+
+    let assemblyFormat = "$string attr-dict";
+}
+
 // linear searches
 
 def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect]> {

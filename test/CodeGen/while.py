@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-pylir -o - | FileCheck %s
 
+# CHECK-LABEL: @__init__
+
 while True:
     pass
 
