@@ -218,11 +218,13 @@ class CodeGen
                                   llvm::MutableArrayRef<Py::GlobalValueOp> bases = {},
                                   llvm::function_ref<void(SlotMapImpl&)> implementation = {});
 
-    mlir::FuncOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
-                                llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation = {});
+    Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
+                                     llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation = {},
+                                     Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 
-    mlir::FuncOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
-                                llvm::function_ref<void(mlir::ValueRange)> implementation);
+    Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
+                                     llvm::function_ref<void(mlir::ValueRange)> implementation,
+                                     Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)

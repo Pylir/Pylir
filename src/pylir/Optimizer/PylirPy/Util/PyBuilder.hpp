@@ -228,6 +228,11 @@ public:
         return create<Py::StrEqualOp>(lhs, rhs);
     }
 
+    Py::StrConcatOp createStrConcat(llvm::ArrayRef<mlir::Value> strings)
+    {
+        return create<Py::StrConcatOp>(strings);
+    }
+
     Py::MROLookupOp createMROLookup(mlir::Value mroTuple, llvm::StringRef attribute)
     {
         return create<Py::MROLookupOp>(mroTuple, attribute);

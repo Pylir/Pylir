@@ -292,6 +292,7 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
             .Case<Py::MakeFuncOp, Py::GetFunctionOp>(
                 [&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
             .Case([&](Py::BoolFromI1Op) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
+            .Case<Py::StrConcatOp>([&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Str.name); })
             .Default({});
     if (!symbol)
     {
@@ -432,6 +433,15 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
         }
     }
     return nullptr;
+}
+
+mlir::LogicalResult pylir::Py::StrConcatOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                             ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                             ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                             ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
 }
 
 namespace

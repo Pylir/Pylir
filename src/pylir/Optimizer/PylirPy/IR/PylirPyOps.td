@@ -96,6 +96,8 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot"> {
     let hasCanonicalizer = 1;
 }
 
+// Dict ops
+
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem"> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$dict, DynamicType:$index);
     let results = (outs DynamicType:$result, I1:$found);
@@ -136,6 +138,8 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
     }];
 }
 
+// Tuple ops
+
 def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple, IntegerLike:$index);
     let results = (outs DynamicType:$result);
@@ -165,6 +169,8 @@ def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
 
     let hasFolder = 1;
 }
+
+// List ops
 
 def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
     let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list, DynamicType:$item);
@@ -209,6 +215,14 @@ def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoSideEffect]> {
     let results = (outs Index:$hash);
 
     let assemblyFormat = "$object attr-dict";
+}
+
+// Str ops
+
+def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoSideEffect, DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+    let arguments = (ins Variadic<DynamicType>:$strings);
+
+    let assemblyFormat = "$strings attr-dict";
 }
 
 def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect]> {

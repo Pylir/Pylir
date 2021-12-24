@@ -40,3 +40,12 @@ mlir::LogicalResult pylir::Mem::InitSetOp::inferReturnTypes(::mlir::MLIRContext*
     inferredReturnTypes.emplace_back(Py::DynamicType::get(context));
     return mlir::success();
 }
+
+mlir::LogicalResult pylir::Mem::InitStrOp::inferReturnTypes(::mlir::MLIRContext* context,
+                                                            ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
+                                                            ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                            ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.emplace_back(Py::DynamicType::get(context));
+    return mlir::success();
+}

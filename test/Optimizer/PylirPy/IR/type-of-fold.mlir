@@ -306,3 +306,18 @@ func @get_function(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @get_function
 // CHECK: %[[RESULT:.*]] = py.constant @builtins.function
 // CHECK: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+func @str_concat(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
+    %0 = py.str.concat %arg0, %arg1, %arg2
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @str_concat
+// CHECK: %[[RESULT:.*]] = py.constant @builtins.str
+// CHECK: return %[[RESULT]]

@@ -71,6 +71,20 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
     }
 };
 
+struct StrConcatOpConversion : mlir::OpRewritePattern<pylir::Py::StrConcatOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::StrConcatOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::StrConcatOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        auto dict = rewriter.create<pylir::Py::ConstantOp>(
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Str.name));
+        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict);
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitStrOp>(op, mem, op.strings());
+        return mlir::success();
+    }
+};
+
 struct MakeFuncOpConversion : mlir::OpRewritePattern<pylir::Py::MakeFuncOp>
 {
     using mlir::OpRewritePattern<pylir::Py::MakeFuncOp>::OpRewritePattern;
@@ -153,13 +167,14 @@ void ConvertPylirPyToPylirMem::runOnOperation()
 
     target.addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
                         pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp,
-                        pylir::Py::BoolFromI1Op, pylir::Py::IntFromIntegerOp>();
+                        pylir::Py::BoolFromI1Op, pylir::Py::IntFromIntegerOp, pylir::Py::StrConcatOp>();
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.insert<MakeTupleOpConversion>(&getContext());
     patterns.insert<MakeListOpConversion>(&getContext());
     patterns.insert<MakeSetOpConversion>(&getContext());
     patterns.insert<MakeDictOpConversion>(&getContext());
+    patterns.insert<StrConcatOpConversion>(&getContext());
     patterns.insert<MakeFuncOpConversion>(&getContext());
     patterns.insert<MakeObjectOpConversion>(&getContext());
     patterns.insert<ListToTupleOpConversion>(&getContext());
