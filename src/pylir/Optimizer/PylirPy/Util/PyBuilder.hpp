@@ -134,6 +134,12 @@ public:
         return create<Py::ConstantOp>(constant);
     }
 
+    template <std::size_t n>
+    Py::ConstantOp createConstant(const char (&c)[n])
+    {
+        return create<Py::ConstantOp>(getPyStringAttr(c));
+    }
+
     Py::ConstantOp createConstant(llvm::StringRef string)
     {
         return create<Py::ConstantOp>(getPyStringAttr(string));

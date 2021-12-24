@@ -593,6 +593,45 @@ public:
                         });
                 })
             .Case(
+                [&](pylir::Py::DictAttr dict)
+                {
+                    auto zeroI = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
+                                                                        builder.getIndexAttr(0));
+                    auto nullPair = builder.create<mlir::LLVM::NullOp>(global.getLoc(),
+                                                                       mlir::LLVM::LLVMPointerType::get(getPairType()));
+                    auto nullBuckets = builder.create<mlir::LLVM::NullOp>(
+                        global.getLoc(), mlir::LLVM::LLVMPointerType::get(getBucketType()));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI,
+                                                                      builder.getI32ArrayAttr({1, 0}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI,
+                                                                      builder.getI32ArrayAttr({1, 1}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, nullPair,
+                                                                      builder.getI32ArrayAttr({1, 2}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI,
+                                                                      builder.getI32ArrayAttr({2}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, nullBuckets,
+                                                                      builder.getI32ArrayAttr({3}));
+                    if (dict.getValue().empty())
+                    {
+                        return;
+                    }
+                    appendToGlobalInit(
+                        builder,
+                        [&]
+                        {
+                            auto address = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), global);
+                            auto dictionary = builder.create<mlir::LLVM::BitcastOp>(
+                                global.getLoc(), mlir::LLVM::LLVMPointerType::get(getPyDictType()), address);
+                            for (auto& [key, value] : dict.getValue())
+                            {
+                                auto keyValue = getConstant(global.getLoc(), key, builder);
+                                auto valueValue = getConstant(global.getLoc(), value, builder);
+                                createRuntimeCall(global.getLoc(), builder, Runtime::pylir_dict_insert,
+                                                  {dictionary, keyValue, valueValue});
+                            }
+                        });
+                })
+            .Case(
                 [&](pylir::Py::TypeAttr)
                 {
                     auto instanceType = getInstanceType(global.getName());
@@ -673,9 +712,9 @@ public:
         mlir::OpBuilder::InsertionGuard guard{builder};
         builder.setInsertionPointToStart(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
         auto type = typeOf(objectAttr);
-        auto globalOp =
-            builder.create<mlir::LLVM::GlobalOp>(builder.getUnknownLoc(), type, !objectAttr.isa<pylir::Py::IntAttr>(),
-                                                 mlir::LLVM::Linkage::Private, "const$", mlir::Attribute{}, 0, 0, true);
+        auto globalOp = builder.create<mlir::LLVM::GlobalOp>(
+            builder.getUnknownLoc(), type, !objectAttr.isa<pylir::Py::IntAttr, pylir::Py::DictAttr>(),
+            mlir::LLVM::Linkage::Private, "const$", mlir::Attribute{}, 0, 0, true);
         globalOp.setUnnamedAddrAttr(mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
         m_symbolTable.insert(globalOp);
         m_globalConstants.insert({objectAttr, globalOp});
@@ -760,7 +799,7 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
             pylir::Py::Builtins::Str.name,
         };
         // Integer attrs currently need to be runtime init due to memory allocation in libtommath
-        bool constant = !op.initializer().isa<pylir::Py::IntAttr>()
+        bool constant = !op.initializer().isa<pylir::Py::IntAttr, pylir::Py::DictAttr>()
                         && (op.constant() || immutable.contains(op.initializer().getType().getValue()));
         auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, constant, linkage, op.getName(),
                                                                         mlir::Attribute{});

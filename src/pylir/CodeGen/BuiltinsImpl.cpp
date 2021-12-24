@@ -458,11 +458,11 @@ void pylir::CodeGen::createBuiltinsImpl()
             m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{initialStr, one});
 
             implementBlock(loopHeader);
-            auto exit = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult,
-                                                              loopHeader->getArgument(1), tupleLen);
+            auto isLess = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult,
+                                                                loopHeader->getArgument(1), tupleLen);
             auto loopBody = new mlir::Block;
-            m_builder.create<mlir::CondBranchOp>(exit, exitBlock, mlir::ValueRange{loopHeader->getArgument(0)},
-                                                 loopBody, mlir::ValueRange{});
+            m_builder.create<mlir::CondBranchOp>(isLess, loopBody, exitBlock,
+                                                 mlir::ValueRange{loopHeader->getArgument(0)});
 
             implementBlock(loopBody);
             auto obj = m_builder.createTupleGetItem(objects, loopHeader->getArgument(1));
