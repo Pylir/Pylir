@@ -14,6 +14,7 @@
 #include <llvm/Support/SourceMgr.h>
 
 #include <pylir/Main/PylirMain.hpp>
+#include <pylir/Support/Macros.hpp>
 
 #ifdef _WIN64
     #ifdef __MINGW32__

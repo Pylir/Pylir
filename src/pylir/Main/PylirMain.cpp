@@ -33,27 +33,12 @@
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
 
+#include "CommandLine.hpp"
+
+using namespace pylir::cli;
+
 namespace
 {
-enum ID
-{
-    OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) OPT_##ID,
-#include <pylir/Main/Opts.inc>
-#undef OPTION
-};
-
-#define PREFIX(NAME, VALUE) const char* const NAME[] = VALUE;
-#include <pylir/Main/Opts.inc>
-#undef PREFIX
-
-static const llvm::opt::OptTable::Info InfoTable[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) \
-    {PREFIX, NAME,  HELPTEXT,    METAVAR,     OPT_##ID,  llvm::opt::Option::KIND##Class,                 \
-     PARAM,  FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS, VALUES},
-#include <pylir/Main/Opts.inc>
-#undef OPTION
-};
 
 enum class Action
 {
@@ -64,19 +49,6 @@ enum class Action
 };
 
 } // namespace
-
-namespace pylir::Diag
-{
-template <>
-struct LocationProvider<llvm::opt::Arg*, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(llvm::opt::Arg* value, const void* context) noexcept
-    {
-        auto* commandLine = reinterpret_cast<const pylir::cli::CommandLine*>(context);
-        return commandLine->m_argRanges.lookup(value);
-    }
-};
-} // namespace pylir::Diag
 
 namespace
 {
@@ -325,45 +297,6 @@ struct fmt::formatter<llvm::StringRef> : formatter<string_view>
         return fmt::formatter<string_view>::format({string.data(), string.size()}, ctx);
     }
 };
-
-pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(InfoTable) {}
-
-pylir::cli::CommandLine::CommandLine(int argc, char** argv)
-    : m_saver(m_allocator),
-      m_args(m_table.parseArgs(argc, argv, OPT_UNKNOWN, m_saver,
-                               [this](llvm::StringRef msg)
-                               {
-                                   m_errorsOccurred = true;
-                                   llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Severity::Error, msg);
-                               })),
-      m_exe(argv[0]),
-      m_rendered(
-          [this]
-          {
-              std::string rendered = llvm::sys::path::filename(m_exe).str();
-              for (auto iter : m_args)
-              {
-                  auto arg = iter->getAsString(m_args);
-                  rendered += " ";
-                  m_argRanges.insert({iter, {rendered.size(), rendered.size() + arg.size()}});
-                  rendered += arg;
-              }
-              return rendered;
-          }(),
-          "<command-line>")
-{
-}
-
-void pylir::cli::CommandLine::printHelp(llvm::raw_ostream& out) const
-{
-    m_table.printHelp(out, (llvm::sys::path::filename(m_exe) + " [options] <input>").str().c_str(),
-                      "Optimizing Python compiler using MLIR and LLVM");
-}
-
-void pylir::cli::CommandLine::printVersion(llvm::raw_ostream& out) const
-{
-    out << "pylir " PYLIR_VERSION "\n";
-}
 
 int pylir::main(int argc, char* argv[])
 {
