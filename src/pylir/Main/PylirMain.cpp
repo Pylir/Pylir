@@ -34,6 +34,10 @@
 #include <pylir/Parser/Parser.hpp>
 
 #include "CommandLine.hpp"
+#include "LinuxToolchain.hpp"
+#include "MSVCToolchain.hpp"
+#include "MinGWToolchain.hpp"
+#include "Toolchain.hpp"
 
 using namespace pylir::cli;
 
@@ -55,12 +59,16 @@ namespace
 
 bool enableLTO(const pylir::cli::CommandLine& commandLine)
 {
-    if (commandLine.getArgs().hasFlag(OPT_flto, OPT_fno_lto, false))
+    auto& args = commandLine.getArgs();
+    if (args.hasFlag(OPT_flto, OPT_fno_lto, false))
     {
         return true;
     }
-    // TODO: if using builtin LLD and -O3 enable LTO as well
+#ifdef PYLIR_EMBEDDED_LLD
+    return args.getLastArgValue(OPT_O, "0") == "3" && args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true);
+#else
     return false;
+#endif
 }
 
 bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pylir::Diag::Document& file,
@@ -279,11 +287,21 @@ bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pyl
     return true;
 }
 
-bool linkExecutable(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile)
+std::unique_ptr<pylir::Toolchain> createToolchainForTriple(const pylir::cli::CommandLine&, llvm::Triple triple)
 {
-    auto& args = commandLine.getArgs();
-
-    return true;
+    if (triple.isKnownWindowsMSVCEnvironment())
+    {
+        return std::make_unique<pylir::MSVCToolchain>(triple);
+    }
+    if (triple.isOSCygMing())
+    {
+        return std::make_unique<pylir::MinGWToolchain>(triple);
+    }
+    if (triple.isOSLinux())
+    {
+        return std::make_unique<pylir::LinuxToolchain>(triple);
+    }
+    return {};
 }
 
 } // namespace
@@ -306,7 +324,8 @@ int pylir::main(int argc, char* argv[])
     llvm::InitializeAllAsmPrinters();
     llvm::InitializeAllAsmParsers();
 
-    pylir::cli::CommandLine commandLine(argc, argv);
+    pylir::cli::CommandLine commandLine(llvm::sys::fs::getMainExecutable(argv[0], reinterpret_cast<void*>(&main)), argc,
+                                        argv);
     if (!commandLine)
     {
         return -1;
@@ -322,6 +341,23 @@ int pylir::main(int argc, char* argv[])
     {
         commandLine.printVersion(llvm::outs());
         return 0;
+    }
+
+    auto triple = llvm::Triple::normalize(args.getLastArgValue(OPT_target_EQ, LLVM_DEFAULT_TARGET_TRIPLE));
+    auto toolchain = createToolchainForTriple(commandLine, llvm::Triple(triple));
+    if (!toolchain)
+    {
+        auto* arg = args.getLastArg(OPT_target_EQ);
+        if (!arg)
+        {
+            llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
+                                                    fmt::format(pylir::Diag::UNSUPPORTED_TARGET_N, triple));
+            return -1;
+        }
+        llvm::errs() << commandLine.createDiagnosticsBuilder(arg, pylir::Diag::UNSUPPORTED_TARGET_N, triple)
+                            .addLabel(arg, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                            .emitError();
+        return -1;
     }
 
     Action action = Action::Link;
@@ -504,7 +540,6 @@ int pylir::main(int argc, char* argv[])
         return 0;
     }
 
-    auto triple = llvm::Triple(args.getLastArgValue(OPT_target_EQ, LLVM_DEFAULT_TARGET_TRIPLE));
     auto filename = llvm::sys::path::filename(inputFile->getValue()).str();
     llvm::SmallString<20> realOutputFilename;
     if (action == Action::Link)
@@ -600,7 +635,7 @@ int pylir::main(int argc, char* argv[])
         }
         return 0;
     }
-    success = linkExecutable(commandLine, outputFile->TmpName);
+    success = toolchain->link(commandLine, outputFile->TmpName);
     if (auto error = outputFile->discard())
     {
         llvm::consumeError(std::move(error));

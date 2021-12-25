@@ -32,7 +32,7 @@ class CommandLine
     friend struct pylir::Diag::LocationProvider<llvm::opt::Arg*, void>;
 
 public:
-    explicit CommandLine(int argc, char* argv[]);
+    explicit CommandLine(std::string exe, int argc, char* argv[]);
 
     explicit operator bool() const
     {
@@ -42,6 +42,11 @@ public:
     const llvm::opt::InputArgList& getArgs() const
     {
         return m_args;
+    }
+
+    llvm::StringRef getExecutablePath() const
+    {
+        return m_exe;
     }
 
     void printHelp(llvm::raw_ostream& out) const;

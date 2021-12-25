@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 17)
 option(PYLIR_BUILD_TESTS "Build tests" ON)
 option(PYLIR_FUZZER "Build fuzzers" OFF)
 option(PYLIR_COVERAGE "Compile with coverage" OFF)
+option(PYLIR_EMBED_LLD "Embed lld into pylir" OFF)
+set(PYLIR_DEFAULT_SYSROOT "" CACHE STRING "Default sysroot to find system libraries")
 
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND MSVC AND (PYLIR_COVERAGE OR PYLIR_SANITIZER OR PYLIR_FUZZER))
     execute_process(
@@ -66,6 +68,10 @@ find_package(Threads REQUIRED)
 link_libraries(Threads::Threads)
 # revision a9e8b1ee7fd44b53c555a7823ae8fd1a8209c520
 find_package(MLIR REQUIRED CONFIG)
+
+if (PYLIR_EMBED_LLD)
+    find_package(LLD REQUIRED)
+endif ()
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")

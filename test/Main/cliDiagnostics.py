@@ -46,7 +46,7 @@
 # RUN: FileCheck %s --check-prefix=UNKNOWN_TARGET
 # RUN: not pylir %s --target wadawdagwhdawzgdwa -o - 2>&1 | \
 # RUN: FileCheck %s --check-prefix=UNKNOWN_TARGET
-# UNKNOWN_TARGET: could not find target 'wadawdagwhdawzgdwa'
+# UNKNOWN_TARGET: unsupported target 'wadawdagwhdawzgdwa'
 
 # RUN: not pylir %s -Og -o - 2>&1 | \
 # RUN: FileCheck %s --check-prefix=INVALID_OPT

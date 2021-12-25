@@ -5,7 +5,7 @@
 
 pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(InfoTable) {}
 
-pylir::cli::CommandLine::CommandLine(int argc, char** argv)
+pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv)
     : m_saver(m_allocator),
       m_args(m_table.parseArgs(argc, argv, OPT_UNKNOWN, m_saver,
                                [this](llvm::StringRef msg)
@@ -13,7 +13,7 @@ pylir::cli::CommandLine::CommandLine(int argc, char** argv)
                                    m_errorsOccurred = true;
                                    llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Severity::Error, msg);
                                })),
-      m_exe(argv[0]),
+      m_exe(exe),
       m_rendered(
           [this]
           {
@@ -40,4 +40,9 @@ void pylir::cli::CommandLine::printHelp(llvm::raw_ostream& out) const
 void pylir::cli::CommandLine::printVersion(llvm::raw_ostream& out) const
 {
     out << "pylir " PYLIR_VERSION "\n";
+    out << "LLVM " LLVM_VERSION_STRING "\n";
+    out << "MLIR " LLVM_VERSION_STRING "\n";
+#ifdef PYLIR_EMBEDDED_LLD
+    out << "lld " LLVM_VERSION_STRING "\n";
+#endif
 }
