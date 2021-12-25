@@ -64,7 +64,7 @@ endif ()
 
 find_package(Threads REQUIRED)
 link_libraries(Threads::Threads)
-# revision 3234f2d9c1669459833e717d34c10296d78b7818
+# revision a9e8b1ee7fd44b53c555a7823ae8fd1a8209c520
 find_package(MLIR REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")

@@ -8,16 +8,47 @@
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 #include <pylir/Support/BigInt.hpp>
 
-namespace pylir::Py
-{
-class DictAttr;
-}
-
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.h.inc"
 
 namespace pylir::Py
 {
+
+namespace detail
+{
+struct ObjectAttrStorage;
+}
+
+class ObjectAttr : public mlir::Attribute::AttrBase<ObjectAttr, mlir::Attribute, detail::ObjectAttrStorage,
+                                                    mlir::SubElementAttrInterface::Trait>
+{
+public:
+    using Base::Base;
+
+    static ObjectAttr get(mlir::FlatSymbolRefAttr type);
+    static ObjectAttr get(mlir::FlatSymbolRefAttr type, ::pylir::Py::SlotsAttr slots,
+                          ::mlir::Attribute builtinValue = {});
+    static constexpr ::llvm::StringLiteral getMnemonic()
+    {
+        return {"obj"};
+    }
+
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
+
+    void printMethod(::mlir::AsmPrinter& printer) const;
+
+    mlir::FlatSymbolRefAttr getType() const;
+
+    ::pylir::Py::SlotsAttr getSlots() const;
+
+    mlir::Attribute getBuiltinValue() const;
+
+    void walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                  llvm::function_ref<void(mlir::Type)> walkTypesFn) const;
+
+    mlir::SubElementAttrInterface
+        replaceImmediateSubAttribute(llvm::ArrayRef<std::pair<size_t, mlir::Attribute>> replacements) const;
+};
 
 class IntAttr : public ObjectAttr
 {
@@ -42,9 +73,9 @@ public:
 
     static IntAttr get(::mlir::MLIRContext* context, BigInt value);
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     BigInt getValue() const;
 };
@@ -71,9 +102,9 @@ public:
         return ::llvm::StringLiteral("bool");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     bool getValue() const;
 };
@@ -100,9 +131,9 @@ public:
         return ::llvm::StringLiteral("float");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     double getValue() const;
 
@@ -131,9 +162,9 @@ public:
         return ::llvm::StringLiteral("str");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     llvm::StringRef getValue() const;
 
@@ -162,9 +193,9 @@ public:
         return ::llvm::StringLiteral("tuple");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
 
@@ -193,9 +224,9 @@ public:
         return ::llvm::StringLiteral("list");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
 
@@ -226,9 +257,9 @@ public:
         return ::llvm::StringLiteral("set");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
 
@@ -261,9 +292,9 @@ public:
         return ::llvm::StringLiteral("dict");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> getValue() const;
 };
@@ -291,9 +322,9 @@ public:
         return ::llvm::StringLiteral("function");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 
     mlir::FlatSymbolRefAttr getValue() const;
 
@@ -333,8 +364,8 @@ public:
         return ::llvm::StringLiteral("type");
     }
 
-    static ::mlir::Attribute parse(::mlir::AsmParser& parser, ::mlir::Type type);
+    static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
-    void print(::mlir::AsmPrinter& printer) const;
+    void printMethod(::mlir::AsmPrinter& printer) const;
 };
 } // namespace pylir::Py

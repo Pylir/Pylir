@@ -102,7 +102,7 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
                 auto integerPointerType = mlir::LLVM::LLVMPointerType::get(func.getType().getParams()[paramBegin + i]);
                 if (auto load = operands[i].getDefiningOp<mlir::LLVM::LoadOp>())
                 {
-                    auto casted = builder.create<mlir::LLVM::BitcastOp>(loc, integerPointerType, load.addr());
+                    auto casted = builder.create<mlir::LLVM::BitcastOp>(loc, integerPointerType, load.getAddr());
                     arguments.push_back(builder.create<mlir::LLVM::LoadOp>(loc, casted));
                     break;
                 }
@@ -130,7 +130,7 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
                     auto null = builder.create<mlir::LLVM::NullOp>(loc, tempAlloca.getType());
                     auto gep = builder.create<mlir::LLVM::GEPOp>(loc, null.getType(), null, mlir::ValueRange{one});
                     auto size = builder.create<mlir::LLVM::PtrToIntOp>(loc, builder.getI64Type(), gep);
-                    builder.create<mlir::LLVM::MemcpyOp>(loc, tempAlloca, load.addr(), size, falseConstant);
+                    builder.create<mlir::LLVM::MemcpyOp>(loc, tempAlloca, load.getAddr(), size, falseConstant);
                     break;
                 }
 

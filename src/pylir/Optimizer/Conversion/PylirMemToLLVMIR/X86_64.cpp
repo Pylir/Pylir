@@ -286,7 +286,7 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
         {
             if (auto load = value.getDefiningOp<mlir::LLVM::LoadOp>())
             {
-                return load.addr();
+                return load.getAddr();
             }
             auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
             auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(

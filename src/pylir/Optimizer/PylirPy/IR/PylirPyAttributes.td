@@ -33,21 +33,10 @@ def PylirPy_SlotsAttr : PylirPy_Attr<"Slots", [DeclareAttrInterfaceMethods<SubEl
     let parameters = (ins ArrayRefParameter<"std::pair<mlir::StringAttr, mlir::Attribute>">:$value);
 }
 
-def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-                                                                                ["replaceImmediateSubAttribute"]>]> {
-    let mnemonic = "obj";
-    let summary = "python object";
-
-    let parameters = (ins "mlir::FlatSymbolRefAttr":$type, "::pylir::Py::SlotsAttr":$slots, "mlir::Attribute":$builtinValue);
-
-    let skipDefaultBuilders = 1;
-
-    let builders = [
-        AttrBuilderWithInferredContext<(ins "mlir::FlatSymbolRefAttr":$type)>,
-        AttrBuilderWithInferredContext<(ins "mlir::FlatSymbolRefAttr":$type,
-                                            "::pylir::Py::SlotsAttr":$slots,
-                                            CArg<"::mlir::Attribute", "{}">:$builtinValue)>,
-    ];
+def PylirPy_ObjectAttr : Attr<CPred<"$_self.isa<::pylir::Py::ObjectAttr>()">, "python object attribute"> {
+    let storageType = "::pylir::Py::ObjectAttr";
+    let returnType = "::pylir::Py::ObjectAttr";
+    let convertFromStorage = "$_self";
 }
 
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
