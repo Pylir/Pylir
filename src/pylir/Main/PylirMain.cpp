@@ -59,7 +59,8 @@ enum class Action
 {
     SyntaxOnly,
     ObjectFile,
-    Assembly
+    Assembly,
+    Link
 };
 
 } // namespace
@@ -193,12 +194,12 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
         return true;
     }
 
-    auto triple = llvm::Triple(options.getLastArgValue(OPT_target, LLVM_DEFAULT_TARGET_TRIPLE));
+    auto triple = llvm::Triple(options.getLastArgValue(OPT_target_EQ, LLVM_DEFAULT_TARGET_TRIPLE));
     std::string error;
     auto* targetM = llvm::TargetRegistry::lookupTarget(triple.str(), error);
     if (!targetM)
     {
-        auto outputArg = options.getLastArg(OPT_target);
+        auto outputArg = options.getLastArg(OPT_target_EQ);
         if (!outputArg)
         {
             llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
@@ -310,21 +311,26 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     llvm::legacy::PassManager codeGenPasses;
     codeGenPasses.add(llvm::createTargetTransformInfoWrapperPass(machine->getTargetIRAnalysis()));
     if (machine->addPassesToEmitFile(codeGenPasses, output, nullptr,
-                                     action == Action::ObjectFile ? llvm::CGFT_ObjectFile : llvm::CGFT_AssemblyFile))
+                                     action == Action::Assembly ? llvm::CGFT_AssemblyFile : llvm::CGFT_ObjectFile))
     {
-        if (action == Action::Assembly)
+        std::string_view format = action == Action::Assembly ? "Assembly" : "Object file";
+        auto arg = options.getLastArg(OPT_target_EQ);
+        if (!arg)
         {
-            auto arg = options.getLastArg(OPT_S);
+            arg = options.getLastArg(OPT_c, OPT_S);
+        }
+        if (arg)
+        {
             llvm::errs() << commandLine
                                 .createDiagnosticsBuilder(arg, pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N,
-                                                          triple.str(), "Assembly")
+                                                          triple.str(), format)
                                 .addLabel(arg, std::nullopt, pylir::Diag::ERROR_COLOUR)
                                 .emitError();
             return false;
         }
         llvm::errs() << pylir::Diag::formatLine(
             pylir::Diag::Error,
-            fmt::format(pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N, triple.str(), "Object file"));
+            fmt::format(pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N, triple.str(), format));
         return false;
     }
 
@@ -366,7 +372,7 @@ pylir::cli::CommandLine::CommandLine(int argc, char** argv)
 void pylir::cli::CommandLine::printHelp(llvm::raw_ostream& out) const
 {
     m_table.printHelp(out, (llvm::sys::path::filename(m_exe) + " [options] <input>").str().c_str(),
-                      "Python optimizing MLIR compiler");
+                      "Optimizing Python compiler using MLIR and LLVM");
 }
 
 void pylir::cli::CommandLine::printVersion(llvm::raw_ostream& out) const
@@ -400,49 +406,7 @@ int pylir::main(int argc, char* argv[])
         return 0;
     }
 
-    if (args.hasArg(OPT_emit_llvm))
-    {
-        if (args.hasArg(OPT_emit_mlir))
-        {
-            auto lastArg = args.getLastArg(OPT_emit_llvm, OPT_emit_mlir);
-            auto secondLast = lastArg->getOption().getID() == OPT_emit_llvm ? args.getLastArg(OPT_emit_mlir) :
-                                                                              args.getLastArg(OPT_emit_llvm);
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(lastArg,
-                                                          pylir::Diag::CANNOT_EMIT_LLVM_IR_AND_MLIR_IR_AT_THE_SAME_TIME)
-                                .addLabel(lastArg, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                .addLabel(secondLast, std::nullopt, pylir::Diag::NOTE_COLOUR)
-                                .emitError();
-            return -1;
-        }
-        if (args.hasArg(OPT_fsyntax_only))
-        {
-            auto llvmArg = args.getLastArg(OPT_emit_llvm);
-            auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(
-                                    llvmArg, pylir::Diag::LLVM_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX)
-                                .addLabel(llvmArg, std::nullopt, pylir::Diag::WARNING_COLOUR)
-                                .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
-                                .emitWarning();
-        }
-    }
-    else if (args.hasArg(OPT_emit_mlir))
-    {
-        if (args.hasArg(OPT_fsyntax_only))
-        {
-            auto mlirArg = args.getLastArg(OPT_emit_mlir);
-            auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(
-                                    mlirArg, pylir::Diag::MLIR_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX)
-                                .addLabel(mlirArg, std::nullopt, pylir::Diag::WARNING_COLOUR)
-                                .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
-                                .emitWarning();
-        }
-    }
-
-    Action action = Action::ObjectFile;
+    Action action = Action::Link;
     if (args.hasArg(OPT_fsyntax_only))
     {
         action = Action::SyntaxOnly;
@@ -452,8 +416,19 @@ int pylir::main(int argc, char* argv[])
             auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
             llvm::errs() << commandLine
                                 .createDiagnosticsBuilder(
-                                    assembly, pylir::Diag::ASSEMBLY_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX)
+                                    assembly, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, "Assembly")
                                 .addLabel(assembly, std::nullopt, pylir::Diag::WARNING_COLOUR)
+                                .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
+                                .emitWarning();
+        }
+        else if (args.hasArg(OPT_c))
+        {
+            auto objectFile = args.getLastArg(OPT_c);
+            auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
+            llvm::errs() << commandLine
+                                .createDiagnosticsBuilder(
+                                    objectFile, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, "Object file")
+                                .addLabel(objectFile, std::nullopt, pylir::Diag::WARNING_COLOUR)
                                 .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
                                 .emitWarning();
         }
@@ -462,56 +437,137 @@ int pylir::main(int argc, char* argv[])
     {
         action = Action::Assembly;
     }
-
-    for (auto& iter : args.getAllArgValues(OPT_c))
+    else if (args.hasArg(OPT_c))
     {
-        pylir::Diag::Document doc(iter);
-        if (!executeAction(action, doc, commandLine))
+        action = Action::ObjectFile;
+    }
+
+    auto diagExlusiveIR = [&](ID first, std::string_view firstName, ID second, std::string_view secondName)
+    {
+        if (args.hasArg(second))
+        {
+            auto lastArg = args.getLastArg(first, second);
+            auto secondLast = lastArg->getOption().getID() == first ? args.getLastArg(second) : args.getLastArg(first);
+            llvm::errs() << commandLine
+                                .createDiagnosticsBuilder(lastArg,
+                                                          pylir::Diag::CANNOT_EMIT_N_IR_AND_N_IR_AT_THE_SAME_TIME,
+                                                          firstName, secondName)
+                                .addLabel(lastArg, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                                .addLabel(secondLast, std::nullopt, pylir::Diag::NOTE_COLOUR)
+                                .emitError();
+            return false;
+        }
+        return true;
+    };
+
+    auto diagActionWithIR = [&](llvm::opt::Arg* arg, std::string_view name)
+    {
+        if (args.hasArg(OPT_fsyntax_only))
+        {
+            auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
+            llvm::errs() << commandLine
+                                .createDiagnosticsBuilder(
+                                    arg, pylir::Diag::N_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, name)
+                                .addLabel(arg, std::nullopt, pylir::Diag::WARNING_COLOUR)
+                                .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
+                                .emitWarning();
+        }
+        if (action == Action::Link)
+        {
+            llvm::errs() << commandLine.createDiagnosticsBuilder(arg, pylir::Diag::CANNOT_EMIT_N_IR_WHEN_LINKING, name)
+                                .addLabel(arg, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                                .emitError();
+            return false;
+        }
+        return true;
+    };
+
+    if (auto* emitLLVM = args.getLastArg(OPT_emit_llvm))
+    {
+        if (!diagExlusiveIR(OPT_emit_llvm, "LLVM", OPT_emit_mlir, "MLIR")
+            || !diagExlusiveIR(OPT_emit_llvm, "LLVM", OPT_emit_pylir, "Pylir"))
+        {
+            return -1;
+        }
+        if (!diagActionWithIR(emitLLVM, "LLVM"))
+        {
+            return -1;
+        }
+    }
+    else if (auto* emitMLIR = args.getLastArg(OPT_emit_mlir))
+    {
+        if (!diagExlusiveIR(OPT_emit_mlir, "MLIR", OPT_emit_pylir, "Pylir"))
+        {
+            return -1;
+        }
+        if (!diagActionWithIR(emitMLIR, "MLIR"))
+        {
+            return -1;
+        }
+    }
+    else if (auto* emitPylir = args.getLastArg(OPT_emit_pylir))
+    {
+        if (!diagActionWithIR(emitPylir, "Pylir"))
         {
             return -1;
         }
     }
 
-    for (auto& iter : args.filtered(OPT_INPUT))
+    if (args.hasMultipleArgs(OPT_INPUT))
     {
-        auto fd = llvm::sys::fs::openNativeFileForRead(iter->getValue());
-        if (!fd)
-        {
-            llvm::consumeError(fd.takeError());
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(iter, pylir::Diag::FAILED_TO_OPEN_FILE_N, iter->getValue())
-                                .addLabel(iter, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                .emitError();
-            return -1;
-        }
-        auto exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
-        llvm::sys::fs::file_status status;
-        auto error = llvm::sys::fs::status(*fd, status);
-        if (error)
-        {
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(iter, pylir::Diag::FAILED_TO_ACCESS_FILE_N, iter->getValue())
-                                .addLabel(iter, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                .emitError();
-            return -1;
-        }
-        std::string content(status.getSize(), '\0');
-        auto read = llvm::sys::fs::readNativeFile(*fd, {content.data(), content.size()});
-        if (!read)
-        {
-            llvm::consumeError(fd.takeError());
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(iter, pylir::Diag::FAILED_TO_READ_FILE_N, iter->getValue())
-                                .addLabel(iter, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                .emitError();
-            return -1;
-        }
+        auto* second = *std::next(args.filtered(OPT_INPUT).begin());
+        llvm::errs() << commandLine.createDiagnosticsBuilder(second, pylir::Diag::EXPECTED_ONLY_ONE_INPUT_FILE)
+                            .addLabel(second, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                            .emitError();
+        return -1;
+    }
 
-        pylir::Diag::Document doc(std::move(content), iter->getValue());
-        if (!executeAction(action, doc, commandLine))
-        {
-            return -1;
-        }
+    auto* inputFile = args.getLastArg(OPT_INPUT);
+    if (!inputFile)
+    {
+        llvm::errs() << pylir::Diag::formatLine(Diag::Error, fmt::format(pylir::Diag::NO_INPUT_FILE));
+    }
+
+    auto fd = llvm::sys::fs::openNativeFileForRead(inputFile->getValue());
+    if (!fd)
+    {
+        llvm::consumeError(fd.takeError());
+        llvm::errs() << commandLine
+                            .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N,
+                                                      inputFile->getValue())
+                            .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                            .emitError();
+        return -1;
+    }
+    auto exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
+    llvm::sys::fs::file_status status;
+    auto error = llvm::sys::fs::status(*fd, status);
+    if (error)
+    {
+        llvm::errs() << commandLine
+                            .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N,
+                                                      inputFile->getValue())
+                            .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                            .emitError();
+        return -1;
+    }
+    std::string content(status.getSize(), '\0');
+    auto read = llvm::sys::fs::readNativeFile(*fd, {content.data(), content.size()});
+    if (!read)
+    {
+        llvm::consumeError(fd.takeError());
+        llvm::errs() << commandLine
+                            .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N,
+                                                      inputFile->getValue())
+                            .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                            .emitError();
+        return -1;
+    }
+
+    pylir::Diag::Document doc(std::move(content), inputFile->getValue());
+    if (!executeAction(action, doc, commandLine))
+    {
+        return -1;
     }
 
     return 0;

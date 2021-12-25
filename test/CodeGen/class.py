@@ -1,4 +1,4 @@
-# RUN: pylir %s -emit-pylir -o - | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
 x = 0
 

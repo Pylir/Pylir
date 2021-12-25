@@ -59,17 +59,19 @@ constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N = FMT_STRING("cannot assign
 
 constexpr auto UNKNOWN_FEATURE_N = FMT_STRING("unknown feature '{}'");
 
-constexpr auto CANNOT_EMIT_LLVM_IR_AND_MLIR_IR_AT_THE_SAME_TIME =
-    FMT_STRING("cannot emit LLVM IR and MLIR IR at the same time");
+constexpr auto CANNOT_EMIT_N_IR_AND_N_IR_AT_THE_SAME_TIME = FMT_STRING("cannot emit {} IR and {} IR at the same time");
 
-constexpr auto LLVM_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
-    FMT_STRING("LLVM IR won't be emitted when only checking syntax");
+constexpr auto CANNOT_EMIT_N_IR_WHEN_LINKING = FMT_STRING("cannot emit {} IR when linking");
 
-constexpr auto MLIR_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
-    FMT_STRING("MLIR IR won't be emitted when only checking syntax");
+constexpr auto N_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
+    FMT_STRING("{} IR won't be emitted when only checking syntax");
 
-constexpr auto ASSEMBLY_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
-    FMT_STRING("Assembly won't be emitted when only checking syntax");
+constexpr auto N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
+    FMT_STRING("{} won't be emitted when only checking syntax");
+
+constexpr auto EXPECTED_ONLY_ONE_INPUT_FILE = FMT_STRING("expected only one input file");
+
+constexpr auto NO_INPUT_FILE = FMT_STRING("no input file");
 
 constexpr auto FAILED_TO_OPEN_FILE_N = FMT_STRING("failed to open file '{}'");
 
@@ -120,6 +122,7 @@ constexpr auto NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEF
 
 constexpr auto PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE = FMT_STRING("parameter '{}' with default argument here");
 
-constexpr auto EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST = FMT_STRING("except clause without expression must come last");
+constexpr auto EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST =
+    FMT_STRING("except clause without expression must come last");
 
 } // namespace pylir::Diag

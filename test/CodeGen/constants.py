@@ -1,4 +1,4 @@
-# RUN: pylir %s -emit-pylir -o - | FileCheck %s
+# RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
 5
 # CHECK: py.constant #py.int<5>

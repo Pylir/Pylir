@@ -16,7 +16,7 @@ def : F<"h", "Alias for --help">, Alias<help>, Group<grp_general>;
 def version : FF<"version", "Print version and exit">, Group<grp_general>;
 def : F<"V", "Alias for --version">, Alias<version>, Group<grp_general>;
 
-def o : JoinedOrSeparate<["-"], "o">, HelpText<"Write output to <file>">, MetaVarName<"file">, Group<grp_general>;
+def o : JoinedOrSeparate<["-"], "o">, HelpText<"Write output to <file>">, MetaVarName<"<file>">, Group<grp_general>;
 
 def grp_language : OptionGroup<"Language">, HelpText<"Language options">;
 
@@ -24,7 +24,7 @@ def fsyntax_only : F<"fsyntax-only", "Don't compile the source file, but do chec
 
 def grp_actions : OptionGroup<"Actions">, HelpText<"Action options">;
 
-def c : JoinedOrSeparate<["-"], "c">, HelpText<"Execute argument as python code">, MetaVarName<"cmd">, Group<grp_actions>;
+def c : F<"c", "Emit compilation output instead of final executable">, Group<grp_actions>;
 def emit_llvm : F<"emit-llvm", "Emit LLVM bitcode for assembly and object files">, Group<grp_actions>;
 def emit_mlir : F<"emit-mlir", "Emit MLIR IR for assembly files">, Group<grp_actions>;
 def emit_pylir : F<"emit-pylir", "Emit Pylir IR for assembly files">, Group<grp_actions>;
@@ -33,6 +33,6 @@ def S : F<"S", "Emit textual assembly files">, Group<grp_actions>;
 
 def grp_codegen : OptionGroup<"CodeGen">, HelpText<"Codegen options">;
 
-def O : Joined<["-"], "O">, Group<grp_codegen>, MetaVarName<"level">, HelpText<"Optimization level">;
+def O : Joined<["-"], "O">, Group<grp_codegen>, MetaVarName<"<level>">, HelpText<"Optimization level">;
 def O_flag : F<"O", "Alias for -O1">, Alias<O>, AliasArgs<["1"]>, Group<grp_codegen>;
-def target : Joined<["--"], "target=">, HelpText<"Generate code for the given target">;
+defm target : Eq<"target", "Generate code for the given target">, MetaVarName<"<target>">, Group<grp_codegen>;
