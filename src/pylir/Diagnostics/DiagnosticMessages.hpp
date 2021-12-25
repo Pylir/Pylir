@@ -79,6 +79,12 @@ constexpr auto FAILED_TO_ACCESS_FILE_N = FMT_STRING("failed to access file '{}'"
 
 constexpr auto FAILED_TO_READ_FILE_N = FMT_STRING("failed to read file '{}'");
 
+constexpr auto FAILED_TO_CREATE_TEMPORARY_FILE_N = FMT_STRING("failed to create temporary file '{}'");
+
+constexpr auto FAILED_TO_DISCARD_TEMPORARY_FILE_N = FMT_STRING("failed to discard temporary file '{}'");
+
+constexpr auto FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N = FMT_STRING("failed to rename temporary file '{}' to '{}'");
+
 constexpr auto COULD_NOT_FIND_TARGET_N = FMT_STRING("could not find target '{}'");
 
 constexpr auto INVALID_OPTIMIZATION_LEVEL_N = FMT_STRING("invalid optimization level '{}'");

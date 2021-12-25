@@ -36,3 +36,12 @@ def grp_codegen : OptionGroup<"CodeGen">, HelpText<"Codegen options">;
 def O : Joined<["-"], "O">, Group<grp_codegen>, MetaVarName<"<level>">, HelpText<"Optimization level">;
 def O_flag : F<"O", "Alias for -O1">, Alias<O>, AliasArgs<["1"]>, Group<grp_codegen>;
 defm target : Eq<"target", "Generate code for the given target">, MetaVarName<"<target>">, Group<grp_codegen>;
+def flto : F<"flto", "Enable link time optimization">, Group<grp_codegen>;
+def fno_lto : F<"fno-lto", "Disable link time optimization">, Group<grp_codegen>;
+
+def grp_link : OptionGroup<"Linker">, HelpText<"Linker options">;
+
+defm ld_path : Eq<"ld-path", "Path to the linker executable to use">, MetaVarName<"<path>">, Group<grp_link>;
+def l : JoinedOrSeparate<["-"], "l">, HelpText<"Extra libraries to link with">, MetaVarName<"<name>">, Group<grp_link>;
+def L : JoinedOrSeparate<["-"], "L">, HelpText<"Add directory to library search path">, MetaVarName<"<dir>">, Group<grp_link>;
+def Wl : CommaJoined<["-"], "Wl,">, HelpText<"Flags to forward to the linker">, MetaVarName<"<flag>">, Group<grp_link>;

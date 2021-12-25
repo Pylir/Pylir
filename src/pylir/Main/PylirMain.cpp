@@ -80,79 +80,25 @@ struct LocationProvider<llvm::opt::Arg*, void>
 
 namespace
 {
-bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli::CommandLine& commandLine)
+
+bool enableLTO(const pylir::cli::CommandLine& commandLine)
 {
-    auto& options = commandLine.getArgs();
-    pylir::Parser parser(file);
-    auto tree = parser.parseFileInput();
-    if (!tree)
-    {
-        llvm::errs() << tree.error();
-        return false;
-    }
-    if (options.hasArg(OPT_emit_ast))
-    {
-        pylir::Dumper dumper;
-        llvm::outs() << dumper.dump(*tree);
-    }
-    if (action == Action::SyntaxOnly)
+    if (commandLine.getArgs().hasFlag(OPT_flto, OPT_fno_lto, false))
     {
         return true;
     }
+    // TODO: if using builtin LLD and -O3 enable LTO as well
+    return false;
+}
+
+bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pylir::Diag::Document& file,
+                        const pylir::cli::CommandLine& commandLine, llvm::raw_pwrite_stream& output)
+{
+    auto& options = commandLine.getArgs();
     mlir::MLIRContext context;
     context.getDiagEngine().registerHandler([](mlir::Diagnostic& diagnostic) { diagnostic.print(llvm::errs()); });
-    auto module = pylir::codegen(&context, *tree, file);
+    auto module = pylir::codegen(&context, tree, file);
 
-    auto filename = llvm::sys::path::filename(file.getFilename()).str();
-
-    std::string defaultName;
-    if (options.hasArg(OPT_emit_mlir))
-    {
-        defaultName = filename + ".mlir";
-    }
-    else if (options.hasArg(OPT_emit_llvm))
-    {
-        if (action == Action::ObjectFile)
-        {
-            defaultName = filename + ".bc";
-        }
-        else
-        {
-            defaultName = filename + ".ll";
-        }
-    }
-    else
-    {
-        if (action == Action::ObjectFile)
-        {
-            defaultName = filename + ".o";
-        }
-        else
-        {
-            defaultName = filename + ".s";
-        }
-    }
-
-    std::error_code errorCode;
-    auto outputString = options.getLastArgValue(OPT_o, defaultName);
-    auto output = llvm::raw_fd_ostream(outputString, errorCode);
-    if (errorCode)
-    {
-        auto outputArg = options.getLastArg(OPT_o);
-        if (outputArg)
-        {
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(outputArg, pylir::Diag::FAILED_TO_OPEN_FILE_N, outputString)
-                                .addLabel(outputArg, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                .emitError();
-        }
-        else
-        {
-            llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
-                                                    fmt::format(pylir::Diag::FAILED_TO_OPEN_FILE_N, outputString));
-        }
-        return false;
-    }
     mlir::PassManager manager(&context);
 #ifndef NDEBUG
     manager.enableVerifier();
@@ -273,6 +219,7 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     passBuilder.registerLoopAnalyses(lam);
     passBuilder.crossRegisterProxies(lam, fam, cgam, mam);
 
+    bool lto = enableLTO(commandLine);
     llvm::ModulePassManager mpm;
     if (options.getLastArgValue(OPT_O, "0") == "0")
     {
@@ -286,14 +233,36 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
                                             .Case("3", llvm::OptimizationLevel::O3)
                                             .Case("s", llvm::OptimizationLevel::Os)
                                             .Case("z", llvm::OptimizationLevel::Oz);
-        mpm = passBuilder.buildPerModuleDefaultPipeline(level);
+        if (lto)
+        {
+            mpm = passBuilder.buildLTOPreLinkDefaultPipeline(level);
+        }
+        else
+        {
+            mpm = passBuilder.buildPerModuleDefaultPipeline(level);
+        }
     }
 
-    if (options.hasArg(OPT_emit_llvm))
+    if (options.hasArg(OPT_emit_llvm) || lto)
     {
-        if (action == Action::ObjectFile)
+        if (action == Action::ObjectFile || lto)
         {
-            mpm.addPass(llvm::BitcodeWriterPass(output));
+            // See
+            // https://github.com/llvm/llvm-project/blob/ea22fdd120aeb1bbb9ea96670d70193dc02b2c5f/clang/lib/CodeGen/BackendUtil.cpp#L1467
+            // Doing full LTO for now
+            bool emitLTOSummary = lto && triple.getVendor() != llvm::Triple::Apple;
+            if (emitLTOSummary)
+            {
+                if (!llvmModule->getModuleFlag("ThinLTO"))
+                {
+                    llvmModule->addModuleFlag(llvm::Module::Error, "ThinLTO", std::uint32_t(0));
+                }
+                if (!llvmModule->getModuleFlag("EnableSplitLTOUnit"))
+                {
+                    llvmModule->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit", std::uint32_t(1));
+                }
+            }
+            mpm.addPass(llvm::BitcodeWriterPass(output, false, true));
         }
         else
         {
@@ -335,11 +304,27 @@ bool executeAction(Action action, pylir::Diag::Document& file, const pylir::cli:
     }
 
     codeGenPasses.run(*llvmModule);
+    return true;
+}
+
+bool linkExecutable(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile)
+{
+    auto& args = commandLine.getArgs();
 
     return true;
 }
 
 } // namespace
+
+template <>
+struct fmt::formatter<llvm::StringRef> : formatter<string_view>
+{
+    template <class Context>
+    auto format(const llvm::StringRef& string, Context& ctx)
+    {
+        return fmt::formatter<string_view>::format({string.data(), string.size()}, ctx);
+    }
+};
 
 pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(InfoTable) {}
 
@@ -526,6 +511,7 @@ int pylir::main(int argc, char* argv[])
     if (!inputFile)
     {
         llvm::errs() << pylir::Diag::formatLine(Diag::Error, fmt::format(pylir::Diag::NO_INPUT_FILE));
+        return -1;
     }
 
     auto fd = llvm::sys::fs::openNativeFileForRead(inputFile->getValue());
@@ -539,17 +525,19 @@ int pylir::main(int argc, char* argv[])
                             .emitError();
         return -1;
     }
-    auto exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
+    std::optional exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
     llvm::sys::fs::file_status status;
-    auto error = llvm::sys::fs::status(*fd, status);
-    if (error)
     {
-        llvm::errs() << commandLine
-                            .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N,
-                                                      inputFile->getValue())
-                            .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                            .emitError();
-        return -1;
+        auto error = llvm::sys::fs::status(*fd, status);
+        if (error)
+        {
+            llvm::errs() << commandLine
+                                .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N,
+                                                          inputFile->getValue())
+                                .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                                .emitError();
+            return -1;
+        }
     }
     std::string content(status.getSize(), '\0');
     auto read = llvm::sys::fs::readNativeFile(*fd, {content.data(), content.size()});
@@ -563,12 +551,129 @@ int pylir::main(int argc, char* argv[])
                             .emitError();
         return -1;
     }
+    exit.reset();
 
     pylir::Diag::Document doc(std::move(content), inputFile->getValue());
-    if (!executeAction(action, doc, commandLine))
+    pylir::Parser parser(doc);
+    auto tree = parser.parseFileInput();
+    if (!tree)
     {
+        llvm::errs() << tree.error();
         return -1;
     }
+    if (args.hasArg(OPT_emit_ast))
+    {
+        pylir::Dumper dumper;
+        llvm::outs() << dumper.dump(*tree);
+    }
+    if (action == Action::SyntaxOnly)
+    {
+        return 0;
+    }
 
-    return 0;
+    auto triple = llvm::Triple(args.getLastArgValue(OPT_target_EQ, LLVM_DEFAULT_TARGET_TRIPLE));
+    auto filename = llvm::sys::path::filename(inputFile->getValue()).str();
+    llvm::SmallString<20> realOutputFilename;
+    if (action == Action::Link)
+    {
+        llvm::sys::path::system_temp_directory(true, realOutputFilename);
+        llvm::sys::path::append(realOutputFilename, "tmp.o");
+    }
+    else
+    {
+        std::string defaultName;
+        if (args.hasArg(OPT_emit_mlir))
+        {
+            defaultName = filename + ".mlir";
+        }
+        else if (args.hasArg(OPT_emit_llvm))
+        {
+            if (action == Action::ObjectFile)
+            {
+                defaultName = filename + ".bc";
+            }
+            else
+            {
+                defaultName = filename + ".ll";
+            }
+        }
+        else if (action == Action::Assembly)
+        {
+            defaultName = filename + ".s";
+        }
+        else if (action == Action::ObjectFile)
+        {
+            defaultName = filename + ".o";
+        }
+        realOutputFilename = args.getLastArgValue(OPT_o, defaultName);
+    }
+
+    std::optional<llvm::sys::fs::TempFile> outputFile;
+    llvm::SmallString<20> tempFileName = realOutputFilename;
+    if (realOutputFilename != "-")
+    {
+        auto extension = llvm::sys::path::extension(realOutputFilename);
+        llvm::sys::path::remove_filename(tempFileName);
+        llvm::sys::path::append(tempFileName, llvm::sys::path::stem(realOutputFilename) + "-%%%%" + extension);
+        auto tempFile = llvm::sys::fs::TempFile::create(tempFileName);
+        if (!tempFile)
+        {
+            llvm::consumeError(tempFile.takeError());
+            llvm::errs() << pylir::Diag::formatLine(
+                pylir::Diag::Error, fmt::format(pylir::Diag::FAILED_TO_CREATE_TEMPORARY_FILE_N, tempFileName.str()));
+            return -1;
+        }
+        outputFile = std::move(tempFile.get());
+    }
+
+    bool success;
+    {
+        if (!outputFile)
+        {
+            success = executeCompilation(action, *tree, doc, commandLine, llvm::outs());
+        }
+        else
+        {
+            auto output = llvm::raw_fd_ostream(outputFile->FD, false);
+            success = executeCompilation(action, *tree, doc, commandLine, output);
+        }
+    }
+    if (!success)
+    {
+        if (outputFile)
+        {
+            if (auto error = outputFile->discard())
+            {
+                llvm::consumeError(std::move(error));
+                llvm::errs() << pylir::Diag::formatLine(
+                    pylir::Diag::Error,
+                    fmt::format(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, tempFileName.str()));
+                return -1;
+            }
+        }
+        return -1;
+    }
+    if (action != Action::Link)
+    {
+        if (outputFile)
+        {
+            if (auto error = outputFile->keep(realOutputFilename))
+            {
+                llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
+                                                        fmt::format(pylir::Diag::FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N,
+                                                                    tempFileName.str(), realOutputFilename.str()));
+                return -1;
+            }
+        }
+        return 0;
+    }
+    success = linkExecutable(commandLine, outputFile->TmpName);
+    if (auto error = outputFile->discard())
+    {
+        llvm::consumeError(std::move(error));
+        llvm::errs() << pylir::Diag::formatLine(
+            pylir::Diag::Error, fmt::format(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, tempFileName.str()));
+        return -1;
+    }
+    return success ? 0 : -1;
 }

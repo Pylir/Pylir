@@ -17,7 +17,7 @@ from lit.llvm.subst import FindTool
 # name: The name of this test suite.
 config.name = 'Pylir'
 
-config.test_format = lit.formats.ShTest(True)
+config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
 # suffixes: A list of file extensions to treat as test files.
 config.suffixes = ['.mlir', '.ll', '.py']
