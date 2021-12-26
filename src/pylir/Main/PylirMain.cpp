@@ -65,7 +65,10 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
         return true;
     }
 #ifdef PYLIR_EMBEDDED_LLD
-    return args.getLastArgValue(OPT_O, "0") == "3" && args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true);
+    // --ld-path overrides -f[no-]integrated-ld unconditionally. If the embedded ld
+    // is used and -O3 enable LTO
+    return !args.hasArg(OPT_ld_path_EQ) && args.getLastArgValue(OPT_O, "0") == "3"
+           && args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true);
 #else
     return false;
 #endif
