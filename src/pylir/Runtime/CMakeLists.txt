@@ -7,6 +7,9 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/pylir/${TARGET_TRIPL
 
 add_library(PylirRuntime STATIC PylirGC.cpp Objects.cpp API.cpp)
 target_link_libraries(PylirRuntime PUBLIC PylirSupport)
+if (PYLIR_SANITIZER)
+    target_compile_options(PylirRuntime PRIVATE -fno-sanitize=all)
+endif ()
 
 if (APPLE)
     set(MERGE_ARCHIVES_LIBTOOL "--use-libtool" "--libtool" "${CMAKE_LIBTOOL}")
@@ -30,4 +33,7 @@ add_custom_command(TARGET PylirRuntime POST_BUILD
         DEPENDS PylirSupport utf8proc tommath
         )
 
-add_library(PylirRuntimeMain OBJECT PylirRuntimeMain.cpp)
+add_library(PylirRuntimeMain STATIC PylirRuntimeMain.cpp)
+if (PYLIR_SANITIZER)
+    target_compile_options(PylirRuntimeMain PRIVATE -fno-sanitize=all)
+endif ()

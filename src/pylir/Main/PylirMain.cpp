@@ -74,13 +74,11 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
 #endif
 }
 
-bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pylir::Diag::Document& file,
+bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& module, const pylir::Toolchain& toolchain,
                         const pylir::cli::CommandLine& commandLine, llvm::raw_pwrite_stream& output)
 {
     auto& options = commandLine.getArgs();
-    mlir::MLIRContext context;
-    context.getDiagEngine().registerHandler([](mlir::Diagnostic& diagnostic) { diagnostic.print(llvm::errs()); });
-    auto module = pylir::codegen(&context, tree, file);
+    auto& context = *module->getContext();
 
     mlir::PassManager manager(&context);
 #ifndef NDEBUG
@@ -162,12 +160,14 @@ bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pyl
     }
 
     llvm::Reloc::Model relocation = llvm::Reloc::Static;
-    if (triple.isOSWindows() && triple.getArch() == llvm::Triple::x86_64)
+    if (toolchain.defaultsToPIC() || toolchain.isPIE(commandLine))
     {
         relocation = llvm::Reloc::PIC_;
     }
+    llvm::TargetOptions targetOptions;
+    targetOptions.UseInitArray = true;
     auto machine = std::unique_ptr<llvm::TargetMachine>(
-        targetM->createTargetMachine(triple.str(), "generic", "", {}, relocation, {}, *optLevel));
+        targetM->createTargetMachine(triple.str(), "generic", "", targetOptions, relocation, {}, *optLevel));
 
     std::string passOptions =
         "target-triple=" + triple.str() + " data-layout=" + machine->createDataLayout().getStringRepresentation();
@@ -228,7 +228,7 @@ bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pyl
 
     if (options.hasArg(OPT_emit_llvm) || lto)
     {
-        if (action == Action::ObjectFile || lto)
+        if (action == Action::ObjectFile)
         {
             // See
             // https://github.com/llvm/llvm-project/blob/ea22fdd120aeb1bbb9ea96670d70193dc02b2c5f/clang/lib/CodeGen/BackendUtil.cpp#L1467
@@ -255,7 +255,7 @@ bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pyl
 
     mpm.run(*llvmModule, mam);
 
-    if (options.hasArg(OPT_emit_llvm))
+    if (options.hasArg(OPT_emit_llvm) || lto)
     {
         return true;
     }
@@ -290,19 +290,20 @@ bool executeCompilation(Action action, const pylir::Syntax::FileInput& tree, pyl
     return true;
 }
 
-std::unique_ptr<pylir::Toolchain> createToolchainForTriple(const pylir::cli::CommandLine&, llvm::Triple triple)
+std::unique_ptr<pylir::Toolchain> createToolchainForTriple(const pylir::cli::CommandLine& commandLine,
+                                                           llvm::Triple triple)
 {
     if (triple.isKnownWindowsMSVCEnvironment())
     {
-        return std::make_unique<pylir::MSVCToolchain>(triple);
+        return std::make_unique<pylir::MSVCToolchain>(triple, commandLine);
     }
     if (triple.isOSCygMing())
     {
-        return std::make_unique<pylir::MinGWToolchain>(triple);
+        return std::make_unique<pylir::MinGWToolchain>(triple, commandLine);
     }
     if (triple.isOSLinux())
     {
-        return std::make_unique<pylir::LinuxToolchain>(triple);
+        return std::make_unique<pylir::LinuxToolchain>(triple, commandLine);
     }
     return {};
 }
@@ -542,6 +543,9 @@ int pylir::main(int argc, char* argv[])
     {
         return 0;
     }
+    mlir::MLIRContext context;
+    context.getDiagEngine().registerHandler([](mlir::Diagnostic& diagnostic) { diagnostic.print(llvm::errs()); });
+    auto module = pylir::codegen(&context, *tree, doc);
 
     auto filename = llvm::sys::path::filename(inputFile->getValue()).str();
     llvm::SmallString<20> realOutputFilename;
@@ -601,12 +605,12 @@ int pylir::main(int argc, char* argv[])
     {
         if (!outputFile)
         {
-            success = executeCompilation(action, *tree, doc, commandLine, llvm::outs());
+            success = executeCompilation(action, std::move(module), *toolchain, commandLine, llvm::outs());
         }
         else
         {
             auto output = llvm::raw_fd_ostream(outputFile->FD, false);
-            success = executeCompilation(action, *tree, doc, commandLine, output);
+            success = executeCompilation(action, std::move(module), *toolchain, commandLine, output);
         }
     }
     if (!success)
@@ -638,13 +642,15 @@ int pylir::main(int argc, char* argv[])
         }
         return 0;
     }
-    success = toolchain->link(commandLine, outputFile->TmpName);
-    if (auto error = outputFile->discard())
+    std::string outputFilename = outputFile->TmpName;
+    if (auto error = outputFile->keep())
     {
         llvm::consumeError(std::move(error));
         llvm::errs() << pylir::Diag::formatLine(
             pylir::Diag::Error, fmt::format(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, tempFileName.str()));
         return -1;
     }
+    success = toolchain->link(commandLine, outputFilename);
+    llvm::sys::fs::remove(outputFilename);
     return success ? 0 : -1;
 }

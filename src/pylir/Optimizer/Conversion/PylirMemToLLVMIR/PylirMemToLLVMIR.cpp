@@ -2046,7 +2046,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
         builder.setInsertionPointToEnd(module.getBody());
         builder.create<mlir::LLVM::GlobalCtorsOp>(builder.getUnknownLoc(),
                                                   builder.getArrayAttr({mlir::FlatSymbolRefAttr::get(globalInit)}),
-                                                  builder.getI32ArrayAttr({0}));
+                                                  builder.getI32ArrayAttr({65535}));
     }
 }
 } // namespace

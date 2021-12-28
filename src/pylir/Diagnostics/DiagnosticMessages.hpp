@@ -87,6 +87,10 @@ constexpr auto FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N = FMT_STRING("failed to re
 
 constexpr auto FAILED_TO_FIND_RUNTIME_LIBRARY_IN_N = FMT_STRING("failed to find runtime library in '{}'");
 
+constexpr auto FAILED_TO_FIND_LINKER = FMT_STRING("failed to find linker");
+
+constexpr auto ATTEMPTED_N = FMT_STRING("attempted {}");
+
 constexpr auto COULD_NOT_FIND_TARGET_N = FMT_STRING("could not find target '{}'");
 
 constexpr auto UNSUPPORTED_TARGET_N = FMT_STRING("unsupported target '{}'");

@@ -25,3 +25,6 @@ add_library(tommath mp_2expt.c mp_abs.c mp_add.c mp_add_d.c mp_addmod.c mp_and.c
         s_mp_sqr_toom.c s_mp_sub.c s_mp_zero_buf.c s_mp_zero_digs.c)
 target_include_directories(tommath SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(tommath PUBLIC MP_NO_ZERO_ON_FREE MP_NO_FILE MP_FIXED_CUTOFFS)
+if (PYLIR_SANITIZER)
+    target_compile_options(tommath PRIVATE -fno-sanitize=all)
+endif ()

@@ -38,6 +38,8 @@ def O_flag : F<"O", "Alias for -O1">, Alias<O>, AliasArgs<["1"]>, Group<grp_code
 defm target : Eq<"target", "Generate code for the given target">, MetaVarName<"<target>">, Group<grp_codegen>;
 def flto : F<"flto", "Enable link time optimization">, Group<grp_codegen>;
 def fno_lto : F<"fno-lto", "Disable link time optimization">, Group<grp_codegen>;
+def fpie : F<"fpie", "Enable Position Independent Executables">, Group<grp_codegen>;
+def fno_pie : F<"fno-pie", "Disable Position Independent Executables">, Group<grp_codegen>;
 
 def grp_link : OptionGroup<"Linker">, HelpText<"Linker options">;
 
@@ -48,3 +50,7 @@ def Wl : CommaJoined<["-"], "Wl,">, HelpText<"Flags to forward to the linker">, 
 def fno_integrated_ld : F<"fno-integrated-ld", "Don't use the builtin version of lld">, Group<grp_link>;
 def fintegrated_ld : F<"fintegrated-ld", "Use the builtin version of lld (default)">, Group<grp_link>;
 defm sysroot : Eq<"sysroot", "Root directory of the system libraries">, Group<grp_link>;
+defm stdlib : Eq<"stdlib", "C++ standard library to use">, MetaVarName<"<name>">, Values<"libc++,libstdc++">,
+    Group<grp_link>;
+defm rtlib : Eq<"rtlib", "Compiler runtime library to use">, MetaVarName<"<name>">, Values<"compiler-rt,libgcc">,
+    Group<grp_link>;
