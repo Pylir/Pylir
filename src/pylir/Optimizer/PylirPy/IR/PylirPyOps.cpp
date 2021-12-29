@@ -395,7 +395,8 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     }
     if (auto blockArg = value().dyn_cast<mlir::BlockArgument>(); blockArg)
     {
-        if (blockArg.getOwner()->isEntryBlock())
+        if (mlir::isa_and_nonnull<mlir::FuncOp>(blockArg.getOwner()->getParentOp())
+            && blockArg.getOwner()->isEntryBlock())
         {
             return mlir::BoolAttr::get(getContext(), false);
         }
