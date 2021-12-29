@@ -15,6 +15,9 @@ def help : FF<"help", "Display this help">, Group<grp_general>;
 def : F<"h", "Alias for --help">, Alias<help>, Group<grp_general>;
 def version : FF<"version", "Print version and exit">, Group<grp_general>;
 def : F<"V", "Alias for --version">, Alias<version>, Group<grp_general>;
+def verbose : FF<"verbose", "Print verbose info to stderr">, Group<grp_general>;
+def : F<"v", "Alias for --verbose">, Alias<verbose>, Group<grp_general>;
+def _HASH_HASH_HASH : F<"###", "Print linker invocation instead of executing it">, Group<grp_general>;
 
 def o : JoinedOrSeparate<["-"], "o">, HelpText<"Write output to <file>">, MetaVarName<"<file>">, Group<grp_general>;
 

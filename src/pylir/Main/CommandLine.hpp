@@ -49,6 +49,10 @@ public:
         return m_exe;
     }
 
+    bool verbose() const;
+
+    bool onlyPrint() const;
+
     void printHelp(llvm::raw_ostream& out) const;
 
     void printVersion(llvm::raw_ostream& out) const;

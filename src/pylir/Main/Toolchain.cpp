@@ -75,6 +75,26 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
 #ifdef PYLIR_EMBEDDED_LLD
     if (linkerPath.empty())
     {
+        if (commandLine.verbose() || commandLine.onlyPrint())
+        {
+            llvm::errs() << "<builtin-";
+            switch (style)
+            {
+                case LinkerStyle::MSVC: llvm::errs() << "lld-link"; break;
+                case LinkerStyle::GNU: llvm::errs() << "ld.lld"; break;
+                case LinkerStyle::Mac: llvm::errs() << "ld64.lld"; break;
+                case LinkerStyle::Wasm: llvm::errs() << "wasm-lld"; break;
+            }
+            llvm::errs() << ">";
+            for (auto& iter : arguments)
+            {
+                llvm::errs() << " " << iter;
+            }
+            if (commandLine.onlyPrint())
+            {
+                return true;
+            }
+        }
         std::vector<const char*> refs(1 + arguments.size());
         refs[0] = "pylir";
         std::transform(arguments.begin(), arguments.end(), 1 + refs.begin(),
@@ -94,6 +114,18 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
         PYLIR_UNREACHABLE;
     }
 #endif
+    if (commandLine.verbose() || commandLine.onlyPrint())
+    {
+        llvm::errs() << linkerPath;
+        for (auto& iter : arguments)
+        {
+            llvm::errs() << " " << iter;
+        }
+        if (commandLine.onlyPrint())
+        {
+            return true;
+        }
+    }
     std::vector<llvm::StringRef> refs(arguments.begin(), arguments.end());
     return llvm::sys::ExecuteAndWait(linkerPath, refs) == 0;
 }

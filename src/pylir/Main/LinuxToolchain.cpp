@@ -219,6 +219,18 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     std::vector<llvm::SmallString<32>> builtinPaths;
     builtinPaths.emplace_back(gccInstall->libPath);
     builtinPaths.emplace_back(gccInstall->gccLibPath);
+    if (m_triple.isArch64Bit())
+    {
+        if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + "lib64"))
+        {
+            builtinPaths.emplace_back((gccInstall->libPath + sep + ".." + sep + "lib64").str());
+        }
+        if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64"))
+        {
+            builtinPaths.emplace_back(
+                (gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64").str());
+        }
+    }
     if (llvm::sys::fs::exists("/lib/" + gccInstall->gccTriple.str()))
     {
         builtinPaths.emplace_back("/lib/" + gccInstall->gccTriple.str());

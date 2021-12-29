@@ -46,3 +46,13 @@ void pylir::cli::CommandLine::printVersion(llvm::raw_ostream& out) const
     out << "lld " LLVM_VERSION_STRING "\n";
 #endif
 }
+
+bool pylir::cli::CommandLine::verbose() const
+{
+    return m_args.hasArg(OPT_verbose);
+}
+
+bool pylir::cli::CommandLine::onlyPrint() const
+{
+    return m_args.hasArg(OPT__HASH_HASH_HASH);
+}
