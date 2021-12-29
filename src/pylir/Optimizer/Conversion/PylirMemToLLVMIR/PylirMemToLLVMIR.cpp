@@ -1024,8 +1024,7 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
             auto twoI32 = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
                                                                   rewriter.getI32IntegerAttr(2));
             mlir::Value newCapacity = rewriter.create<mlir::LLVM::ShlOp>(op.getLoc(), capacity, oneIndex);
-            // TODO: use UMinOp once available
-            newCapacity = rewriter.create<mlir::LLVM::SMinOp>(op.getLoc(), newCapacity, incremented);
+            newCapacity = rewriter.create<mlir::LLVM::UMinOp>(op.getLoc(), newCapacity, incremented);
             auto arrayPtr = rewriter.create<mlir::LLVM::GEPOp>(
                 op.getLoc(),
                 mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(

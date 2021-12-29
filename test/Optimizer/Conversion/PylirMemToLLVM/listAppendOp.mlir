@@ -26,7 +26,7 @@ func @foo(%list : !py.dynamic, %item : !py.dynamic) {
 // CHECK-NEXT: ^[[GROW_BLOCK]]:
 // CHECK-NEXT: %[[TWO:.*]] = llvm.mlir.constant(2 : i32)
 // CHECK-NEXT: %[[SHL:.*]] = llvm.shl %[[CAPACITY]], %[[ONE_INDEX]]
-// CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.smin"(%[[SHL]], %[[INCREMENTED]])
+// CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.umin"(%[[SHL]], %[[INCREMENTED]])
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][%[[ZERO]], %[[ONE]], %[[TWO]]]
 // CHECK-NEXT: %[[ARRAY:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
