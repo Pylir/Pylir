@@ -2,7 +2,7 @@
 
 #include <pylir/Support/HashTable.hpp>
 
-TEST_CASE("Insertion and lookup", "[HashTable]")
+TEST_CASE("HashTable Insertion and lookup", "[HashTable]")
 {
     pylir::HashTable<int, std::size_t> table;
     STATIC_REQUIRE(std::is_standard_layout_v<decltype(table)>);
@@ -34,7 +34,7 @@ TEST_CASE("Insertion and lookup", "[HashTable]")
     }
 }
 
-TEST_CASE("Erase", "[HashTable]")
+TEST_CASE("HashTable Erase", "[HashTable]")
 {
     std::string_view words[] = {
         "Lorem",      "ipsum",     "dolor",     "sit",       "amet,",   "consectetur",  "adipiscing",
