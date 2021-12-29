@@ -10,12 +10,12 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOpsEnums.h.inc>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyTraits.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
 
 #include "PylirMemAttributes.hpp"
 #include "PylirMemTypes.hpp"
-
-#include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
-#include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.h.inc>

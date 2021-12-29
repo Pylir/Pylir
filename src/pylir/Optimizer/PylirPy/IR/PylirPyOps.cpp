@@ -402,12 +402,10 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
         }
         return nullptr;
     }
-    // For now we are sanctioning all the Ops in the Py dialect with the exception of LoadOp, they can never
-    // produce an unbound op. Others will have to be manually sanctioned. TODO: Probably want to have a trait for this
+    // If the defining op has the AlwaysBound trait then it is false. Also manually sanction some ops from other
+    // dialects
     if (auto* op = value().getDefiningOp();
-        op
-        && (op->getDialect() == this->getOperation()->getDialect() || mlir::isa<mlir::CallOp, mlir::CallIndirectOp>(op))
-        && !mlir::isa<Py::LoadOp>(op) && !mlir::isa<Py::GetSlotOp>(op))
+        op && (mlir::isa<mlir::CallOp, mlir::CallIndirectOp>(op) || op->hasTrait<Py::AlwaysBound>()))
     {
         return mlir::BoolAttr::get(getContext(), false);
     }

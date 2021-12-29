@@ -3,8 +3,8 @@
 
 #include <mlir/IR/OpDefinition.h>
 #include <mlir/IR/OpImplementation.h>
-#include <mlir/IR/SymbolTable.h>
 #include <mlir/IR/PatternMatch.h>
+#include <mlir/IR/SymbolTable.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Interfaces/ControlFlowInterfaces.h>
 #include <mlir/Interfaces/InferTypeOpInterface.h>
@@ -13,6 +13,7 @@
 #include <variant>
 
 #include "PylirPyAttributes.hpp"
+#include "PylirPyTraits.hpp"
 #include "PylirPyTypes.hpp"
 
 namespace pylir::Py
