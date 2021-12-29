@@ -66,9 +66,22 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
     }
 #ifdef PYLIR_EMBEDDED_LLD
     // --ld-path overrides -f[no-]integrated-ld unconditionally. If the embedded ld
-    // is used and -O3 enable LTO
-    return !args.hasArg(OPT_ld_path_EQ) && args.getLastArgValue(OPT_O, "0") == "3"
-           && args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true);
+    // is used and -O4 enable LTO
+    bool enable = !args.hasArg(OPT_ld_path_EQ) && args.getLastArgValue(OPT_O, "0") == "4"
+                  && args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true);
+    if (commandLine.verbose())
+    {
+        if (enable)
+        {
+            llvm::errs() << "Enabling LTO as integrated LLD and -O4 was enabled\n";
+        }
+        else if (args.getLastArgValue(OPT_O, "0") == "4"
+                 && (args.hasArg(OPT_ld_path_EQ) || !args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true)))
+        {
+            llvm::errs() << "LTO not enabled as integrated LLD is not used. Add '-flto' if your linker supports LTO\n";
+        }
+    }
+    return enable;
 #else
     return false;
 #endif
@@ -145,6 +158,7 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
                         .Case("1", llvm::CodeGenOpt::Less)
                         .Case("2", llvm::CodeGenOpt::Default)
                         .Case("3", llvm::CodeGenOpt::Aggressive)
+                        .Case("4", llvm::CodeGenOpt::Aggressive)
                         .Case("s", llvm::CodeGenOpt::Default)
                         .Case("z", llvm::CodeGenOpt::Default)
                         .Default(std::nullopt);
@@ -206,7 +220,7 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
     llvm::ModulePassManager mpm;
     if (options.getLastArgValue(OPT_O, "0") == "0")
     {
-        mpm = passBuilder.buildO0DefaultPipeline(llvm::OptimizationLevel::O0);
+        mpm = passBuilder.buildO0DefaultPipeline(llvm::OptimizationLevel::O0, lto);
     }
     else
     {
@@ -214,6 +228,7 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
                                             .Case("1", llvm::OptimizationLevel::O1)
                                             .Case("2", llvm::OptimizationLevel::O2)
                                             .Case("3", llvm::OptimizationLevel::O3)
+                                            .Case("4", llvm::OptimizationLevel::O3)
                                             .Case("s", llvm::OptimizationLevel::Os)
                                             .Case("z", llvm::OptimizationLevel::Oz);
         if (lto)
@@ -228,28 +243,28 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
 
     if (options.hasArg(OPT_emit_llvm) || lto)
     {
-        if (action == Action::ObjectFile)
+        // See
+        // https://github.com/llvm/llvm-project/blob/ea22fdd120aeb1bbb9ea96670d70193dc02b2c5f/clang/lib/CodeGen/BackendUtil.cpp#L1467
+        // Doing full LTO for now
+        bool emitLTOSummary = lto && triple.getVendor() != llvm::Triple::Apple;
+        if (emitLTOSummary)
         {
-            // See
-            // https://github.com/llvm/llvm-project/blob/ea22fdd120aeb1bbb9ea96670d70193dc02b2c5f/clang/lib/CodeGen/BackendUtil.cpp#L1467
-            // Doing full LTO for now
-            bool emitLTOSummary = lto && triple.getVendor() != llvm::Triple::Apple;
-            if (emitLTOSummary)
+            if (!llvmModule->getModuleFlag("ThinLTO"))
             {
-                if (!llvmModule->getModuleFlag("ThinLTO"))
-                {
-                    llvmModule->addModuleFlag(llvm::Module::Error, "ThinLTO", std::uint32_t(0));
-                }
-                if (!llvmModule->getModuleFlag("EnableSplitLTOUnit"))
-                {
-                    llvmModule->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit", std::uint32_t(1));
-                }
+                llvmModule->addModuleFlag(llvm::Module::Error, "ThinLTO", std::uint32_t(0));
             }
-            mpm.addPass(llvm::BitcodeWriterPass(output, false, true));
+            if (!llvmModule->getModuleFlag("EnableSplitLTOUnit"))
+            {
+                llvmModule->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit", std::uint32_t(1));
+            }
+        }
+        if (action == Action::Assembly)
+        {
+            mpm.addPass(llvm::PrintModulePass(output));
         }
         else
         {
-            mpm.addPass(llvm::PrintModulePass(output));
+            mpm.addPass(llvm::BitcodeWriterPass(output, false, emitLTOSummary));
         }
     }
 
@@ -469,6 +484,28 @@ int pylir::main(int argc, char* argv[])
         {
             return -1;
         }
+    }
+
+    if (auto opt = args.getLastArg(OPT_O);
+        opt && opt->getValue() == std::string_view{"4"} && !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm)
+        && (action == Action::Assembly || action == Action::ObjectFile) && !args.hasArg(OPT_flto, OPT_fno_lto))
+    {
+        llvm::errs() << commandLine
+                            .createDiagnosticsBuilder(opt, pylir::Diag::O4_MAY_ENABLE_LTO_COMPILER_MIGHT_OUTPUT_LLVM_IR,
+                                                      action == Action::Assembly ? "Assembly file" : "Object file")
+                            .addLabel(opt, std::nullopt, pylir::Diag::WARNING_COLOUR)
+                            .emitWarning();
+    }
+
+    if (auto opt = args.getLastArg(OPT_flto, OPT_fno_lto);
+        opt && opt->getOption().matches(OPT_flto) && !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm)
+        && (action == Action::Assembly || action == Action::ObjectFile))
+    {
+        llvm::errs() << commandLine
+                            .createDiagnosticsBuilder(opt, pylir::Diag::LTO_ENABLED_COMPILER_WILL_OUTPUT_LLVM_IR,
+                                                      action == Action::Assembly ? "Assembly file" : "Object file")
+                            .addLabel(opt, std::nullopt, pylir::Diag::WARNING_COLOUR)
+                            .emitWarning();
     }
 
     if (args.hasMultipleArgs(OPT_INPUT))
