@@ -412,6 +412,11 @@ public:
         return create<Py::IntToIntegerOp>(integerLike, object);
     }
 
+    Py::IntToStrOp createIntToStr(mlir::Value object)
+    {
+        return create<Py::IntToStrOp>(object);
+    }
+
     Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant, Py::ObjectAttr initializer,
                                         bool external = false)
     {

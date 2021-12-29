@@ -397,7 +397,19 @@ void pylir::CodeGen::createBuiltinsImpl()
                 });
     // Stubs
     createClass(m_builder.getTupleBuiltin());
-    auto integer = createClass(m_builder.getIntBuiltin());
+    auto integer = createClass(m_builder.getIntBuiltin(), {},
+                               [&](SlotMapImpl& slots)
+                               {
+                                   slots["__str__"] =
+                                       createFunction("builtins.int.__str__", {{"", FunctionParameter::PosOnly, false}},
+                                                      [&](mlir::ValueRange functionArguments)
+                                                      {
+                                                          auto self = functionArguments[0];
+                                                          // TODO: check its int
+                                                          auto asStr = m_builder.createIntToStr(self);
+                                                          m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asStr});
+                                                      });
+                               });
     createClass(m_builder.getListBuiltin());
     createClass(m_builder.getBoolBuiltin(), {integer});
 

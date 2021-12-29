@@ -342,12 +342,14 @@ public:
     enum class Runtime
     {
         Memcmp,
-        pylir_gc_alloc,
-        mp_init_u64,
-        pylir_str_hash,
         abort,
+        mp_init_u64,
         mp_init,
         mp_unpack,
+        mp_radix_size_overestimate,
+        mp_to_radix,
+        pylir_gc_alloc,
+        pylir_str_hash,
         pylir_dict_lookup,
         pylir_dict_insert,
         pylir_dict_erase,
@@ -405,6 +407,20 @@ public:
                                  builder.getIntegerType(sizeof(mp_endian) * 8),        getIndexType(),
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type())};
                 functionName = "mp_unpack";
+                break;
+            case Runtime::mp_radix_size_overestimate:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()), /*TODO: int*/ builder.getI32Type(),
+                                 mlir::LLVM::LLVMPointerType::get(getIndexType())};
+                functionName = "mp_radix_size_overestimate";
+                break;
+            case Runtime::mp_to_radix:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()),
+                                 mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), getIndexType(),
+                                 mlir::LLVM::LLVMPointerType::get(getIndexType()),
+                                 /*TODO: int*/ builder.getI32Type()};
+                functionName = "mp_to_radix";
                 break;
             case Runtime::pylir_dict_lookup:
                 returnType = mlir::LLVM::LLVMPointerType::get(getPyObjectType());
@@ -1909,6 +1925,57 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
     }
 };
 
+struct InitStrFromIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitStrFromIntOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitStrFromIntOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitStrFromIntOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto string = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyStringType()),
+            adaptor.memory());
+        auto integer = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyIntType()), adaptor.integer());
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto mpIntPtr = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getMPInt()), integer,
+            mlir::ValueRange{zero, one});
+        auto sizePtr = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
+                                                          string, mlir::ValueRange{zero, one, zero});
+        auto ten =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(10));
+        getTypeConverter()->createRuntimeCall(
+            op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_radix_size_overestimate, {mpIntPtr, ten, sizePtr});
+        auto capacity = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), sizePtr);
+        auto array = this->getTypeConverter()->createRuntimeCall(
+            op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_gc_alloc, {capacity});
+        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_to_radix,
+                                              {mpIntPtr, array, capacity, sizePtr, ten});
+
+        // mp_to_radix sadly includes the NULL terminator that it uses in size...
+        mlir::Value size = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), sizePtr);
+        auto oneI = createIndexConstant(rewriter, op.getLoc(), 1);
+        size = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), size, oneI);
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, sizePtr);
+
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(capacity.getType()),
+                                                 string, mlir::ValueRange{zero, one, one});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), capacity, gep);
+        auto two =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), string,
+                                                 mlir::ValueRange{zero, one, two});
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
+
+        rewriter.replaceOp(op, adaptor.memory());
+        return mlir::success();
+    }
+};
+
 struct InitFuncOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitFuncOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::InitFuncOp>::ConvertPylirOpToLLVMPattern;
@@ -2045,6 +2112,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<DictDelItemOpConversion>(converter);
     patternSet.insert<InitStrOpConversion>(converter);
     patternSet.insert<PrintOpConversion>(converter);
+    patternSet.insert<InitStrFromIntOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

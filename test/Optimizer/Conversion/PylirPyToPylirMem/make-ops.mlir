@@ -150,3 +150,22 @@ func @make_int_fromInteger(%arg0 : i32) -> !py.dynamic {
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : i32
 // CHECK-NEXT: return %[[RESULT]]
+
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.str = #py.type
+
+func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.int.toStr %arg0
+    return %0 : !py.dynamic
+}
+
+// CHECK-LABEL: @make_str_fromInt
+// CHECK-SAME: %[[ARG:[[:alnum:]]+]]
+// CHECK-NEXT: %[[STR:.*]] = py.constant @builtins.str
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[STR]]
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initStrFromInt %[[MEM]] to %[[ARG]]
+// CHECK-NEXT: return %[[RESULT]]

@@ -98,6 +98,13 @@ def PylirMem_InitStrOp : PylirMem_Op<"initStr", [DeclareOpInterfaceMethods<Infer
     let assemblyFormat = "$memory (`to` $strings^)? attr-dict";
 }
 
+def PylirMem_InitStrFromIntOp : PylirMem_Op<"initStrFromInt"> {
+    let results = (outs DynamicType:$result);
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$integer);
+
+    let assemblyFormat = "$memory `to` $integer attr-dict";
+}
+
 def PylirMem_InitFuncOp : PylirMem_Op<"initFunc"> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, FlatSymbolRefAttr:$initializer);

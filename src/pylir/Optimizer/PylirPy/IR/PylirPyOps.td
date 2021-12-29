@@ -239,6 +239,28 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
     let assemblyFormat = "$lhs `,` $rhs attr-dict";
 }
 
+// Int ops
+
+def PylirPy_IntFromIntegerOp : PylirPy_Op<"int.fromInteger", [NoSideEffect]> {
+    let arguments = (ins IntegerLike:$input);
+
+    let assemblyFormat = "$input `:` type($input) attr-dict";
+}
+
+def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$input);
+    let results = (outs IntegerLike:$result);
+
+    let assemblyFormat = "$input `:` type($result) attr-dict";
+}
+
+def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$input);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "$input attr-dict";
+}
+
 // Intrinsics
 
 def PylirPy_PrintOp : PylirPy_Op<"intr.print"> {
@@ -592,19 +614,6 @@ def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [NoSideEffect]> {
     let description = [{
         This op converts an `I1` given by `$input` into a python bool object.
     }];
-}
-
-def PylirPy_IntFromIntegerOp : PylirPy_Op<"int.fromInteger", [NoSideEffect]> {
-    let arguments = (ins IntegerLike:$input);
-
-    let assemblyFormat = "$input `:` type($input) attr-dict";
-}
-
-def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$input);
-    let results = (outs IntegerLike:$result);
-
-    let assemblyFormat = "$input `:` type($result) attr-dict";
 }
 
 // Memory operations
