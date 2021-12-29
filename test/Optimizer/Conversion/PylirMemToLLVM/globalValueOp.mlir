@@ -45,3 +45,18 @@ py.globalValue @foo = #py.str<"test">
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER_ADDR]][%[[ZERO]], %[[ZERO]]]
 // CHECK-NEXT: %[[UNDEF4:.*]] = llvm.insertvalue %[[GEP]], %[[UNDEF3]][1 : i32, 2 : i32]
 // CHECK-NEXT: llvm.return %[[UNDEF4]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.list = #py.type
+
+py.globalValue @bar = #py.list<[]>
+py.globalValue const @foo = #py.list<[]>
+py.globalValue "private" @foobar = #py.list<[]>
+py.globalValue "private" const @barfoo = #py.list<[]>
+
+// CHECK: llvm.mlir.global external @bar
+// CHECK: llvm.mlir.global external constant @foo
+// CHECK: llvm.mlir.global internal @foobar
+// CHECK: llvm.mlir.global internal constant @barfoo

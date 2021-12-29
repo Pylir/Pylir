@@ -1,9 +1,9 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
-# CHECK-DAG: globalHandle @x
-# CHECK-DAG: globalHandle @y
-# CHECK-DAG: globalHandle @z
-# CHECK-DAG: globalHandle @foo
+# CHECK-DAG: globalHandle "private" @x
+# CHECK-DAG: globalHandle "private" @y
+# CHECK-DAG: globalHandle "private" @z
+# CHECK-DAG: globalHandle "private" @foo
 
 x = 2
 

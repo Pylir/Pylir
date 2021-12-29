@@ -86,7 +86,8 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                    });
     return m_builder.createGlobalValue(
         className.getValue(), true,
-        m_builder.getObjectAttr(m_builder.getTypeBuiltin(), Py::SlotsAttr::get(m_builder.getContext(), converted)));
+        m_builder.getObjectAttr(m_builder.getTypeBuiltin(), Py::SlotsAttr::get(m_builder.getContext(), converted)),
+        true);
 }
 
 pylir::Py::GlobalValueOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
@@ -108,6 +109,7 @@ pylir::Py::GlobalValueOp
         m_builder.getCurrentLoc(), (functionName + "$impl").str(),
         m_builder.getFunctionType(llvm::SmallVector<mlir::Type>(parameters.size() + 1, m_builder.getDynamicType()),
                                   m_builder.getDynamicType()));
+    function.setPrivate();
     {
         auto reset = implementFunction(function);
         if (implementation)
@@ -136,7 +138,8 @@ pylir::Py::GlobalValueOp
         realKWArgs = mlir::FlatSymbolRefAttr::get(createGlobalConstant(kwArgs));
     }
     return m_builder.createGlobalValue(
-        functionName, true, m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(function), realPosArgs, realKWArgs));
+        functionName, true, m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(function), realPosArgs, realKWArgs),
+        true);
 }
 
 void pylir::CodeGen::createBuiltinsImpl()

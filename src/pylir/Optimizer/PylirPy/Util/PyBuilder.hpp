@@ -412,16 +412,16 @@ public:
         return create<Py::IntToIntegerOp>(integerLike, object);
     }
 
-    // TODO: linkage
-    Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant, Py::ObjectAttr initializer)
+    Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant, Py::ObjectAttr initializer,
+                                        bool external = false)
     {
-        return create<Py::GlobalValueOp>(symbolName, mlir::StringAttr{}, constant, initializer);
+        return create<Py::GlobalValueOp>(symbolName, external ? mlir::StringAttr{} : getStringAttr("private"), constant,
+                                         initializer);
     }
 
-    // TODO: linkage
     Py::GlobalHandleOp createGlobalHandle(llvm::StringRef symbolName)
     {
-        return create<Py::GlobalHandleOp>(symbolName, mlir::StringAttr{});
+        return create<Py::GlobalHandleOp>(symbolName, getStringAttr("private"));
     }
 
     Py::StoreOp createStore(mlir::Value value, mlir::FlatSymbolRefAttr handle)

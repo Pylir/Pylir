@@ -24,6 +24,13 @@
 namespace
 {
 
+bool needToBeRuntimeInit(pylir::Py::ObjectAttr attr)
+{
+    // Integer attrs currently need to be runtime init due to memory allocation in libtommath
+    // Dict attr need to be runtime init due to the hash calculation
+    return attr.isa<pylir::Py::IntAttr, pylir::Py::DictAttr>();
+}
+
 class PylirTypeConverter : public mlir::LLVMTypeConverter
 {
     llvm::DenseMap<pylir::Py::ObjectAttr, mlir::LLVM::GlobalOp> m_globalConstants;
@@ -712,9 +719,9 @@ public:
         mlir::OpBuilder::InsertionGuard guard{builder};
         builder.setInsertionPointToStart(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
         auto type = typeOf(objectAttr);
-        auto globalOp = builder.create<mlir::LLVM::GlobalOp>(
-            builder.getUnknownLoc(), type, !objectAttr.isa<pylir::Py::IntAttr, pylir::Py::DictAttr>(),
-            mlir::LLVM::Linkage::Private, "const$", mlir::Attribute{}, 0, 0, true);
+        auto globalOp =
+            builder.create<mlir::LLVM::GlobalOp>(builder.getUnknownLoc(), type, !needToBeRuntimeInit(objectAttr),
+                                                 mlir::LLVM::Linkage::Private, "const$", mlir::Attribute{}, 0, 0, true);
         globalOp.setUnnamedAddrAttr(mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
         m_symbolTable.insert(globalOp);
         m_globalConstants.insert({objectAttr, globalOp});
@@ -786,11 +793,11 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
     void rewrite(pylir::Py::GlobalValueOp op, OpAdaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto type = getTypeConverter()->typeOf(op.initializer());
-        mlir::LLVM::Linkage linkage; // TODO: externally_available
+        mlir::LLVM::Linkage linkage;
         switch (op.getVisibility())
         {
             case mlir::SymbolTable::Visibility::Public: linkage = mlir::LLVM::linkage::Linkage::External; break;
-            case mlir::SymbolTable::Visibility::Private: linkage = mlir::LLVM::linkage::Linkage::Private; break;
+            case mlir::SymbolTable::Visibility::Private: linkage = mlir::LLVM::linkage::Linkage::Internal; break;
             case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
         }
         static llvm::DenseSet<llvm::StringRef> immutable = {
@@ -798,8 +805,7 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
             pylir::Py::Builtins::Float.name,
             pylir::Py::Builtins::Str.name,
         };
-        // Integer attrs currently need to be runtime init due to memory allocation in libtommath
-        bool constant = !op.initializer().isa<pylir::Py::IntAttr, pylir::Py::DictAttr>()
+        bool constant = !needToBeRuntimeInit(op.initializer())
                         && (op.constant() || immutable.contains(op.initializer().getType().getValue()));
         auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, constant, linkage, op.getName(),
                                                                         mlir::Attribute{});
@@ -1978,6 +1984,17 @@ protected:
 void ConvertPylirToLLVMPass::runOnOperation()
 {
     auto module = getOperation();
+    // For now, map all functions that are private to internal. Public functions are external. In Python code
+    // these are all functions that are not __init__
+    for (auto iter : module.getOps<mlir::FuncOp>())
+    {
+        if (iter.isPublic())
+        {
+            continue;
+        }
+        iter->setAttr("llvm.linkage",
+                      mlir::LLVM::LinkageAttr::get(&getContext(), mlir::LLVM::linkage::Linkage::Internal));
+    }
 
     PylirTypeConverter converter(&getContext(), llvm::Triple(targetTriple.getValue()),
                                  llvm::DataLayout(dataLayout.getValue()), module);

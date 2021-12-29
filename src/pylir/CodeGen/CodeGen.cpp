@@ -1875,7 +1875,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                                     m_builder.getFunctionType(std::vector<mlir::Type>(1 + functionParameters.size(),
                                                                                       m_builder.getDynamicType()),
                                                               {m_builder.getDynamicType()}));
-        func.setVisibility(mlir::SymbolTable::Visibility::Private);
+        func.setPrivate();
         auto reset = implementFunction(func);
 
         m_scope.emplace();
@@ -2037,7 +2037,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                                  m_builder.getFunctionType(std::vector<mlir::Type>(2 /* cell tuple + namespace dict */,
                                                                                    m_builder.getDynamicType()),
                                                            {m_builder.getDynamicType()}));
-        func.setVisibility(mlir::SymbolTable::Visibility::Private);
+        func.setPrivate();
         auto reset = implementFunction(func);
         m_scope.emplace();
         m_qualifierStack.emplace_back(classDef.className.getValue());
@@ -2399,7 +2399,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::FuncOp impl
 {
     auto cc = mlir::FuncOp::create(m_builder.getCurrentLoc(), name.str(),
                                    Py::getUniversalFunctionType(m_builder.getContext()));
-    cc.setVisibility(mlir::SymbolTable::Visibility::Private);
+    cc.setPrivate();
     auto reset = implementFunction(cc);
 
     auto self = cc.getArgument(0);
