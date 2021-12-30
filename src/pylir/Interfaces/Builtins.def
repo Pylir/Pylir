@@ -3,6 +3,10 @@
 #error BUILTIN is not defined
 #endif
 
+#ifndef BUILTIN_EXCEPTION
+#define BUILTIN_EXCEPTION(...) BUILTIN(__VA_ARGS__)
+#endif
+
 BUILTIN(None, "builtins.None", false)
 BUILTIN(NoneType, "builtins.NoneType", false)
 BUILTIN(NotImplemented, "builtins.NotImplemented", true)
@@ -18,15 +22,16 @@ BUILTIN(Set, "builtins.set", true)
 BUILTIN(Dict, "builtins.dict", true)
 BUILTIN(Function, "builtins.function", false)
 BUILTIN(Cell, "builtins.cell", false)
-BUILTIN(BaseException, "builtins.BaseException", true)
-BUILTIN(Exception, "builtins.Exception", true)
-BUILTIN(TypeError, "builtins.TypeError", true)
-BUILTIN(NameError, "builtins.NameError", true)
-BUILTIN(UnboundLocalError, "builtins.UnboundLocalError", true)
-BUILTIN(LookupError, "builtins.LookupError", true)
-BUILTIN(KeyError, "builtins.KeyError", true)
-BUILTIN(IndexError, "builtins.IndexError", true)
-BUILTIN(StopIteration, "builtins.StopIteration", true)
+BUILTIN_EXCEPTION(BaseException, "builtins.BaseException", true)
+BUILTIN_EXCEPTION(Exception, "builtins.Exception", true)
+BUILTIN_EXCEPTION(TypeError, "builtins.TypeError", true)
+BUILTIN_EXCEPTION(NameError, "builtins.NameError", true)
+BUILTIN_EXCEPTION(UnboundLocalError, "builtins.UnboundLocalError", true)
+BUILTIN_EXCEPTION(LookupError, "builtins.LookupError", true)
+BUILTIN_EXCEPTION(KeyError, "builtins.KeyError", true)
+BUILTIN_EXCEPTION(IndexError, "builtins.IndexError", true)
+BUILTIN_EXCEPTION(StopIteration, "builtins.StopIteration", true)
 BUILTIN(Print, "builtins.print", true)
 
 #undef BUILTIN
+#undef BUILTIN_EXCEPTION

@@ -16,3 +16,5 @@ extern "C" void pylir_dict_insert(pylir::rt::PyDict* dict, pylir::rt::PyObject* 
 extern "C" void pylir_dict_erase(pylir::rt::PyDict* dict, pylir::rt::PyObject* key);
 
 extern "C" void pylir_print(pylir::rt::PyString* string);
+
+extern "C" void pylir_raise(pylir::rt::PyBaseException* exception);

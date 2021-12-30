@@ -8,6 +8,8 @@
 #include <string_view>
 #include <type_traits>
 
+#include <unwind.h>
+
 namespace pylir::rt
 {
 
@@ -28,7 +30,7 @@ public:
     PyObject& operator=(const PyObject&) = delete;
     PyObject& operator=(PyObject&&) noexcept = delete;
 
-    PyObject* getType() const
+    PyObject* getType()
     {
         return reinterpret_cast<PyObject*>(m_type);
     }
@@ -74,7 +76,7 @@ class PyTypeObject
     std::size_t m_offset;
 
 public:
-    std::size_t getOffset() const
+    std::size_t getOffset()
     {
         return m_offset;
     }
@@ -84,6 +86,11 @@ public:
 #define TYPE_SLOT(x) x,
 #include <pylir/Interfaces/Slots.def>
     };
+
+    PySequence* getMRO()
+    {
+        return reinterpret_cast<pylir::rt::PySequence*>(m_base.getSlot(Slots::__mro__));
+    }
 };
 
 static_assert(std::is_standard_layout_v<PyTypeObject>);
@@ -140,7 +147,7 @@ public:
         return m_buffer.size;
     }
 
-    PyObject* getItem(std::size_t index) const
+    PyObject* getItem(std::size_t index)
     {
         return m_buffer.array[index];
     }
@@ -154,7 +161,7 @@ class PyString
     BufferComponent<char> m_buffer;
 
 public:
-    friend bool operator==(const PyString& lhs, std::string_view sv)
+    friend bool operator==(PyString& lhs, std::string_view sv)
     {
         return lhs.view() == sv;
     }
@@ -227,6 +234,39 @@ public:
         return m_integer.getInteger<T>();
     }
 };
+
+static_assert(std::is_standard_layout_v<PyInt>);
+
+class PyBaseException
+{
+    PyObject m_base;
+
+    _Unwind_Exception m_unwindHeader;
+
+public:
+    constexpr static std::uint64_t EXCEPTION_CLASS = 0x50594C5250590000; // PYLRPY\0\0
+
+    enum Slots
+    {
+#define BASEEXCEPTION_SLOT(x) x,
+#include <pylir/Interfaces/Slots.def>
+    };
+
+    _Unwind_Exception& getUnwindHeader()
+    {
+        static_assert(offsetof(PyBaseException, m_unwindHeader) == alignof(_Unwind_Exception));
+        return m_unwindHeader;
+    }
+
+    static PyBaseException* fromUnwindHeader(_Unwind_Exception* header)
+    {
+        PYLIR_ASSERT(header->exception_class == EXCEPTION_CLASS);
+        return reinterpret_cast<PyBaseException*>(reinterpret_cast<char*>(header)
+                                                  - offsetof(PyBaseException, m_unwindHeader));
+    }
+};
+
+static_assert(std::is_standard_layout_v<PyBaseException>);
 
 // TODO: Inheritance
 

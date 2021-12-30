@@ -1,5 +1,7 @@
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
+#include <llvm/ADT/StringSet.h>
+
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
@@ -70,6 +72,23 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                 {
                     slots["__slots__"] = refAttr;
                 }
+            }
+            static auto typeSlots = []
+            {
+                llvm::StringSet<> set;
+#define TYPE_SLOT(x) set.insert(#x);
+#include <pylir/Interfaces/Slots.def>
+                set.erase("__slots__");
+                set.erase("__mro__");
+                return set;
+            }();
+            for (auto [slotName, value] : bases[0].initializer().getSlots().getValue())
+            {
+                if (!typeSlots.contains(slotName.getValue()))
+                {
+                    continue;
+                }
+                slots[slotName.getValue()] = value.cast<mlir::FlatSymbolRefAttr>();
             }
         }
     }

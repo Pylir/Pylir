@@ -9,6 +9,7 @@
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/ScopeExit.h>
+#include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/ADT/TypeSwitch.h>
 
@@ -38,6 +39,12 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     mlir::SymbolTable m_symbolTable;
     std::unique_ptr<pylir::CABI> m_cabi;
     mlir::LLVM::LLVMFuncOp m_globalInit;
+    enum class ExceptionModel
+    {
+        SEH,
+        Dwarf
+    };
+    ExceptionModel m_exceptionModel;
 
     mlir::LLVM::LLVMArrayType getSlotEpilogue(unsigned slotSize = 0)
     {
@@ -86,10 +93,12 @@ public:
                 if (triple.isOSWindows())
                 {
                     m_cabi = std::make_unique<pylir::WinX64>(mlir::DataLayout{moduleOp});
+                    m_exceptionModel = ExceptionModel::SEH;
                 }
                 else
                 {
                     m_cabi = std::make_unique<pylir::X86_64>(mlir::DataLayout{moduleOp});
+                    m_exceptionModel = ExceptionModel::Dwarf;
                 }
                 break;
             }
@@ -257,6 +266,57 @@ public:
         return pyType;
     }
 
+    mlir::LLVM::LLVMStructType getUnwindHeader()
+    {
+        auto unwindHeader = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "_Unwind_Exception");
+        if (!unwindHeader.isInitialized())
+        {
+            llvm::SmallVector<mlir::Type> header = {mlir::IntegerType::get(&getContext(), 64),
+                                                    mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMFunctionType::get(
+                                                        mlir::LLVM::LLVMVoidType::get(&getContext()), {}))};
+            switch (m_exceptionModel)
+            {
+                case ExceptionModel::Dwarf:
+                    header.append(
+                        {mlir::IntegerType::get(&getContext(), 64), mlir::IntegerType::get(&getContext(), 64)});
+                    break;
+                case ExceptionModel::SEH:
+                    header.push_back(mlir::LLVM::LLVMArrayType::get(mlir::IntegerType::get(&getContext(), 64), 6));
+                    break;
+                default: PYLIR_UNREACHABLE;
+            }
+            [[maybe_unused]] auto result = unwindHeader.setBody(header, false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return unwindHeader;
+    }
+
+    mlir::LLVM::LLVMStructType getPyBaseExceptionType(llvm::Optional<unsigned> slotSize = {})
+    {
+        // While the itanium ABI specifies a 64 bit alignment, GCC and libunwind implementations specify the header
+        // to the max alignment (16 bytes on x64). For that reason we'll add some padding that fits a pointer which will
+        // align the unwind header to 16 bytes (PyObject* + pointer afterwards).
+        // TODO This is almost certainly incorrect on non 64 bit platforms
+        if (slotSize)
+        {
+            return mlir::LLVM::LLVMStructType::getLiteral(
+                &getContext(), {mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
+                                mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 8)),
+                                getUnwindHeader(), getSlotEpilogue(*slotSize)});
+        }
+        auto pyBaseException = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyBaseException");
+        if (!pyBaseException.isInitialized())
+        {
+            [[maybe_unused]] auto result =
+                pyBaseException.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
+                                         mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 8)),
+                                         getUnwindHeader(), getSlotEpilogue()},
+                                        false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return pyBaseException;
+    }
+
     mlir::LLVM::LLVMStructType getPyTypeType(llvm::Optional<unsigned> slotSize = {})
     {
         if (slotSize)
@@ -305,6 +365,18 @@ public:
         }
         else
         {
+            static auto builtinExceptionClasses = []
+            {
+                llvm::StringSet<> set;
+#define BUILTIN_EXCEPTION(x, id, ...) set.insert(id);
+#define BUILTIN(...)
+#include <pylir/Interfaces/Builtins.def>
+                return set;
+            }();
+            if (builtinExceptionClasses.contains(builtinsName))
+            {
+                return getPyBaseExceptionType();
+            }
             return getPyObjectType();
         }
     }
@@ -342,7 +414,6 @@ public:
     enum class Runtime
     {
         Memcmp,
-        abort,
         mp_init_u64,
         mp_init,
         mp_unpack,
@@ -354,6 +425,7 @@ public:
         pylir_dict_insert,
         pylir_dict_erase,
         pylir_print,
+        pylir_raise,
     };
 
     mlir::Value createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder, Runtime func, mlir::ValueRange args)
@@ -390,10 +462,10 @@ public:
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyStringType())};
                 functionName = "pylir_print";
                 break;
-            case Runtime::abort:
+            case Runtime::pylir_raise:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
-                argumentTypes = {};
-                functionName = "abort";
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyObjectType())};
+                functionName = "pylir_raise";
                 break;
             case Runtime::mp_init:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -1585,11 +1657,11 @@ struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::RaiseOp op, OpAdaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::RaiseOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        // TODO:
-        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::abort, {});
+        getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_raise,
+                                              {adaptor.exception()});
         rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
         return mlir::success();
     }
@@ -1963,7 +2035,7 @@ struct InitStrFromIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Me
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, sizePtr);
 
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(capacity.getType()),
-                                                 string, mlir::ValueRange{zero, one, one});
+                                                      string, mlir::ValueRange{zero, one, one});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), capacity, gep);
         auto two =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
@@ -2118,13 +2190,24 @@ void ConvertPylirToLLVMPass::runOnOperation()
         signalPassFailure();
         return;
     }
+    auto builder = mlir::OpBuilder::atBlockEnd(module.getBody());
+    builder.create<mlir::LLVM::LLVMFuncOp>(
+        builder.getUnknownLoc(), "pylir_personality_function",
+        mlir::LLVM::LLVMFunctionType::get(builder.getI32Type(),
+                                          {builder.getI32Type(), builder.getI64Type(),
+                                           mlir::LLVM::LLVMPointerType::get(builder.getI8Type()),
+                                           mlir::LLVM::LLVMPointerType::get(builder.getI8Type())}));
+    for (auto iter : module.getOps<mlir::LLVM::LLVMFuncOp>())
+    {
+        iter.setPersonalityAttr(mlir::FlatSymbolRefAttr::get(&getContext(), "pylir_personality_function"));
+    }
     module->setAttr(mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
                     mlir::StringAttr::get(&getContext(), dataLayout.getValue()));
     module->setAttr(mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
                     mlir::StringAttr::get(&getContext(), targetTriple.getValue()));
     if (auto globalInit = converter.getGlobalInit())
     {
-        auto builder = mlir::OpBuilder::atBlockEnd(&globalInit.back());
+        builder.setInsertionPointToEnd(&globalInit.back());
         builder.create<mlir::LLVM::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{});
 
         builder.setInsertionPointToEnd(module.getBody());

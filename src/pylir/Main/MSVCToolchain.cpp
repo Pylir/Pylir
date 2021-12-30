@@ -19,6 +19,7 @@ bool pylir::MSVCToolchain::link(const pylir::cli::CommandLine& commandLine, llvm
         arguments.push_back("-libpath:" + iter);
     }
     arguments.emplace_back("-nologo");
+    arguments.emplace_back("/debug");
     if (auto output = args.getLastArg(pylir::cli::OPT_o))
     {
         arguments.emplace_back("-out:" + std::string(output->getValue()));

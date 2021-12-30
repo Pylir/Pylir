@@ -5,7 +5,7 @@ endif ()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/pylir/${TARGET_TRIPLE}")
 
-add_library(PylirRuntime STATIC PylirGC.cpp Objects.cpp API.cpp)
+add_library(PylirRuntime STATIC PylirGC.cpp Objects.cpp API.cpp ExceptionHandling.cpp)
 target_link_libraries(PylirRuntime PUBLIC PylirSupport)
 if (PYLIR_SANITIZER)
     target_compile_options(PylirRuntime PRIVATE -fno-sanitize=all)

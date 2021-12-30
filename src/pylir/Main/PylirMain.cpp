@@ -179,6 +179,14 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
         relocation = llvm::Reloc::PIC_;
     }
     llvm::TargetOptions targetOptions;
+    if (triple.isOSWindows())
+    {
+        targetOptions.ExceptionModel = llvm::ExceptionHandling::WinEH;
+    }
+    else
+    {
+        targetOptions.ExceptionModel = llvm::ExceptionHandling::DwarfCFI;
+    }
     targetOptions.UseInitArray = true;
     auto machine = std::unique_ptr<llvm::TargetMachine>(
         targetM->createTargetMachine(triple.str(), "generic", "", targetOptions, relocation, {}, *optLevel));
