@@ -4,6 +4,7 @@
 void pylir_raise(pylir::rt::PyBaseException* exception)
 {
     auto& header = exception->getUnwindHeader();
+    std::memset(&header, 0, sizeof(header));
     header.exception_cleanup = +[](_Unwind_Reason_Code, _Unwind_Exception*) { /*NOOP for now*/ };
     header.exception_class = pylir::rt::PyBaseException::EXCEPTION_CLASS;
     auto code = _Unwind_RaiseException(&header);
@@ -11,7 +12,7 @@ void pylir_raise(pylir::rt::PyBaseException* exception)
     {
         case _URC_END_OF_STACK:
             // TODO call sys.excepthook
-            std::abort();
+            std::exit(1);
         case _URC_FATAL_PHASE1_ERROR:
         case _URC_FATAL_PHASE2_ERROR: std::abort();
         default: PYLIR_UNREACHABLE;

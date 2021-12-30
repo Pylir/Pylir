@@ -16,9 +16,6 @@ set(LIBUNWIND_C_SOURCES
     UnwindLevel1-gcc-ext.c
     Unwind-sjlj.c
     )
-set_source_files_properties(${LIBUNWIND_C_SOURCES}
-                            PROPERTIES
-                              COMPILE_FLAGS "-std=c99")
 
 set(LIBUNWIND_ASM_SOURCES
     UnwindRegistersRestore.S
@@ -124,7 +121,7 @@ set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 # Build the shared library.
 if (LIBUNWIND_ENABLE_SHARED)
   add_library(unwind_shared SHARED ${LIBUNWIND_SOURCES} ${LIBUNWIND_HEADERS})
-  if(CMAKE_C_COMPILER_ID STREQUAL MSVC)
+  if(MSVC)
     target_compile_options(unwind_shared PRIVATE /GR-)
   else()
     target_compile_options(unwind_shared PRIVATE -fno-rtti)
@@ -152,7 +149,7 @@ endif()
 # Build the static library.
 if (LIBUNWIND_ENABLE_STATIC)
   add_library(unwind_static STATIC ${LIBUNWIND_SOURCES} ${LIBUNWIND_HEADERS})
-  if(CMAKE_C_COMPILER_ID STREQUAL MSVC)
+  if(MSVC)
     target_compile_options(unwind_static PRIVATE /GR-)
   else()
     target_compile_options(unwind_static PRIVATE -fno-rtti)

@@ -1,6 +1,6 @@
-if (NOT IS_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libcxx")
-  message(FATAL_ERROR "libunwind requires being built in a monorepo layout with libcxx available")
-endif()
+#if (NOT IS_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../libcxx")
+#  message(FATAL_ERROR "libunwind requires being built in a monorepo layout with libcxx available")
+#endif()
 
 #===============================================================================
 # Setup Project
@@ -41,6 +41,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR LIBUNWIND_STANDALONE_B
   # Find the LLVM sources and simulate LLVM CMake options.
   include(HandleOutOfTreeLLVM)
 else()
+  enable_language(C ASM)
   set(LLVM_LIT "${CMAKE_SOURCE_DIR}/utils/lit/lit.py")
 endif()
 
@@ -177,7 +178,9 @@ add_compile_flags_if_supported(-Werror=return-type)
 
 # Get warning flags
 add_compile_flags_if_supported(-W)
-add_compile_flags_if_supported(-Wall)
+if (NOT MSVC)
+  add_compile_flags_if_supported(-Wall)
+endif ()
 add_compile_flags_if_supported(-Wchar-subscripts)
 add_compile_flags_if_supported(-Wconversion)
 add_compile_flags_if_supported(-Wmismatched-tags)
@@ -248,7 +251,11 @@ if (LIBUNWIND_USES_ARM_EHABI AND NOT LIBUNWIND_SUPPORTS_FUNWIND_TABLES_FLAG)
 endif()
 
 add_cxx_compile_flags_if_supported(-fno-exceptions)
-add_cxx_compile_flags_if_supported(-fno-rtti)
+if (NOT MSVC)
+  add_cxx_compile_flags_if_supported(-fno-rtti)
+else ()
+  add_cxx_compile_flags_if_supported(/GR-)
+endif ()
 
 # Ensure that we don't depend on C++ standard library.
 if (LIBUNWIND_HAS_NOSTDINCXX_FLAG)

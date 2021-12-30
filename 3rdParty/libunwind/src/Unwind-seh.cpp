@@ -137,7 +137,8 @@ _GCC_specific_handler(PEXCEPTION_RECORD ms_exc, PVOID frame, PCONTEXT ms_ctx,
     // If we were called by __libunwind_seh_personality(), indicate that
     // a handler was found; otherwise, initiate phase 2 by unwinding.
     if (ours && ms_exc->NumberParameters > 1)
-      return 4 /* ExecptionExecuteHandler in mingw */;
+      /* ExecptionExecuteHandler in mingw */
+      return static_cast<EXCEPTION_DISPOSITION>(4);
     // This should never happen in phase 2.
     if (IS_UNWINDING(ms_exc->ExceptionFlags))
       _LIBUNWIND_ABORT("Personality indicated exception handler in phase 2!");
@@ -154,8 +155,10 @@ _GCC_specific_handler(PEXCEPTION_RECORD ms_exc, PVOID frame, PCONTEXT ms_ctx,
     // If we were called by __libunwind_seh_personality(), indicate that
     // a handler was found; otherwise, it's time to initiate a collided
     // unwind to the target.
-    if (ours && !IS_UNWINDING(ms_exc->ExceptionFlags) && ms_exc->NumberParameters > 1)
-      return 4 /* ExecptionExecuteHandler in mingw */;
+    if (ours && !IS_UNWINDING(ms_exc->ExceptionFlags) &&
+        ms_exc->NumberParameters > 1)
+      /* ExecptionExecuteHandler in mingw */
+      return static_cast<EXCEPTION_DISPOSITION>(4);
     // This should never happen in phase 1.
     if (!IS_UNWINDING(ms_exc->ExceptionFlags))
       _LIBUNWIND_ABORT("Personality installed context during phase 1!");
