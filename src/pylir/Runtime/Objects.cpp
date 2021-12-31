@@ -15,7 +15,7 @@ public:
 
 PyObject* PyObject::getSlot(int index)
 {
-    return reinterpret_cast<PyObject**>(this + 1)[m_type->getOffset() + index];
+    return reinterpret_cast<PyObject**>(this)[m_type->getOffset() + index];
 }
 
 PyObject* PyObject::getSlot(std::string_view name)

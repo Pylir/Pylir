@@ -735,10 +735,7 @@ public:
                     auto pointerSize = builder.create<mlir::LLVM::ConstantOp>(
                         global.getLoc(), getIndexType(), builder.getI32IntegerAttr(getPointerBitwidth() / 8));
                     auto asCount = builder.create<mlir::LLVM::UDivOp>(global.getLoc(), sizeOf, pointerSize);
-                    auto oneI = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
-                                                                       builder.getI32IntegerAttr(1));
-                    auto asOffset = builder.create<mlir::LLVM::SubOp>(global.getLoc(), asCount, oneI);
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asOffset,
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asCount,
                                                                       builder.getI32ArrayAttr({1}));
                 })
             .Case(
@@ -1565,10 +1562,12 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
                                                       typeObj, mlir::ValueRange{zero, one});
         auto offset = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
-        gep = rewriter.create<mlir::LLVM::GEPOp>(
+        auto pyObjectPtrPtr = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
-            adaptor.object(), mlir::ValueRange{zero, one, index});
+            adaptor.object());
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), pyObjectPtrPtr.getType(), pyObjectPtrPtr,
+                                                 mlir::ValueRange{index});
         auto slot = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         rewriter.create<mlir::BranchOp>(op.getLoc(), endBlock, mlir::ValueRange{slot});
 
@@ -1642,10 +1641,12 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
                                                       typeObj, mlir::ValueRange{zero, one});
         auto offset = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
-        gep = rewriter.create<mlir::LLVM::GEPOp>(
+        auto pyObjectPtrPtr = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
-            adaptor.object(), mlir::ValueRange{zero, one, index});
+            adaptor.object());
+        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), pyObjectPtrPtr.getType(), pyObjectPtrPtr,
+                                                 mlir::ValueRange{index});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.value(), gep);
         rewriter.create<mlir::BranchOp>(op.getLoc(), endBlock);
 
@@ -1748,8 +1749,9 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
         auto hasSlotsBlock = new mlir::Block;
         {
             auto zero = createIndexConstant(rewriter, op.getLoc(), 0);
-            auto hasSlots = rewriter.create<pylir::Py::IsUnboundValueOp>(op.getLoc(), slotsTuple);
-            rewriter.create<mlir::CondBranchOp>(op.getLoc(), hasSlots, hasSlotsBlock, endBlock, zero);
+            auto hasNoSlots = rewriter.create<pylir::Py::IsUnboundValueOp>(op.getLoc(), slotsTuple);
+            rewriter.create<mlir::CondBranchOp>(op.getLoc(), hasNoSlots, endBlock, mlir::ValueRange{zero},
+                                                hasSlotsBlock, mlir::ValueRange{});
         }
 
         hasSlotsBlock->insertBefore(endBlock);

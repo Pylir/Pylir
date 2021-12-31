@@ -34,7 +34,7 @@ _Unwind_Reason_Code personalityImpl(int version, _Unwind_Action action, _Unwind_
         // TODO
         return _URC_CONTINUE_UNWIND;
     }
-    PYLIR_UNREACHABLE;
+    return _URC_CONTINUE_UNWIND;
 }
 
 } // namespace

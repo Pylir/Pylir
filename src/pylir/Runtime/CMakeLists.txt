@@ -7,8 +7,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/pylir/${TARGET_TRIPL
 
 add_library(PylirRuntime STATIC PylirGC.cpp Objects.cpp API.cpp ExceptionHandling.cpp)
 target_link_libraries(PylirRuntime PUBLIC PylirSupport)
-if (PYLIR_SANITIZER)
-    target_compile_options(PylirRuntime PRIVATE -fno-sanitize=all)
+if (PYLIR_SANITIZER OR PYLIR_COVERAGE)
+    target_compile_options(PylirRuntime PRIVATE -fno-sanitize=all -fno-profile-instr-generate -fno-coverage-mapping)
 endif ()
 
 if (APPLE)
@@ -47,6 +47,6 @@ endif ()
 
 
 add_library(PylirRuntimeMain STATIC PylirRuntimeMain.cpp)
-if (PYLIR_SANITIZER)
-    target_compile_options(PylirRuntimeMain PRIVATE -fno-sanitize=all)
+if (PYLIR_SANITIZER OR PYLIR_COVERAGE)
+    target_compile_options(PylirRuntimeMain PRIVATE -fno-sanitize=all -fno-profile-instr-generate -fno-coverage-mapping)
 endif ()
