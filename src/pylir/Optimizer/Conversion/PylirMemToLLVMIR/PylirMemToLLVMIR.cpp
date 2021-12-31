@@ -1294,8 +1294,17 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrE
         auto rhsLen = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
         auto sizeEqual =
             rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, lhsLen, rhsLen);
+        auto sizeEqualBlock = new mlir::Block;
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sizeEqual, sizeEqualBlock, endBlock,
+                                              mlir::ValueRange{sizeEqual});
+
+        sizeEqualBlock->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(sizeEqualBlock);
+        auto zeroI = createIndexConstant(rewriter, op.getLoc(), 0);
+        auto sizeZero = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, lhsLen, zeroI);
         auto bufferCmp = new mlir::Block;
-        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sizeEqual, bufferCmp, endBlock, mlir::ValueRange{sizeEqual});
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sizeZero, endBlock, mlir::ValueRange{sizeZero}, bufferCmp,
+                                              mlir::ValueRange{});
 
         bufferCmp->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(bufferCmp);
