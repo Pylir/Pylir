@@ -1085,7 +1085,7 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
                  mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto block = op->getBlock();
-        auto endBlock = op->getBlock()->splitBlock(op);
+        auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
         rewriter.setInsertionPointToEnd(block);
 
         auto zeroI32 =
@@ -1267,7 +1267,7 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrE
     void rewrite(pylir::Py::StrEqualOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto block = op->getBlock();
-        auto endBlock = op->getBlock()->splitBlock(op);
+        auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
         endBlock->addArgument(rewriter.getI1Type());
         rewriter.setInsertionPointToEnd(block);
 
@@ -1516,7 +1516,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
     void rewrite(pylir::Py::GetSlotOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto block = op->getBlock();
-        auto endBlock = op->getBlock()->splitBlock(op);
+        auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
         endBlock->addArgument(typeConverter->convertType(op.getType()));
 
         rewriter.setInsertionPointToEnd(block);
@@ -1597,7 +1597,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
     void rewrite(pylir::Py::SetSlotOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto block = op->getBlock();
-        auto endBlock = op->getBlock()->splitBlock(op);
+        auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
 
         rewriter.setInsertionPointToEnd(block);
         auto str = rewriter.create<pylir::Py::ConstantOp>(
@@ -1748,7 +1748,7 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
                  mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto block = op->getBlock();
-        auto endBlock = op->getBlock()->splitBlock(op);
+        auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
         endBlock->addArgument(getIndexType());
 
         rewriter.setInsertionPointToEnd(block);
