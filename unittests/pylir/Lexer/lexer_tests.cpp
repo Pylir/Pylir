@@ -792,6 +792,25 @@ TEST_CASE("Lex indentation", "[Lexer]")
         CHECK(result[10] == pylir::TokenType::Dedent);
         CHECK(result[11] == pylir::TokenType::Dedent);
     }
+    SECTION("Tab only")
+    {
+        pylir::Diag::Document document("foo\n"
+                                       "\tbar\n"
+                                       "\tfoobar");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 8);
+        CHECK(result[0] == pylir::TokenType::Identifier);
+        CHECK(result[1] == pylir::TokenType::Newline);
+        CHECK(result[2] == pylir::TokenType::Indent);
+        CHECK(result[3] == pylir::TokenType::Identifier);
+        CHECK(result[4] == pylir::TokenType::Newline);
+        CHECK(result[5] == pylir::TokenType::Identifier);
+        CHECK(result[6] == pylir::TokenType::Newline);
+        CHECK(result[7] == pylir::TokenType::Dedent);
+    }
     LEXER_EMITS("foo\n"
                 "    bar\n"
                 "   foobar",

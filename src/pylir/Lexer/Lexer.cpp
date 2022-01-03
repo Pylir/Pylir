@@ -1463,7 +1463,16 @@ void pylir::Lexer::parseIndent()
         switch (*m_current)
         {
             case U'\n': return;
-            case U'\t': indent = pylir::roundUpTo(indent, 8); break;
+            case U'\t':
+                if (indent % 8 == 0)
+                {
+                    indent += 8;
+                }
+                else
+                {
+                    indent = pylir::roundUpTo(indent, 8);
+                }
+                break;
             default: indent++;
         }
     }
