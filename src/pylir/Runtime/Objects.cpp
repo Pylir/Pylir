@@ -54,6 +54,12 @@ PyObject* PyObject::call(std::initializer_list<PyObject*> args)
     return call(&tuple, &dict);
 }
 
+bool PyObject::isInstanceOf(pylir::rt::PyObject* typeObject)
+{
+    auto mro = m_type->getMRO();
+    return std::find(mro->begin(), mro->end(), typeObject) != mro->end();
+}
+
 std::size_t PyObjectHasher::operator()(PyObject* object) const noexcept
 {
     auto* hashFunction = object->getType()->getSlot(PyTypeObject::__hash__);

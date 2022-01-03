@@ -315,20 +315,19 @@ void ExpandPyDialectPass::runOnFunction()
     mlir::ConversionTarget target(getContext());
     target.addLegalDialect<pylir::Py::PylirPyDialect, mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
     target.addLegalOp<mlir::FuncOp>();
-    target.addDynamicallyLegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListOp,
-                                 pylir::Py::MakeListExOp, pylir::Py::MakeSetOp, pylir::Py::MakeSetExOp,
-                                 pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>(
+    target.addDynamicallyLegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp,
+                                 pylir::Py::MakeDictOp>(
         [](mlir::Operation* op) -> bool
         {
             return llvm::TypeSwitch<mlir::Operation*, bool>(op)
-                .Case<pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>([](auto op)
-                                                                      { return op.mappingExpansion().empty(); })
-                .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListOp, pylir::Py::MakeListExOp,
-                      pylir::Py::MakeSetOp, pylir::Py::MakeSetExOp>([](auto op) { return op.iterExpansion().empty(); })
+                .Case([](pylir::Py::MakeDictOp op) { return op.mappingExpansion().empty(); })
+                .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp>(
+                    [](auto op) { return op.iterExpansion().empty(); })
                 .Default(false);
         });
     target.addIllegalOp<pylir::Py::MakeClassOp, pylir::Py::LinearContainsOp, pylir::Py::GetFunctionOp,
-                        pylir::Py::MROLookupOp>();
+                        pylir::Py::MROLookupOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp,
+                        pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp>();
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.add<LinearContainsPattern>(&getContext());

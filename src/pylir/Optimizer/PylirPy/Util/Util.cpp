@@ -41,7 +41,9 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
     auto typeObj = builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
     args.emplace(args.begin(), typeObj);
     mlir::Value tuple;
-    if (!landingPadBlock)
+    if (!landingPadBlock
+        || std::none_of(args.begin(), args.end(),
+                        [](const Py::IterArg& arg) { return std::holds_alternative<Py::IterExpansion>(arg); }))
     {
         tuple = builder.create<Py::MakeTupleOp>(loc, args);
     }

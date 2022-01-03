@@ -110,9 +110,9 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
         module->print(output, mlir::OpPrintingFlags{}.enableDebugInfo());
         return true;
     }
+    manager.addPass(mlir::createCanonicalizerPass());
     if (options.getLastArgValue(OPT_O, "0") != "0")
     {
-        manager.addPass(mlir::createCanonicalizerPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
     }

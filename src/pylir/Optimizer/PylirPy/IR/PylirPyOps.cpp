@@ -358,15 +358,6 @@ mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribu
     return nullptr;
 }
 
-mlir::OpFoldResult pylir::Py::MakeTupleExOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    if (auto result = doConstantIterExpansion<pylir::Py::TupleAttr>(operands, iterExpansion()))
-    {
-        return *result;
-    }
-    return nullptr;
-}
-
 mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
     auto boolean = operands[0].dyn_cast_or_null<Py::BoolAttr>();

@@ -58,6 +58,8 @@ public:
     PyObject* call(PySequence* args, PyDict* keywords);
 
     PyObject* call(std::initializer_list<PyObject*> args);
+
+    bool isInstanceOf(pylir::rt::PyObject* typeObject);
 };
 
 static_assert(std::is_standard_layout_v<PyObject>);
@@ -240,8 +242,9 @@ static_assert(std::is_standard_layout_v<PyInt>);
 class PyBaseException
 {
     PyObject m_base;
-
+    std::uintptr_t m_landingPad;
     _Unwind_Exception m_unwindHeader;
+    std::uint32_t m_typeIndex;
 
 public:
     constexpr static std::uint64_t EXCEPTION_CLASS = 0x50594C5250590000; // PYLRPY\0\0
@@ -263,6 +266,26 @@ public:
         PYLIR_ASSERT(header->exception_class == EXCEPTION_CLASS);
         return reinterpret_cast<PyBaseException*>(reinterpret_cast<char*>(header)
                                                   - offsetof(PyBaseException, m_unwindHeader));
+    }
+
+    std::uintptr_t getLandingPad() const
+    {
+        return m_landingPad;
+    }
+
+    void setLandingPad(std::uintptr_t landingPad)
+    {
+        m_landingPad = landingPad;
+    }
+
+    std::uint32_t getTypeIndex() const
+    {
+        return m_typeIndex;
+    }
+
+    void setTypeIndex(std::uint32_t typeIndex)
+    {
+        m_typeIndex = typeIndex;
     }
 };
 

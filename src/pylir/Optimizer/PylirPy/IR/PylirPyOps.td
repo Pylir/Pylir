@@ -384,8 +384,6 @@ def PylirPy_MakeTupleExOp : PylirPy_MakeExOp<"makeTupleEx"> {
          )>
     ];
 
-    let hasFolder = 1;
-
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict `\n`
         ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?

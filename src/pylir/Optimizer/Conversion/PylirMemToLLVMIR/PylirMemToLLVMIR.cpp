@@ -294,23 +294,22 @@ public:
     mlir::LLVM::LLVMStructType getPyBaseExceptionType(llvm::Optional<unsigned> slotSize = {})
     {
         // While the itanium ABI specifies a 64 bit alignment, GCC and libunwind implementations specify the header
-        // to the max alignment (16 bytes on x64). For that reason we'll add some padding that fits a pointer which will
-        // align the unwind header to 16 bytes (PyObject* + pointer afterwards).
-        // TODO This is almost certainly incorrect on non 64 bit platforms
+        // to the max alignment (16 bytes on x64). We put the landing pad which is an integer of pointer width
+        // right after the PyObjectType base so that the unwind header is always 16 bytes aligned.
         if (slotSize)
         {
             return mlir::LLVM::LLVMStructType::getLiteral(
                 &getContext(), {mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
-                                mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 8)),
-                                getUnwindHeader(), getSlotEpilogue(*slotSize)});
+                                mlir::IntegerType::get(&getContext(), getPointerBitwidth()), getUnwindHeader(),
+                                mlir::IntegerType::get(&getContext(), 32), getSlotEpilogue(*slotSize)});
         }
         auto pyBaseException = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyBaseException");
         if (!pyBaseException.isInitialized())
         {
             [[maybe_unused]] auto result =
                 pyBaseException.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType()),
-                                         mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(&getContext(), 8)),
-                                         getUnwindHeader(), getSlotEpilogue()},
+                                         mlir::IntegerType::get(&getContext(), getPointerBitwidth()), getUnwindHeader(),
+                                         mlir::IntegerType::get(&getContext(), 32), getSlotEpilogue()},
                                         false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
@@ -1743,10 +1742,34 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
         }
         auto literal = mlir::LLVM::LLVMStructType::getLiteral(getContext(), {i8Ptr, rewriter.getI32Type()});
         auto landingPad = rewriter.create<mlir::LLVM::LandingpadOp>(op.getLoc(), literal, refs);
-        mlir::Value exceptionObject =
+        mlir::Value exceptionHeader =
             rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), i8Ptr, landingPad, rewriter.getI32ArrayAttr({0}));
-        exceptionObject = rewriter.create<mlir::LLVM::BitcastOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()), exceptionObject);
+        {
+            // Itanium ABI mandates a pointer to the exception header be returned by the landing pad.
+            // So we need to subtract the offset of the exception header inside of PyBaseException to get to it.
+            auto pyBaseException = getTypeConverter()->getPyBaseExceptionType();
+            auto unwindHeader = getTypeConverter()->getUnwindHeader();
+            static std::size_t index = [&]
+            {
+                auto body = getTypeConverter()->getPyBaseExceptionType().getBody();
+                return std::find(body.begin(), body.end(), unwindHeader) - body.begin();
+            }();
+            auto null =
+                rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(pyBaseException));
+            auto zero = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
+                                                                rewriter.getI32IntegerAttr(0));
+            auto offset = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
+                                                                  rewriter.getI32IntegerAttr(index));
+            auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(unwindHeader),
+                                                          null, mlir::ValueRange{zero, offset});
+            mlir::Value byteOffset = rewriter.create<mlir::LLVM::PtrToIntOp>(op.getLoc(), getIndexType(), gep);
+            auto zeroI = createIndexConstant(rewriter, op.getLoc(), 0);
+            byteOffset = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), zeroI, byteOffset);
+            exceptionHeader =
+                rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), exceptionHeader.getType(), exceptionHeader, byteOffset);
+        }
+        auto exceptionObject = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()), exceptionHeader);
         auto catchIndex = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), rewriter.getI32Type(), landingPad,
                                                                       rewriter.getI32ArrayAttr({1}));
         for (auto [type, succ, args] : llvm::zip(refs, op.getSuccessors(), adaptor.branchArgs()))
@@ -1755,7 +1778,7 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
             auto isEqual =
                 rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, catchIndex, index);
             auto continueSearch = new mlir::Block;
-            llvm::SmallVector newArgs{exceptionObject};
+            llvm::SmallVector<mlir::Value> newArgs{exceptionObject};
             newArgs.append(args.begin(), args.end());
             rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), isEqual, succ, newArgs, continueSearch,
                                                   mlir::ValueRange{});
