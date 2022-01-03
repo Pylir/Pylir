@@ -14,7 +14,7 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @foo
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%{{.*}})
-// CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
+// CHECK: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][%[[ZERO]], %[[ZERO]]]
 // CHECK-NEXT: llvm.store %{{.*}}, %[[GEP]]
@@ -27,7 +27,7 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[TEN:.*]] = llvm.mlir.constant(10 : i32)
 // CHECK-NEXT: llvm.call @mp_radix_size_overestimate(%[[MP_INT_PTR]], %[[TEN]], %[[SIZE_PTR]])
 // CHECK-NEXT: %[[CAP:.*]] = llvm.load %[[SIZE_PTR]]
-// CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[CAP]])
+// CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @malloc(%[[CAP]])
 // CHECK-NEXT: llvm.call @mp_to_radix(%[[MP_INT_PTR]], %[[MEMORY]], %[[CAP]], %[[SIZE_PTR]], %[[TEN]])
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.load %[[SIZE_PTR]]
 // CHECK-NEXT: %[[ONE_I:.*]] = llvm.mlir.constant(1 : index)

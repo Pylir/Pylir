@@ -22,11 +22,14 @@ func @foo() -> !pyMem.memory {
 // CHECK-NEXT: %[[SLOTS:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[SIZE]], %[[SLOTS]]
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
+// CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
+// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
+// CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][%[[ZERO]], %[[ZERO]]]
 // CHECK-NEXT: llvm.store %[[TUPLE_CAST]], %[[GEP]]
-// CHECK-NEXT: llvm.return %9
+// CHECK-NEXT: llvm.return %[[RESULT]]
 
 // -----
 

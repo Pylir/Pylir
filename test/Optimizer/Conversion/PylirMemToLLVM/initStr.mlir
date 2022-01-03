@@ -23,6 +23,9 @@ func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[SLOTS:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[SIZE]], %[[SLOTS]]
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
+// CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
+// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
+// CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][%[[ZERO]], %[[ZERO]]]
@@ -43,7 +46,7 @@ func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: llvm.store %[[SIZE]], %[[GEP]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[STR_OBJ]][%[[ZERO]], %[[ONE]], %[[ONE]]]
 // CHECK-NEXT: llvm.store %[[SIZE]], %[[GEP]]
-// CHECK-NEXT: %[[ARRAY:.*]] = llvm.call @pylir_gc_alloc(%[[SIZE]])
+// CHECK-NEXT: %[[ARRAY:.*]] = llvm.call @malloc(%[[SIZE]])
 // CHECK-NEXT: %[[TWO:.*]] = llvm.mlir.constant(2 : i32)
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[STR_OBJ]][%[[ZERO]], %[[ONE]], %[[TWO]]]
 // CHECK-NEXT: llvm.store %[[ARRAY]], %[[GEP]]

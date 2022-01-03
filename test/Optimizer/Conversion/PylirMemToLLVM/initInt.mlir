@@ -13,7 +13,7 @@ func @foo(%value : i64) -> !py.dynamic {
 // CHECK-LABEL: llvm.func @foo
 // CHECK-SAME: %[[VALUE:[[:alnum:]]+]]
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc
-// CHECK-NEXT: %[[CASTED:.*]] = llvm.bitcast %[[MEMORY]]
+// CHECK: %[[CASTED:.*]] = llvm.bitcast %[[MEMORY]]
 // CHECK: %[[INTEGER:.*]] = llvm.bitcast %[[CASTED]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
 // CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)

@@ -413,6 +413,8 @@ public:
     enum class Runtime
     {
         Memcmp,
+        malloc,
+        realloc,
         mp_init_u64,
         mp_init,
         mp_unpack,
@@ -440,6 +442,16 @@ public:
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(builder.getI8Type()),
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), builder.getI64Type()};
                 functionName = "memcmp";
+                break;
+            case Runtime::malloc:
+                returnType = mlir::LLVM::LLVMPointerType::get(builder.getI8Type());
+                argumentTypes = {builder.getI64Type()};
+                functionName = "malloc";
+                break;
+            case Runtime::realloc:
+                returnType = mlir::LLVM::LLVMPointerType::get(builder.getI8Type());
+                argumentTypes = {returnType, builder.getI64Type()};
+                functionName = "realloc";
                 break;
             case Runtime::pylir_gc_alloc:
                 returnType = mlir::LLVM::LLVMPointerType::get(builder.getI8Type());
@@ -1124,17 +1136,11 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
             auto pyObjectSize = getTypeConverter()->createSizeOf(
                 op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()));
             auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), newCapacity, pyObjectSize);
-            auto newMemory = getTypeConverter()->createRuntimeCall(
-                op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
-            auto newArray = rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), array.getType(), newMemory);
             auto arrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
                 op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), array);
-            auto newArrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
-                op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), newArray);
-            auto falseC =
-                rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
-            auto byteCount = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, pyObjectSize);
-            rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), newArrayI8, arrayI8, byteCount, falseC);
+            auto newMemory = getTypeConverter()->createRuntimeCall(
+                op.getLoc(), rewriter, PylirTypeConverter::Runtime::realloc, {arrayI8, inBytes});
+            auto newArray = rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), array.getType(), newMemory);
             rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), newArray, arrayPtr);
         }
         rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, endBlock);
@@ -1837,6 +1843,11 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         auto inBytes = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), sizeOf, slotSize);
         auto memory = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
                                                             PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
+        auto zeroI8 =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
+        auto falseC =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
+        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, falseC);
         auto object =
             rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), memory);
         auto zero =
@@ -1898,6 +1909,11 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, pointerSize);
         auto memory = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
                                                             PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
+        auto zeroI8 =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
+        auto falseC =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
+        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, falseC);
         auto object =
             rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), memory);
         gep = rewriter.create<mlir::LLVM::GEPOp>(
@@ -1951,8 +1967,8 @@ struct InitSequence : public ConvertPylirOpToLLVMPattern<T>
         auto sizeOf = this->getTypeConverter()->createSizeOf(
             op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyObjectType()));
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
-        auto memory = this->getTypeConverter()->createRuntimeCall(
-            op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
+        auto memory = this->getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
+                                                                  PylirTypeConverter::Runtime::malloc, {inBytes});
         auto array = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->typeConverter->convertType(op.getType())), memory);
         auto two =
@@ -2006,8 +2022,8 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
         auto sizeOf = getTypeConverter()->createSizeOf(
             op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()));
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
-        auto memory = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
-                                                            PylirTypeConverter::Runtime::pylir_gc_alloc, {inBytes});
+        auto memory = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::malloc,
+                                                            {inBytes});
         auto array = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(typeConverter->convertType(op.getType())), memory);
         auto two =
@@ -2093,7 +2109,7 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
                                                  string, mlir::ValueRange{zero, one, one});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         auto array = this->getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
-                                                                 PylirTypeConverter::Runtime::pylir_gc_alloc, {size});
+                                                                 PylirTypeConverter::Runtime::malloc, {size});
         auto two =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), string,
@@ -2149,8 +2165,8 @@ struct InitStrFromIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Me
         getTypeConverter()->createRuntimeCall(
             op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_radix_size_overestimate, {mpIntPtr, ten, sizePtr});
         auto capacity = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), sizePtr);
-        auto array = this->getTypeConverter()->createRuntimeCall(
-            op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_gc_alloc, {capacity});
+        auto array = this->getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
+                                                                 PylirTypeConverter::Runtime::malloc, {capacity});
         getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_to_radix,
                                               {mpIntPtr, array, capacity, sizePtr, ten});
 
@@ -2204,37 +2220,6 @@ struct InitDictOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
     mlir::LogicalResult matchAndRewrite(pylir::Mem::InitDictOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
-        auto three =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(3));
-        auto dict = rewriter.create<mlir::LLVM::BitcastOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyDictType()), adaptor.memory());
-        auto zeroI = createIndexConstant(rewriter, op.getLoc(), 0);
-        auto nullPair = rewriter.create<mlir::LLVM::NullOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPairType()));
-        auto nullBuckets = rewriter.create<mlir::LLVM::NullOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getBucketType()));
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                      dict, mlir::ValueRange{zero, one, zero});
-        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), zeroI, gep);
-        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), dict,
-                                                 mlir::ValueRange{zero, one, one});
-        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), zeroI, gep);
-        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(nullPair.getType()),
-                                                 dict, mlir::ValueRange{zero, one, two});
-        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), nullPair, gep);
-        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), dict,
-                                                 mlir::ValueRange{zero, two});
-        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), zeroI, gep);
-        gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(nullBuckets.getType()),
-                                                 dict, mlir::ValueRange{zero, three});
-        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), nullBuckets, gep);
-
         rewriter.replaceOp(op, adaptor.memory());
         return mlir::success();
     }

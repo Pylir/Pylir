@@ -34,13 +34,9 @@ func @foo(%list : !py.dynamic, %item : !py.dynamic) {
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[NULL]][%[[ONE2]]]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.ptrtoint %[[GEP2]]
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.mul %[[NEW_CAP]], %[[SIZE]]
-// CHECK-NEXT: %[[NEW_MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
-// CHECK-NEXT: %[[NEW_ARRAY:.*]] = llvm.bitcast %[[NEW_MEMORY]]
 // CHECK-NEXT: %[[ARRAY_I8:.*]] = llvm.bitcast %[[ARRAY]]
-// CHECK-NEXT: %[[NEW_ARRAY_I8:.*]] = llvm.bitcast %[[NEW_ARRAY]]
-// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: %[[BYTES:.*]] = llvm.mul %[[LEN]], %[[SIZE]]
-// CHECK-NEXT: "llvm.intr.memcpy"(%[[NEW_ARRAY_I8]], %[[ARRAY_I8]], %[[BYTES]], %[[FALSE]])
+// CHECK-NEXT: %[[NEW_MEMORY:.*]] = llvm.call @realloc(%[[ARRAY_I8]], %[[BYTES]])
+// CHECK-NEXT: %[[NEW_ARRAY:.*]] = llvm.bitcast %[[NEW_MEMORY]]
 // CHECK-NEXT: llvm.store %[[NEW_ARRAY]], %[[GEP]]
 // CHECK-NEXT: llvm.br ^[[END_BLOCK]]
 // CHECK-NEXT: ^[[END_BLOCK]]:

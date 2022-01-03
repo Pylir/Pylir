@@ -21,26 +21,11 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[SLOTS:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[SIZE]], %[[SLOTS]]
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
+// CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
+// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
+// CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][%[[ZERO]], %[[ZERO]]]
 // CHECK-NEXT: llvm.store %[[DICT_CAST]], %[[GEP]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
-// CHECK-NEXT: %[[TWO:.*]] = llvm.mlir.constant(2 : i32)
-// CHECK-NEXT: %[[THREE:.*]] = llvm.mlir.constant(3 : i32)
-// CHECK-NEXT: %[[DICT_OBJ:.*]] = llvm.bitcast %[[RESULT]]
-// CHECK-NEXT: %[[ZERO_I:.*]] = llvm.mlir.constant(0 : index)
-// CHECK-NEXT: %[[NULL_PAIR:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[NULL_BUCKET:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[DICT_OBJ]][%[[ZERO]], %[[ONE]], %[[ZERO]]]
-// CHECK-NEXT: llvm.store %[[ZERO_I]], %[[GEP]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[DICT_OBJ]][%[[ZERO]], %[[ONE]], %[[ONE]]]
-// CHECK-NEXT: llvm.store %[[ZERO_I]], %[[GEP]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[DICT_OBJ]][%[[ZERO]], %[[ONE]], %[[TWO]]]
-// CHECK-NEXT: llvm.store %[[NULL_PAIR]], %[[GEP]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[DICT_OBJ]][%[[ZERO]], %[[TWO]]]
-// CHECK-NEXT: llvm.store %[[ZERO_I]], %[[GEP]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[DICT_OBJ]][%[[ZERO]], %[[THREE]]]
-// CHECK-NEXT: llvm.store %[[NULL_BUCKET]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[RESULT]]
