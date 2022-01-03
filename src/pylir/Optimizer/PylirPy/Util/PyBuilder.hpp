@@ -449,11 +449,13 @@ public:
         return create<Py::RaiseOp>(exception);
     }
 
-    Py::InvokeOp createInvoke(mlir::FlatSymbolRefAttr callee, llvm::ArrayRef<mlir::Value> operands,
-                              mlir::Block* happyPath, llvm::ArrayRef<mlir::Value> normalOperands,
-                              mlir::Block* unwindPath, llvm::ArrayRef<mlir::Value> unwindOperands)
+    Py::InvokeOp createInvoke(llvm::ArrayRef<mlir::Type> resultTypes, mlir::FlatSymbolRefAttr callee,
+                              llvm::ArrayRef<mlir::Value> operands, mlir::Block* happyPath,
+                              llvm::ArrayRef<mlir::Value> normalOperands, mlir::Block* unwindPath,
+                              llvm::ArrayRef<mlir::Value> unwindOperands)
     {
-        return create<Py::InvokeOp>(callee, operands, normalOperands, unwindOperands, happyPath, unwindPath);
+        return create<Py::InvokeOp>(resultTypes, callee, operands, normalOperands, unwindOperands, happyPath,
+                                    unwindPath);
     }
 
     Py::InvokeIndirectOp createInvokeIndirect(mlir::Value callee, llvm::ArrayRef<mlir::Value> operands,

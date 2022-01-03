@@ -49,11 +49,13 @@ class CodeGen
     } m_currentLoop{nullptr, nullptr};
 
     mlir::Block* m_currentExceptBlock = nullptr;
+    mlir::Block* m_currentLandingPadBlock = nullptr;
     struct FinallyBlocks
     {
         const Syntax::TryStmt::Finally* PYLIR_NON_NULL finallySuite;
         Loop parentLoop;
         mlir::Block* parentExceptBlock;
+        mlir::Block* parentLandingPadBlock;
     };
     std::vector<FinallyBlocks> m_finallyBlocks;
 
@@ -108,12 +110,16 @@ class CodeGen
             {
                 return;
             }
-            if (!m_block->hasNoPredecessors())
+            if (!m_block->hasNoPredecessors() && m_block->getParent())
             {
-                PYLIR_ASSERT(m_block->getParent() && "Block has uses but does not have a parent");
                 return;
             }
-            PYLIR_ASSERT(!m_block->getParent() && "Block should not have a parent region if it is unreachable");
+            m_block->dropAllReferences();
+            if (m_block->getParent())
+            {
+                m_block->erase();
+                return;
+            }
             delete m_block;
         }
 
@@ -163,6 +169,20 @@ class CodeGen
             return lhs.get() == rhs;
         }
     };
+
+    BlockPtr createLandingPadBlock(mlir::Block* exceptionHandlerBlock, mlir::FlatSymbolRefAttr typeToCatch = {})
+    {
+        if (!typeToCatch)
+        {
+            typeToCatch = m_builder.getBaseExceptionBuiltin();
+        }
+        mlir::OpBuilder::InsertionGuard guard{m_builder};
+        BlockPtr landingPad;
+        m_builder.setInsertionPointToStart(landingPad);
+        m_builder.create<pylir::Py::LandingPadOp>(m_builder.getArrayAttr({typeToCatch}),
+                                                  llvm::ArrayRef{mlir::ValueRange{}}, exceptionHandlerBlock);
+        return landingPad;
+    }
 
     mlir::Value toI1(mlir::Value value);
 

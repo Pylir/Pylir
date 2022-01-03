@@ -189,6 +189,12 @@ struct TupleExUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>
     }
 };
 
+mlir::Block* exceptionHandlerFromLandingPad(mlir::Block* landingPadBlock)
+{
+    auto op = mlir::cast<pylir::Py::LandingPadOp>(landingPadBlock->front());
+    return op.getSuccessors().back();
+}
+
 template <class TargetOp, class InsertOp, class NormalMakeOp = TargetOp>
 struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
 {
@@ -199,10 +205,12 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
 
     void rewrite(TargetOp op, mlir::PatternRewriter& rewriter) const override
     {
-        mlir::Block* exceptionPath = nullptr;
+        mlir::Block* landingPadBlock = nullptr;
+        mlir::Block* exceptionHandlerBlock = nullptr;
         if constexpr (hasExceptions)
         {
-            exceptionPath = op.exceptionPath();
+            landingPadBlock = op.exceptionPath();
+            exceptionHandlerBlock = exceptionHandlerFromLandingPad(landingPadBlock);
         }
         auto block = op->getBlock();
         auto dest = block->splitBlock(op);
@@ -226,7 +234,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
                 loc, rewriter, "__iter__", type,
                 rewriter.create<pylir::Py::MakeTupleOp>(loc, std::vector<pylir::Py::IterArg>{iter.value()}),
                 rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext())),
-                exceptionPath);
+                exceptionHandlerBlock, landingPadBlock);
 
             auto metaType = rewriter.create<pylir::Py::TypeOfOp>(loc, type);
             auto typeMRO = rewriter.create<pylir::Py::GetSlotOp>(loc, type, metaType, "__mro__");
@@ -239,10 +247,10 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
                 notNextBlock->insertBefore(dest);
                 rewriter.setInsertionPointToStart(notNextBlock);
                 auto exception =
-                    pylir::Py::buildException(loc, rewriter, pylir::Py::Builtins::TypeError.name, {}, exceptionPath);
-                if (exceptionPath)
+                    pylir::Py::buildException(loc, rewriter, pylir::Py::Builtins::TypeError.name, {}, landingPadBlock);
+                if (exceptionHandlerBlock)
                 {
-                    rewriter.create<mlir::BranchOp>(loc, exceptionPath, exception);
+                    rewriter.create<mlir::BranchOp>(loc, exceptionHandlerBlock, exception);
                 }
                 else
                 {
@@ -252,43 +260,26 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
 
             condition->insertBefore(dest);
             rewriter.setInsertionPointToStart(condition);
-            auto exceptionHandler = new mlir::Block;
-            exceptionHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>());
+            auto stopIterationHandler = new mlir::Block;
+            stopIterationHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>());
+            auto landingPad = new mlir::Block;
             auto next = pylir::Py::buildCall(
                 loc, rewriter, nextMethod.result(),
                 rewriter.create<pylir::Py::MakeTupleOp>(loc, std::vector<pylir::Py::IterArg>{iterObject}),
                 rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(this->getContext())),
-                exceptionHandler);
+                exceptionHandlerBlock, landingPad);
 
             rewriter.create<InsertOp>(loc, list, next);
             rewriter.create<mlir::BranchOp>(loc, condition);
 
-            exceptionHandler->insertBefore(dest);
-            rewriter.setInsertionPointToStart(exceptionHandler);
-            auto exception = exceptionHandler->getArgument(0);
-            auto exceptionType = rewriter.create<pylir::Py::TypeOfOp>(loc, exception);
-            auto stopIteration = rewriter.create<pylir::Py::ConstantOp>(
-                loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
-            metaType = rewriter.create<pylir::Py::TypeOfOp>(loc, exceptionType);
-            auto mro = rewriter.create<pylir::Py::GetSlotOp>(loc, exceptionType, metaType, "__mro__");
-            auto isStopIteration = rewriter.create<pylir::Py::LinearContainsOp>(loc, mro, stopIteration);
-            auto reraiseBlock = new mlir::Block;
-            auto exitBlock = new mlir::Block;
-            rewriter.create<mlir::CondBranchOp>(loc, isStopIteration, exitBlock, reraiseBlock);
-
-            reraiseBlock->insertBefore(dest);
-            rewriter.setInsertionPointToStart(reraiseBlock);
-            if (exceptionPath)
-            {
-                rewriter.create<mlir::BranchOp>(loc, exceptionPath, exception);
-            }
-            else
-            {
-                rewriter.create<pylir::Py::RaiseOp>(loc, exception);
-            }
-
-            exitBlock->insertBefore(dest);
-            rewriter.setInsertionPointToStart(exitBlock);
+            landingPad->insertBefore(dest);
+            rewriter.setInsertionPointToStart(landingPad);
+            rewriter.create<pylir::Py::LandingPadOp>(loc,
+                                                     rewriter.getArrayAttr({mlir::FlatSymbolRefAttr::get(
+                                                         this->getContext(), pylir::Py::Builtins::StopIteration.name)}),
+                                                     llvm::ArrayRef{mlir::ValueRange{}}, stopIterationHandler);
+            stopIterationHandler->insertBefore(dest);
+            rewriter.setInsertionPointToStart(stopIterationHandler);
         }
         rewriter.mergeBlocks(dest, rewriter.getBlock());
 
@@ -323,6 +314,7 @@ void ExpandPyDialectPass::runOnFunction()
 {
     mlir::ConversionTarget target(getContext());
     target.addLegalDialect<pylir::Py::PylirPyDialect, mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
+    target.addLegalOp<mlir::FuncOp>();
     target.addDynamicallyLegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListOp,
                                  pylir::Py::MakeListExOp, pylir::Py::MakeSetOp, pylir::Py::MakeSetExOp,
                                  pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>(

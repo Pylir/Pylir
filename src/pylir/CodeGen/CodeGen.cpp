@@ -153,15 +153,15 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
                 {
                     implementBlock(typeError);
                     auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                        Py::Builtins::TypeError.name, {}, m_currentExceptBlock);
+                                                        Py::Builtins::TypeError.name, {}, m_currentLandingPadBlock);
                     raiseException(exception);
                 }
 
                 implementBlock(createException);
                 auto tuple = m_builder.createConstant(m_builder.getTupleAttr());
                 auto dict = m_builder.createConstant(m_builder.getDictAttr());
-                auto exception =
-                    Py::buildCall(m_builder.getCurrentLoc(), m_builder, expression, tuple, dict, m_currentExceptBlock);
+                auto exception = Py::buildCall(m_builder.getCurrentLoc(), m_builder, expression, tuple, dict,
+                                               m_currentExceptBlock, m_currentLandingPadBlock);
                 m_builder.create<mlir::BranchOp>(instanceBlock, mlir::ValueRange{exception});
             }
 
@@ -175,7 +175,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             {
                 implementBlock(typeError);
                 auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name,
-                                                    {}, m_currentExceptBlock);
+                                                    {}, m_currentLandingPadBlock);
                 raiseException(exception);
             }
 
@@ -271,7 +271,8 @@ void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value valu
             auto type = m_builder.createTypeOf(container);
             Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__setitem__", type,
                                        m_builder.createMakeTuple({container, indices, value}),
-                                       m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+                                       m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock,
+                                       m_currentLandingPadBlock);
         },
         [&](const Syntax::Target::Square& square)
         {
@@ -584,7 +585,7 @@ mlir::Value pylir::CodeGen::binOp(llvm::Twine method, mlir::Value lhs, mlir::Val
     auto dict = m_builder.createConstant(m_builder.getDictAttr());
     auto type = m_builder.createTypeOf(lhs);
     return Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, method, type, tuple, dict,
-                                      m_currentExceptBlock);
+                                      m_currentExceptBlock, m_currentLandingPadBlock);
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
@@ -866,7 +867,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
             {
                 return {};
             }
-            return Py::buildCall(m_builder.getCurrentLoc(), m_builder, callable, tuple, keywords, m_currentExceptBlock);
+            return Py::buildCall(m_builder.getCurrentLoc(), m_builder, callable, tuple, keywords, m_currentExceptBlock,
+                                 m_currentLandingPadBlock);
         },
         [&](const auto&) -> mlir::Value
         {
@@ -940,7 +942,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         else
         {
             auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::NameError.name,
-                                                /*TODO: string arg*/ {}, m_currentExceptBlock);
+                                                /*TODO: string arg*/ {}, m_currentLandingPadBlock);
             raiseException(exception);
             if (!m_classNamespace)
             {
@@ -974,7 +976,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             implementBlock(failureBlock);
             auto exception =
                 Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::UnboundLocalError.name,
-                                   /*TODO: string arg*/ {}, m_currentExceptBlock);
+                                   /*TODO: string arg*/ {}, m_currentLandingPadBlock);
             raiseException(exception);
 
             implementBlock(successBlock);
@@ -990,13 +992,13 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     if (result->second.kind.index() == Identifier::Global)
     {
         auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::NameError.name,
-                                            /*TODO: string arg*/ {}, m_currentExceptBlock);
+                                            /*TODO: string arg*/ {}, m_currentLandingPadBlock);
         raiseException(exception);
     }
     else
     {
         auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::UnboundLocalError.name,
-                                            /*TODO: string arg*/ {}, m_currentExceptBlock);
+                                            /*TODO: string arg*/ {}, m_currentLandingPadBlock);
         raiseException(exception);
     }
 
@@ -1071,9 +1073,9 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscriptio
 
     m_builder.setCurrentLoc(getLoc(subscription, subscription));
     auto type = m_builder.createTypeOf(container);
-    return buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__getitem__", type,
-                                  m_builder.createMakeTuple({container, indices}),
-                                  m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+    return buildSpecialMethodCall(
+        m_builder.getCurrentLoc(), m_builder, "__getitem__", type, m_builder.createMakeTuple({container, indices}),
+        m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock, m_currentLandingPadBlock);
 }
 
 mlir::Value pylir::CodeGen::toI1(mlir::Value value)
@@ -1086,9 +1088,9 @@ mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 {
     auto type = m_builder.createTypeOf(value);
     auto tuple = m_builder.createMakeTuple({value});
-    auto maybeBool =
-        Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__bool__", type, tuple,
-                                   m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+    auto maybeBool = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__bool__", type, tuple,
+                                                m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock,
+                                                m_currentLandingPadBlock);
     auto typeOfResult = m_builder.createTypeOf(maybeBool);
     auto booleanType = m_builder.createBoolRef();
     auto isBool = m_builder.createIs(typeOfResult, booleanType);
@@ -1097,7 +1099,7 @@ mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 
     implementBlock(typeErrorBlock);
     auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
-                                        m_currentExceptBlock);
+                                        m_currentLandingPadBlock);
     raiseException(exception);
 
     implementBlock(isBoolBlock);
@@ -1374,7 +1376,7 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
 
     auto iterObject = Py::buildSpecialMethodCall(
         m_builder.getCurrentLoc(), m_builder, "__iter__", type, m_builder.createMakeTuple({iterable}),
-        m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+        m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock, m_currentLandingPadBlock);
 
     auto metaType = m_builder.createTypeOf(type);
     auto typeMRO = m_builder.createGetSlot(type, metaType, "__mro__");
@@ -1385,13 +1387,13 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
     {
         implementBlock(notNextBlock);
         auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
-                                            m_currentExceptBlock);
+                                            m_currentLandingPadBlock);
         raiseException(exception);
     }
 
     implementBlock(condition);
     markOpenBlock(condition);
-    BlockPtr exceptionHandler, thenBlock;
+    BlockPtr stopIterationHandler, thenBlock;
     auto implementThenBlock = llvm::make_scope_exit(
         [&]
         {
@@ -1401,13 +1403,11 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
             }
         });
 
-    exceptionHandler->addArgument(m_builder.getDynamicType());
-    std::optional reset = pylir::ValueReset(m_currentExceptBlock);
-    m_currentExceptBlock = exceptionHandler;
+    auto landingPad = createLandingPadBlock(stopIterationHandler, m_builder.getStopIterationBuiltin());
+    stopIterationHandler->addArgument(m_builder.getDynamicType());
     auto next = Py::buildCall(m_builder.getCurrentLoc(), m_builder, nextMethod.result(),
                               m_builder.createMakeTuple({iterObject}),
-                              m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
-    reset.reset();
+                              m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock, landingPad);
     assignTarget(targets, next);
     mlir::Block* elseBlock;
     if (elseSection)
@@ -1431,20 +1431,9 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
     }
     exit.reset();
     sealBlock(condition);
-    if (!exceptionHandler->hasNoPredecessors())
+    if (!landingPad->hasNoPredecessors())
     {
-        implementBlock(exceptionHandler);
-        auto exception = exceptionHandler->getArgument(0);
-        auto exceptionType = m_builder.createTypeOf(exception);
-        auto stopIteration = m_builder.createStopIterationRef();
-        auto isStopIteration = buildSubclassCheck(exceptionType, stopIteration);
-        BlockPtr reraiseBlock, exitBlock;
-        m_builder.create<mlir::CondBranchOp>(isStopIteration, exitBlock, reraiseBlock);
-
-        implementBlock(reraiseBlock);
-        raiseException(exception);
-
-        implementBlock(exitBlock);
+        implementBlock(stopIterationHandler);
         m_builder.create<mlir::BranchOp>(elseBlock);
     }
     if (elseBlock == thenBlock)
@@ -1535,15 +1524,17 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
 {
     BlockPtr exceptionHandler;
     exceptionHandler->addArgument(m_builder.getDynamicType());
-    std::optional reset = pylir::ValueReset(m_currentExceptBlock);
+    BlockPtr landingPad = createLandingPadBlock(exceptionHandler);
+    std::optional reset = pylir::valueResetMany(m_currentExceptBlock, m_currentLandingPadBlock);
     auto lambda = [&] { m_finallyBlocks.pop_back(); };
     std::optional<decltype(llvm::make_scope_exit(lambda))> popFinally;
     if (tryStmt.finally)
     {
-        m_finallyBlocks.push_back({&*tryStmt.finally, m_currentLoop, m_currentExceptBlock});
+        m_finallyBlocks.push_back({&*tryStmt.finally, m_currentLoop, m_currentExceptBlock, m_currentLandingPadBlock});
         popFinally.emplace(llvm::make_scope_exit(lambda));
     }
     m_currentExceptBlock = exceptionHandler;
+    m_currentLandingPadBlock = landingPad;
     visit(*tryStmt.suite);
 
     auto enterFinallyCode = [&]
@@ -1551,8 +1542,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         auto back = m_finallyBlocks.back();
         m_finallyBlocks.pop_back();
         auto tuple = std::make_tuple(llvm::make_scope_exit([back, this] { m_finallyBlocks.push_back(back); }),
-                                     pylir::ValueReset(m_currentExceptBlock));
+                                     pylir::valueResetMany(m_currentExceptBlock, m_currentLandingPadBlock));
         m_currentExceptBlock = back.parentExceptBlock;
+        m_currentLandingPadBlock = back.parentLandingPadBlock;
         return tuple;
     };
 
@@ -1589,11 +1581,12 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         m_builder.create<mlir::BranchOp>(continueBlock);
     }
 
-    if (exceptionHandler->hasNoPredecessors())
+    if (landingPad->hasNoPredecessors())
     {
         return;
     }
 
+    m_currentFunc.push_back(landingPad);
     implementBlock(exceptionHandler);
     // Exceptions thrown in exception handlers (including the expression after except) are propagated upwards and not
     // handled by this block
@@ -1649,7 +1642,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
 
             implementBlock(raiseBlock);
             auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
-                                                m_currentExceptBlock);
+                                                m_currentLandingPadBlock);
             raiseException(exception);
 
             implementBlock(noTypeErrorBlock);
@@ -1673,7 +1666,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
                                   implementBlock(raiseBlock);
                                   auto exception =
                                       Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                         Py::Builtins::TypeError.name, {}, m_currentExceptBlock);
+                                                         Py::Builtins::TypeError.name, {}, m_currentLandingPadBlock);
                                   raiseException(exception);
 
                                   implementBlock(noTypeErrorBlock);
@@ -2009,7 +2002,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             return;
         }
         value = Py::buildCall(m_builder.getCurrentLoc(), m_builder, decorator, m_builder.createMakeTuple({value}),
-                              m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+                              m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock,
+                              m_currentLandingPadBlock);
     }
     writeIdentifier(funcDef.funcName, value);
 }
@@ -2294,7 +2288,7 @@ std::vector<mlir::Value> pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, m
 
                     implementBlock(boundBlock);
                     auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                        Py::Builtins::TypeError.name, {}, m_currentExceptBlock);
+                                                        Py::Builtins::TypeError.name, {}, m_currentLandingPadBlock);
                     raiseException(exception);
                 }
                 else
@@ -2357,7 +2351,7 @@ std::vector<mlir::Value> pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, m
                 if (!iter.hasDefaultParam)
                 {
                     auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                        Py::Builtins::TypeError.name, {}, m_currentExceptBlock);
+                                                        Py::Builtins::TypeError.name, {}, m_currentLandingPadBlock);
                     raiseException(exception);
                 }
                 else
@@ -2471,8 +2465,9 @@ void pylir::CodeGen::executeFinallyBlocks(bool fullUnwind)
     for (auto iter = copy.rbegin();
          iter != copy.rend() && (fullUnwind || iter->parentLoop == m_currentLoop) && needsTerminator(); iter++)
     {
-        pylir::ValueReset exceptReset(m_currentExceptBlock);
+        auto exceptReset = pylir::valueResetMany(m_currentExceptBlock, m_currentLandingPadBlock);
         m_currentExceptBlock = iter->parentExceptBlock;
+        m_currentLandingPadBlock = iter->parentLandingPadBlock;
         m_finallyBlocks.pop_back();
         visit(*iter->finallySuite->suite);
     }
@@ -2480,7 +2475,7 @@ void pylir::CodeGen::executeFinallyBlocks(bool fullUnwind)
 
 mlir::Value pylir::CodeGen::makeTuple(const std::vector<Py::IterArg>& args)
 {
-    if (!m_currentExceptBlock)
+    if (!m_currentLandingPadBlock)
     {
         return m_builder.createMakeTuple(args);
     }
@@ -2489,12 +2484,12 @@ mlir::Value pylir::CodeGen::makeTuple(const std::vector<Py::IterArg>& args)
     {
         return m_builder.createMakeTuple(args);
     }
-    return m_builder.createMakeTupleEx(args, m_currentExceptBlock);
+    return m_builder.createMakeTupleEx(args, m_currentLandingPadBlock);
 }
 
 mlir::Value pylir::CodeGen::makeList(const std::vector<Py::IterArg>& args)
 {
-    if (!m_currentExceptBlock)
+    if (!m_currentLandingPadBlock)
     {
         return m_builder.createMakeList(args);
     }
@@ -2503,12 +2498,12 @@ mlir::Value pylir::CodeGen::makeList(const std::vector<Py::IterArg>& args)
     {
         return m_builder.createMakeList(args);
     }
-    return m_builder.createMakeListEx(args, m_currentExceptBlock);
+    return m_builder.createMakeListEx(args, m_currentLandingPadBlock);
 }
 
 mlir::Value pylir::CodeGen::makeSet(const std::vector<Py::IterArg>& args)
 {
-    if (!m_currentExceptBlock)
+    if (!m_currentLandingPadBlock)
     {
         return m_builder.createMakeSet(args);
     }
@@ -2517,12 +2512,12 @@ mlir::Value pylir::CodeGen::makeSet(const std::vector<Py::IterArg>& args)
     {
         return m_builder.createMakeSet(args);
     }
-    return m_builder.createMakeSetEx(args, m_currentExceptBlock);
+    return m_builder.createMakeSetEx(args, m_currentLandingPadBlock);
 }
 
 mlir::Value pylir::CodeGen::makeDict(const std::vector<Py::DictArg>& args)
 {
-    if (!m_currentExceptBlock)
+    if (!m_currentLandingPadBlock)
     {
         return m_builder.createMakeDict(args);
     }
@@ -2532,7 +2527,7 @@ mlir::Value pylir::CodeGen::makeDict(const std::vector<Py::DictArg>& args)
     {
         return m_builder.createMakeDict(args);
     }
-    return m_builder.createMakeDictEx(args, m_currentExceptBlock);
+    return m_builder.createMakeDictEx(args, m_currentLandingPadBlock);
 }
 
 mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Value type, mlir::Value base)
@@ -2614,7 +2609,7 @@ void removeBlockArgumentOperands(mlir::BlockArgument argument)
             llvm::TypeSwitch<mlir::Operation*>(terminator)
                 .Case<pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp, pylir::Py::MakeSetExOp,
                       pylir::Py::MakeDictExOp, pylir::Py::InvokeOp, pylir::Py::InvokeIndirectOp>(
-                    [&](auto op) { op.unwindDestOperandsMutable().erase(argument.getArgNumber() - 1); })
+                    [&](auto op) { op.unwindDestOperandsMutable().erase(argument.getArgNumber()); })
                 .Default([](auto&&) { PYLIR_UNREACHABLE; });
         }
     }
@@ -2642,7 +2637,7 @@ mlir::Value pylir::CodeGen::tryRemoveTrivialBlockArgument(mlir::BlockArgument ar
             blockOperand = llvm::TypeSwitch<mlir::Operation*, mlir::Value>(terminator)
                                .Case<Py::MakeTupleExOp, Py::MakeListExOp, Py::MakeSetExOp, Py::MakeDictExOp,
                                      Py::InvokeOp, Py::InvokeIndirectOp>(
-                                   [&](auto op) { return op.unwindDestOperands()[argument.getArgNumber() - 1]; })
+                                   [&](auto op) { return op.unwindDestOperands()[argument.getArgNumber()]; })
                                .Default([](auto&&) -> mlir::Value { PYLIR_UNREACHABLE; });
         }
         if (blockOperand == same || blockOperand == argument)

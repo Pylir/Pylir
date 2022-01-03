@@ -149,6 +149,7 @@ func @make_tuple() -> !py.dynamic {
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.BaseException = #py.type
 
 func @make_tuple_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTupleEx (*%arg0)
@@ -156,7 +157,11 @@ func @make_tuple_ex(%arg0 : !py.dynamic) -> !py.dynamic {
 ^bb0:
     %1 = py.typeOf %0
     return %1 : !py.dynamic
-^bb1(%e : !py.dynamic):
+^bb1:
+    py.landingPad
+        except @builtins.BaseException ^bb2()
+
+^bb2(%e : !py.dynamic):
     return %e : !py.dynamic
 }
 
@@ -188,6 +193,7 @@ func @make_list() -> !py.dynamic {
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.list = #py.type
+py.globalValue @builtins.BaseException = #py.type
 
 func @make_list_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeListEx (*%arg0)
@@ -195,7 +201,11 @@ func @make_list_ex(%arg0 : !py.dynamic) -> !py.dynamic {
 ^bb0:
     %1 = py.typeOf %0
     return %1 : !py.dynamic
-^bb1(%e : !py.dynamic):
+^bb1:
+    py.landingPad
+        except @builtins.BaseException ^bb2()
+
+^bb2(%e : !py.dynamic):
     return %e : !py.dynamic
 }
 
@@ -228,6 +238,7 @@ func @make_dict() -> !py.dynamic {
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.BaseException = #py.type
 
 func @make_dict_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeDictEx (**%arg0)
@@ -235,7 +246,11 @@ func @make_dict_ex(%arg0 : !py.dynamic) -> !py.dynamic {
 ^bb0:
     %1 = py.typeOf %0
     return %1 : !py.dynamic
-^bb1(%e : !py.dynamic):
+^bb1:
+    py.landingPad
+        except @builtins.BaseException ^bb2()
+
+^bb2(%e : !py.dynamic):
     return %e : !py.dynamic
 }
 

@@ -329,6 +329,10 @@ class PylirPy_MakeExOp<string mnemonic, list<OpTrait> traits = []> :
                                                  DeclareOpInterfaceMethods<BranchOpInterface>,
                                                  DeclareOpInterfaceMethods<InferTypeOpInterface>])> {
     let successors = (successor AnySuccessor:$happyPath, AnySuccessor:$exceptionPath);
+
+    let verifier = [{
+            return ::verifyHasLandingpad(*this, exceptionPath());
+    }];
 }
 
 def PylirPy_MakeTupleOp : PylirPy_MakeOp<"makeTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
@@ -718,13 +722,16 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator, ReturnLike]> {
 class PylirPy_InvokeBase<string mnemonic,list<OpTrait> traits = []> : PylirPy_Op<mnemonic,
                                             !listconcat(traits,[Terminator, DeclareOpInterfaceMethods<CallOpInterface>,
                                              DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments,
-                                             DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound])> {
+                                             AlwaysBound])> {
     let summary = "invoke operation";
-    let description = [{
-
-    }];
 
     let successors = (successor AnySuccessor:$happyPath, AnySuccessor:$exceptionPath);
+
+    let results = (outs Variadic<AnyType>:$results);
+
+    let verifier = [{
+        return ::verifyHasLandingpad(*this, exceptionPath());
+    }];
 }
 
 def PylirPy_InvokeOp : PylirPy_InvokeBase<"invoke",[DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
@@ -732,7 +739,6 @@ def PylirPy_InvokeOp : PylirPy_InvokeBase<"invoke",[DeclareOpInterfaceMethods<Sy
                          Variadic<DynamicType>:$operands,
                          Variadic<DynamicType>:$normalDestOperands,
                          Variadic<DynamicType>:$unwindDestOperands);
-
 
     let assemblyFormat = [{
         $callee `(` $operands `)` attr-dict `:` functional-type($operands, results) `\n`
@@ -747,18 +753,33 @@ def PylirPy_InvokeIndirectOp : PylirPy_InvokeBase<"invoke_indirect",
                                                         "$_self.cast<::mlir::FunctionType>().getInputs()">,
                                         TypesMatchWith<"callee result types match result types",
                                                         "callee", "results",
-                                                        "$_self.cast<::mlir::FunctionType>().getResults()">]> {
+                                                        "$_self.cast<::mlir::FunctionType>().getResults()">,
+                                        DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
     let arguments = (ins FunctionType:$callee,
                          Variadic<DynamicType>:$operands,
                          Variadic<DynamicType>:$normalDestOperands,
                          Variadic<DynamicType>:$unwindDestOperands);
 
-    let results = (outs Variadic<AnyType>:$results);
-
     let assemblyFormat = [{
         $callee `(` $operands `)` attr-dict `:` type($callee) `\n`
         ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
                 `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
+    }];
+}
+
+def PylirPy_LandingPadOp : PylirPy_Op<"landingPad", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {
+    let arguments = (ins FlatSymbolRefArrayAttr:$catchTypes,
+                         VariadicOfVariadic<DynamicType, "argSizes">:$branchArgs, I32ElementsAttr:$argSizes);
+    let results = (outs);
+
+    let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
+
+    let assemblyFormat = [{
+        attr-dict custom<Clauses>($catchTypes, $branchArgs, $successors)
+    }];
+
+    let verifier = [{
+        return ::verify(*this);
     }];
 }
 

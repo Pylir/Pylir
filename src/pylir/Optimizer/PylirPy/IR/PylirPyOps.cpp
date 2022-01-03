@@ -783,7 +783,7 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeOp::getMutableSuccess
     {
         return normalDestOperandsMutable();
     }
-    return llvm::None;
+    return unwindDestOperandsMutable();
 }
 
 mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
@@ -796,22 +796,13 @@ mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
     return operands();
 }
 
-mlir::LogicalResult pylir::Py::InvokeOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                          ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                          ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                          ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeIndirectOp::getMutableSuccessorOperands(unsigned int index)
 {
     if (index == 0)
     {
         return normalDestOperandsMutable();
     }
-    return llvm::None;
+    return unwindDestOperandsMutable();
 }
 
 mlir::CallInterfaceCallable pylir::Py::InvokeIndirectOp::getCallableForCallee()
@@ -833,6 +824,62 @@ mlir::LogicalResult
     return mlir::success();
 }
 
+namespace
+{
+bool parseClauses(mlir::OpAsmParser& parser, mlir::ArrayAttr& catches,
+                  llvm::SmallVectorImpl<llvm::SmallVector<mlir::OpAsmParser::OperandType>>& branchArgs,
+                  llvm::SmallVectorImpl<mlir::Block*>& successors)
+{
+    llvm::SmallVector<mlir::Attribute> types;
+    while (!parser.parseOptionalKeyword("except"))
+    {
+        if (parser.parseAttribute(types.emplace_back()) || parser.parseSuccessor(successors.emplace_back())
+            || parser.parseOperandList(branchArgs.emplace_back(), -1, mlir::OpAsmParser::Delimiter::Paren))
+        {
+            return true;
+        }
+    }
+    catches = mlir::ArrayAttr::get(parser.getContext(), types);
+    return false;
+}
+
+void printClauses(mlir::OpAsmPrinter& printer, pylir::Py::LandingPadOp, mlir::ArrayAttr catches,
+                  mlir::OperandRangeRange branchArgs, mlir::SuccessorRange successorRange)
+{
+    for (auto [type, succ, args] : llvm::zip(catches.getAsRange<mlir::FlatSymbolRefAttr>(), successorRange, branchArgs))
+    {
+        printer.printNewline();
+        printer << "  except " << type << ' ';
+        printer.printSuccessor(succ);
+        printer << '(';
+        printer.printOperands(args);
+        printer << ')';
+    }
+}
+
+mlir::LogicalResult verify(pylir::Py::LandingPadOp op)
+{
+    if (op.branchArgs().size() != op.successors().size())
+    {
+        return op->emitOpError("Expected branch arguments for every successor");
+    }
+    if (op.catchTypes().size() != op.successors().size())
+    {
+        return op->emitOpError("Expected catch types for every successor");
+    }
+    if (!op->getBlock() || &op->getBlock()->front() != op)
+    {
+        return op->emitOpError("Expected 'py.landingPad' to be the only op in its block");
+    }
+    return mlir::success();
+}
+} // namespace
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::LandingPadOp::getMutableSuccessorOperands(unsigned)
+{
+    return llvm::None;
+}
+
 mlir::LogicalResult
     pylir::Py::MakeTupleExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
                                                ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
@@ -848,7 +895,7 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeTupleExOp::getMutableSu
     {
         return normalDestOperandsMutable();
     }
-    return llvm::None;
+    return unwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -887,7 +934,7 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeListExOp::getMutableSuc
     {
         return normalDestOperandsMutable();
     }
-    return llvm::None;
+    return unwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -926,7 +973,7 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeSetExOp::getMutableSucc
     {
         return normalDestOperandsMutable();
     }
-    return llvm::None;
+    return unwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -965,7 +1012,7 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeDictExOp::getMutableSuc
     {
         return normalDestOperandsMutable();
     }
-    return llvm::None;
+    return unwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -1210,6 +1257,16 @@ mlir::LogicalResult verify(pylir::Py::ConstantOp op)
     }
     return verify(op, op.constant());
 }
+
+mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock)
+{
+    if (unwindBlock->empty() || !mlir::isa<pylir::Py::LandingPadOp>(unwindBlock->front()))
+    {
+        return op->emitOpError("Expected 'py.landingPad' as first non-const operation in unwind block");
+    }
+    return mlir::success();
+}
+
 } // namespace
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>

@@ -1677,6 +1677,98 @@ struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp
     }
 };
 
+struct InvokeOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::InvokeOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::InvokeOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::InvokeOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        llvm::SmallVector<mlir::Type> resultTypes;
+        [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
+        PYLIR_ASSERT(mlir::succeeded(result));
+        rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(op, resultTypes, adaptor.callee(), adaptor.operands(),
+                                                          op.happyPath(), adaptor.normalDestOperands(),
+                                                          op.exceptionPath(), adaptor.unwindDestOperands());
+        return mlir::success();
+    }
+};
+
+struct InvokeIndirectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::InvokeIndirectOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::InvokeIndirectOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::InvokeIndirectOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        llvm::SmallVector<mlir::Type> resultTypes;
+        [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
+        PYLIR_ASSERT(mlir::succeeded(result));
+        llvm::SmallVector<mlir::Value> operands{adaptor.callee()};
+        operands.append(adaptor.operands().begin(), adaptor.operands().end());
+        rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(op, resultTypes, operands, op.happyPath(),
+                                                          adaptor.normalDestOperands(), op.exceptionPath(),
+                                                          adaptor.unwindDestOperands());
+
+        return mlir::success();
+    }
+};
+
+struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::LandingPadOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::LandingPadOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::LandingPadOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto* block = op->getBlock();
+        auto* dest = rewriter.splitBlock(block, mlir::Block::iterator{op});
+        rewriter.setInsertionPointToStart(block);
+
+        auto i8Ptr = mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type());
+        llvm::SmallVector<mlir::Value> refs;
+        {
+            mlir::OpBuilder::InsertionGuard guard{rewriter};
+            rewriter.setInsertionPointToStart(&op->getParentRegion()->front());
+            for (auto iter : adaptor.catchTypes().getAsRange<mlir::FlatSymbolRefAttr>())
+            {
+                mlir::Value address = getTypeConverter()->getConstant(op.getLoc(), iter, rewriter);
+                while (auto cast = address.getDefiningOp<mlir::LLVM::BitcastOp>())
+                {
+                    address = cast.getArg().getDefiningOp<mlir::LLVM::AddressOfOp>();
+                    PYLIR_ASSERT(address);
+                }
+                refs.emplace_back(rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), i8Ptr, address));
+            }
+        }
+        auto literal = mlir::LLVM::LLVMStructType::getLiteral(getContext(), {i8Ptr, rewriter.getI32Type()});
+        auto landingPad = rewriter.create<mlir::LLVM::LandingpadOp>(op.getLoc(), literal, refs);
+        mlir::Value exceptionObject =
+            rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), i8Ptr, landingPad, rewriter.getI32ArrayAttr({0}));
+        exceptionObject = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()), exceptionObject);
+        auto catchIndex = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), rewriter.getI32Type(), landingPad,
+                                                                      rewriter.getI32ArrayAttr({1}));
+        for (auto [type, succ, args] : llvm::zip(refs, op.getSuccessors(), adaptor.branchArgs()))
+        {
+            auto index = rewriter.create<mlir::LLVM::EhTypeidForOp>(op.getLoc(), rewriter.getI32Type(), type);
+            auto isEqual =
+                rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, catchIndex, index);
+            auto continueSearch = new mlir::Block;
+            llvm::SmallVector newArgs{exceptionObject};
+            newArgs.append(args.begin(), args.end());
+            rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), isEqual, succ, newArgs, continueSearch,
+                                                  mlir::ValueRange{});
+            continueSearch->insertBefore(dest);
+            rewriter.setInsertionPointToStart(continueSearch);
+        }
+        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, dest);
+        rewriter.setInsertionPointToStart(dest);
+        rewriter.replaceOpWithNewOp<mlir::LLVM::ResumeOp>(op, landingPad);
+        return mlir::success();
+    }
+};
+
 struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocObjectOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocObjectOp>::ConvertPylirOpToLLVMPattern;
@@ -2196,6 +2288,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitStrOpConversion>(converter);
     patternSet.insert<PrintOpConversion>(converter);
     patternSet.insert<InitStrFromIntOpConversion>(converter);
+    patternSet.insert<InvokeOpConversion>(converter);
+    patternSet.insert<InvokeIndirectOpConversion>(converter);
+    patternSet.insert<LandingPadOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

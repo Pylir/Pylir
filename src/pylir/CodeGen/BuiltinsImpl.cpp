@@ -485,7 +485,7 @@ void pylir::CodeGen::createBuiltinsImpl()
             auto tuple = m_builder.createMakeTuple({firstObj});
             auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
             auto initialStr = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__str__", firstType,
-                                                         tuple, emptyDict, nullptr);
+                                                         tuple, emptyDict, nullptr, nullptr);
             // TODO: check initialStr is actually a str
             auto loopHeader = new mlir::Block;
             loopHeader->addArguments({m_builder.getDynamicType(), m_builder.getIndexType()});
@@ -503,7 +503,7 @@ void pylir::CodeGen::createBuiltinsImpl()
             auto type = m_builder.createTypeOf(obj);
             tuple = m_builder.createMakeTuple({obj});
             auto nextStr = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__str__", type, tuple,
-                                                      emptyDict, nullptr);
+                                                      emptyDict, nullptr, nullptr);
             // TODO: check nextStr is actually a str
             auto concat = m_builder.createStrConcat({loopHeader->getArgument(0), sep, nextStr});
             auto incremented = m_builder.create<mlir::arith::AddIOp>(loopHeader->getArgument(1), one);

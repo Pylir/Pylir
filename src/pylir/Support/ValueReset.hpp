@@ -46,4 +46,10 @@ public:
     }
 };
 
+template <class... Args>
+std::tuple<ValueReset<std::decay_t<Args>>...> valueResetMany(Args&... args)
+{
+    return {ValueReset(args)...};
+}
+
 } // namespace pylir

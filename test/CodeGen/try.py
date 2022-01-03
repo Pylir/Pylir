@@ -21,21 +21,16 @@ def bar(param):
         return 0
 
 # CHECK-LABEL: func private @"bar$impl[0]"
-# CHECK: %[[TYPE_ERROR:.*]] = py.constant @builtins.TypeError
-# CHECK: %[[NEW_METHOD:.*]] = py.getSlot "__new__" from %[[TYPE_ERROR]]
-# CHECK: %[[NEW_METHOD_PTR:.*]] = py.function.getFunction %[[NEW_METHOD]]
-# CHECK: %[[EXCEPTION:.*]] = call_indirect %[[NEW_METHOD_PTR]]
-# CHECK: br ^[[EXCEPTION_HANDLER:[[:alnum:]]+]](
-# CHECK-SAME: %[[EXCEPTION]]
 
+# CHECK: py.landingPad
+# CHECK-NEXT: except @builtins.BaseException ^[[EXCEPTION_HANDLER:.*]]()
 # CHECK: ^[[EXCEPTION_HANDLER]](
 # CHECK-SAME: %[[EXCEPTION:[[:alnum:]]+]]
-
-# CHECK: %[[MATCHING:.*]] = py.constant @builtins.TypeError
-# CHECK: %[[TUPLE_TYPE:.*]] = py.constant @builtins.tuple
-# CHECK: %[[MATCHING_TYPE:.*]] = py.typeOf %[[MATCHING]]
-# CHECK: %[[IS_TUPLE:.*]] = py.is %[[MATCHING_TYPE]], %[[TUPLE_TYPE]]
-# CHECK: cond_br %[[IS_TUPLE]], ^[[TUPLE_BLOCK:.*]], ^[[EXCEPTION_BLOCK:[[:alnum:]]+]]
+# CHECK-NEXT: %[[MATCHING:.*]] = py.constant @builtins.TypeError
+# CHECK-NEXT: %[[TUPLE_TYPE:.*]] = py.constant @builtins.tuple
+# CHECK-NEXT: %[[MATCHING_TYPE:.*]] = py.typeOf %[[MATCHING]]
+# CHECK-NEXT: %[[IS_TUPLE:.*]] = py.is %[[MATCHING_TYPE]], %[[TUPLE_TYPE]]
+# CHECK-NEXT: cond_br %[[IS_TUPLE]], ^[[TUPLE_BLOCK:.*]], ^[[EXCEPTION_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[EXCEPTION_BLOCK]]:
 # subclass of BaseException check...
