@@ -85,7 +85,7 @@ public:
 
     enum Slots
     {
-#define TYPE_SLOT(x) x,
+#define TYPE_SLOT(x, ...) x,
 #include <pylir/Interfaces/Slots.def>
     };
 
@@ -105,7 +105,7 @@ class PyFunction
 public:
     enum Slots
     {
-#define FUNCTION_SLOT(x) x,
+#define FUNCTION_SLOT(x, ...) x,
 #include <pylir/Interfaces/Slots.def>
     };
 
@@ -251,7 +251,7 @@ public:
 
     enum Slots
     {
-#define BASEEXCEPTION_SLOT(x) x,
+#define BASEEXCEPTION_SLOT(x, ...) x,
 #include <pylir/Interfaces/Slots.def>
     };
 
@@ -291,8 +291,6 @@ public:
 
 static_assert(std::is_standard_layout_v<PyBaseException>);
 
-// TODO: Inheritance
-
 template <class T>
 inline bool PyObject::isa()
 {
@@ -303,37 +301,37 @@ inline bool PyObject::isa()
 template <>
 inline bool PyObject::isa<PyTypeObject>()
 {
-    return getType() == &Builtin::Type;
+    return isInstanceOf(&Builtin::Type);
 }
 
 template <>
 inline bool PyObject::isa<PySequence>()
 {
-    return getType() == &Builtin::Tuple || getType() == &Builtin::List;
+    return isInstanceOf(&Builtin::Tuple) || isInstanceOf(&Builtin::List);
 }
 
 template <>
 inline bool PyObject::isa<PyDict>()
 {
-    return getType() == &Builtin::Dict;
+    return isInstanceOf(&Builtin::Dict);
 }
 
 template <>
 inline bool PyObject::isa<PyFunction>()
 {
-    return getType() == &Builtin::Function;
+    return isInstanceOf(&Builtin::Function);
 }
 
 template <>
 inline bool PyObject::isa<PyString>()
 {
-    return getType() == &Builtin::Str;
+    return isInstanceOf(&Builtin::Str);
 }
 
 template <>
 inline bool PyObject::isa<PyInt>()
 {
-    return getType() == &Builtin::Int || getType() == &Builtin::Bool;
+    return isInstanceOf(&Builtin::Int);
 }
 
 } // namespace pylir::rt

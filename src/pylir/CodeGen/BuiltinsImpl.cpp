@@ -76,10 +76,11 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
             static auto typeSlots = []
             {
                 llvm::StringSet<> set;
-#define TYPE_SLOT(x) set.insert(#x);
+#define TYPE_SLOT(x, ...) set.insert(#x);
 #include <pylir/Interfaces/Slots.def>
                 set.erase("__slots__");
                 set.erase("__mro__");
+                set.erase("__name__");
                 return set;
             }();
             for (auto [slotName, value] : bases[0].initializer().getSlots().getValue())
@@ -93,6 +94,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
         }
     }
     slots["__mro__"] = createGlobalConstant(m_builder.getTupleAttr(mro));
+    slots["__name__"] = createGlobalConstant(m_builder.getPyStringAttr(className.getValue()));
     llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> converted(slots.size());
     std::transform(slots.begin(), slots.end(), converted.begin(),
                    [this](auto pair) -> std::pair<mlir::StringAttr, mlir::Attribute>
@@ -167,7 +169,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                 [this](SlotMapImpl& slots)
                 {
                     slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
-#define TYPE_SLOT(x) m_builder.getPyStringAttr(#x),
+#define TYPE_SLOT(x, ...) m_builder.getPyStringAttr(#x),
 #include <pylir/Interfaces/Slots.def>
                     }));
                 });
@@ -238,7 +240,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                                m_builder.createSetSlot(self, selfType, "args", args);
                                                            });
                         slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
-#define BASEEXCEPTION_SLOT(name) m_builder.getPyStringAttr(#name),
+#define BASEEXCEPTION_SLOT(name, ...) m_builder.getPyStringAttr(#name),
 #include <pylir/Interfaces/Slots.def>
                         }));
                     });
@@ -266,7 +268,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto selfType = m_builder.create<Py::TypeOfOp>(self);
                             m_builder.createSetSlot(self, selfType, "args", args);
 
-                            auto len = m_builder.createTupleLen(m_builder.getIndexType(), args);
+                            auto len = m_builder.createTupleLen(args);
                             auto zero = m_builder.create<mlir::arith::ConstantIndexOp>(0);
                             auto greaterZero =
                                 m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ugt, len, zero);
@@ -320,7 +322,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     m_builder.create<mlir::ReturnOp>(result.getResults());
                 });
             slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
-#define FUNCTION_SLOT(x) m_builder.getPyStringAttr(#x),
+#define FUNCTION_SLOT(x, ...) m_builder.getPyStringAttr(#x),
 #include <pylir/Interfaces/Slots.def>
             }));
         });
@@ -468,7 +470,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                 end = continueBlock->getArgument(0);
             }
 
-            auto tupleLen = m_builder.createTupleLen(m_builder.getIndexType(), objects);
+            auto tupleLen = m_builder.createTupleLen(objects);
             auto one = m_builder.create<mlir::arith::ConstantOp>(m_builder.getIndexType(), m_builder.getIndexAttr(1));
             auto lessThanOne = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult, tupleLen, one);
             auto exitBlock = new mlir::Block;

@@ -142,14 +142,23 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem"> {
     }];
 }
 
+def PylirPy_DictLenOp : PylirPy_Op<"dict.len"> {
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$input);
+    let results = (outs Index:$result);
+
+    let assemblyFormat = [{
+        $input attr-dict
+    }];
+}
+
 // Tuple ops
 
 def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoSideEffect, AlwaysBound]> {
-    let arguments = (ins DynamicType:$tuple, IntegerLike:$index);
+    let arguments = (ins DynamicType:$tuple, Index:$index);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
-        $tuple `[` $index `:` type($index) `]` attr-dict
+        $tuple `[` $index `]` attr-dict
     }];
 
     let description = [{
@@ -159,11 +168,11 @@ def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoSideEffect, AlwaysBo
 }
 
 def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$tuple);
-    let results = (outs IntegerLike:$result);
+    let arguments = (ins DynamicType:$input);
+    let results = (outs Index:$result);
 
     let assemblyFormat = [{
-        $tuple `:` type($result) attr-dict
+        $input attr-dict
     }];
 
     let description = [{

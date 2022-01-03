@@ -194,14 +194,19 @@ public:
         return create<Py::DictDelItemOp>(dict, key);
     }
 
+    Py::DictLenOp createDictLen(mlir::Value dict)
+    {
+        return create<Py::DictLenOp>(dict);
+    }
+
     Py::TupleGetItemOp createTupleGetItem(mlir::Value tuple, mlir::Value index)
     {
         return create<Py::TupleGetItemOp>(tuple, index);
     }
 
-    Py::TupleLenOp createTupleLen(mlir::Type integerLike, mlir::Value tuple)
+    Py::TupleLenOp createTupleLen(mlir::Value tuple)
     {
-        return create<Py::TupleLenOp>(integerLike, tuple);
+        return create<Py::TupleLenOp>(tuple);
     }
 
     Py::ListAppendOp createListAppend(mlir::Value list, mlir::Value item)

@@ -1060,25 +1060,29 @@ struct TupleGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::
     }
 };
 
-struct TupleLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleLenOp>
+template <class T>
+struct BufferLenOpConversion : public ConvertPylirOpToLLVMPattern<T>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::TupleLenOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<T>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult match(pylir::Py::TupleLenOp) const override
+    mlir::LogicalResult match(T) const override
     {
         return mlir::success();
     }
 
-    void rewrite(pylir::Py::TupleLenOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    void rewrite(T op, typename BufferLenOpConversion<T>::OpAdaptor adaptor,
+                 mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto zero =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
         auto one =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto tuple = rewriter.create<mlir::LLVM::BitcastOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPySequenceType()), adaptor.tuple());
-        auto sizePtr = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                          tuple, mlir::ValueRange{zero, one, zero});
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPySequenceType()),
+            adaptor.input());
+        auto sizePtr =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
+                                               tuple, mlir::ValueRange{zero, one, zero});
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, sizePtr);
     }
 };
@@ -2270,7 +2274,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<IsUnboundValueOpConversion>(converter);
     patternSet.insert<TypeOfOpConversion>(converter);
     patternSet.insert<TupleGetItemOpConversion>(converter);
-    patternSet.insert<TupleLenOpConversion>(converter);
+    patternSet.insert<BufferLenOpConversion<pylir::Py::TupleLenOp>>(converter);
     patternSet.insert<FunctionGetFunctionOpConversion>(converter);
     patternSet.insert<GetSlotOpConstantConversion>(converter, 2);
     patternSet.insert<GetSlotOpConversion>(converter);
@@ -2293,6 +2297,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<DictTryGetItemOpConversion>(converter);
     patternSet.insert<DictSetItemOpConversion>(converter);
     patternSet.insert<DictDelItemOpConversion>(converter);
+    patternSet.insert<BufferLenOpConversion<pylir::Py::DictLenOp>>(converter);
     patternSet.insert<InitStrOpConversion>(converter);
     patternSet.insert<PrintOpConversion>(converter);
     patternSet.insert<InitStrFromIntOpConversion>(converter);

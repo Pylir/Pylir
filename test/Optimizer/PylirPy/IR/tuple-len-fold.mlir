@@ -8,7 +8,7 @@ py.globalValue @builtins.tuple = #py.type
 
 func @constant_tuple() -> index {
     %0 = py.constant #py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>
-    %1 = py.tuple.len %0 : index
+    %1 = py.tuple.len %0
     return %1 : index
 }
 

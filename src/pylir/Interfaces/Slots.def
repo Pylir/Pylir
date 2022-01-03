@@ -1,7 +1,8 @@
 #ifndef TYPE_SLOT
-#define TYPE_SLOT(x,...)
+#define TYPE_SLOT(...)
 #endif
 
+TYPE_SLOT(__name__)
 TYPE_SLOT(__new__)
 TYPE_SLOT(__init__)
 TYPE_SLOT(__slots__)
@@ -17,7 +18,7 @@ TYPE_SLOT(__setitem__)
 #undef TYPE_SLOT
 
 #ifndef FUNCTION_SLOT
-#define FUNCTION_SLOT(x,...)
+#define FUNCTION_SLOT(...)
 #endif
 
 FUNCTION_SLOT(__name__)
@@ -29,7 +30,7 @@ FUNCTION_SLOT(__closure__)
 #undef FUNCTION_SLOT
 
 #ifndef BASEEXCEPTION_SLOT
-#define BASEEXCEPTION_SLOT(x,...)
+#define BASEEXCEPTION_SLOT(...)
 #endif
 
 BASEEXCEPTION_SLOT(args)

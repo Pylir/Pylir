@@ -182,7 +182,7 @@ struct SlotTypeSimplifier : mlir::OpRewritePattern<T>
     mlir::LogicalResult match(T op) const override
     {
         static llvm::StringSet<> set = {
-#define TYPE_SLOT(x) #x,
+#define TYPE_SLOT(x, ...) #x,
 #include <pylir/Interfaces/Slots.def>
         };
         if (!set.contains(op.slot()))

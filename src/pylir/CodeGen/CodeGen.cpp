@@ -2224,7 +2224,7 @@ std::vector<mlir::Value> pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, m
                                                             llvm::function_ref<mlir::Value(std::size_t)> posDefault,
                                                             llvm::function_ref<mlir::Value(std::string_view)> kwDefault)
 {
-    auto tupleLen = m_builder.createTupleLen(m_builder.getIndexType(), tuple);
+    auto tupleLen = m_builder.createTupleLen(tuple);
 
     std::vector<mlir::Value> args;
     std::size_t posIndex = 0;
@@ -2540,7 +2540,7 @@ mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Value type, mlir::Value bas
 void pylir::CodeGen::buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,
                                        llvm::function_ref<void(mlir::Value)> iterationCallback)
 {
-    auto tupleSize = m_builder.createTupleLen(m_builder.getIndexType(), tuple);
+    auto tupleSize = m_builder.createTupleLen(tuple);
     auto startConstant = m_builder.create<mlir::arith::ConstantIndexOp>(0);
     auto conditionBlock = BlockPtr{};
     conditionBlock->addArgument(m_builder.getIndexType());
