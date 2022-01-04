@@ -149,6 +149,10 @@ def PylirPy_DictLenOp : PylirPy_Op<"dict.len"> {
     let assemblyFormat = [{
         $input attr-dict
     }];
+
+    let description = [{
+        Returns the amount of key-value pairs stored in `$input`.
+    }];
 }
 
 // Tuple ops
@@ -176,7 +180,7 @@ def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
     }];
 
     let description = [{
-        This op returns the length of `$tuple` as the given integer type. If `$tuple` is not really a tuple (or a
+        This op returns the length of `$input` as the given integer type. If `$tuple` is not really a tuple (or a
         subclass of) then the behaviour of is undefined.
     }];
 
@@ -219,7 +223,8 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEf
     let assemblyFormat = "$function attr-dict";
 
     let description = [{
-
+        This op retrieves the internal function that `$function` wraps. If `$function` is not really a
+        function the behaviour is undefined.
     }];
 }
 
@@ -228,6 +233,10 @@ def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoSideEffect]> {
     let results = (outs Index:$hash);
 
     let assemblyFormat = "$object attr-dict";
+
+    let description = [{
+        Returns a hash value from an arbitrary object using its identity.
+    }];
 }
 
 // Str ops
@@ -237,6 +246,11 @@ def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoSideEffect, DeclareOpInter
     let arguments = (ins Variadic<DynamicType>:$strings);
 
     let assemblyFormat = "$strings attr-dict";
+
+    let description = [{
+        Creates a new string by concatenating all `$strings` from left to right. If any of the operands are not
+        really a string (or a subclass of) the behaviour is undefined.
+    }];
 }
 
 def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect]> {
@@ -244,6 +258,11 @@ def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect]> {
     let results = (outs Index:$hash);
 
     let assemblyFormat = "$object attr-dict";
+
+    let description = [{
+        Returns the hash value for the string `$object`. If `$object` is not really a string (or a subclass of) the
+        behaviour is undefined.
+    }];
 }
 
 def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
@@ -251,6 +270,11 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
     let results = (outs I1:$result);
 
     let assemblyFormat = "$lhs `,` $rhs attr-dict";
+
+    let description = [{
+        Checks whether two strings are equal. If `$lhs` or `$rhs` are not really strings (or a subclass of) the
+        behaviour is undefined.
+    }];
 }
 
 // Int ops
@@ -259,6 +283,10 @@ def PylirPy_IntFromIntegerOp : PylirPy_Op<"int.fromInteger", [NoSideEffect, Alwa
     let arguments = (ins IntegerLike:$input);
 
     let assemblyFormat = "$input `:` type($input) attr-dict";
+
+    let description = [{
+        Converts an arbitrary integer-like into a python integer.
+    }];
 }
 
 def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
@@ -266,6 +294,12 @@ def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
     let results = (outs IntegerLike:$result);
 
     let assemblyFormat = "$input `:` type($result) attr-dict";
+
+    let description = [{
+        Converts a python integer into an arbitrary integer-like. If `$input` is not really an int (or subclass of)
+        the behaviour is undefined.
+        TODO: Overflow behaviour?
+    }];
 }
 
 def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoSideEffect, AlwaysBound]> {
@@ -273,6 +307,11 @@ def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoSideEffect, AlwaysBound]> {
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$input attr-dict";
+
+    let description = [{
+        Converts a python integer into a python string. If `$input` is not really an int (or subclass of)
+        the behaviour is undefined.
+    }];
 }
 
 // Intrinsics
