@@ -1225,6 +1225,33 @@ struct DictDelItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::D
     }
 };
 
+struct BoolToI1OpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::BoolToI1Op>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::BoolToI1Op>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult match(pylir::Py::BoolToI1Op) const override
+    {
+        return mlir::success();
+    }
+
+    void rewrite(pylir::Py::BoolToI1Op op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto zero =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
+        auto one =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
+        auto boolean = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyIntType()), adaptor.input());
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(/*TODO: int*/ rewriter.getI32Type()), boolean,
+            mlir::ValueRange{zero, one, zero});
+        auto load = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
+        auto zeroI =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), load.getType(), rewriter.getI32IntegerAttr(0));
+        rewriter.replaceOpWithNewOp<mlir::LLVM::ICmpOp>(op, mlir::LLVM::ICmpPredicate::ne, load, zeroI);
+    }
+};
+
 struct FunctionGetFunctionOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>::ConvertPylirOpToLLVMPattern;
@@ -2304,6 +2331,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InvokeOpConversion>(converter);
     patternSet.insert<InvokeIndirectOpConversion>(converter);
     patternSet.insert<LandingPadOpConversion>(converter);
+    patternSet.insert<BoolToI1OpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

@@ -85,7 +85,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
             }();
             for (auto [slotName, value] : bases[0].initializer().getSlots().getValue())
             {
-                if (!typeSlots.contains(slotName.getValue()))
+                if (!typeSlots.contains(slotName.getValue()) || slots.count(slotName.getValue()) != 0)
                 {
                     continue;
                 }
@@ -534,7 +534,26 @@ void pylir::CodeGen::createBuiltinsImpl()
                                        });
                                });
     createClass(m_builder.getListBuiltin());
-    createClass(m_builder.getBoolBuiltin(), {integer});
+    createClass(m_builder.getBoolBuiltin(), {integer},
+                [&](SlotMapImpl& slots)
+                {
+                    slots["__repr__"] = createFunction(
+                        "builtins.bool.__repr__", {{"", FunctionParameter::PosOnly, false}},
+                        [&](mlir::ValueRange functionArguments)
+                        {
+                            auto self = functionArguments[0];
+                            // TODO: check its bool
+                            auto i1 = m_builder.createBoolToI1(self);
+                            auto trueStr = m_builder.createConstant("True");
+                            auto falseStr = m_builder.createConstant("False");
+                            auto* successor = new mlir::Block;
+                            successor->addArgument(m_builder.getDynamicType());
+                            m_builder.create<mlir::CondBranchOp>(i1, successor, mlir::ValueRange{trueStr}, successor,
+                                                                 mlir::ValueRange{falseStr});
+                            implementBlock(successor);
+                            m_builder.create<mlir::ReturnOp>(successor->getArgument(0));
+                        });
+                });
 
     createFunction(
         m_builder.getPrintBuiltin().getValue(),
