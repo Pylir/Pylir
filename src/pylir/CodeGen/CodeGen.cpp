@@ -31,16 +31,13 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
         {
             continue;
         }
-        auto pos = iter.name.find_last_of('.');
-        if (pos == std::string_view::npos)
+        constexpr std::string_view builtinsModule = "builtins.";
+        if (iter.name.substr(0, builtinsModule.size()) != builtinsModule)
         {
-            pos = 0;
+            continue;
         }
-        else
-        {
-            pos++;
-        }
-        m_builtinNamespace.emplace(iter.name.substr(pos), iter.name);
+        m_builtinNamespace.emplace(iter.name.substr(builtinsModule.size()),
+                                   mlir::FlatSymbolRefAttr::get(context, iter.name));
     }
 }
 
@@ -929,8 +926,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     {
         if (auto builtin = m_builtinNamespace.find(identifierToken.getValue()); builtin != m_builtinNamespace.end())
         {
-            auto builtinValue =
-                m_builder.createConstant(mlir::FlatSymbolRefAttr::get(m_builder.getContext(), builtin->second));
+            auto builtinValue = m_builder.createConstant(builtin->second);
             if (!m_classNamespace)
             {
                 return builtinValue;

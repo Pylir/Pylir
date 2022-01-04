@@ -30,7 +30,7 @@ class CodeGen
     mlir::Value m_classNamespace{};
     std::vector<std::string> m_qualifierStack;
     std::unordered_map<std::string, std::size_t> m_implNames;
-    std::unordered_map<std::string_view, std::string_view> m_builtinNamespace;
+    std::unordered_map<std::string_view, mlir::FlatSymbolRefAttr> m_builtinNamespace;
 
     struct Loop
     {
