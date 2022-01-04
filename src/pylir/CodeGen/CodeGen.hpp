@@ -240,10 +240,12 @@ class CodeGen
 
     Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
                                      llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation = {},
+                                     mlir::FuncOp* implOut = nullptr,
                                      Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 
     Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
                                      llvm::function_ref<void(mlir::ValueRange)> implementation,
+                                     mlir::FuncOp* implOut = nullptr,
                                      Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 
     template <class AST, class FallBackLocation>
