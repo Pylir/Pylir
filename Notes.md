@@ -40,13 +40,37 @@ Setter:
 
 # Attempting a call
 
+Uses method lookup for `__call__` until a function has been found.
+
+Recursive version: akin to what CPython uses
 ```python
-def call(callable, *args, **kwd):
-  while callable is not function and hasattr(callable, '__call__'):
-    callable = callable.__call__
+def call(self, *args, **kwargs):
+  if not hasattr(self, '__call__'):
+    raise TypeError
+  callable = self.__call__
+  if callable is function:
+    (callable.fptr)(self, *args, **kwargs)
+  if hasattr(callable, '__get__'):
+    callable = call(callable.__get__, self, type(self))
+  call(callable, *args, **kwargs)
+```
+
+Mostly iterative version
+
+```python
+def call(self, *args, **kwd):
+  callable = None
+  while hasattr(self, '__call__'):
+    callable = self.__call__
+    if callable is function:
+      break
+    if hasattr(callable, '__get__'):
+      callable = call(callable.__get__, self, type(self))
+    self = callable
+
   if callable is not function:
     raise TypeError
-  callable(*args, **kwd)
+  return (callable.fptr)(self, *args, **kwd)
 ```
 
 # Creating a class
