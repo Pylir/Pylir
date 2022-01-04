@@ -434,28 +434,27 @@ public:
         mlir::Type returnType;
         llvm::SmallVector<mlir::Type> argumentTypes;
         std::string functionName;
-        // TODO: Some common abstraction to get C Types? Maybe in CABI?
         switch (func)
         {
             case Runtime::Memcmp:
-                returnType = builder.getI32Type();
+                returnType = m_cabi->getInt(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(builder.getI8Type()),
-                                 mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), builder.getI64Type()};
+                                 mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), getIndexType()};
                 functionName = "memcmp";
                 break;
             case Runtime::malloc:
                 returnType = mlir::LLVM::LLVMPointerType::get(builder.getI8Type());
-                argumentTypes = {builder.getI64Type()};
+                argumentTypes = {getIndexType()};
                 functionName = "malloc";
                 break;
             case Runtime::realloc:
                 returnType = mlir::LLVM::LLVMPointerType::get(builder.getI8Type());
-                argumentTypes = {returnType, builder.getI64Type()};
+                argumentTypes = {returnType, getIndexType()};
                 functionName = "realloc";
                 break;
             case Runtime::pylir_gc_alloc:
                 returnType = mlir::LLVM::LLVMPointerType::get(builder.getI8Type());
-                argumentTypes = {builder.getI64Type()};
+                argumentTypes = {getIndexType()};
                 functionName = "pylir_gc_alloc";
                 break;
             case Runtime::mp_init_u64:
@@ -464,7 +463,7 @@ public:
                 functionName = "mp_init_u64";
                 break;
             case Runtime::pylir_str_hash:
-                returnType = builder.getI64Type();
+                returnType = getIndexType();
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyStringType())};
                 functionName = "pylir_str_hash";
                 break;
@@ -485,15 +484,18 @@ public:
                 break;
             case Runtime::mp_unpack:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
-                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()),         getIndexType(),
-                                 builder.getIntegerType(sizeof(mp_order) * 8),         getIndexType(),
-                                 builder.getIntegerType(sizeof(mp_endian) * 8),        getIndexType(),
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()),
+                                 getIndexType(),
+                                 m_cabi->getInt(&getContext()),
+                                 getIndexType(),
+                                 m_cabi->getInt(&getContext()),
+                                 getIndexType(),
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type())};
                 functionName = "mp_unpack";
                 break;
             case Runtime::mp_radix_size_overestimate:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
-                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()), /*TODO: int*/ builder.getI32Type(),
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()), m_cabi->getInt(&getContext()),
                                  mlir::LLVM::LLVMPointerType::get(getIndexType())};
                 functionName = "mp_radix_size_overestimate";
                 break;
@@ -501,8 +503,7 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()),
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), getIndexType(),
-                                 mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                 /*TODO: int*/ builder.getI32Type()};
+                                 mlir::LLVM::LLVMPointerType::get(getIndexType()), m_cabi->getInt(&getContext())};
                 functionName = "mp_to_radix";
                 break;
             case Runtime::pylir_dict_lookup:
@@ -533,6 +534,11 @@ public:
             llvmFunc = m_cabi->declareFunc(builder, loc, returnType, functionName, argumentTypes);
         }
         return m_cabi->callFunc(builder, loc, llvmFunc, args);
+    }
+
+    pylir::CABI& getCABI() const
+    {
+        return *m_cabi;
     }
 
     void initializeGlobal(mlir::LLVM::GlobalOp global, pylir::Py::ObjectAttr objectAttr, mlir::OpBuilder& builder)
@@ -679,16 +685,13 @@ public:
                             createRuntimeCall(global.getLoc(), builder, Runtime::mp_init, {mpIntPtr});
                             auto count = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
                                                                                 builder.getIndexAttr(numElements));
-                            auto integerType = builder.getIntegerType(sizeof(mp_order) * 8);
+                            auto intType = m_cabi->getInt(&getContext());
                             auto order = builder.create<mlir::LLVM::ConstantOp>(
-                                global.getLoc(), integerType,
-                                builder.getIntegerAttr(integerType, mp_order::MP_LSB_FIRST));
+                                global.getLoc(), intType, builder.getIntegerAttr(intType, mp_order::MP_LSB_FIRST));
                             auto size = builder.create<mlir::LLVM::ConstantOp>(
-                                global.getLoc(), getIndexType(), builder.getIndexAttr(sizeof(std::size_t)));
-                            integerType = builder.getIntegerType(sizeof(mp_endian) * 8);
+                                global.getLoc(), getIndexType(), builder.getIndexAttr(getIndexTypeBitwidth() / 8));
                             auto endian = builder.create<mlir::LLVM::ConstantOp>(
-                                global.getLoc(), integerType,
-                                builder.getIntegerAttr(integerType, mp_endian::MP_BIG_ENDIAN));
+                                global.getLoc(), intType, builder.getIntegerAttr(intType, mp_endian::MP_BIG_ENDIAN));
                             auto zero = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
                                                                                builder.getIndexAttr(0));
                             auto buffer = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), result);
@@ -1355,6 +1358,8 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrE
         auto rhsBuffer = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
         auto result = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::Memcmp,
                                                             {lhsBuffer, rhsBuffer, lhsLen});
+        zeroI = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), getTypeConverter()->getCABI().getInt(getContext()),
+                                                        rewriter.getI32IntegerAttr(0));
         auto isZero = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, result, zero);
         rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{isZero}, endBlock);
 
@@ -2191,8 +2196,8 @@ struct InitStrFromIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Me
             mlir::ValueRange{zero, one});
         auto sizePtr = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
                                                           string, mlir::ValueRange{zero, one, zero});
-        auto ten =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(10));
+        auto ten = rewriter.create<mlir::LLVM::ConstantOp>(
+            op.getLoc(), getTypeConverter()->getCABI().getInt(getContext()), rewriter.getI32IntegerAttr(10));
         getTypeConverter()->createRuntimeCall(
             op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_radix_size_overestimate, {mpIntPtr, ten, sizePtr});
         auto capacity = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), sizePtr);

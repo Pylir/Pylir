@@ -32,6 +32,7 @@ func @strEqual(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RHS_STR]][%[[ZERO]], %[[ONE]], %[[TWO]]]
 // CHECK-NEXT: %[[RHS_CHAR:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @memcmp(%[[LHS_CHAR]], %[[RHS_CHAR]], %[[LHS_LEN]])
+// CHECK-NEXT: %[[ZERO_I:.*]] = llvm.mlir.constant(0 : i32)
 // CHECK-NEXT: %[[EQUAL:.*]] = llvm.icmp "eq" %[[RESULT]], %[[ZERO]]
 // CHECK-NEXT: llvm.br ^[[EXIT]](%[[EQUAL]] : i1)
 // CHECK-NEXT: ^[[EXIT]](%[[RESULT:.*]]: i1):

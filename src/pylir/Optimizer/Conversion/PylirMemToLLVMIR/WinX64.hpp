@@ -33,5 +33,10 @@ public:
 
     mlir::Value callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
                          mlir::ValueRange operands) override;
+
+    mlir::Type getInt(mlir::MLIRContext* context) const override
+    {
+        return mlir::IntegerType::get(context, 32);
+    }
 };
 } // namespace pylir::Dialect

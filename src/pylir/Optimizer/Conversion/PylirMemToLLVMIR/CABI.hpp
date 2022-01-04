@@ -27,5 +27,7 @@ public:
 
     virtual mlir::Value callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
                                  mlir::ValueRange operands) = 0;
+
+    virtual mlir::Type getInt(mlir::MLIRContext* context) const = 0;
 };
 } // namespace pylir::Dialect
