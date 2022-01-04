@@ -172,6 +172,68 @@ void pylir::CodeGen::createBuiltinsImpl()
 #define TYPE_SLOT(x, ...) m_builder.getPyStringAttr(#x),
 #include <pylir/Interfaces/Slots.def>
                     }));
+                    slots["__call__"] = createFunction(
+                        "builtins.type.__call__",
+                        {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                         FunctionParameter{"", FunctionParameter::PosRest, false},
+                         FunctionParameter{"", FunctionParameter::KeywordRest, false}},
+                        [&](mlir::ValueRange functionArgs)
+                        {
+                            // TODO: check self is type
+                            auto self = functionArgs[0];
+                            auto args = functionArgs[1];
+                            auto kw = functionArgs[2];
+
+                            auto selfIsType = m_builder.createIs(self, m_builder.createTypeRef());
+
+                            auto* isSelfBlock = new mlir::Block;
+                            auto* constructBlock = new mlir::Block;
+                            m_builder.create<mlir::CondBranchOp>(selfIsType, isSelfBlock, constructBlock);
+
+                            implementBlock(isSelfBlock);
+                            auto tupleLen = m_builder.createTupleLen(args);
+                            auto dictLen = m_builder.createDictLen(args);
+                            auto oneI = m_builder.create<mlir::arith::ConstantIndexOp>(1);
+                            auto zeroI = m_builder.create<mlir::arith::ConstantIndexOp>(0);
+                            auto tupleHasOne =
+                                m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, tupleLen, oneI);
+                            auto dictIsEmpty =
+                                m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, dictLen, zeroI);
+                            auto andComb = m_builder.create<mlir::arith::AndIOp>(tupleHasOne, dictIsEmpty);
+                            auto* typeOfBlock = new mlir::Block;
+                            m_builder.create<mlir::CondBranchOp>(andComb, typeOfBlock, constructBlock);
+
+                            implementBlock(typeOfBlock);
+                            auto item = m_builder.createTupleGetItem(args, zeroI);
+                            auto typeOf = m_builder.createTypeOf(item);
+                            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{typeOf});
+
+                            implementBlock(constructBlock);
+                            auto mro = m_builder.createGetSlot(self, m_builder.createTypeRef(), "__mro__");
+                            auto newMethod = m_builder.createMROLookup(self, "__new__").result();
+                            // TODO: can this even not succeed?
+                            auto tuple = m_builder.createMakeTuple({self, Py::IterExpansion{args}});
+                            auto result = Py::buildCall(m_builder.getCurrentLoc(), m_builder, newMethod, tuple, kw,
+                                                        nullptr, nullptr);
+
+                            auto resultType = m_builder.createTypeOf(result);
+                            auto isSubclass = buildSubclassCheck(resultType, self);
+                            auto* isSubclassBlock = new mlir::Block;
+                            auto* notSubclassBlock = new mlir::Block;
+                            m_builder.create<mlir::CondBranchOp>(isSubclass, isSubclassBlock, notSubclassBlock);
+
+                            implementBlock(notSubclassBlock);
+                            m_builder.create<mlir::ReturnOp>(result);
+
+                            implementBlock(isSubclassBlock);
+                            mro = m_builder.createGetSlot(resultType, m_builder.createTypeRef(), "__mro__");
+                            auto initMethod = m_builder.createMROLookup(resultType, "__init__").result();
+                            // TODO: can this even not succeed?
+                            tuple = m_builder.createMakeTuple({result, Py::IterExpansion{args}});
+                            result = Py::buildCall(m_builder.getCurrentLoc(), m_builder, initMethod, tuple, kw, nullptr,
+                                                   nullptr);
+                            m_builder.create<mlir::ReturnOp>(result);
+                        });
                 });
 
     createClass(m_builder.getObjectBuiltin(), {},
