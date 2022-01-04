@@ -221,7 +221,13 @@ class CodeGen
         bool hasDefaultParam;
     };
 
-    std::vector<mlir::Value> unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
+    struct UnpackResults
+    {
+        mlir::Value parameterValue;
+        mlir::Value parameterSet;
+    };
+
+    std::vector<UnpackResults> unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
                                                 const std::vector<FunctionParameter>& parameters,
                                                 llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
                                                 llvm::function_ref<mlir::Value(std::string_view)> kwDefault = {});
@@ -240,13 +246,16 @@ class CodeGen
 
     Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
                                      llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation = {},
-                                     mlir::FuncOp* implOut = nullptr,
-                                     Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
+                                     mlir::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
+                                     Py::DictAttr kwArgs = {});
 
     Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
                                      llvm::function_ref<void(mlir::ValueRange)> implementation,
-                                     mlir::FuncOp* implOut = nullptr,
-                                     Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
+                                     mlir::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
+                                     Py::DictAttr kwArgs = {});
+
+    std::vector<UnpackResults> createOverload(const std::vector<FunctionParameter>& parameters, mlir::Value tuple,
+                                                mlir::Value dict, Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)

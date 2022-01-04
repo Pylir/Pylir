@@ -2219,14 +2219,15 @@ void pylir::CodeGen::raiseException(mlir::Value exceptionObject)
     m_builder.clearInsertionPoint();
 }
 
-std::vector<mlir::Value> pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
-                                                            const std::vector<FunctionParameter>& parameters,
-                                                            llvm::function_ref<mlir::Value(std::size_t)> posDefault,
-                                                            llvm::function_ref<mlir::Value(std::string_view)> kwDefault)
+std::vector<pylir::CodeGen::UnpackResults>
+    pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
+                                       const std::vector<FunctionParameter>& parameters,
+                                       llvm::function_ref<mlir::Value(std::size_t)> posDefault,
+                                       llvm::function_ref<mlir::Value(std::string_view)> kwDefault)
 {
     auto tupleLen = m_builder.createTupleLen(tuple);
 
-    std::vector<mlir::Value> args;
+    std::vector<UnpackResults> args;
     std::size_t posIndex = 0;
     std::size_t posDefaultsIndex = 0;
     for (auto& iter : parameters)
@@ -2345,7 +2346,10 @@ std::vector<mlir::Value> pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, m
                 auto unboundBlock = BlockPtr{};
                 auto boundBlock = BlockPtr{};
                 boundBlock->addArgument(m_builder.getDynamicType());
-                m_builder.create<mlir::CondBranchOp>(isUnbound, unboundBlock, boundBlock, mlir::ValueRange{argValue});
+                boundBlock->addArgument(m_builder.getI1Type());
+                auto trueConstant = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
+                m_builder.create<mlir::CondBranchOp>(isUnbound, unboundBlock, boundBlock,
+                                                     mlir::ValueRange{argValue, trueConstant});
 
                 implementBlock(unboundBlock);
                 if (!iter.hasDefaultParam)
@@ -2374,15 +2378,16 @@ std::vector<mlir::Value> pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, m
                         }
                         default: PYLIR_UNREACHABLE;
                     }
-                    m_builder.create<mlir::BranchOp>(boundBlock, mlir::ValueRange{defaultArg});
+                    auto falseConstant = m_builder.create<mlir::arith::ConstantIntOp>(false, 1);
+                    m_builder.create<mlir::BranchOp>(boundBlock, mlir::ValueRange{defaultArg, falseConstant});
                 }
 
                 implementBlock(boundBlock);
-                args.push_back(boundBlock->getArgument(0));
+                args.push_back({boundBlock->getArgument(0), boundBlock->getArgument(1)});
                 break;
             }
             case FunctionParameter::PosRest:
-            case FunctionParameter::KeywordRest: args.push_back(argValue); break;
+            case FunctionParameter::KeywordRest: args.push_back({argValue, {}}); break;
         }
     }
     return args;
@@ -2404,7 +2409,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::FuncOp impl
     auto defaultTuple = m_builder.createGetSlot(self, functionType, "__defaults__");
     auto kwDefaultDict = m_builder.createGetSlot(self, functionType, "__kwdefaults__");
 
-    auto args = unpackArgsKeywords(
+    auto unpacked = unpackArgsKeywords(
         tuple, dict, parameters,
         [&](std::size_t posIndex) -> mlir::Value
         {
@@ -2420,7 +2425,10 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::FuncOp impl
             //      affects __defaults__
             return lookup.result();
         });
-    args.insert(args.begin(), self);
+    llvm::SmallVector<mlir::Value> args{self};
+    args.resize(1 + unpacked.size());
+    std::transform(unpacked.begin(), unpacked.end(), args.begin() + 1,
+                   [](const UnpackResults& unpackResults) { return unpackResults.parameterValue; });
 
     auto result = m_builder.create<mlir::CallOp>(implementation, args);
     m_builder.create<mlir::ReturnOp>(result->getResults());

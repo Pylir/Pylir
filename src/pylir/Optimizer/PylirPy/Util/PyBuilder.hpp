@@ -229,6 +229,11 @@ public:
         return create<Py::ObjectHashOp>(object);
     }
 
+    Py::StrCopyOp createStrCopy(mlir::Value string, mlir::Value typeObject)
+    {
+        return create<Py::StrCopyOp>(string, typeObject);
+    }
+
     Py::StrHashOp createStrHash(mlir::Value string)
     {
         return create<Py::StrHashOp>(string);

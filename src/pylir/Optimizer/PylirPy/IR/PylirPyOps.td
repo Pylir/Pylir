@@ -241,6 +241,17 @@ def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoSideEffect]> {
 
 // Str ops
 
+def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [NoSideEffect, AlwaysBound]> {
+    let arguments = (ins DynamicType:$string, DynamicType:$typeObject);
+
+    let assemblyFormat = "$string `:` $typeObject attr-dict";
+
+    let description = [{
+        Creates a copy of `$string` which will have the type `$typeObject`. If `$string` is not really a string (or
+        subclass of) or `$typeObject` is not `builtins.str` (or subclass of) the behaviour is undefined.
+    }];
+}
+
 def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoSideEffect, DeclareOpInterfaceMethods<InferTypeOpInterface>,
                                                     AlwaysBound]> {
     let arguments = (ins Variadic<DynamicType>:$strings);
