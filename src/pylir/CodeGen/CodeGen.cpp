@@ -2600,9 +2600,7 @@ void removeBlockArgumentOperands(mlir::BlockArgument argument)
         else
         {
             llvm::TypeSwitch<mlir::Operation*>(terminator)
-                .Case<pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp, pylir::Py::MakeSetExOp,
-                      pylir::Py::MakeDictExOp, pylir::Py::InvokeOp, pylir::Py::InvokeIndirectOp>(
-                    [&](auto op) { op.unwindDestOperandsMutable().erase(argument.getArgNumber()); })
+                .Case([&](pylir::Py::LandingPadOp op) { op.branchArgsMutable()[index].erase(argument.getArgNumber()); })
                 .Default([](auto&&) { PYLIR_UNREACHABLE; });
         }
     }
@@ -2628,9 +2626,8 @@ mlir::Value pylir::CodeGen::tryRemoveTrivialBlockArgument(mlir::BlockArgument ar
         else
         {
             blockOperand = llvm::TypeSwitch<mlir::Operation*, mlir::Value>(terminator)
-                               .Case<Py::MakeTupleExOp, Py::MakeListExOp, Py::MakeSetExOp, Py::MakeDictExOp,
-                                     Py::InvokeOp, Py::InvokeIndirectOp>(
-                                   [&](auto op) { return op.unwindDestOperands()[argument.getArgNumber()]; })
+                               .Case([&](pylir::Py::LandingPadOp op) -> mlir::Value
+                                     { return op.branchArgs()[index][argument.getArgNumber() - 1]; })
                                .Default([](auto&&) -> mlir::Value { PYLIR_UNREACHABLE; });
         }
         if (blockOperand == same || blockOperand == argument)
@@ -2649,16 +2646,15 @@ mlir::Value pylir::CodeGen::tryRemoveTrivialBlockArgument(mlir::BlockArgument ar
         same = m_builder.createConstant(m_builder.getUnboundAttr());
     }
 
-    std::vector users{argument.use_begin(), argument.use_end()};
     std::vector<mlir::BlockArgument> bas;
-    for (auto user : users)
+    for (auto& user : argument.getUses())
     {
-        auto branch = mlir::dyn_cast<mlir::BranchOpInterface>(user.getUser());
+        auto branch = mlir::dyn_cast<mlir::BranchOpInterface>(user.getOwner());
         if (!branch)
         {
             continue;
         }
-        auto ops = branch.getSuccessorBlockArgument(user->getOperandNumber());
+        auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber());
         // Common case for vast majority of branch ops that don't synthesize ops.
         // Otherwise we are dealing with a branch op that synthesizes arguments and we'll have to specialize for those
         if (ops)
@@ -2668,18 +2664,24 @@ mlir::Value pylir::CodeGen::tryRemoveTrivialBlockArgument(mlir::BlockArgument ar
         else
         {
             llvm::TypeSwitch<mlir::Operation*>(branch)
-                .Case([&](Py::LandingPadOp op)
-                      {
-                          //TODO:
-                          PYLIR_UNREACHABLE;
-                          //bas.emplace_back(op.exceptionPath()->getArguments()[user->getOperandNumber()]);
-                      })
+                .Case(
+                    [&](Py::LandingPadOp op)
+                    {
+                        auto branchArgs = op.branchArgs();
+                        auto result = std::lower_bound(branchArgs.begin(), branchArgs.end(), user.getOperandNumber(),
+                                                       [](mlir::OperandRange range, unsigned index)
+                                                       { return range.getBeginOperandIndex() < index; });
+                        PYLIR_ASSERT(result != branchArgs.end());
+                        bas.emplace_back(
+                            op.successors()[result - branchArgs.end()]->getArguments()[user.getOperandNumber() + 1]);
+                    })
                 .Default([](auto&&) { PYLIR_UNREACHABLE; });
         }
     }
 
     removeBlockArgumentOperands(argument);
     argument.replaceAllUsesWith(same);
+    argument.getOwner()->eraseArgument(argument.getArgNumber());
     std::for_each(bas.begin(), bas.end(), pylir::bind_front(&CodeGen::tryRemoveTrivialBlockArgument, this));
 
     return same;
