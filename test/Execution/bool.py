@@ -3,6 +3,11 @@
 
 print(True)
 # CHECK: True
-
 print(False)
 # CHECK: False
+
+print(str(True) == "True")
+# CHECK: True
+
+print(str(False) == "False")
+# CHECK: True
