@@ -605,6 +605,13 @@ void pylir::CodeGen::createBuiltinsImpl()
     createClass(m_builder.getBoolBuiltin(), {integer},
                 [&](SlotMapImpl& slots)
                 {
+                    slots["__bool__"] =
+                        createFunction("builtins.bool.__bool__", {{"", FunctionParameter::PosOnly, false}},
+                                       [&](mlir::ValueRange functionArguments)
+                                       {
+                                           auto self = functionArguments[0];
+                                           m_builder.create<mlir::ReturnOp>(self);
+                                       });
                     slots["__repr__"] = createFunction(
                         "builtins.bool.__repr__", {{"", FunctionParameter::PosOnly, false}},
                         [&](mlir::ValueRange functionArguments)
