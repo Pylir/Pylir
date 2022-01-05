@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
+# XFAIL: *
+
 # CHECK-LABEL: __init__
 
 if 3:

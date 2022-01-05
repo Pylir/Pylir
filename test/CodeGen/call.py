@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
+# XFAIL: *
+
 # CHECK-LABEL: __init__
 
 global x

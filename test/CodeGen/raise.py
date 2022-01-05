@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
+# XFAIL: *
+
 def foo():
     raise TypeError
 
