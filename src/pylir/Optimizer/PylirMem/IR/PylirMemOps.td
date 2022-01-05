@@ -67,6 +67,22 @@ def PylirMem_InitTupleOp : PylirMem_Op<"initTuple", [DeclareOpInterfaceMethods<I
     let assemblyFormat = "$memory `to` ` ` `(` $initializer `)` (`reuse` $reuse^)? attr-dict";
 }
 
+def PylirMem_InitTuplePrependOp : PylirMem_Op<"initTuplePrepend", [AlwaysBound]> {
+    let results = (outs DynamicType:$result);
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$element, DynamicType:$tuple,
+                                                                    Arg<Optional<DynamicType>, "", [MemWrite]>:$reuse);
+
+    let assemblyFormat = "$memory `to` ` ` `(` $element `,` $tuple `)` (`reuse` $reuse^)? attr-dict";
+}
+
+def PylirMem_InitTuplePopFrontOp : PylirMem_Op<"initTuplePopFront", [AlwaysBound]> {
+    let results = (outs DynamicType:$result);
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$tuple,
+                                                                    Arg<Optional<DynamicType>, "", [MemWrite]>:$reuse);
+
+    let assemblyFormat = "$memory `to` ` ` `(` $tuple `)` (`reuse` $reuse^)? attr-dict";
+}
+
 def PylirMem_InitTupleFromListOp : PylirMem_Op<"initTupleFromList"> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$initializer, Arg<Optional<DynamicType>, "", [MemWrite]>:$reuse);

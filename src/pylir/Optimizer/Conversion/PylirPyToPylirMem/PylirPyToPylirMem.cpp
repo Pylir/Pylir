@@ -25,6 +25,37 @@ struct MakeTupleOpConversion : mlir::OpRewritePattern<pylir::Py::MakeTupleOp>
     }
 };
 
+struct TuplePrependOpConversion : mlir::OpRewritePattern<pylir::Py::TuplePrependOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::TuplePrependOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::TuplePrependOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        auto tuple = rewriter.create<pylir::Py::ConstantOp>(
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
+        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitTuplePrependOp>(op, mem, op.input(), op.tuple(), mlir::Value{});
+        return mlir::success();
+    }
+};
+
+struct TuplePopOpConversion : mlir::OpRewritePattern<pylir::Py::TuplePopFrontOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::TuplePopFrontOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::TuplePopFrontOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        auto tuple = rewriter.create<pylir::Py::ConstantOp>(
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
+        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
+        auto zeroI = rewriter.create<mlir::arith::ConstantIndexOp>(op.getLoc(), 0);
+        auto result = rewriter.create<pylir::Mem::InitTuplePopFrontOp>(op.getLoc(), mem, op.tuple(), mlir::Value{});
+        auto firstElement = rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), op.tuple(), zeroI);
+        rewriter.replaceOp(op, {firstElement, result});
+        return mlir::success();
+    }
+};
+
 struct MakeListOpConversion : mlir::OpRewritePattern<pylir::Py::MakeListOp>
 {
     using mlir::OpRewritePattern<pylir::Py::MakeListOp>::OpRewritePattern;
@@ -191,10 +222,11 @@ void ConvertPylirPyToPylirMem::runOnOperation()
     target.addLegalDialect<pylir::Py::PylirPyDialect, pylir::Mem::PylirMemDialect, mlir::StandardOpsDialect,
                            mlir::arith::ArithmeticDialect>();
 
-    target.addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
-                        pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp,
-                        pylir::Py::BoolFromI1Op, pylir::Py::IntFromIntegerOp, pylir::Py::StrConcatOp,
-                        pylir::Py::IntToStrOp, pylir::Py::StrCopyOp>();
+    target
+        .addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
+                      pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp, pylir::Py::BoolFromI1Op,
+                      pylir::Py::IntFromIntegerOp, pylir::Py::StrConcatOp, pylir::Py::IntToStrOp, pylir::Py::StrCopyOp,
+                      pylir::Py::TuplePopFrontOp, pylir::Py::TuplePrependOp>();
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.insert<MakeTupleOpConversion>(&getContext());
@@ -209,6 +241,8 @@ void ConvertPylirPyToPylirMem::runOnOperation()
     patterns.insert<IntFromIntegerOpConversion>(&getContext());
     patterns.insert<IntToStrOpConversion>(&getContext());
     patterns.insert<StrCopyOpConversion>(&getContext());
+    patterns.insert<TuplePrependOpConversion>(&getContext());
+    patterns.insert<TuplePopOpConversion>(&getContext());
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target, std::move(patterns))))
     {
         signalPassFailure();

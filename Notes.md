@@ -49,28 +49,24 @@ def call(self, *args, **kwargs):
     raise TypeError
   callable = self.__call__
   if callable is function:
-    (callable.fptr)(self, *args, **kwargs)
+    return (callable.fptr)(callable, self, *args, **kwargs)
   if hasattr(callable, '__get__'):
     callable = call(callable.__get__, self, type(self))
-  call(callable, *args, **kwargs)
+  return call(callable, *args, **kwargs)
 ```
 
 Mostly iterative version
 
 ```python
 def call(self, *args, **kwd):
-  callable = None
   while hasattr(self, '__call__'):
     callable = self.__call__
     if callable is function:
-      break
+      return (callable.fptr)(callable, self, *args, **kwd)
     if hasattr(callable, '__get__'):
       callable = call(callable.__get__, self, type(self))
     self = callable
-
-  if callable is not function:
-    raise TypeError
-  return (callable.fptr)(self, *args, **kwd)
+  raise TypeError
 ```
 
 # Creating a class

@@ -10,6 +10,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Text.hpp>
 #include <pylir/Support/Variant.hpp>
@@ -289,8 +290,8 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name); })
             .Case<Py::MakeDictOp, Py::MakeDictExOp>(
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Dict.name); })
-            .Case<Py::MakeFuncOp, Py::GetFunctionOp>(
-                [&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
+            .Case<Py::MakeFuncOp>([&](auto)
+                                  { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
             .Case([&](Py::BoolFromI1Op) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
             .Case<Py::StrConcatOp>([&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Str.name); })
             .Default({});
@@ -395,12 +396,33 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     }
     // If the defining op has the AlwaysBound trait then it is false. Also manually sanction some ops from other
     // dialects
-    if (auto* op = value().getDefiningOp();
-        op && (mlir::isa<mlir::CallOp, mlir::CallIndirectOp>(op) || op->hasTrait<Py::AlwaysBound>()))
+    auto* op = value().getDefiningOp();
+    if (!op)
     {
-        return mlir::BoolAttr::get(getContext(), false);
+        return nullptr;
     }
-    return nullptr;
+    return llvm::TypeSwitch<mlir::Operation*, mlir::OpFoldResult>(op)
+        .Case(
+            [&](mlir::CallOpInterface callOpInterface) -> mlir::OpFoldResult
+            {
+                auto ref = callOpInterface.getCallableForCallee()
+                               .dyn_cast<mlir::SymbolRefAttr>()
+                               .dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+                if (!ref || ref.getValue() != llvm::StringRef{Py::pylirCallIntrinsic})
+                {
+                    return mlir::BoolAttr::get(getContext(), false);
+                }
+                return nullptr;
+            })
+        .Default(
+            [&](mlir::Operation* op) -> mlir::OpFoldResult
+            {
+                if (op->hasTrait<Py::AlwaysBound>())
+                {
+                    return mlir::BoolAttr::get(getContext(), false);
+                }
+                return nullptr;
+            });
 }
 
 mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -432,6 +454,24 @@ mlir::LogicalResult pylir::Py::StrConcatOp::inferReturnTypes(::mlir::MLIRContext
 {
     inferredReturnTypes.push_back(Py::DynamicType::get(context));
     return mlir::success();
+}
+
+mlir::LogicalResult
+    pylir::Py::CallMethodExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
+                                                ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
+                                                ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+{
+    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    return mlir::success();
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::CallMethodExOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return normalDestOperandsMutable();
+    }
+    return unwindDestOperandsMutable();
 }
 
 namespace

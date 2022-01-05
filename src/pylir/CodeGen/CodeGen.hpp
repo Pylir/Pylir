@@ -298,12 +298,12 @@ class CodeGen
 
     [[nodiscard]] auto implementFunction(mlir::FuncOp funcOp)
     {
-        // We are putting InsertionGuard into a unique_ptr to make it moveable and not call its destructor early
-        // when compiling with MSVC
-        auto tuple = std::make_tuple(pylir::ValueReset(m_currentFunc), mlir::OpBuilder::InsertionGuard(m_builder),
-                                     pylir::ValueReset(m_currentLoop), pylir::ValueReset(m_currentExceptBlock));
+        auto tuple = std::make_tuple(
+            mlir::OpBuilder::InsertionGuard(m_builder),
+            pylir::valueResetMany(m_currentFunc, m_currentLoop, m_currentExceptBlock, m_currentLandingPadBlock));
         m_currentLoop = {nullptr, nullptr};
         m_currentExceptBlock = nullptr;
+        m_currentLandingPadBlock = nullptr;
         m_currentFunc = funcOp;
         m_module.push_back(m_currentFunc);
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());

@@ -302,28 +302,6 @@ func @bool_from_I1(%arg0 : i1) -> !py.dynamic {
 
 // -----
 
-func private @test(%self : !py.dynamic, %tuple : !py.dynamic, %dict : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant #py.int<0>
-    return %0 : !py.dynamic
-}
-
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.None = #py.type
-py.globalValue @builtins.function = #py.type
-py.globalValue @builtins.int = #py.type
-
-func @get_function(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0, %1 = py.getFunction %arg0
-    %2 = py.typeOf %0
-    return %2 : !py.dynamic
-}
-
-// CHECK-LABEL: @get_function
-// CHECK: %[[RESULT:.*]] = py.constant @builtins.function
-// CHECK: return %[[RESULT]]
-
-// -----
-
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 

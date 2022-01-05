@@ -209,6 +209,16 @@ public:
         return create<Py::TupleLenOp>(tuple);
     }
 
+    Py::TuplePrependOp createTuplePrepend(mlir::Value element, mlir::Value tuple)
+    {
+        return create<Py::TuplePrependOp>(element, tuple);
+    }
+
+    Py::TuplePopFrontOp createTuplePopFront(mlir::Value tuple)
+    {
+        return create<Py::TuplePopFrontOp>(tuple);
+    }
+
     Py::ListAppendOp createListAppend(mlir::Value list, mlir::Value item)
     {
         return create<Py::ListAppendOp>(list, item);
@@ -252,11 +262,6 @@ public:
     Py::MROLookupOp createMROLookup(mlir::Value mroTuple, llvm::StringRef attribute)
     {
         return create<Py::MROLookupOp>(mroTuple, attribute);
-    }
-
-    Py::GetFunctionOp createGetFunction(mlir::Value callable)
-    {
-        return create<Py::GetFunctionOp>(callable);
     }
 
     Py::LinearContainsOp createLinearContains(mlir::Value mroTuple, mlir::Value element)

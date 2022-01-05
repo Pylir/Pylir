@@ -187,6 +187,36 @@ def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
     let hasFolder = 1;
 }
 
+// TODO: I don't think this should exist but don't have better option until iterators work
+def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBound]> {
+    let arguments = (ins DynamicType:$input, DynamicType:$tuple);
+
+    let assemblyFormat = [{
+        $input `,` $tuple attr-dict
+    }];
+
+    let description = [{
+
+    }];
+
+    let hasFolder = 0;
+}
+
+def PylirPy_TuplePopFrontOp : PylirPy_Op<"tuple.popFront", [NoSideEffect, AlwaysBound]> {
+    let arguments = (ins DynamicType:$tuple);
+    let results = (outs DynamicType:$element, DynamicType:$result);
+
+    let assemblyFormat = [{
+        $tuple attr-dict
+    }];
+
+    let description = [{
+
+    }];
+
+    let hasFolder = 0;
+}
+
 // List ops
 
 def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
@@ -349,17 +379,40 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
     }];
 }
 
-def PylirPy_GetFunctionOp : PylirPy_Op<"getFunction", [AlwaysBound]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$callable);
-    let results = (outs DynamicType:$result, I1:$success);
-
-    let assemblyFormat = "$callable attr-dict";
+class PylirPy_CallMethodBase<string mnemonic, list<OpTrait> traits = []> : PylirPy_Op<mnemonic, traits> {
+    let results = (outs DynamicType:$result);
 
     let description = [{
-        This op does a recursive search through the `__call__` operators results of `$callable` until a result of type
-        `@builtins.function` is found, or the current item has no `__call__` operator. If successful `$success`
-        returns `true` and `$result` is guaranteed to be of type `@builtins.function`. Otherwise `$success` is false
-        and using `$result` is undefined behaviour.
+        This op attempts to call `$callable` using an iterative chain of method lookups of `__call__` and descriptors
+        until a function could be returned and called. If no such function exists `$result` is unbound.
+        `$callable` is typically the result of a `py.mroLookup` for a specific method in the type object of `$self`.
+        `$args` and `$keywords` correspond to the positional and keyword arguments respectively.
+    }];
+}
+
+def PylirPy_CallMethodOp : PylirPy_CallMethodBase<"callMethod"> {
+    let arguments = (ins DynamicType:$method, DynamicType:$args, DynamicType:$keywords);
+    let assemblyFormat = "$method`(``*` $args `,` `*` `*` $keywords `)` attr-dict";
+}
+
+def PylirPy_CallMethodExOp : PylirPy_CallMethodBase<"callMethodEx", [Terminator, AttrSizedOperandSegments,
+                                                                     DeclareOpInterfaceMethods<BranchOpInterface>,
+                                                                     DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+    let successors = (successor AnySuccessor:$happyPath, AnySuccessor:$exceptionPath);
+
+    let arguments = (ins
+                        DynamicType:$method, DynamicType:$args, DynamicType:$keywords,
+                        Variadic<DynamicType>:$normalDestOperands,
+                        Variadic<DynamicType>:$unwindDestOperands);
+
+    let verifier = [{
+        return ::verifyHasLandingpad(*this, exceptionPath());
+    }];
+
+    let assemblyFormat = [{
+        $method `(` `*` $args `,` `*` `*` $keywords `)` attr-dict
+        `\n` ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)`)?
+                     `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)`)?
     }];
 }
 
