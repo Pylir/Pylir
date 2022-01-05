@@ -1,6 +1,8 @@
 
 #include "API.hpp"
 
+#include <iostream>
+
 void pylir_raise(pylir::rt::PyBaseException* exception)
 {
     auto& header = exception->getUnwindHeader();
@@ -12,6 +14,7 @@ void pylir_raise(pylir::rt::PyBaseException* exception)
     {
         case _URC_END_OF_STACK:
             // TODO call sys.excepthook
+            std::cerr << "Uncaught exception!!!";
             std::exit(1);
         case _URC_FATAL_PHASE1_ERROR:
         case _URC_FATAL_PHASE2_ERROR: std::abort();
@@ -244,10 +247,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
         {
             continue;
         }
-        if (offset < start)
-        {
-            PYLIR_UNREACHABLE;
-        }
+        PYLIR_ASSERT(offset >= start);
 
         if (landingPad == 0)
         {
