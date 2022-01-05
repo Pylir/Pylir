@@ -353,7 +353,7 @@ tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStm
     {
         return tl::unexpected{std::move(colon).error()};
     }
-    std::optional reset = pylir::ValueReset(m_inLoop, m_inLoop);
+    std::optional reset = pylir::ValueReset(m_inLoop);
     m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
@@ -403,7 +403,7 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
     {
         return tl::unexpected{std::move(colon).error()};
     }
-    std::optional reset = pylir::ValueReset(m_inLoop, m_inLoop);
+    std::optional reset = pylir::ValueReset(m_inLoop);
     m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
@@ -971,7 +971,8 @@ class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
         for (auto& iter : def.unknown)
         {
             if (std::any_of(scopes.begin(), scopes.end(),
-                            [&](const pylir::IdentifierSet* set) -> bool { return set->count(iter); }))
+                            [&](const pylir::IdentifierSet* set) -> bool { return set->count(iter); })
+                || globals.count(iter))
             {
                 def.nonLocalVariables.insert(iter);
             }
@@ -1006,12 +1007,21 @@ class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
         }
     }
 
-public:
     std::vector<const pylir::IdentifierSet*> scopes;
     std::function<std::string(const pylir::IdentifierToken&)> onError;
-    std::optional<std::string> error;
     std::variant<std::monostate, pylir::Syntax::FuncDef*, pylir::Syntax::ClassDef*> parentDef;
+    const pylir::IdentifierSet& globals;
+
+public:
     pylir::IdentifierSet closures;
+    std::optional<std::string> error;
+
+    NamespaceVisitor(std::vector<const pylir::IdentifierSet*>&& scopes,
+                     std::function<std::string(const pylir::IdentifierToken&)>&& onError,
+                     const pylir::IdentifierSet& globals)
+        : scopes(std::move(scopes)), onError(std::move(onError)), globals(globals)
+    {
+    }
 
     using Visitor::visit;
 
@@ -1022,7 +1032,7 @@ public:
     {
         auto& def = const_cast<pylir::Syntax::ClassDef&>(classDef);
         {
-            pylir::ValueReset reset(parentDef, parentDef);
+            pylir::ValueReset reset(parentDef);
             parentDef = &def;
             Visitor::visit(classDef);
         }
@@ -1035,7 +1045,7 @@ public:
         auto exit = llvm::make_scope_exit([&] { scopes.pop_back(); });
         auto& def = const_cast<pylir::Syntax::FuncDef&>(funcDef);
         {
-            pylir::ValueReset reset(parentDef, parentDef);
+            pylir::ValueReset reset(parentDef);
             parentDef = &def;
             Visitor::visit(funcDef);
         }
@@ -1056,8 +1066,7 @@ tl::expected<pylir::IdentifierSet, std::string>
                 .addLabel(*first, std::nullopt, Diag::ERROR_COLOUR)
                 .emitError()};
     }
-    NamespaceVisitor visitor{{},
-                             std::move(scopes),
+    NamespaceVisitor visitor{std::move(scopes),
                              [&](const IdentifierToken& token)
                              {
                                  return createDiagnosticsBuilder(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
@@ -1065,9 +1074,7 @@ tl::expected<pylir::IdentifierSet, std::string>
                                      .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
                                      .emitError();
                              },
-                             {},
-                             {},
-                             {}};
+                             m_globals};
     visitor.visit(suite);
     if (visitor.error)
     {
@@ -1147,8 +1154,8 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
         visitor.visit(*parameterList);
     }
 
-    pylir::ValueReset resetLoop(m_inLoop, m_inLoop);
-    pylir::ValueReset resetFunc(m_inFunc, m_inFunc);
+    pylir::ValueReset resetLoop(m_inLoop);
+    pylir::ValueReset resetFunc(m_inFunc);
     m_inLoop = false;
     m_inFunc = true;
     auto suite = parseSuite();
