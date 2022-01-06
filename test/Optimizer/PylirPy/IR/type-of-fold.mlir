@@ -28,6 +28,21 @@ func @constant_obj() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @a = #py.type
+
+func @global_value() -> !py.dynamic {
+    %0 = py.constant @a
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @global_value
+// CHECK: %[[CONST:.*]] = py.constant @builtins.type
+// CHECK: return %[[CONST]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
 func @int_attr() -> !py.dynamic {
@@ -142,6 +157,36 @@ func @make_tuple() -> !py.dynamic {
 }
 
 // CHECK-LABEL: @make_tuple
+// CHECK: %[[RESULT:.*]] = py.constant @builtins.tuple
+// CHECK: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+
+func @prepend_tuple(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.tuple.prepend %arg0, %arg1
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @prepend_tuple
+// CHECK: %[[RESULT:.*]] = py.constant @builtins.tuple
+// CHECK: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+
+func @tuple_pop_front(%arg0 : !py.dynamic) -> !py.dynamic {
+    %element, %result = py.tuple.popFront %arg0
+    %1 = py.typeOf %result
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @tuple_pop_front
 // CHECK: %[[RESULT:.*]] = py.constant @builtins.tuple
 // CHECK: return %[[RESULT]]
 
@@ -305,6 +350,21 @@ func @bool_from_I1(%arg0 : i1) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
+func @int_to_str(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.int.toStr %arg0
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @int_to_str
+// CHECK: %[[RESULT:.*]] = py.constant @builtins.str
+// CHECK: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
 func @str_concat(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
     %0 = py.str.concat %arg0, %arg1, %arg2
     %1 = py.typeOf %0
@@ -314,3 +374,19 @@ func @str_concat(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) 
 // CHECK-LABEL: @str_concat
 // CHECK: %[[RESULT:.*]] = py.constant @builtins.str
 // CHECK: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.str.copy %arg0 : %arg1
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @str_copy
+// CHECK-SAME: %{{[[:alnum:]]+}}
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK: return %[[ARG1]]

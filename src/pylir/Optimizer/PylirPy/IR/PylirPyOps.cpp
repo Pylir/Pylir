@@ -268,9 +268,28 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
     return constant();
 }
 
+namespace
+{
+mlir::Attribute resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
+{
+    auto ref = attr.dyn_cast_or_null<mlir::SymbolRefAttr>();
+    if (!ref)
+    {
+        return attr;
+    }
+    auto value = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
+    if (!value || (!value.constant() && onlyConstGlobal))
+    {
+        return attr;
+    }
+    return value.initializerAttr();
+}
+} // namespace
+
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
-    if (auto obj = operands[0].dyn_cast_or_null<Py::ObjectAttr>())
+    auto input = resolveValue(*this, operands[0], false);
+    if (auto obj = input.dyn_cast_or_null<Py::ObjectAttr>())
     {
         return obj.getType();
     }
@@ -282,8 +301,17 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     auto symbol =
         llvm::TypeSwitch<mlir::Operation*, mlir::OpFoldResult>(defOp)
             .Case([&](Py::MakeObjectOp op) { return op.typeObj(); })
-            .Case<Py::ListToTupleOp, Py::MakeTupleOp, Py::MakeTupleExOp>(
+            .Case<Py::ListToTupleOp, Py::MakeTupleOp, Py::MakeTupleExOp, Py::TuplePrependOp>(
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name); })
+            .Case(
+                [&](Py::TuplePopFrontOp op) -> mlir::OpFoldResult
+                {
+                    if (object() == op.result())
+                    {
+                        return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name);
+                    }
+                    return nullptr;
+                })
             .Case<Py::MakeListOp, Py::MakeListExOp>(
                 [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::List.name); })
             .Case<Py::MakeSetOp, Py::MakeSetExOp>(
@@ -293,7 +321,11 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
             .Case<Py::MakeFuncOp>([&](auto)
                                   { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
             .Case([&](Py::BoolFromI1Op) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
-            .Case<Py::StrConcatOp>([&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Str.name); })
+            .Case<Py::IntFromIntegerOp>([&](auto)
+                                        { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Int.name); })
+            .Case<Py::StrConcatOp, Py::IntToStrOp>(
+                [&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Str.name); })
+            .Case([&](Py::StrCopyOp op) { return op.typeObject(); })
             .Default({});
     if (!symbol)
     {
