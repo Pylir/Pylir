@@ -100,9 +100,9 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
     return obj;
 }
 
-mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder, llvm::Twine methodName,
-                                              mlir::Value tuple, mlir::Value kwargs, mlir::Block* exceptionPath,
-                                              mlir::Block* landingPadBlock)
+mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder, llvm::Twine methodName,
+                                                 mlir::Value tuple, mlir::Value kwargs, mlir::Block* notFoundPath,
+                                                 mlir::Block* exceptionPath, mlir::Block* landingPadBlock)
 {
     auto emptyDict = builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(builder.getContext()));
     if (!kwargs)
@@ -115,13 +115,8 @@ mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilde
         loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Type.name));
     auto mroTuple = builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__").result();
     auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
-    auto notFound = new mlir::Block;
     auto exec = new mlir::Block;
-    builder.create<mlir::CondBranchOp>(loc, lookup.success(), exec, notFound);
-
-    implementBlock(builder, notFound);
-    auto exception = Py::buildException(loc, builder, Py::Builtins::TypeError.name, {}, landingPadBlock);
-    raiseException(loc, builder, exception, exceptionPath);
+    builder.create<mlir::CondBranchOp>(loc, lookup.success(), exec, notFoundPath);
 
     implementBlock(builder, exec);
     auto function = builder.create<Py::ConstantOp>(
@@ -176,6 +171,20 @@ mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilde
 
     implementBlock(builder, exitBlock);
     return exitBlock->getArgument(0);
+}
+
+mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder, llvm::Twine methodName,
+                                              mlir::Value tuple, mlir::Value kwargs, mlir::Block* exceptionPath,
+                                              mlir::Block* landingPadBlock)
+{
+    auto* notFound = new mlir::Block;
+    auto result =
+        buildTrySpecialMethodCall(loc, builder, methodName, tuple, kwargs, notFound, exceptionPath, landingPadBlock);
+    mlir::OpBuilder::InsertionGuard guard{builder};
+    implementBlock(builder, notFound);
+    auto exception = Py::buildException(loc, builder, Py::Builtins::TypeError.name, {}, landingPadBlock);
+    raiseException(loc, builder, exception, exceptionPath);
+    return result;
 }
 
 mlir::FunctionType pylir::Py::getUniversalFunctionType(mlir::MLIRContext* context)
