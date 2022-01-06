@@ -918,6 +918,12 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         scope = &getCurrentScope();
     }
     auto result = scope->identifiers.find(identifierToken.getValue());
+    if (result == scope->identifiers.end() && !m_classNamespace)
+    {
+        // Try the global namespace
+        result = m_globalScope.identifiers.find(identifierToken.getValue());
+        scope = &m_globalScope;
+    }
     if (result == scope->identifiers.end())
     {
         if (auto builtin = m_builtinNamespace.find(identifierToken.getValue()); builtin != m_builtinNamespace.end())

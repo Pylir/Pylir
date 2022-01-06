@@ -363,7 +363,7 @@ void pylir::CodeGen::createBuiltinsImpl()
     createClass(m_builder.getStopIterationBuiltin(), {exception},
                 [&](SlotMapImpl& slots)
                 {
-                    slots["__new__"] = createFunction(
+                    slots["__init__"] = createFunction(
                         "builtins.StopIteration.__init__",
                         {FunctionParameter{"", FunctionParameter::PosOnly, false},
                          FunctionParameter{"", FunctionParameter::PosRest, false}},
