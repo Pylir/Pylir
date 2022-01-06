@@ -1561,8 +1561,8 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         endBlock->addArgument(typeConverter->convertType(op.getType()));
 
         rewriter.setInsertionPointToEnd(block);
-        auto str = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), pylir::Py::StringAttr::get(getContext(), adaptor.slot().getValue()));
+        auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
+                                                          pylir::Py::StringAttr::get(getContext(), adaptor.slot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
         auto slotsTuple =
@@ -1641,8 +1641,8 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
 
         rewriter.setInsertionPointToEnd(block);
-        auto str = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), pylir::Py::StringAttr::get(getContext(), adaptor.slot().getValue()));
+        auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
+                                                          pylir::Py::StringAttr::get(getContext(), adaptor.slot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
         auto slotsTuple =
@@ -1728,7 +1728,7 @@ struct InvokeOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Invoke
         llvm::SmallVector<mlir::Type> resultTypes;
         [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
         PYLIR_ASSERT(mlir::succeeded(result));
-        rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(op, resultTypes, adaptor.callee(), adaptor.operands(),
+        rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(op, resultTypes, adaptor.calleeAttr(), adaptor.operands(),
                                                           op.happyPath(), adaptor.normalDestOperands(),
                                                           op.exceptionPath(), adaptor.unwindDestOperands());
         return mlir::success();

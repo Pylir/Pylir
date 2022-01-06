@@ -66,7 +66,7 @@ endif ()
 
 find_package(Threads REQUIRED)
 link_libraries(Threads::Threads)
-# revision a9e8b1ee7fd44b53c555a7823ae8fd1a8209c520
+# revision 560972052a25ada0efd47ddaf21ece1cd286ae65
 find_package(MLIR REQUIRED CONFIG)
 
 if (PYLIR_EMBED_LLD)
@@ -87,20 +87,6 @@ include(AddLLVM)
 include(AddMLIR)
 
 set(LLVM_TABLEGEN_EXE "llvm-tblgen")
-
-# Fedora 34 does not import mlir-tblgen, but one compiled from source does. Tis a workaround to find and get a mlir-tblgen
-# target if it is not defined
-if (NOT TARGET mlir-tblgen)
-    set(MLIR_TABLEGEN_EXECUTABLE ${MLIR_TABLEGEN_EXE})
-    if (NOT IS_ABSOLUTE ${MLIR_TABLEGEN_EXECUTABLE})
-        message(STATUS "Not absolute")
-        find_program(MLIR_TABLEGEN_EXECUTABLE_PROGRAM NAMES ${MLIR_TABLEGEN_EXECUTABLE})
-        set(MLIR_TABLEGEN_EXECUTABLE ${MLIR_TABLEGEN_EXECUTABLE_PROGRAM})
-    endif ()
-    message(STATUS "${MLIR_TABLEGEN_EXECUTABLE}")
-    add_executable(mlir-tblgen IMPORTED GLOBAL)
-    set_target_properties(mlir-tblgen PROPERTIES IMPORTED_LOCATION "${MLIR_TABLEGEN_EXECUTABLE}")
-endif ()
 
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
