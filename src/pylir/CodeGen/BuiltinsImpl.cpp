@@ -359,6 +359,8 @@ void pylir::CodeGen::createBuiltinsImpl()
     createClass(m_builder.getKeyErrorBuiltin(), {lookupError});
     auto nameError = createClass(m_builder.getNameErrorBuiltin(), {exception});
     createClass(m_builder.getUnboundLocalErrorBuiltin(), {nameError});
+    auto arithmeticError = createClass(m_builder.getArithmeticErrorBuiltin(), {exception});
+    createClass(m_builder.getOverflowErrorBuiltin(), {arithmeticError});
 
     createClass(m_builder.getStopIterationBuiltin(), {exception},
                 [&](SlotMapImpl& slots)

@@ -31,6 +31,8 @@ BUILTIN_EXCEPTION(LookupError, "builtins.LookupError", true)
 BUILTIN_EXCEPTION(KeyError, "builtins.KeyError", true)
 BUILTIN_EXCEPTION(IndexError, "builtins.IndexError", true)
 BUILTIN_EXCEPTION(StopIteration, "builtins.StopIteration", true)
+BUILTIN_EXCEPTION(ArithmeticError, "builtins.ArithmeticError", true)
+BUILTIN_EXCEPTION(OverflowError, "builtins.OverflowError", true)
 BUILTIN(Print, "builtins.print", true)
 
 #undef BUILTIN
