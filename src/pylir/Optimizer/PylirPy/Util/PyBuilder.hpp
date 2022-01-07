@@ -224,6 +224,11 @@ public:
         return create<Py::ListAppendOp>(list, item);
     }
 
+    Py::ListLenOp createListLen(mlir::Value list)
+    {
+        return create<Py::ListLenOp>(list);
+    }
+
     Py::ListToTupleOp createListToTuple(mlir::Value list)
     {
         return create<Py::ListToTupleOp>(list);

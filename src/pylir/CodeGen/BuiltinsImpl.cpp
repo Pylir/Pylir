@@ -587,23 +587,65 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                               // TODO: check dict is dict or subclass
                                                               m_builder.createDictSetItem(dict, key, value);
                                                           });
-                });
-    // Stubs
-    createClass(m_builder.getTupleBuiltin());
-    auto integer = createClass(m_builder.getIntBuiltin(), {},
-                               [&](SlotMapImpl& slots)
-                               {
-                                   slots["__repr__"] = createFunction(
-                                       "builtins.int.__repr__", {{"", FunctionParameter::PosOnly, false}},
+                    slots["__len__"] =
+                        createFunction("builtins.dict.__len__", {{"", FunctionParameter::PosOnly, false}},
                                        [&](mlir::ValueRange functionArguments)
                                        {
                                            auto self = functionArguments[0];
-                                           // TODO: check its int
-                                           auto asStr = m_builder.createIntToStr(self);
-                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asStr});
+                                           // TODO: maybe check its dict
+                                           auto len = m_builder.createDictLen(self);
+                                           auto integer = m_builder.createIntFromInteger(len);
+                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
                                        });
-                               });
-    createClass(m_builder.getListBuiltin());
+                });
+    // Stubs
+    createClass(m_builder.getTupleBuiltin(), {},
+                [&](SlotMapImpl& slots)
+                {
+                    slots["__len__"] =
+                        createFunction("builtins.tuple.__len__", {{"", FunctionParameter::PosOnly, false}},
+                                       [&](mlir::ValueRange functionArguments)
+                                       {
+                                           auto self = functionArguments[0];
+                                           // TODO: maybe check its tuple
+                                           auto len = m_builder.createTupleLen(self);
+                                           auto integer = m_builder.createIntFromInteger(len);
+                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
+                                       });
+                });
+    auto integer = createClass(
+        m_builder.getIntBuiltin(), {},
+        [&](SlotMapImpl& slots)
+        {
+            slots["__repr__"] = createFunction("builtins.int.__repr__", {{"", FunctionParameter::PosOnly, false}},
+                                               [&](mlir::ValueRange functionArguments)
+                                               {
+                                                   auto self = functionArguments[0];
+                                                   // TODO: check its int
+                                                   auto asStr = m_builder.createIntToStr(self);
+                                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asStr});
+                                               });
+            slots["__index__"] = createFunction("builtins.int.__index__", {{"", FunctionParameter::PosOnly, false}},
+                                                [&](mlir::ValueRange functionArguments)
+                                                {
+                                                    auto self = functionArguments[0];
+                                                    m_builder.create<mlir::ReturnOp>(self);
+                                                });
+        });
+    createClass(m_builder.getListBuiltin(), {},
+                [&](SlotMapImpl& slots)
+                {
+                    slots["__len__"] =
+                        createFunction("builtins.list.__len__", {{"", FunctionParameter::PosOnly, false}},
+                                       [&](mlir::ValueRange functionArguments)
+                                       {
+                                           auto self = functionArguments[0];
+                                           // TODO: maybe check its list
+                                           auto len = m_builder.createListLen(self);
+                                           auto integer = m_builder.createIntFromInteger(len);
+                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
+                                       });
+                });
     createClass(m_builder.getBoolBuiltin(), {integer},
                 [&](SlotMapImpl& slots)
                 {
@@ -712,4 +754,20 @@ void pylir::CodeGen::createBuiltinsImpl()
         nullptr, {},
         m_builder.getDictAttr({{m_builder.getPyStringAttr("sep"), m_builder.getPyStringAttr(" ")},
                                {m_builder.getPyStringAttr("end"), m_builder.getPyStringAttr("\n")}}));
+    createFunction(m_builder.getLenBuiltin().getValue(),
+                   {
+                       {"", FunctionParameter::PosOnly, false},
+                   },
+                   [&](mlir::ValueRange functionArguments)
+                   {
+                       auto object = functionArguments[0];
+                       auto tuple = m_builder.createMakeTuple({object});
+                       auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__len__", tuple,
+                                                                {}, nullptr, nullptr);
+                       tuple = m_builder.createMakeTuple({result});
+                       result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__index__", tuple, {},
+                                                           nullptr, nullptr);
+                       // TODO: Check not negative && fits in host size_t
+                       m_builder.create<mlir::ReturnOp>(result);
+                   });
 }

@@ -2438,6 +2438,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitSequence<pylir::Mem::InitTupleOp>>(converter);
     patternSet.insert<InitTupleFromListOpConversion>(converter);
     patternSet.insert<ListAppendOpConversion>(converter);
+    patternSet.insert<BufferLenOpConversion<pylir::Py::ListLenOp>>(converter);
     patternSet.insert<RaiseOpConversion>(converter);
     patternSet.insert<InitIntOpConversion>(converter);
     patternSet.insert<ObjectHashOpConversion>(converter);

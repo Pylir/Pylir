@@ -233,6 +233,20 @@ def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
     }];
 }
 
+def PylirPy_ListLenOp : PylirPy_Op<"list.len", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$input);
+    let results = (outs Index:$result);
+
+    let assemblyFormat = [{
+        $input attr-dict
+    }];
+
+    let description = [{
+        This op returns the length of `$input` as the given integer type. If `$input` is not really a list (or a
+        subclass of) then the behaviour of is undefined.
+    }];
+}
+
 def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$list);
 
