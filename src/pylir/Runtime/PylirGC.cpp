@@ -1,6 +1,8 @@
-#include "API.hpp"
+#include "PylirGC.hpp"
 
 #include <cstdlib>
+
+#include "API.hpp"
 
 void* pylir_gc_alloc(size_t size)
 {

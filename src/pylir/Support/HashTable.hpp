@@ -8,6 +8,8 @@
 #include <memory>
 #include <type_traits>
 
+#include "BufferComponent.hpp"
+
 namespace pylir
 {
 template <class Key, class Value, class Hasher = std::hash<Key>, class Equality = std::equal_to<Key>,
@@ -46,176 +48,13 @@ class HashTable
         }
     }
 
-    template <class T>
-    class BufferComponent
-    {
-        std::size_t m_size{};
-        std::size_t m_capacity{};
-        T* m_data = nullptr;
-
-        static_assert(std::is_default_constructible_v<Allocator<T>>,
-                      "BufferComponent only allows default constructible stateless allocator implementations");
-
-        static T* allocate(std::size_t capacity)
-        {
-            return Allocator<T>{}.allocate(capacity);
-        }
-
-        static void deallocate(T* data, std::size_t capacity)
-        {
-            if (data)
-            {
-                Allocator<T>{}.deallocate(data, capacity);
-            }
-        }
-
-        void destruct()
-        {
-            std::destroy_n(m_data, m_size);
-            deallocate(m_data, m_capacity);
-        }
-
-        void ensureCapacity()
-        {
-            if (m_size <= m_capacity)
-            {
-                return;
-            }
-            auto prevCap = m_capacity;
-            m_capacity *= 2;
-            m_capacity = std::max(m_size, m_capacity);
-            auto* newData = allocate(m_capacity);
-            std::uninitialized_move_n(m_data, m_size - 1, newData);
-            deallocate(m_data, prevCap);
-            m_data = newData;
-        }
-
-    public:
-        BufferComponent() = default;
-
-        ~BufferComponent()
-        {
-            destruct();
-        }
-
-        BufferComponent(const BufferComponent& rhs)
-            : m_size(rhs.m_size), m_capacity(rhs.m_capacity), m_data(allocate(m_capacity))
-        {
-            std::uninitialized_copy_n(rhs.m_data, m_size, m_data);
-        }
-
-        BufferComponent(BufferComponent&& rhs) noexcept
-            : m_size(std::exchange(rhs.m_size, 0)),
-              m_capacity(std::exchange(rhs.m_capacity, 0)),
-              m_data(std::exchange(rhs.m_data, nullptr))
-        {
-        }
-
-        BufferComponent& operator=(const BufferComponent& rhs) noexcept
-        {
-            if (m_size > rhs.m_size)
-            {
-                std::destroy_n(m_data + rhs.m_size, m_size - rhs.m_size);
-            }
-            auto prevSize = m_size;
-            m_size = rhs.m_size;
-            ensureCapacity();
-            std::copy_n(rhs.m_data, std::min(prevSize, m_size), m_data);
-            if (prevSize < rhs.m_size)
-            {
-                std::uninitialized_copy_n(rhs.m_data + prevSize, rhs.m_size - prevSize, m_data + prevSize);
-            }
-            return *this;
-        }
-
-        BufferComponent& operator=(BufferComponent&& rhs) noexcept
-        {
-            destruct();
-            m_size = std::exchange(rhs.m_size, 0);
-            m_capacity = std::exchange(rhs.m_capacity, 0);
-            m_data = std::exchange(rhs.m_data, nullptr);
-            return *this;
-        }
-
-        std::size_t size() const
-        {
-            return m_size;
-        }
-
-        T* data()
-        {
-            return m_data;
-        }
-
-        const T* data() const
-        {
-            return m_data;
-        }
-
-        T& operator[](std::size_t index)
-        {
-            return m_data[index];
-        }
-
-        const T& operator[](std::size_t index) const
-        {
-            return m_data[index];
-        }
-
-        T& back()
-        {
-            return (*this)[m_size - 1];
-        }
-
-        const T& back() const
-        {
-            return (*this)[m_size - 1];
-        }
-
-        void push_back(T&& value)
-        {
-            m_size++;
-            ensureCapacity();
-            new (&m_data[m_size - 1]) T{std::move(value)};
-        }
-
-        void push_back(const T& value)
-        {
-            m_size++;
-            ensureCapacity();
-            new (&m_data[m_size - 1]) T{value};
-        }
-
-        template <class... Args>
-        void emplace_back(Args&&... args)
-        {
-            m_size++;
-            ensureCapacity();
-            new (&m_data[m_size - 1]) T{std::forward<Args>(args)...};
-        }
-
-        void erase(std::size_t index)
-        {
-            std::move(m_data + index + 1, m_data + m_size, m_data + index);
-            m_size--;
-            std::destroy_at(m_data + m_size);
-            return;
-        }
-
-        void clear()
-        {
-            std::destroy_n(m_data, m_size);
-            m_size = 0;
-        }
-    };
-
     struct Pair
     {
         Key key;
         Value value;
     };
 
-    BufferComponent<Pair> m_values;
+    BufferComponent<Pair, Allocator> m_values;
     std::size_t m_bucketCount{};
     Index* m_buckets{};
 

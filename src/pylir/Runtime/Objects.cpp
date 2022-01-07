@@ -4,27 +4,18 @@
 
 using namespace pylir::rt;
 
-class StackTuple : public PySequence
-{
-public:
-    StackTuple(PyObject** data, std::size_t size)
-        : PySequence(reinterpret_cast<PyTypeObject*>(&Builtin::Tuple), {size, size, data})
-    {
-    }
-};
-
 PyObject* PyObject::getSlot(int index)
 {
-    return reinterpret_cast<PyObject**>(this)[m_type->getOffset() + index];
+    return reinterpret_cast<PyObject**>(this)[m_type->m_offset + index];
 }
 
 PyObject* PyObject::getSlot(std::string_view name)
 {
-    PySequence* slotsTuple = getType()->getSlot(PyTypeObject::__slots__)->cast<PySequence>();
-    for (std::size_t i = 0; i < slotsTuple->len(); i++)
+    PySequence& slotsTuple = type(*this).getSlot(PyTypeObject::__slots__)->cast<PySequence>();
+    for (std::size_t i = 0; i < slotsTuple.len(); i++)
     {
-        auto* str = slotsTuple->getItem(i)->cast<PyString>();
-        if (*str == name)
+        auto& str = slotsTuple.getItem(i).cast<PyString>();
+        if (str == name)
         {
             return getSlot(i);
         }
@@ -32,63 +23,19 @@ PyObject* PyObject::getSlot(std::string_view name)
     return nullptr;
 }
 
-PyObject* PyObject::call(PySequence* args, PyDict* keywords)
+bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 {
-    auto current = this;
-    while (current && !current->isa<PyFunction>())
-    {
-        current = current->getType()->getSlot(PyTypeObject::__call__);
-    }
-    if (!current)
-    {
-        // TODO: exception
-    }
-    auto* function = current->cast<PyFunction>();
-    return function->call(args, keywords);
+    auto& mro = type(object).getSlot(PyTypeObject::__mro__)->cast<PySequence>();
+    return std::find(mro.begin(), mro.end(), &typeObject) != mro.end();
 }
 
-PyObject* PyObject::call(std::initializer_list<PyObject*> args)
+bool PyObject::operator==(PyObject& other)
 {
-    StackTuple tuple(const_cast<PyObject**>(args.begin()), args.size());
-    PyDict dict;
-    return call(&tuple, &dict);
-}
-
-bool PyObject::isInstanceOf(pylir::rt::PyObject* typeObject)
-{
-    auto mro = m_type->getMRO();
-    return std::find(mro->begin(), mro->end(), typeObject) != mro->end();
-}
-
-std::size_t PyObjectHasher::operator()(PyObject* object) const noexcept
-{
-    auto* hashFunction = object->getType()->getSlot(PyTypeObject::__hash__);
-    PYLIR_ASSERT(hashFunction);
-    auto* integer = hashFunction->call({object})->dyn_cast<PyInt>();
-    if (!integer)
+    PyObject& eqFunc = *type(*this).getSlot(PyTypeObject::__eq__);
+    PyObject& boolean = eqFunc(*this, other);
+    if (!type(boolean).is(Builtins::Bool))
     {
-        // TODO: something
+        // TODO: TypeError
     }
-    return integer->to<std::size_t>();
-}
-
-bool PyObjectEqual::operator()(PyObject* lhs, PyObject* rhs) const noexcept
-{
-    auto* eqFunction = lhs->getType()->getSlot(PyTypeObject::__eq__);
-    PYLIR_ASSERT(eqFunction);
-    auto* boolean = eqFunction->call({lhs, rhs})->dyn_cast<PyInt>();
-    if (!boolean) // TODO: probably need to check its EXACTLY a boolean
-    {
-    }
-    return boolean->boolean();
-}
-
-PyObject* PyDict::tryGetItem(PyObject* key)
-{
-    auto result = m_table.find(key);
-    if (result == m_table.end())
-    {
-        return nullptr;
-    }
-    return result->value;
+    return boolean.cast<PyInt>().boolean();
 }

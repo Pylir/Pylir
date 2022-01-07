@@ -1,11 +1,11 @@
 
-#include "API.hpp"
-
 #include <iostream>
 
-void pylir_raise(pylir::rt::PyBaseException* exception)
+#include "API.hpp"
+
+void pylir_raise(pylir::rt::PyBaseException& exception)
 {
-    auto& header = exception->getUnwindHeader();
+    auto& header = exception.getUnwindHeader();
     std::memset(&header, 0, sizeof(header));
     header.exception_cleanup = +[](_Unwind_Reason_Code, _Unwind_Exception*) { /*NOOP for now*/ };
     header.exception_class = pylir::rt::PyBaseException::EXCEPTION_CLASS;
@@ -268,7 +268,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
             {
                 // catch clauses
                 auto* typeObject = readTypeObject(typeIndex, classInfo, typeEncoding);
-                if (!nativeException && typeObject == &pylir::rt::Builtin::BaseException)
+                if (!nativeException && typeObject == &pylir::rt::Builtins::BaseException)
                 {
                     // TODO: synthesize some kind of foreign exception object that can't be handled by user code.
                     //       That way we can safely execute code, such as finally blocks. Those can't be part
@@ -276,7 +276,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
                     PYLIR_ASSERT(false && "Not yet implemented");
                 }
                 auto* pyException = pylir::rt::PyBaseException::fromUnwindHeader(exception);
-                if (reinterpret_cast<pylir::rt::PyObject*>(pyException)->isInstanceOf(typeObject))
+                if (isinstance(*pyException, *typeObject))
                 {
                     return {_URC_HANDLER_FOUND, landingPad, static_cast<std::uint32_t>(typeIndex)};
                 }
