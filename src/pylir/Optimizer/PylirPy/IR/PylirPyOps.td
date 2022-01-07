@@ -751,17 +751,17 @@ def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [NoSideEffect, AlwaysBound]
 
 // Memory operations
 
-def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [Symbol]> {
+def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>]> {
     let arguments = (ins
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility,
             UnitAttr:$constant,
-            PylirPy_ObjectAttr:$initializer);
+            OptionalAttr<PylirPy_ObjectAttr>:$initializer);
 
     let results = (outs);
 
     let assemblyFormat = [{
-        ($sym_visibility^)? (`const` $constant^)? $sym_name `=` $initializer attr-dict
+        ($sym_visibility^)? (`const` $constant^)? $sym_name (`=` $initializer^)? attr-dict
     }];
 
     let description = [{
@@ -769,7 +769,13 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [Symbol]> {
         are undefined behaviour.
     }];
 
-    let verifier = [{ return ::verify(*this, initializer()); }];
+    let verifier = [{
+        if (!isDeclaration())
+        {
+            return ::verify(*this, *initializer());
+        }
+        return mlir::success();
+    }];
 }
 
 def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {

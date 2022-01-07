@@ -384,7 +384,8 @@ public:
     {
         auto typeObject = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getType().getAttr());
         PYLIR_ASSERT(typeObject);
-        auto slots = typeObject.initializer().getSlots();
+        PYLIR_ASSERT(!typeObject.isDeclaration() && "Type objects can't be declarations");
+        auto slots = typeObject.initializer()->getSlots();
         unsigned count = 0;
         auto result = llvm::find_if(slots.getValue(), [](auto pair) { return pair.first.getValue() == "__slots__"; });
         if (result != slots.getValue().end())
@@ -545,8 +546,9 @@ public:
     {
         builder.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
         mlir::Value undef = builder.create<mlir::LLVM::UndefOp>(global.getLoc(), global.getType());
-        auto typeObjectAttr =
-            m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getType().getValue()).initializer();
+        auto globalValueOp = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getType().getValue());
+        PYLIR_ASSERT(!globalValueOp.isDeclaration() && "Type objects can't be a declaration");
+        auto typeObjectAttr = *globalValueOp.initializer();
         auto typeObj = builder.create<mlir::LLVM::AddressOfOp>(
             global.getLoc(), mlir::LLVM::LLVMPointerType::get(typeOf(typeObjectAttr)), objectAttr.getType());
         auto bitcast = builder.create<mlir::LLVM::BitcastOp>(
@@ -795,11 +797,17 @@ public:
         mlir::LLVM::AddressOfOp address;
         if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
         {
-            address = builder.create<mlir::LLVM::AddressOfOp>(
-                loc,
-                mlir::LLVM::LLVMPointerType::get(
-                    typeOf(m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getValue()).initializer())),
-                ref);
+            auto globalValueOp = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
+            if (globalValueOp.initializer())
+            {
+                address = builder.create<mlir::LLVM::AddressOfOp>(
+                    loc, mlir::LLVM::LLVMPointerType::get(typeOf(*globalValueOp.initializer())), ref);
+            }
+            else
+            {
+                address = builder.create<mlir::LLVM::AddressOfOp>(
+                    loc, mlir::LLVM::LLVMPointerType::get(getPyObjectType(0)), ref);
+            }
         }
         else
         {
@@ -833,7 +841,9 @@ public:
     {
         if (auto ref = attr.dyn_cast<mlir::FlatSymbolRefAttr>())
         {
-            return m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).initializer().dyn_cast<T>();
+            auto globalValueOp = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
+            PYLIR_ASSERT(!globalValueOp.isDeclaration() && "Type objects can't be a declaration");
+            return globalValueOp.initializer()->dyn_cast<T>();
         }
         return attr.dyn_cast<T>();
     }
@@ -891,7 +901,15 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
 
     void rewrite(pylir::Py::GlobalValueOp op, OpAdaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto type = getTypeConverter()->typeOf(op.initializer());
+        mlir::Type type;
+        if (op.isDeclaration())
+        {
+            type = getTypeConverter()->getPyObjectType();
+        }
+        else
+        {
+            type = getTypeConverter()->typeOf(*op.initializer());
+        }
         mlir::LLVM::Linkage linkage;
         switch (op.getVisibility())
         {
@@ -899,16 +917,27 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
             case mlir::SymbolTable::Visibility::Private: linkage = mlir::LLVM::linkage::Linkage::Internal; break;
             case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
         }
+        if (op.isDeclaration())
+        {
+            linkage = mlir::LLVM::linkage::Linkage::External;
+        }
         static llvm::DenseSet<llvm::StringRef> immutable = {
             pylir::Py::Builtins::Tuple.name,
             pylir::Py::Builtins::Float.name,
             pylir::Py::Builtins::Str.name,
         };
-        bool constant = !needToBeRuntimeInit(op.initializer())
-                        && (op.constant() || immutable.contains(op.initializer().getType().getValue()));
+        bool constant = op.constant();
+        if (!op.isDeclaration())
+        {
+            constant = (constant || immutable.contains(op.initializer()->getType().getValue()))
+                       && !needToBeRuntimeInit(*op.initializer());
+        }
         auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, constant, linkage, op.getName(),
                                                                         mlir::Attribute{});
-        getTypeConverter()->initializeGlobal(global, op.initializer(), rewriter);
+        if (!op.isDeclaration())
+        {
+            getTypeConverter()->initializeGlobal(global, *op.initializer(), rewriter);
+        }
     }
 };
 

@@ -437,11 +437,11 @@ public:
         return create<Py::IntToStrOp>(object);
     }
 
-    Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant, Py::ObjectAttr initializer,
-                                        bool external = false)
+    Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant = false,
+                                        llvm::Optional<Py::ObjectAttr> initializer = {}, bool external = false)
     {
         return create<Py::GlobalValueOp>(symbolName, external ? mlir::StringAttr{} : getStringAttr("private"), constant,
-                                         initializer);
+                                         initializer.getValueOr(Py::ObjectAttr{}));
     }
 
     Py::GlobalHandleOp createGlobalHandle(llvm::StringRef symbolName)

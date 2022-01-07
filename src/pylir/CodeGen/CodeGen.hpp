@@ -254,6 +254,8 @@ class CodeGen
                                      mlir::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
                                      Py::DictAttr kwArgs = {});
 
+    Py::GlobalValueOp createExternal(llvm::StringRef objectName);
+
     std::vector<UnpackResults> createOverload(const std::vector<FunctionParameter>& parameters, mlir::Value tuple,
                                                 mlir::Value dict, Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 

@@ -38,33 +38,33 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
         PYLIR_ASSERT(bases.size() == 1 && "Multiply inheritance not yet implemented");
 
         {
-            auto result = llvm::find_if(bases[0].initializer().getSlots().getValue(),
+            auto result = llvm::find_if(bases[0].initializer()->getSlots().getValue(),
                                         [](auto pair) { return pair.first == "__mro__"; });
             auto array = m_module.lookupSymbol<Py::GlobalValueOp>(result->second.cast<mlir::FlatSymbolRefAttr>())
                              .initializer()
-                             .cast<Py::TupleAttr>()
+                             ->cast<Py::TupleAttr>()
                              .getValue();
             mro.insert(mro.end(), array.begin(), array.end());
         }
         {
-            auto result = llvm::find_if(bases[0].initializer().getSlots().getValue(),
+            auto result = llvm::find_if(bases[0].initializer()->getSlots().getValue(),
                                         [](auto pair) { return pair.first == "__slots__"; });
-            if (result != bases[0].initializer().getSlots().getValue().end())
+            if (result != bases[0].initializer()->getSlots().getValue().end())
             {
                 auto refAttr = result->second.cast<mlir::FlatSymbolRefAttr>();
                 if (auto iter = slots.find("__slots__"); iter != slots.end())
                 {
                     auto array = m_module.lookupSymbol<Py::GlobalValueOp>(refAttr)
                                      .initializer()
-                                     .cast<Py::TupleAttr>()
+                                     ->cast<Py::TupleAttr>()
                                      .getValue();
                     llvm::SmallVector<mlir::Attribute> currentSlots{array.begin(), array.end()};
                     auto thisSlots = pylir::match(
                         iter->second,
                         [](mlir::Operation* op)
-                        { return mlir::cast<Py::GlobalValueOp>(op).initializer().cast<Py::TupleAttr>(); },
+                        { return mlir::cast<Py::GlobalValueOp>(op).initializer()->cast<Py::TupleAttr>(); },
                         [&](mlir::FlatSymbolRefAttr ref)
-                        { return m_module.lookupSymbol<Py::GlobalValueOp>(ref).initializer().cast<Py::TupleAttr>(); });
+                        { return m_module.lookupSymbol<Py::GlobalValueOp>(ref).initializer()->cast<Py::TupleAttr>(); });
                     currentSlots.insert(currentSlots.end(), thisSlots.getValue().begin(), thisSlots.getValue().end());
                     slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr(currentSlots));
                 }
@@ -83,7 +83,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                 set.erase("__name__");
                 return set;
             }();
-            for (auto [slotName, value] : bases[0].initializer().getSlots().getValue())
+            for (auto [slotName, value] : bases[0].initializer()->getSlots().getValue())
             {
                 if (!typeSlots.contains(slotName.getValue()) || slots.count(slotName.getValue()) != 0)
                 {
@@ -177,17 +177,22 @@ std::vector<pylir::CodeGen::UnpackResults>
         [&](std::string_view name)
         {
             auto result = std::find_if(kwArgs.getValue().begin(), kwArgs.getValue().end(),
-                                    [&](const auto& pair)
-                                    {
-                                        auto str = pair.first.template dyn_cast<mlir::StringAttr>();
-                                        if (!str)
-                                        {
-                                            return false;
-                                        }
-                                        return str.getValue() == llvm::StringRef{name};
-                                    });
+                                       [&](const auto& pair)
+                                       {
+                                           auto str = pair.first.template dyn_cast<mlir::StringAttr>();
+                                           if (!str)
+                                           {
+                                               return false;
+                                           }
+                                           return str.getValue() == llvm::StringRef{name};
+                                       });
             return m_builder.createConstant(result->second);
         });
+}
+
+pylir::Py::GlobalValueOp pylir::CodeGen::createExternal(llvm::StringRef objectName)
+{
+    return m_builder.createGlobalValue(objectName, true);
 }
 
 void pylir::CodeGen::createBuiltinsImpl()
@@ -320,8 +325,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<mlir::ReturnOp>(result);
                         });
                 });
-    auto baseException =
-        createClass(m_builder.getBaseExceptionBuiltin(), {},
+    auto baseException = createClass(
+        m_builder.getBaseExceptionBuiltin(), {},
         [&](SlotMapImpl& slots)
         {
             slots["__new__"] =
@@ -490,102 +495,100 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
                                                       });
                 });
-    createClass(m_builder.getStrBuiltin(), {},
-                [&](SlotMapImpl& slots)
+    createClass(
+        m_builder.getStrBuiltin(), {},
+        [&](SlotMapImpl& slots)
+        {
+            mlir::FuncOp newFunction;
+            slots["__new__"] = createFunction(
+                "builtins.str.__new__",
+                {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                 FunctionParameter{"", FunctionParameter::PosRest, false},
+                 FunctionParameter{"", FunctionParameter::KeywordRest, false}},
+                [&](mlir::Value functionObj, mlir::ValueRange functionArguments)
                 {
-                    mlir::FuncOp newFunction;
-                    slots["__new__"] = createFunction(
-                        "builtins.str.__new__",
-                        {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                         FunctionParameter{"", FunctionParameter::PosRest, false},
-                         FunctionParameter{"", FunctionParameter::KeywordRest, false}},
-                        [&](mlir::Value functionObj, mlir::ValueRange functionArguments)
-                        {
-                            // TODO: probably check that clazz is a type?
-                            auto clazz = functionArguments[0];
-                            mlir::Value isStr = m_builder.createIs(clazz, m_builder.createStrRef());
-                            auto* subClass = new mlir::Block;
-                            auto* normal = new mlir::Block;
-                            m_builder.create<mlir::CondBranchOp>(isStr, normal, subClass);
+                    // TODO: probably check that clazz is a type?
+                    auto clazz = functionArguments[0];
+                    mlir::Value isStr = m_builder.createIs(clazz, m_builder.createStrRef());
+                    auto* subClass = new mlir::Block;
+                    auto* normal = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(isStr, normal, subClass);
 
-                            implementBlock(subClass);
-                            {
-                                llvm::SmallVector args{functionObj};
-                                args.push_back(m_builder.createStrRef());
-                                args.append(functionArguments.begin() + 1, functionArguments.end());
-                                auto call = m_builder.create<mlir::CallOp>(newFunction, args).getResult(0);
-                                auto result = m_builder.createStrCopy(call, clazz);
-                                m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
-                            }
+                    implementBlock(subClass);
+                    {
+                        llvm::SmallVector args{functionObj};
+                        args.push_back(m_builder.createStrRef());
+                        args.append(functionArguments.begin() + 1, functionArguments.end());
+                        auto call = m_builder.create<mlir::CallOp>(newFunction, args).getResult(0);
+                        auto result = m_builder.createStrCopy(call, clazz);
+                        m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                    }
 
-                            implementBlock(normal);
-                            auto args = createOverload({FunctionParameter{"object", FunctionParameter::Normal, true},
-                                                        FunctionParameter{"encoding", FunctionParameter::Normal, true},
-                                                        FunctionParameter{"errors", FunctionParameter::Normal, true}},
-                                                       functionArguments[1], functionArguments[2],
-                                                       m_builder.getTupleAttr({
-                                                           m_builder.getPyStringAttr(""),
-                                                           m_builder.getPyStringAttr("utf-8"),
-                                                           m_builder.getPyStringAttr("strict"),
-                                                       }));
-                            auto encoded =
-                                m_builder.create<mlir::arith::OrIOp>(args[1].parameterSet, args[2].parameterSet);
-                            auto* singleArgBlock = new mlir::Block;
-                            auto* encodedBlock = new mlir::Block;
-                            m_builder.create<mlir::CondBranchOp>(encoded, encodedBlock, singleArgBlock);
+                    implementBlock(normal);
+                    auto args = createOverload({FunctionParameter{"object", FunctionParameter::Normal, true},
+                                                FunctionParameter{"encoding", FunctionParameter::Normal, true},
+                                                FunctionParameter{"errors", FunctionParameter::Normal, true}},
+                                               functionArguments[1], functionArguments[2],
+                                               m_builder.getTupleAttr({
+                                                   m_builder.getPyStringAttr(""),
+                                                   m_builder.getPyStringAttr("utf-8"),
+                                                   m_builder.getPyStringAttr("strict"),
+                                               }));
+                    auto encoded = m_builder.create<mlir::arith::OrIOp>(args[1].parameterSet, args[2].parameterSet);
+                    auto* singleArgBlock = new mlir::Block;
+                    auto* encodedBlock = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(encoded, encodedBlock, singleArgBlock);
 
-                            implementBlock(singleArgBlock);
-                            auto object = args[0].parameterValue;
-                            auto str =
-                                Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__str__",
-                                                           m_builder.createMakeTuple({object}), {}, nullptr, nullptr);
-                            auto strType = m_builder.createTypeOf(str);
-                            isStr = buildSubclassCheck(strType, m_builder.createStrRef());
-                            auto* notStrBlock = new mlir::Block;
-                            auto* strBlock = new mlir::Block;
-                            m_builder.create<mlir::CondBranchOp>(isStr, strBlock, notStrBlock);
+                    implementBlock(singleArgBlock);
+                    auto object = args[0].parameterValue;
+                    auto str = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__str__",
+                                                          m_builder.createMakeTuple({object}), {}, nullptr, nullptr);
+                    auto strType = m_builder.createTypeOf(str);
+                    isStr = buildSubclassCheck(strType, m_builder.createStrRef());
+                    auto* notStrBlock = new mlir::Block;
+                    auto* strBlock = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(isStr, strBlock, notStrBlock);
 
-                            implementBlock(notStrBlock);
-                            auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                                Py::Builtins::TypeError.name, {}, nullptr);
-                            raiseException(exception);
+                    implementBlock(notStrBlock);
+                    auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
+                                                        Py::Builtins::TypeError.name, {}, nullptr);
+                    raiseException(exception);
 
-                            implementBlock(strBlock);
-                            m_builder.create<mlir::ReturnOp>(str);
+                    implementBlock(strBlock);
+                    m_builder.create<mlir::ReturnOp>(str);
 
-                            implementBlock(encodedBlock);
-                            // TODO:
-                        },
-                        &newFunction);
-                    slots["__hash__"] =
-                        createFunction("builtins.str.__hash__", {{"", FunctionParameter::PosOnly, false}},
-                                       [&](mlir::ValueRange functionArguments)
-                                       {
-                                           auto self = functionArguments[0];
-                                           // TODO: check its str or subclass
-                                           auto hash = m_builder.createStrHash(self);
-                                           auto result = m_builder.createIntFromInteger(hash);
-                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
-                                       });
-                    slots["__eq__"] = createFunction(
-                        "builtins.str.__eq__",
-                        {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
-                        [&](mlir::ValueRange functionArguments)
-                        {
-                            auto lhs = functionArguments[0];
-                            auto rhs = functionArguments[1];
-                            // TODO: check both are str or subclass
-                            auto equal = m_builder.createStrEqual(lhs, rhs);
-                            auto result = m_builder.createBoolFromI1(equal);
-                            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
-                        });
-                    slots["__str__"] = createFunction("builtins.str.__str__", {{"", FunctionParameter::PosOnly, false}},
-                                                      [&](mlir::ValueRange functionArguments)
-                                                      {
-                                                          auto self = functionArguments[0];
-                                                          m_builder.create<mlir::ReturnOp>(self);
-                                                      });
-                });
+                    implementBlock(encodedBlock);
+                    // TODO:
+                },
+                &newFunction);
+            slots["__hash__"] = createFunction("builtins.str.__hash__", {{"", FunctionParameter::PosOnly, false}},
+                                               [&](mlir::ValueRange functionArguments)
+                                               {
+                                                   auto self = functionArguments[0];
+                                                   // TODO: check its str or subclass
+                                                   auto hash = m_builder.createStrHash(self);
+                                                   auto result = m_builder.createIntFromInteger(hash);
+                                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                                               });
+            slots["__eq__"] =
+                createFunction("builtins.str.__eq__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               [&](mlir::ValueRange functionArguments)
+                               {
+                                   auto lhs = functionArguments[0];
+                                   auto rhs = functionArguments[1];
+                                   // TODO: check both are str or subclass
+                                   auto equal = m_builder.createStrEqual(lhs, rhs);
+                                   auto result = m_builder.createBoolFromI1(equal);
+                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                               });
+            slots["__str__"] = createFunction("builtins.str.__str__", {{"", FunctionParameter::PosOnly, false}},
+                                              [&](mlir::ValueRange functionArguments)
+                                              {
+                                                  auto self = functionArguments[0];
+                                                  m_builder.create<mlir::ReturnOp>(self);
+                                              });
+        });
     createClass(m_builder.getDictBuiltin(), {},
                 [&](SlotMapImpl& slots)
                 {

@@ -1156,6 +1156,11 @@ llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetExOp::getIterArgs()
     return ::getIterArgs(*this);
 }
 
+bool pylir::Py::GlobalValueOp::isDeclaration()
+{
+    return !initializer();
+}
+
 namespace
 {
 
@@ -1293,7 +1298,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     if (auto ref = result->second.dyn_cast<mlir::FlatSymbolRefAttr>())
                     {
                         auto lookup = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
-                        if (!lookup || !lookup.initializer().isa<pylir::Py::TupleAttr>())
+                        if (!lookup || !lookup.initializer() || !lookup.initializer()->isa<pylir::Py::TupleAttr>())
                         {
                             return op->emitOpError("Expected __slots__ to refer to a tuple\n");
                         }
