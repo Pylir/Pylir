@@ -322,35 +322,71 @@ void pylir::CodeGen::createBuiltinsImpl()
                 });
     auto baseException =
         createClass(m_builder.getBaseExceptionBuiltin(), {},
-                    [&](SlotMapImpl& slots)
-                    {
-                        slots["__new__"] = createFunction("builtins.BaseException.__new__",
-                                                          {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                                           FunctionParameter{"", FunctionParameter::PosRest, false}},
-                                                          [&](mlir::ValueRange functionArgs)
-                                                          {
-                                                              [[maybe_unused]] auto clazz = functionArgs[0];
-                                                              [[maybe_unused]] auto args = functionArgs[1];
-                                                              auto obj = m_builder.createMakeObject(clazz);
-                                                              m_builder.createSetSlot(obj, clazz, "args", args);
-                                                              m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
-                                                          });
-                        slots["__init__"] = createFunction("builtins.BaseException.__init__",
-                                                           {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                                            FunctionParameter{"", FunctionParameter::PosRest, false}},
-                                                           [&](mlir::ValueRange functionArgs)
-                                                           {
-                                                               auto self = functionArgs[0];
-                                                               auto args = functionArgs[1];
+        [&](SlotMapImpl& slots)
+        {
+            slots["__new__"] =
+                createFunction("builtins.BaseException.__new__",
+                               {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                                FunctionParameter{"", FunctionParameter::PosRest, false}},
+                               [&](mlir::ValueRange functionArgs)
+                               {
+                                   [[maybe_unused]] auto clazz = functionArgs[0];
+                                   [[maybe_unused]] auto args = functionArgs[1];
+                                   auto obj = m_builder.createMakeObject(clazz);
+                                   m_builder.createSetSlot(obj, m_builder.createBaseExceptionRef(), "args", args);
+                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
+                               });
+            slots["__init__"] = createFunction("builtins.BaseException.__init__",
+                                               {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                                                FunctionParameter{"", FunctionParameter::PosRest, false}},
+                                               [&](mlir::ValueRange functionArgs)
+                                               {
+                                                   auto self = functionArgs[0];
+                                                   auto args = functionArgs[1];
 
-                                                               auto selfType = m_builder.createTypeOf(self);
-                                                               m_builder.createSetSlot(self, selfType, "args", args);
-                                                           });
-                        slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
+                                                   auto selfType = m_builder.createTypeOf(self);
+                                                   m_builder.createSetSlot(self, selfType, "args", args);
+                                               });
+            slots["__str__"] = createFunction(
+                "builtins.BaseException.__str__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+                [&](mlir::ValueRange functionArgs)
+                {
+                    auto self = functionArgs[0];
+                    auto type = m_builder.createBaseExceptionRef();
+                    auto args = m_builder.createGetSlot(self, type, "args");
+                    auto len = m_builder.createTupleLen(args);
+                    auto zeroI = m_builder.create<mlir::arith::ConstantIndexOp>(0);
+                    auto oneI = m_builder.create<mlir::arith::ConstantIndexOp>(1);
+                    auto isZero = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, len, zeroI);
+                    auto zeroLenBlock = new mlir::Block;
+                    auto contBlock = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(isZero, zeroLenBlock, contBlock);
+
+                    implementBlock(zeroLenBlock);
+                    m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createConstant("")});
+
+                    implementBlock(contBlock);
+                    auto isOne = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, len, oneI);
+                    auto oneLenBlock = new mlir::Block;
+                    contBlock = new mlir::Block;
+                    contBlock->addArgument(m_builder.getDynamicType());
+                    m_builder.create<mlir::CondBranchOp>(isOne, oneLenBlock, contBlock, mlir::ValueRange{args});
+
+                    implementBlock(oneLenBlock);
+                    auto first = m_builder.createTupleGetItem(args, zeroI);
+                    m_builder.create<mlir::BranchOp>(contBlock, mlir::ValueRange{first});
+
+                    implementBlock(contBlock);
+                    auto tuple = m_builder.createMakeTuple({m_builder.createStrRef(), contBlock->getArgument(0)});
+                    auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__", tuple,
+                                                             {}, nullptr, nullptr);
+                    m_builder.create<mlir::ReturnOp>(result);
+                });
+            slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
 #define BASEEXCEPTION_SLOT(name, ...) m_builder.getPyStringAttr(#name),
 #include <pylir/Interfaces/Slots.def>
-                        }));
-                    });
+            }));
+        });
 
     auto exception = createClass(m_builder.getExceptionBuiltin(), {baseException});
     createClass(m_builder.getTypeErrorBuiltin(), {exception});
