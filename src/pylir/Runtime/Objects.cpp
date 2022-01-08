@@ -32,6 +32,11 @@ PyObject* PyObject::getSlot(std::string_view name)
     return nullptr;
 }
 
+void PyObject::setSlot(int index, PyObject& object)
+{
+    reinterpret_cast<PyObject**>(this)[m_type->m_offset + index] = &object;
+}
+
 bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 {
     auto& mro = type(object).getSlot(PyTypeObject::__mro__)->cast<PySequence>();

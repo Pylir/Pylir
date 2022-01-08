@@ -13,8 +13,10 @@ void pylir_raise(pylir::rt::PyBaseException& exception)
     switch (code)
     {
         case _URC_END_OF_STACK:
-            // TODO call sys.excepthook
-            std::cerr << "Uncaught exception!!!";
+            // TODO call sys.excepthook instead
+            extern pylir::rt::PyObject exceptHook asm("sys.__excepthook__");
+            exceptHook(type(static_cast<pylir::rt::PyObject&>(exception)), static_cast<pylir::rt::PyObject&>(exception),
+                       pylir::rt::Builtins::None);
             std::exit(1);
         case _URC_FATAL_PHASE1_ERROR:
         case _URC_FATAL_PHASE2_ERROR: std::abort();

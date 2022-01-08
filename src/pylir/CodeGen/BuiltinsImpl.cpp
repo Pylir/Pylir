@@ -451,7 +451,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
                         });
                 });
-    m_builder.createGlobalValue(Py::Builtins::None.name, true, Py::ObjectAttr::get(m_builder.getNoneTypeBuiltin()));
+    m_builder.createGlobalValue(Py::Builtins::None.name, true, Py::ObjectAttr::get(m_builder.getNoneTypeBuiltin()),
+                                true);
     createClass(
         m_builder.getFunctionBuiltin(), {},
         [&](SlotMapImpl& slots)
@@ -809,4 +810,5 @@ void pylir::CodeGen::createBuiltinsImpl()
                        // TODO: Check not negative && fits in host size_t
                        m_builder.create<mlir::ReturnOp>(result);
                    });
+    createExternal("sys.__excepthook__");
 }

@@ -58,7 +58,7 @@ class PyObject
     PyObject* methodLookup(int index);
 
 public:
-    PyObject(PyObject& type) : m_type(reinterpret_cast<PyTypeObject*>(&type)) {}
+    explicit PyObject(PyObject& type) : m_type(reinterpret_cast<PyTypeObject*>(&type)) {}
 
     PyObject(const PyObject&) = delete;
     PyObject(PyObject&&) noexcept = delete;
@@ -70,11 +70,11 @@ public:
         return *reinterpret_cast<PyObject*>(obj.m_type);
     }
 
-    friend bool isinstance(PyObject& obj, PyObject& type);
-
     PyObject* getSlot(int index);
 
     PyObject* getSlot(std::string_view name);
+
+    void setSlot(int index, PyObject& object);
 
     template <class... Args>
     PyObject& operator()(Args&&... args);
@@ -102,6 +102,8 @@ public:
         return isa<T>() ? &cast<T>() : nullptr;
     }
 };
+
+bool isinstance(PyObject& obj, PyObject& type);
 
 namespace Builtins
 {
@@ -139,6 +141,8 @@ class PyFunction
     PyUniversalCC m_function;
 
 public:
+    explicit PyFunction(PyUniversalCC function) : m_base(Builtins::Function), m_function(function) {}
+
     operator PyObject&()
     {
         return m_base;
@@ -228,7 +232,10 @@ class PyString
     BufferComponent<char, MallocAllocator> m_buffer;
 
 public:
-    explicit PyString(std::string_view string) : m_base(Builtins::Str), m_buffer(string.begin(), string.end()) {}
+    explicit PyString(std::string_view string, PyObject& type = Builtins::Str)
+        : m_base(type), m_buffer(string.begin(), string.end())
+    {
+    }
 
     operator PyObject&()
     {
@@ -368,6 +375,133 @@ public:
     }
 };
 
+template <PyObject&>
+struct PyTypeTraits;
+
+template <>
+struct PyTypeTraits<Builtins::Type>
+{
+    using instanceType = PyTypeObject;
+    constexpr static std::size_t slotCount =
+        std::initializer_list<const char*>{
+#define TYPE_SLOT(x, ...) #x,
+#include <pylir/Interfaces/Slots.def>
+        }
+            .size();
+};
+
+template <>
+struct PyTypeTraits<Builtins::Function>
+{
+    using instanceType = PyFunction;
+    constexpr static std::size_t slotCount =
+        std::initializer_list<const char*>{
+#define FUNCTION_SLOT(x, ...) #x,
+#include <pylir/Interfaces/Slots.def>
+        }
+            .size();
+};
+
+#define NO_SLOT_TYPE(name, instance)                \
+    template <>                                     \
+    struct PyTypeTraits<Builtins::name>             \
+    {                                               \
+        using instanceType = instance;              \
+        constexpr static std::size_t slotCount = 0; \
+    }
+
+NO_SLOT_TYPE(Int, PyInt);
+NO_SLOT_TYPE(Bool, PyInt);
+// TODO: NO_SLOT_TYPE(Float, PyFloat);
+NO_SLOT_TYPE(Str, PyString);
+NO_SLOT_TYPE(Tuple, PySequence);
+NO_SLOT_TYPE(List, PySequence);
+// TODO: NO_SLOT_TYPE(Set, PySet);
+NO_SLOT_TYPE(Dict, PyDict);
+#undef NO_SLOT_TYPE
+
+namespace details
+{
+constexpr static std::size_t BaseExceptionSlotCount =
+    std::initializer_list<const char*>{
+#define BASEEXCEPTION_SLOT(x, ...) #x,
+#include <pylir/Interfaces/Slots.def>
+    }
+        .size();
+} // namespace details
+
+#define BUILTIN_EXCEPTION(name, ...)                                              \
+    template <>                                                                   \
+    struct PyTypeTraits<Builtins::name>                                           \
+    {                                                                             \
+        using instanceType = PyBaseException;                                     \
+        constexpr static std::size_t slotCount = details::BaseExceptionSlotCount; \
+    };
+#include <pylir/Interfaces/Builtins.def>
+
+template <PyObject& typeObject, std::size_t slotCount = PyTypeTraits<typeObject>::slotCount>
+class StaticInstance
+{
+    using InstanceType = typename PyTypeTraits<typeObject>::instanceType;
+    static_assert(alignof(InstanceType) >= alignof(PyObject*));
+    alignas(InstanceType) std::byte m_buffer[sizeof(InstanceType) + slotCount * sizeof(PyObject*)]{};
+
+public:
+    template <class... Args>
+    StaticInstance(std::initializer_list<std::pair<typename InstanceType::Slots, PyObject&>> slotsInit, Args&&... args)
+    {
+        static_assert(std::is_standard_layout_v<std::remove_reference_t<decltype(*this)>>);
+        PyObject& instance = *new (m_buffer) InstanceType(std::forward<Args>(args)...);
+        for (auto& pair : slotsInit)
+        {
+            instance.setSlot(pair.first, pair.second);
+        }
+    }
+
+    operator PyObject&()
+    {
+        return get();
+    }
+
+    operator InstanceType&()
+    {
+        return *reinterpret_cast<InstanceType*>(m_buffer);
+    }
+
+    InstanceType& get()
+    {
+        return *this;
+    }
+};
+
+template <PyObject& typeObject>
+class StaticInstance<typeObject, 0>
+{
+    using InstanceType = typename PyTypeTraits<typeObject>::instanceType;
+    InstanceType m_object;
+
+public:
+    template <class... Args>
+    StaticInstance(Args&&... args) : m_object(std::forward<Args>(args)...)
+    {
+    }
+
+    operator PyObject&()
+    {
+        return m_object;
+    }
+
+    operator InstanceType&()
+    {
+        return m_object;
+    }
+
+    InstanceType& get()
+    {
+        return m_object;
+    }
+};
+
 template <class... Args>
 PyObject& PyObject::operator()(Args&&... args)
 {
@@ -432,7 +566,7 @@ inline bool PyObject::isa<PyDict>()
 template <>
 inline bool PyObject::isa<PyFunction>()
 {
-    return isinstance(*this, Builtins::Function);
+    return type(*this).is(Builtins::Function);
 }
 
 template <>

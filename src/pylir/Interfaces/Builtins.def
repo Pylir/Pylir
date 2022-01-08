@@ -1,6 +1,6 @@
 
 #ifndef BUILTIN
-#error BUILTIN is not defined
+#define BUILTIN(...)
 #endif
 
 #ifndef BUILTIN_EXCEPTION
