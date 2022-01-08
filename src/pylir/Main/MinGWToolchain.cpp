@@ -176,6 +176,10 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     arguments.emplace_back((path + sep + "crt2.o").str());
     arguments.emplace_back((path + sep + "crtbegin.o").str());
 
+    for (auto& iter : args.getAllArgValues(pylir::cli::OPT_L))
+    {
+        arguments.push_back("-L" + iter);
+    }
     if (gccLib)
     {
         arguments.push_back("-L" + *gccLib);
@@ -184,10 +188,6 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     arguments.push_back(("-L" + m_sysroot + sep + "lib").str());
     arguments.push_back(("-L" + m_sysroot + sep + "lib" + sep + m_triple.str()).str());
     arguments.push_back(("-L" + m_sysroot + sep + "sys-root" + sep + "mingw" + sep + "lib").str());
-    for (auto& iter : args.getAllArgValues(pylir::cli::OPT_L))
-    {
-        arguments.push_back("-L" + iter);
-    }
     auto clangRTPath = findClangResourceDir(m_triple, m_sysroot);
     if (clangRTPath)
     {
