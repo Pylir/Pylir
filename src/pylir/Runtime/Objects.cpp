@@ -31,11 +31,42 @@ bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 
 bool PyObject::operator==(PyObject& other)
 {
-    PyObject& eqFunc = *type(*this).getSlot(PyTypeObject::__eq__);
+    PyObject& eqFunc = *type(*this).methodLookup(PyTypeObject::__eq__);
     PyObject& boolean = eqFunc(*this, other);
     if (!type(boolean).is(Builtins::Bool))
     {
         // TODO: TypeError
     }
     return boolean.cast<PyInt>().boolean();
+}
+
+PyObject* PyObject::mroLookup(int index)
+{
+    auto& mro = type(*this).getSlot(PyTypeObject::__mro__)->cast<PySequence>();
+    for (auto* iter : mro)
+    {
+        if (auto slot = iter->getSlot(index))
+        {
+            return slot;
+        }
+    }
+    return nullptr;
+}
+
+PyObject* PyObject::methodLookup(int index)
+{
+    auto* overload = mroLookup(index);
+    if (!overload)
+    {
+        return nullptr;
+    }
+    if (overload->isa<PyFunction>())
+    {
+        return overload;
+    }
+    if (auto* getter = overload->mroLookup(PyTypeObject::__get__))
+    {
+        overload = &(*getter)(*this, type(*this));
+    }
+    return overload;
 }

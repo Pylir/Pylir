@@ -53,6 +53,10 @@ class PyObject
 {
     PyTypeObject* m_type;
 
+    PyObject* mroLookup(int index);
+
+    PyObject* methodLookup(int index);
+
 public:
     PyObject(PyObject& type) : m_type(reinterpret_cast<PyTypeObject*>(&type)) {}
 
@@ -386,7 +390,7 @@ PyObject& PyObject::operator()(Args&&... args)
     PyObject* self = this;
     while (true)
     {
-        auto* call = type(*self).getSlot(PyTypeObject::__call__);
+        auto* call = self->methodLookup(PyTypeObject::__call__);
         if (!call)
         {
             // TODO: raise Type error
@@ -412,7 +416,6 @@ PyObject& PyObject::operator()(Args&&... args)
                 ...);
             return pyF->m_function(*pyF, tuple, dict);
         }
-        // TODO: descriptor call once we have a __get__
         self = call;
     }
 }
