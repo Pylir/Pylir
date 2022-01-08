@@ -103,8 +103,6 @@ public:
     }
 };
 
-static_assert(std::is_standard_layout_v<PyObject>);
-
 namespace Builtins
 {
 #define BUILTIN(name, symbol, ...) extern PyObject name asm(symbol);
@@ -131,8 +129,6 @@ public:
     };
 };
 
-static_assert(std::is_standard_layout_v<PyTypeObject>);
-
 using PyUniversalCC = PyObject& (*)(PyFunction&, PySequence&, PyDict&);
 
 class PyFunction
@@ -154,8 +150,6 @@ public:
 #include <pylir/Interfaces/Slots.def>
     };
 };
-
-static_assert(std::is_standard_layout_v<PyFunction>);
 
 class PySequence
 {
@@ -196,8 +190,6 @@ public:
         return *m_buffer[index];
     }
 };
-
-static_assert(std::is_standard_layout_v<PySequence>);
 
 class PyTuple : public PySequence
 {
@@ -264,8 +256,6 @@ public:
     }
 };
 
-static_assert(std::is_standard_layout_v<PySequence>);
-
 class PyDict
 {
     PyObject m_base;
@@ -300,8 +290,6 @@ public:
     }
 };
 
-static_assert(std::is_standard_layout_v<PyDict>);
-
 class PyInt
 {
     PyObject m_base;
@@ -324,8 +312,6 @@ public:
         return m_integer.getInteger<T>();
     }
 };
-
-static_assert(std::is_standard_layout_v<PyInt>);
 
 class PyBaseException
 {
@@ -381,8 +367,6 @@ public:
         m_typeIndex = typeIndex;
     }
 };
-
-static_assert(std::is_standard_layout_v<PyBaseException>);
 
 template <class... Args>
 PyObject& PyObject::operator()(Args&&... args)

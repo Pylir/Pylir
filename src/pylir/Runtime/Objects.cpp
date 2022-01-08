@@ -4,6 +4,15 @@
 
 using namespace pylir::rt;
 
+static_assert(std::is_standard_layout_v<PyObject>);
+static_assert(std::is_standard_layout_v<PyTypeObject>);
+static_assert(std::is_standard_layout_v<PyFunction>);
+static_assert(std::is_standard_layout_v<PySequence>);
+static_assert(std::is_standard_layout_v<PyString>);
+static_assert(std::is_standard_layout_v<PyDict>);
+static_assert(std::is_standard_layout_v<PyInt>);
+static_assert(std::is_standard_layout_v<PyBaseException>);
+
 PyObject* PyObject::getSlot(int index)
 {
     return reinterpret_cast<PyObject**>(this)[m_type->m_offset + index];
