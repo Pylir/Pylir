@@ -810,5 +810,29 @@ void pylir::CodeGen::createBuiltinsImpl()
                        // TODO: Check not negative && fits in host size_t
                        m_builder.create<mlir::ReturnOp>(result);
                    });
+    createFunction(m_builder.getReprBuiltin().getValue(),
+                   {
+                       {"", FunctionParameter::PosOnly, false},
+                   },
+                   [&](mlir::ValueRange functionArguments)
+                   {
+                       auto object = functionArguments[0];
+                       auto tuple = m_builder.createMakeTuple({object});
+                       auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__", tuple,
+                                                                {}, nullptr, nullptr);
+                       auto strType = m_builder.createTypeOf(result);
+                       auto isStr = buildSubclassCheck(strType, m_builder.createStrRef());
+                       auto* notStrBlock = new mlir::Block;
+                       auto* strBlock = new mlir::Block;
+                       m_builder.create<mlir::CondBranchOp>(isStr, strBlock, notStrBlock);
+
+                       implementBlock(notStrBlock);
+                       auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
+                                                           Py::Builtins::TypeError.name, {}, nullptr);
+                       raiseException(exception);
+
+                       implementBlock(strBlock);
+                       m_builder.create<mlir::ReturnOp>(result);
+                   });
     createExternal("sys.__excepthook__");
 }

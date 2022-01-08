@@ -35,6 +35,7 @@ BUILTIN_EXCEPTION(ArithmeticError, "builtins.ArithmeticError", true)
 BUILTIN_EXCEPTION(OverflowError, "builtins.OverflowError", true)
 BUILTIN(Print, "builtins.print", true)
 BUILTIN(Len, "builtins.len", true)
+BUILTIN(Repr, "builtins.repr", true)
 
 #undef BUILTIN
 #undef BUILTIN_EXCEPTION
