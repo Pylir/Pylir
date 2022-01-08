@@ -30,7 +30,17 @@ def PylirPy_DictImplAttr : PylirPy_Attr<"DictImpl", [DeclareAttrInterfaceMethods
 def PylirPy_SlotsAttr : PylirPy_Attr<"Slots", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
                                                                             ["replaceImmediateSubAttribute"]>]> {
     let mnemonic = "slots";
-    let parameters = (ins ArrayRefParameter<"std::pair<mlir::StringAttr, mlir::Attribute>">:$value);
+    let parameters = (ins "llvm::MapVector<mlir::StringAttr, mlir::Attribute>":$value);
+
+    let genStorageClass = 0;
+    let genAccessors = 0;
+    let skipDefaultBuilders = 1;
+
+    let extraClassDeclaration = [{
+        static SlotsAttr get(::mlir::MLIRContext* context, pylir::Py::SlotsMap&& map);
+
+        const pylir::Py::SlotsMap& getValue() const;
+    }];
 }
 
 def PylirPy_ObjectAttr : Attr<CPred<"$_self.isa<::pylir::Py::ObjectAttr>()">, "python object attribute"> {

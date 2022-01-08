@@ -8,6 +8,26 @@
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 #include <pylir/Support/BigInt.hpp>
 
+#include <map>
+
+namespace pylir::Py::detail
+{
+struct StrAttrCompare
+{
+    bool operator()(llvm::StringRef t, llvm::StringRef u) const noexcept
+    {
+        return t < u;
+    }
+
+    typedef void is_transparent;
+};
+} // namespace pylir::Py::detail
+
+namespace pylir::Py
+{
+using SlotsMap = std::map<mlir::StringAttr, mlir::Attribute, detail::StrAttrCompare>;
+}
+
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.h.inc"
 

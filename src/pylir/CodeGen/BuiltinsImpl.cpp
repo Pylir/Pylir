@@ -36,10 +36,10 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
     else
     {
         PYLIR_ASSERT(bases.size() == 1 && "Multiply inheritance not yet implemented");
-
+        auto& map = bases[0].initializer()->getSlots().getValue();
         {
-            auto result = llvm::find_if(bases[0].initializer()->getSlots().getValue(),
-                                        [](auto pair) { return pair.first == "__mro__"; });
+            auto result = map.find("__mro__");
+            PYLIR_ASSERT(result != map.end());
             auto array = m_module.lookupSymbol<Py::GlobalValueOp>(result->second.cast<mlir::FlatSymbolRefAttr>())
                              .initializer()
                              ->cast<Py::TupleAttr>()
@@ -47,9 +47,8 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
             mro.insert(mro.end(), array.begin(), array.end());
         }
         {
-            auto result = llvm::find_if(bases[0].initializer()->getSlots().getValue(),
-                                        [](auto pair) { return pair.first == "__slots__"; });
-            if (result != bases[0].initializer()->getSlots().getValue().end())
+            auto result = map.find("__slots__");
+            if (result != map.end())
             {
                 auto refAttr = result->second.cast<mlir::FlatSymbolRefAttr>();
                 if (auto iter = slots.find("__slots__"); iter != slots.end())
@@ -83,7 +82,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                 set.erase("__name__");
                 return set;
             }();
-            for (auto [slotName, value] : bases[0].initializer()->getSlots().getValue())
+            for (auto [slotName, value] : map)
             {
                 if (!typeSlots.contains(slotName.getValue()) || slots.count(slotName.getValue()) != 0)
                 {
@@ -95,8 +94,8 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
     }
     slots["__mro__"] = createGlobalConstant(m_builder.getTupleAttr(mro));
     slots["__name__"] = createGlobalConstant(m_builder.getPyStringAttr(className.getValue()));
-    llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> converted(slots.size());
-    std::transform(slots.begin(), slots.end(), converted.begin(),
+    pylir::Py::SlotsMap converted;
+    std::transform(slots.begin(), slots.end(), std::inserter(converted, converted.end()),
                    [this](auto pair) -> std::pair<mlir::StringAttr, mlir::Attribute>
                    {
                        return {m_builder.getStringAttr(pair.first),
@@ -107,7 +106,8 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                    });
     return m_builder.createGlobalValue(
         className.getValue(), true,
-        m_builder.getObjectAttr(m_builder.getTypeBuiltin(), Py::SlotsAttr::get(m_builder.getContext(), converted)),
+        m_builder.getObjectAttr(m_builder.getTypeBuiltin(),
+                                Py::SlotsAttr::get(m_builder.getContext(), std::move(converted))),
         true);
 }
 

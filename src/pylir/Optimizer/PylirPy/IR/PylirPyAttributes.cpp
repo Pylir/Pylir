@@ -70,6 +70,31 @@ struct ObjectAttrStorage : public ::mlir::AttributeStorage
     mlir::Attribute builtinValue;
 };
 
+struct SlotsAttrStorage : public mlir::AttributeStorage
+{
+    using KeyTy = pylir::Py::SlotsMap;
+
+    SlotsAttrStorage(KeyTy&& map) : ::mlir::AttributeStorage(), map(std::move(map)) {}
+
+    bool operator==(const KeyTy& tblgenKey) const
+    {
+        return map == tblgenKey;
+    }
+
+    static ::llvm::hash_code hashKey(const KeyTy& tblgenKey)
+    {
+        return ::llvm::hash_combine_range(tblgenKey.begin(), tblgenKey.end());
+    }
+
+    // KeyTy& because mlir does not move. TODO: fix in MLIR
+    static SlotsAttrStorage* construct(::mlir::AttributeStorageAllocator& allocator, KeyTy& tblgenKey)
+    {
+        return new (allocator.allocate<SlotsAttrStorage>()) SlotsAttrStorage(std::move(tblgenKey));
+    }
+
+    KeyTy map;
+};
+
 } // namespace pylir::Py::detail
 
 #define GET_ATTRDEF_CLASSES
@@ -470,15 +495,15 @@ pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::FlatSymbolRefAttr val
     {
         kwDefaults = mlir::SymbolRefAttr::get(value.getContext(), Builtins::None.name);
     }
-    llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> slots = {
-        {mlir::StringAttr::get(value.getContext(), "__defaults__"), defaults},
-        {mlir::StringAttr::get(value.getContext(), "__kwdefaults__"), kwDefaults}};
+    pylir::Py::SlotsMap slots;
+    slots.insert({mlir::StringAttr::get(value.getContext(), "__defaults__"), defaults});
+    slots.insert({mlir::StringAttr::get(value.getContext(), "__kwdefaults__"), kwDefaults});
     if (dict)
     {
-        slots.emplace_back(mlir::StringAttr::get(value.getContext(), "__dict__"), dict);
+        slots.insert({mlir::StringAttr::get(value.getContext(), "__dict__"), dict});
     }
     return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(value.getContext(), Builtins::Function.name),
-                           Py::SlotsAttr::get(value.getContext(), slots), value)
+                           Py::SlotsAttr::get(value.getContext(), std::move(slots)), value)
         .cast<FunctionAttr>();
 }
 
@@ -552,27 +577,32 @@ mlir::FlatSymbolRefAttr pylir::Py::FunctionAttr::getValue() const
 
 mlir::Attribute pylir::Py::FunctionAttr::getDefaults() const
 {
-    return std::find_if(getSlots().getValue().begin(), getSlots().getValue().end(),
-                        [](auto pair) { return pair.first.getValue() == "__defaults__"; })
-        ->second;
+    auto begin = getSlots().getValue().find("__defaults__");
+    if (begin == getSlots().getValue().end())
+    {
+        return {};
+    }
+    return begin->second;
 }
 
 mlir::Attribute pylir::Py::FunctionAttr::getKWDefaults() const
 {
-    return std::find_if(getSlots().getValue().begin(), getSlots().getValue().end(),
-                        [](auto pair) { return pair.first.getValue() == "__kwdefaults__"; })
-        ->second;
+    auto begin = getSlots().getValue().find("__kwdefaults__");
+    if (begin == getSlots().getValue().end())
+    {
+        return {};
+    }
+    return begin->second;
 }
 
 mlir::Attribute pylir::Py::FunctionAttr::getDict() const
 {
-    auto result = std::find_if(getSlots().getValue().begin(), getSlots().getValue().end(),
-                               [](auto pair) { return pair.first.getValue() == "__dict__"; });
-    if (result == getSlots().getValue().end())
+    auto begin = getSlots().getValue().find("__dict__");
+    if (begin == getSlots().getValue().end())
     {
         return {};
     }
-    return result->second;
+    return begin->second;
 }
 
 pylir::Py::TypeAttr pylir::Py::TypeAttr::get(mlir::MLIRContext* context, ::pylir::Py::SlotsAttr slots)
@@ -661,6 +691,16 @@ mlir::SubElementAttrInterface pylir::Py::DictImplAttr::replaceImmediateSubAttrib
     return getUniqued(getContext(), vector);
 }
 
+pylir::Py::SlotsAttr pylir::Py::SlotsAttr::get(::mlir::MLIRContext* context, pylir::Py::SlotsMap&& value)
+{
+    return Base::get<pylir::Py::SlotsMap&&>(context, std::move(value));
+}
+
+const pylir::Py::SlotsMap& pylir::Py::SlotsAttr::getValue() const
+{
+    return getImpl()->map;
+}
+
 void pylir::Py::SlotsAttr::print(::mlir::AsmPrinter& printer) const
 {
     printer << "<{";
@@ -671,20 +711,24 @@ void pylir::Py::SlotsAttr::print(::mlir::AsmPrinter& printer) const
 
 mlir::Attribute pylir::Py::SlotsAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
-    llvm::SmallVector<std::pair<mlir::StringAttr, mlir::Attribute>> attrs;
+    pylir::Py::SlotsMap attrs;
     if (parser.parseLess()
         || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
                                           [&]
                                           {
-                                              return mlir::failure(parser.parseAttribute(attrs.emplace_back().first)
-                                                                   || parser.parseKeyword("to")
-                                                                   || parser.parseAttribute(attrs.back().second));
+                                              mlir::StringAttr key;
+                                              mlir::Attribute value;
+                                              auto failure =
+                                                  mlir::failure(parser.parseAttribute(key) || parser.parseKeyword("to")
+                                                                || parser.parseAttribute(value));
+                                              attrs.insert({key, value});
+                                              return failure;
                                           })
         || parser.parseGreater())
     {
         return {};
     }
-    return get(parser.getContext(), attrs);
+    return get(parser.getContext(), std::move(attrs));
 }
 
 void pylir::Py::SlotsAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -692,7 +736,6 @@ void pylir::Py::SlotsAttr::walkImmediateSubElements(llvm::function_ref<void(mlir
 {
     for (auto [str, attr] : getValue())
     {
-        walkAttrsFn(str);
         walkAttrsFn(attr);
     }
 }
@@ -700,19 +743,13 @@ void pylir::Py::SlotsAttr::walkImmediateSubElements(llvm::function_ref<void(mlir
 mlir::SubElementAttrInterface pylir::Py::SlotsAttr::replaceImmediateSubAttribute(
     ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
 {
-    auto vector = getValue().vec();
+    // TODO: Kinda expensive
+    auto map = getValue();
     for (auto [index, attr] : replacements)
     {
-        if (index & 1)
-        {
-            vector[index / 2].second = attr;
-        }
-        else
-        {
-            vector[index / 2].first = attr.cast<mlir::StringAttr>();
-        }
+        std::next(map.begin(), index)->second = attr;
     }
-    return get(getContext(), vector);
+    return get(getContext(), std::move(map));
 }
 
 pylir::Py::ObjectAttr pylir::Py::ObjectAttr::get(mlir::FlatSymbolRefAttr type)
