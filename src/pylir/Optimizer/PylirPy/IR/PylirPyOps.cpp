@@ -343,6 +343,38 @@ mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> o
     return nullptr;
 }
 
+mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto element = operands[0];
+    auto tuple = resolveValue(*this, operands[1]).dyn_cast_or_null<Py::TupleAttr>();
+    if (tuple && element)
+    {
+        llvm::SmallVector<mlir::Attribute> values{element};
+        values.append(tuple.getValue().begin(), tuple.getValue().end());
+        return Py::TupleAttr::get(getContext(), values);
+    }
+    return nullptr;
+}
+
+mlir::LogicalResult pylir::Py::TuplePopFrontOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                     llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    auto constant = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>();
+    if (constant)
+    {
+        results.emplace_back(constant.getValue()[0]);
+        results.emplace_back(Py::TupleAttr::get(getContext(), constant.getValue().drop_front()));
+        return mlir::success();
+    }
+    if (auto prepend = tuple().getDefiningOp<Py::TuplePrependOp>())
+    {
+        results.emplace_back(prepend.input());
+        results.emplace_back(prepend.tuple());
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
 namespace
 {
 template <class Attr>

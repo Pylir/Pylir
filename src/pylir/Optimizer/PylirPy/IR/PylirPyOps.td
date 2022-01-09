@@ -199,7 +199,7 @@ def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBo
 
     }];
 
-    let hasFolder = 0;
+    let hasFolder = 1;
 }
 
 def PylirPy_TuplePopFrontOp : PylirPy_Op<"tuple.popFront", [NoSideEffect, AlwaysBound]> {
@@ -214,7 +214,7 @@ def PylirPy_TuplePopFrontOp : PylirPy_Op<"tuple.popFront", [NoSideEffect, Always
 
     }];
 
-    let hasFolder = 0;
+    let hasFolder = 1;
 }
 
 // List ops
