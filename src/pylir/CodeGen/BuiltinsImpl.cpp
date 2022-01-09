@@ -639,20 +639,82 @@ void pylir::CodeGen::createBuiltinsImpl()
                                        });
                 });
     // Stubs
-    createClass(m_builder.getTupleBuiltin(), {},
-                [&](SlotMapImpl& slots)
+    createClass(
+        m_builder.getTupleBuiltin(), {},
+        [&](SlotMapImpl& slots)
+        {
+            slots["__len__"] = createFunction("builtins.tuple.__len__", {{"", FunctionParameter::PosOnly, false}},
+                                              [&](mlir::ValueRange functionArguments)
+                                              {
+                                                  auto self = functionArguments[0];
+                                                  // TODO: maybe check its tuple
+                                                  auto len = m_builder.createTupleLen(self);
+                                                  auto integer = m_builder.createIntFromInteger(len);
+                                                  m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
+                                              });
+            slots["__repr__"] = createFunction(
+                "builtins.tuple.__repr__", {{"", FunctionParameter::PosOnly, false}},
+                [&](mlir::ValueRange functionArguments)
                 {
-                    slots["__len__"] =
-                        createFunction("builtins.tuple.__len__", {{"", FunctionParameter::PosOnly, false}},
-                                       [&](mlir::ValueRange functionArguments)
-                                       {
-                                           auto self = functionArguments[0];
-                                           // TODO: maybe check its tuple
-                                           auto len = m_builder.createTupleLen(self);
-                                           auto integer = m_builder.createIntFromInteger(len);
-                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
-                                       });
+                    auto self = functionArguments[0];
+                    // TODO: maybe check its tuple
+                    auto tupleLen = m_builder.createTupleLen(self);
+                    auto one =
+                        m_builder.create<mlir::arith::ConstantOp>(m_builder.getIndexType(), m_builder.getIndexAttr(1));
+                    auto lessThanOne =
+                        m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult, tupleLen, one);
+                    auto exitBlock = new mlir::Block;
+                    exitBlock->addArgument(m_builder.getDynamicType());
+                    auto leftParen = m_builder.createConstant("(");
+                    auto loopSetup = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(lessThanOne, exitBlock, mlir::ValueRange{leftParen}, loopSetup,
+                                                         mlir::ValueRange{});
+
+                    implementBlock(loopSetup);
+                    auto zero =
+                        m_builder.create<mlir::arith::ConstantOp>(m_builder.getIndexType(), m_builder.getIndexAttr(0));
+                    auto firstObj = m_builder.createTupleGetItem(self, zero);
+                    auto initialStr = Py::buildSpecialMethodCall(
+                        m_builder.getCurrentLoc(), m_builder, "__call__",
+                        m_builder.createMakeTuple({m_builder.createReprRef(), firstObj}), {}, nullptr, nullptr);
+                    auto concat = m_builder.createStrConcat({leftParen, initialStr});
+
+                    auto loopHeader = new mlir::Block;
+                    loopHeader->addArguments({m_builder.getDynamicType(), m_builder.getIndexType()});
+                    m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{concat, one});
+
+                    implementBlock(loopHeader);
+                    auto isLess = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult,
+                                                                        loopHeader->getArgument(1), tupleLen);
+                    auto loopBody = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(isLess, loopBody, exitBlock,
+                                                         mlir::ValueRange{loopHeader->getArgument(0)});
+
+                    implementBlock(loopBody);
+                    auto obj = m_builder.createTupleGetItem(self, loopHeader->getArgument(1));
+                    auto nextStr = Py::buildSpecialMethodCall(
+                        m_builder.getCurrentLoc(), m_builder, "__call__",
+                        m_builder.createMakeTuple({m_builder.createReprRef(), obj}), {}, nullptr, nullptr);
+                    concat = m_builder.createStrConcat(
+                        {loopHeader->getArgument(0), m_builder.createConstant(", "), nextStr});
+                    auto incremented = m_builder.create<mlir::arith::AddIOp>(loopHeader->getArgument(1), one);
+                    m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{concat, incremented});
+
+                    implementBlock(exitBlock);
+                    auto isOne = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, tupleLen, one);
+                    auto* oneBlock = new mlir::Block;
+                    auto* elseBlock = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(isOne, oneBlock, elseBlock);
+
+                    implementBlock(oneBlock);
+                    concat = m_builder.createStrConcat({exitBlock->getArgument(0), m_builder.createConstant(",)")});
+                    m_builder.create<mlir::ReturnOp>(mlir::Value{concat});
+
+                    implementBlock(elseBlock);
+                    concat = m_builder.createStrConcat({exitBlock->getArgument(0), m_builder.createConstant(")")});
+                    m_builder.create<mlir::ReturnOp>(mlir::Value{concat});
                 });
+        });
     auto integer = createClass(
         m_builder.getIntBuiltin(), {},
         [&](SlotMapImpl& slots)
