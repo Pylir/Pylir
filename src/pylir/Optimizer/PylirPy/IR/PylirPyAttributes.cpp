@@ -498,7 +498,7 @@ pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::FlatSymbolRefAttr val
     }
     if (!qualName)
     {
-        qualName = mlir::SymbolRefAttr::get(value.getContext(), "");
+        qualName = Py::StringAttr::get(value.getContext(), "");
     }
     pylir::Py::SlotsMap slots;
     slots.insert({mlir::StringAttr::get(value.getContext(), "__qualname__"), qualName});
@@ -566,7 +566,7 @@ void pylir::Py::FunctionAttr::printMethod(::mlir::AsmPrinter& printer) const
 {
     printer << "<" << getValue();
     if (auto qualName = getQualName();
-        (!qualName.isa<Py::StringAttr>() || !qualName.cast<Py::StringAttr>().getValue().empty()))
+        !qualName.isa<Py::StringAttr>() || !qualName.cast<Py::StringAttr>().getValue().empty())
     {
         printer << ", __qualname__: " << qualName;
     }

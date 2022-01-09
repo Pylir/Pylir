@@ -22,7 +22,6 @@ PyObject& exceptHookImpl(PyFunction& function, PySequence& args, PyDict& keyword
     return Builtins::None;
 }
 
-StaticInstance<Builtins::Str> functionName("__excepthook__");
 StaticInstance<Builtins::Str> qualFunctionName("sys.__excepthook__");
 
 } // namespace
@@ -30,7 +29,6 @@ StaticInstance<Builtins::Str> qualFunctionName("sys.__excepthook__");
 // TODO: fill slots
 StaticInstance<Builtins::Function> exceptHook asm("sys.__excepthook__")(
     {
-        {PyFunction::__name__, functionName},
         {PyFunction::__qualname__, qualFunctionName},
         {PyFunction::__defaults__, Builtins::None},
         {PyFunction::__kwdefaults__, Builtins::None},

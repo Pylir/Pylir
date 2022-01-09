@@ -2,6 +2,7 @@
 
 py.globalValue @builtins.type = #py.type // stub
 py.globalValue @builtins.function = #py.type // stub
+py.globalValue @builtins.str = #py.type // stub
 py.globalValue @builtins.None = #py.type // stub
 
 py.globalValue @foo = #py.function<@bar>
