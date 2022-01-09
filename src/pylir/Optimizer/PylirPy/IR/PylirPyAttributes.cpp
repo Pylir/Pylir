@@ -484,8 +484,9 @@ mlir::Attribute pylir::Py::SetAttr::parseMethod(::mlir::AsmParser& parser, ::mli
     return get(parser.getContext(), attrs);
 }
 
-pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::FlatSymbolRefAttr value, mlir::Attribute defaults,
-                                                     mlir::Attribute kwDefaults, mlir::Attribute dict)
+pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::FlatSymbolRefAttr value, mlir::Attribute qualName,
+                                                     mlir::Attribute defaults, mlir::Attribute kwDefaults,
+                                                     mlir::Attribute dict)
 {
     if (!defaults)
     {
@@ -495,7 +496,12 @@ pylir::Py::FunctionAttr pylir::Py::FunctionAttr::get(mlir::FlatSymbolRefAttr val
     {
         kwDefaults = mlir::SymbolRefAttr::get(value.getContext(), Builtins::None.name);
     }
+    if (!qualName)
+    {
+        qualName = mlir::SymbolRefAttr::get(value.getContext(), "");
+    }
     pylir::Py::SlotsMap slots;
+    slots.insert({mlir::StringAttr::get(value.getContext(), "__qualname__"), qualName});
     slots.insert({mlir::StringAttr::get(value.getContext(), "__defaults__"), defaults});
     slots.insert({mlir::StringAttr::get(value.getContext(), "__kwdefaults__"), kwDefaults});
     if (dict)
@@ -517,6 +523,7 @@ mlir::Attribute pylir::Py::FunctionAttr::parseMethod(::mlir::AsmParser& parser, 
     mlir::Attribute defaults;
     mlir::Attribute kwDefaults;
     mlir::Attribute dict;
+    mlir::Attribute qualName;
     while (!parser.parseOptionalComma())
     {
         mlir::Attribute attribute;
@@ -538,6 +545,10 @@ mlir::Attribute pylir::Py::FunctionAttr::parseMethod(::mlir::AsmParser& parser, 
         {
             dict = attribute;
         }
+        else if (keyword == "__qualname__")
+        {
+            qualName = attribute;
+        }
         else
         {
             parser.emitError(loc, "Invalid keyword '") << keyword << "'";
@@ -548,12 +559,17 @@ mlir::Attribute pylir::Py::FunctionAttr::parseMethod(::mlir::AsmParser& parser, 
     {
         return {};
     }
-    return get(symbol, defaults, kwDefaults, dict);
+    return get(symbol, qualName, defaults, kwDefaults, dict);
 }
 
 void pylir::Py::FunctionAttr::printMethod(::mlir::AsmPrinter& printer) const
 {
     printer << "<" << getValue();
+    if (auto qualName = getQualName();
+        (!qualName.isa<Py::StringAttr>() || !qualName.cast<Py::StringAttr>().getValue().empty()))
+    {
+        printer << ", __qualname__: " << qualName;
+    }
     if (auto defaults = getDefaults(); defaults != mlir::FlatSymbolRefAttr::get(getContext(), Builtins::None.name))
     {
         printer << ", __defaults__: " << defaults;
@@ -573,6 +589,16 @@ void pylir::Py::FunctionAttr::printMethod(::mlir::AsmPrinter& printer) const
 mlir::FlatSymbolRefAttr pylir::Py::FunctionAttr::getValue() const
 {
     return getBuiltinValue().cast<mlir::FlatSymbolRefAttr>();
+}
+
+mlir::Attribute pylir::Py::FunctionAttr::getQualName() const
+{
+    auto begin = getSlots().getValue().find("__qualname__");
+    if (begin == getSlots().getValue().end())
+    {
+        return {};
+    }
+    return begin->second;
 }
 
 mlir::Attribute pylir::Py::FunctionAttr::getDefaults() const

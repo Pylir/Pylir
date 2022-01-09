@@ -1937,7 +1937,6 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     }
     mlir::Value value = m_builder.createMakeFunc(mlir::FlatSymbolRefAttr::get(func));
     auto type = m_builder.createTypeOf(value);
-    m_builder.createSetSlot(value, type, "__name__", m_builder.createConstant(funcDef.funcName.getValue()));
     m_builder.createSetSlot(value, type, "__qualname__", m_builder.createConstant(qualifiedName));
     {
         mlir::Value defaults;

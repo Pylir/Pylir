@@ -163,9 +163,12 @@ pylir::Py::GlobalValueOp
     {
         realKWArgs = mlir::FlatSymbolRefAttr::get(createGlobalConstant(kwArgs));
     }
-    return m_builder.createGlobalValue(
-        functionName, true, m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(function), realPosArgs, realKWArgs),
-        true);
+    return m_builder.createGlobalValue(functionName, true,
+                                       m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(function),
+                                                                 mlir::FlatSymbolRefAttr::get(createGlobalConstant(
+                                                                     m_builder.getPyStringAttr(functionName))),
+                                                                 realPosArgs, realKWArgs),
+                                       true);
 }
 
 std::vector<pylir::CodeGen::UnpackResults>

@@ -92,10 +92,11 @@ public:
         return Py::SetAttr::get(getContext(), value);
     }
 
-    Py::FunctionAttr getFunctionAttr(mlir::FlatSymbolRefAttr value, mlir::Attribute defaults = {},
-                                     mlir::Attribute kwDefaults = {}, mlir::Attribute dict = {})
+    Py::FunctionAttr getFunctionAttr(mlir::FlatSymbolRefAttr value, mlir::Attribute qualName = {},
+                                     mlir::Attribute defaults = {}, mlir::Attribute kwDefaults = {},
+                                     mlir::Attribute dict = {})
     {
-        return Py::FunctionAttr::get(value, defaults, kwDefaults, dict);
+        return Py::FunctionAttr::get(value, qualName, defaults, kwDefaults, dict);
     }
 
     Py::DynamicType getDynamicType()

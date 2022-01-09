@@ -383,8 +383,8 @@ struct PyTypeTraits<Builtins::Type>
 {
     using instanceType = PyTypeObject;
     constexpr static std::size_t slotCount =
-        std::initializer_list<const char*>{
-#define TYPE_SLOT(x, ...) #x,
+        std::initializer_list<int>{
+#define TYPE_SLOT(x, ...) 0,
 #include <pylir/Interfaces/Slots.def>
         }
             .size();
@@ -395,8 +395,8 @@ struct PyTypeTraits<Builtins::Function>
 {
     using instanceType = PyFunction;
     constexpr static std::size_t slotCount =
-        std::initializer_list<const char*>{
-#define FUNCTION_SLOT(x, ...) #x,
+        std::initializer_list<int>{
+#define FUNCTION_SLOT(x, ...) 0,
 #include <pylir/Interfaces/Slots.def>
         }
             .size();
@@ -423,8 +423,8 @@ NO_SLOT_TYPE(Dict, PyDict);
 namespace details
 {
 constexpr static std::size_t BaseExceptionSlotCount =
-    std::initializer_list<const char*>{
-#define BASEEXCEPTION_SLOT(x, ...) #x,
+    std::initializer_list<int>{
+#define BASEEXCEPTION_SLOT(x, ...) 0,
 #include <pylir/Interfaces/Slots.def>
     }
         .size();
