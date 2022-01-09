@@ -1,4 +1,6 @@
 # RUN: pylir %s -o %t
-# RUN: not %t
+# RUN: not %t 2>&1 | FileCheck %s
+
 a
-# TODO: Check the Name Error, not just that it compiles and crashes
+# CHECK: NameError:
+# TODO error messagea

@@ -2,11 +2,23 @@
 
 using namespace pylir::rt;
 
+#include <iostream>
+
 namespace
 {
 
 PyObject& exceptHookImpl(PyFunction& function, PySequence& args, PyDict& keywords)
 {
+    // TODO: check arguments
+    auto& exceptionType = args.getItem(0);
+    auto& exception = args.getItem(1);
+    auto type = exceptionType.getSlot(PyTypeObject::Slots::__name__)->cast<PyString>().view();
+    if (type.substr(0, sizeof("builtins")) == "builtins.")
+    {
+        type = type.substr(sizeof("builtins"));
+    }
+    std::cerr << type << ": ";
+    std::cerr << Builtins::Str(exception).cast<PyString>().view() << std::endl;
     return Builtins::None;
 }
 
