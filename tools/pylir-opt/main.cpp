@@ -1,5 +1,4 @@
 
-#include <mlir/Dialect/SCF/SCF.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/InitAllDialects.h>
@@ -11,6 +10,11 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transform/Passes.hpp>
 
+std::unique_ptr<mlir::Pass> createTestMemorySSA();
+
+#define GEN_PASS_REGISTRATION
+#include "Passes.h.inc"
+
 int main(int argc, char** argv)
 {
     mlir::registerAllPasses();
@@ -21,6 +25,7 @@ int main(int argc, char** argv)
 
     pylir::registerConversionPasses();
     pylir::Py::registerTransformPasses();
+    ::registerTestPasses();
 
     return mlir::failed(mlir::MlirOptMain(argc, argv, "Standalone optimizer driver\n", registry));
 }

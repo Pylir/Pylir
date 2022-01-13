@@ -44,7 +44,7 @@ class PylirPy_Op<string mneomic, list<OpTrait> traits = []> :
 
 class PylirPy_AllocOp<string mnemonic, list<OpTrait> traits = []> :
     Op<PylirPy_Dialect, mnemonic, !listconcat(traits, [AlwaysBound])> {
-    let results = (outs Arg<DynamicType,"",[MemAlloc]>:$result);
+    let results = (outs Arg<DynamicType,"",[MemAlloc, MemWrite]>:$result);
 }
 
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
@@ -238,8 +238,8 @@ def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
     }];
 }
 
-def PylirPy_ListLenOp : PylirPy_Op<"list.len", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$input);
+def PylirPy_ListLenOp : PylirPy_Op<"list.len"> {
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$input);
     let results = (outs Index:$result);
 
     let assemblyFormat = [{
