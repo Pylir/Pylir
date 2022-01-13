@@ -26,6 +26,11 @@ class PyBuilder : public mlir::OpBuilder
     }
 
 public:
+    explicit PyBuilder(mlir::Operation* operationBefore)
+        : mlir::OpBuilder(operationBefore), m_loc(operationBefore->getLoc())
+    {
+    }
+
     explicit PyBuilder(mlir::MLIRContext* context, llvm::Optional<mlir::Location> loc = {})
         : mlir::OpBuilder(context), m_loc(loc.getValueOr(getUnknownLoc()))
     {

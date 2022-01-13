@@ -57,6 +57,12 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     auto initFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), formQualifiedName("__init__"),
                                          m_builder.getFunctionType({}, {}));
     auto reset = implementFunction(initFunc);
+    // Go through all globals again and initialize them explicitly to unbound
+    auto unbound = m_builder.createConstant(m_builder.getUnboundAttr());
+    for (auto& [name, identifier] : m_globalScope.identifiers)
+    {
+        m_builder.createStore(unbound, mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(identifier.kind)));
+    }
 
     for (auto& iter : fileInput.input)
     {

@@ -5,6 +5,13 @@
 # CHECK-DAG: globalHandle "private" @z
 # CHECK-DAG: globalHandle "private" @foo
 
+# CHECK-LABEL: @__init__
+# CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
+# CHECK-DAG: py.store %[[UNBOUND]] into @x
+# CHECK-DAG: py.store %[[UNBOUND]] into @y
+# CHECK-DAG: py.store %[[UNBOUND]] into @z
+# CHECK-DAG: py.store %[[UNBOUND]] into @foo
+
 x = 2
 
 # CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<2>

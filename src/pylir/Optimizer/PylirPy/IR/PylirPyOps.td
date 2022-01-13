@@ -789,7 +789,8 @@ def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
     }];
 
     let description = [{
-        This op creates a global handle to which objects can be bound. By default it is unbound.
+        This op creates a global handle to which objects can be bound.
+        Loading from it before a value has ever been stored in it is undefined behaviour.
     }];
 }
 
