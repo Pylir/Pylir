@@ -1,9 +1,7 @@
-// RUN: pylir-opt %s --test-memory-ssa --split-input-files
+// RUN: pylir-opt %s --test-memory-ssa --split-input-file
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
-
-py.globalHandle @foo
 
 func @test() -> index {
     %0 = py.constant #py.str<"test">

@@ -2,36 +2,29 @@
 
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
+#include <mlir/IR/ImplicitLocOpBuilder.h>
+
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 
-pylir::MemoryAccess* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
+mlir::Operation* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
 {
     auto result = m_results.find(operation);
     if (result == m_results.end())
     {
         return nullptr;
     }
-    return result->second.get();
-}
-
-pylir::MemoryPhi* pylir::MemorySSA::getMemoryAccess(mlir::Block* block)
-{
-    auto result = m_results.find(block);
-    if (result == m_results.end())
-    {
-        return nullptr;
-    }
-    return llvm::cast<MemoryPhi>(result->second.get());
+    return result->second;
 }
 
 namespace
 {
-std::unique_ptr<pylir::MemoryAccess> maybeAddAccess(pylir::MemorySSA& ssa, mlir::Operation* operation,
-                                                    pylir::MemoryAccess* lastDef)
+mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::MemorySSA& ssa, mlir::Operation* operation,
+                                mlir::Value lastDef)
 {
-    std::unique_ptr<pylir::MemoryAccess> access;
+    using namespace pylir::MemSSA;
+    mlir::Operation* access = nullptr;
     auto memoryEffectOpInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(operation);
     if (memoryEffectOpInterface)
     {
@@ -41,15 +34,15 @@ std::unique_ptr<pylir::MemoryAccess> maybeAddAccess(pylir::MemorySSA& ssa, mlir:
         }
         if (memoryEffectOpInterface.hasEffect<mlir::MemoryEffects::Write>())
         {
-            access = std::make_unique<pylir::MemoryDef>(operation, lastDef);
+            access = builder.create<MemoryDefOp>(lastDef, operation);
         }
         else if (memoryEffectOpInterface.hasEffect<mlir::MemoryEffects::Read>())
         {
-            access = std::make_unique<pylir::MemoryUse>(operation, lastDef, mlir::AliasResult::MayAlias);
+            access = builder.create<MemoryUseOp>(lastDef, operation, mlir::AliasResult::MayAlias);
         }
     }
     // Already identified as a Def
-    if (mlir::isa_and_nonnull<pylir::MemoryDef>(access.get()))
+    if (mlir::isa_and_nonnull<MemoryDefOp>(access))
     {
         return access;
     }
@@ -72,7 +65,7 @@ std::unique_ptr<pylir::MemoryAccess> maybeAddAccess(pylir::MemorySSA& ssa, mlir:
             continue;
         }
         // Conservatively assume it was captured and clobbered
-        return std::make_unique<pylir::MemoryDef>(operation, lastDef);
+        return builder.create<MemoryDefOp>(lastDef, operation);
     }
     return access;
 }
@@ -82,23 +75,36 @@ std::unique_ptr<pylir::MemoryAccess> maybeAddAccess(pylir::MemorySSA& ssa, mlir:
 pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager)
 {
     auto& aliasAnalysis = analysisManager.getAnalysis<mlir::AliasAnalysis>();
+    mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
+    m_region = builder.create<MemSSA::MemoryRegionOp>();
+    builder.setInsertionPointToStart(&m_region->body().emplaceBlock());
     for (auto& region : operation->getRegions())
     {
-        MemoryAccess* lastDef = nullptr;
+        mlir::Value lastDef;
         for (auto& block : region)
         {
             for (auto& op : block)
             {
-                auto result = maybeAddAccess(*this, &op, lastDef);
-                if (auto* def = mlir::dyn_cast_or_null<pylir::MemoryDef>(result.get()))
+                auto result = maybeAddAccess(builder, *this, &op, lastDef);
+                if (auto def = mlir::dyn_cast_or_null<MemSSA::MemoryDefOp>(result))
                 {
                     lastDef = def;
                 }
                 if (result)
                 {
-                    m_results.insert({&op, std::move(result)});
+                    m_results.insert({&op, result});
                 }
             }
         }
     }
+}
+
+void pylir::MemorySSA::dump() const
+{
+    m_region.get()->dump();
+}
+
+void pylir::MemorySSA::print(llvm::raw_ostream& out) const
+{
+    m_region.get().print(out);
 }

@@ -6,7 +6,7 @@ include "mlir/Pass/PassBase.td"
 
 def TestMemorySSA : Pass<"test-memory-ssa","::mlir::ModuleOp"> {
     let constructor = "::createTestMemorySSA()";
-    let dependentDialects = [];
+    let dependentDialects = ["::pylir::MemSSA::MemorySSADialect"];
 }
 
 #endif
