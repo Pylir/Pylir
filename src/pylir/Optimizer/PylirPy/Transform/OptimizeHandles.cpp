@@ -20,6 +20,7 @@ void OptimizeHandlesPass::runOnOperation()
     auto module = getOperation();
     mlir::SymbolTableCollection collection;
     mlir::SymbolUserMap userMap(collection, module);
+    bool changed = false;
     for (auto handle : llvm::make_early_inc_range(module.getOps<pylir::Py::GlobalHandleOp>()))
     {
         // If the globalHandle is not public and there is only a single store to it with a constant value,
@@ -57,6 +58,7 @@ void OptimizeHandlesPass::runOnOperation()
             m_noLoadHandlesRemoved++;
             std::for_each(users.begin(), users.end(), std::mem_fn(&mlir::Operation::erase));
             handle->erase();
+            changed = true;
             continue;
         }
         if (!hasSingleStore)
@@ -86,6 +88,11 @@ void OptimizeHandlesPass::runOnOperation()
         globalValue.setVisibility(handle.getVisibility());
         handle->erase();
         m_singleStoreHandlesConverted++;
+        changed = true;
+    }
+    if (!changed)
+    {
+        markAllAnalysesPreserved();
     }
 }
 
