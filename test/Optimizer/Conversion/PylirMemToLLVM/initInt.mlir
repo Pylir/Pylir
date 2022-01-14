@@ -15,8 +15,6 @@ func @foo(%value : i64) -> !py.dynamic {
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc
 // CHECK: %[[CASTED:.*]] = llvm.bitcast %[[MEMORY]]
 // CHECK: %[[INTEGER:.*]] = llvm.bitcast %[[CASTED]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[INTEGER]][%[[ZERO]], %[[ONE]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[INTEGER]][0, 1]
 // CHECK-NEXT: llvm.call @mp_init_u64(%[[GEP]], %[[VALUE]])
 // CHECK-NEXT: llvm.return %[[CASTED]]

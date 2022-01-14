@@ -7,7 +7,6 @@ func @test(%arg : !py.dynamic) -> !py.dynamic {
 
 // CHECK: @test
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARG]][%[[ZERO]], %[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARG]][0, 0]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: llvm.return %[[RESULT]]

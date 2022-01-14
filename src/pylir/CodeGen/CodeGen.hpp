@@ -264,7 +264,7 @@ class CodeGen
     {
         auto [line, col] = m_document->getLineCol(Diag::range(fallBackLocation).first);
         return mlir::OpaqueLoc::get(
-            &astObject, mlir::FileLineColLoc::get(m_builder.getIdentifier(m_document->getFilename()), line, col));
+            &astObject, mlir::FileLineColLoc::get(m_builder.getStringAttr(m_document->getFilename()), line, col));
     }
 
     std::string formQualifiedName(std::string_view symbol);

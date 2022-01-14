@@ -36,9 +36,7 @@ func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: catch %[[BIT_CAST]]
 // CHECK-NEXT: %[[EXCEPTION_HEADER_i8:.*]] = llvm.extractvalue %[[LANDING_PAD]][0 : i32]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[MEMBER_OFFSET:.*]] = llvm.mlir.constant
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][%[[ZERO]], %[[MEMBER_OFFSET]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][0, {{[0-9]+}}]
 // CHECK-NEXT: %[[PTR_TO_INT:.*]] = llvm.ptrtoint %[[GEP]]
 // CHECK-NEXT: %[[ZERO_I:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: %[[NEG:.*]] = llvm.sub %[[ZERO_I]], %[[PTR_TO_INT]]

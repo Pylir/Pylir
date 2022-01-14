@@ -20,10 +20,8 @@ func @bar(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
 // CHECK-NEXT: %[[ADDRESS:.*]] = llvm.mlir.addressof @foo
 // CHECK-NEXT: %[[CAST:.*]] = llvm.bitcast %[[ADDRESS]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
 // CHECK-NEXT: %[[FUNCTION:.*]] = llvm.bitcast %[[CAST]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[FUNCTION]][%[[ZERO]], %[[ONE]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[FUNCTION]][0, 1]
 // CHECK-NEXT: %[[LOADED:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[CALL:.*]] = llvm.call %[[LOADED]](%[[CAST]], %[[ARG1]], %[[ARG2]])
 // CHECK-NEXT: llvm.return %[[CALL]]

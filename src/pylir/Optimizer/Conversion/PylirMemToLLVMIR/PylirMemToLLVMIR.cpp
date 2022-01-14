@@ -406,8 +406,8 @@ public:
     mlir::Value createSizeOf(mlir::Location loc, mlir::OpBuilder& builder, mlir::Type type)
     {
         auto null = builder.create<mlir::LLVM::NullOp>(loc, mlir::LLVM::LLVMPointerType::get(type));
-        auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
-        auto gep = builder.create<mlir::LLVM::GEPOp>(loc, null.getType(), null, mlir::ValueRange{one});
+        auto gep = builder.create<mlir::LLVM::GEPOp>(loc, null.getType(), null, mlir::ValueRange{},
+                                                     llvm::ArrayRef<std::int32_t>{1});
         return builder.create<mlir::LLVM::PtrToIntOp>(loc, getIndexType(), gep);
     }
 
@@ -616,11 +616,9 @@ public:
                         }
                     }
                     auto bufferAddress = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), bufferObject);
-                    auto zero = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), builder.getI32Type(),
-                                                                       builder.getI32IntegerAttr(0));
-                    auto gep = builder.create<mlir::LLVM::GEPOp>(global.getLoc(),
-                                                                 mlir::LLVM::LLVMPointerType::get(elementType),
-                                                                 bufferAddress, mlir::ValueRange{zero, zero});
+                    auto gep = builder.create<mlir::LLVM::GEPOp>(
+                        global.getLoc(), mlir::LLVM::LLVMPointerType::get(elementType), bufferAddress,
+                        mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 0});
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, gep,
                                                                       builder.getI32ArrayAttr({1, 2}));
                 })
@@ -674,14 +672,9 @@ public:
                             mlir::Value mpIntPtr;
                             {
                                 auto toInit = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), global);
-
-                                auto zero = builder.create<mlir::LLVM::ConstantOp>(
-                                    global.getLoc(), builder.getI32Type(), builder.getI32IntegerAttr(0));
-                                auto one = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), builder.getI32Type(),
-                                                                                  builder.getI32IntegerAttr(1));
                                 mpIntPtr = builder.create<mlir::LLVM::GEPOp>(
                                     global.getLoc(), mlir::LLVM::LLVMPointerType::get(getMPInt()), toInit,
-                                    mlir::ValueRange{zero, one});
+                                    mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
                             }
 
                             createRuntimeCall(global.getLoc(), builder, Runtime::mp_init, {mpIntPtr});
@@ -1050,12 +1043,10 @@ struct TypeOfOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TypeOf
 
     void rewrite(pylir::Py::TypeOfOp op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
-            adaptor.object(), mlir::ValueRange{zero, zero});
+            adaptor.object(), mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 0});
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep);
     }
 };
@@ -1072,19 +1063,13 @@ struct TupleGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::
     void rewrite(pylir::Py::TupleGetItemOp op, OpAdaptor adaptor,
                  mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         auto tuple = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPySequenceType()), adaptor.tuple());
         auto bufferStartPtr = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(
                 mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()))),
-            tuple, mlir::ValueRange{zero, one, two});
+            tuple, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         auto bufferStart = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), bufferStartPtr);
         auto offset =
             rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), bufferStart.getType(), bufferStart, adaptor.index());
@@ -1105,16 +1090,12 @@ struct BufferLenOpConversion : public ConvertPylirOpToLLVMPattern<T>
     void rewrite(T op, typename BufferLenOpConversion<T>::OpAdaptor adaptor,
                  mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto tuple = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPySequenceType()),
             adaptor.input());
         auto sizePtr =
             rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
-                                               tuple, mlir::ValueRange{zero, one, zero});
+                                               tuple, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, sizePtr);
     }
 };
@@ -1135,21 +1116,18 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
         auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
         rewriter.setInsertionPointToEnd(block);
 
-        auto zeroI32 =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto oneI32 =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto list = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPySequenceType()), adaptor.list());
-        auto sizePtr = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                          list, mlir::ValueRange{zeroI32, oneI32, zeroI32});
+        auto sizePtr =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), list,
+                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         auto size = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), sizePtr);
         auto oneIndex = createIndexConstant(rewriter, op.getLoc(), 1);
         auto incremented = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), size, oneIndex);
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), incremented, sizePtr);
         auto capacityPtr =
             rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), list,
-                                               mlir::ValueRange{zeroI32, oneI32, oneI32});
+                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 1});
         auto capacity = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), capacityPtr);
         auto notEnoughCapacity =
             rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::ult, capacity, incremented);
@@ -1159,15 +1137,13 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
         growBlock->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(growBlock);
         {
-            auto twoI32 = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
-                                                                  rewriter.getI32IntegerAttr(2));
             mlir::Value newCapacity = rewriter.create<mlir::LLVM::ShlOp>(op.getLoc(), capacity, oneIndex);
             newCapacity = rewriter.create<mlir::LLVM::UMaxOp>(op.getLoc(), newCapacity, incremented);
             auto arrayPtr = rewriter.create<mlir::LLVM::GEPOp>(
                 op.getLoc(),
                 mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(
                     mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()))),
-                list, mlir::ValueRange{zeroI32, oneI32, twoI32});
+                list, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
             auto array = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), arrayPtr);
             auto pyObjectSize = getTypeConverter()->createSizeOf(
                 op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()));
@@ -1182,13 +1158,11 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
         rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, endBlock);
 
         rewriter.setInsertionPointToStart(endBlock);
-        auto twoI32 =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         auto arrayPtr = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(
                 mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()))),
-            list, mlir::ValueRange{zeroI32, oneI32, twoI32});
+            list, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         auto array = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), arrayPtr);
         auto offset = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), array.getType(), array, mlir::ValueRange{size});
         rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.item(), offset);
@@ -1268,15 +1242,11 @@ struct BoolToI1OpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Bool
 
     void rewrite(pylir::Py::BoolToI1Op op, OpAdaptor adaptor, mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto boolean = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyIntType()), adaptor.input());
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(/*TODO: int*/ rewriter.getI32Type()), boolean,
-            mlir::ValueRange{zero, one, zero});
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getCABI().getInt(getContext())), boolean,
+            mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         auto load = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto zeroI =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), load.getType(), rewriter.getI32IntegerAttr(0));
@@ -1296,15 +1266,11 @@ struct FunctionGetFunctionOpConversion : public ConvertPylirOpToLLVMPattern<pyli
     void rewrite(pylir::Py::FunctionGetFunctionOp op, OpAdaptor adaptor,
                  mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto function = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyFunctionType()), adaptor.function());
         auto funcPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(typeConverter->convertType(op.getType())), function,
-            mlir::ValueRange{zero, one});
+            mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, funcPtrPtr);
     }
 };
@@ -1350,15 +1316,13 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrE
         auto lhs = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyStringType()), adaptor.lhs());
         auto rhs = rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), lhs.getType(), adaptor.rhs());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
-        auto lhsGep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                         lhs, mlir::ValueRange{zero, one, zero});
+        auto lhsGep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), lhs,
+                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         auto lhsLen = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), lhsGep);
-        auto rhsGep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                         rhs, mlir::ValueRange{zero, one, zero});
+        auto rhsGep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), rhs,
+                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         auto rhsLen = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
         auto sizeEqual =
             rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, lhsLen, rhsLen);
@@ -1376,14 +1340,12 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrE
 
         bufferCmp->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(bufferCmp);
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         lhsGep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type())), lhs,
-            mlir::ValueRange{zero, one, two});
+            mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         auto lhsBuffer = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), lhsGep);
-        rhsGep =
-            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), lhsGep.getType(), rhs, mlir::ValueRange{zero, one, two});
+        rhsGep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), lhsGep.getType(), rhs, mlir::ValueRange{},
+                                                    llvm::ArrayRef<std::int32_t>{0, 1, 2});
         auto rhsBuffer = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), rhsGep);
         auto result = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::Memcmp,
                                                             {lhsBuffer, rhsBuffer, lhsLen});
@@ -1497,8 +1459,9 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
             i8Ptr);
-        auto index = createIndexConstant(rewriter, op.getLoc(), result - tupleAttr.getValue().begin());
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), objectPtrPtr.getType(), objectPtrPtr, index);
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), objectPtrPtr.getType(), objectPtrPtr, mlir::ValueRange{},
+            llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(result - tupleAttr.getValue().begin())});
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep);
         return mlir::success();
     }
@@ -1633,12 +1596,8 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         rewriter.setInsertionPointToStart(foundIndex);
         auto typeObj = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyTypeType()), adaptor.typeObject());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                      typeObj, mlir::ValueRange{zero, one});
+                                                      typeObj, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
         auto offset = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
         auto pyObjectPtrPtr = rewriter.create<mlir::LLVM::BitcastOp>(
@@ -1717,7 +1676,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto one =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                      typeObj, mlir::ValueRange{zero, one});
+                                                      typeObj, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
         auto offset = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
         auto pyObjectPtrPtr = rewriter.create<mlir::LLVM::BitcastOp>(
@@ -1820,19 +1779,16 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
             // So we need to subtract the offset of the exception header inside of PyBaseException to get to it.
             auto pyBaseException = getTypeConverter()->getPyBaseExceptionType();
             auto unwindHeader = getTypeConverter()->getUnwindHeader();
-            static std::size_t index = [&]
+            const std::int32_t index = [&]
             {
                 auto body = getTypeConverter()->getPyBaseExceptionType().getBody();
                 return std::find(body.begin(), body.end(), unwindHeader) - body.begin();
             }();
             auto null =
                 rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(pyBaseException));
-            auto zero = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
-                                                                rewriter.getI32IntegerAttr(0));
-            auto offset = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
-                                                                  rewriter.getI32IntegerAttr(index));
-            auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(unwindHeader),
-                                                          null, mlir::ValueRange{zero, offset});
+            auto gep =
+                rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(unwindHeader), null,
+                                                   mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, index});
             mlir::Value byteOffset = rewriter.create<mlir::LLVM::PtrToIntOp>(op.getLoc(), getIndexType(), gep);
             auto zeroI = createIndexConstant(rewriter, op.getLoc(), 0);
             byteOffset = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), zeroI, byteOffset);
@@ -1915,12 +1871,10 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, falseC);
         auto object =
             rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(op, typeConverter->convertType(op.getType()), memory);
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
-            object, mlir::ValueRange{zero, zero});
+            object, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 0});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.typeObj(), gep);
         return mlir::success();
     }
@@ -1962,12 +1916,8 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
         rewriter.setInsertionPointToStart(endBlock);
         auto typeObj = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyTypeType()), adaptor.typeObj());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                      typeObj, mlir::ValueRange{zero, one});
+                                                      typeObj, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
         auto offset = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto size = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, endBlock->getArgument(0));
         auto pointerSize = createIndexConstant(rewriter, op.getLoc(), getTypeConverter()->getPointerBitwidth() / 8);
@@ -1984,7 +1934,7 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
         gep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(),
             mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType())),
-            object, mlir::ValueRange{zero, zero});
+            object, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 0});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.typeObj(), gep);
     }
 };
@@ -2018,16 +1968,12 @@ struct InitSequence : public ConvertPylirOpToLLVMPattern<T>
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPySequenceType()),
             adaptor.memory());
         auto size = this->createIndexConstant(rewriter, op.getLoc(), adaptor.initializer().size());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto gep =
             rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
-                                               sequence, mlir::ValueRange{zero, one, zero});
+                                               sequence, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
-                                                 sequence, mlir::ValueRange{zero, one, one});
+                                                 sequence, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 1});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         auto sizeOf = this->getTypeConverter()->createSizeOf(
             op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyObjectType()));
@@ -2036,17 +1982,15 @@ struct InitSequence : public ConvertPylirOpToLLVMPattern<T>
                                                                   PylirTypeConverter::Runtime::malloc, {inBytes});
         auto array = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->typeConverter->convertType(op.getType())), memory);
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()),
-                                                 sequence, mlir::ValueRange{zero, one, two});
+                                                 sequence, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
         rewriter.replaceOp(op, adaptor.memory());
         for (auto iter : llvm::enumerate(adaptor.initializer()))
         {
-            auto offset = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
-                                                                  rewriter.getI32IntegerAttr(iter.index()));
-            gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), array.getType(), array, mlir::ValueRange{offset});
+            gep = rewriter.create<mlir::LLVM::GEPOp>(
+                op.getLoc(), array.getType(), array, mlir::ValueRange{},
+                llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(iter.index())});
             rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), iter.value(), gep);
         }
     }
@@ -2070,19 +2014,15 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPySequenceType()),
             adaptor.initializer());
 
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                      list, mlir::ValueRange{zero, one, zero});
+                                                      list, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         auto size = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
 
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), tuple,
-                                                 mlir::ValueRange{zero, one, zero});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), tuple,
-                                                 mlir::ValueRange{zero, one, one});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 1});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         auto sizeOf = getTypeConverter()->createSizeOf(
             op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()));
@@ -2091,15 +2031,13 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
                                                             {inBytes});
         auto array = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(typeConverter->convertType(op.getType())), memory);
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), tuple,
-                                                 mlir::ValueRange{zero, one, two});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
         rewriter.replaceOp(op, adaptor.memory());
 
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), list,
-                                                 mlir::ValueRange{zero, one, two});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         auto listArray = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto arrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), array);
@@ -2123,21 +2061,18 @@ struct InitTuplePopFrontOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
         auto prevTuple = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPySequenceType()), adaptor.tuple());
 
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                      prevTuple, mlir::ValueRange{zero, one, zero});
+        auto gep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), prevTuple,
+                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         mlir::Value size = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto oneI = createIndexConstant(rewriter, op.getLoc(), 1);
         size = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), size, oneI);
 
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), tuple,
-                                                 mlir::ValueRange{zero, one, zero});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), tuple,
-                                                 mlir::ValueRange{zero, one, one});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 1});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         auto sizeOf = getTypeConverter()->createSizeOf(
             op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()));
@@ -2146,18 +2081,16 @@ struct InitTuplePopFrontOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
                                                             {inBytes});
         auto array = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(typeConverter->convertType(op.getType())), memory);
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), tuple,
-                                                 mlir::ValueRange{zero, one, two});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
         rewriter.replaceOp(op, adaptor.memory());
 
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()),
-                                                 prevTuple, mlir::ValueRange{zero, one, two});
+                                                 prevTuple, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         mlir::Value prevArray = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
-        prevArray =
-            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), prevArray.getType(), prevArray, mlir::ValueRange{one});
+        prevArray = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), prevArray.getType(), prevArray, mlir::ValueRange{},
+                                                       llvm::ArrayRef<std::int32_t>{1});
         auto arrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), array);
         auto prevArrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
@@ -2181,21 +2114,18 @@ struct InitTuplePrependOpConversion : public ConvertPylirOpToLLVMPattern<pylir::
         auto prevTuple = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPySequenceType()), adaptor.tuple());
 
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                      prevTuple, mlir::ValueRange{zero, one, zero});
+        auto gep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), prevTuple,
+                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         mlir::Value size = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
         auto oneI = createIndexConstant(rewriter, op.getLoc(), 1);
         size = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), size, oneI);
 
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), tuple,
-                                                 mlir::ValueRange{zero, one, zero});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), tuple,
-                                                 mlir::ValueRange{zero, one, one});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 1});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         auto sizeOf = getTypeConverter()->createSizeOf(
             op.getLoc(), rewriter, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()));
@@ -2207,16 +2137,16 @@ struct InitTuplePrependOpConversion : public ConvertPylirOpToLLVMPattern<pylir::
         auto two =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), tuple,
-                                                 mlir::ValueRange{zero, one, two});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.element(), array);
         rewriter.replaceOp(op, adaptor.memory());
 
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()),
-                                                 prevTuple, mlir::ValueRange{zero, one, two});
+                                                 prevTuple, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         auto prevArray = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
-        auto arrayPlusOne =
-            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), prevArray.getType(), array, mlir::ValueRange{one});
+        auto arrayPlusOne = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), prevArray.getType(), array,
+                                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{1});
         auto arrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type()), arrayPlusOne);
         auto prevArrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
@@ -2238,13 +2168,9 @@ struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
     {
         auto casted = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyIntType()), adaptor.memory());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto mpIntPointer = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getMPInt()), casted,
-            mlir::ValueRange{zero, one});
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getMPInt()), casted, mlir::ValueRange{},
+            llvm::ArrayRef<std::int32_t>{0, 1});
         auto value = adaptor.initializer();
         if (value.getType() != rewriter.getI64Type())
         {
@@ -2269,34 +2195,28 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
             adaptor.memory());
 
         mlir::Value size = this->createIndexConstant(rewriter, op.getLoc(), 0);
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         for (auto iter : adaptor.strings())
         {
             auto iterString = rewriter.create<mlir::LLVM::BitcastOp>(
                 op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyStringType()), iter);
-            auto gep =
-                rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
-                                                   iterString, mlir::ValueRange{zero, one, zero});
+            auto gep = rewriter.create<mlir::LLVM::GEPOp>(
+                op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()), iterString, mlir::ValueRange{},
+                llvm::ArrayRef<std::int32_t>{0, 1, 0});
             auto sizeLoaded = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
             size = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), size, sizeLoaded);
         }
 
         auto gep =
             rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
-                                               string, mlir::ValueRange{zero, one, zero});
+                                               string, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
-                                                 string, mlir::ValueRange{zero, one, one});
+                                                 string, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 1});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, gep);
         auto array = this->getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
                                                                  PylirTypeConverter::Runtime::malloc, {size});
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), string,
-                                                 mlir::ValueRange{zero, one, two});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
 
         size = this->createIndexConstant(rewriter, op.getLoc(), 0);
@@ -2304,12 +2224,13 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
         {
             auto iterString = rewriter.create<mlir::LLVM::BitcastOp>(
                 op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyStringType()), iter);
-            gep =
-                rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getIndexType()),
-                                                   iterString, mlir::ValueRange{zero, one, zero});
+            gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(),
+                                                     mlir::LLVM::LLVMPointerType::get(this->getIndexType()), iterString,
+                                                     mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
             auto sizeLoaded = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
             gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()),
-                                                     iterString, mlir::ValueRange{zero, one, two});
+                                                     iterString, mlir::ValueRange{},
+                                                     llvm::ArrayRef<std::int32_t>{0, 1, 2});
             auto sourceLoaded = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
             auto dest = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), array.getType(), array, size);
             auto falseC =
@@ -2334,15 +2255,12 @@ struct InitStrFromIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Me
             adaptor.memory());
         auto integer = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getPyIntType()), adaptor.integer());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto mpIntPtr = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(this->getTypeConverter()->getMPInt()), integer,
-            mlir::ValueRange{zero, one});
-        auto sizePtr = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()),
-                                                          string, mlir::ValueRange{zero, one, zero});
+            mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
+        auto sizePtr =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(getIndexType()), string,
+                                               mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 0});
         auto ten = rewriter.create<mlir::LLVM::ConstantOp>(
             op.getLoc(), getTypeConverter()->getCABI().getInt(getContext()), rewriter.getI32IntegerAttr(10));
         getTypeConverter()->createRuntimeCall(
@@ -2359,13 +2277,12 @@ struct InitStrFromIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Me
         size = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), size, oneI);
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), size, sizePtr);
 
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(capacity.getType()),
-                                                      string, mlir::ValueRange{zero, one, one});
+        auto gep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(capacity.getType()),
+                                               string, mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 1});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), capacity, gep);
-        auto two =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(2));
         gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(array.getType()), string,
-                                                 mlir::ValueRange{zero, one, two});
+                                                 mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1, 2});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), array, gep);
 
         rewriter.replaceOp(op, adaptor.memory());
@@ -2382,13 +2299,9 @@ struct InitFuncOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
     {
         auto casted = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyFunctionType()), adaptor.memory());
-        auto zero =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(0));
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
         auto fpType = typeConverter->convertType(pylir::Py::getUniversalCCType(getContext()));
         auto fp = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), mlir::LLVM::LLVMPointerType::get(fpType), casted,
-                                                     mlir::ValueRange{zero, one});
+                                                     mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
         auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), fpType, adaptor.initializer());
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), address, fp);
         rewriter.replaceOp(op, adaptor.memory());

@@ -15,8 +15,7 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[LIST:.*]] = llvm.mlir.addressof @builtins.list
 // CHECK-NEXT: %[[LIST_CAST:.*]] = llvm.bitcast %[[LIST]]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][%[[ONE]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][1]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.ptrtoint %[[GEP]]
 // CHECK-NEXT: %[[SLOTS:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[SIZE]], %[[SLOTS]]
@@ -25,28 +24,22 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][%[[ZERO]], %[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][0, 0]
 // CHECK-NEXT: llvm.store %[[LIST_CAST]], %[[GEP]]
 // CHECK-NEXT: %[[LIST_OBJ:.*]] = llvm.bitcast %[[RESULT]]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.mlir.constant(1 : index) : i64
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_OBJ]][%[[ZERO]], %[[ONE]], %[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_OBJ]][0, 1, 0]
 // CHECK-NEXT: llvm.store %[[LEN]], %[[GEP]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_OBJ]][%[[ZERO]], %[[ONE]], %[[ONE]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_OBJ]][0, 1, 1]
 // CHECK-NEXT: llvm.store %[[LEN]], %[[GEP]]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[ONE2:.*]] = llvm.mlir.constant(1 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][%[[ONE2]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][1]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.ptrtoint %[[GEP]]
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.mul %[[LEN]], %[[SIZE]]
 // CHECK-NEXT: %[[ARRAY:.*]] = llvm.call @malloc(%[[BYTES]])
 // CHECK-NEXT: %[[ARRAY_CAST:.*]] = llvm.bitcast %[[ARRAY]]
-// CHECK-NEXT: %[[TWO:.*]] = llvm.mlir.constant(2 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_OBJ]][%[[ZERO]], %[[ONE]], %[[TWO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_OBJ]][0, 1, 2]
 // CHECK-NEXT: llvm.store %[[ARRAY_CAST]], %[[GEP]]
-// CHECK-NEXT: %[[OFFSET:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARRAY_CAST]][%[[OFFSET]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARRAY_CAST]][0]
 // CHECK-NEXT: llvm.store %[[LIST_CAST]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[RESULT]]

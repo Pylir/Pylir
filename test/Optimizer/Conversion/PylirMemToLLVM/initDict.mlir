@@ -15,8 +15,7 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[DICT:.*]] = llvm.mlir.addressof @builtins.dict
 // CHECK-NEXT: %[[DICT_CAST:.*]] = llvm.bitcast %[[DICT]]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][%[[ONE]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][1]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.ptrtoint %[[GEP]]
 // CHECK-NEXT: %[[SLOTS:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[SIZE]], %[[SLOTS]]
@@ -25,7 +24,6 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][%[[ZERO]], %[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][0, 0]
 // CHECK-NEXT: llvm.store %[[DICT_CAST]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[RESULT]]

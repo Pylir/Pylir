@@ -18,8 +18,7 @@ py.globalValue @foo = #py.tuple<()>
 // CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1 : i32, 0 : i32]
 // CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF2]][1 : i32, 1 : i32]
 // CHECK-NEXT: %[[BUFFER_ADDR:.*]] = llvm.mlir.addressof @[[BUFFER]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER_ADDR]][%[[ZERO]], %[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER_ADDR]][0, 0]
 // CHECK-NEXT: %[[UNDEF4:.*]] = llvm.insertvalue %[[GEP]], %[[UNDEF3]][1 : i32, 2 : i32]
 // CHECK-NEXT: llvm.return %[[UNDEF4]]
 
@@ -41,8 +40,7 @@ py.globalValue @foo = #py.str<"test">
 // CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1 : i32, 0 : i32]
 // CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF2]][1 : i32, 1 : i32]
 // CHECK-NEXT: %[[BUFFER_ADDR:.*]] = llvm.mlir.addressof @[[BUFFER]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER_ADDR]][%[[ZERO]], %[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER_ADDR]][0, 0]
 // CHECK-NEXT: %[[UNDEF4:.*]] = llvm.insertvalue %[[GEP]], %[[UNDEF3]][1 : i32, 2 : i32]
 // CHECK-NEXT: llvm.return %[[UNDEF4]]
 

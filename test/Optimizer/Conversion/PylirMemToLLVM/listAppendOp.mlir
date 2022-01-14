@@ -11,27 +11,23 @@ func @foo(%list : !py.dynamic, %item : !py.dynamic) {
 // CHECK-LABEL: llvm.func @foo
 // CHECK-SAME: %[[LIST:[[:alnum:]]+]]
 // CHECK-SAME: %[[ITEM:[[:alnum:]]+]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i32)
-// CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i32)
 // CHECK-NEXT: %[[LIST_CAST:.*]] = llvm.bitcast %[[LIST]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][%[[ZERO]], %[[ONE]], %[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][0, 1, 0]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[ONE_INDEX:.*]] = llvm.mlir.constant(1 : index)
 // CHECK-NEXT: %[[INCREMENTED:.*]] = llvm.add %[[LEN]], %[[ONE_INDEX]]
 // CHECK-NEXT: llvm.store %[[INCREMENTED:.*]], %[[GEP]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][%[[ZERO]], %[[ONE]], %[[ONE]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][0, 1, 1]
 // CHECK-NEXT: %[[CAPACITY:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[GROW:.*]] = llvm.icmp "ult" %[[CAPACITY]], %[[INCREMENTED]]
 // CHECK-NEXT: llvm.cond_br %[[GROW]], ^[[GROW_BLOCK:.*]], ^[[END_BLOCK:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[GROW_BLOCK]]:
-// CHECK-NEXT: %[[TWO:.*]] = llvm.mlir.constant(2 : i32)
 // CHECK-NEXT: %[[SHL:.*]] = llvm.shl %[[CAPACITY]], %[[ONE_INDEX]]
 // CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.umax"(%[[SHL]], %[[INCREMENTED]])
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][%[[ZERO]], %[[ONE]], %[[TWO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][0, 1, 2]
 // CHECK-NEXT: %[[ARRAY:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[ONE2:.*]] = llvm.mlir.constant(1 : i32)
-// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[NULL]][%[[ONE2]]]
+// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[NULL]][1]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.ptrtoint %[[GEP2]]
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.mul %[[NEW_CAP]], %[[SIZE]]
 // CHECK-NEXT: %[[ARRAY_I8:.*]] = llvm.bitcast %[[ARRAY]]
@@ -40,8 +36,7 @@ func @foo(%list : !py.dynamic, %item : !py.dynamic) {
 // CHECK-NEXT: llvm.store %[[NEW_ARRAY]], %[[GEP]]
 // CHECK-NEXT: llvm.br ^[[END_BLOCK]]
 // CHECK-NEXT: ^[[END_BLOCK]]:
-// CHECK-NEXT: %[[TWO:.*]] = llvm.mlir.constant(2 : i32)
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][%[[ZERO]], %[[ONE]], %[[TWO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST_CAST]][0, 1, 2]
 // CHECK-NEXT: %[[ARRAY:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARRAY]][%[[LEN]]]
 // CHECK-NEXT: llvm.store %[[ITEM]], %[[GEP]]
