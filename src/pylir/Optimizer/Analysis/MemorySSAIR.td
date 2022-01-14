@@ -64,11 +64,11 @@ def AliasResultAttr : MemorySSA_Attr<"AliasResult"> {
 }
 
 def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, NoTerminator]> {
-    let arguments = (ins);
+    let arguments = (ins FlatSymbolRefAttr:$functionName);
     let results = (outs);
 
     let regions = (region AnyRegion:$body);
-    let assemblyFormat = "attr-dict-with-keyword $body";
+    let assemblyFormat = "$functionName attr-dict-with-keyword $body";
 }
 
 def MemoryUseOp : MemorySSA_Op<"use"> {

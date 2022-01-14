@@ -76,7 +76,7 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
 {
     auto& aliasAnalysis = analysisManager.getAnalysis<mlir::AliasAnalysis>();
     mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
-    m_region = builder.create<MemSSA::MemoryRegionOp>();
+    m_region = builder.create<MemSSA::MemoryRegionOp>(mlir::FlatSymbolRefAttr::get(operation));
     builder.setInsertionPointToStart(&m_region->body().emplaceBlock());
     for (auto& region : operation->getRegions())
     {
