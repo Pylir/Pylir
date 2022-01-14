@@ -63,7 +63,7 @@ def AliasResultAttr : MemorySSA_Attr<"AliasResult"> {
     }];
 }
 
-def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, NoTerminator]> {
+def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove]> {
     let arguments = (ins FlatSymbolRefAttr:$functionName);
     let results = (outs);
 
@@ -71,18 +71,25 @@ def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, NoTerminator]> {
     let assemblyFormat = "$functionName attr-dict-with-keyword $body";
 }
 
+def MemoryLiveOnEntryOp : MemorySSA_Op<"liveOnEntry"> {
+    let arguments = (ins );
+    let results = (outs MemoryDefType:$result);
+
+    let assemblyFormat = "attr-dict";
+}
+
 def MemoryUseOp : MemorySSA_Op<"use"> {
-    let arguments = (ins Optional<MemoryDefType>:$definition, InstrAttr:$instruction, AliasResultAttr:$aliasResult);
+    let arguments = (ins MemoryDefType:$definition, InstrAttr:$instruction, AliasResultAttr:$aliasResult);
     let results = (outs);
 
-    let assemblyFormat = "`(` ($definition^) : ( `` `liveOnEntry` )? `)` $aliasResult attr-dict `\\n` $instruction";
+    let assemblyFormat = "`(` $definition `)` $aliasResult attr-dict `\\n` $instruction";
 }
 
 def MemoryDefOp : MemorySSA_Op<"def"> {
-    let arguments = (ins Optional<MemoryDefType>:$clobbered, InstrAttr:$instruction);
+    let arguments = (ins MemoryDefType:$clobbered, InstrAttr:$instruction);
     let results = (outs MemoryDefType:$result);
 
-    let assemblyFormat = "`(` ($clobbered^) : ( `` `liveOnEntry` )? `)` attr-dict `\\n` $instruction";
+    let assemblyFormat = "`(` $clobbered `)` attr-dict `\\n` $instruction";
 }
 
 def MemoryBranchOp : MemorySSA_Op<"br", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {
@@ -91,7 +98,7 @@ def MemoryBranchOp : MemorySSA_Op<"br", [Terminator, DeclareOpInterfaceMethods<B
 
     let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
 
-    let assemblyFormat = "$successors `(` $branchArgs `)` attr-dict";
+    let assemblyFormat = "$successors $branchArgs attr-dict";
 
     let verifier = [{
         if (branchArgs().size() != successors().size())

@@ -7,6 +7,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
+#include <pylir/Optimizer/Transforms/Utils/SSABuilder.hpp>
 
 mlir::Operation* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
 {
@@ -77,25 +78,88 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
     auto& aliasAnalysis = analysisManager.getAnalysis<mlir::AliasAnalysis>();
     mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
     m_region = builder.create<MemSSA::MemoryRegionOp>(mlir::FlatSymbolRefAttr::get(operation));
-    builder.setInsertionPointToStart(&m_region->body().emplaceBlock());
-    for (auto& region : operation->getRegions())
+    PYLIR_ASSERT(operation->getNumRegions() == 1);
+    auto& region = operation->getRegion(0);
+    llvm::DenseMap<mlir::Block*, mlir::Block*> blockMapping;
+    llvm::DenseMap<mlir::Block*, mlir::Value> lastDefs;
+    pylir::SSABuilder ssaBuilder;
+
+    auto hasUnresolvedPredecessors = [&](mlir::Block* block)
     {
-        mlir::Value lastDef;
-        for (auto& block : region)
+        return llvm::any_of(block->getPredecessors(),
+                            [&](mlir::Block* pred)
+                            {
+                                auto predMemBlock = blockMapping.lookup(pred);
+                                if (!predMemBlock)
+                                {
+                                    return true;
+                                }
+                                return !predMemBlock->getParent();
+                            });
+    };
+
+    // Insert entry block that has no predecessors
+    blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
+    for (auto& block : region)
+    {
+        auto* memBlock = blockMapping.find(&block)->second;
+        PYLIR_ASSERT(memBlock);
+        m_region->body().push_back(memBlock);
+        builder.setInsertionPointToStart(memBlock);
+        // If any of the predecessors have not yet been inserted
+        // mark the block as open
+        if (hasUnresolvedPredecessors(&block))
         {
-            for (auto& op : block)
+            ssaBuilder.markOpenBlock(memBlock);
+        }
+
+        mlir::Value lastDef;
+        if (memBlock->isEntryBlock())
+        {
+            lastDef = builder.create<MemSSA::MemoryLiveOnEntryOp>();
+        }
+        else
+        {
+            lastDef = ssaBuilder.readVariable(builder.getType<MemSSA::DefType>(), lastDefs, memBlock);
+        }
+        for (auto& op : block)
+        {
+            auto result = maybeAddAccess(builder, *this, &op, lastDef);
+            if (!result)
             {
-                auto result = maybeAddAccess(builder, *this, &op, lastDef);
-                if (auto def = mlir::dyn_cast_or_null<MemSSA::MemoryDefOp>(result))
-                {
-                    lastDef = def;
-                }
-                if (result)
-                {
-                    m_results.insert({&op, result});
-                }
+                continue;
+            }
+            m_results.insert({&op, result});
+            if (auto def = mlir::dyn_cast_or_null<MemSSA::MemoryDefOp>(result))
+            {
+                lastDef = def;
             }
         }
+        lastDefs[memBlock] = lastDef;
+
+        llvm::SmallVector<mlir::Block*> memSuccessors;
+        for (auto* succ : block.getSuccessors())
+        {
+            auto lookup = blockMapping.lookup(succ);
+            if (!lookup)
+            {
+                lookup = new mlir::Block;
+                blockMapping.insert({succ, lookup});
+            }
+            else if (lookup->getParent())
+            {
+                // This particular successor seems to have already been filled
+                // Check whether filling this block has made all of its predecessors filled
+                // and seal it
+                if (!hasUnresolvedPredecessors(succ))
+                {
+                    ssaBuilder.sealBlock(lookup);
+                }
+            }
+            memSuccessors.push_back(lookup);
+        }
+        builder.create<MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(memSuccessors.size()),
+                                               memSuccessors);
     }
 }
 
