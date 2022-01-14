@@ -49,14 +49,16 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     for (auto& token : fileInput.globals)
     {
         m_builder.setCurrentLoc(getLoc(token, token));
-        auto op = m_builder.createGlobalHandle(formQualifiedName(token.getValue()));
+        auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()));
         m_globalScope.identifiers.emplace(token.getValue(), Identifier{op.getOperation()});
     }
     m_builder.setCurrentLoc(m_builder.getUnknownLoc());
 
-    auto initFunc = mlir::FuncOp::create(m_builder.getUnknownLoc(), formQualifiedName("__init__"),
-                                         m_builder.getFunctionType({}, {}));
+    auto initFunc =
+        mlir::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__", m_builder.getFunctionType({}, {}));
     auto reset = implementFunction(initFunc);
+    // We aren't actually at function scope, even if wwe are implementing a function
+    m_functionScope.reset();
     // Go through all globals again and initialize them explicitly to unbound
     auto unbound = m_builder.createConstant(m_builder.getUnboundAttr());
     for (auto& [name, identifier] : m_globalScope.identifiers)
@@ -221,7 +223,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
         [&](const Syntax::NonLocalStmt&) {},
         [&](const Syntax::GlobalStmt& globalStmt)
         {
-            if (m_scope.empty())
+            if (!m_functionScope)
             {
                 return;
             }
@@ -229,7 +231,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             {
                 auto result = m_globalScope.identifiers.find(token.getValue());
                 PYLIR_ASSERT(result != m_globalScope.identifiers.end());
-                getCurrentScope().identifiers.insert(*result);
+                m_functionScope->identifiers.insert(*result);
             };
             handleIdentifier(globalStmt.identifier);
             for (auto& [token, identifier] : globalStmt.rest)
@@ -924,7 +926,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         scope = &getCurrentScope();
     }
     auto result = scope->identifiers.find(identifierToken.getValue());
-    if (result == scope->identifiers.end() && !m_classNamespace)
+    if (result == scope->identifiers.end() && scope != &m_globalScope)
     {
         // Try the global namespace
         result = m_globalScope.identifiers.find(identifierToken.getValue());
@@ -1855,7 +1857,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
     }
     m_builder.setCurrentLoc(getLoc(funcDef.funcName, funcDef.funcName));
-    auto qualifiedName = formQualifiedName(std::string(funcDef.funcName.getValue()));
+    auto qualifiedName = m_qualifiers + std::string(funcDef.funcName.getValue());
     std::vector<IdentifierToken> usedClosures;
     mlir::FuncOp func;
     {
@@ -1868,16 +1870,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         func.setPrivate();
         auto reset = implementFunction(func);
 
-        m_scope.emplace();
-        m_qualifierStack.emplace_back(funcDef.funcName.getValue());
-        m_qualifierStack.push_back("<locals>");
-        auto exit = llvm::make_scope_exit(
-            [&]
-            {
-                m_scope.pop();
-                m_qualifierStack.pop_back();
-                m_qualifierStack.pop_back();
-            });
+        m_qualifiers.append(funcDef.funcName.getValue());
+        m_qualifiers += ".<locals>.";
         auto locals = funcDef.localVariables;
         auto closures = funcDef.closures;
         for (auto [name, value] : llvm::zip(functionParametersTokens, llvm::drop_begin(func.getArguments())))
@@ -1893,19 +1887,19 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                                 .create<mlir::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
                                                               mlir::ValueRange{newMethod, tuple, emptyDict})
                                 ->getResult(0);
-                m_scope.top().identifiers.emplace(name.getValue(), Identifier{cell});
+                m_functionScope->identifiers.emplace(name.getValue(), Identifier{cell});
                 closures.erase(name);
             }
             else
             {
-                m_scope.top().identifiers.emplace(name.getValue(),
-                                                  Identifier{Identifier::DefinitionMap{{m_builder.getBlock(), value}}});
+                m_functionScope->identifiers.emplace(
+                    name.getValue(), Identifier{Identifier::DefinitionMap{{m_builder.getBlock(), value}}});
                 locals.erase(name);
             }
         }
         for (auto& iter : locals)
         {
-            m_scope.top().identifiers.emplace(iter.getValue(), Identifier{Identifier::DefinitionMap{}});
+            m_functionScope->identifiers.emplace(iter.getValue(), Identifier{Identifier::DefinitionMap{}});
         }
         for (auto& iter : closures)
         {
@@ -1918,7 +1912,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                             .create<mlir::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
                                                           mlir::ValueRange{newMethod, tuple, emptyDict})
                             ->getResult(0);
-            m_scope.top().identifiers.emplace(iter.getValue(), Identifier{cell});
+            m_functionScope->identifiers.emplace(iter.getValue(), Identifier{cell});
         }
         if (!funcDef.nonLocalVariables.empty())
         {
@@ -1929,7 +1923,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             {
                 auto constant = m_builder.create<mlir::arith::ConstantIndexOp>(iter.index());
                 auto cell = m_builder.createTupleGetItem(closureTuple, constant);
-                m_scope.top().identifiers.emplace(iter.value().getValue(), Identifier{mlir::Value{cell}});
+                m_functionScope->identifiers.emplace(iter.value().getValue(), Identifier{mlir::Value{cell}});
                 usedClosures.push_back(iter.value());
             }
         }
@@ -2017,7 +2011,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         bases = m_builder.createConstant(m_builder.getTupleAttr());
         keywords = m_builder.createConstant(m_builder.getDictAttr());
     }
-    auto qualifiedName = formQualifiedName(classDef.className.getValue());
+    auto qualifiedName = m_qualifiers + std::string(classDef.className.getValue());
     auto name = m_builder.createConstant(qualifiedName);
 
     mlir::FuncOp func;
@@ -2029,14 +2023,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                                                            {m_builder.getDynamicType()}));
         func.setPrivate();
         auto reset = implementFunction(func);
-        m_scope.emplace();
-        m_qualifierStack.emplace_back(classDef.className.getValue());
-        auto exit = llvm::make_scope_exit(
-            [&]
-            {
-                m_scope.pop();
-                m_qualifierStack.pop_back();
-            });
+        m_qualifiers.append(classDef.className.getValue()) += ".";
+
         pylir::ValueReset namespaceReset(m_classNamespace);
         m_classNamespace = func.getArgument(1);
 
@@ -2176,21 +2164,6 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
         }
     }
     return {makeTuple(iterArgs), makeDict(dictArgs)};
-}
-
-std::string pylir::CodeGen::formQualifiedName(std::string_view symbol)
-{
-    if (m_qualifierStack.empty())
-    {
-        return std::string(symbol);
-    }
-    std::string result;
-    {
-        llvm::raw_string_ostream os(result);
-        llvm::interleave(m_qualifierStack, os, ".");
-        os << "." << symbol;
-    }
-    return result;
 }
 
 std::string pylir::CodeGen::formImplName(std::string_view symbol)

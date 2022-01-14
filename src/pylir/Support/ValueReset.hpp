@@ -15,9 +15,11 @@ class ValueReset
 
 public:
     template <class U = T>
-    ValueReset(T& assignedTo, U valueAfter) : m_valueAfter(valueAfter), m_assignedTo(&assignedTo)
+    ValueReset(T& assignedTo, U valueAfter) : m_valueAfter(std::move(valueAfter)), m_assignedTo(&assignedTo)
     {
     }
+
+    explicit ValueReset(T&& assignedTo) : ValueReset(assignedTo, std::move(assignedTo)) {}
 
     explicit ValueReset(T& assignedTo) : ValueReset(assignedTo, assignedTo) {}
 
@@ -25,7 +27,7 @@ public:
     {
         if (m_assignedTo)
         {
-            *m_assignedTo = m_valueAfter;
+            *m_assignedTo = std::move(m_valueAfter);
         }
     }
 
@@ -35,21 +37,21 @@ public:
     ValueReset(ValueReset&& rhs) noexcept
     {
         m_assignedTo = std::exchange(rhs.m_assignedTo, nullptr);
-        m_valueAfter = rhs.m_valueAfter;
+        m_valueAfter = std::move(rhs.m_valueAfter);
     }
 
     ValueReset& operator=(ValueReset&& rhs) noexcept
     {
         m_assignedTo = std::exchange(rhs.m_assignedTo, nullptr);
-        m_valueAfter = rhs.m_valueAfter;
+        m_valueAfter = std::move(rhs.m_valueAfter);
         return *this;
     }
 };
 
 template <class... Args>
-std::tuple<ValueReset<std::decay_t<Args>>...> valueResetMany(Args&... args)
+std::tuple<ValueReset<std::decay_t<Args>>...> valueResetMany(Args&&... args)
 {
-    return {ValueReset(args)...};
+    return {ValueReset(std::forward<Args>(args))...};
 }
 
 } // namespace pylir

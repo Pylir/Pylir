@@ -28,7 +28,6 @@ class CodeGen
     mlir::FuncOp m_currentFunc;
     Diag::Document* m_document;
     mlir::Value m_classNamespace{};
-    std::vector<std::string> m_qualifierStack;
     std::unordered_map<std::string, std::size_t> m_implNames;
     std::unordered_map<std::string_view, mlir::FlatSymbolRefAttr> m_builtinNamespace;
 
@@ -81,7 +80,8 @@ class CodeGen
     };
 
     Scope m_globalScope;
-    std::stack<Scope> m_scope;
+    std::optional<Scope> m_functionScope;
+    std::string m_qualifiers;
 
     void markOpenBlock(mlir::Block* block);
 
@@ -97,7 +97,7 @@ class CodeGen
 
     Scope& getCurrentScope()
     {
-        return m_scope.empty() ? m_globalScope : m_scope.top();
+        return m_functionScope ? *m_functionScope : m_globalScope;
     }
 
     class BlockPtr
@@ -267,8 +267,6 @@ class CodeGen
             &astObject, mlir::FileLineColLoc::get(m_builder.getStringAttr(m_document->getFilename()), line, col));
     }
 
-    std::string formQualifiedName(std::string_view symbol);
-
     std::string formImplName(std::string_view symbol);
 
     void assignTarget(const Syntax::TargetList& targetList, mlir::Value value);
@@ -300,15 +298,16 @@ class CodeGen
 
     [[nodiscard]] auto implementFunction(mlir::FuncOp funcOp)
     {
-        auto tuple = std::make_tuple(
-            mlir::OpBuilder::InsertionGuard(m_builder),
-            pylir::valueResetMany(m_currentFunc, m_currentLoop, m_currentExceptBlock, m_currentLandingPadBlock));
+        auto tuple = std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
+                                     pylir::valueResetMany(m_currentFunc, m_currentLoop, m_currentExceptBlock,
+                                                           m_currentLandingPadBlock, std::move(m_functionScope), m_qualifiers));
         m_currentLoop = {nullptr, nullptr};
         m_currentExceptBlock = nullptr;
         m_currentLandingPadBlock = nullptr;
         m_currentFunc = funcOp;
         m_module.push_back(m_currentFunc);
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
+        m_functionScope.emplace();
         return tuple;
     }
 
