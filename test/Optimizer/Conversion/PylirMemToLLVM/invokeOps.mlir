@@ -16,8 +16,8 @@ func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
     return %trueValue : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb2()
+    %1 = py.landingPad @builtins.BaseException
+    br ^bb2(%1 : !py.dynamic)
 
 ^bb2(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -42,16 +42,8 @@ func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[NEG:.*]] = llvm.sub %[[ZERO_I]], %[[PTR_TO_INT]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[EXCEPTION_HEADER_i8]][%[[NEG]]]
 // CHECK-NEXT: %[[EXCEPTION_OBJECT:.*]] = llvm.bitcast %[[GEP]]
-// CHECK-NEXT: %[[INDEX:.*]] = llvm.extractvalue %[[LANDING_PAD]][1 : i32]
-// CHECK-NEXT: %[[TYPE_INDEX:.*]] = llvm.intr.eh.typeid.for %[[BIT_CAST]]
-// CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[INDEX]], %[[TYPE_INDEX]]
-// CHECK-NEXT: llvm.cond_br %[[CMP]], ^[[EXCEPTION_HANDLER:[[:alnum:]]+]]
+// CHECK-NEXT: llvm.br ^[[DEST:[[:alnum:]]+]]
 // CHECK-SAME: %[[EXCEPTION_OBJECT]]
-// CHECK-SAME: ^[[RESUME_BLOCK:[[:alnum:]]+]]
-// CHECK-NEXT: ^[[RESUME_BLOCK]]:
-// CHECK-NEXT: llvm.br ^[[RESUME_BLOCK:[[:alnum:]]+]]
-// CHECK-NEXT: ^[[RESUME_BLOCK]]:
-// CHECK-NEXT: llvm.resume %[[LANDING_PAD]]
-// CHECK-NEXT: ^[[EXCEPTION_HANDLER]]
+// CHECK-NEXT: ^[[DEST]]
 // CHECK-SAME: %[[EXCEPTION_OBJECT:[[:alnum:]]+]]
 // CHECK-NEXT: llvm.return %[[EXCEPTION_OBJECT]]

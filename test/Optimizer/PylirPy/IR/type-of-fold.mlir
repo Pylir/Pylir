@@ -203,8 +203,8 @@ func @make_tuple_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 ^bb1:
-    py.landingPad
-        except @builtins.BaseException ^bb2()
+    %2 = py.landingPad @builtins.BaseException
+    br ^bb2(%2 : !py.dynamic)
 
 ^bb2(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -247,8 +247,8 @@ func @make_list_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 ^bb1:
-    py.landingPad
-        except @builtins.BaseException ^bb2()
+    %2 = py.landingPad @builtins.BaseException
+    br ^bb2(%2 : !py.dynamic)
 
 ^bb2(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -292,8 +292,8 @@ func @make_dict_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 ^bb1:
-    py.landingPad
-        except @builtins.BaseException ^bb2()
+    %2 = py.landingPad @builtins.BaseException
+    br ^bb2(%2 : !py.dynamic)
 
 ^bb2(%e : !py.dynamic):
     return %e : !py.dynamic

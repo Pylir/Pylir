@@ -19,15 +19,17 @@ func @foo() -> !py.dynamic {
     return %1 : !py.dynamic
 
 ^exception(%2 : !py.dynamic):
-    // CHECK: py.landingPad
-    // CHECK-NEXT: except @builtins.BaseException ^[[BLOCK:[[:alnum:]]+]](%{{[[:alnum:]]+}})
-    py.landingPad
-        except @builtins.BaseException ^baseExcept(%2)
+    // CHECK: %[[EXCEPTION:.*]] = py.landingPad @builtins.BaseException
+    // CHECK-NEXT: br ^[[BLOCK:[[:alnum:]]+]]
+    // CHECK-SAME: %[[EXCEPTION]]
+    // CHECK-SAME-1: %{{[[:alnum:]]+}}
+    %3 = py.landingPad @builtins.BaseException
+    br ^baseExcept(%3, %2 : !py.dynamic, !py.dynamic)
 
 // CHECK: ^[[BLOCK]]
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK: return %[[ARG1]]
-^baseExcept(%3 : !py.dynamic, %4 : !py.dynamic):
+^baseExcept(%e : !py.dynamic, %4 : !py.dynamic):
     return %4 : !py.dynamic
 }

@@ -1750,28 +1750,21 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
     mlir::LogicalResult matchAndRewrite(pylir::Py::LandingPadOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto* block = op->getBlock();
-        auto* dest = rewriter.splitBlock(block, mlir::Block::iterator{op});
-        rewriter.setInsertionPointToStart(block);
-
         auto i8Ptr = mlir::LLVM::LLVMPointerType::get(rewriter.getI8Type());
-        llvm::SmallVector<mlir::Value> refs;
+        mlir::Value catchType;
         {
             mlir::OpBuilder::InsertionGuard guard{rewriter};
             rewriter.setInsertionPointToStart(&op->getParentRegion()->front());
-            for (auto iter : adaptor.catchTypes().getAsRange<mlir::FlatSymbolRefAttr>())
+            mlir::Value address = getTypeConverter()->getConstant(op.getLoc(), adaptor.catchTypeAttr(), rewriter);
+            while (auto cast = address.getDefiningOp<mlir::LLVM::BitcastOp>())
             {
-                mlir::Value address = getTypeConverter()->getConstant(op.getLoc(), iter, rewriter);
-                while (auto cast = address.getDefiningOp<mlir::LLVM::BitcastOp>())
-                {
-                    address = cast.getArg().getDefiningOp<mlir::LLVM::AddressOfOp>();
-                    PYLIR_ASSERT(address);
-                }
-                refs.emplace_back(rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), i8Ptr, address));
+                address = cast.getArg().getDefiningOp<mlir::LLVM::AddressOfOp>();
+                PYLIR_ASSERT(address);
             }
+            catchType = rewriter.create<mlir::LLVM::BitcastOp>(op.getLoc(), i8Ptr, address);
         }
         auto literal = mlir::LLVM::LLVMStructType::getLiteral(getContext(), {i8Ptr, rewriter.getI32Type()});
-        auto landingPad = rewriter.create<mlir::LLVM::LandingpadOp>(op.getLoc(), literal, refs);
+        auto landingPad = rewriter.create<mlir::LLVM::LandingpadOp>(op.getLoc(), literal, catchType);
         mlir::Value exceptionHeader =
             rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), i8Ptr, landingPad, rewriter.getI32ArrayAttr({0}));
         {
@@ -1795,26 +1788,8 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
             exceptionHeader =
                 rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), exceptionHeader.getType(), exceptionHeader, byteOffset);
         }
-        auto exceptionObject = rewriter.create<mlir::LLVM::BitcastOp>(
-            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()), exceptionHeader);
-        auto catchIndex = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), rewriter.getI32Type(), landingPad,
-                                                                      rewriter.getI32ArrayAttr({1}));
-        for (auto [type, succ, args] : llvm::zip(refs, op.getSuccessors(), adaptor.branchArgs()))
-        {
-            auto index = rewriter.create<mlir::LLVM::EhTypeidForOp>(op.getLoc(), rewriter.getI32Type(), type);
-            auto isEqual =
-                rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, catchIndex, index);
-            auto continueSearch = new mlir::Block;
-            llvm::SmallVector<mlir::Value> newArgs{exceptionObject};
-            newArgs.append(args.begin(), args.end());
-            rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), isEqual, succ, newArgs, continueSearch,
-                                                  mlir::ValueRange{});
-            continueSearch->insertBefore(dest);
-            rewriter.setInsertionPointToStart(continueSearch);
-        }
-        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, dest);
-        rewriter.setInsertionPointToStart(dest);
-        rewriter.replaceOpWithNewOp<mlir::LLVM::ResumeOp>(op, landingPad);
+        rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(
+            op, mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyObjectType()), exceptionHeader);
         return mlir::success();
     }
 };

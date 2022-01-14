@@ -22,8 +22,8 @@ def bar(param):
 
 # CHECK-LABEL: func private @"bar$impl[0]"
 
-# CHECK: py.landingPad
-# CHECK-NEXT: except @builtins.BaseException ^[[EXCEPTION_HANDLER:.*]]()
+# CHECK: py.landingPad @builtins.BaseException
+# CHECK-NEXT: br ^[[EXCEPTION_HANDLER:[[:alnum:]]+]]
 # CHECK: ^[[EXCEPTION_HANDLER]](
 # CHECK-SAME: %[[EXCEPTION:[[:alnum:]]+]]
 # CHECK-NEXT: %[[MATCHING:.*]] = py.constant @builtins.TypeError

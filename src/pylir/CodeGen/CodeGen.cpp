@@ -2549,9 +2549,9 @@ void pylir::CodeGen::sealBlock(mlir::Block* block)
 {
     auto result = getCurrentScope().openBlocks.find(block);
     PYLIR_ASSERT(result != getCurrentScope().openBlocks.end());
-    for (auto iter : llvm::zip(block->getArguments().take_back(result->second.size()), result->second))
+    for (auto [blockArgument, map] : llvm::zip(block->getArguments().take_back(result->second.size()), result->second))
     {
-        addBlockArguments(*std::get<1>(iter), std::get<0>(iter));
+        addBlockArguments(*map, blockArgument);
     }
     getCurrentScope().openBlocks.erase(result);
 }
@@ -2575,18 +2575,8 @@ void removeBlockArgumentOperands(mlir::BlockArgument argument)
         auto successors = terminator->getSuccessors();
         auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
         auto ops = terminator.getMutableSuccessorOperands(index);
-        // Common case for vast majority of branch ops that don't synthesize ops.
-        // Otherwise we are dealing with a branch op that synthesizes arguments and we'll have to specialize for those
-        if (ops)
-        {
-            ops->erase(argument.getArgNumber());
-        }
-        else
-        {
-            llvm::TypeSwitch<mlir::Operation*>(terminator)
-                .Case([&](pylir::Py::LandingPadOp op) { op.branchArgsMutable()[index].erase(argument.getArgNumber()); })
-                .Default([](auto&&) { PYLIR_UNREACHABLE; });
-        }
+        PYLIR_ASSERT(ops);
+        ops->erase(argument.getArgNumber());
     }
 }
 } // namespace
@@ -2601,19 +2591,8 @@ mlir::Value pylir::CodeGen::tryRemoveTrivialBlockArgument(mlir::BlockArgument ar
         auto successors = terminator->getSuccessors();
         auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
         auto ops = terminator.getSuccessorOperands(index);
-        // Common case for vast majority of branch ops that don't synthesize ops.
-        // Otherwise we are dealing with a branch op that synthesizes arguments and we'll have to specialize for those
-        if (ops)
-        {
-            blockOperand = (*ops)[argument.getArgNumber()];
-        }
-        else
-        {
-            blockOperand = llvm::TypeSwitch<mlir::Operation*, mlir::Value>(terminator)
-                               .Case([&](pylir::Py::LandingPadOp op) -> mlir::Value
-                                     { return op.branchArgs()[index][argument.getArgNumber() - 1]; })
-                               .Default([](auto&&) -> mlir::Value { PYLIR_UNREACHABLE; });
-        }
+        PYLIR_ASSERT(ops);
+        blockOperand = (*ops)[argument.getArgNumber()];
         if (blockOperand == same || blockOperand == argument)
         {
             continue;
@@ -2639,28 +2618,8 @@ mlir::Value pylir::CodeGen::tryRemoveTrivialBlockArgument(mlir::BlockArgument ar
             continue;
         }
         auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber());
-        // Common case for vast majority of branch ops that don't synthesize ops.
-        // Otherwise we are dealing with a branch op that synthesizes arguments and we'll have to specialize for those
-        if (ops)
-        {
-            bas.emplace_back(*ops);
-        }
-        else
-        {
-            llvm::TypeSwitch<mlir::Operation*>(branch)
-                .Case(
-                    [&](Py::LandingPadOp op)
-                    {
-                        auto branchArgs = op.branchArgs();
-                        auto result = std::lower_bound(branchArgs.begin(), branchArgs.end(), user.getOperandNumber(),
-                                                       [](mlir::OperandRange range, unsigned index)
-                                                       { return range.getBeginOperandIndex() < index; });
-                        PYLIR_ASSERT(result != branchArgs.end());
-                        bas.emplace_back(
-                            op.successors()[result - branchArgs.end()]->getArguments()[user.getOperandNumber() + 1]);
-                    })
-                .Default([](auto&&) { PYLIR_UNREACHABLE; });
-        }
+        PYLIR_ASSERT(ops);
+        bas.emplace_back(*ops);
     }
 
     removeBlockArgumentOperands(argument);
@@ -2679,16 +2638,8 @@ mlir::Value pylir::CodeGen::addBlockArguments(Identifier::DefinitionMap& map, ml
         auto successors = terminator->getSuccessors();
         auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
         auto ops = terminator.getMutableSuccessorOperands(index);
-        // Common case for vast majority of branch ops that don't synthesize ops.
-        // Otherwise we are dealing with a branch op that synthesizes arguments and we'll have to specialize for those
-        if (ops)
-        {
-            ops->append(readVariable(map, pred));
-            continue;
-        }
-        llvm::TypeSwitch<mlir::Operation*>(terminator)
-            .Case([&](Py::LandingPadOp op) { op.branchArgsMutable()[index].append(readVariable(map, pred)); })
-            .Default([](auto&&) { PYLIR_UNREACHABLE; });
+        PYLIR_ASSERT(ops);
+        ops->append(readVariable(map, pred));
     }
     return tryRemoveTrivialBlockArgument(argument);
 }
@@ -2713,4 +2664,19 @@ mlir::Value pylir::CodeGen::readVariableRecursive(Identifier::DefinitionMap& map
     }
     map[block] = val;
     return val;
+}
+
+pylir::CodeGen::BlockPtr pylir::CodeGen::createLandingPadBlock(mlir::Block* exceptionHandlerBlock,
+                                                               mlir::FlatSymbolRefAttr typeToCatch)
+{
+    if (!typeToCatch)
+    {
+        typeToCatch = m_builder.getBaseExceptionBuiltin();
+    }
+    mlir::OpBuilder::InsertionGuard guard{m_builder};
+    BlockPtr landingPad;
+    m_builder.setInsertionPointToStart(landingPad);
+    mlir::Value exceptionObject = m_builder.create<pylir::Py::LandingPadOp>(typeToCatch);
+    m_builder.create<mlir::BranchOp>(exceptionHandlerBlock, exceptionObject);
+    return landingPad;
 }

@@ -897,20 +897,10 @@ def PylirPy_InvokeIndirectOp : PylirPy_InvokeBase<"invoke_indirect",
     }];
 }
 
-def PylirPy_LandingPadOp : PylirPy_Op<"landingPad", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {
-    let arguments = (ins FlatSymbolRefArrayAttr:$catchTypes,
-                         VariadicOfVariadic<DynamicType, "argSizes">:$branchArgs, I32ElementsAttr:$argSizes);
-    let results = (outs);
+def PylirPy_LandingPadOp : PylirPy_Op<"landingPad"> {
+    let arguments = (ins FlatSymbolRefAttr:$catchType);
 
-    let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
-
-    let assemblyFormat = [{
-        attr-dict custom<Clauses>($catchTypes, $branchArgs, $successors)
-    }];
-
-    let verifier = [{
-        return ::verify(*this);
-    }];
+    let assemblyFormat = "$catchType attr-dict";
 }
 
 #endif

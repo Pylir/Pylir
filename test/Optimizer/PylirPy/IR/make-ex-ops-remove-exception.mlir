@@ -14,8 +14,8 @@ func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -42,8 +42,8 @@ func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -70,8 +70,8 @@ func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -98,8 +98,8 @@ func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -126,8 +126,8 @@ func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -154,8 +154,8 @@ func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -181,8 +181,8 @@ func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -208,8 +208,8 @@ func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 
 ^failure:
-    py.landingPad
-        except @builtins.BaseException ^bb3()
+    %3 = py.landingPad @builtins.BaseException
+    br ^bb3(%3 : !py.dynamic)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic

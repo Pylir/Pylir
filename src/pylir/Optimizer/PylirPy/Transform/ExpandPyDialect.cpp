@@ -14,12 +14,6 @@
 namespace
 {
 
-mlir::Block* exceptionHandlerFromLandingPad(mlir::Block* landingPadBlock)
-{
-    auto op = mlir::cast<pylir::Py::LandingPadOp>(landingPadBlock->front());
-    return op.getSuccessors().back();
-}
-
 struct CallMethodPattern : mlir::OpRewritePattern<pylir::Py::CallMethodOp>
 {
     using mlir::OpRewritePattern<pylir::Py::CallMethodOp>::OpRewritePattern;
@@ -191,7 +185,8 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
         if constexpr (hasExceptions)
         {
             landingPadBlock = op.exceptionPath();
-            exceptionHandlerBlock = exceptionHandlerFromLandingPad(landingPadBlock);
+            PYLIR_ASSERT(landingPadBlock->getNumSuccessors() == 1);
+            exceptionHandlerBlock = landingPadBlock->getSuccessor(0);
         }
         auto block = op->getBlock();
         auto dest = block->splitBlock(op);
@@ -228,10 +223,9 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
 
             landingPad->insertBefore(dest);
             rewriter.setInsertionPointToStart(landingPad);
-            rewriter.create<pylir::Py::LandingPadOp>(loc,
-                                                     rewriter.getArrayAttr({mlir::FlatSymbolRefAttr::get(
-                                                         this->getContext(), pylir::Py::Builtins::StopIteration.name)}),
-                                                     llvm::ArrayRef{mlir::ValueRange{}}, stopIterationHandler);
+            mlir::Value exceptionObject = rewriter.create<pylir::Py::LandingPadOp>(
+                loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
+            rewriter.create<mlir::BranchOp>(loc, stopIterationHandler, exceptionObject);
             stopIterationHandler->insertBefore(dest);
             rewriter.setInsertionPointToStart(stopIterationHandler);
         }

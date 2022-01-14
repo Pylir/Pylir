@@ -919,62 +919,6 @@ mlir::LogicalResult
     return mlir::success();
 }
 
-namespace
-{
-bool parseClauses(mlir::OpAsmParser& parser, mlir::ArrayAttr& catches,
-                  llvm::SmallVectorImpl<llvm::SmallVector<mlir::OpAsmParser::OperandType>>& branchArgs,
-                  llvm::SmallVectorImpl<mlir::Block*>& successors)
-{
-    llvm::SmallVector<mlir::Attribute> types;
-    while (!parser.parseOptionalKeyword("except"))
-    {
-        if (parser.parseAttribute(types.emplace_back()) || parser.parseSuccessor(successors.emplace_back())
-            || parser.parseOperandList(branchArgs.emplace_back(), -1, mlir::OpAsmParser::Delimiter::Paren))
-        {
-            return true;
-        }
-    }
-    catches = mlir::ArrayAttr::get(parser.getContext(), types);
-    return false;
-}
-
-void printClauses(mlir::OpAsmPrinter& printer, pylir::Py::LandingPadOp, mlir::ArrayAttr catches,
-                  mlir::OperandRangeRange branchArgs, mlir::SuccessorRange successorRange)
-{
-    for (auto [type, succ, args] : llvm::zip(catches.getAsRange<mlir::FlatSymbolRefAttr>(), successorRange, branchArgs))
-    {
-        printer.printNewline();
-        printer << "  except " << type << ' ';
-        printer.printSuccessor(succ);
-        printer << '(';
-        printer.printOperands(args);
-        printer << ')';
-    }
-}
-
-mlir::LogicalResult verify(pylir::Py::LandingPadOp op)
-{
-    if (op.branchArgs().size() != op.successors().size())
-    {
-        return op->emitOpError("Expected branch arguments for every successor");
-    }
-    if (op.catchTypes().size() != op.successors().size())
-    {
-        return op->emitOpError("Expected catch types for every successor");
-    }
-    if (!op->getBlock() || &op->getBlock()->front() != op)
-    {
-        return op->emitOpError("Expected 'py.landingPad' to be the only op in its block");
-    }
-    return mlir::success();
-}
-} // namespace
-
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::LandingPadOp::getMutableSuccessorOperands(unsigned)
-{
-    return llvm::None;
-}
-
 mlir::LogicalResult
     pylir::Py::MakeTupleExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
                                                ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,

@@ -170,19 +170,7 @@ class CodeGen
         }
     };
 
-    BlockPtr createLandingPadBlock(mlir::Block* exceptionHandlerBlock, mlir::FlatSymbolRefAttr typeToCatch = {})
-    {
-        if (!typeToCatch)
-        {
-            typeToCatch = m_builder.getBaseExceptionBuiltin();
-        }
-        mlir::OpBuilder::InsertionGuard guard{m_builder};
-        BlockPtr landingPad;
-        m_builder.setInsertionPointToStart(landingPad);
-        m_builder.create<pylir::Py::LandingPadOp>(m_builder.getArrayAttr({typeToCatch}),
-                                                  llvm::ArrayRef{mlir::ValueRange{}}, exceptionHandlerBlock);
-        return landingPad;
-    }
+    BlockPtr createLandingPadBlock(mlir::Block* exceptionHandlerBlock, mlir::FlatSymbolRefAttr typeToCatch = {});
 
     mlir::Value toI1(mlir::Value value);
 
