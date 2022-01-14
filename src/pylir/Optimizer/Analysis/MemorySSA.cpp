@@ -138,6 +138,7 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
         lastDefs[memBlock] = lastDef;
 
         llvm::SmallVector<mlir::Block*> memSuccessors;
+        llvm::SmallVector<mlir::Block*> sealAfter;
         for (auto* succ : block.getSuccessors())
         {
             auto lookup = blockMapping.lookup(succ);
@@ -153,13 +154,14 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
                 // and seal it
                 if (!hasUnresolvedPredecessors(succ))
                 {
-                    ssaBuilder.sealBlock(lookup);
+                    sealAfter.push_back(lookup);
                 }
             }
             memSuccessors.push_back(lookup);
         }
         builder.create<MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(memSuccessors.size()),
                                                memSuccessors);
+        llvm::for_each(sealAfter, [&](mlir::Block* lookup) { ssaBuilder.sealBlock(lookup); });
     }
 }
 

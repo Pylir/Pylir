@@ -47,3 +47,39 @@ func @test2(%arg0 : i1) -> index {
 // CHECK-SAME: %[[MERGE:[[:alnum:]]+]]
 // CHECK-NEXT: memSSA.use(%[[MERGE]])
 // CHECK-NEXT: // {{.*}} py.list.len
+
+func private @random() -> i1
+
+func @test3() -> index {
+    %0 = py.constant #py.str<"test">
+    %1 = py.makeList ()
+    br ^condition
+
+^condition:
+    %2 = call @random() : () -> i1
+    cond_br %2, ^bb1, ^bb2
+
+^bb1:
+    py.list.append %1, %0
+    br ^condition
+
+^bb2:
+    %3 = py.list.len %1
+    return %3 : index
+}
+
+// CHECK-LABEL: memSSA.region @test3
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: // {{.*}} py.makeList
+// CHECK-NEXT: memSSA.br ^[[FIRST:.*]] (%[[DEF]])
+// CHECK-NEXT: ^[[FIRST]]
+// CHECK-SAME: %[[COND:[[:alnum:]]+]]
+// CHECK-NEXT: memSSA.br ^[[BODY:.*]], ^[[EXIT:.*]] (), ()
+// CHECK-NEXT: ^[[BODY]]:
+// CHECK-NEXT: %[[NEW_DEF:.*]] = memSSA.def(%[[COND]])
+// CHECK-NEXT: // py.list.append
+// CHECK-NEXT: memSSA.br ^[[FIRST]] (%[[NEW_DEF]])
+// CHECK-NEXT: ^[[EXIT]]:
+// CHECK-NEXT: memSSA.use(%[[COND]])
+// CHECK-NEXT: // {{.*}} py.list.len

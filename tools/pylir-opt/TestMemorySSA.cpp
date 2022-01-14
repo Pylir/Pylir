@@ -21,6 +21,10 @@ void TestMemorySSA::runOnOperation()
 {
     for (auto func : getOperation().getOps<mlir::FuncOp>())
     {
+        if (func.isDeclaration())
+        {
+            continue;
+        }
         llvm::outs() << getChildAnalysis<pylir::MemorySSA>(func);
     }
 }
