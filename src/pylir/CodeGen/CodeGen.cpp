@@ -966,8 +966,9 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
                 m_builder.createLoad(mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(result->second.kind)));
             break;
         case Identifier::StackAlloc:
-            loadedValue =
-                readVariable(pylir::get<Identifier::DefinitionMap>(result->second.kind), m_builder.getBlock());
+            loadedValue = scope->ssaBuilder.readVariable(m_builder.getDynamicType(),
+                                                         pylir::get<Identifier::DefinitionMap>(result->second.kind),
+                                                         m_builder.getBlock());
             break;
         case Identifier::Cell:
         {
@@ -1331,7 +1332,7 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     m_builder.create<mlir::BranchOp>(conditionBlock);
 
     implementBlock(conditionBlock);
-    markOpenBlock(conditionBlock);
+    auto conditionSeal = markOpenBlock(conditionBlock);
     auto condition = visit(whileStmt.condition);
     if (!condition)
     {
@@ -1358,7 +1359,6 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
         m_builder.create<mlir::BranchOp>(conditionBlock);
     }
     exit.reset();
-    sealBlock(conditionBlock);
     if (elseBlock == thenBlock)
     {
         return;
@@ -1383,7 +1383,7 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
     m_builder.create<mlir::BranchOp>(condition);
 
     implementBlock(condition);
-    markOpenBlock(condition);
+    auto conditionSeal = markOpenBlock(condition);
     BlockPtr stopIterationHandler, thenBlock;
     auto implementThenBlock = llvm::make_scope_exit(
         [&]
@@ -1395,8 +1395,8 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
         });
 
     auto landingPad = createLandingPadBlock(stopIterationHandler, m_builder.getStopIterationBuiltin());
-    markOpenBlock(landingPad);
-    markOpenBlock(stopIterationHandler);
+    auto landingPadSeal = markOpenBlock(landingPad);
+    auto stopIterationSeal = markOpenBlock(stopIterationHandler);
     stopIterationHandler->addArgument(m_builder.getDynamicType());
     auto next =
         Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__next__",
@@ -1423,9 +1423,6 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
         m_builder.create<mlir::BranchOp>(condition);
     }
     exit.reset();
-    sealBlock(condition);
-    sealBlock(landingPad);
-    sealBlock(stopIterationHandler);
     if (!landingPad->hasNoPredecessors())
     {
         implementBlock(stopIterationHandler);
@@ -1520,8 +1517,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
     BlockPtr exceptionHandler;
     exceptionHandler->addArgument(m_builder.getDynamicType());
     BlockPtr landingPad = createLandingPadBlock(exceptionHandler);
-    markOpenBlock(landingPad);
-    markOpenBlock(exceptionHandler);
+    auto landingPadSeal = markOpenBlock(landingPad);
+    auto exceptionHandlerSeal = markOpenBlock(exceptionHandler);
     std::optional reset = pylir::valueResetMany(m_currentExceptBlock, m_currentLandingPadBlock);
     auto lambda = [&] { m_finallyBlocks.pop_back(); };
     std::optional<decltype(llvm::make_scope_exit(lambda))> popFinally;
@@ -1577,8 +1574,6 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         m_builder.setCurrentLoc(getLoc(tryStmt, tryStmt.tryKeyword));
         m_builder.create<mlir::BranchOp>(continueBlock);
     }
-    sealBlock(landingPad);
-    sealBlock(exceptionHandler);
 
     if (landingPad->hasNoPredecessors())
     {
@@ -2521,7 +2516,7 @@ void pylir::CodeGen::buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock,
     auto startConstant = m_builder.create<mlir::arith::ConstantIndexOp>(0);
     auto conditionBlock = BlockPtr{};
     conditionBlock->addArgument(m_builder.getIndexType());
-    markOpenBlock(conditionBlock);
+    auto conditionBlockSeal = markOpenBlock(conditionBlock);
     m_builder.create<mlir::BranchOp>(conditionBlock, mlir::ValueRange{startConstant});
 
     implementBlock(conditionBlock);
@@ -2537,133 +2532,6 @@ void pylir::CodeGen::buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock,
     auto one = m_builder.create<mlir::arith::ConstantIndexOp>(1);
     auto nextIter = m_builder.create<mlir::arith::AddIOp>(conditionBlock->getArgument(0), one);
     m_builder.create<mlir::BranchOp>(conditionBlock, mlir::ValueRange{nextIter});
-    sealBlock(conditionBlock);
-}
-
-void pylir::CodeGen::markOpenBlock(mlir::Block* block)
-{
-    getCurrentScope().openBlocks.insert({block, {}});
-}
-
-void pylir::CodeGen::sealBlock(mlir::Block* block)
-{
-    auto result = getCurrentScope().openBlocks.find(block);
-    PYLIR_ASSERT(result != getCurrentScope().openBlocks.end());
-    for (auto [blockArgument, map] : llvm::zip(block->getArguments().take_back(result->second.size()), result->second))
-    {
-        addBlockArguments(*map, blockArgument);
-    }
-    getCurrentScope().openBlocks.erase(result);
-}
-
-mlir::Value pylir::CodeGen::readVariable(Identifier::DefinitionMap& map, mlir::Block* block)
-{
-    if (auto result = map.find(block); result != map.end())
-    {
-        return result->second;
-    }
-    return readVariableRecursive(map, block);
-}
-
-namespace
-{
-void removeBlockArgumentOperands(mlir::BlockArgument argument)
-{
-    for (auto pred : argument.getOwner()->getPredecessors())
-    {
-        auto terminator = mlir::cast<mlir::BranchOpInterface>(pred->getTerminator());
-        auto successors = terminator->getSuccessors();
-        auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
-        auto ops = terminator.getMutableSuccessorOperands(index);
-        PYLIR_ASSERT(ops);
-        ops->erase(argument.getArgNumber());
-    }
-}
-} // namespace
-
-mlir::Value pylir::CodeGen::tryRemoveTrivialBlockArgument(mlir::BlockArgument argument)
-{
-    mlir::Value same;
-    for (auto pred : argument.getOwner()->getPredecessors())
-    {
-        mlir::Value blockOperand;
-        auto terminator = mlir::cast<mlir::BranchOpInterface>(pred->getTerminator());
-        auto successors = terminator->getSuccessors();
-        auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
-        auto ops = terminator.getSuccessorOperands(index);
-        PYLIR_ASSERT(ops);
-        blockOperand = (*ops)[argument.getArgNumber()];
-        if (blockOperand == same || blockOperand == argument)
-        {
-            continue;
-        }
-        if (same)
-        {
-            return argument;
-        }
-        same = blockOperand;
-    }
-    if (!same)
-    {
-        m_builder.setCurrentLoc(argument.getLoc());
-        same = m_builder.createConstant(m_builder.getUnboundAttr());
-    }
-
-    std::vector<mlir::BlockArgument> bas;
-    for (auto& user : argument.getUses())
-    {
-        auto branch = mlir::dyn_cast<mlir::BranchOpInterface>(user.getOwner());
-        if (!branch)
-        {
-            continue;
-        }
-        auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber());
-        PYLIR_ASSERT(ops);
-        bas.emplace_back(*ops);
-    }
-
-    removeBlockArgumentOperands(argument);
-    argument.replaceAllUsesWith(same);
-    argument.getOwner()->eraseArgument(argument.getArgNumber());
-    std::for_each(bas.begin(), bas.end(), pylir::bind_front(&CodeGen::tryRemoveTrivialBlockArgument, this));
-
-    return same;
-}
-
-mlir::Value pylir::CodeGen::addBlockArguments(Identifier::DefinitionMap& map, mlir::BlockArgument argument)
-{
-    for (auto pred : argument.getOwner()->getPredecessors())
-    {
-        auto terminator = mlir::cast<mlir::BranchOpInterface>(pred->getTerminator());
-        auto successors = terminator->getSuccessors();
-        auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
-        auto ops = terminator.getMutableSuccessorOperands(index);
-        PYLIR_ASSERT(ops);
-        ops->append(readVariable(map, pred));
-    }
-    return tryRemoveTrivialBlockArgument(argument);
-}
-
-mlir::Value pylir::CodeGen::readVariableRecursive(Identifier::DefinitionMap& map, mlir::Block* block)
-{
-    mlir::Value val;
-    if (auto result = getCurrentScope().openBlocks.find(block); result != getCurrentScope().openBlocks.end())
-    {
-        val = block->addArgument(m_builder.getDynamicType());
-        result->second.emplace_back(&map);
-    }
-    else if (auto* pred = block->getUniquePredecessor())
-    {
-        val = readVariable(map, pred);
-    }
-    else
-    {
-        val = block->addArgument(m_builder.getDynamicType());
-        map[block] = val;
-        val = addBlockArguments(map, val.cast<mlir::BlockArgument>());
-    }
-    map[block] = val;
-    return val;
 }
 
 pylir::CodeGen::BlockPtr pylir::CodeGen::createLandingPadBlock(mlir::Block* exceptionHandlerBlock,

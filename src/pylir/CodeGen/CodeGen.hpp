@@ -10,9 +10,12 @@
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
+#include <pylir/Optimizer/Transforms/Utils/SSABuilder.hpp>
 #include <pylir/Parser/Syntax.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/ValueReset.hpp>
+
+#include <llvm/ADT/ScopeExit.h>
 
 #include <stack>
 #include <tuple>
@@ -75,25 +78,18 @@ class CodeGen
     struct Scope
     {
         std::unordered_map<std::string_view, Identifier> identifiers;
-        // Opposite of sealed blocks. Blocks are assumed to be sealed unless contained in here
-        llvm::DenseMap<mlir::Block*, std::vector<Identifier::DefinitionMap * PYLIR_NON_NULL>> openBlocks;
+        SSABuilder ssaBuilder;
     };
 
     Scope m_globalScope;
     std::optional<Scope> m_functionScope;
     std::string m_qualifiers;
 
-    void markOpenBlock(mlir::Block* block);
-
-    void sealBlock(mlir::Block* block);
-
-    mlir::Value tryRemoveTrivialBlockArgument(mlir::BlockArgument argument);
-
-    mlir::Value addBlockArguments(Identifier::DefinitionMap& map, mlir::BlockArgument argument);
-
-    mlir::Value readVariable(Identifier::DefinitionMap& map, mlir::Block* block);
-
-    mlir::Value readVariableRecursive(Identifier::DefinitionMap& map, mlir::Block* block);
+    [[nodiscard]] auto markOpenBlock(mlir::Block* block)
+    {
+        getCurrentScope().ssaBuilder.markOpenBlock(block);
+        return llvm::make_scope_exit([this, block] { getCurrentScope().ssaBuilder.sealBlock(block); });
+    }
 
     Scope& getCurrentScope()
     {
@@ -286,16 +282,28 @@ class CodeGen
 
     [[nodiscard]] auto implementFunction(mlir::FuncOp funcOp)
     {
-        auto tuple = std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
-                                     pylir::valueResetMany(m_currentFunc, m_currentLoop, m_currentExceptBlock,
-                                                           m_currentLandingPadBlock, std::move(m_functionScope), m_qualifiers));
+        auto tuple =
+            std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
+                            pylir::valueResetMany(m_currentFunc, m_currentLoop, m_currentExceptBlock,
+                                                  m_currentLandingPadBlock, std::move(m_functionScope), m_qualifiers));
         m_currentLoop = {nullptr, nullptr};
         m_currentExceptBlock = nullptr;
         m_currentLandingPadBlock = nullptr;
         m_currentFunc = funcOp;
         m_module.push_back(m_currentFunc);
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
-        m_functionScope.emplace();
+        m_functionScope.emplace(Scope{{},
+                                      SSABuilder(
+                                          [this](mlir::BlockArgument arg) -> mlir::Value
+                                          {
+                                              auto prev = m_builder.getCurrentLoc();
+                                              m_builder.setCurrentLoc(arg.getLoc());
+                                              mlir::OpBuilder::InsertionGuard guard{m_builder};
+                                              m_builder.setInsertionPointToStart(arg.getOwner());
+                                              auto value = m_builder.createConstant(m_builder.getUnboundAttr());
+                                              m_builder.setCurrentLoc(prev);
+                                              return value;
+                                          })});
         return tuple;
     }
 
