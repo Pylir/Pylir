@@ -1,0 +1,28 @@
+// RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.str = #py.type
+
+func @test() -> index {
+    %0 = py.constant #py.str<"test">
+    %1 = py.makeDict ()
+    %2 = py.makeDict ()
+    py.dict.setItem %1[%0] to %0
+    py.dict.setItem %2[%0] to %0
+    %3 = py.dict.len %1
+    return %3 : index
+}
+
+// CHECK-LABEL: memSSA.region @test
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY:.*]])
+// CHECK-NEXT: %[[DICT1:.*]] = py.makeDict ()
+// CHECK-NEXT: %[[DEF2:.*]] = memSSA.def(%[[DEF]])
+// CHECK-NEXT: %[[DICT2:.*]] = py.makeDict ()
+// CHECK-NEXT: %[[DEF3:.*]] = memSSA.def(%[[DEF2]])
+// CHECK-NEXT: py.dict.setItem %[[DICT1]]
+// CHECK-NEXT: %[[DEF4:.*]] = memSSA.def(%[[DEF3]])
+// CHECK-NEXT: py.dict.setItem %[[DICT2]]
+// CHECK-NEXT: memSSA.use(%[[DEF3]])
+// CHECK-NEXT: py.dict.len %[[DICT1]]

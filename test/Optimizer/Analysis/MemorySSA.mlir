@@ -83,3 +83,28 @@ func @test3() -> index {
 // CHECK-NEXT: ^[[EXIT]]:
 // CHECK-NEXT: memSSA.use(%[[COND]])
 // CHECK-NEXT: // {{.*}} py.list.len
+
+func @test4() -> index {
+    %0 = py.constant #py.str<"test">
+    %1 = py.makeList ()
+    br ^condition
+
+^condition:
+    %2 = call @random() : () -> i1
+    cond_br %2, ^bb1, ^bb5
+
+^bb1:
+    %3 = call @random() : () -> i1
+    cond_br %3, ^bb2, ^bb4
+
+^bb2:
+    br ^condition
+
+^bb4:
+    py.list.append %1, %0
+    br ^bb5
+
+^bb5:
+    %5 = py.list.len %1
+    return %5 : index
+}

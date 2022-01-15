@@ -3,6 +3,7 @@
 #define PYLIR_MEMORY_SSA_TABLEGEN
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/RegionKindInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
@@ -35,35 +36,7 @@ def InstrAttr : MemorySSA_Attr<"Instruction"> {
     let constBuilderCall = "::pylir::MemSSA::InstructionAttr::get($_builder.getContext(), $0)";
 }
 
-def AliasResultAttr : MemorySSA_Attr<"AliasResult"> {
-    let mnemonic = "aliasResult";
-    let parameters = (ins "::mlir::AliasResult::Kind":$kind);
-    let returnType = "::mlir::AliasResult";
-    let convertFromStorage = "$_self.getKind()";
-
-    let constBuilderCall = [{
-    [&]{
-        if ($0.isNo())
-        {
-            return ::pylir::MemSSA::AliasResultAttr::get($_builder.getContext(), ::mlir::AliasResult::NoAlias);
-        }
-        if ($0.isMay())
-        {
-            return ::pylir::MemSSA::AliasResultAttr::get($_builder.getContext(), ::mlir::AliasResult::MayAlias);
-        }
-        if ($0.isMust())
-        {
-            return ::pylir::MemSSA::AliasResultAttr::get($_builder.getContext(), ::mlir::AliasResult::MustAlias);
-        }
-        if ($0.isPartial())
-        {
-            return ::pylir::MemSSA::AliasResultAttr::get($_builder.getContext(), ::mlir::AliasResult::PartialAlias);
-        }
-        }()
-    }];
-}
-
-def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove]> {
+def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$functionName);
     let results = (outs);
 
@@ -79,10 +52,10 @@ def MemoryLiveOnEntryOp : MemorySSA_Op<"liveOnEntry"> {
 }
 
 def MemoryUseOp : MemorySSA_Op<"use"> {
-    let arguments = (ins MemoryDefType:$definition, InstrAttr:$instruction, AliasResultAttr:$aliasResult);
+    let arguments = (ins MemoryDefType:$definition, InstrAttr:$instruction);
     let results = (outs);
 
-    let assemblyFormat = "`(` $definition `)` $aliasResult attr-dict `\\n` $instruction";
+    let assemblyFormat = "`(` $definition `)` attr-dict `\\n` $instruction";
 }
 
 def MemoryDefOp : MemorySSA_Op<"def"> {

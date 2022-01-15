@@ -3,6 +3,9 @@
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
 #include <mlir/IR/ImplicitLocOpBuilder.h>
+#include <mlir/IR/Dominance.h>
+
+#include <llvm/ADT/DepthFirstIterator.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
@@ -11,12 +14,7 @@
 
 mlir::Operation* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
 {
-    auto result = m_results.find(operation);
-    if (result == m_results.end())
-    {
-        return nullptr;
-    }
-    return result->second;
+    return m_results.lookup(operation);
 }
 
 namespace
@@ -26,27 +24,25 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
 {
     using namespace pylir::MemSSA;
     mlir::Operation* access = nullptr;
+    llvm::SmallVector<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> effects;
     auto memoryEffectOpInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(operation);
     if (memoryEffectOpInterface)
     {
-        if (memoryEffectOpInterface.hasNoEffect())
-        {
-            return {};
-        }
-        if (memoryEffectOpInterface.hasEffect<mlir::MemoryEffects::Write>())
-        {
-            access = builder.create<MemoryDefOp>(lastDef, operation);
-        }
-        else if (memoryEffectOpInterface.hasEffect<mlir::MemoryEffects::Read>())
-        {
-            access = builder.create<MemoryUseOp>(lastDef, operation, mlir::AliasResult::MayAlias);
-        }
+        memoryEffectOpInterface.getEffects(effects);
     }
-    // Already identified as a Def
-    if (mlir::isa_and_nonnull<MemoryDefOp>(access))
+    if (memoryEffectOpInterface && effects.empty())
     {
-        return access;
+        return nullptr;
     }
+    if (llvm::any_of(effects, [](const auto& it) { return llvm::isa<mlir::MemoryEffects::Write>(it.getEffect()); }))
+    {
+        return builder.create<MemoryDefOp>(lastDef, operation);
+    }
+    else if (llvm::any_of(effects, [](const auto& it) { return llvm::isa<mlir::MemoryEffects::Read>(it.getEffect()); }))
+    {
+        access = builder.create<MemoryUseOp>(lastDef, operation);
+    }
+
     auto capturing = mlir::dyn_cast<pylir::CaptureInterface>(operation);
     for (auto& operand : operation->getOpOperands())
     {
@@ -71,16 +67,26 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
     return access;
 }
 
+mlir::Value getReadValue(mlir::Operation* op)
+{
+    auto effectOp = mlir::cast<mlir::MemoryEffectOpInterface>(op);
+    llvm::SmallVector<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> effects;
+    effectOp.getEffects(effects);
+    auto result = llvm::find_if(effects, [](typename decltype(effects)::const_reference effect)
+                                { return mlir::isa<mlir::MemoryEffects::Read>(effect.getEffect()); });
+    PYLIR_ASSERT(result != effects.end());
+    PYLIR_ASSERT(result->getValue());
+    return result->getValue();
+}
+
 } // namespace
 
-pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager)
+void pylir::MemorySSA::createIR(mlir::Operation* operation)
 {
-    auto& aliasAnalysis = analysisManager.getAnalysis<mlir::AliasAnalysis>();
     mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
     m_region = builder.create<MemSSA::MemoryRegionOp>(mlir::FlatSymbolRefAttr::get(operation));
     PYLIR_ASSERT(operation->getNumRegions() == 1);
     auto& region = operation->getRegion(0);
-    llvm::DenseMap<mlir::Block*, mlir::Block*> blockMapping;
     llvm::DenseMap<mlir::Block*, mlir::Value> lastDefs;
     pylir::SSABuilder ssaBuilder;
 
@@ -89,7 +95,7 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
         return llvm::any_of(block->getPredecessors(),
                             [&](mlir::Block* pred)
                             {
-                                auto predMemBlock = blockMapping.lookup(pred);
+                                auto predMemBlock = m_blockMapping.lookup(pred);
                                 if (!predMemBlock)
                                 {
                                     return true;
@@ -99,10 +105,10 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
     };
 
     // Insert entry block that has no predecessors
-    blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
+    m_blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
     for (auto& block : region)
     {
-        auto* memBlock = blockMapping.find(&block)->second;
+        auto* memBlock = m_blockMapping.find(&block)->second;
         PYLIR_ASSERT(memBlock);
         m_region->body().push_back(memBlock);
         builder.setInsertionPointToStart(memBlock);
@@ -141,11 +147,11 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
         llvm::SmallVector<mlir::Block*> sealAfter;
         for (auto* succ : block.getSuccessors())
         {
-            auto lookup = blockMapping.lookup(succ);
+            auto lookup = m_blockMapping.lookup(succ);
             if (!lookup)
             {
                 lookup = new mlir::Block;
-                blockMapping.insert({succ, lookup});
+                m_blockMapping.insert({succ, lookup});
             }
             else if (lookup->getParent())
             {
@@ -163,6 +169,87 @@ pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& a
                                                memSuccessors);
         llvm::for_each(sealAfter, [&](mlir::Block* lookup) { ssaBuilder.sealBlock(lookup); });
     }
+}
+
+namespace
+{
+mlir::Value getLastClobber(mlir::Value location, mlir::AliasAnalysis& aliasAnalysis,
+                           llvm::ArrayRef<mlir::Value> dominatingDefs)
+{
+    for (auto def : llvm::reverse(dominatingDefs.drop_front()))
+    {
+        if (auto blockArg = def.dyn_cast<mlir::BlockArgument>())
+        {
+            // TODO: Implement optimizations
+            return blockArg;
+        }
+        auto memDef = def.getDefiningOp<pylir::MemSSA::MemoryDefOp>();
+        auto modRef = aliasAnalysis.getModRef(memDef.instruction(), location);
+        if (modRef.isMod())
+        {
+            return memDef;
+        }
+    }
+    return {};
+}
+} // namespace
+
+void pylir::MemorySSA::optimizeUses(mlir::AnalysisManager& analysisManager)
+{
+    auto& aliasAnalysis = analysisManager.getAnalysis<mlir::AliasAnalysis>();
+
+    auto liveOnEntry = mlir::cast<MemSSA::MemoryLiveOnEntryOp>(*m_region->body().op_begin());
+    llvm::SmallVector<mlir::Value> dominatingDefs{liveOnEntry};
+    llvm::DomTreeBase<mlir::Block> tree;
+    tree.recalculate(m_region->body());
+    for (auto* node : llvm::depth_first(tree.getRootNode()))
+    {
+        auto accesses = node->getBlock()->without_terminator();
+        if (accesses.empty() && node->getBlock()->getNumArguments() == 0)
+        {
+            continue;
+        }
+
+        // Pop any values that are in blocks that do not dominate the current block
+        while (!tree.dominates(dominatingDefs.back().getParentBlock(), node->getBlock()))
+        {
+            auto* backBlock = dominatingDefs.back().getParentBlock();
+            while (dominatingDefs.back().getParentBlock() == backBlock)
+            {
+                dominatingDefs.pop_back();
+            }
+        }
+
+        for (auto& blockArg : node->getBlock()->getArguments())
+        {
+            dominatingDefs.push_back(blockArg);
+        }
+        for (auto& access : accesses)
+        {
+            auto use = mlir::dyn_cast<MemSSA::MemoryUseOp>(access);
+            if (!use)
+            {
+                if (auto def = mlir::dyn_cast<MemSSA::MemoryDefOp>(access))
+                {
+                    dominatingDefs.push_back(def);
+                }
+                continue;
+            }
+            auto readValue = getReadValue(use.instruction());
+            auto lastClobber = getLastClobber(readValue, aliasAnalysis, dominatingDefs);
+            if (!lastClobber)
+            {
+                lastClobber = liveOnEntry;
+            }
+            use.definitionMutable().assign(lastClobber);
+        }
+    }
+}
+
+pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager)
+{
+    createIR(operation);
+    optimizeUses(analysisManager);
 }
 
 void pylir::MemorySSA::dump() const

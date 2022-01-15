@@ -41,15 +41,9 @@ mlir::Attribute pylir::MemSSA::InstructionAttr::parse(::mlir::AsmParser& parser,
     return {};
 }
 
-void pylir::MemSSA::AliasResultAttr::print(::mlir::AsmPrinter& printer) const
+mlir::RegionKind pylir::MemSSA::MemoryRegionOp::getRegionKind(unsigned int)
 {
-    printer.getStream() << mlir::AliasResult(getKind());
-}
-
-mlir::Attribute pylir::MemSSA::AliasResultAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    parser.emitError(parser.getCurrentLocation(), "Parsing " + getMnemonic() + " not supported");
-    return {};
+    return mlir::RegionKind::SSACFG;
 }
 
 #define GET_OP_CLASSES

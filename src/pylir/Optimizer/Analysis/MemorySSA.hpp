@@ -20,6 +20,11 @@ class MemorySSA
 {
     mlir::OwningOpRef<MemSSA::MemoryRegionOp> m_region;
     llvm::DenseMap<mlir::Operation*, mlir::Operation*> m_results;
+    llvm::DenseMap<mlir::Block*, mlir::Block*> m_blockMapping;
+
+    void createIR(mlir::Operation* operation);
+
+    void optimizeUses(mlir::AnalysisManager& analysisManager);
 
 public:
     explicit MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager);

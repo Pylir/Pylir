@@ -3,6 +3,7 @@
 
 #include <mlir/Analysis/AliasAnalysis.h>
 #include <mlir/IR/OpImplementation.h>
+#include <mlir/IR/RegionKindInterface.h>
 #include <mlir/Interfaces/ControlFlowInterfaces.h>
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 
