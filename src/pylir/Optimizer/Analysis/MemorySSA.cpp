@@ -190,28 +190,54 @@ mlir::Value getLastClobber(mlir::Value location, mlir::AliasAnalysis& aliasAnaly
             return memDef;
         }
     }
-    return {};
+    return dominatingDefs[0];
+}
+
+void optimizeUsesInBlock(mlir::Block* block, mlir::AliasAnalysis& aliasAnalysis,
+                         llvm::SmallVectorImpl<mlir::Value>& dominatingDefs)
+{
+    for (auto& blockArg : block->getArguments())
+    {
+        dominatingDefs.push_back(blockArg);
+    }
+    for (auto& access : block->without_terminator())
+    {
+        auto use = mlir::dyn_cast<pylir::MemSSA::MemoryUseOp>(access);
+        if (!use)
+        {
+            dominatingDefs.push_back(access.getResult(0));
+            continue;
+        }
+        auto readValue = getReadValue(use.instruction());
+        use.definitionMutable().assign(getLastClobber(readValue, aliasAnalysis, dominatingDefs));
+    }
 }
 } // namespace
 
 void pylir::MemorySSA::optimizeUses(mlir::AnalysisManager& analysisManager)
 {
     auto& aliasAnalysis = analysisManager.getAnalysis<mlir::AliasAnalysis>();
+    auto& dominanceInfo = analysisManager.getAnalysis<mlir::DominanceInfo>();
 
-    auto liveOnEntry = mlir::cast<MemSSA::MemoryLiveOnEntryOp>(*m_region->body().op_begin());
-    llvm::SmallVector<mlir::Value> dominatingDefs{liveOnEntry};
-    llvm::DomTreeBase<mlir::Block> tree;
-    tree.recalculate(m_region->body());
+    llvm::SmallVector<mlir::Value> dominatingDefs;
+    if (m_region->body().hasOneBlock())
+    {
+        optimizeUsesInBlock(&m_region->body().front(), aliasAnalysis, dominatingDefs);
+        return;
+    }
+
+    auto& tree = dominanceInfo.getDomTree(&m_region->body());
     for (auto* node : llvm::depth_first(tree.getRootNode()))
     {
-        auto accesses = node->getBlock()->without_terminator();
-        if (accesses.empty() && node->getBlock()->getNumArguments() == 0)
+        auto* block = node->getBlock();
+        auto accesses = block->without_terminator();
+        if (accesses.empty() && block->getNumArguments() == 0)
         {
             continue;
         }
 
         // Pop any values that are in blocks that do not dominate the current block
-        while (!tree.dominates(dominatingDefs.back().getParentBlock(), node->getBlock()))
+        while (!block->isEntryBlock() && !tree.dominates(dominatingDefs.back().getParentBlock(), block))
         {
             auto* backBlock = dominatingDefs.back().getParentBlock();
             while (dominatingDefs.back().getParentBlock() == backBlock)
@@ -220,29 +246,7 @@ void pylir::MemorySSA::optimizeUses(mlir::AnalysisManager& analysisManager)
             }
         }
 
-        for (auto& blockArg : node->getBlock()->getArguments())
-        {
-            dominatingDefs.push_back(blockArg);
-        }
-        for (auto& access : accesses)
-        {
-            auto use = mlir::dyn_cast<MemSSA::MemoryUseOp>(access);
-            if (!use)
-            {
-                if (auto def = mlir::dyn_cast<MemSSA::MemoryDefOp>(access))
-                {
-                    dominatingDefs.push_back(def);
-                }
-                continue;
-            }
-            auto readValue = getReadValue(use.instruction());
-            auto lastClobber = getLastClobber(readValue, aliasAnalysis, dominatingDefs);
-            if (!lastClobber)
-            {
-                lastClobber = liveOnEntry;
-            }
-            use.definitionMutable().assign(lastClobber);
-        }
+        optimizeUsesInBlock(block, aliasAnalysis, dominatingDefs);
     }
 }
 
