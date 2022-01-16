@@ -5,6 +5,7 @@
 #include <pylir/Support/Macros.hpp>
 
 #include <functional>
+#include <variant>
 
 namespace pylir
 {

@@ -87,7 +87,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
     m_region = builder.create<MemSSA::MemoryRegionOp>(mlir::FlatSymbolRefAttr::get(operation));
     PYLIR_ASSERT(operation->getNumRegions() == 1);
     auto& region = operation->getRegion(0);
-    llvm::DenseMap<mlir::Block*, mlir::Value> lastDefs;
+    SSABuilder::DefinitionsMap lastDefs;
     pylir::SSABuilder ssaBuilder;
 
     auto hasUnresolvedPredecessors = [&](mlir::Block* block)

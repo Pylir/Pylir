@@ -900,7 +900,7 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
             auto cellType = m_builder.createCellRef();
             m_builder.createSetSlot(value, cellType, "cell_contents", cell);
         },
-        [&](Identifier::DefinitionMap& localMap) { localMap[m_builder.getBlock()] = value; });
+        [&](SSABuilder::DefinitionsMap& localMap) { localMap[m_builder.getBlock()] = value; });
 }
 
 mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToken)
@@ -967,7 +967,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             break;
         case Identifier::StackAlloc:
             loadedValue = scope->ssaBuilder.readVariable(m_builder.getDynamicType(),
-                                                         pylir::get<Identifier::DefinitionMap>(result->second.kind),
+                                                         pylir::get<SSABuilder::DefinitionsMap>(result->second.kind),
                                                          m_builder.getBlock());
             break;
         case Identifier::Cell:
@@ -1888,13 +1888,13 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             else
             {
                 m_functionScope->identifiers.emplace(
-                    name.getValue(), Identifier{Identifier::DefinitionMap{{m_builder.getBlock(), value}}});
+                    name.getValue(), Identifier{SSABuilder::DefinitionsMap{{m_builder.getBlock(), value}}});
                 locals.erase(name);
             }
         }
         for (auto& iter : locals)
         {
-            m_functionScope->identifiers.emplace(iter.getValue(), Identifier{Identifier::DefinitionMap{}});
+            m_functionScope->identifiers.emplace(iter.getValue(), Identifier{SSABuilder::DefinitionsMap{}});
         }
         for (auto& iter : closures)
         {

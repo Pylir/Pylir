@@ -71,8 +71,7 @@ class CodeGen
             StackAlloc = 1,
             Cell = 2
         };
-        using DefinitionMap = llvm::DenseMap<mlir::Block*, mlir::Value>;
-        std::variant<mlir::Operation*, DefinitionMap, mlir::Value> kind;
+        std::variant<mlir::Operation*, SSABuilder::DefinitionsMap, mlir::Value> kind;
     };
 
     struct Scope

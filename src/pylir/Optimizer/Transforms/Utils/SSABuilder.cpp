@@ -4,7 +4,6 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Support/Functional.hpp>
 #include <pylir/Support/Macros.hpp>
 
 void pylir::SSABuilder::markOpenBlock(mlir::Block* block)
@@ -19,9 +18,24 @@ void pylir::SSABuilder::sealBlock(mlir::Block* block)
     {
         return;
     }
-    for (auto [blockArgument, map] : llvm::zip(block->getArguments().take_back(result->second.size()), result->second))
+    auto blockArgs = llvm::to_vector(block->getArguments().take_back(result->second.size()));
+    for (auto [blockArgument, map] : llvm::zip(blockArgs, result->second))
     {
-        addBlockArguments(*map, blockArgument);
+        auto optimized = addBlockArguments(*map, blockArgument);
+        if (optimized != blockArgument)
+        {
+            // TODO: This could probably be vastly improved. But I don't know how yet.
+            //       It would not be necessary if MLIR had something like ValueHandle in LLVM.
+            //       Then we would be able to have a map of those and the RAU would take care of it.
+            //       I guess we'll have to do so manually for now
+            for (auto& [key, value] : *map)
+            {
+                if (value == blockArgument)
+                {
+                    value = optimized;
+                }
+            }
+        }
     }
     m_openBlocks.erase(result);
 }
@@ -86,13 +100,21 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
         }
         auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber());
         PYLIR_ASSERT(ops);
+        if (*ops == argument)
+        {
+            continue;
+        }
         bas.emplace_back(*ops);
     }
 
     removeBlockArgumentOperands(argument);
     argument.replaceAllUsesWith(same);
     argument.getOwner()->eraseArgument(argument.getArgNumber());
-    std::for_each(bas.begin(), bas.end(), pylir::bind_front(&SSABuilder::tryRemoveTrivialBlockArgument, this));
+
+    for (auto ba : bas)
+    {
+        tryRemoveTrivialBlockArgument(ba);
+    }
 
     return same;
 }
