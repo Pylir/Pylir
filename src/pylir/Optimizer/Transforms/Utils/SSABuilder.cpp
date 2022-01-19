@@ -21,21 +21,7 @@ void pylir::SSABuilder::sealBlock(mlir::Block* block)
     auto blockArgs = llvm::to_vector(block->getArguments().take_back(result->second.size()));
     for (auto [blockArgument, map] : llvm::zip(blockArgs, result->second))
     {
-        auto optimized = addBlockArguments(*map, blockArgument);
-        if (optimized != blockArgument)
-        {
-            // TODO: This could probably be vastly improved. But I don't know how yet.
-            //       It would not be necessary if MLIR had something like ValueHandle in LLVM.
-            //       Then we would be able to have a map of those and the RAU would take care of it.
-            //       I guess we'll have to do so manually for now
-            for (auto& [key, value] : *map)
-            {
-                if (value == blockArgument)
-                {
-                    value = optimized;
-                }
-            }
-        }
+        addBlockArguments(*map, blockArgument);
     }
     m_openBlocks.erase(result);
 }

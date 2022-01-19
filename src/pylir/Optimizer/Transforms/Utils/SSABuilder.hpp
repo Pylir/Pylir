@@ -7,13 +7,15 @@
 #include <functional>
 #include <variant>
 
+#include "ValueTracker.hpp"
+
 namespace pylir
 {
 
 class SSABuilder
 {
 public:
-    using DefinitionsMap = llvm::DenseMap<mlir::Block*, mlir::Value>;
+    using DefinitionsMap = llvm::DenseMap<mlir::Block*, ValueTracker>;
 
 private:
     llvm::DenseMap<mlir::Block*, std::vector<DefinitionsMap*>> m_openBlocks;
