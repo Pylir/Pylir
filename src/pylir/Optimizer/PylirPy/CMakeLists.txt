@@ -1,3 +1,3 @@
 add_subdirectory(IR)
-add_subdirectory(Transform)
+add_subdirectory(Transforms)
 add_subdirectory(Util)

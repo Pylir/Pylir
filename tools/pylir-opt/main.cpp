@@ -8,7 +8,7 @@
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
-#include <pylir/Optimizer/PylirPy/Transform/Passes.hpp>
+#include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 
 std::unique_ptr<mlir::Pass> createTestMemorySSA();
 
