@@ -10,9 +10,9 @@ def ExpandPyDialect : Pass<"expand-py-dialect", "::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::Py::PylirPyDialect", "::mlir::StandardOpsDialect"];
 }
 
-def OptimizeHandles : Pass<"optimize-handles", "::mlir::ModuleOp"> {
-    let summary = "Optimize usage of py.globalHandle";
-    let constructor = "::pylir::Py::createOptimizeHandlesPass()";
+def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {
+    let summary = "Fold py.globalHandle";
+    let constructor = "::pylir::Py::createFoldHandlesPass()";
     let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
     let statistics = [

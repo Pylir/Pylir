@@ -9,7 +9,7 @@ namespace pylir::Py
 {
 std::unique_ptr<mlir::Pass> createExpandPyDialectPass();
 
-std::unique_ptr<mlir::Pass> createOptimizeHandlesPass();
+std::unique_ptr<mlir::Pass> createFoldHandlesPass();
 
 #define GEN_PASS_REGISTRATION
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"

@@ -114,7 +114,7 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
     manager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
     if (options.getLastArgValue(OPT_O, "0") != "0")
     {
-        manager.addPass(pylir::Py::createOptimizeHandlesPass());
+        manager.addPass(pylir::Py::createFoldHandlesPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
         manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());

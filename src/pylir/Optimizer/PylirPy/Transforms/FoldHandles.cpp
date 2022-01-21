@@ -1,3 +1,4 @@
+#include <mlir/IR/Dominance.h>
 #include <mlir/IR/Matchers.h>
 
 #include <llvm/ADT/STLExtras.h>
@@ -10,12 +11,12 @@
 
 namespace
 {
-struct OptimizeHandlesPass : public pylir::Py::OptimizeHandlesBase<OptimizeHandlesPass>
+struct FoldHandlesPass : public pylir::Py::FoldHandlesBase<FoldHandlesPass>
 {
     void runOnOperation() override;
 };
 
-void OptimizeHandlesPass::runOnOperation()
+void FoldHandlesPass::runOnOperation()
 {
     auto module = getOperation();
     mlir::SymbolTableCollection collection;
@@ -94,11 +95,12 @@ void OptimizeHandlesPass::runOnOperation()
     {
         markAllAnalysesPreserved();
     }
+    markAnalysesPreserved<mlir::DominanceInfo>();
 }
 
 } // namespace
 
-std::unique_ptr<mlir::Pass> pylir::Py::createOptimizeHandlesPass()
+std::unique_ptr<mlir::Pass> pylir::Py::createFoldHandlesPass()
 {
-    return std::make_unique<OptimizeHandlesPass>();
+    return std::make_unique<FoldHandlesPass>();
 }
