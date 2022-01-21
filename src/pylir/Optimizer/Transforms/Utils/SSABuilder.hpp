@@ -25,7 +25,7 @@ private:
 
     mlir::Value addBlockArguments(DefinitionsMap& map, mlir::BlockArgument argument);
 
-    mlir::Value readVariableRecursive(mlir::Type type, DefinitionsMap& map, mlir::Block* block);
+    mlir::Value readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block);
 
     void removeBlockArgumentOperands(mlir::BlockArgument argument);
 
@@ -50,6 +50,6 @@ public:
 
     void sealBlock(mlir::Block* block);
 
-    mlir::Value readVariable(mlir::Type type, DefinitionsMap& map, mlir::Block* block);
+    mlir::Value readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block);
 };
 } // namespace pylir

@@ -26,13 +26,14 @@ void pylir::SSABuilder::sealBlock(mlir::Block* block)
     m_openBlocks.erase(result);
 }
 
-mlir::Value pylir::SSABuilder::readVariable(mlir::Type type, DefinitionsMap& map, mlir::Block* block)
+mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
+                                            mlir::Block* block)
 {
     if (auto result = map.find(block); result != map.end())
     {
         return result->second;
     }
-    return readVariableRecursive(type, map, block);
+    return readVariableRecursive(loc, type, map, block);
 }
 
 void pylir::SSABuilder::removeBlockArgumentOperands(mlir::BlockArgument argument)
@@ -114,26 +115,27 @@ mlir::Value pylir::SSABuilder::addBlockArguments(DefinitionsMap& map, mlir::Bloc
         auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
         auto ops = terminator.getMutableSuccessorOperands(index);
         PYLIR_ASSERT(ops);
-        ops->append(readVariable(argument.getType(), map, pred));
+        ops->append(readVariable(argument.getLoc(), argument.getType(), map, pred));
     }
     return tryRemoveTrivialBlockArgument(argument);
 }
 
-mlir::Value pylir::SSABuilder::readVariableRecursive(mlir::Type type, DefinitionsMap& map, mlir::Block* block)
+mlir::Value pylir::SSABuilder::readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
+                                                     mlir::Block* block)
 {
     mlir::Value val;
     if (auto result = m_openBlocks.find(block); result != m_openBlocks.end())
     {
-        val = block->addArgument(type);
+        val = block->addArgument(type, loc);
         result->second.emplace_back(&map);
     }
     else if (auto* pred = block->getUniquePredecessor())
     {
-        val = readVariable(type, map, pred);
+        val = readVariable(loc, type, map, pred);
     }
     else
     {
-        val = block->addArgument(type);
+        val = block->addArgument(type, loc);
         map[block] = val;
         val = addBlockArguments(map, val.cast<mlir::BlockArgument>());
     }

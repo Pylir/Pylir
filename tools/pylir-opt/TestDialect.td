@@ -9,8 +9,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 def TestDialect : Dialect {
     let name = "test";
     let cppNamespace = "::pylir::test";
-    let useDefaultTypePrinterParser = 0;
-    let useDefaultAttributePrinterParser = 0;
 }
 
 class Test_Op<string mnemonic, list <OpTrait> traits = []> : Op<TestDialect, mnemonic, traits>;

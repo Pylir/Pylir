@@ -101,15 +101,15 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
                        [](const std::string& string) { return string.c_str(); });
         switch (style)
         {
-            case LinkerStyle::MSVC: return lld::coff::link(refs, false, llvm::outs(), llvm::errs());
+            case LinkerStyle::MSVC: return lld::coff::link(refs, llvm::outs(), llvm::errs(), false, false);
             case LinkerStyle::GNU:
                 if (m_triple.isOSCygMing())
                 {
-                    return lld::mingw::link(refs, false, llvm::outs(), llvm::errs());
+                    return lld::mingw::link(refs, llvm::outs(), llvm::errs(), false, false);
                 }
-                return lld::elf::link(refs, false, llvm::outs(), llvm::errs());
-            case LinkerStyle::Mac: return lld::macho::link(refs, false, llvm::outs(), llvm::errs());
-            case LinkerStyle::Wasm: return lld::wasm::link(refs, false, llvm::outs(), llvm::errs());
+                return lld::elf::link(refs, llvm::outs(), llvm::errs(), false, false);
+            case LinkerStyle::Mac: return lld::macho::link(refs, llvm::outs(), llvm::errs(), false, false);
+            case LinkerStyle::Wasm: return lld::wasm::link(refs, llvm::outs(), llvm::errs(), false, false);
         }
         PYLIR_UNREACHABLE;
     }

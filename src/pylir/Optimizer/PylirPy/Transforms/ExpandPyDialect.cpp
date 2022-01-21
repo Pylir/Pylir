@@ -5,8 +5,8 @@
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
+#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
 #include "PassDetail.hpp"
 #include "Passes.hpp"
@@ -55,7 +55,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         auto tupleSize = rewriter.create<pylir::Py::TupleLenOp>(loc, rewriter.getIndexType(), tuple);
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
         auto conditionBlock = new mlir::Block;
-        conditionBlock->addArgument(rewriter.getIndexType());
+        conditionBlock->addArgument(rewriter.getIndexType(), loc);
         rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
 
         conditionBlock->insertBefore(endBlock);
@@ -103,7 +103,7 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
         auto tupleSize = rewriter.create<pylir::Py::TupleLenOp>(loc, rewriter.getIndexType(), tuple);
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
         auto conditionBlock = new mlir::Block;
-        conditionBlock->addArgument(rewriter.getIndexType());
+        conditionBlock->addArgument(rewriter.getIndexType(), loc);
         rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
 
         conditionBlock->insertBefore(endBlock);
@@ -213,7 +213,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             condition->insertBefore(dest);
             rewriter.setInsertionPointToStart(condition);
             auto stopIterationHandler = new mlir::Block;
-            stopIterationHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>());
+            stopIterationHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
             auto landingPad = new mlir::Block;
             auto next = pylir::Py::buildSpecialMethodCall(loc, rewriter, "__next__", iterObject, {},
                                                           exceptionHandlerBlock, landingPad);
@@ -276,7 +276,7 @@ void ExpandPyDialectPass::runOnOperation()
         auto kws = func.getArgument(2);
 
         auto* condition = new mlir::Block;
-        condition->addArgument(builder.getDynamicType());
+        condition->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
         builder.create<mlir::BranchOp>(condition, self);
 
         func.push_back(condition);
@@ -286,7 +286,7 @@ void ExpandPyDialectPass::runOnOperation()
         auto mroTuple = builder.createGetSlot(selfType, builder.createTypeRef(), "__mro__");
         auto lookup = builder.createMROLookup(mroTuple, "__call__");
         auto* exitBlock = new mlir::Block;
-        exitBlock->addArgument(builder.getDynamicType());
+        exitBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
         auto unbound = builder.createConstant(builder.getUnboundAttr());
         auto* body = new mlir::Block;
         builder.create<mlir::CondBranchOp>(lookup.success(), body, exitBlock, mlir::ValueRange{unbound});

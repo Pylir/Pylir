@@ -145,7 +145,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             auto typeObject = m_builder.createTypeRef();
             auto isTypeSubclass = buildSubclassCheck(typeOf, typeObject);
             BlockPtr isType, instanceBlock;
-            instanceBlock->addArgument(m_builder.getDynamicType());
+            instanceBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
             m_builder.create<mlir::CondBranchOp>(isTypeSubclass, isType, instanceBlock, mlir::ValueRange{expression});
 
             {
@@ -483,7 +483,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     auto found = BlockPtr{};
     auto elseBlock = BlockPtr{};
     auto thenBlock = BlockPtr{};
-    thenBlock->addArgument(m_builder.getDynamicType());
+    thenBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
 
     m_builder.create<mlir::CondBranchOp>(condition, found, elseBlock);
 
@@ -522,7 +522,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
                 return {};
             }
             auto found = BlockPtr{};
-            found->addArgument(m_builder.getDynamicType());
+            found->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
             auto rhsTry = BlockPtr{};
             m_builder.create<mlir::CondBranchOp>(toI1(lhs), found, lhs, rhsTry, mlir::ValueRange{});
 
@@ -551,7 +551,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
                 return {};
             }
             auto found = BlockPtr{};
-            found->addArgument(m_builder.getDynamicType());
+            found->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
             auto rhsTry = BlockPtr{};
             m_builder.create<mlir::CondBranchOp>(toI1(lhs), rhsTry, mlir::ValueRange{}, found, mlir::ValueRange{lhs});
 
@@ -608,7 +608,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         BlockPtr found;
         if (result)
         {
-            found->addArgument(m_builder.getDynamicType());
+            found->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
             auto rhsTry = BlockPtr{};
             m_builder.create<mlir::CondBranchOp>(toI1(result), found, result, rhsTry, mlir::ValueRange{});
             implementBlock(rhsTry);
@@ -910,7 +910,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     Scope* scope;
     if (m_classNamespace)
     {
-        classNamespaceFound->addArgument(m_builder.getDynamicType());
+        classNamespaceFound->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
         auto str = m_builder.createConstant(identifierToken.getValue());
         auto tryGet = m_builder.createDictTryGetItem(m_classNamespace, str);
         auto elseBlock = BlockPtr{};
@@ -966,7 +966,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
                 m_builder.createLoad(mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(result->second.kind)));
             break;
         case Identifier::StackAlloc:
-            loadedValue = scope->ssaBuilder.readVariable(m_builder.getDynamicType(),
+            loadedValue = scope->ssaBuilder.readVariable(m_builder.getCurrentLoc(), m_builder.getDynamicType(),
                                                          pylir::get<SSABuilder::DefinitionsMap>(result->second.kind),
                                                          m_builder.getBlock());
             break;
@@ -1397,7 +1397,7 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
     auto landingPad = createLandingPadBlock(stopIterationHandler, m_builder.getStopIterationBuiltin());
     auto landingPadSeal = markOpenBlock(landingPad);
     auto stopIterationSeal = markOpenBlock(stopIterationHandler);
-    stopIterationHandler->addArgument(m_builder.getDynamicType());
+    stopIterationHandler->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
     auto next =
         Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__next__",
                                    m_builder.createMakeTuple({iterObject}), {}, m_currentExceptBlock, landingPad);
@@ -1515,7 +1515,7 @@ void pylir::CodeGen::visit(mlir::Value container, const Syntax::Comprehension& c
 void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
 {
     BlockPtr exceptionHandler;
-    exceptionHandler->addArgument(m_builder.getDynamicType());
+    exceptionHandler->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
     BlockPtr landingPad = createLandingPadBlock(exceptionHandler);
     auto landingPadSeal = markOpenBlock(landingPad);
     auto exceptionHandlerSeal = markOpenBlock(exceptionHandler);
@@ -2210,7 +2210,7 @@ std::vector<pylir::CodeGen::UnpackResults>
                 m_builder.create<mlir::CondBranchOp>(isLess, lessBlock, unboundBlock);
 
                 auto resultBlock = BlockPtr{};
-                resultBlock->addArgument(m_builder.getDynamicType());
+                resultBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
                 implementBlock(unboundBlock);
                 auto unboundValue = m_builder.createConstant(m_builder.getUnboundAttr());
                 m_builder.create<mlir::BranchOp>(resultBlock, mlir::ValueRange{unboundValue});
@@ -2236,7 +2236,7 @@ std::vector<pylir::CodeGen::UnpackResults>
                 m_builder.create<mlir::CondBranchOp>(lookup.found(), foundBlock, notFoundBlock);
 
                 auto resultBlock = BlockPtr{};
-                resultBlock->addArgument(m_builder.getDynamicType());
+                resultBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
                 implementBlock(notFoundBlock);
                 auto elseValue = argValue ? argValue : m_builder.createConstant(m_builder.getUnboundAttr());
                 m_builder.create<mlir::BranchOp>(resultBlock, mlir::ValueRange{elseValue});
@@ -2277,7 +2277,7 @@ std::vector<pylir::CodeGen::UnpackResults>
                 auto list = m_builder.createMakeList();
                 auto start = m_builder.create<mlir::arith::ConstantIndexOp>(posIndex);
                 auto conditionBlock = BlockPtr{};
-                conditionBlock->addArgument(m_builder.getIndexType());
+                conditionBlock->addArgument(m_builder.getIndexType(), m_builder.getCurrentLoc());
                 m_builder.create<mlir::BranchOp>(conditionBlock, mlir::ValueRange{start});
 
                 implementBlock(conditionBlock);
@@ -2309,8 +2309,8 @@ std::vector<pylir::CodeGen::UnpackResults>
                 auto isUnbound = m_builder.createIsUnboundValue(argValue);
                 auto unboundBlock = BlockPtr{};
                 auto boundBlock = BlockPtr{};
-                boundBlock->addArgument(m_builder.getDynamicType());
-                boundBlock->addArgument(m_builder.getI1Type());
+                boundBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+                boundBlock->addArgument(m_builder.getI1Type(), m_builder.getCurrentLoc());
                 auto trueConstant = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
                 m_builder.create<mlir::CondBranchOp>(isUnbound, unboundBlock, boundBlock,
                                                      mlir::ValueRange{argValue, trueConstant});
@@ -2515,7 +2515,7 @@ void pylir::CodeGen::buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock,
     auto tupleSize = m_builder.createTupleLen(tuple);
     auto startConstant = m_builder.create<mlir::arith::ConstantIndexOp>(0);
     auto conditionBlock = BlockPtr{};
-    conditionBlock->addArgument(m_builder.getIndexType());
+    conditionBlock->addArgument(m_builder.getIndexType(), m_builder.getCurrentLoc());
     auto conditionBlockSeal = markOpenBlock(conditionBlock);
     m_builder.create<mlir::BranchOp>(conditionBlock, mlir::ValueRange{startConstant});
 

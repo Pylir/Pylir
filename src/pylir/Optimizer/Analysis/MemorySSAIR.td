@@ -10,8 +10,6 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 def MemorySSA_Dialect : Dialect {
     let name = "memSSA";
     let cppNamespace = "::pylir::MemSSA";
-    let useDefaultTypePrinterParser = 1;
-    let useDefaultAttributePrinterParser = 1;
 }
 
 class MemorySSA_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type">

@@ -1302,7 +1302,7 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrE
     {
         auto block = op->getBlock();
         auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
-        endBlock->addArgument(rewriter.getI1Type());
+        endBlock->addArgument(rewriter.getI1Type(), op.getLoc());
         rewriter.setInsertionPointToEnd(block);
 
         auto sameObject = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, adaptor.lhs(),
@@ -1550,7 +1550,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
     {
         auto block = op->getBlock();
         auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
-        endBlock->addArgument(typeConverter->convertType(op.getType()));
+        endBlock->addArgument(typeConverter->convertType(op.getType()), op.getLoc());
 
         rewriter.setInsertionPointToEnd(block);
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
@@ -1564,7 +1564,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         {
             auto zero = rewriter.create<mlir::arith::ConstantOp>(op.getLoc(), rewriter.getIndexType(),
                                                                  rewriter.getIndexAttr(0));
-            condition->addArgument(getIndexType());
+            condition->addArgument(getIndexType(), op.getLoc());
             rewriter.create<mlir::BranchOp>(op.getLoc(), condition, mlir::ValueRange{zero});
         }
 
@@ -1640,7 +1640,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         {
             auto zero = rewriter.create<mlir::arith::ConstantOp>(op.getLoc(), rewriter.getIndexType(),
                                                                  rewriter.getIndexAttr(0));
-            condition->addArgument(getIndexType());
+            condition->addArgument(getIndexType(), op.getLoc());
             rewriter.create<mlir::BranchOp>(op.getLoc(), condition, mlir::ValueRange{zero});
         }
 
@@ -1865,7 +1865,7 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
     {
         auto block = op->getBlock();
         auto endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
-        endBlock->addArgument(getIndexType());
+        endBlock->addArgument(getIndexType(), op.getLoc());
 
         rewriter.setInsertionPointToEnd(block);
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(

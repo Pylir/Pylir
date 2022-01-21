@@ -145,7 +145,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
         implementBlock(builder, happyPath);
     }
     auto* exitBlock = new mlir::Block;
-    exitBlock->addArgument(builder.getType<Py::DynamicType>());
+    exitBlock->addArgument(builder.getType<Py::DynamicType>(), loc);
     builder.create<mlir::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, notFunctionBlock);
@@ -153,7 +153,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     auto getMethod = builder.create<Py::MROLookupOp>(loc, mroTuple, "__get__");
     auto* isDescriptor = new mlir::Block;
     auto* mergeBlock = new mlir::Block;
-    mergeBlock->addArgument(builder.getType<Py::DynamicType>());
+    mergeBlock->addArgument(builder.getType<Py::DynamicType>(), loc);
     builder.create<mlir::CondBranchOp>(loc, getMethod.success(), isDescriptor, mergeBlock,
                                        mlir::ValueRange{lookup.result()});
 

@@ -124,7 +124,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         }
         else
         {
-            lastDef = ssaBuilder.readVariable(builder.getType<MemSSA::DefType>(), lastDefs, memBlock);
+            lastDef = ssaBuilder.readVariable(builder.getLoc(), builder.getType<MemSSA::DefType>(), lastDefs, memBlock);
         }
         for (auto& op : block)
         {

@@ -66,7 +66,7 @@ endif ()
 
 find_package(Threads REQUIRED)
 link_libraries(Threads::Threads)
-# revision daf06590dc8f3d117e2744aff0ee0254b2c0d565
+# revision 0abaf64580921e31983e355972b91c83fd7521f2
 find_package(MLIR REQUIRED CONFIG)
 
 if (PYLIR_EMBED_LLD)
