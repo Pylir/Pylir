@@ -1,12 +1,10 @@
 #include "MemorySSA.hpp"
 
+#include <mlir/IR/Dominance.h>
+#include <mlir/IR/ImplicitLocOpBuilder.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
-#include <mlir/IR/ImplicitLocOpBuilder.h>
-#include <mlir/IR/Dominance.h>
-
 #include <llvm/ADT/DepthFirstIterator.h>
-
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
@@ -19,12 +17,12 @@ mlir::Operation* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
 
 namespace
 {
+// TODO: support multiple reads
 mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::MemorySSA& ssa, mlir::Operation* operation,
                                 mlir::Value lastDef)
 {
     using namespace pylir::MemSSA;
-    mlir::Operation* access = nullptr;
-    llvm::SmallVector<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> effects;
+    llvm::SmallVector<mlir::MemoryEffects::EffectInstance> effects;
     auto memoryEffectOpInterface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(operation);
     if (memoryEffectOpInterface)
     {
@@ -34,13 +32,19 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
     {
         return nullptr;
     }
-    if (llvm::any_of(effects, [](const auto& it) { return llvm::isa<mlir::MemoryEffects::Write>(it.getEffect()); }))
+    mlir::Value read;
+    for (auto& iter : effects)
     {
-        return builder.create<MemoryDefOp>(lastDef, operation);
-    }
-    else if (llvm::any_of(effects, [](const auto& it) { return llvm::isa<mlir::MemoryEffects::Read>(it.getEffect()); }))
-    {
-        access = builder.create<MemoryUseOp>(lastDef, operation);
+        if (llvm::isa<mlir::MemoryEffects::Write>(iter.getEffect()))
+        {
+            return builder.create<MemoryDefOp>(lastDef, operation);
+        }
+        else if (llvm::isa<mlir::MemoryEffects::Read>(iter.getEffect()))
+        {
+            PYLIR_ASSERT(iter.getValue() && "Reading non mlir::Value is not yet supported");
+            PYLIR_ASSERT(!read && "Multiple reads are not yet supported");
+            read = iter.getValue();
+        }
     }
 
     auto capturing = mlir::dyn_cast<pylir::CaptureInterface>(operation);
@@ -64,19 +68,13 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
         // Conservatively assume it was captured and clobbered
         return builder.create<MemoryDefOp>(lastDef, operation);
     }
-    return access;
-}
-
-mlir::Value getReadValue(mlir::Operation* op)
-{
-    auto effectOp = mlir::cast<mlir::MemoryEffectOpInterface>(op);
-    llvm::SmallVector<mlir::SideEffects::EffectInstance<mlir::MemoryEffects::Effect>> effects;
-    effectOp.getEffects(effects);
-    auto result = llvm::find_if(effects, [](typename decltype(effects)::const_reference effect)
-                                { return mlir::isa<mlir::MemoryEffects::Read>(effect.getEffect()); });
-    PYLIR_ASSERT(result != effects.end());
-    PYLIR_ASSERT(result->getValue());
-    return result->getValue();
+    if (read)
+    {
+        return builder.create<MemoryUseOp>(lastDef, operation, read);
+    }
+    // If we had no indication it was reading or didn't have any side effects we have to conservatively assume it does
+    // TODO: Escape analysis could figure this out probably
+    return builder.create<MemoryDefOp>(lastDef, operation);
 }
 
 } // namespace
@@ -208,8 +206,7 @@ void optimizeUsesInBlock(mlir::Block* block, mlir::AliasAnalysis& aliasAnalysis,
             dominatingDefs.push_back(access.getResult(0));
             continue;
         }
-        auto readValue = getReadValue(use.instruction());
-        use.definitionMutable().assign(getLastClobber(readValue, aliasAnalysis, dominatingDefs));
+        use.definitionMutable().assign(getLastClobber(use.read(), aliasAnalysis, dominatingDefs));
     }
 }
 } // namespace

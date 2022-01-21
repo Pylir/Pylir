@@ -48,15 +48,13 @@ func @test2(%arg0 : i1) -> index {
 // CHECK-NEXT: memSSA.use(%[[MERGE]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
-func private @random() -> i1
-
 func @test3() -> index {
     %0 = py.constant #py.str<"test">
     %1 = py.makeList ()
     br ^condition
 
 ^condition:
-    %2 = call @random() : () -> i1
+    %2 = test.random
     cond_br %2, ^bb1, ^bb2
 
 ^bb1:
@@ -84,27 +82,27 @@ func @test3() -> index {
 // CHECK-NEXT: memSSA.use(%[[COND]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
-func @test4() -> index {
-    %0 = py.constant #py.str<"test">
-    %1 = py.makeList ()
-    br ^condition
+// -----
 
-^condition:
-    %2 = call @random() : () -> i1
-    cond_br %2, ^bb1, ^bb5
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
 
-^bb1:
-    %3 = call @random() : () -> i1
-    cond_br %3, ^bb2, ^bb4
+func private @bar()
 
-^bb2:
-    br ^condition
-
-^bb4:
-    py.list.append %1, %0
-    br ^bb5
-
-^bb5:
-    %5 = py.list.len %1
-    return %5 : index
+func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant #py.str<"value">
+    %1 = py.typeOf %arg0
+    py.setSlot "test" of %arg0 : %1 to %0
+    call @bar() : () -> ()
+    %2 = py.getSlot "test" from %arg0 : %1
+    return %2 : !py.dynamic
 }
+
+// CHECK-LABEL: @test4
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: py.setSlot "test"
+// CHECK-NEXT: %[[DEF2:.*]] = memSSA.def(%[[DEF]])
+// CHECK-NEXT: call @bar()
+// CHECK-NEXT: memSSA.use(%[[DEF2]])
+// CHECK-NEXT: py.getSlot "test"

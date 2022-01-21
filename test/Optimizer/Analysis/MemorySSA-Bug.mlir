@@ -4,19 +4,17 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.list = #py.type
 
-func private @random() -> i1
-
 func @test4() -> index {
     %0 = py.constant #py.str<"test">
     %1 = py.makeList ()
     br ^condition
 
 ^condition: // pred: ^bb0, ^bb2
-    %2 = call @random() : () -> i1
+    %2 = test.random
     cond_br %2, ^bb1, ^bb5
 
 ^bb1: // pred: ^condition
-    %3 = call @random() : () -> i1
+    %3 = test.random
     cond_br %3, ^bb2, ^bb4
 
 ^bb2: // pred: ^bb1
@@ -56,11 +54,11 @@ func @test5() -> index {
     br ^exit2
 
 ^exit2: // pred: ^bb1
-    %2 = call @random() : () -> i1
+    %2 = test.random
     cond_br %2, ^back2, ^exit1
 
 ^exit1: // pred: ^bb4
-    %3 = call @random() : () -> i1
+    %3 = test.random
     cond_br %3, ^back1, ^bb5
 
 ^bb5: // pred: ^condition, ^bb4

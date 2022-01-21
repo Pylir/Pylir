@@ -36,6 +36,15 @@ def InstrAttr : MemorySSA_Attr<"Instruction"> {
     let constBuilderCall = "::pylir::MemSSA::InstructionAttr::get($_builder.getContext(), $0)";
 }
 
+def ReadAttr : MemorySSA_Attr<"Read"> {
+    let mnemonic = "read";
+    let parameters = (ins "::mlir::Value":$read);
+    let returnType = "::mlir::Value";
+    let convertFromStorage = "$_self.getRead()";
+
+    let constBuilderCall = "::pylir::MemSSA::ReadAttr::get($_builder.getContext(), $0)";
+}
+
 def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>]> {
     let arguments = (ins FlatSymbolRefAttr:$functionName);
     let results = (outs);
@@ -52,10 +61,10 @@ def MemoryLiveOnEntryOp : MemorySSA_Op<"liveOnEntry"> {
 }
 
 def MemoryUseOp : MemorySSA_Op<"use"> {
-    let arguments = (ins MemoryDefType:$definition, InstrAttr:$instruction);
+    let arguments = (ins MemoryDefType:$definition, InstrAttr:$instruction, ReadAttr:$read);
     let results = (outs);
 
-    let assemblyFormat = "`(` $definition `)` attr-dict `\\n` $instruction";
+    let assemblyFormat = "`(` $definition `)` attr-dict `\\n` $instruction $read";
 }
 
 def MemoryDefOp : MemorySSA_Op<"def"> {

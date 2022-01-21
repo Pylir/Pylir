@@ -31,6 +31,11 @@ public:
 
     mlir::Operation* getMemoryAccess(mlir::Operation* operation);
 
+    mlir::Region& getMemoryRegion()
+    {
+        return m_region->body();
+    }
+
     void dump() const;
 
     void print(llvm::raw_ostream& out) const;

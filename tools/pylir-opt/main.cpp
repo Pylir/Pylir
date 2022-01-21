@@ -9,6 +9,9 @@
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
+#include <pylir/Optimizer/Transforms/Passes.hpp>
+
+#include "TestDialect.hpp"
 
 std::unique_ptr<mlir::Pass> createTestMemorySSA();
 
@@ -20,10 +23,11 @@ int main(int argc, char** argv)
     mlir::registerAllPasses();
 
     mlir::DialectRegistry registry;
-    registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect>();
+    registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect, pylir::test::TestDialect>();
     mlir::registerAllDialects(registry);
 
     pylir::registerConversionPasses();
+    pylir::registerTransformPasses();
     pylir::Py::registerTransformPasses();
     ::registerTestPasses();
 

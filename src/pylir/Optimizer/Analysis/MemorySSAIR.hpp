@@ -6,6 +6,7 @@
 #include <mlir/IR/RegionKindInterface.h>
 #include <mlir/Interfaces/ControlFlowInterfaces.h>
 #include <mlir/Interfaces/InferTypeOpInterface.h>
+#include <mlir/Interfaces/SideEffectInterfaces.h>
 
 #include "pylir/Optimizer/Analysis/MemorySSAIRDialect.h.inc"
 
