@@ -2,6 +2,9 @@
 
 #include <mlir/IR/OpDefinition.h>
 
+#include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
+#include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
+
 namespace pylir::Py
 {
 template <class ConcreteType>
@@ -14,4 +17,15 @@ class AlwaysBound : public mlir::OpTrait::TraitBase<ConcreteType, AlwaysBound>
         return mlir::success();
     }
 };
+
+template <class ConcreteType>
+class NoCapture : public CaptureInterface::Trait<ConcreteType>
+{
+public:
+    bool capturesOperand(unsigned int)
+    {
+        return false;
+    }
+};
+
 } // namespace pylir::Py

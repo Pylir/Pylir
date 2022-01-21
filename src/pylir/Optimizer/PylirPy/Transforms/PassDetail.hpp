@@ -9,5 +9,5 @@
 namespace pylir::Py
 {
 #define GEN_PASS_CLASSES
-#include <pylir/Optimizer/PylirPy/Transform/Passes.h.inc>
+#include <pylir/Optimizer/PylirPy/Transforms/Passes.h.inc>
 } // namespace pylir::Py

@@ -18,7 +18,7 @@ mlir_tablegen(TestDialect.cpp.inc -gen-dialect-defs -dialect="test")
 add_public_tablegen_target(TestDialectIncGen)
 add_dependencies(mlir-headers TestDialectIncGen)
 
-add_executable(pylir-opt main.cpp TestMemorySSA.cpp TestDialect)
+add_executable(pylir-opt main.cpp TestMemorySSA.cpp TestDialect.cpp)
 target_link_libraries(pylir-opt PRIVATE MLIRMlirOptMain ${dialect_libs} ${conversion_libs} PylirAnalysis)
 target_include_directories(pylir-opt SYSTEM PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(pylir-opt TestPassIncGen)

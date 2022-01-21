@@ -511,6 +511,89 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
     return nullptr;
 }
 
+mlir::LogicalResult pylir::Py::GetSlotOp::foldUsage(mlir::Operation* lastClobber,
+                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    auto setSlotOp = mlir::dyn_cast<Py::SetSlotOp>(lastClobber);
+    if (!setSlotOp)
+    {
+        if (mlir::isa<Py::MakeObjectOp>(lastClobber))
+        {
+            results.emplace_back(Py::UnboundAttr::get(getContext()));
+            return mlir::success();
+        }
+        return mlir::failure();
+    }
+    if (setSlotOp.slotAttr() == slotAttr())
+    {
+        results.emplace_back(setSlotOp.value());
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+mlir::LogicalResult pylir::Py::DictLenOp::foldUsage(mlir::Operation* lastClobber,
+                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    auto makeDictOp = mlir::dyn_cast<Py::MakeDictOp>(lastClobber);
+    // I can not fold a non empty one as I can't tell whether there are any duplicates in the arguments
+    if (!makeDictOp || !makeDictOp.keys().empty())
+    {
+        return mlir::failure();
+    }
+    results.emplace_back(mlir::IntegerAttr::get(getType(), 0));
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* lastClobber,
+                                                           ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    if (auto setItemOp = mlir::dyn_cast<Py::DictSetItemOp>(lastClobber))
+    {
+        if (setItemOp.key() == key())
+        {
+            results.emplace_back(setItemOp.value());
+            results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+            return mlir::success();
+        }
+        return mlir::failure();
+    }
+    if (auto delItemOp = mlir::dyn_cast<Py::DictDelItemOp>(lastClobber))
+    {
+        if (delItemOp.key() == key())
+        {
+            results.emplace_back(Py::UnboundAttr::get(getContext()));
+            results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+            return mlir::success();
+        }
+        return mlir::failure();
+    }
+    if (auto makeDictOp = mlir::dyn_cast<Py::MakeDictOp>(lastClobber); makeDictOp && makeDictOp.keys().empty())
+    {
+        results.emplace_back(Py::UnboundAttr::get(getContext()));
+        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber,
+                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    auto makeListOp = mlir::dyn_cast<Py::MakeListOp>(lastClobber);
+    if (!makeListOp || !makeListOp.iterExpansion().empty())
+    {
+        return mlir::failure();
+    }
+    results.emplace_back(mlir::IntegerAttr::get(getType(), makeListOp.arguments().size()));
+    return mlir::success();
+}
+
+bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
+{
+    return static_cast<mlir::OperandRange>(typeObjectMutable()).getBeginOperandIndex() != index;
+}
+
 mlir::LogicalResult pylir::Py::StrConcatOp::inferReturnTypes(::mlir::MLIRContext* context,
                                                              ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
                                                              ::mlir::DictionaryAttr, ::mlir::RegionRange,

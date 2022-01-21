@@ -12,6 +12,6 @@ std::unique_ptr<mlir::Pass> createExpandPyDialectPass();
 std::unique_ptr<mlir::Pass> createOptimizeHandlesPass();
 
 #define GEN_PASS_REGISTRATION
-#include "pylir/Optimizer/PylirPy/Transform/Passes.h.inc"
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 
 } // namespace pylir::Py

@@ -10,6 +10,9 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
+#include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
+#include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
+
 #include <variant>
 
 #include "PylirPyAttributes.hpp"

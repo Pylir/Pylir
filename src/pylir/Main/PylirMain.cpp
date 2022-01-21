@@ -30,6 +30,7 @@
 #include <pylir/Main/Opts.inc>
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
+#include <pylir/Optimizer/Transforms/Passes.hpp>
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
 
@@ -116,6 +117,7 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
         manager.addPass(pylir::Py::createOptimizeHandlesPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
+        manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());
     }
     manager.addPass(pylir::Py::createExpandPyDialectPass());
     if (options.getLastArgValue(OPT_O, "0") != "0")
@@ -123,6 +125,7 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
         manager.addPass(mlir::createCanonicalizerPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
+        manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());
     }
     manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
     if (options.hasArg(OPT_emit_mlir))

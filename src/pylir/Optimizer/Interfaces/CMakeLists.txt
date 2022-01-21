@@ -12,3 +12,4 @@ function(add_interface name)
 endfunction()
 
 add_interface(CaptureInterface)
+add_interface(MemoryFoldInterface)
