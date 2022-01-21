@@ -12,12 +12,12 @@ func @test() -> index {
 }
 
 // CHECK-LABEL: memSSA.region @test
-// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
-// CHECK-NEXT: %[[APPEND:.*]] = memSSA.def(%[[DEF]])
+// CHECK-NEXT: %[[APPEND:.*]] = def(%[[DEF]])
 // CHECK-NEXT: // py.list.append
-// CHECK-NEXT: memSSA.use(%[[APPEND]])
+// CHECK-NEXT: use(%[[APPEND]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
 func @test2(%arg0 : i1) -> index {
@@ -35,17 +35,17 @@ func @test2(%arg0 : i1) -> index {
 }
 
 // CHECK-LABEL: memSSA.region @test2
-// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
-// CHECK-NEXT: memSSA.br ^[[FIRST:.*]], ^[[SECOND:.*]] (), (%[[DEF]])
+// CHECK-NEXT: br ^[[FIRST:.*]], ^[[SECOND:.*]] (), (%[[DEF]])
 // CHECK-NEXT: ^[[FIRST]]:
-// CHECK-NEXT: %[[APPEND:.*]] = memSSA.def(%[[DEF]])
+// CHECK-NEXT: %[[APPEND:.*]] = def(%[[DEF]])
 // CHECK-NEXT: // py.list.append
-// CHECK-NEXT: memSSA.br ^[[SECOND]] (%[[APPEND]])
+// CHECK-NEXT: br ^[[SECOND]] (%[[APPEND]])
 // CHECK-NEXT: ^[[SECOND]]
 // CHECK-SAME: %[[MERGE:[[:alnum:]]+]]
-// CHECK-NEXT: memSSA.use(%[[MERGE]])
+// CHECK-NEXT: use(%[[MERGE]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
 func @test3() -> index {
@@ -67,19 +67,19 @@ func @test3() -> index {
 }
 
 // CHECK-LABEL: memSSA.region @test3
-// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
-// CHECK-NEXT: memSSA.br ^[[FIRST:.*]] (%[[DEF]])
+// CHECK-NEXT: br ^[[FIRST:.*]] (%[[DEF]])
 // CHECK-NEXT: ^[[FIRST]]
 // CHECK-SAME: %[[COND:[[:alnum:]]+]]
-// CHECK-NEXT: memSSA.br ^[[BODY:.*]], ^[[EXIT:.*]] (), ()
+// CHECK-NEXT: br ^[[BODY:.*]], ^[[EXIT:.*]] (), ()
 // CHECK-NEXT: ^[[BODY]]:
-// CHECK-NEXT: %[[NEW_DEF:.*]] = memSSA.def(%[[COND]])
+// CHECK-NEXT: %[[NEW_DEF:.*]] = def(%[[COND]])
 // CHECK-NEXT: // py.list.append
-// CHECK-NEXT: memSSA.br ^[[FIRST]] (%[[NEW_DEF]])
+// CHECK-NEXT: br ^[[FIRST]] (%[[NEW_DEF]])
 // CHECK-NEXT: ^[[EXIT]]:
-// CHECK-NEXT: memSSA.use(%[[COND]])
+// CHECK-NEXT: use(%[[COND]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
 // -----
@@ -99,10 +99,10 @@ func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
 }
 
 // CHECK-LABEL: @test4
-// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: py.setSlot "test"
-// CHECK-NEXT: %[[DEF2:.*]] = memSSA.def(%[[DEF]])
+// CHECK-NEXT: %[[DEF2:.*]] = def(%[[DEF]])
 // CHECK-NEXT: call @bar()
-// CHECK-NEXT: memSSA.use(%[[DEF2]])
+// CHECK-NEXT: use(%[[DEF2]])
 // CHECK-NEXT: py.getSlot "test"

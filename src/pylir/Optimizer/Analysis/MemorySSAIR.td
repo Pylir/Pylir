@@ -4,6 +4,7 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/IR/RegionKindInterface.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
@@ -43,7 +44,8 @@ def ReadAttr : MemorySSA_Attr<"Read"> {
     let constBuilderCall = "::pylir::MemSSA::ReadAttr::get($_builder.getContext(), $0)";
 }
 
-def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>]> {
+def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>,
+                                             DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
     let arguments = (ins FlatSymbolRefAttr:$functionName);
     let results = (outs);
 

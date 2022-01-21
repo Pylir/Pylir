@@ -54,6 +54,11 @@ mlir::RegionKind pylir::MemSSA::MemoryRegionOp::getRegionKind(unsigned int)
     return mlir::RegionKind::SSACFG;
 }
 
+llvm::StringRef pylir::MemSSA::MemoryRegionOp::getDefaultDialect()
+{
+    return pylir::MemSSA::MemorySSADialect::getDialectNamespace();
+}
+
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/Analysis/MemorySSAIROps.cpp.inc"
 

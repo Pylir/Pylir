@@ -15,14 +15,14 @@ func @test() -> index {
 }
 
 // CHECK-LABEL: memSSA.region @test
-// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = memSSA.liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = memSSA.def(%[[LIVE_ON_ENTRY:.*]])
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
+// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY:.*]])
 // CHECK-NEXT: %[[DICT1:.*]] = py.makeDict ()
-// CHECK-NEXT: %[[DEF2:.*]] = memSSA.def(%[[DEF]])
+// CHECK-NEXT: %[[DEF2:.*]] = def(%[[DEF]])
 // CHECK-NEXT: %[[DICT2:.*]] = py.makeDict ()
-// CHECK-NEXT: %[[DEF3:.*]] = memSSA.def(%[[DEF2]])
+// CHECK-NEXT: %[[DEF3:.*]] = def(%[[DEF2]])
 // CHECK-NEXT: py.dict.setItem %[[DICT1]]
-// CHECK-NEXT: %[[DEF4:.*]] = memSSA.def(%[[DEF3]])
+// CHECK-NEXT: %[[DEF4:.*]] = def(%[[DEF3]])
 // CHECK-NEXT: py.dict.setItem %[[DICT2]]
-// CHECK-NEXT: memSSA.use(%[[DEF3]])
+// CHECK-NEXT: use(%[[DEF3]])
 // CHECK-NEXT: py.dict.len %[[DICT1]]
