@@ -1,3 +1,3 @@
 
-add_library(PylirTransformUtils SSABuilder.cpp)
-target_link_libraries(PylirTransformUtils PUBLIC MLIRIR)
+add_library(PylirTransformsUtils SSABuilder.cpp)
+target_link_libraries(PylirTransformsUtils PUBLIC MLIRIR)

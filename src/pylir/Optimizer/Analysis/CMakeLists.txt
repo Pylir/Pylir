@@ -12,5 +12,5 @@ add_public_tablegen_target(MemorySSAIRIncGen)
 add_dependencies(mlir-headers MemorySSAIRIncGen)
 
 add_library(PylirAnalysis MemorySSA.cpp MemorySSAIR.cpp)
-target_link_libraries(PylirAnalysis PUBLIC MLIRPass MLIRAnalysis PRIVATE PylirCaptureInterface PRIVATE PylirTransformUtils)
+target_link_libraries(PylirAnalysis PUBLIC MLIRPass MLIRAnalysis PRIVATE PylirCaptureInterface PRIVATE PylirTransformsUtils)
 add_dependencies(PylirAnalysis MemorySSAIRIncGen)
