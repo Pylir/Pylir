@@ -451,11 +451,13 @@ public:
     StaticInstance(std::initializer_list<std::pair<typename InstanceType::Slots, PyObject&>> slotsInit, Args&&... args)
     {
         static_assert(std::is_standard_layout_v<std::remove_reference_t<decltype(*this)>>);
-        PyObject& instance = *new (m_buffer) InstanceType(std::forward<Args>(args)...);
-        for (auto& pair : slotsInit)
+        new (m_buffer) InstanceType(std::forward<Args>(args)...);
+        std::array<PyObject*, slotCount> slots;
+        for (auto& [index, object] : slotsInit)
         {
-            instance.setSlot(pair.first, pair.second);
+            slots[index] = &object;
         }
+        std::memcpy(m_buffer + sizeof(InstanceType), slots.data(), slots.size() * sizeof(PyObject*));
     }
 
     operator PyObject&()
