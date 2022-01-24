@@ -803,6 +803,8 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
         }
         return mlir::success();
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {

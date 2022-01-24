@@ -511,6 +511,21 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
     return nullptr;
 }
 
+mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attribute>,
+                                                   llvm::SmallVectorImpl<mlir::OpFoldResult>&)
+{
+    static llvm::StringSet<> immutableTypes = {
+        Py::Builtins::Float.name, Py::Builtins::Int.name,   Py::Builtins::Bool.name,
+        Py::Builtins::Str.name,   Py::Builtins::Tuple.name,
+    };
+    if (!constant() && immutableTypes.contains(initializer()->getType().getValue()))
+    {
+        constantAttr(mlir::UnitAttr::get(getContext()));
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
 mlir::LogicalResult pylir::Py::GetSlotOp::foldUsage(mlir::Operation* lastClobber,
                                                     ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
