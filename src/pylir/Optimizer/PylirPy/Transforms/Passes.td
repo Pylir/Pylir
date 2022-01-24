@@ -23,4 +23,17 @@ def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {
     ];
 }
 
+def HandleLoadStoreElimination : Pass<"handle-load-store-elimination"> {
+    let summary = "Eliminate loads and stores of handles";
+    let constructor = "::pylir::Py::createHandleLoadStoreEliminationPass()";
+    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+    let statistics = [
+        Statistic<"m_loadRemoved", "handle loads removed",
+            "Amount of loads of handles that could be removed">,
+        Statistic<"m_storesRemoved", "Stores to handles removed",
+            "Amount of stores to handles removed">
+    ];
+}
+
 #endif

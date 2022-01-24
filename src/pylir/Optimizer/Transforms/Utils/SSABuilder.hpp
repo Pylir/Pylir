@@ -25,7 +25,8 @@ private:
 
     mlir::Value addBlockArguments(DefinitionsMap& map, mlir::BlockArgument argument);
 
-    mlir::Value readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block);
+    mlir::Value readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block,
+                                      bool* createdBlockArg);
 
     void removeBlockArgumentOperands(mlir::BlockArgument argument);
 
@@ -46,10 +47,16 @@ public:
     SSABuilder(SSABuilder&&) noexcept = default;
     SSABuilder& operator=(SSABuilder&&) noexcept = default;
 
+    bool isOpenBlock(mlir::Block* block) const
+    {
+        return m_openBlocks.count(block);
+    }
+
     void markOpenBlock(mlir::Block* block);
 
     void sealBlock(mlir::Block* block);
 
-    mlir::Value readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block);
+    mlir::Value readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block,
+                             bool* createdBlockArg = nullptr);
 };
 } // namespace pylir

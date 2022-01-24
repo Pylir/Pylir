@@ -47,6 +47,10 @@ public:
 
     ValueTracker(mlir::Value value)
     {
+        if (!value)
+        {
+            return;
+        }
         auto* context = value.getContext();
         context->allowUnregisteredDialects();
         mlir::OperationState state(mlir::UnknownLoc::get(context), "__value_tracker");
@@ -56,7 +60,7 @@ public:
 
     ValueTracker& operator=(mlir::Value value)
     {
-        if (!m_tracker)
+        if (!m_tracker || !value)
         {
             return *this = ValueTracker(value);
         }
@@ -66,6 +70,10 @@ public:
 
     operator mlir::Value() const
     {
+        if (!m_tracker)
+        {
+            return {};
+        }
         return m_tracker->getOperand(0);
     }
 };
