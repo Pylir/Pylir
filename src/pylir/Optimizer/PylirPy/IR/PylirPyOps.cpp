@@ -270,17 +270,17 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
 
 namespace
 {
-mlir::Attribute resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
+pylir::Py::ObjectAttr resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
 {
     auto ref = attr.dyn_cast_or_null<mlir::SymbolRefAttr>();
     if (!ref)
     {
-        return attr;
+        return attr.dyn_cast_or_null<pylir::Py::ObjectAttr>();
     }
     auto value = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
     if (!value || (!value.constant() && onlyConstGlobal))
     {
-        return attr;
+        return attr.dyn_cast_or_null<pylir::Py::ObjectAttr>();
     }
     return value.initializerAttr();
 }
@@ -288,10 +288,9 @@ mlir::Attribute resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onl
 
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
-    auto input = resolveValue(*this, operands[0], false);
-    if (auto obj = input.dyn_cast_or_null<Py::ObjectAttr>())
+    if (auto input = resolveValue(*this, operands[0], false))
     {
-        return obj.getType();
+        return input.getType();
     }
     auto* defOp = object().getDefiningOp();
     if (!defOp)
@@ -332,6 +331,22 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
         return nullptr;
     }
     return symbol;
+}
+
+mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto object = resolveValue(*this, operands[0]);
+    if (!object)
+    {
+        return nullptr;
+    }
+    auto& map = object.getSlots().getValue();
+    auto result = map.find(slotAttr());
+    if (result == map.end())
+    {
+        return Py::UnboundAttr::get(getContext());
+    }
+    return result->second;
 }
 
 mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)

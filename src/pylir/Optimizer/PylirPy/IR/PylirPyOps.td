@@ -96,6 +96,7 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryF
     }];
 
     let hasCanonicalizer = 1;
+    let hasFolder = 1;
 }
 
 def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<CaptureInterface>]> {
