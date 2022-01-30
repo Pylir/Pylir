@@ -1,11 +1,31 @@
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/IR/Matchers.h>
 
 #include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
+#include <pylir/Support/Variant.hpp>
 
 #include "PylirPyOps.hpp"
+
+namespace llvm
+{
+template <>
+struct PointerLikeTypeTraits<pylir::Py::IterExpansion> : public PointerLikeTypeTraits<mlir::Value>
+{
+public:
+    static inline void* getAsVoidPointer(pylir::Py::IterExpansion value)
+    {
+        return const_cast<void*>(value.value.getAsOpaquePointer());
+    }
+
+    static inline pylir::Py::IterExpansion getFromVoidPointer(void* pointer)
+    {
+        return {mlir::Value::getFromOpaquePointer(pointer)};
+    }
+};
+} // namespace llvm
 
 namespace
 {
@@ -274,6 +294,89 @@ pylir::Py::ObjectAttr resolveValue(mlir::Operation* op, mlir::Attribute attr, bo
     }
     return value.initializerAttr();
 }
+
+llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* context, mlir::Value operand)
+{
+    llvm::SmallVector<mlir::OpFoldResult> result;
+    mlir::Attribute attr;
+    if (mlir::matchPattern(operand, mlir::m_Constant(&attr)))
+    {
+        auto tuple = resolveValue(context, attr).dyn_cast_or_null<pylir::Py::TupleAttr>();
+        if (!tuple)
+        {
+            result.emplace_back(nullptr);
+            return result;
+        }
+        result.insert(result.end(), tuple.getValue().begin(), tuple.getValue().end());
+        return result;
+    }
+    if (!operand.getDefiningOp())
+    {
+        result.emplace_back(nullptr);
+        return result;
+    }
+    llvm::TypeSwitch<mlir::Operation*>(operand.getDefiningOp())
+        .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(
+            [&](auto makeTuple)
+            {
+                auto args = makeTuple.getIterArgs();
+                for (auto& arg : args)
+                {
+                    pylir::match(
+                        arg,
+                        [&](mlir::Value value)
+                        {
+                            mlir::Attribute attr;
+                            if (mlir::matchPattern(value, mlir::m_Constant(&attr)))
+                            {
+                                result.emplace_back(attr);
+                            }
+                            else
+                            {
+                                result.emplace_back(value);
+                            }
+                        },
+                        [&](auto) { result.emplace_back(nullptr); });
+                }
+            })
+        .Case(
+            [&](pylir::Py::TuplePrependOp op)
+            {
+                mlir::Attribute attr;
+                if (mlir::matchPattern(op.input(), mlir::m_Constant(&attr)))
+                {
+                    result.emplace_back(attr);
+                }
+                else
+                {
+                    result.emplace_back(op.input());
+                }
+                auto rest = resolveTupleOperands(context, op.tuple());
+                result.insert(result.end(), rest.begin(), rest.end());
+            })
+        .Case(
+            [&](pylir::Py::TuplePopFrontOp op)
+            {
+                auto tuple = resolveTupleOperands(context, op.tuple());
+                if (!tuple[0])
+                {
+                    // We don't know the expansion/content of the very first element. If it were empty it might
+                    // remove the element right after.
+                    if (tuple.size() > 1)
+                    {
+                        tuple[1] = nullptr;
+                    }
+                    else
+                    {
+                        tuple.emplace_back(nullptr);
+                    }
+                }
+                result.insert(result.end(), tuple.begin() + 1, tuple.end());
+            })
+        .Default([&](auto) { result.emplace_back(nullptr); });
+    return result;
+}
+
 } // namespace
 
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
@@ -530,18 +633,17 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
     return nullptr;
 }
 
-mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute>,
                                                  ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
-    // TODO: use common abstraction for partially resolving tuples here and in other tuple users
-    auto mroTuple = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>();
-    if (!mroTuple)
+    auto operands = resolveTupleOperands(*this, mroTuple());
+    for (auto& iter : operands)
     {
-        return mlir::failure();
-    }
-    for (auto& iter : mroTuple.getValue())
-    {
-        auto object = resolveValue(*this, iter);
+        if (!iter || !iter.is<mlir::Attribute>())
+        {
+            return mlir::failure();
+        }
+        auto object = resolveValue(*this, iter.get<mlir::Attribute>());
         if (!object)
         {
             return mlir::failure();

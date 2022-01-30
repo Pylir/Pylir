@@ -26,3 +26,15 @@ func @test2() -> (!py.dynamic, i1) {
 // CHECK-DAG: %[[C1:.*]] = py.constant #py.unbound
 // CHECK-DAG: %[[C2:.*]] = arith.constant false
 // CHECK: return %[[C1]], %[[C2]]
+
+func @test3(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
+    %0 = py.constant @builtins.type
+    %1 = py.makeTuple (%0, %arg0)
+    %2, %found = py.mroLookup "__slots__" in %1
+    return %2, %found : !py.dynamic, i1
+}
+
+// CHECK-LABEL: func @test3
+// CHECK-DAG: %[[C1:.*]] = py.constant @tuple
+// CHECK-DAG: %[[C2:.*]] = arith.constant true
+// CHECK: return %[[C1]], %[[C2]]
