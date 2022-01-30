@@ -284,6 +284,8 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEf
         This op retrieves the internal function that `$function` wraps. If `$function` is not really a
         function the behaviour is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoSideEffect]> {
