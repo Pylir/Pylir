@@ -49,6 +49,12 @@ def PylirPy_ObjectAttr : Attr<CPred<"$_self.isa<::pylir::Py::ObjectAttr>()">, "p
     let convertFromStorage = "$_self";
 }
 
+def PylirPy_TupleAttr : Attr<CPred<"$_self.isa<::pylir::Py::TupleAttr>()">, "python tuple attribute"> {
+    let storageType = "::pylir::Py::TupleAttr";
+    let returnType = "::pylir::Py::TupleAttr";
+    let convertFromStorage = "$_self";
+}
+
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let mnemonic = "unbound";
     let summary = "python unbound value";

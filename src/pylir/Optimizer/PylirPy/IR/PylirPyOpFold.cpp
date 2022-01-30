@@ -843,6 +843,17 @@ pylir::Py::MakeTupleOp prependTuple(mlir::OpBuilder& builder, mlir::Location loc
     arguments.append(range.begin(), range.end());
     return builder.create<pylir::Py::MakeTupleOp>(loc, arguments, builder.getI32ArrayAttr(newArray));
 }
+
+pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
+                                         mlir::Attribute attr)
+{
+    llvm::SmallVector<mlir::Value> arguments{input};
+    for (auto& iter : attr.cast<pylir::Py::TupleAttr>().getValue())
+    {
+        arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
+    }
+    return builder.create<pylir::Py::MakeTupleOp>(loc, arguments, builder.getI32ArrayAttr({}));
+}
 } // namespace
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyPatterns.cpp.inc"
