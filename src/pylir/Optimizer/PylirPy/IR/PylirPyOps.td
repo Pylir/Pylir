@@ -475,12 +475,13 @@ class PylirPy_MakeExOp<string mnemonic, list<OpTrait> traits = []> :
     }];
 }
 
-def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound]> {
+def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound,
+                                                   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iterExpansion
                          );
 
-    let results = (outs Res<DynamicType, "", [MemAlloc]>:$result);
+    let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iterExpansion) attr-dict
