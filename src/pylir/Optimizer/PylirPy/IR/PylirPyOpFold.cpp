@@ -442,6 +442,23 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
     return result->second;
 }
 
+mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto indexAttr = operands[1].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!indexAttr)
+    {
+        return nullptr;
+    }
+    auto index = indexAttr.getValue().getZExtValue();
+    auto tupleOperands = resolveTupleOperands(*this, tuple());
+    auto ref = llvm::makeArrayRef(tupleOperands).take_front(index + 1);
+    if (ref.size() != index + 1 || llvm::any_of(ref, [](auto result) -> bool { return !result; }))
+    {
+        return nullptr;
+    }
+    return ref[index];
+}
+
 mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
     if (auto tuple = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>())

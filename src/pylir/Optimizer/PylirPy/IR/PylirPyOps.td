@@ -183,6 +183,8 @@ def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoSideEffect, AlwaysBo
         This op fetches the object stored at `$index` in `$tuple`. If `$tuple` is not really a tuple (or subclass of)
         or `$index` is out of range for the tuple, the behaviour is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
