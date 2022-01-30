@@ -104,8 +104,22 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
     #if !defined(__MINGW32_MAJOR_VERSION) || !defined(__clang__)
     manager.enableCrashReproducerGeneration("failure.mlir");
     #endif
-    manager.enableIRPrinting(std::make_unique<mlir::PassManager::IRPrinterConfig>(false, false, true));
 #endif
+    if (options.hasArg(OPT_Xprint_before, OPT_Xprint_after, OPT_Xprint_after_all))
+    {
+        bool afterAll = options.hasArg(OPT_Xprint_after_all);
+        auto afterName = options.getLastArgValue(OPT_Xprint_after);
+        auto beforeName = options.getLastArgValue(OPT_Xprint_before);
+        manager.enableIRPrinting([beforeName](mlir::Pass* pass, mlir::Operation*)
+                                 { return pass->getName().equals_insensitive(beforeName); },
+                                 [afterName, afterAll](mlir::Pass* pass, mlir::Operation*)
+                                 { return afterAll || pass->getName().equals_insensitive(afterName); },
+                                 false);
+    }
+    if (options.hasArg(OPT_Xtiming))
+    {
+        manager.enableTiming();
+    }
     if (options.hasArg(OPT_emit_pylir))
     {
         if (mlir::failed(manager.run(*module)))
