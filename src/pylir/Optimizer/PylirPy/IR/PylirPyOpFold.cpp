@@ -504,6 +504,36 @@ mlir::LogicalResult pylir::Py::TuplePopFrontOp::fold(::llvm::ArrayRef<::mlir::At
     return mlir::failure();
 }
 
+mlir::LogicalResult pylir::Py::TuplePopFrontOp::canonicalize(TuplePopFrontOp op, mlir::PatternRewriter& rewriter)
+{
+    auto* definingOp = op.tuple().getDefiningOp();
+    if (!definingOp)
+    {
+        return mlir::failure();
+    }
+    return llvm::TypeSwitch<mlir::Operation*, mlir::LogicalResult>(definingOp)
+        .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(
+            [&](auto makeTuple)
+            {
+                if (!makeTuple.arguments().empty()
+                    && (makeTuple.iterExpansionAttr().empty()
+                        || makeTuple.iterExpansionAttr().getValue()[0] != rewriter.getI32IntegerAttr(0)))
+                {
+                    llvm::SmallVector<std::int32_t> newArray;
+                    for (auto value : makeTuple.iterExpansionAttr().template getAsValueRange<mlir::IntegerAttr>())
+                    {
+                        newArray.push_back(value.getZExtValue() - 1);
+                    }
+                    auto popped = rewriter.create<Py::MakeTupleOp>(op.getLoc(), makeTuple.arguments().drop_front(),
+                                                                   rewriter.getI32ArrayAttr(newArray));
+                    rewriter.replaceOp(op, {makeTuple.arguments()[0], popped});
+                    return mlir::success();
+                }
+                return mlir::failure();
+            })
+        .Default(mlir::failure());
+}
+
 namespace
 {
 template <class Attr>

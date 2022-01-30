@@ -231,6 +231,7 @@ def PylirPy_TuplePopFrontOp : PylirPy_Op<"tuple.popFront", [NoSideEffect, Always
     }];
 
     let hasFolder = 1;
+    let hasCanonicalizeMethod = 1;
 }
 
 // List ops

@@ -13,3 +13,16 @@ func @test() -> (!py.dynamic, !py.dynamic) {
 // CHECK-DAG: %[[C1:.*]] = py.constant @builtins.tuple
 // CHECK-DAG: %[[C2:.*]] = py.constant #py.tuple<()>
 // CHECK: return %[[C1]], %[[C2]]
+
+func @test2(%arg0 : !py.dynamic) -> (!py.dynamic, !py.dynamic) {
+    %0 = py.constant @builtins.tuple
+    %1 = py.makeTuple (%0, *%arg0)
+    %element, %result = py.tuple.popFront %1
+    return %element, %result : !py.dynamic, !py.dynamic
+}
+
+// CHECK-LABEL: @test2
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-DAG: %[[C1:.*]] = py.constant @builtins.tuple
+// CHECK-DAG: %[[C2:.*]] = py.makeTuple (*%[[ARG0]])
+// CHECK: return %[[C1]], %[[C2]]
