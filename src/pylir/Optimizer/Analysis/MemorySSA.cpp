@@ -106,8 +106,15 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
     m_blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
     for (auto& block : region)
     {
-        auto* memBlock = m_blockMapping.find(&block)->second;
-        PYLIR_ASSERT(memBlock);
+        mlir::Block* memBlock;
+        {
+            auto [lookup, inserted] = m_blockMapping.insert({&block, nullptr});
+            if (inserted)
+            {
+                lookup->second = new mlir::Block;
+            }
+            memBlock = lookup->second;
+        }
         m_region->body().push_back(memBlock);
         builder.setInsertionPointToStart(memBlock);
         // If any of the predecessors have not yet been inserted
@@ -145,23 +152,22 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         llvm::SmallVector<mlir::Block*> sealAfter;
         for (auto* succ : block.getSuccessors())
         {
-            auto lookup = m_blockMapping.lookup(succ);
-            if (!lookup)
+            auto [lookup, inserted] = m_blockMapping.insert({succ, nullptr});
+            if (inserted)
             {
-                lookup = new mlir::Block;
-                m_blockMapping.insert({succ, lookup});
+                lookup->second = new mlir::Block;
             }
-            else if (lookup->getParent())
+            else if (lookup->second->getParent())
             {
                 // This particular successor seems to have already been filled
                 // Check whether filling this block has made all of its predecessors filled
                 // and seal it
                 if (!hasUnresolvedPredecessors(succ))
                 {
-                    sealAfter.push_back(lookup);
+                    sealAfter.push_back(lookup->second);
                 }
             }
-            memSuccessors.push_back(lookup);
+            memSuccessors.push_back(lookup->second);
         }
         builder.create<MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(memSuccessors.size()),
                                                memSuccessors);

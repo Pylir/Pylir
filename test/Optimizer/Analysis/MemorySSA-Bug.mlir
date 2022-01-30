@@ -72,3 +72,21 @@ func @test5() -> index {
 // CHECK-NEXT: %[[LIST_DEF:.*]] = py.makeList
 // CHECK: use(%[[DEF1]])
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
+
+func @test6() {
+    %0 = py.constant #py.str<"test">
+    %1 = py.makeList ()
+    br ^bb2
+
+^exit1:
+    return
+
+^bb2:
+    %2 = test.random
+    cond_br %2, ^exit1, ^exit2
+
+^exit2:
+    return
+}
+
+// CHECK-LABEL: memSSA.region @test6
