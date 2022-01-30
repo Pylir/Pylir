@@ -37,3 +37,18 @@ func @constant_tuple() -> index {
 // CHECK: return %[[RESULT]]
 
 // -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+
+func @make_tuple(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> index {
+    %0 = py.makeTuple (%arg0, %arg1)
+    %1 = py.tuple.len %0
+    return %1 : index
+}
+
+// CHECK-LABEL: @make_tuple
+// CHECK: %[[RESULT:.*]] = arith.constant 2 : index
+// CHECK: return %[[RESULT]]
+
+// -----

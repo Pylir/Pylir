@@ -461,6 +461,10 @@ mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
+    if (auto makeTuple = input().getDefiningOp<Py::MakeTupleOp>(); makeTuple && makeTuple.iterExpansionAttr().empty())
+    {
+        return mlir::IntegerAttr::get(getType(), makeTuple.arguments().size());
+    }
     if (auto tuple = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>())
     {
         return mlir::IntegerAttr::get(getType(), tuple.getValue().size());
