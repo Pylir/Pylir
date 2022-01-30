@@ -397,16 +397,18 @@ def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCapture]> {
 // linear searches
 
 def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
-    let arguments = (ins DynamicType:$mroTuple, StrAttr:$attribute);
+    let arguments = (ins DynamicType:$mroTuple, StrAttr:$slot);
     let results = (outs DynamicType:$result, I1:$success);
 
-    let assemblyFormat = "$attribute `in` $mroTuple attr-dict";
+    let assemblyFormat = "$slot `in` $mroTuple attr-dict";
 
     let description = [{
         This op does a linear search through the given tuple, returning the first element which contains the given
         attribute. If `$mroTuple` is not really a tuple (or subclass of) the behaviour is undefined. If the attribute
         was found `$success` returns `true` and `false` otherwise. If `false`, using `$result` is undefined behaviour.
     }];
+
+    let hasFolder = 1;
 }
 
 class PylirPy_CallMethodBase<string mnemonic, list<OpTrait> traits = []> : PylirPy_Op<mnemonic, traits> {

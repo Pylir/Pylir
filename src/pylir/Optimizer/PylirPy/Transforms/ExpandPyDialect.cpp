@@ -71,7 +71,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         rewriter.setInsertionPointToStart(body);
         auto entry = rewriter.create<pylir::Py::TupleGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
         auto entryType = rewriter.create<pylir::Py::TypeOfOp>(loc, entry);
-        auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.attribute());
+        auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.slotAttr());
         auto failure = rewriter.create<pylir::Py::IsUnboundValueOp>(loc, fetch);
         auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
         auto notFound = new mlir::Block;

@@ -540,6 +540,36 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
     return nullptr;
 }
 
+mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                 ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    // TODO: use common abstraction for partially resolving tuples here and in other tuple users
+    auto mroTuple = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>();
+    if (!mroTuple)
+    {
+        return mlir::failure();
+    }
+    for (auto& iter : mroTuple.getValue())
+    {
+        auto object = resolveValue(*this, iter);
+        if (!object)
+        {
+            return mlir::failure();
+        }
+        auto& map = object.getSlots().getValue();
+        auto result = map.find(slotAttr());
+        if (result != map.end())
+        {
+            results.emplace_back(result->second);
+            results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+            return mlir::success();
+        }
+    }
+    results.emplace_back(Py::UnboundAttr::get(getContext()));
+    results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+    return mlir::success();
+}
+
 mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attribute>,
                                                    llvm::SmallVectorImpl<mlir::OpFoldResult>&)
 {
