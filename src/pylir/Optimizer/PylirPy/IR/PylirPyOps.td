@@ -461,6 +461,8 @@ def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
         If it is `$success` returns `true`, `false` otherwise. This is used to check whether a type is a subclass
         of another. If `$mroTuple` is not really a tuple (or subclass of) the behaviour is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 // Make ops

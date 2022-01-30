@@ -683,6 +683,29 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
     return mlir::success();
 }
 
+mlir::OpFoldResult pylir::Py::LinearContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto tupleOperands = resolveTupleOperands(*this, mroTuple());
+    bool hadWildcard = false;
+    for (auto& op : tupleOperands)
+    {
+        if (!op)
+        {
+            hadWildcard = true;
+            continue;
+        }
+        if (op == mlir::OpFoldResult{element()} || op == mlir::OpFoldResult{operands[1]})
+        {
+            return mlir::BoolAttr::get(getContext(), true);
+        }
+    }
+    if (hadWildcard)
+    {
+        return nullptr;
+    }
+    return mlir::BoolAttr::get(getContext(), false);
+}
+
 mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attribute>,
                                                    llvm::SmallVectorImpl<mlir::OpFoldResult>&)
 {
