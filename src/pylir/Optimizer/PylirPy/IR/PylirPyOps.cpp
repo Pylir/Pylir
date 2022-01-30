@@ -351,7 +351,7 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
 
 mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
-    if (auto tuple = operands[0].dyn_cast_or_null<Py::TupleAttr>())
+    if (auto tuple = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>())
     {
         return mlir::IntegerAttr::get(getType(), tuple.getValue().size());
     }
