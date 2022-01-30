@@ -95,6 +95,10 @@ bool executeCompilation(Action action, mlir::OwningOpRef<mlir::ModuleOp>&& modul
     auto& context = *module->getContext();
 
     mlir::PassManager manager(&context);
+    if (options.hasArg(OPT_Xstatistics))
+    {
+        manager.enableStatistics();
+    }
 #ifndef NDEBUG
     manager.enableVerifier();
     #if !defined(__MINGW32_MAJOR_VERSION) || !defined(__clang__)
@@ -594,6 +598,7 @@ int pylir::main(int argc, char* argv[])
         return 0;
     }
     mlir::MLIRContext context;
+    context.enableMultithreading(args.hasFlag(OPT_XmultiThread, OPT_XsingleThread, true));
     context.getDiagEngine().registerHandler([](mlir::Diagnostic& diagnostic) { diagnostic.print(llvm::errs()); });
     auto module = pylir::codegen(&context, *tree, doc);
 

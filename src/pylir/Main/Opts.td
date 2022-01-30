@@ -57,3 +57,11 @@ defm stdlib : Eq<"stdlib", "C++ standard library to use">, MetaVarName<"<name>">
     Group<grp_link>;
 defm rtlib : Eq<"rtlib", "Compiler runtime library to use">, MetaVarName<"<name>">, Values<"compiler-rt,libgcc">,
     Group<grp_link>;
+
+def grp_internal : OptionGroup<"Internal"> {
+    let Flags = [HelpHidden];
+}
+
+def Xstatistics : F<"Xstatistics", "Show pass statistics">, Group<grp_internal>;
+def XsingleThread : F<"XsingleThread", "Run in single threaded mode">, Group<grp_internal>;
+def XmultiThread : F<"XmultiThread", "Run in multi threaded mode (Default)">, Group<grp_internal>;

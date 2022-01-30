@@ -77,6 +77,9 @@ enum ID
 #include <pylir/Main/Opts.inc>
 #undef PREFIX
 
+// Don't have much choice until this is fixed in LLVM
+using llvm::opt::HelpHidden;
+
 static const llvm::opt::OptTable::Info InfoTable[] = {
 #define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) \
     {PREFIX, NAME,  HELPTEXT,    METAVAR,     OPT_##ID,  llvm::opt::Option::KIND##Class,                 \
