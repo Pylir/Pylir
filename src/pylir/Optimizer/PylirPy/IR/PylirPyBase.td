@@ -15,6 +15,7 @@ def PylirPy_Dialect : Dialect {
     let dependentDialects = ["::mlir::arith::ArithmeticDialect", "::mlir::StandardOpsDialect"];
 
     let hasConstantMaterializer = 1;
+    let hasCanonicalizer = 1;
 
     let useDefaultTypePrinterParser = 1;
     let useDefaultAttributePrinterParser = 0;

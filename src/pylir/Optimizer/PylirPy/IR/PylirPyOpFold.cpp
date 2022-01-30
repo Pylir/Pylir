@@ -771,3 +771,28 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
     results.emplace_back(mlir::IntegerAttr::get(getType(), makeListOp.arguments().size()));
     return mlir::success();
 }
+
+namespace
+{
+pylir::Py::MakeTupleOp prependTuple(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
+                                    mlir::OperandRange range, mlir::ArrayAttr attr)
+{
+    llvm::SmallVector<std::int32_t> newArray;
+    for (auto value : attr.getAsValueRange<mlir::IntegerAttr>())
+    {
+        newArray.push_back(value.getZExtValue() + 1);
+    }
+    llvm::SmallVector<mlir::Value> arguments{input};
+    arguments.append(range.begin(), range.end());
+    return builder.create<pylir::Py::MakeTupleOp>(loc, arguments, builder.getI32ArrayAttr(newArray));
+}
+} // namespace
+
+#include "pylir/Optimizer/PylirPy/IR/PylirPyPatterns.cpp.inc"
+
+#include "PylirPyDialect.hpp"
+
+void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(::mlir::RewritePatternSet& results) const
+{
+    populateWithGenerated(results);
+}

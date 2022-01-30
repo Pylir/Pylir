@@ -13,8 +13,12 @@ mlir_tablegen(PylirPyOpsEnums.cpp.inc -gen-enum-defs)
 add_public_tablegen_target(PylirPyOpsIncGen)
 add_dependencies(mlir-headers PylirPyOpsIncGen)
 
+set(LLVM_TARGET_DEFINITIONS PylirPyPatterns.td)
+mlir_tablegen(PylirPyPatterns.cpp.inc -gen-rewriters)
+add_public_tablegen_target(PylirPyPatternsIncGen)
+
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp)
-add_dependencies(PylirPyDialect PylirPyOpsIncGen)
+add_dependencies(PylirPyDialect PylirPyOpsIncGen PylirPyPatternsIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface PRIVATE MLIRStandard MLIRArithmetic)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)
