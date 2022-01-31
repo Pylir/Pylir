@@ -343,45 +343,17 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     {
         return input.getType();
     }
-    auto* defOp = object().getDefiningOp();
+    auto opResult = object().dyn_cast<mlir::OpResult>();
+    if (!opResult)
+    {
+        return nullptr;
+    }
+    auto defOp = mlir::dyn_cast_or_null<Py::RuntimeTypeInterface>(opResult.getOwner());
     if (!defOp)
     {
         return nullptr;
     }
-    auto symbol =
-        llvm::TypeSwitch<mlir::Operation*, mlir::OpFoldResult>(defOp)
-            .Case([&](Py::MakeObjectOp op) { return op.typeObj(); })
-            .Case<Py::ListToTupleOp, Py::MakeTupleOp, Py::MakeTupleExOp, Py::TuplePrependOp>(
-                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name); })
-            .Case(
-                [&](Py::TuplePopFrontOp op) -> mlir::OpFoldResult
-                {
-                    if (object() == op.result())
-                    {
-                        return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name);
-                    }
-                    return nullptr;
-                })
-            .Case<Py::MakeListOp, Py::MakeListExOp>(
-                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::List.name); })
-            .Case<Py::MakeSetOp, Py::MakeSetExOp>(
-                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Set.name); })
-            .Case<Py::MakeDictOp, Py::MakeDictExOp>(
-                [&](auto&&) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Dict.name); })
-            .Case<Py::MakeFuncOp>([&](auto)
-                                  { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name); })
-            .Case([&](Py::BoolFromI1Op) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Bool.name); })
-            .Case<Py::IntFromIntegerOp>([&](auto)
-                                        { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Int.name); })
-            .Case<Py::StrConcatOp, Py::IntToStrOp>(
-                [&](auto) { return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Str.name); })
-            .Case([&](Py::StrCopyOp op) { return op.typeObject(); })
-            .Default({});
-    if (!symbol)
-    {
-        return nullptr;
-    }
-    return symbol;
+    return defOp.getRuntimeType(opResult.getResultNumber());
 }
 
 mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)

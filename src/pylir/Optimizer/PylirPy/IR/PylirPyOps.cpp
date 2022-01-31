@@ -18,6 +18,25 @@ bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
     return static_cast<mlir::OperandRange>(typeObjectMutable()).getBeginOperandIndex() != index;
 }
 
+mlir::OpFoldResult pylir::Py::TuplePopFrontOp::getRuntimeType(unsigned int resultIndex)
+{
+    if (resultIndex == 0)
+    {
+        return nullptr;
+    }
+    return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name);
+}
+
+mlir::OpFoldResult pylir::Py::MakeObjectOp::getRuntimeType(unsigned int)
+{
+    return typeObject();
+}
+
+mlir::OpFoldResult pylir::Py::StrCopyOp::getRuntimeType(unsigned int)
+{
+    return typeObject();
+}
+
 mlir::LogicalResult pylir::Py::StrConcatOp::inferReturnTypes(::mlir::MLIRContext* context,
                                                              ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
                                                              ::mlir::DictionaryAttr, ::mlir::RegionRange,

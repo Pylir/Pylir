@@ -148,7 +148,7 @@ struct MakeObjectOpConversion : mlir::OpRewritePattern<pylir::Py::MakeObjectOp>
 
     mlir::LogicalResult matchAndRewrite(pylir::Py::MakeObjectOp op, mlir::PatternRewriter& rewriter) const override
     {
-        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), op.typeObj());
+        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), op.typeObject());
         rewriter.replaceOpWithNewOp<pylir::Mem::InitObjectOp>(op, mem);
         return mlir::success();
     }
