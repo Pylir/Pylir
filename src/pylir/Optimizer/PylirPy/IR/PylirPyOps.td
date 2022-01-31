@@ -95,7 +95,6 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryF
         type.
     }];
 
-    let hasCanonicalizer = 1;
     let hasFolder = 1;
 }
 
@@ -109,8 +108,6 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
         Sets the value of the slot named `$slot` inside of `$object` to `$value`. The `$slot` has to be one of the slots
         that were defined in `$typeObject`. If `$object` is not of type `$typeObject` the result is undefined.
     }];
-
-    let hasCanonicalizer = 1;
 }
 
 // Dict ops
