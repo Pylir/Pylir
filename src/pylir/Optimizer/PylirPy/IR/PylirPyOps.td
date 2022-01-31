@@ -112,7 +112,7 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
 
 // Dict ops
 
-def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [AlwaysBound,
+def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [AlwaysBound, NoCapture,
                                                               DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$dict, DynamicType:$key);
     let results = (outs DynamicType:$result, I1:$found);
@@ -773,7 +773,7 @@ def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoSideEffect]> {
     }];
 }
 
-def PylirPy_BoolFromI1Op : PylirPy_AllocOp<"bool.fromI1", [NoCapture]> {
+def PylirPy_BoolFromI1Op : PylirPy_AllocOp<"bool.fromI1"> {
     let arguments = (ins I1:$input);
 
     let assemblyFormat = "$input attr-dict";
