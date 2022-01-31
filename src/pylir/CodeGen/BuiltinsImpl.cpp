@@ -9,7 +9,6 @@
 
 pylir::Py::GlobalValueOp pylir::CodeGen::createGlobalConstant(Py::ObjectAttr value)
 {
-    // TODO: private
     auto table = mlir::SymbolTable(m_module);
     auto result = m_builder.createGlobalValue("const$", true, value);
     table.insert(result);
