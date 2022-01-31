@@ -250,6 +250,11 @@ public:
         return create<Py::ObjectHashOp>(object);
     }
 
+    Py::ObjectIdOp createObjectId(mlir::Value object)
+    {
+        return create<Py::ObjectIdOp>(object);
+    }
+
     Py::StrCopyOp createStrCopy(mlir::Value string, mlir::Value typeObject)
     {
         return create<Py::StrCopyOp>(string, typeObject);

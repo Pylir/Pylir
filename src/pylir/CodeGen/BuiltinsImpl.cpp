@@ -313,7 +313,17 @@ void pylir::CodeGen::createBuiltinsImpl()
                         "builtins.object.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
                         [&](mlir::ValueRange functionArgs)
                         {
-                            // TODO:
+                            auto self = functionArgs[0];
+                            auto type = m_builder.createTypeOf(self);
+                            auto name = m_builder.createGetSlot(type, m_builder.createTypeRef(), "__name__");
+                            auto id = m_builder.createObjectId(self);
+                            auto integer = m_builder.createIntFromInteger(id);
+                            // TODO: hex
+                            auto str = m_builder.createIntToStr(integer);
+                            mlir::Value concat = m_builder.createStrConcat({m_builder.createConstant("<"), name,
+                                                                            m_builder.createConstant(" object at "),
+                                                                            str, m_builder.createConstant(">")});
+                            m_builder.create<mlir::ReturnOp>(concat);
                         },
                         &objectReprFunc);
                     slots["__str__"] = createFunction(
