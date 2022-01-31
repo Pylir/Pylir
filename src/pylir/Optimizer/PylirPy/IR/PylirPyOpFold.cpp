@@ -793,9 +793,9 @@ bool isTypeSlot(llvm::StringRef ref)
     };
     return set.contains(ref);
 }
-} // namespace
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyPatterns.cpp.inc"
+} // namespace
 
 #include "PylirPyDialect.hpp"
 
