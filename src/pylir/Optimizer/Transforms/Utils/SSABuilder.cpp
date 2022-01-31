@@ -42,12 +42,10 @@ mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type,
 
 void pylir::SSABuilder::removeBlockArgumentOperands(mlir::BlockArgument argument)
 {
-    for (auto pred : argument.getOwner()->getPredecessors())
+    for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
-        auto terminator = mlir::cast<mlir::BranchOpInterface>(pred->getTerminator());
-        auto successors = terminator->getSuccessors();
-        auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
-        auto ops = terminator.getMutableSuccessorOperands(index);
+        auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
+        auto ops = terminator.getMutableSuccessorOperands(pred.getSuccessorIndex());
         PYLIR_ASSERT(ops);
         ops->erase(argument.getArgNumber());
     }
@@ -56,13 +54,11 @@ void pylir::SSABuilder::removeBlockArgumentOperands(mlir::BlockArgument argument
 mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument argument)
 {
     mlir::Value same;
-    for (auto pred : argument.getOwner()->getPredecessors())
+    for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
         mlir::Value blockOperand;
-        auto terminator = mlir::cast<mlir::BranchOpInterface>(pred->getTerminator());
-        auto successors = terminator->getSuccessors();
-        auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
-        auto ops = terminator.getSuccessorOperands(index);
+        auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
+        auto ops = terminator.getSuccessorOperands(pred.getSuccessorIndex());
         PYLIR_ASSERT(ops);
         blockOperand = (*ops)[argument.getArgNumber()];
 
@@ -112,14 +108,12 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
 
 mlir::Value pylir::SSABuilder::addBlockArguments(DefinitionsMap& map, mlir::BlockArgument argument)
 {
-    for (auto pred : argument.getOwner()->getPredecessors())
+    for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
-        auto terminator = mlir::cast<mlir::BranchOpInterface>(pred->getTerminator());
-        auto successors = terminator->getSuccessors();
-        auto index = std::find(successors.begin(), successors.end(), argument.getOwner()) - successors.begin();
-        auto ops = terminator.getMutableSuccessorOperands(index);
+        auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
+        auto ops = terminator.getMutableSuccessorOperands(pred.getSuccessorIndex());
         PYLIR_ASSERT(ops);
-        ops->append(readVariable(argument.getLoc(), argument.getType(), map, pred));
+        ops->append(readVariable(argument.getLoc(), argument.getType(), map, *pred));
     }
     return tryRemoveTrivialBlockArgument(argument);
 }
