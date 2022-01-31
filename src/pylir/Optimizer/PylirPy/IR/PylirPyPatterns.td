@@ -3,6 +3,7 @@
 #define PYLIR_PY_PATTERNS_TABLEGEN
 
 include "mlir/IR/OpBase.td"
+include "mlir/Dialect/Arithmetic/IR/ArithmeticOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
 def prependTuple : NativeCodeCall<"prependTuple($_builder, $_loc, $0, $1, $2)">;
@@ -30,5 +31,9 @@ def : Pattern<(PylirPy_GetSlotOp $object, (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_
 def : Pattern<(PylirPy_SetSlotOp $object, (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_)), IsTypeSlot:$slot, $value),
     [(PylirPy_ConstantOp:$constant (BuiltinRef<"Type">)), (PylirPy_SetSlotOp $object, $constant, $slot, $value)]
 >;
+
+defvar Arith_CmpIEq = !head(!filter(x, Arith_CmpIPredicateAttr.enumerants, !eq(x.symbol, "eq")));
+
+def : Pat<(Arith_CmpIOp Arith_CmpIEq, (PylirPy_ObjectIdOp $lhs), (PylirPy_ObjectIdOp $rhs)), (PylirPy_IsOp $lhs, $rhs)>;
 
 #endif
