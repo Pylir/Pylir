@@ -12,7 +12,7 @@ PyObject& exceptHookImpl(PyFunction& function, PySequence& args, PyDict& keyword
     // TODO: check arguments
     auto& exceptionType = args.getItem(0);
     auto& exception = args.getItem(1);
-    auto type = exceptionType.getSlot(PyTypeObject::Slots::__name__)->cast<PyString>().view();
+    auto type = exceptionType.getSlot(PyTypeObject::Slots::Name)->cast<PyString>().view();
     if (type.substr(0, sizeof("builtins")) == "builtins.")
     {
         type = type.substr(sizeof("builtins"));
@@ -26,12 +26,11 @@ StaticInstance<Builtins::Str> qualFunctionName("sys.__excepthook__");
 
 } // namespace
 
-// TODO: fill slots
 StaticInstance<Builtins::Function> exceptHook asm("sys.__excepthook__")(
     {
-        {PyFunction::__qualname__, qualFunctionName},
-        {PyFunction::__defaults__, Builtins::None},
-        {PyFunction::__kwdefaults__, Builtins::None},
-        {PyFunction::__closure__, Builtins::None},
+        {PyFunction::QualName, qualFunctionName},
+        {PyFunction::Defaults, Builtins::None},
+        {PyFunction::KwDefaults, Builtins::None},
+        {PyFunction::Closure, Builtins::None},
     },
     exceptHookImpl);

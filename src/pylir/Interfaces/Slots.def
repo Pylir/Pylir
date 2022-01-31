@@ -2,22 +2,22 @@
 #define TYPE_SLOT(...)
 #endif
 
-TYPE_SLOT(__name__)
-TYPE_SLOT(__new__)
-TYPE_SLOT(__init__)
-TYPE_SLOT(__slots__)
-TYPE_SLOT(__mro__)
-TYPE_SLOT(__eq__)
-TYPE_SLOT(__hash__)
-TYPE_SLOT(__bool__)
-TYPE_SLOT(__len__)
-TYPE_SLOT(__index__)
-TYPE_SLOT(__str__)
-TYPE_SLOT(__repr__)
-TYPE_SLOT(__call__)
-TYPE_SLOT(__getitem__)
-TYPE_SLOT(__setitem__)
-TYPE_SLOT(__get__)
+TYPE_SLOT(__name__, Name)
+TYPE_SLOT(__new__, New)
+TYPE_SLOT(__init__, Init)
+TYPE_SLOT(__slots__, Slots)
+TYPE_SLOT(__mro__, MRO)
+TYPE_SLOT(__eq__, Eq)
+TYPE_SLOT(__hash__, Hash)
+TYPE_SLOT(__bool__, Bool)
+TYPE_SLOT(__len__, Len)
+TYPE_SLOT(__index__, Index)
+TYPE_SLOT(__str__, Str)
+TYPE_SLOT(__repr__, Repr)
+TYPE_SLOT(__call__, Call)
+TYPE_SLOT(__getitem__, GetItem)
+TYPE_SLOT(__setitem__, setItem)
+TYPE_SLOT(__get__, Get)
 
 #undef TYPE_SLOT
 
@@ -25,10 +25,10 @@ TYPE_SLOT(__get__)
 #define FUNCTION_SLOT(...)
 #endif
 
-FUNCTION_SLOT(__qualname__)
-FUNCTION_SLOT(__defaults__)
-FUNCTION_SLOT(__kwdefaults__)
-FUNCTION_SLOT(__closure__)
+FUNCTION_SLOT(__qualname__, QualName)
+FUNCTION_SLOT(__defaults__, Defaults)
+FUNCTION_SLOT(__kwdefaults__, KwDefaults)
+FUNCTION_SLOT(__closure__, Closure)
 
 #undef FUNCTION_SLOT
 
@@ -36,8 +36,8 @@ FUNCTION_SLOT(__closure__)
 #define BASEEXCEPTION_SLOT(...)
 #endif
 
-BASEEXCEPTION_SLOT(args)
-BASEEXCEPTION_SLOT(__context__)
-BASEEXCEPTION_SLOT(__cause__)
+BASEEXCEPTION_SLOT(args, Args)
+BASEEXCEPTION_SLOT(__context__, Context)
+BASEEXCEPTION_SLOT(__cause__, Cause)
 
 #undef BASEEXCEPTION_SLOT

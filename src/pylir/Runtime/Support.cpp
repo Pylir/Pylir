@@ -7,7 +7,7 @@ using namespace pylir::rt;
 std::size_t PyObjectHasher::operator()(PyObject* object) const noexcept
 {
     // TODO: use hash
-    auto* hashFunction = type(*object).getSlot(PyTypeObject::__hash__);
+    auto* hashFunction = type(*object).getSlot(PyTypeObject::Hash);
     PYLIR_ASSERT(hashFunction);
     auto* integer = (*hashFunction)(*object).dyn_cast<PyInt>();
     if (!integer)

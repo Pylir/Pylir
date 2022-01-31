@@ -20,7 +20,7 @@ PyObject* PyObject::getSlot(int index)
 
 PyObject* PyObject::getSlot(std::string_view name)
 {
-    PySequence& slotsTuple = type(*this).getSlot(PyTypeObject::__slots__)->cast<PySequence>();
+    PySequence& slotsTuple = type(*this).getSlot(PyTypeObject::Slots)->cast<PySequence>();
     for (std::size_t i = 0; i < slotsTuple.len(); i++)
     {
         auto& str = slotsTuple.getItem(i).cast<PyString>();
@@ -39,13 +39,13 @@ void PyObject::setSlot(int index, PyObject& object)
 
 bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 {
-    auto& mro = type(object).getSlot(PyTypeObject::__mro__)->cast<PySequence>();
+    auto& mro = type(object).getSlot(PyTypeObject::MRO)->cast<PySequence>();
     return std::find(mro.begin(), mro.end(), &typeObject) != mro.end();
 }
 
 bool PyObject::operator==(PyObject& other)
 {
-    PyObject& eqFunc = *type(*this).methodLookup(PyTypeObject::__eq__);
+    PyObject& eqFunc = *type(*this).methodLookup(PyTypeObject::Eq);
     PyObject& boolean = eqFunc(*this, other);
     if (!type(boolean).is(Builtins::Bool))
     {
@@ -56,7 +56,7 @@ bool PyObject::operator==(PyObject& other)
 
 PyObject* PyObject::mroLookup(int index)
 {
-    auto& mro = type(*this).getSlot(PyTypeObject::__mro__)->cast<PySequence>();
+    auto& mro = type(*this).getSlot(PyTypeObject::MRO)->cast<PySequence>();
     for (auto* iter : mro)
     {
         if (auto slot = iter->getSlot(index))
@@ -78,7 +78,7 @@ PyObject* PyObject::methodLookup(int index)
     {
         return overload;
     }
-    if (auto* getter = overload->mroLookup(PyTypeObject::__get__))
+    if (auto* getter = overload->mroLookup(PyTypeObject::Get))
     {
         overload = &(*getter)(*this, type(*this));
     }

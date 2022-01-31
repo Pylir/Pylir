@@ -126,7 +126,7 @@ public:
 
     enum Slots
     {
-#define TYPE_SLOT(x, ...) x,
+#define TYPE_SLOT(x, y, ...) y,
 #include <pylir/Interfaces/Slots.def>
     };
 };
@@ -150,7 +150,7 @@ public:
 
     enum Slots
     {
-#define FUNCTION_SLOT(x, ...) x,
+#define FUNCTION_SLOT(x, y, ...) y,
 #include <pylir/Interfaces/Slots.def>
     };
 };
@@ -337,7 +337,7 @@ public:
 
     enum Slots
     {
-#define BASEEXCEPTION_SLOT(x, ...) x,
+#define BASEEXCEPTION_SLOT(x, y, ...) y,
 #include <pylir/Interfaces/Slots.def>
     };
 
@@ -510,7 +510,7 @@ PyObject& PyObject::operator()(Args&&... args)
     PyObject* self = this;
     while (true)
     {
-        auto* call = self->methodLookup(PyTypeObject::__call__);
+        auto* call = self->methodLookup(PyTypeObject::Call);
         if (!call)
         {
             // TODO: raise Type error
