@@ -305,6 +305,13 @@ def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoSideEffect]> {
     }];
 }
 
+def PylirPy_ObjectIdOp : PylirPy_Op<"object.id", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$object);
+    let results = (outs Index:$id);
+
+    let assemblyFormat = "$object attr-dict";
+}
+
 // Str ops
 
 def PylirPy_StrCopyOp : PylirPy_AllocOp<"str.copy", [NoCapture, DeclareOpInterfaceMethods<RuntimeTypeInterface>]> {

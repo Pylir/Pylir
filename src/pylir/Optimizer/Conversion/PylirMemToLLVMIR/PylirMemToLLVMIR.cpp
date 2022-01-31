@@ -1289,6 +1289,19 @@ struct ObjectHashOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Ob
     }
 };
 
+struct ObjectIdOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ObjectIdOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::ObjectIdOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::ObjectIdOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOpWithNewOp<mlir::LLVM::PtrToIntOp>(op, typeConverter->convertType(op.getType()),
+                                                            adaptor.object());
+        return mlir::success();
+    }
+};
+
 struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>::ConvertPylirOpToLLVMPattern;
@@ -2353,6 +2366,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<RaiseOpConversion>(converter);
     patternSet.insert<InitIntOpConversion>(converter);
     patternSet.insert<ObjectHashOpConversion>(converter);
+    patternSet.insert<ObjectIdOpConversion>(converter);
     patternSet.insert<StrHashOpConversion>(converter);
     patternSet.insert<InitFuncOpConversion>(converter);
     patternSet.insert<InitDictOpConversion>(converter);
