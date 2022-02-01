@@ -440,7 +440,7 @@ public:
 
     Py::IntToIntegerOp createIntToInteger(mlir::Type integerLike, mlir::Value object)
     {
-        return create<Py::IntToIntegerOp>(integerLike, object);
+        return create<Py::IntToIntegerOp>(integerLike, getI1Type(), object);
     }
 
     Py::IntToStrOp createIntToStr(mlir::Value object)

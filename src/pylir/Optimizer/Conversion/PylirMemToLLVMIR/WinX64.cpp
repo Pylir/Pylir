@@ -9,7 +9,7 @@ namespace
 {
 bool isLegalIntegerSize(std::size_t size)
 {
-    return size == 8 || size == 16 || size == 32 || size == 64;
+    return size == 1 || size == 2 || size == 4 || size == 8;
 }
 } // namespace
 
@@ -85,6 +85,8 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
     std::size_t paramBegin = 0;
     if (adjustments.returnType == PointerToTemporary)
     {
+        mlir::OpBuilder::InsertionGuard guard{builder};
+        builder.setInsertionPointToStart(&builder.getBlock()->getParent()->front());
         paramBegin = 1;
         auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
         returnSlot =

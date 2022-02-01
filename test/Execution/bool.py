@@ -11,3 +11,23 @@ print(str(True) == "True")
 
 print(str(False) == "False")
 # CHECK: True
+
+print(bool())
+# CHECK: False
+
+print(bool(False))
+# CHECK: False
+
+print(bool(True))
+# CHECK: True
+
+print(bool(None))
+# CHECK: False
+
+# Calls len afterwards
+
+print(bool([]))
+# CHECK: False
+
+print(bool([0]))
+# CHECK: True

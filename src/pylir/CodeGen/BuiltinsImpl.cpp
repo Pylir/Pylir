@@ -462,6 +462,10 @@ void pylir::CodeGen::createBuiltinsImpl()
                             // TODO: probably disallow subclassing NoneType here
                             m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
                         });
+                    slots["__bool__"] = createFunction(
+                        "builtins.NoneType.__bool__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+                        [&](mlir::ValueRange)
+                        { m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createConstant(false)}); });
                 });
     m_builder.createGlobalValue(Py::Builtins::None.name, true, Py::ObjectAttr::get(m_builder.getNoneTypeBuiltin()),
                                 true);
@@ -761,33 +765,56 @@ void pylir::CodeGen::createBuiltinsImpl()
                                            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
                                        });
                 });
-    createClass(m_builder.getBoolBuiltin(), {integer},
-                [&](SlotMapImpl& slots)
+    createClass(
+        m_builder.getBoolBuiltin(), {integer},
+        [&](SlotMapImpl& slots)
+        {
+            slots["__new__"] = createFunction(
+                "builtins.bool.__new__",
+                {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, true}},
+                [&](mlir::ValueRange functionArguments)
                 {
-                    slots["__bool__"] =
-                        createFunction("builtins.bool.__bool__", {{"", FunctionParameter::PosOnly, false}},
-                                       [&](mlir::ValueRange functionArguments)
-                                       {
-                                           auto self = functionArguments[0];
-                                           m_builder.create<mlir::ReturnOp>(self);
-                                       });
-                    slots["__repr__"] = createFunction(
-                        "builtins.bool.__repr__", {{"", FunctionParameter::PosOnly, false}},
-                        [&](mlir::ValueRange functionArguments)
-                        {
-                            auto self = functionArguments[0];
-                            // TODO: check its bool
-                            auto i1 = m_builder.createBoolToI1(self);
-                            auto trueStr = m_builder.createConstant("True");
-                            auto falseStr = m_builder.createConstant("False");
-                            auto* successor = new mlir::Block;
-                            successor->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-                            m_builder.create<mlir::CondBranchOp>(i1, successor, mlir::ValueRange{trueStr}, successor,
-                                                                 mlir::ValueRange{falseStr});
-                            implementBlock(successor);
-                            m_builder.create<mlir::ReturnOp>(successor->getArgument(0));
-                        });
-                });
+                    auto value = functionArguments[1];
+                    mlir::Block* notFoundBlock = new mlir::Block;
+                    auto boolResult = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__bool__",
+                                                                    m_builder.createMakeTuple({value}), {},
+                                                                    notFoundBlock, nullptr, nullptr);
+                    m_builder.create<mlir::ReturnOp>(boolResult);
+
+                    implementBlock(notFoundBlock);
+                    auto len = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
+                                                          m_builder.createMakeTuple({m_builder.createLenRef(), value}),
+                                                          {}, nullptr, nullptr);
+                    auto index = m_builder.createIntToInteger(m_builder.getIndexType(), len).result();
+                    auto zero = m_builder.create<mlir::arith::ConstantIndexOp>(0);
+                    auto notEqual = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ne, index, zero);
+                    auto asBool = m_builder.createBoolFromI1(notEqual);
+                    m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asBool});
+                },
+                nullptr, m_builder.getTupleAttr({m_builder.getPyBoolAttr(false)}), {});
+            slots["__bool__"] = createFunction("builtins.bool.__bool__", {{"", FunctionParameter::PosOnly, false}},
+                                               [&](mlir::ValueRange functionArguments)
+                                               {
+                                                   auto self = functionArguments[0];
+                                                   m_builder.create<mlir::ReturnOp>(self);
+                                               });
+            slots["__repr__"] =
+                createFunction("builtins.bool.__repr__", {{"", FunctionParameter::PosOnly, false}},
+                               [&](mlir::ValueRange functionArguments)
+                               {
+                                   auto self = functionArguments[0];
+                                   // TODO: check its bool
+                                   auto i1 = m_builder.createBoolToI1(self);
+                                   auto trueStr = m_builder.createConstant("True");
+                                   auto falseStr = m_builder.createConstant("False");
+                                   auto* successor = new mlir::Block;
+                                   successor->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+                                   m_builder.create<mlir::CondBranchOp>(i1, successor, mlir::ValueRange{trueStr},
+                                                                        successor, mlir::ValueRange{falseStr});
+                                   implementBlock(successor);
+                                   m_builder.create<mlir::ReturnOp>(successor->getArgument(0));
+                               });
+        });
 
     createFunction(
         m_builder.getPrintBuiltin().getValue(),

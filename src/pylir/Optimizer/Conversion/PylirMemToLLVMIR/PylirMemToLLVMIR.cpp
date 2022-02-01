@@ -423,6 +423,7 @@ public:
         mp_to_radix,
         pylir_gc_alloc,
         pylir_str_hash,
+        pylir_int_get,
         pylir_dict_lookup,
         pylir_dict_insert,
         pylir_dict_erase,
@@ -506,6 +507,12 @@ public:
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), getIndexType(),
                                  mlir::LLVM::LLVMPointerType::get(getIndexType()), m_cabi->getInt(&getContext())};
                 functionName = "mp_to_radix";
+                break;
+            case Runtime::pylir_int_get:
+                returnType = mlir::LLVM::LLVMStructType::getLiteral(
+                    &getContext(), {getIndexType(), mlir::IntegerType::get(&getContext(), 1)});
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()), getIndexType()};
+                functionName = "pylir_int_get";
                 break;
             case Runtime::pylir_dict_lookup:
                 returnType = mlir::LLVM::LLVMPointerType::get(getPyObjectType());
@@ -1228,6 +1235,35 @@ struct DictDelItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::D
         getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_erase,
                                               {dict, adaptor.key()});
         rewriter.eraseOp(op);
+    }
+};
+
+struct IntGetIntegerOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::IntToIntegerOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::IntToIntegerOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::IntToIntegerOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto pyInt = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyIntType()), adaptor.input());
+        auto mpInt = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getMPInt()), pyInt, mlir::ValueRange{},
+            llvm::ArrayRef<std::int32_t>{0, 1});
+        auto converted = typeConverter->convertType(op.result().getType());
+        auto size = getSizeInBytes(op.getLoc(), converted, rewriter);
+        auto result = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter,
+                                                            PylirTypeConverter::Runtime::pylir_int_get, {mpInt, size});
+        mlir::Value first = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), getIndexType(), result,
+                                                                        rewriter.getI32ArrayAttr({0}));
+        auto second = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), rewriter.getI1Type(), result,
+                                                                  rewriter.getI32ArrayAttr({1}));
+        if (first.getType() != converted)
+        {
+            first = rewriter.create<mlir::LLVM::TruncOp>(op.getLoc(), converted, first);
+        }
+        rewriter.replaceOp(op, {first, second});
+        return mlir::success();
     }
 };
 
@@ -2383,6 +2419,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<BoolToI1OpConversion>(converter);
     patternSet.insert<InitTuplePrependOpConversion>(converter);
     patternSet.insert<InitTuplePopFrontOpConversion>(converter);
+    patternSet.insert<IntGetIntegerOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

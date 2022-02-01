@@ -375,14 +375,14 @@ def PylirPy_IntFromIntegerOp : PylirPy_AllocOp<"int.fromInteger", [NoCapture, Ru
 
 def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
     let arguments = (ins DynamicType:$input);
-    let results = (outs IntegerLike:$result);
+    let results = (outs IntegerLike:$result, I1:$success);
 
     let assemblyFormat = "$input `:` type($result) attr-dict";
 
     let description = [{
-        Converts a python integer into an arbitrary integer-like. If `$input` is not really an int (or subclass of)
-        the behaviour is undefined.
-        TODO: Overflow behaviour?
+        Converts a python integer into an arbitrary integer-like. If the result type is not capable of representing the
+        value, the conversion will fail, `$success` will be set to false and using `$result` is undefined behaviour.
+        If `$input` is not really an int (or subclass of) the behaviour is undefined.
     }];
 }
 
