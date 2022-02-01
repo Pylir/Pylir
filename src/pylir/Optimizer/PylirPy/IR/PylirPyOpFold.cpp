@@ -546,6 +546,16 @@ mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(::llvm::ArrayRef<mlir::Attribut
     return Py::BoolAttr::get(getContext(), boolean.getValue());
 }
 
+mlir::OpFoldResult pylir::Py::IntFromIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto integer = operands[0].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!integer)
+    {
+        return nullptr;
+    }
+    return Py::IntAttr::get(getContext(), BigInt(integer.getValue().getZExtValue()));
+}
+
 mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
                                                     ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {

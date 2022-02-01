@@ -371,6 +371,8 @@ def PylirPy_IntFromIntegerOp : PylirPy_AllocOp<"int.fromInteger", [NoCapture, Ru
     let description = [{
         Converts an arbitrary integer-like into a python integer.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
