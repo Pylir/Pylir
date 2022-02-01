@@ -40,7 +40,7 @@ IntGetResult pylir_int_get(mp_int* mpInt, std::size_t bytes)
     {
         return {value, true};
     }
-    return {value, value <= (1ull << (8 * bytes))};
+    return {value, value <= (1ull << ((8 * bytes) - 1))};
 }
 
 void pylir_print(PyString& string)
