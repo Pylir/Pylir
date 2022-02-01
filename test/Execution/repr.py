@@ -5,3 +5,6 @@ print(repr(420) == "420")
 print(repr(True) == "True")
 # CHECK: True
 # CHECK: True
+
+print(repr(object()))
+# CHECK: <{{(.*\.)?}}object object at {{[[:alnum:]]+}}>
