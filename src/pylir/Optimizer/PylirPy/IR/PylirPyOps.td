@@ -384,6 +384,8 @@ def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
         value, the conversion will fail, `$success` will be set to false and using `$result` is undefined behaviour.
         If `$input` is not really an int (or subclass of) the behaviour is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_IntToStrOp : PylirPy_AllocOp<"int.toStr", [NoCapture, RuntimeType<"Str">]> {

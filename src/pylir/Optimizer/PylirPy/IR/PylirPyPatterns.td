@@ -34,4 +34,7 @@ defvar Arith_CmpIEq = !head(!filter(x, Arith_CmpIPredicateAttr.enumerants, !eq(x
 
 def : Pat<(Arith_CmpIOp Arith_CmpIEq, (PylirPy_ObjectIdOp $lhs), (PylirPy_ObjectIdOp $rhs)), (PylirPy_IsOp $lhs, $rhs)>;
 
+def : Pattern<(PylirPy_IntToIntegerOp (PylirPy_IntFromIntegerOp $input)),
+                [(Arith_TruncIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)]>;
+
 #endif

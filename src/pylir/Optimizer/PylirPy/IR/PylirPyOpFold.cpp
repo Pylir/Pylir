@@ -546,6 +546,31 @@ mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(::llvm::ArrayRef<mlir::Attribut
     return Py::BoolAttr::get(getContext(), boolean.getValue());
 }
 
+mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    // TODO: Think about index and whether its worth using
+    if (!result().getType().isa<mlir::IntegerType>())
+    {
+        return mlir::failure();
+    }
+    auto integer = operands[0].dyn_cast_or_null<Py::IntAttr>();
+    if (!integer)
+    {
+        return mlir::failure();
+    }
+    auto optional = integer.getValue().tryGetInteger<std::uintmax_t>();
+    if (!optional || *optional > (1uLL << (result().getType().getIntOrFloatBitWidth() - 1)))
+    {
+        results.emplace_back(mlir::IntegerAttr::get(result().getType(), 0));
+        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+        return mlir::success();
+    }
+    results.emplace_back(mlir::IntegerAttr::get(result().getType(), *optional));
+    results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+    return mlir::success();
+}
+
 mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (operands[0])
