@@ -8,3 +8,15 @@ if True:
 if False:
     print("Failure")
 # CHECK-NOT: Failure
+
+if [0]:
+    print("Success")
+# CHECK: Success
+
+if []:
+    print("Failure")
+# CHECK-NOT: Failure
+
+if object():
+    print("Success")
+# CHECK: Success

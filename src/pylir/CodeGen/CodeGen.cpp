@@ -1092,22 +1092,10 @@ mlir::Value pylir::CodeGen::toI1(mlir::Value value)
 
 mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 {
-    auto tuple = m_builder.createMakeTuple({value});
-    auto maybeBool = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__bool__", tuple, {},
-                                                m_currentExceptBlock, m_currentLandingPadBlock);
-    auto typeOfResult = m_builder.createTypeOf(maybeBool);
-    auto booleanType = m_builder.createBoolRef();
-    auto isBool = m_builder.createIs(typeOfResult, booleanType);
-    BlockPtr isBoolBlock, typeErrorBlock;
-    m_builder.create<mlir::CondBranchOp>(isBool, isBoolBlock, typeErrorBlock);
-
-    implementBlock(typeErrorBlock);
-    auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
-                                        m_currentLandingPadBlock);
-    raiseException(exception);
-
-    implementBlock(isBoolBlock);
-    return maybeBool;
+    auto tuple = m_builder.createMakeTuple({m_builder.createBoolRef(), value});
+    auto boolean = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__", tuple, {},
+                                              m_currentExceptBlock, m_currentLandingPadBlock);
+    return boolean;
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
