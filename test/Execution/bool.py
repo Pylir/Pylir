@@ -31,3 +31,6 @@ print(bool([]))
 
 print(bool([0]))
 # CHECK: True
+
+print(bool(object()))
+# CHECK: True

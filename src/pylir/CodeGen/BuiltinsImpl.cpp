@@ -197,6 +197,31 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createExternal(llvm::StringRef objectNa
     return m_builder.createGlobalValue(objectName, true);
 }
 
+namespace
+{
+mlir::Value implementLenBuiltin(pylir::Py::PyBuilder& builder, mlir::Value object,
+                                mlir::Block* PYLIR_NULLABLE notFoundBlock)
+{
+    auto tuple = builder.createMakeTuple({object});
+    mlir::Value result;
+    if (notFoundBlock)
+    {
+        result = pylir::Py::buildTrySpecialMethodCall(builder.getCurrentLoc(), builder, "__len__", tuple, {},
+                                                      notFoundBlock, nullptr, nullptr);
+    }
+    else
+    {
+        result =
+            pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__len__", tuple, {}, nullptr, nullptr);
+    }
+    tuple = builder.createMakeTuple({result});
+    result =
+        pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__index__", tuple, {}, nullptr, nullptr);
+    // TODO: Check not negative && fits in host size_t
+    return result;
+}
+} // namespace
+
 void pylir::CodeGen::createBuiltinsImpl()
 {
     createClass(m_builder.getTypeBuiltin(), {},
@@ -782,14 +807,16 @@ void pylir::CodeGen::createBuiltinsImpl()
                     m_builder.create<mlir::ReturnOp>(boolResult);
 
                     implementBlock(notFoundBlock);
-                    auto len = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
-                                                          m_builder.createMakeTuple({m_builder.createLenRef(), value}),
-                                                          {}, nullptr, nullptr);
+                    notFoundBlock = new mlir::Block;
+                    auto len = implementLenBuiltin(m_builder, value, notFoundBlock);
                     auto index = m_builder.createIntToInteger(m_builder.getIndexType(), len).result();
                     auto zero = m_builder.create<mlir::arith::ConstantIndexOp>(0);
                     auto notEqual = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ne, index, zero);
                     auto asBool = m_builder.createBoolFromI1(notEqual);
                     m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asBool});
+
+                    implementBlock(notFoundBlock);
+                    m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createConstant(true)});
                 },
                 nullptr, m_builder.getTupleAttr({m_builder.getPyBoolAttr(false)}), {});
             slots["__bool__"] = createFunction("builtins.bool.__bool__", {{"", FunctionParameter::PosOnly, false}},
@@ -904,13 +931,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                    [&](mlir::ValueRange functionArguments)
                    {
                        auto object = functionArguments[0];
-                       auto tuple = m_builder.createMakeTuple({object});
-                       auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__len__", tuple,
-                                                                {}, nullptr, nullptr);
-                       tuple = m_builder.createMakeTuple({result});
-                       result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__index__", tuple, {},
-                                                           nullptr, nullptr);
-                       // TODO: Check not negative && fits in host size_t
+                       auto result = implementLenBuiltin(m_builder, object, nullptr);
                        m_builder.create<mlir::ReturnOp>(result);
                    });
     createFunction(m_builder.getReprBuiltin().getValue(),
