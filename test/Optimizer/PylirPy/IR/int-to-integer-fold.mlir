@@ -34,5 +34,28 @@ func @test3(%arg0 : i64) -> (i32, i1) {
 // CHECK-LABEL: @test3
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-DAG: %[[C1:.*]] = arith.constant true
-// CHECK-DAG: %[[RESULT:.*]] = arith.trunci %[[ARG0]]
+// CHECK-DAG: %[[RESULT:.*]] = arith.trunci %[[ARG0]] : i64 to i32
 // CHECK: return %[[RESULT]], %[[C1]]
+
+func @test4(%arg0 : i32) -> (i64, i1) {
+    %0 = py.int.fromInteger %arg0 : i32
+    %1, %2 = py.int.toInteger %0 : i64
+    return %1, %2 : i64, i1
+}
+
+// CHECK-LABEL: @test4
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-DAG: %[[C1:.*]] = arith.constant true
+// CHECK-DAG: %[[RESULT:.*]] = arith.extsi %[[ARG0]] : i32 to i64
+// CHECK: return %[[RESULT]], %[[C1]]
+
+func @test5(%arg0 : i64) -> (i64, i1) {
+    %0 = py.int.fromInteger %arg0 : i64
+    %1, %2 = py.int.toInteger %0 : i64
+    return %1, %2 : i64, i1
+}
+
+// CHECK-LABEL: @test5
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-DAG: %[[C1:.*]] = arith.constant true
+// CHECK: return %[[ARG0]], %[[C1]]

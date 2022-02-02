@@ -34,7 +34,23 @@ defvar Arith_CmpIEq = !head(!filter(x, Arith_CmpIPredicateAttr.enumerants, !eq(x
 
 def : Pat<(Arith_CmpIOp Arith_CmpIEq, (PylirPy_ObjectIdOp $lhs), (PylirPy_ObjectIdOp $rhs)), (PylirPy_IsOp $lhs, $rhs)>;
 
-def : Pattern<(PylirPy_IntToIntegerOp (PylirPy_IntFromIntegerOp $input)),
-                [(Arith_TruncIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)]>;
+class IntegerWidthComp<string op> : Constraint<CPred<
+    "$0.getType().getIntOrFloatBitWidth() " # op # "$1.getType().getIntOrFloatBitWidth()">,
+     "integer width is " # op # " than the other">;
+
+def TypesMatch : Constraint<CPred<"$0.getType() == $1.getType()">, "has same type">;
+
+def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp AnyInteger:$input)),
+                [(Arith_TruncIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
+                [(AnyInteger $result), (IntegerWidthComp<">"> $input, $result__0)]>;
+
+def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp AnyInteger:$input)),
+                [(Arith_ExtSIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
+                [(AnyInteger $result), (IntegerWidthComp<"<"> $input, $result__0)]>;
+
+def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp $input)),
+                [(replaceWithValue $input), (Arith_ConstantOp ConstBoolAttrTrue)],
+                [(TypesMatch $result__0, $input)]>;
+
 
 #endif
