@@ -251,7 +251,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
                             implementBlock(isSelfBlock);
                             auto tupleLen = m_builder.createTupleLen(args);
-                            auto dictLen = m_builder.createDictLen(args);
+                            auto dictLen = m_builder.createDictLen(kw);
                             auto oneI = m_builder.create<mlir::arith::ConstantIndexOp>(1);
                             auto zeroI = m_builder.create<mlir::arith::ConstantIndexOp>(0);
                             auto tupleHasOne =
