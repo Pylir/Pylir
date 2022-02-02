@@ -8,3 +8,9 @@ print(repr(True) == "True")
 
 print(repr(object()))
 # CHECK: <{{(.*\.)?}}object object at {{[[:alnum:]]+}}>
+
+print(repr(None))
+# CHECK: None
+
+print(repr(NotImplemented))
+# CHECK: NotImplemented

@@ -7,9 +7,10 @@
 #define BUILTIN_EXCEPTION(...) BUILTIN(__VA_ARGS__)
 #endif
 
-BUILTIN(None, "builtins.None", false)
+BUILTIN(None, "builtins.None", true)
 BUILTIN(NoneType, "builtins.NoneType", false)
 BUILTIN(NotImplemented, "builtins.NotImplemented", true)
+BUILTIN(NotImplementedType, "builtins.NotImplementedType", false)
 BUILTIN(Type, "builtins.type", true)
 BUILTIN(Object, "builtins.object", true)
 BUILTIN(Int, "builtins.int", true)
