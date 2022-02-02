@@ -91,6 +91,8 @@ constexpr auto FAILED_TO_DISCARD_TEMPORARY_FILE_N = FMT_STRING("failed to discar
 
 constexpr auto FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N = FMT_STRING("failed to rename temporary file '{}' to '{}'");
 
+constexpr auto FAILED_TO_KEEP_TEMPORARY_FILE_N = FMT_STRING("failed to rename temporary file '{}'");
+
 constexpr auto FAILED_TO_FIND_LINKER = FMT_STRING("failed to find linker");
 
 constexpr auto ATTEMPTED_N = FMT_STRING("attempted {}");
