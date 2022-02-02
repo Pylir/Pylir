@@ -19,9 +19,5 @@ std::size_t PyObjectHasher::operator()(PyObject* object) const noexcept
 
 bool PyObjectEqual::operator()(PyObject* lhs, PyObject* rhs) const noexcept
 {
-    if (lhs == rhs)
-    {
-        return true;
-    }
     return *lhs == *rhs;
 }

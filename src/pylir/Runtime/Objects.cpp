@@ -45,13 +45,12 @@ bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 
 bool PyObject::operator==(PyObject& other)
 {
-    PyObject& eqFunc = *type(*this).methodLookup(PyTypeObject::Eq);
-    PyObject& boolean = eqFunc(*this, other);
-    if (!type(boolean).is(Builtins::Bool))
+    if (this == &other)
     {
-        // TODO: TypeError
+        return true;
     }
-    return boolean.cast<PyInt>().boolean();
+    PyObject& eqFunc = *type(*this).methodLookup(PyTypeObject::Eq);
+    return Builtins::Bool(eqFunc(*this, other)).cast<PyInt>().boolean();
 }
 
 PyObject* PyObject::mroLookup(int index)
