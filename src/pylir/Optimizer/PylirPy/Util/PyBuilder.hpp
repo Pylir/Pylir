@@ -443,6 +443,11 @@ public:
         return create<Py::IntToIntegerOp>(integerLike, getI1Type(), object);
     }
 
+    Py::IntCmpOp createIntCmpOp(Py::IntCmpKind kind, mlir::Value lhs, mlir::Value rhs)
+    {
+        return create<Py::IntCmpOp>(kind, lhs, rhs);
+    }
+
     Py::IntToStrOp createIntToStr(mlir::Value object)
     {
         return create<Py::IntToStrOp>(object);

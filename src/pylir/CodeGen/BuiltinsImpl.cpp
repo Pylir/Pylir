@@ -775,6 +775,15 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                     auto self = functionArguments[0];
                                                     m_builder.create<mlir::ReturnOp>(self);
                                                 });
+            slots["__bool__"] = createFunction("builtins.int.__bool__", {{"", FunctionParameter::PosOnly, false}},
+                                               [&](mlir::ValueRange functionArguments)
+                                               {
+                                                   auto self = functionArguments[0];
+                                                   auto zero = m_builder.createConstant(BigInt(0));
+                                                   auto cmp = m_builder.createIntCmpOp(Py::IntCmpKind::ne, self, zero);
+                                                   mlir::Value result = m_builder.createBoolFromI1(cmp);
+                                                   m_builder.create<mlir::ReturnOp>(result);
+                                               });
         });
     createClass(m_builder.getListBuiltin(), {},
                 [&](SlotMapImpl& slots)

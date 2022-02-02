@@ -421,6 +421,7 @@ public:
         mp_unpack,
         mp_radix_size_overestimate,
         mp_to_radix,
+        mp_cmp,
         pylir_gc_alloc,
         pylir_str_hash,
         pylir_int_get,
@@ -507,6 +508,12 @@ public:
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type()), getIndexType(),
                                  mlir::LLVM::LLVMPointerType::get(getIndexType()), m_cabi->getInt(&getContext())};
                 functionName = "mp_to_radix";
+                break;
+            case Runtime::mp_cmp:
+                returnType = m_cabi->getInt(&getContext());
+                argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt()),
+                                 mlir::LLVM::LLVMPointerType::get(getMPInt())};
+                functionName = "mp_cmp";
                 break;
             case Runtime::pylir_int_get:
                 returnType = mlir::LLVM::LLVMStructType::getLiteral(
@@ -1263,6 +1270,62 @@ struct IntGetIntegerOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py:
             first = rewriter.create<mlir::LLVM::TruncOp>(op.getLoc(), converted, first);
         }
         rewriter.replaceOp(op, {first, second});
+        return mlir::success();
+    }
+};
+
+struct IntCmpOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::IntCmpOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::IntCmpOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::IntCmpOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto lhs = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyIntType()), adaptor.lhs());
+        auto rhs = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getPyIntType()), adaptor.rhs());
+        auto lhsInt = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getMPInt()), lhs, mlir::ValueRange{},
+            llvm::ArrayRef<std::int32_t>{0, 1});
+        auto rhsInt = rewriter.create<mlir::LLVM::GEPOp>(
+            op.getLoc(), mlir::LLVM::LLVMPointerType::get(getTypeConverter()->getMPInt()), rhs, mlir::ValueRange{},
+            llvm::ArrayRef<std::int32_t>{0, 1});
+        auto result = getTypeConverter()->createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_cmp,
+                                                            {lhsInt, rhsInt});
+        mp_ord mpOrd;
+        mlir::LLVM::ICmpPredicate predicate;
+        switch (adaptor.pred())
+        {
+            case pylir::Py::IntCmpKind::eq:
+                mpOrd = MP_EQ;
+                predicate = mlir::LLVM::ICmpPredicate::eq;
+                break;
+            case pylir::Py::IntCmpKind::ne:
+                mpOrd = MP_EQ;
+                predicate = mlir::LLVM::ICmpPredicate::ne;
+                break;
+            case pylir::Py::IntCmpKind::lt:
+                mpOrd = MP_LT;
+                predicate = mlir::LLVM::ICmpPredicate::eq;
+                break;
+            case pylir::Py::IntCmpKind::le:
+                mpOrd = MP_GT;
+                predicate = mlir::LLVM::ICmpPredicate::ne;
+                break;
+            case pylir::Py::IntCmpKind::gt:
+                mpOrd = MP_GT;
+                predicate = mlir::LLVM::ICmpPredicate::eq;
+                break;
+            case pylir::Py::IntCmpKind::ge:
+                mpOrd = MP_LT;
+                predicate = mlir::LLVM::ICmpPredicate::ne;
+                break;
+        }
+        auto cInt = getTypeConverter()->getCABI().getInt(getContext());
+        rewriter.replaceOpWithNewOp<mlir::LLVM::ICmpOp>(
+            op, predicate, result,
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), cInt, mlir::IntegerAttr::get(cInt, mpOrd)));
         return mlir::success();
     }
 };
@@ -2420,6 +2483,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitTuplePrependOpConversion>(converter);
     patternSet.insert<InitTuplePopFrontOpConversion>(converter);
     patternSet.insert<IntGetIntegerOpConversion>(converter);
+    patternSet.insert<IntCmpOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
