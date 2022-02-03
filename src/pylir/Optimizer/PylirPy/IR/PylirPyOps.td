@@ -72,7 +72,7 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
         Writing to a value returned from this op is undefined behaviour.
     }];
 
-    let verifier = "return ::verify(*this);";
+    let hasVerifier = 1;
 }
 
 def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect, AlwaysBound]> {
@@ -474,9 +474,7 @@ def PylirPy_CallMethodExOp : PylirPy_CallMethodBase<"callMethodEx", [Terminator,
                         Variadic<DynamicType>:$normalDestOperands,
                         Variadic<DynamicType>:$unwindDestOperands);
 
-    let verifier = [{
-        return ::verifyHasLandingpad(*this, exceptionPath());
-    }];
+    let hasVerifier = 1;
 
     let assemblyFormat = [{
         $method `(` `*` $args `,` `*` `*` $keywords `)` attr-dict
@@ -509,9 +507,7 @@ class PylirPy_MakeExOp<string mnemonic, list<Trait> traits = []> :
                                                  AlwaysBound])> {
     let successors = (successor AnySuccessor:$happyPath, AnySuccessor:$exceptionPath);
 
-    let verifier = [{
-            return ::verifyHasLandingpad(*this, exceptionPath());
-    }];
+    let hasVerifier = 1;
 }
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound,
@@ -752,14 +748,6 @@ def PylirPy_MakeClassOp : PylirPy_Op<"makeClass", [DeclareOpInterfaceMethods<Sym
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
     let assemblyFormat = "$name `,` $initFunc `,` $bases `,` $keywords attr-dict";
-
-    let verifier = [{
-        if (!isStrictTuple(bases()) || !isStrictDict(keywords()))
-        {
-            return emitError("bases and keywords operands must be makeTuple, makeDict or tuple or dict constant ops");
-        }
-        return mlir::success();
-    }];
 }
 
 def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, DeclareOpInterfaceMethods<RuntimeTypeInterface>]> {
@@ -847,14 +835,7 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
         are undefined behaviour.
     }];
 
-    let verifier = [{
-        if (!isDeclaration())
-        {
-            return ::verify(*this, *initializer());
-        }
-        return mlir::success();
-    }];
-
+    let hasVerifier = 1;
     let hasFolder = 1;
 }
 
@@ -940,9 +921,7 @@ class PylirPy_InvokeBase<string mnemonic,list<Trait> traits = []> : PylirPy_Op<m
 
     let results = (outs Variadic<AnyType>:$results);
 
-    let verifier = [{
-        return ::verifyHasLandingpad(*this, exceptionPath());
-    }];
+    let hasVerifier = 1;
 }
 
 def PylirPy_InvokeOp : PylirPy_InvokeBase<"invoke",[DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {

@@ -216,34 +216,6 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
     printer << ')';
 }
 
-bool isStrictTuple(mlir::Value value)
-{
-    if (value.getDefiningOp<pylir::Py::MakeTupleOp>())
-    {
-        return true;
-    }
-    auto constant = value.getDefiningOp<pylir::Py::ConstantOp>();
-    if (!constant)
-    {
-        return false;
-    }
-    return constant.constant().isa<pylir::Py::TupleAttr>();
-}
-
-bool isStrictDict(mlir::Value value)
-{
-    if (value.getDefiningOp<pylir::Py::MakeDictOp>())
-    {
-        return true;
-    }
-    auto constant = value.getDefiningOp<pylir::Py::ConstantOp>();
-    if (!constant)
-    {
-        return false;
-    }
-    return constant.constant().isa<pylir::Py::DictAttr>();
-}
-
 } // namespace
 
 mlir::LogicalResult pylir::Py::MakeTupleOp::inferReturnTypes(::mlir::MLIRContext* context,
@@ -826,19 +798,6 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
         .Default(mlir::success());
 }
 
-mlir::LogicalResult verify(pylir::Py::ConstantOp op)
-{
-    for (auto& uses : op->getUses())
-    {
-        if (auto interface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(uses.getOwner());
-            interface && interface.getEffectOnValue<mlir::MemoryEffects::Write>(op))
-        {
-            return uses.getOwner()->emitOpError("Write to a constant value is not allowed\n");
-        }
-    }
-    return verify(op, op.constant());
-}
-
 mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock)
 {
     if (unwindBlock->empty() || !mlir::isa<pylir::Py::LandingPadOp>(unwindBlock->front()))
@@ -849,6 +808,63 @@ mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwind
 }
 
 } // namespace
+
+mlir::LogicalResult pylir::Py::ConstantOp::verify()
+{
+    for (auto& uses : getOperation()->getUses())
+    {
+        if (auto interface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(uses.getOwner());
+            interface && interface.getEffectOnValue<mlir::MemoryEffects::Write>(*this))
+        {
+            return uses.getOwner()->emitOpError("Write to a constant value is not allowed\n");
+        }
+    }
+    return ::verify(*this, constant());
+}
+
+mlir::LogicalResult pylir::Py::CallMethodExOp::verify()
+{
+    return verifyHasLandingpad(*this, exceptionPath());
+}
+
+mlir::LogicalResult pylir::Py::MakeTupleExOp::verify()
+{
+    return verifyHasLandingpad(*this, exceptionPath());
+}
+
+mlir::LogicalResult pylir::Py::MakeListExOp::verify()
+{
+    return verifyHasLandingpad(*this, exceptionPath());
+}
+
+mlir::LogicalResult pylir::Py::MakeSetExOp::verify()
+{
+    return verifyHasLandingpad(*this, exceptionPath());
+}
+
+mlir::LogicalResult pylir::Py::MakeDictExOp::verify()
+{
+    return verifyHasLandingpad(*this, exceptionPath());
+}
+
+mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
+{
+    if (!isDeclaration())
+    {
+        return ::verify(*this, *initializer());
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::InvokeOp::verify()
+{
+    return verifyHasLandingpad(*this, exceptionPath());
+}
+
+mlir::LogicalResult pylir::Py::InvokeIndirectOp::verify()
+{
+    return verifyHasLandingpad(*this, exceptionPath());
+}
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
 

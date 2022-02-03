@@ -29,6 +29,15 @@ mlir::Optional<mlir::MutableOperandRange> pylir::MemSSA::MemoryBranchOp::getMuta
     return branchArgsMutable()[index];
 }
 
+mlir::LogicalResult pylir::MemSSA::MemoryBranchOp::verify()
+{
+    if (branchArgs().size() != successors().size())
+    {
+        return emitOpError("Expected branch arguments for every successor");
+    }
+    return mlir::success();
+}
+
 void pylir::MemSSA::InstructionAttr::print(::mlir::AsmPrinter& printer) const
 {
     printer.getStream() << "// ";

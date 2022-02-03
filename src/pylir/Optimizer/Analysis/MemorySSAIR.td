@@ -82,13 +82,7 @@ def MemoryBranchOp : MemorySSA_Op<"br", [Terminator, DeclareOpInterfaceMethods<B
 
     let assemblyFormat = "$successors $branchArgs attr-dict";
 
-    let verifier = [{
-        if (branchArgs().size() != successors().size())
-        {
-            return emitOpError("Expected branch arguments for every successor");
-        }
-        return mlir::success();
-    }];
+    let hasVerifier = 1;
 }
 
 #endif
