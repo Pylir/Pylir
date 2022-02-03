@@ -48,12 +48,12 @@ class RuntimeType<string name> : NativeOpTrait<name # "RuntimeType"> {
     let cppNamespace = "pylir::Py";
 }
 
-class PylirPy_Op<string mneomic, list<OpTrait> traits = []> :
+class PylirPy_Op<string mneomic, list<Trait> traits = []> :
     Op<PylirPy_Dialect, mneomic, traits> {
     let results = (outs DynamicType:$result);
 }
 
-class PylirPy_AllocOp<string mnemonic, list<OpTrait> traits = []> :
+class PylirPy_AllocOp<string mnemonic, list<Trait> traits = []> :
     Op<PylirPy_Dialect, mnemonic, !listconcat(traits, [AlwaysBound])> {
     let results = (outs Arg<DynamicType,"",[MemAlloc]>:$result);
 }
@@ -448,7 +448,7 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
     let hasFolder = 1;
 }
 
-class PylirPy_CallMethodBase<string mnemonic, list<OpTrait> traits = []> : PylirPy_Op<mnemonic, traits> {
+class PylirPy_CallMethodBase<string mnemonic, list<Trait> traits = []> : PylirPy_Op<mnemonic, traits> {
     let results = (outs DynamicType:$result);
 
     let description = [{
@@ -502,7 +502,7 @@ def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
 
 // Make ops
 
-class PylirPy_MakeExOp<string mnemonic, list<OpTrait> traits = []> :
+class PylirPy_MakeExOp<string mnemonic, list<Trait> traits = []> :
     PylirPy_Op<mnemonic, !listconcat(traits,[Terminator, AttrSizedOperandSegments,
                                                  DeclareOpInterfaceMethods<BranchOpInterface>,
                                                  DeclareOpInterfaceMethods<InferTypeOpInterface>,
@@ -777,7 +777,7 @@ def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, DeclareOpInter
 
 // Unary ops
 
-class PylirPy_UnaryOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name, traits> {
+class PylirPy_UnaryOp<string name, list<Trait> traits = []> : PylirPy_Op<name, traits> {
     let arguments = (ins DynamicType:$input);
 
     let assemblyFormat = "$input attr-dict";
@@ -787,7 +787,7 @@ class PylirPy_UnaryOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,
 
 // Binary ops
 
-class PylirPy_BinOp<string name, list<OpTrait> traits = []> : PylirPy_Op<name,traits> {
+class PylirPy_BinOp<string name, list<Trait> traits = []> : PylirPy_Op<name,traits> {
     let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
 
     let assemblyFormat = "$lhs `,` $rhs attr-dict";
@@ -930,7 +930,7 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator, ReturnLike]> {
     }];
 }
 
-class PylirPy_InvokeBase<string mnemonic,list<OpTrait> traits = []> : PylirPy_Op<mnemonic,
+class PylirPy_InvokeBase<string mnemonic,list<Trait> traits = []> : PylirPy_Op<mnemonic,
                                             !listconcat(traits,[Terminator, DeclareOpInterfaceMethods<CallOpInterface>,
                                              DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments,
                                              AlwaysBound])> {

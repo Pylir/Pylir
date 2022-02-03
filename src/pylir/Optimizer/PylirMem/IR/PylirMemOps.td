@@ -29,7 +29,7 @@ def AlwaysBound : NativeOpTrait<"AlwaysBound"> {
     let cppNamespace = "pylir::Py";
 }
 
-class PylirMem_Op<string mnemonic, list<OpTrait> traits = []> :
+class PylirMem_Op<string mnemonic, list<Trait> traits = []> :
     Op<PylirMem_Dialect, mnemonic, traits>;
 
 def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {

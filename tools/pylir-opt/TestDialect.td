@@ -11,7 +11,7 @@ def TestDialect : Dialect {
     let cppNamespace = "::pylir::test";
 }
 
-class Test_Op<string mnemonic, list <OpTrait> traits = []> : Op<TestDialect, mnemonic, traits>;
+class Test_Op<string mnemonic, list <Trait> traits = []> : Op<TestDialect, mnemonic, traits>;
 
 def RandomOp : Test_Op<"random", [NoSideEffect]> {
     let arguments = (ins);

@@ -19,7 +19,7 @@ class MemorySSA_Type<string name, list<Trait> traits = [], string baseCppClass =
 class MemorySSA_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute">
     : AttrDef<MemorySSA_Dialect, name, traits, baseCppClass>;
 
-class MemorySSA_Op<string mnemonic, list<OpTrait> traits = []>
+class MemorySSA_Op<string mnemonic, list<Trait> traits = []>
     : Op<MemorySSA_Dialect, mnemonic, traits>;
 
 def MemoryDefType : MemorySSA_Type<"Def"> {
