@@ -98,3 +98,18 @@ to be `type` however we can't not do the above. Since `type` might also manually
 the above in `type` either. We have no way to know whether `metaclass` is actually `type` unless going through the above
 as well. The best way is likely to simply call an internal function which is also called by `type`s call operator
 that does all the dynamic type creation. 
+
+# Calling a reversible binary operator
+
+Given 'lhs' and 'rhs', which are the left and right operand respectively:
+
+* if typeOf rhs subtype of typeOf lhs but not the same type:
+  * Check rhsType implements reflected operator, if it doesn't break
+  * Check lhsType either doesn't implement reflected operator or has a different implementation, else break
+  * Call reflected operator of rhs with (rhs, lhs)
+  * If result is not NotImplemented return value, else continue
+* Call normal operator of lhs with (lhs, rhs)
+* If result is not NotImplemented return
+* If rhs and lhs are of the same type raise TypeError
+* If reverse operator has not been tried yet try it
+* If not found or NotImplemented is returned, raise TypeError
