@@ -32,6 +32,7 @@ struct Keyword
 {
     std::string_view name;
 
+    ~Keyword() = default;
     Keyword(const Keyword&) = delete;
     Keyword& operator=(const Keyword&) = delete;
     Keyword(Keyword&&) = delete;
@@ -58,8 +59,9 @@ class PyObject
     PyObject* methodLookup(int index);
 
 public:
-    explicit PyObject(PyObject& type) : m_type(reinterpret_cast<PyTypeObject*>(&type)) {}
+    explicit PyObject(PyTypeObject& type) : m_type(&type) {}
 
+    ~PyObject() = default;
     PyObject(const PyObject&) = delete;
     PyObject(PyObject&&) noexcept = delete;
     PyObject& operator=(const PyObject&) = delete;
@@ -119,7 +121,7 @@ class PyTypeObject
     std::size_t m_offset;
 
 public:
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_base;
     }
@@ -141,9 +143,11 @@ class PyFunction
     PyUniversalCC m_function;
 
 public:
-    explicit PyFunction(PyUniversalCC function) : m_base(Builtins::Function), m_function(function) {}
+    explicit PyFunction(PyUniversalCC function) : m_base(Builtins::Function.cast<PyTypeObject>()), m_function(function)
+    {
+    }
 
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_base;
     }
@@ -162,14 +166,14 @@ protected:
     BufferComponent<PyObject*, MallocAllocator> m_buffer;
 
     template <class InputIter>
-    PySequence(PyObject& type, InputIter begin, InputIter end) : m_base(type), m_buffer(begin, end)
+    PySequence(PyObject& type, InputIter begin, InputIter end) : m_base(type.cast<PyTypeObject>()), m_buffer(begin, end)
     {
     }
 
 public:
-    explicit PySequence(PyObject& type) : m_base(type) {}
+    explicit PySequence(PyObject& type) : m_base(type.cast<PyTypeObject>()) {}
 
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_base;
     }
@@ -233,11 +237,11 @@ class PyString
 
 public:
     explicit PyString(std::string_view string, PyObject& type = Builtins::Str)
-        : m_base(type), m_buffer(string.begin(), string.end())
+        : m_base(type.cast<PyTypeObject>()), m_buffer(string.begin(), string.end())
     {
     }
 
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_base;
     }
@@ -252,12 +256,12 @@ public:
         return rhs.view() == sv;
     }
 
-    std::string_view view() const
+    [[nodiscard]] std::string_view view() const
     {
         return std::string_view{m_buffer.data(), m_buffer.size()};
     }
 
-    std::size_t len() const
+    [[nodiscard]] std::size_t len() const
     {
         return m_buffer.size();
     }
@@ -269,16 +273,16 @@ class PyDict
     HashTable<PyObject*, PyObject*, PyObjectHasher, PyObjectEqual, MallocAllocator> m_table;
 
 public:
-    PyDict(PyObject& type = Builtins::Dict) : m_base(type) {}
+    explicit PyDict(PyObject& type = Builtins::Dict) : m_base(type.cast<PyTypeObject>()) {}
 
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_base;
     }
 
     PyObject* tryGetItem(PyObject& key)
     {
-        auto result = m_table.find(&key);
+        auto* result = m_table.find(&key);
         if (result == m_table.end())
         {
             return nullptr;
@@ -303,7 +307,7 @@ class PyInt
     BigInt m_integer;
 
 public:
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_base;
     }
@@ -330,7 +334,7 @@ class PyBaseException
 public:
     constexpr static std::uint64_t EXCEPTION_CLASS = 0x50594C5250590000; // PYLRPY\0\0
 
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_base;
     }
@@ -354,7 +358,7 @@ public:
                                                   - offsetof(PyBaseException, m_unwindHeader));
     }
 
-    std::uintptr_t getLandingPad() const
+    [[nodiscard]] std::uintptr_t getLandingPad() const
     {
         return m_landingPad;
     }
@@ -364,7 +368,7 @@ public:
         m_landingPad = landingPad;
     }
 
-    std::uint32_t getTypeIndex() const
+    [[nodiscard]] std::uint32_t getTypeIndex() const
     {
         return m_typeIndex;
     }
@@ -444,28 +448,29 @@ class StaticInstance
 {
     using InstanceType = typename PyTypeTraits<typeObject>::instanceType;
     static_assert(alignof(InstanceType) >= alignof(PyObject*));
-    alignas(InstanceType) std::byte m_buffer[sizeof(InstanceType) + slotCount * sizeof(PyObject*)]{};
+    // NOLINTNEXTLINE(bugprone-sizeof-expression)
+    alignas(InstanceType) std::array<std::byte, sizeof(InstanceType) + slotCount * sizeof(PyObject*)> m_buffer{};
 
 public:
     template <class... Args>
     StaticInstance(std::initializer_list<std::pair<typename InstanceType::Slots, PyObject&>> slotsInit, Args&&... args)
     {
         static_assert(std::is_standard_layout_v<std::remove_reference_t<decltype(*this)>>);
-        new (m_buffer) InstanceType(std::forward<Args>(args)...);
+        new (m_buffer.data()) InstanceType(std::forward<Args>(args)...);
         std::array<PyObject*, slotCount> slots;
         for (auto& [index, object] : slotsInit)
         {
             slots[index] = &object;
         }
-        std::memcpy(m_buffer + sizeof(InstanceType), slots.data(), slots.size() * sizeof(PyObject*));
+        std::memcpy(m_buffer.data() + sizeof(InstanceType), slots.data(), slots.size() * sizeof(PyObject*));
     }
 
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return get();
     }
 
-    operator InstanceType&()
+    /*implicit*/ operator InstanceType&()
     {
         return *reinterpret_cast<InstanceType*>(m_buffer);
     }
@@ -484,16 +489,16 @@ class StaticInstance<typeObject, 0>
 
 public:
     template <class... Args>
-    StaticInstance(Args&&... args) : m_object(std::forward<Args>(args)...)
+    explicit StaticInstance(Args&&... args) : m_object(std::forward<Args>(args)...)
     {
     }
 
-    operator PyObject&()
+    /*implicit*/ operator PyObject&()
     {
         return m_object;
     }
 
-    operator InstanceType&()
+    /*implicit*/ operator InstanceType&()
     {
         return m_object;
     }
@@ -517,8 +522,8 @@ PyObject& PyObject::operator()(Args&&... args)
         }
         if (auto* pyF = call->dyn_cast<PyFunction>())
         {
-            PyTuple& tuple = alloc<PyTuple>(*self);
-            PyDict& dict = alloc<PyDict>();
+            auto& tuple = alloc<PyTuple>(*self);
+            auto& dict = alloc<PyDict>();
             (
                 [&](auto&& arg)
                 {

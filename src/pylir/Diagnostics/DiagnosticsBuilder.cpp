@@ -200,7 +200,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
 
 std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message, Severity severity) const
 {
-    auto& document = *message.document;
+    const auto& document = *message.document;
     auto [lineNumber, colNumber] = document.getLineCol(message.location);
     std::string_view severityStr;
     fmt::color colour;
@@ -235,7 +235,7 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
     std::unordered_map<std::size_t, std::set<Label, LabelCompare>> labeled;
     std::set<std::size_t> neededLines;
     neededLines.insert(lineNumber);
-    for (auto& iter : message.labels)
+    for (const auto& iter : message.labels)
     {
         auto end = document.getLineNumber(iter.end - 1);
         auto start = document.getLineNumber(iter.start);
@@ -286,10 +286,11 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message,
         }
     }
     auto largestLine = *std::prev(neededLines.end());
-    auto width = pylir::roundUpTo(1 + (std::size_t)std::floor(log10f(largestLine)), 4);
+    auto width = pylir::roundUpTo(1 + (std::size_t)std::floor(log10f(static_cast<float>(largestLine))), 4);
 
     constexpr auto MARGIN = 1;
-    for (std::size_t i = std::max<std::ptrdiff_t>(1, *neededLines.begin() - MARGIN); i < *neededLines.begin(); i++)
+    for (std::size_t i = std::max<std::ptrdiff_t>(1, static_cast<std::ptrdiff_t>(*neededLines.begin()) - MARGIN);
+         i < *neededLines.begin(); i++)
     {
         result += fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
     }

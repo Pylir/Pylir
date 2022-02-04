@@ -203,22 +203,22 @@ mlir::LLVM::LLVMFuncOp pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir
 
     std::uint8_t takenIntegerRegisters = 0;
     std::uint8_t takenFloatingPointRegisters = 0;
-    for (auto arg = inputTypes.begin(); arg != inputTypes.end(); arg++)
+    for (auto inputType : inputTypes)
     {
-        if (getSizeOf(*arg) > 16)
+        if (getSizeOf(inputType) > 16)
         {
-            adjustments.arguments.push_back(OnStack{});
-            argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(*arg));
+            adjustments.arguments.emplace_back(OnStack{});
+            argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(inputType));
             continue;
         }
         std::pair<mlir::Type, mlir::Type> types;
         Adjustments::Arg dest;
         std::tie(dest, types.first, types.second) =
-            flattenSingleArg(*arg, &takenIntegerRegisters, &takenFloatingPointRegisters);
+            flattenSingleArg(inputType, &takenIntegerRegisters, &takenFloatingPointRegisters);
         adjustments.arguments.push_back(dest);
         if (std::holds_alternative<OnStack>(dest))
         {
-            argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(*arg));
+            argumentTypes.push_back(mlir::LLVM::LLVMPointerType::get(inputType));
         }
         else if (std::holds_alternative<MultipleArgs>(dest))
         {
@@ -230,7 +230,7 @@ mlir::LLVM::LLVMFuncOp pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir
         }
         else
         {
-            argumentTypes.push_back(*arg);
+            argumentTypes.push_back(inputType);
         }
     }
 

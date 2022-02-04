@@ -19,7 +19,7 @@ struct StrAttrCompare
         return t < u;
     }
 
-    typedef void is_transparent;
+    using is_transparent = void;
 };
 } // namespace pylir::Py::detail
 
@@ -57,16 +57,16 @@ public:
 
     void printMethod(::mlir::AsmPrinter& printer) const;
 
-    mlir::FlatSymbolRefAttr getType() const;
+    [[nodiscard]] mlir::FlatSymbolRefAttr getType() const;
 
-    ::pylir::Py::SlotsAttr getSlots() const;
+    [[nodiscard]] ::pylir::Py::SlotsAttr getSlots() const;
 
-    mlir::Attribute getBuiltinValue() const;
+    [[nodiscard]] mlir::Attribute getBuiltinValue() const;
 
     void walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                   llvm::function_ref<void(mlir::Type)> walkTypesFn) const;
 
-    mlir::SubElementAttrInterface
+    [[nodiscard]] mlir::SubElementAttrInterface
         replaceImmediateSubAttribute(llvm::ArrayRef<std::pair<size_t, mlir::Attribute>> replacements) const;
 };
 
@@ -88,7 +88,7 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("int");
+        return {"int"};
     }
 
     static IntAttr get(::mlir::MLIRContext* context, BigInt value);
@@ -97,7 +97,7 @@ public:
 
     void printMethod(::mlir::AsmPrinter& printer) const;
 
-    const BigInt& getValue() const;
+    [[nodiscard]] const BigInt& getValue() const;
 };
 
 class BoolAttr : public ObjectAttr
@@ -119,14 +119,14 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("bool");
+        return {"bool"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
     void printMethod(::mlir::AsmPrinter& printer) const;
 
-    bool getValue() const;
+    [[nodiscard]] bool getValue() const;
 };
 
 class FloatAttr : public ObjectAttr
@@ -148,16 +148,16 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("float");
+        return {"float"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
     void printMethod(::mlir::AsmPrinter& printer) const;
 
-    double getValue() const;
+    [[nodiscard]] double getValue() const;
 
-    mlir::FloatAttr getValueAttr() const;
+    [[nodiscard]] mlir::FloatAttr getValueAttr() const;
 };
 
 class StringAttr : public ObjectAttr
@@ -179,16 +179,16 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("str");
+        return {"str"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
     void printMethod(::mlir::AsmPrinter& printer) const;
 
-    llvm::StringRef getValue() const;
+    [[nodiscard]] llvm::StringRef getValue() const;
 
-    mlir::StringAttr getValueAttr() const;
+    [[nodiscard]] mlir::StringAttr getValueAttr() const;
 };
 
 class TupleAttr : public ObjectAttr
@@ -210,7 +210,7 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("tuple");
+        return {"tuple"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
@@ -219,7 +219,7 @@ public:
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
 
-    mlir::ArrayAttr getValueAttr() const;
+    [[nodiscard]] mlir::ArrayAttr getValueAttr() const;
 };
 
 class ListAttr : public ObjectAttr
@@ -241,7 +241,7 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("list");
+        return {"list"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
@@ -250,7 +250,7 @@ public:
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
 
-    mlir::ArrayAttr getValueAttr() const;
+    [[nodiscard]] mlir::ArrayAttr getValueAttr() const;
 };
 
 class SetAttr : public ObjectAttr
@@ -274,7 +274,7 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("set");
+        return {"set"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
@@ -283,7 +283,7 @@ public:
 
     llvm::ArrayRef<mlir::Attribute> getValue() const;
 
-    mlir::ArrayAttr getValueAttr() const;
+    [[nodiscard]] mlir::ArrayAttr getValueAttr() const;
 };
 
 class DictAttr : public ObjectAttr
@@ -309,7 +309,7 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("dict");
+        return {"dict"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
@@ -339,31 +339,31 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("function");
+        return {"function"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
     void printMethod(::mlir::AsmPrinter& printer) const;
 
-    mlir::FlatSymbolRefAttr getValue() const;
+    [[nodiscard]] mlir::FlatSymbolRefAttr getValue() const;
 
     // If its a SymbolRefAttr it must refer to a string
     // Otherwise it must be a string
-    mlir::Attribute getQualName() const;
+    [[nodiscard]] mlir::Attribute getQualName() const;
 
     // If its a SymbolRefAttr it must refer to a dictionary or builtins.None
     // Otherwise it must be a Py::DictAttr
-    mlir::Attribute getKWDefaults() const;
+    [[nodiscard]] mlir::Attribute getKWDefaults() const;
 
     // If its a SymbolRefAttr it must refer to a tuple or builtins.None
     // Otherwise it must be a Py::TupleAttr
-    mlir::Attribute getDefaults() const;
+    [[nodiscard]] mlir::Attribute getDefaults() const;
 
     // Nullable
     // If its a SymbolRefAttr it must refer to a dictionary
     // Otherwise it must be a Py::DictAttr
-    mlir::Attribute getDict() const;
+    [[nodiscard]] mlir::Attribute getDict() const;
 };
 
 class TypeAttr : public ObjectAttr
@@ -385,7 +385,7 @@ public:
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
-        return ::llvm::StringLiteral("type");
+        return {"type"};
     }
 
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);

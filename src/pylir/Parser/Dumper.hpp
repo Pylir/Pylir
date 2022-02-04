@@ -65,7 +65,7 @@ class Dumper
             return *this;
         }
 
-        std::string emit() const;
+        [[nodiscard]] std::string emit() const;
     };
 
     template <class S, class... Args>

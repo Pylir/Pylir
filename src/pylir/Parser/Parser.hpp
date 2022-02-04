@@ -91,7 +91,7 @@ class Parser
             }
             rest.emplace_back(*comma, std::make_unique<T>(*std::move(other)));
         }
-        return Syntax::CommaList<T>{std::make_unique<T>(std::move(*optionalFirst)), std::move(rest), std::move(last)};
+        return Syntax::CommaList<T>{std::make_unique<T>(std::move(*optionalFirst)), std::move(rest), last};
     }
 
     template <class T, auto parseLesser, TokenType... allowed>

@@ -12,8 +12,8 @@ namespace pylir
 template <class ValueType, class CacheObject, auto nextFunc, auto containerAccess>
 class LazyCacheIterator
 {
-    CacheObject* m_cache;
-    std::size_t m_index;
+    CacheObject* m_cache{};
+    std::size_t m_index{};
 
     decltype(auto) container()
     {

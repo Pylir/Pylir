@@ -21,7 +21,7 @@ namespace
 {
 
 std::unique_ptr<pylir::Toolchain> createToolchainForTriple(const pylir::cli::CommandLine& commandLine,
-                                                           llvm::Triple triple)
+                                                           const llvm::Triple& triple)
 {
     if (triple.isKnownWindowsMSVCEnvironment())
     {
@@ -50,7 +50,7 @@ struct fmt::formatter<llvm::StringRef> : formatter<string_view>
     }
 };
 
-int pylir::main(int argc, char* argv[])
+int pylir::main(int argc, char** argv)
 {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
@@ -64,7 +64,7 @@ int pylir::main(int argc, char* argv[])
     {
         return -1;
     }
-    auto& args = commandLine.getArgs();
+    const auto& args = commandLine.getArgs();
     if (args.hasArg(OPT_help))
     {
         commandLine.printHelp(llvm::outs());
@@ -100,8 +100,8 @@ int pylir::main(int argc, char* argv[])
         action = pylir::CompilerInvocation::SyntaxOnly;
         if (args.hasArg(OPT_S))
         {
-            auto assembly = args.getLastArg(OPT_S);
-            auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
+            auto *assembly = args.getLastArg(OPT_S);
+            auto *syntaxOnly = args.getLastArg(OPT_fsyntax_only);
             llvm::errs() << commandLine
                                 .createDiagnosticsBuilder(
                                     assembly, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, "Assembly")
@@ -111,8 +111,8 @@ int pylir::main(int argc, char* argv[])
         }
         else if (args.hasArg(OPT_c))
         {
-            auto objectFile = args.getLastArg(OPT_c);
-            auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
+            auto *objectFile = args.getLastArg(OPT_c);
+            auto *syntaxOnly = args.getLastArg(OPT_fsyntax_only);
             llvm::errs() << commandLine
                                 .createDiagnosticsBuilder(
                                     objectFile, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, "Object file")
@@ -134,8 +134,8 @@ int pylir::main(int argc, char* argv[])
     {
         if (args.hasArg(second))
         {
-            auto lastArg = args.getLastArg(first, second);
-            auto secondLast = lastArg->getOption().getID() == first ? args.getLastArg(second) : args.getLastArg(first);
+            auto *lastArg = args.getLastArg(first, second);
+            auto *secondLast = lastArg->getOption().getID() == first ? args.getLastArg(second) : args.getLastArg(first);
             llvm::errs() << commandLine
                                 .createDiagnosticsBuilder(lastArg,
                                                           pylir::Diag::CANNOT_EMIT_N_IR_AND_N_IR_AT_THE_SAME_TIME,
@@ -152,7 +152,7 @@ int pylir::main(int argc, char* argv[])
     {
         if (args.hasArg(OPT_fsyntax_only))
         {
-            auto syntaxOnly = args.getLastArg(OPT_fsyntax_only);
+            auto *syntaxOnly = args.getLastArg(OPT_fsyntax_only);
             llvm::errs() << commandLine
                                 .createDiagnosticsBuilder(
                                     arg, pylir::Diag::N_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, name)
@@ -201,7 +201,7 @@ int pylir::main(int argc, char* argv[])
         }
     }
 
-    if (auto opt = args.getLastArg(OPT_O);
+    if (auto *opt = args.getLastArg(OPT_O);
         opt && opt->getValue() == std::string_view{"4"} && !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm)
         && (action == pylir::CompilerInvocation::Assembly || action == pylir::CompilerInvocation::ObjectFile)
         && !args.hasArg(OPT_flto, OPT_fno_lto))
@@ -214,7 +214,7 @@ int pylir::main(int argc, char* argv[])
                             .emitWarning();
     }
 
-    if (auto opt = args.getLastArg(OPT_flto, OPT_fno_lto);
+    if (auto *opt = args.getLastArg(OPT_flto, OPT_fno_lto);
         opt && opt->getOption().matches(OPT_flto) && !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm)
         && (action == pylir::CompilerInvocation::Assembly || action == pylir::CompilerInvocation::ObjectFile))
     {

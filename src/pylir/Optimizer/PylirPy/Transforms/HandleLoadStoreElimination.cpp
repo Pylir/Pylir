@@ -32,7 +32,7 @@ private:
 void HandleLoadStoreEliminationPass::runOnOperation()
 {
     bool changed = false;
-    auto topLevel = getOperation();
+    auto *topLevel = getOperation();
     getContext().allowUnregisteredDialects();
     mlir::OperationState state(mlir::UnknownLoc::get(&getContext()), "__clobber_tracker");
     state.addTypes({pylir::Py::DynamicType::get(&getContext())});

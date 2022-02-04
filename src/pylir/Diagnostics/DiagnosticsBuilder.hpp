@@ -255,12 +255,12 @@ class DiagnosticsBuilder
         std::vector<Label> labels;
     };
     std::vector<Message> m_messages;
-    const void* m_context;
+    const void* m_context{};
 
     static std::string printLine(std::size_t width, std::size_t lineNumber, const pylir::Diag::Document& document,
                                  std::vector<Label> labels);
 
-    std::string emitMessage(const Message& message, Severity severity) const;
+    [[nodiscard]] std::string emitMessage(const Message& message, Severity severity) const;
 
 public:
     template <class T, class S, class... Args>
@@ -352,7 +352,7 @@ public:
         return std::move(addNote(document, location, message, std::forward<Args>(args)...));
     }
 
-    std::string emit(Severity severity) const
+    [[nodiscard]] std::string emit(Severity severity) const
     {
         auto begin = m_messages.begin();
         std::string result = emitMessage(*begin++, severity);
@@ -360,12 +360,12 @@ public:
         return result;
     }
 
-    std::string emitError() const
+    [[nodiscard]] std::string emitError() const
     {
         return emit(Severity::Error);
     }
 
-    std::string emitWarning() const
+    [[nodiscard]] std::string emitWarning() const
     {
         return emit(Severity::Warning);
     }

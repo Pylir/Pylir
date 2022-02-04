@@ -29,7 +29,8 @@ public:
     using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
 
-    Document(std::string input, std::string filename = "<stdin>", Text::Encoding encoding = Text::Encoding::UTF8);
+    explicit Document(std::string input, std::string filename = "<stdin>",
+                      Text::Encoding encoding = Text::Encoding::UTF8);
 
     [[nodiscard]] iterator begin() const
     {

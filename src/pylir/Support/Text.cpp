@@ -121,7 +121,7 @@ std::array<char16_t, 2> pylir::Text::toUTF16(std::u16string_view& utf16, bool* l
     {
         return REPLACEMENT_CHARACTER_UTF16;
     }
-    std::array<char16_t, 2> result;
+    std::array<char16_t, 2> result{};
     std::copy(copy.data(), utf16.data(), result.begin());
     return result;
 }
@@ -155,7 +155,7 @@ std::array<char16_t, 2> pylir::Text::toUTF16(char32_t utf32, bool* legal)
     // https://unicode.org/faq/utf_bom.html
     constexpr char32_t LEAD_OFFSET = 0xD800 - (0x10000 >> 10);
 
-    std::array<char16_t, 2> result;
+    std::array<char16_t, 2> result{};
     result[0] = LEAD_OFFSET + (utf32 >> 10);
     result[1] = 0xDC00 + (utf32 & 0x3FF);
     return result;
@@ -329,7 +329,7 @@ std::u32string pylir::Text::toUTF32String(std::string_view utf8, bool* legal)
 
 bool pylir::Text::isWhitespace(char32_t codepoint)
 {
-    auto properties = utf8proc_get_property(codepoint);
+    const auto *properties = utf8proc_get_property(codepoint);
     return properties->category == UTF8PROC_CATEGORY_ZS || properties->bidi_class == UTF8PROC_BIDI_CLASS_WS
            || properties->bidi_class == UTF8PROC_BIDI_CLASS_B || properties->bidi_class == UTF8PROC_BIDI_CLASS_S;
 }
@@ -380,7 +380,7 @@ std::u32string pylir::Text::normalize(std::u32string_view utf32, pylir::Text::No
             break;
         } while (true);
     }
-    return std::u32string(buffer.begin(), buffer.begin() + actuallyWritten);
+    return {buffer.begin(), buffer.begin() + actuallyWritten};
 }
 
 std::size_t pylir::Text::consoleWidth(char32_t codepoint)

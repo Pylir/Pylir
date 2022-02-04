@@ -25,6 +25,10 @@ public:
 
     ValueTracker& operator=(const ValueTracker& rhs)
     {
+        if (this == &rhs)
+        {
+            return *this;
+        }
         if (m_tracker)
         {
             m_tracker->erase();
@@ -45,6 +49,7 @@ public:
         return *this;
     }
 
+    // NOLINTNEXTLINE(google-explicit-constructor)
     ValueTracker(mlir::Value value)
     {
         if (!value)
@@ -68,6 +73,7 @@ public:
         return *this;
     }
 
+    // NOLINTNEXTLINE(google-explicit-constructor)
     operator mlir::Value() const
     {
         if (!m_tracker)

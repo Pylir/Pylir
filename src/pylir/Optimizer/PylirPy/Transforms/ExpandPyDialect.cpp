@@ -46,15 +46,15 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
     {
         auto loc = op.getLoc();
         auto tuple = op.mroTuple();
-        auto block = op->getBlock();
-        auto endBlock = block->splitBlock(op);
+        auto *block = op->getBlock();
+        auto *endBlock = block->splitBlock(op);
         endBlock->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
         endBlock->addArgument(rewriter.getI1Type(), loc);
 
         rewriter.setInsertionPointToEnd(block);
         auto tupleSize = rewriter.create<pylir::Py::TupleLenOp>(loc, rewriter.getIndexType(), tuple);
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-        auto conditionBlock = new mlir::Block;
+        auto *conditionBlock = new mlir::Block;
         conditionBlock->addArgument(rewriter.getIndexType(), loc);
         rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
 
@@ -62,7 +62,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         rewriter.setInsertionPointToStart(conditionBlock);
         auto isLess = rewriter.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
                                                            conditionBlock->getArgument(0), tupleSize);
-        auto body = new mlir::Block;
+        auto *body = new mlir::Block;
         auto unbound = rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::UnboundAttr::get(getContext()));
         auto falseConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
         rewriter.create<mlir::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{unbound, falseConstant});
@@ -74,7 +74,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.slotAttr());
         auto failure = rewriter.create<pylir::Py::IsUnboundValueOp>(loc, fetch);
         auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
-        auto notFound = new mlir::Block;
+        auto *notFound = new mlir::Block;
         rewriter.create<mlir::CondBranchOp>(loc, failure, notFound, endBlock, mlir::ValueRange{fetch, trueConstant});
 
         notFound->insertBefore(endBlock);
@@ -96,13 +96,13 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
     {
         auto loc = op.getLoc();
         auto tuple = op.mroTuple();
-        auto block = op->getBlock();
-        auto endBlock = block->splitBlock(op);
+        auto *block = op->getBlock();
+        auto *endBlock = block->splitBlock(op);
         endBlock->addArgument(rewriter.getI1Type(), loc);
         rewriter.setInsertionPointToEnd(block);
         auto tupleSize = rewriter.create<pylir::Py::TupleLenOp>(loc, rewriter.getIndexType(), tuple);
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-        auto conditionBlock = new mlir::Block;
+        auto *conditionBlock = new mlir::Block;
         conditionBlock->addArgument(rewriter.getIndexType(), loc);
         rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
 
@@ -110,7 +110,7 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
         rewriter.setInsertionPointToStart(conditionBlock);
         auto isLess = rewriter.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
                                                            conditionBlock->getArgument(0), tupleSize);
-        auto body = new mlir::Block;
+        auto *body = new mlir::Block;
         auto falseConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
         rewriter.create<mlir::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{falseConstant});
 
@@ -118,7 +118,7 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
         rewriter.setInsertionPointToStart(body);
         auto entry = rewriter.create<pylir::Py::TupleGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
         auto isType = rewriter.create<pylir::Py::IsOp>(loc, entry, op.element());
-        auto notFound = new mlir::Block;
+        auto *notFound = new mlir::Block;
         auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
         rewriter.create<mlir::CondBranchOp>(loc, isType, endBlock, mlir::ValueRange{trueConstant}, notFound,
                                             mlir::ValueRange{});
@@ -197,7 +197,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
         auto begin = range.begin();
         auto prefix = op.getOperands().take_front((*begin).getValue().getZExtValue());
         auto list = rewriter.create<NormalMakeOp>(loc, prefix, rewriter.getI32ArrayAttr({}));
-        for (auto iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), (*begin).getValue().getZExtValue()))
+        for (const auto& iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), (*begin).getValue().getZExtValue()))
         {
             if (begin == range.end() || (*begin).getValue() != iter.index())
             {
@@ -207,14 +207,14 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             begin++;
             auto iterObject = pylir::Py::buildSpecialMethodCall(loc, rewriter, "__iter__", {iter.value()}, {},
                                                                 exceptionHandlerBlock, landingPadBlock);
-            auto condition = new mlir::Block;
+            auto *condition = new mlir::Block;
             rewriter.create<mlir::BranchOp>(loc, condition);
 
             condition->insertBefore(dest);
             rewriter.setInsertionPointToStart(condition);
-            auto stopIterationHandler = new mlir::Block;
+            auto *stopIterationHandler = new mlir::Block;
             stopIterationHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
-            auto landingPad = new mlir::Block;
+            auto *landingPad = new mlir::Block;
             auto next = pylir::Py::buildSpecialMethodCall(loc, rewriter, "__next__", iterObject, {},
                                                           exceptionHandlerBlock, landingPad);
 

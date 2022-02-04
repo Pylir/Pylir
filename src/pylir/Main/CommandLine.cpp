@@ -3,6 +3,8 @@
 #include <llvm/Support/Path.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <utility>
+
 pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(InfoTable) {}
 
 pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv)
@@ -13,12 +15,12 @@ pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv)
                                    m_errorsOccurred = true;
                                    llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Severity::Error, msg);
                                })),
-      m_exe(exe),
+      m_exe(std::move(exe)),
       m_rendered(
           [this]
           {
               std::string rendered = llvm::sys::path::filename(m_exe).str();
-              for (auto iter : m_args)
+              for (auto* iter : m_args)
               {
                   auto arg = iter->getAsString(m_args);
                   rendered += " ";

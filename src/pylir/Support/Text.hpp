@@ -174,7 +174,7 @@ class Transcoder<void, Target>
     {
         std::string_view m_source;
         std::array<Target, sizeof(char32_t) / sizeof(Target)> m_data;
-        Encoding m_encoding;
+        Encoding m_encoding{};
 
         void transcodeNext()
         {

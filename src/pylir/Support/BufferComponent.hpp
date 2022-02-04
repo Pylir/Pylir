@@ -82,8 +82,12 @@ public:
     {
     }
 
-    BufferComponent& operator=(const BufferComponent& rhs) noexcept
+    BufferComponent& operator=(const BufferComponent& rhs)
     {
+        if (this == &rhs)
+        {
+            return *this;
+        }
         if (m_size > rhs.m_size)
         {
             std::destroy_n(m_data + rhs.m_size, m_size - rhs.m_size);
@@ -108,7 +112,7 @@ public:
         return *this;
     }
 
-    std::size_t size() const
+    [[nodiscard]] std::size_t size() const
     {
         return m_size;
     }
@@ -184,8 +188,7 @@ public:
         std::move(m_data + index + 1, m_data + m_size, m_data + index);
         m_size--;
         std::destroy_at(m_data + m_size);
-        return;
-    }
+   }
 
     void clear()
     {

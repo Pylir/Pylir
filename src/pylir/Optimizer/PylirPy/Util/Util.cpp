@@ -9,7 +9,7 @@ namespace
 void implementBlock(mlir::OpBuilder& builder, mlir::Block* block)
 {
     PYLIR_ASSERT(block);
-    if (auto next = builder.getBlock()->getNextNode())
+    if (auto *next = builder.getBlock()->getNextNode())
     {
         block->insertBefore(next);
     }
@@ -77,7 +77,7 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
     }
     else
     {
-        auto happyPath = new mlir::Block;
+        auto *happyPath = new mlir::Block;
         tuple = builder.create<Py::MakeTupleExOp>(loc, args, happyPath, mlir::ValueRange{}, landingPadBlock,
                                                   mlir::ValueRange{});
         implementBlock(builder, happyPath);
@@ -115,7 +115,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
         loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Type.name));
     auto mroTuple = builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__").result();
     auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
-    auto exec = new mlir::Block;
+    auto *exec = new mlir::Block;
     builder.create<mlir::CondBranchOp>(loc, lookup.success(), exec, notFoundPath);
 
     implementBlock(builder, exec);

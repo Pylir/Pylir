@@ -20,7 +20,9 @@ public:
     virtual ~CABI() = default;
 
     CABI(const CABI&) = delete;
+    CABI& operator=(const CABI&) = delete;
     CABI(CABI&&) = delete;
+    CABI& operator=(CABI&&) = delete;
 
     virtual mlir::LLVM::LLVMFuncOp declareFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type returnType,
                                                llvm::StringRef name, mlir::TypeRange inputTypes) = 0;

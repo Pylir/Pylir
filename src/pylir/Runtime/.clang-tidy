@@ -1,0 +1,2 @@
+InheritParentConfig: true
+Checks: '-cert-err58-cpp, -google-explicit-constructor'

@@ -4,6 +4,7 @@
 
 #pragma region gen_unicode_names.py
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 static const char* NAME_DATA[] = {
     "SPACE",
     "EXCLAMATION MARK",
@@ -34172,7 +34173,7 @@ static const char* NAME_DATA[] = {
     "VS255",
     "VS256",
 };
-
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 static char32_t NAME_CODEPOINT[] = {
     0x20,    0x21,    0x22,    0x23,    0x24,    0x25,    0x26,    0x27,    0x28,    0x29,    0x2a,    0x2b,    0x2c,
     0x2d,    0x2e,    0x2f,    0x30,    0x31,    0x32,    0x33,    0x34,    0x35,    0x36,    0x37,    0x38,    0x39,

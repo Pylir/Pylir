@@ -1168,9 +1168,9 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     {
         switch (kind)
         {
-            case Scope::Kind::Local: locals.insert(std::move(token)); break;
-            case Scope::Kind::NonLocal: nonLocals.insert(std::move(token)); break;
-            case Scope::Kind::Unknown: unknowns.insert(std::move(token)); break;
+            case Scope::Kind::Local: locals.insert(token); break;
+            case Scope::Kind::NonLocal: nonLocals.insert(token); break;
+            case Scope::Kind::Unknown: unknowns.insert(token); break;
             default: break;
         }
     }
@@ -1196,7 +1196,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
             return tl::unexpected{std::move(error.error())};
         }
         closures = std::move(*error);
-        for (auto& iter : closures)
+        for (const auto& iter : closures)
         {
             locals.erase(iter);
         }
@@ -1274,9 +1274,9 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     {
         switch (kind)
         {
-            case Scope::Kind::NonLocal: nonLocals.insert(std::move(token)); break;
-            case Scope::Kind::Local: locals.insert(std::move(token)); break;
-            case Scope::Kind::Unknown: unknowns.insert(std::move(token)); break;
+            case Scope::Kind::NonLocal: nonLocals.insert(token); break;
+            case Scope::Kind::Local: locals.insert(token); break;
+            case Scope::Kind::Unknown: unknowns.insert(token); break;
             default: break;
         }
     }

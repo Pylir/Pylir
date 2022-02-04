@@ -25,7 +25,7 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
       m_module(mlir::ModuleOp::create(m_builder.getUnknownLoc())),
       m_document(&document)
 {
-    for (auto& iter : Py::Builtins::allBuiltins)
+    for (const auto& iter : Py::Builtins::allBuiltins)
     {
         if (!iter.isPublic)
         {
@@ -46,7 +46,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     m_builder.setInsertionPointToEnd(m_module.getBody());
     createBuiltinsImpl();
 
-    for (auto& token : fileInput.globals)
+    for (const auto& token : fileInput.globals)
     {
         m_builder.setCurrentLoc(getLoc(token, token));
         auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()));
@@ -66,9 +66,9 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         m_builder.createStore(unbound, mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(identifier.kind)));
     }
 
-    for (auto& iter : fileInput.input)
+    for (const auto& iter : fileInput.input)
     {
-        if (auto* statement = std::get_if<Syntax::Statement>(&iter))
+        if (const auto* statement = std::get_if<Syntax::Statement>(&iter))
         {
             visit(*statement);
             if (!m_builder.getInsertionBlock())
@@ -103,7 +103,7 @@ void pylir::CodeGen::visit(const Syntax::StmtList& stmtList)
         return;
     }
     visit(*stmtList.firstExpr);
-    for (auto& iter : stmtList.remainingExpr)
+    for (const auto& iter : stmtList.remainingExpr)
     {
         if (!m_builder.getInsertionBlock())
         {
@@ -234,7 +234,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
                 m_functionScope->identifiers.insert(*result);
             };
             handleIdentifier(globalStmt.identifier);
-            for (auto& [token, identifier] : globalStmt.rest)
+            for (const auto& [token, identifier] : globalStmt.rest)
             {
                 (void)token;
                 handleIdentifier(identifier);
@@ -311,7 +311,7 @@ void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
     {
         return;
     }
-    for (auto& [list, token] : assignmentStmt.targets)
+    for (const auto& [list, token] : assignmentStmt.targets)
     {
         assignTarget(list, rhs);
         if (!m_builder.getInsertionBlock())
@@ -337,7 +337,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
                 {
                     return false;
                 }
-                operands.push_back(value);
+                operands.emplace_back(value);
                 return true;
             },
             [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
@@ -347,7 +347,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
                 {
                     return false;
                 }
-                operands.push_back(Py::IterExpansion{value});
+                operands.emplace_back(Py::IterExpansion{value});
                 return true;
             });
     };
@@ -355,7 +355,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
     {
         return {};
     }
-    for (auto& iter : starredList.remainingExpr)
+    for (const auto& iter : starredList.remainingExpr)
     {
         if (!handleItem(*iter.second))
         {
@@ -406,7 +406,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpres
                         return true;
                     });
             };
-            for (auto& iter : items.leading)
+            for (const auto& iter : items.leading)
             {
                 if (!handleItem(iter.first))
                 {
@@ -439,7 +439,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ExpressionList& expressionList)
     {
         return {};
     }
-    for (auto& iter : llvm::enumerate(expressionList.remainingExpr))
+    for (const auto& iter : llvm::enumerate(expressionList.remainingExpr))
     {
         auto value = visit(*iter.value().second);
         if (!value)
@@ -700,7 +700,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         return {};
     }
     auto previousRHS = first;
-    for (auto& [op, rhs] : comparison.rest)
+    for (const auto& [op, rhs] : comparison.rest)
     {
         m_builder.setCurrentLoc(getLoc(op.firstToken, op.firstToken));
 
@@ -967,8 +967,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
                     {
                         return {};
                     }
-                    auto tuple = m_builder.createListToTuple(list);
-                    return {tuple, m_builder.createConstant(m_builder.getDictAttr())};
+                    return {m_builder.createListToTuple(list), m_builder.createConstant(m_builder.getDictAttr())};
                 });
             if (!tuple || !keywords)
             {
@@ -1052,15 +1051,12 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             implementBlock(classNamespaceFound);
             return classNamespaceFound->getArgument(0);
         }
-        else
+        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::NameError.name,
+                                            /*TODO: string arg*/ {}, m_currentLandingPadBlock);
+        raiseException(exception);
+        if (!m_classNamespace)
         {
-            auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::NameError.name,
-                                                /*TODO: string arg*/ {}, m_currentLandingPadBlock);
-            raiseException(exception);
-            if (!m_classNamespace)
-            {
-                return {};
-            }
+            return {};
         }
         implementBlock(classNamespaceFound);
         return classNamespaceFound->getArgument(0);
@@ -1284,7 +1280,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
                                 {
                                     return false;
                                 }
-                                result.push_back(Py::MappingExpansion{mapping});
+                                result.emplace_back(Py::MappingExpansion{mapping});
                                 return true;
                             });
                     };
@@ -1292,7 +1288,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
                     {
                         return {};
                     }
-                    for (auto& [token, iter] : list.remainingExpr)
+                    for (const auto& [token, iter] : list.remainingExpr)
                     {
                         (void)token;
                         if (!handleOne(*iter))
@@ -1370,7 +1366,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
         return;
     }
     implementBlock(elseBlock);
-    for (auto& iter : llvm::enumerate(ifStmt.elifs))
+    for (const auto& iter : llvm::enumerate(ifStmt.elifs))
     {
         m_builder.setCurrentLoc(getLoc(iter.value().elif, iter.value().elif));
         condition = visit(iter.value().condition);
@@ -1681,7 +1677,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
     // handled by this block
     reset.reset();
 
-    for (auto& iter : tryStmt.excepts)
+    for (const auto& iter : tryStmt.excepts)
     {
         m_builder.setCurrentLoc(getLoc(iter, iter.exceptKeyword));
         if (!iter.expression)
@@ -1860,7 +1856,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 }
                 if (kind != FunctionParameter::KeywordOnly)
                 {
-                    defaultParameters.push_back(value);
+                    defaultParameters.emplace_back(value);
                     return;
                 }
                 builder.setCurrentLoc(locCallback(defParameter.parameter.identifier));
@@ -1917,7 +1913,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                             }
                             functionParameters.back().kind = FunctionParameter::PosRest;
                         }
-                        for (auto& iter : llvm::make_second_range(star.defParameters))
+                        for (const auto& iter : llvm::make_second_range(star.defParameters))
                         {
                             visit(iter);
                             if (!builder.getInsertionBlock())
@@ -1987,11 +1983,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 locals.erase(name);
             }
         }
-        for (auto& iter : locals)
+        for (const auto& iter : locals)
         {
             m_functionScope->identifiers.emplace(iter.getValue(), Identifier{SSABuilder::DefinitionsMap{}});
         }
-        for (auto& iter : closures)
+        for (const auto& iter : closures)
         {
             auto closureType = m_builder.createCellRef();
             auto tuple = m_builder.createMakeTuple({closureType});
@@ -2009,7 +2005,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             auto self = func.getArgument(0);
             auto metaType = m_builder.createFunctionRef();
             auto closureTuple = m_builder.createGetSlot(self, metaType, "__closure__");
-            for (auto& iter : llvm::enumerate(funcDef.nonLocalVariables))
+            for (const auto& iter : llvm::enumerate(funcDef.nonLocalVariables))
             {
                 auto constant = m_builder.create<mlir::arith::ConstantIndexOp>(iter.index());
                 auto cell = m_builder.createTupleGetItem(closureTuple, constant);
@@ -2073,7 +2069,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
         m_builder.createSetSlot(value, type, "__closure__", closure);
     }
-    for (auto& iter : llvm::reverse(funcDef.decorators))
+    for (const auto& iter : llvm::reverse(funcDef.decorators))
     {
         auto decLoc = getLoc(iter.atSign, iter.atSign);
         auto decorator = visit(iter.assignmentExpression);
@@ -2135,7 +2131,7 @@ void pylir::CodeGen::visit(const Syntax::Suite& suite)
         suite.variant, [&](const Syntax::Suite::SingleLine& singleLine) { visit(singleLine.stmtList); },
         [&](const Syntax::Suite::MultiLine& singleLine)
         {
-            for (auto& iter : singleLine.statements)
+            for (const auto& iter : singleLine.statements)
             {
                 visit(iter);
             }
@@ -2170,7 +2166,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
                     {
                         return false;
                     }
-                    iterArgs.push_back(Py::IterExpansion{iter});
+                    iterArgs.emplace_back(Py::IterExpansion{iter});
                     return true;
                 });
         };
@@ -2178,7 +2174,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
         {
             return {{}, {}};
         }
-        for (auto& [token, rest] : argumentList.positionalArguments->rest)
+        for (const auto& [token, rest] : argumentList.positionalArguments->rest)
         {
             (void)token;
             if (!handlePositionalItem(rest))
@@ -2208,7 +2204,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
             {
                 return false;
             }
-            iterArgs.push_back(Py::IterExpansion{value});
+            iterArgs.emplace_back(Py::IterExpansion{value});
             return true;
         };
         auto handleStarredAndKeywords = [&](const Syntax::ArgumentList::StarredAndKeywords::Variant& variant)
@@ -2217,7 +2213,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
         {
             return {{}, {}};
         }
-        for (auto& [token, variant] : argumentList.starredAndKeywords->rest)
+        for (const auto& [token, variant] : argumentList.starredAndKeywords->rest)
         {
             (void)token;
             if (!handleStarredAndKeywords(variant))
@@ -2235,7 +2231,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
             {
                 return false;
             }
-            dictArgs.push_back(Py::MappingExpansion{value});
+            dictArgs.emplace_back(Py::MappingExpansion{value});
             return true;
         };
         auto handleKeywordArguments = [&](const Syntax::ArgumentList::KeywordArguments::Variant& variant)
@@ -2244,7 +2240,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
         {
             return {{}, {}};
         }
-        for (auto& [token, variant] : argumentList.keywordArguments->rest)
+        for (const auto& [token, variant] : argumentList.keywordArguments->rest)
         {
             (void)token;
             if (!handleKeywordArguments(variant))
@@ -2289,7 +2285,7 @@ std::vector<pylir::CodeGen::UnpackResults>
     std::vector<UnpackResults> args;
     std::size_t posIndex = 0;
     std::size_t posDefaultsIndex = 0;
-    for (auto& iter : parameters)
+    for (const auto& iter : parameters)
     {
         mlir::Value argValue;
         switch (iter.kind)

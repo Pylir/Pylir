@@ -42,7 +42,7 @@ namespace
 {
 bool enableLTO(const pylir::cli::CommandLine& commandLine)
 {
-    auto& args = commandLine.getArgs();
+    const auto& args = commandLine.getArgs();
     if (args.hasFlag(OPT_flto, OPT_fno_lto, false))
     {
         return true;
@@ -82,7 +82,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                     .Case(".mlir", FileType::MLIR)
                     .Cases(".ll", ".bc", FileType::LLVM)
                     .Default(FileType::Python);
-    auto& args = commandLine.getArgs();
+    const auto& args = commandLine.getArgs();
     mlir::OwningOpRef<mlir::ModuleOp> mlirModule;
     std::unique_ptr<llvm::Module> llvmModule;
     switch (type)
@@ -353,7 +353,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                     action == pylir::CompilerInvocation::Assembly ? llvm::CGFT_AssemblyFile : llvm::CGFT_ObjectFile))
             {
                 std::string_view format = action == pylir::CompilerInvocation::Assembly ? "Assembly" : "Object file";
-                auto arg = args.getLastArg(OPT_target_EQ);
+                auto *arg = args.getLastArg(OPT_target_EQ);
                 if (!arg)
                 {
                     arg = args.getLastArg(OPT_c, OPT_S);
@@ -547,10 +547,10 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
         triple = llvm::Triple(args.getLastArgValue(OPT_target_EQ, LLVM_DEFAULT_TARGET_TRIPLE));
     }
     std::string error;
-    auto* targetM = llvm::TargetRegistry::lookupTarget(triple->str(), error);
+    const auto* targetM = llvm::TargetRegistry::lookupTarget(triple->str(), error);
     if (!targetM)
     {
-        auto outputArg = args.getLastArg(OPT_target_EQ);
+        auto *outputArg = args.getLastArg(OPT_target_EQ);
         if (!outputArg)
         {
             llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
@@ -575,7 +575,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
                         .Default(std::nullopt);
     if (!optLevel)
     {
-        auto optArg = args.getLastArg(OPT_O);
+        auto *optArg = args.getLastArg(OPT_O);
         llvm::errs() << commandLine
                             .createDiagnosticsBuilder(optArg, pylir::Diag::INVALID_OPTIMIZATION_LEVEL_N,
                                                       optArg->getAsString(args))

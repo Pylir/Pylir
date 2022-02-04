@@ -9,7 +9,7 @@
 #define PARSER_EMITS(source, ...)                                         \
     [](std::string str)                                                   \
     {                                                                     \
-        pylir::Diag::Document document(str);                              \
+        pylir::Diag::Document document(std::move(str));                   \
         pylir::Parser parser(document);                                   \
         auto fileInput = parser.parseFileInput();                         \
         if (!fileInput)                                                   \

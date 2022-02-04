@@ -77,7 +77,7 @@ std::optional<std::string> findGCCLib(const llvm::Triple& triple, llvm::StringRe
     gccLibCandidates.emplace_back(triple.getArchName());
     gccLibCandidates[0] += "-w64-mingw32";
     gccLibCandidates.emplace_back("ming32");
-    for (auto& libCandidate : {"lib", "lib64"})
+    for (const auto& libCandidate : {"lib", "lib64"})
     {
         for (auto& gccLib : gccLibCandidates)
         {
@@ -130,7 +130,7 @@ std::optional<std::string> findClangResourceDir(const llvm::Triple& triple, llvm
     {
         return (path + sep + triple.str()).str();
     }
-    else if (llvm::sys::fs::exists(path + sep + triple.getOSName()))
+    if (llvm::sys::fs::exists(path + sep + triple.getOSName()))
     {
         return (path + sep + triple.getOSName()).str();
     }
@@ -141,7 +141,7 @@ std::optional<std::string> findClangResourceDir(const llvm::Triple& triple, llvm
 
 bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
-    auto& args = commandLine.getArgs();
+    const auto& args = commandLine.getArgs();
     std::vector<std::string> arguments;
     if (!m_sysroot.empty())
     {
@@ -158,12 +158,12 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
 
     arguments.emplace_back("-Bstatic");
 
-    if (auto output = args.getLastArg(pylir::cli::OPT_o))
+    if (auto *output = args.getLastArg(pylir::cli::OPT_o))
     {
         arguments.emplace_back("-o");
         arguments.emplace_back(output->getValue());
     }
-    else if (auto input = args.getLastArg(pylir::cli::OPT_INPUT))
+    else if (auto *input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
         llvm::SmallString<20> path(input->getValue());
         llvm::sys::path::replace_extension(path, ".exe");
@@ -195,7 +195,7 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     }
     arguments.push_back(objectFile.str());
 
-    for (auto arg : args)
+    for (auto *arg : args)
     {
         if (arg->getOption().matches(pylir::cli::OPT_l))
         {

@@ -24,6 +24,7 @@ pylir::Lexer::Lexer(const Diag::Document& document, int fieldId,
 namespace
 {
 #pragma region unicode
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 constexpr llvm::sys::UnicodeCharRange initialCharacters[] = {
     {0x41, 0x5a},       {0x5f, 0x5f},       {0x61, 0x7a},       {0xaa, 0xaa},       {0xb5, 0xb5},
     {0xba, 0xba},       {0xc0, 0xd6},       {0xd8, 0xf6},       {0xf8, 0x13e},      {0x141, 0x2c1},
@@ -150,6 +151,7 @@ constexpr llvm::sys::UnicodeCharRange initialCharacters[] = {
     {0x1ee80, 0x1ee89}, {0x1ee8b, 0x1ee9b}, {0x1eea1, 0x1eea3}, {0x1eea5, 0x1eea9}, {0x1eeab, 0x1eebb},
     {0x20000, 0x2a6d6}, {0x2a700, 0x2b734}, {0x2b740, 0x2b81d}, {0x2b820, 0x2cea1}, {0x2ceb0, 0x2ebe0},
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 constexpr llvm::sys::UnicodeCharRange legalIdentifiers[] = {
     {0x30, 0x39},       {0x41, 0x5a},       {0x5f, 0x5f},       {0x61, 0x7a},       {0xaa, 0xaa},
     {0xb5, 0xb5},       {0xba, 0xba},       {0xc0, 0xd6},       {0xd8, 0xf6},       {0xf8, 0x13e},
@@ -803,7 +805,6 @@ void pylir::Lexer::parseIdentifier()
     PYLIR_ASSERT(ok);
     m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Identifier,
                           std::move(utf8));
-    return;
 }
 
 namespace
@@ -822,17 +823,17 @@ int fromHex(char32_t value)
         case U'7': return 7;
         case U'8': return 8;
         case U'9': return 9;
-        case U'a': return 10;
+        case U'a':
         case U'A': return 10;
-        case U'b': return 11;
+        case U'b':
         case U'B': return 11;
-        case U'c': return 12;
+        case U'c':
         case U'C': return 12;
-        case U'd': return 13;
+        case U'd':
         case U'D': return 13;
-        case U'e': return 14;
+        case U'e':
         case U'E': return 14;
-        case U'f': return 15;
+        case U'f':
         case U'F': return 15;
         default: PYLIR_UNREACHABLE;
     }
@@ -907,8 +908,10 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
         if (m_current == m_document->end() || std::next(m_current) == m_document->end()
             || std::next(m_current, 2) == m_document->end())
         {
-            for (; m_current != m_document->end(); m_current = std::next(m_current))
-                ;
+            while (m_current != m_document->end())
+            {
+                m_current = std::next(m_current);
+            }
             auto builder =
                 createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
                     .addLabel(m_current - m_document->begin(), std::string(3, character), Diag::ERROR_COLOUR);
@@ -1275,30 +1278,30 @@ void pylir::Lexer::parseNumber()
         }
     }
     auto numberStart = m_current;
-    auto* end = std::find_if_not(m_current, m_document->end(),
-                                 [allowedDigits, previous = U'\0', &isFloat, radix](char32_t value) mutable
-                                 {
-                                     if (value == U'.' && radix == 10)
-                                     {
-                                         previous = U'.';
-                                         if (!isFloat)
-                                         {
-                                             isFloat = true;
-                                             return true;
-                                         }
-                                         return false;
-                                     }
-                                     if (value == U'_')
-                                     {
-                                         if (previous == U'_' || previous == U'.')
-                                         {
-                                             return false;
-                                         }
-                                         previous = value;
-                                         return true;
-                                     }
-                                     return allowedDigits(previous = value);
-                                 });
+    auto end = std::find_if_not(m_current, m_document->end(),
+                                [allowedDigits, previous = U'\0', &isFloat, radix](char32_t value) mutable
+                                {
+                                    if (value == U'.' && radix == 10)
+                                    {
+                                        previous = U'.';
+                                        if (!isFloat)
+                                        {
+                                            isFloat = true;
+                                            return true;
+                                        }
+                                        return false;
+                                    }
+                                    if (value == U'_')
+                                    {
+                                        if (previous == U'_' || previous == U'.')
+                                        {
+                                            return false;
+                                        }
+                                        previous = value;
+                                        return true;
+                                    }
+                                    return allowedDigits(previous = value);
+                                });
     m_current = end;
     if (*std::prev(end) == U'_')
     {
@@ -1321,8 +1324,8 @@ void pylir::Lexer::parseNumber()
     auto checkSuffix = [&]
     {
         static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-        auto* suffixEnd = std::find_if_not(m_current, m_document->end(),
-                                           [&](char32_t value) { return legalIdentifierSet.contains(value); });
+        auto suffixEnd = std::find_if_not(m_current, m_document->end(),
+                                          [&](char32_t value) { return legalIdentifierSet.contains(value); });
         if (suffixEnd != m_current)
         {
             auto builder = createDiagnosticsBuilder(
@@ -1352,7 +1355,7 @@ void pylir::Lexer::parseNumber()
         }
         if (radix == 10 && !integer.isZero() && text.front() == '0')
         {
-            auto* leadingEnd =
+            auto leadingEnd =
                 std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
             auto builder =
                 createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
@@ -1418,7 +1421,6 @@ void pylir::Lexer::parseNumber()
                 text += codepoint;
             }
         }
-        end = newEnd;
     }
 
     double number;
@@ -1428,17 +1430,24 @@ void pylir::Lexer::parseNumber()
 #else
     struct LocalReset
     {
-        std::locale locale;
+        std::locale locale{};
+
+        LocalReset() = default;
 
         ~LocalReset()
         {
             std::locale::global(locale);
         }
+
+        LocalReset(const LocalReset&) = delete;
+        LocalReset& operator=(const LocalReset&) = delete;
+        LocalReset(LocalReset&&) = delete;
+        LocalReset& operator=(LocalReset&&) = delete;
     };
     std::optional<LocalReset> reset;
     if (std::use_facet<std::numpunct<char>>(std::locale()).decimal_point() != '.')
     {
-        reset = LocalReset{std::locale()};
+        reset.emplace();
         std::locale::global(std::locale::classic());
     }
     number = std::stod(std::string{text.begin(), text.begin() + text.size()});

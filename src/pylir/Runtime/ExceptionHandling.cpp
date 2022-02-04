@@ -55,7 +55,7 @@ enum
 /// @link http://dwarfstd.org/Dwarf4.pdf @unlink
 /// @param data reference variable holding memory pointer to decode from
 /// @returns decoded value
-static std::uintptr_t readULEB128(const std::uint8_t** data)
+std::uintptr_t readULEB128(const std::uint8_t** data)
 {
     std::uintptr_t result = 0;
     std::uintptr_t shift = 0;
@@ -76,7 +76,7 @@ static std::uintptr_t readULEB128(const std::uint8_t** data)
 /// @link http://dwarfstd.org/Dwarf4.pdf @unlink
 /// @param data reference variable holding memory pointer to decode from
 /// @returns decoded value
-static std::intptr_t readSLEB128(const std::uint8_t** data)
+std::intptr_t readSLEB128(const std::uint8_t** data)
 {
     std::uintptr_t result = 0;
     std::uintptr_t shift = 0;
@@ -90,7 +90,9 @@ static std::intptr_t readSLEB128(const std::uint8_t** data)
     } while (byte & 0x80);
     *data = p;
     if ((byte & 0x40) && (shift < (sizeof(result) << 3)))
+    {
         result |= static_cast<std::uintptr_t>(~0) << shift;
+    }
     return static_cast<std::intptr_t>(result);
 }
 
@@ -103,7 +105,7 @@ std::uintptr_t readPointerHelper(const std::uint8_t*& p)
     return static_cast<std::uintptr_t>(value);
 }
 
-std::uintptr_t readEncodedPointer(const std::uint8_t** data, std::uint8_t encoding, std::uint8_t base = 0)
+std::uintptr_t readEncodedPointer(const std::uint8_t** data, std::uint8_t encoding)
 {
     std::uintptr_t result = 0;
     if (encoding == DW_EH_PE_omit)
@@ -136,14 +138,10 @@ std::uintptr_t readEncodedPointer(const std::uint8_t** data, std::uint8_t encodi
         case DW_EH_PE_pcrel:
             if (result)
             {
-                result += (uintptr_t)(*data);
+                result += reinterpret_cast<intptr_t>(*data);
             }
             break;
         case DW_EH_PE_datarel:
-            PYLIR_ASSERT((base != 0) && "DW_EH_PE_datarel is invalid with a base of 0");
-            if (result)
-                result += base;
-            break;
         case DW_EH_PE_textrel:
         case DW_EH_PE_funcrel:
         case DW_EH_PE_aligned:
@@ -162,7 +160,7 @@ std::uintptr_t readEncodedPointer(const std::uint8_t** data, std::uint8_t encodi
 
 pylir::rt::PyObject* readTypeObject(std::uint64_t typeIndex, const std::uint8_t* classInfo, std::uint8_t typeEncoding)
 {
-    if (classInfo == 0)
+    if (classInfo == nullptr)
     {
         // this should not happen.  Indicates corrupted eh_table.
         PYLIR_UNREACHABLE;
@@ -181,7 +179,7 @@ pylir::rt::PyObject* readTypeObject(std::uint64_t typeIndex, const std::uint8_t*
             PYLIR_UNREACHABLE;
     }
     classInfo -= typeIndex;
-    return (pylir::rt::PyObject*)readEncodedPointer(&classInfo, typeEncoding);
+    return reinterpret_cast<pylir::rt::PyObject*>(readEncodedPointer(&classInfo, typeEncoding));
 }
 
 struct Result
@@ -213,7 +211,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
     {
         return {_URC_FATAL_PHASE1_ERROR, 0, 0};
     }
-    const std::uint8_t* exceptionTable = static_cast<const uint8_t*>(_Unwind_GetLanguageSpecificData(context));
+    const auto* exceptionTable = static_cast<const uint8_t*>(_Unwind_GetLanguageSpecificData(context));
     if (!exceptionTable)
     {
         return {_URC_CONTINUE_UNWIND, 0, 0};
@@ -222,7 +220,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
     std::uintptr_t functionStart = _Unwind_GetRegionStart(context);
     auto offset = ip - functionStart;
     auto encodingStart = *exceptionTable++;
-    const std::uint8_t* lpStart = reinterpret_cast<const uint8_t*>(readEncodedPointer(&exceptionTable, encodingStart));
+    const auto* lpStart = reinterpret_cast<const uint8_t*>(readEncodedPointer(&exceptionTable, encodingStart));
     if (!lpStart)
     {
         lpStart = reinterpret_cast<const uint8_t*>(functionStart);
@@ -235,11 +233,11 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
         classInfo = exceptionTable + classInfoOffset;
     }
     std::uint8_t callSiteEncoding = *exceptionTable++;
-    std::uint32_t callSiteTableLength = static_cast<std::uint32_t>(readULEB128(&exceptionTable));
-    auto* callSiteTableStart = exceptionTable;
-    auto* callSiteTableEnd = callSiteTableStart + callSiteTableLength;
-    auto* actionTableStart = callSiteTableEnd;
-    for (auto* callSitePtr = callSiteTableStart; callSitePtr < callSiteTableEnd;)
+    auto callSiteTableLength = static_cast<std::uint32_t>(readULEB128(&exceptionTable));
+    const auto* callSiteTableStart = exceptionTable;
+    const auto* callSiteTableEnd = callSiteTableStart + callSiteTableLength;
+    const auto* actionTableStart = callSiteTableEnd;
+    for (const auto* callSitePtr = callSiteTableStart; callSitePtr < callSiteTableEnd;)
     {
         auto start = readEncodedPointer(&callSitePtr, callSiteEncoding);
         auto length = readEncodedPointer(&callSitePtr, callSiteEncoding);
@@ -260,7 +258,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
         {
             return {actions & _UA_SEARCH_PHASE ? _URC_CONTINUE_UNWIND : _URC_HANDLER_FOUND, landingPad, 0};
         }
-        auto* action = actionTableStart + (actionEntry - 1);
+        const auto* action = actionTableStart + (actionEntry - 1);
         bool hasCleanUp = false;
         while (true)
         {
@@ -292,7 +290,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
                 // cleanup clause
                 hasCleanUp = true;
             }
-            auto temp = action;
+            const auto* temp = action;
             auto actionOffset = readSLEB128(&temp);
             if (actionOffset == 0)
             {
@@ -353,6 +351,7 @@ _Unwind_Reason_Code personalityImpl(int version, _Unwind_Action actions, _Unwind
     #define WIN32_MEAN_AND_LEAN
     #include <windows.h>
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern "C" EXCEPTION_DISPOSITION _GCC_specific_handler(EXCEPTION_RECORD* exc, void* frame, CONTEXT* ctx,
                                                        DISPATCHER_CONTEXT* disp, _Unwind_Personality_Fn pers);
 

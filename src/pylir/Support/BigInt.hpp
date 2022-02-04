@@ -87,6 +87,10 @@ public:
 
     BigInt& operator=(const BigInt& rhs)
     {
+        if (&rhs == this)
+        {
+            return *this;
+        }
         cantFail(mp_copy(rhs.m_int, m_int));
         return *this;
     }
@@ -177,7 +181,7 @@ public:
         return *this;
     }
 
-    double roundToDouble() const
+    [[nodiscard]] double roundToDouble() const
     {
         return mp_get_double(m_int);
     }
@@ -213,7 +217,7 @@ public:
         return *optional;
     }
 
-    std::string toString(std::uint8_t radix = 10) const
+    [[nodiscard]] std::string toString(std::uint8_t radix = 10) const
     {
         std::size_t size;
         cantFail(mp_radix_size_overestimate(m_int, radix, &size));
@@ -224,12 +228,12 @@ public:
         return result;
     }
 
-    bool isZero() const
+    [[nodiscard]] bool isZero() const
     {
         return mp_iszero(m_int);
     }
 
-    bool isNegative() const
+    [[nodiscard]] bool isNegative() const
     {
         return mp_isneg(m_int);
     }
@@ -351,7 +355,7 @@ public:
         return m_int[0];
     }
 
-    const mp_int& getHandle() const
+    [[nodiscard]] const mp_int& getHandle() const
     {
         return m_int[0];
     }

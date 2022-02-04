@@ -8,12 +8,12 @@ namespace pylir
 class LinuxToolchain : public Toolchain
 {
 protected:
-    Stdlib defaultStdlib() const override
+    [[nodiscard]] Stdlib defaultStdlib() const override
     {
         return Stdlib::libstdcpp;
     }
 
-    RTLib defaultRTLib() const override
+    [[nodiscard]] RTLib defaultRTLib() const override
     {
         return RTLib::libgcc;
     }
@@ -21,6 +21,6 @@ protected:
 public:
     explicit LinuxToolchain(const llvm::Triple& triple, const cli::CommandLine& commandLine);
 
-    bool link(const cli::CommandLine& commandLine, llvm::StringRef objectFile) const override;
+    [[nodiscard]] bool link(const cli::CommandLine& commandLine, llvm::StringRef objectFile) const override;
 };
 } // namespace pylir

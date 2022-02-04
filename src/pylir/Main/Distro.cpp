@@ -22,9 +22,13 @@ static pylir::Distro::DistroType DetectOsRelease()
 {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> File = llvm::MemoryBuffer::getFile("/etc/os-release");
     if (!File)
+    {
         File = llvm::MemoryBuffer::getFile("/usr/lib/os-release");
+    }
     if (!File)
+    {
         return pylir::Distro::UnknownDistro;
+    }
 
     llvm::SmallVector<llvm::StringRef, 16> Lines;
     File.get()->getBuffer().split(Lines, "\n");
@@ -32,7 +36,9 @@ static pylir::Distro::DistroType DetectOsRelease()
 
     // Obviously this can be improved a lot.
     for (llvm::StringRef Line : Lines)
+    {
         if (Version == pylir::Distro::UnknownDistro && Line.startswith("ID="))
+        {
             Version = llvm::StringSwitch<pylir::Distro::DistroType>(Line.substr(3))
                           .Case("alpine", pylir::Distro::AlpineLinux)
                           .Case("fedora", pylir::Distro::Fedora)
@@ -43,6 +49,8 @@ static pylir::Distro::DistroType DetectOsRelease()
                           .Case("opensuse", pylir::Distro::OpenSUSE)
                           .Case("exherbo", pylir::Distro::Exherbo)
                           .Default(pylir::Distro::UnknownDistro);
+        }
+    }
     return Version;
 }
 
@@ -50,14 +58,18 @@ static pylir::Distro::DistroType DetectLsbRelease()
 {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> File = llvm::MemoryBuffer::getFile("/etc/lsb-release");
     if (!File)
+    {
         return pylir::Distro::UnknownDistro;
+    }
 
     llvm::SmallVector<llvm::StringRef, 16> Lines;
     File.get()->getBuffer().split(Lines, "\n");
     pylir::Distro::DistroType Version = pylir::Distro::UnknownDistro;
 
     for (llvm::StringRef Line : Lines)
+    {
         if (Version == pylir::Distro::UnknownDistro && Line.startswith("DISTRIB_CODENAME="))
+        {
             Version = llvm::StringSwitch<pylir::Distro::DistroType>(Line.substr(17))
                           .Case("hardy", pylir::Distro::UbuntuHardy)
                           .Case("intrepid", pylir::Distro::UbuntuIntrepid)
@@ -89,23 +101,29 @@ static pylir::Distro::DistroType DetectLsbRelease()
                           .Case("impish", pylir::Distro::UbuntuImpish)
                           .Case("jammy", pylir::Distro::UbuntuJammy)
                           .Default(pylir::Distro::UnknownDistro);
+        }
+    }
     return Version;
 }
 
 static pylir::Distro::DistroType DetectDistro()
 {
-    pylir::Distro::DistroType Version = pylir::Distro::UnknownDistro;
+    pylir::Distro::DistroType Version;
 
     // Newer freedesktop.org's compilant systemd-based systems
     // should provide /etc/os-release or /usr/lib/os-release.
     Version = DetectOsRelease();
     if (Version != pylir::Distro::UnknownDistro)
+    {
         return Version;
+    }
 
     // Older systems might provide /etc/lsb-release.
     Version = DetectLsbRelease();
     if (Version != pylir::Distro::UnknownDistro)
+    {
         return Version;
+    }
 
     // Otherwise try some distro-specific quirks for RedHat...
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> File = llvm::MemoryBuffer::getFile("/etc/redhat-release");
@@ -114,16 +132,24 @@ static pylir::Distro::DistroType DetectDistro()
     {
         llvm::StringRef Data = File.get()->getBuffer();
         if (Data.startswith("Fedora release"))
+        {
             return pylir::Distro::Fedora;
+        }
         if (Data.startswith("Red Hat Enterprise Linux") || Data.startswith("CentOS")
             || Data.startswith("Scientific Linux"))
         {
             if (Data.contains("release 7"))
+            {
                 return pylir::Distro::RHEL7;
-            else if (Data.contains("release 6"))
+            }
+            if (Data.contains("release 6"))
+            {
                 return pylir::Distro::RHEL6;
-            else if (Data.contains("release 5"))
+            }
+            if (Data.contains("release 5"))
+            {
                 return pylir::Distro::RHEL5;
+            }
         }
         return pylir::Distro::UnknownDistro;
     }
@@ -171,7 +197,9 @@ static pylir::Distro::DistroType DetectDistro()
         for (const llvm::StringRef& Line : Lines)
         {
             if (!Line.trim().startswith("VERSION"))
+            {
                 continue;
+            }
             std::pair<llvm::StringRef, llvm::StringRef> SplitLine = Line.split('=');
             // Old versions have split VERSION and PATCHLEVEL
             // Newer versions use VERSION = x.y
@@ -181,7 +209,9 @@ static pylir::Distro::DistroType DetectDistro()
             // OpenSUSE/SLES 10 and older are not supported and not compatible
             // with our rules, so just treat them as Distro::UnknownDistro.
             if (!SplitVer.first.getAsInteger(10, Version) && Version > 10)
+            {
                 return pylir::Distro::OpenSUSE;
+            }
             return pylir::Distro::UnknownDistro;
         }
         return pylir::Distro::UnknownDistro;
@@ -189,7 +219,9 @@ static pylir::Distro::DistroType DetectDistro()
 
     // ...and others.
     if (llvm::sys::fs::exists("/etc/gentoo-release"))
+    {
         return pylir::Distro::Gentoo;
+    }
 
     return pylir::Distro::UnknownDistro;
 }
@@ -199,7 +231,9 @@ static pylir::Distro::DistroType GetDistro(const llvm::Triple& TargetOrHost)
     // If we don't target Linux, no need to check the distro. This saves a few
     // OS calls.
     if (!TargetOrHost.isOSLinux())
+    {
         return pylir::Distro::UnknownDistro;
+    }
 
     // If the host is not running Linux, and we're backed by a real file
     // system, no need to check the distro. This is the case where someone
@@ -207,7 +241,9 @@ static pylir::Distro::DistroType GetDistro(const llvm::Triple& TargetOrHost)
     // meaningless to try to figure out the "distro" of the non-Linux host.
     llvm::Triple HostTriple(llvm::sys::getProcessTriple());
     if (!HostTriple.isOSLinux())
+    {
         return pylir::Distro::UnknownDistro;
+    }
 
     static pylir::Distro::DistroType LinuxDistro = DetectDistro();
     return LinuxDistro;

@@ -138,12 +138,13 @@ class CodeGen
             return *this;
         }
 
-        mlir::Block* get() const
+        [[nodiscard]] mlir::Block* get() const
         {
             PYLIR_ASSERT(m_block);
             return m_block;
         }
 
+        // NOLINTNEXTLINE(google-explicit-constructor)
         operator mlir::Block*() const
         {
             return get();

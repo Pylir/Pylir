@@ -103,12 +103,7 @@ bool parseIterArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::O
         }
     }
 
-    if (parser.parseRParen())
-    {
-        return true;
-    }
-
-    return false;
+    return static_cast<bool>(parser.parseRParen());
 }
 
 void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange operands,
@@ -182,12 +177,7 @@ bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir
         }
     }
 
-    if (parser.parseRParen())
-    {
-        return true;
-    }
-
-    return false;
+    return static_cast<bool>(parser.parseRParen());
 }
 
 void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange keys,
@@ -304,7 +294,7 @@ void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
-    for (auto& iter : llvm::enumerate(args))
+    for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(), [&](mlir::Value value) { values.push_back(value); },
@@ -322,7 +312,7 @@ void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
-    for (auto& iter : llvm::enumerate(args))
+    for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(), [&](mlir::Value value) { values.push_back(value); },
@@ -340,7 +330,7 @@ void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operatio
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
-    for (auto& iter : llvm::enumerate(args))
+    for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(), [&](mlir::Value value) { values.push_back(value); },
@@ -358,7 +348,7 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
 {
     std::vector<mlir::Value> keys, values;
     std::vector<std::int32_t> mappingExpansion;
-    for (auto& iter : llvm::enumerate(args))
+    for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(),
@@ -453,7 +443,7 @@ void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
-    for (auto& iter : llvm::enumerate(args))
+    for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(), [&](mlir::Value value) { values.push_back(value); },
@@ -492,7 +482,7 @@ void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
-    for (auto& iter : llvm::enumerate(args))
+    for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(), [&](mlir::Value value) { values.push_back(value); },
@@ -531,7 +521,7 @@ void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
-    for (auto& iter : llvm::enumerate(args))
+    for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(), [&](mlir::Value value) { values.push_back(value); },
@@ -570,7 +560,7 @@ void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
 {
     std::vector<mlir::Value> keys, values;
     std::vector<std::int32_t> mappingExpansion;
-    for (auto& iter : llvm::enumerate(keyValues))
+    for (const auto& iter : llvm::enumerate(keyValues))
     {
         pylir::match(
             iter.value(),
@@ -597,7 +587,7 @@ llvm::SmallVector<pylir::Py::IterArg> getIterArgs(T op)
     llvm::SmallVector<pylir::Py::IterArg> result(op.getNumOperands());
     auto range = op.iterExpansion().template getAsValueRange<mlir::IntegerAttr>();
     auto begin = range.begin();
-    for (auto pair : llvm::enumerate(op.getOperands()))
+    for (const auto& pair : llvm::enumerate(op.getOperands()))
     {
         if (begin == range.end() || *begin != pair.index())
         {
@@ -727,7 +717,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                 {
                     return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference\n");
                 }
-                else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
+                if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
                          ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
                 {
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
@@ -745,7 +735,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                 {
                     return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference\n");
                 }
-                else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
+                if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
                          ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
                 {
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
@@ -761,7 +751,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     {
                         return op->emitOpError("Expected __dict__ to be a dict or symbol reference\n");
                     }
-                    else if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>())
+                    if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>())
                     {
                         auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                         if (!lookup)

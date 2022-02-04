@@ -170,7 +170,7 @@ struct MakeDictExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeDictExOp>
         {
             return mlir::failure();
         }
-        auto happyPath = op.happyPath();
+        auto *happyPath = op.happyPath();
         if (!happyPath->getSinglePredecessor())
         {
             auto newOp =
@@ -363,7 +363,7 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
     {
         return nullptr;
     }
-    auto& map = object.getSlots().getValue();
+    const auto& map = object.getSlots().getValue();
     auto result = map.find(slotAttr());
     if (result == map.end())
     {
@@ -478,7 +478,7 @@ llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute>
     llvm::SmallVector<mlir::Attribute> result;
     auto range = iterExpansion.getAsValueRange<mlir::IntegerAttr>();
     auto begin = range.begin();
-    for (auto pair : llvm::enumerate(operands))
+    for (const auto& pair : llvm::enumerate(operands))
     {
         if (begin == range.end() || pair.index() != *begin)
         {
@@ -664,7 +664,7 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
         {
             return mlir::failure();
         }
-        auto& map = object.getSlots().getValue();
+        const auto& map = object.getSlots().getValue();
         auto result = map.find(slotAttr());
         if (result != map.end())
         {
@@ -813,7 +813,7 @@ pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Locatio
                                          mlir::Attribute attr)
 {
     llvm::SmallVector<mlir::Value> arguments{input};
-    for (auto& iter : attr.cast<pylir::Py::TupleAttr>().getValue())
+    for (const auto& iter : attr.cast<pylir::Py::TupleAttr>().getValue())
     {
         arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
     }

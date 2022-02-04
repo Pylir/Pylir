@@ -36,7 +36,7 @@ void pylir::Parser::addToNamespace(const Syntax::TargetList& targetList)
 
         void visit(const Syntax::Target& target)
         {
-            if (auto* identifier = std::get_if<IdentifierToken>(&target.variant))
+            if (const auto* identifier = std::get_if<IdentifierToken>(&target.variant))
             {
                 callback(*identifier);
             }
@@ -57,7 +57,7 @@ tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType t
                 .addLabel(m_document->getText().size(), fmt::format("{}", tokenType), Diag::ERROR_COLOUR)
                 .emitError()};
     }
-    else if (m_current->getTokenType() == TokenType::SyntaxError)
+    if (m_current->getTokenType() == TokenType::SyntaxError)
     {
         return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
     }

@@ -11,7 +11,7 @@
 #define LEXER_EMITS(source, ...)                                              \
     [](std::string str)                                                       \
     {                                                                         \
-        pylir::Diag::Document document(str);                                  \
+        pylir::Diag::Document document(std::move(str));                       \
         pylir::Lexer lexer(document);                                         \
         for (auto& token : lexer)                                             \
         {                                                                     \
@@ -129,7 +129,7 @@ TEST_CASE("Lex identifiers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
         CHECK(identifier.getTokenType() == pylir::TokenType::Identifier);
-        auto* str = std::get_if<std::string>(&identifier.getValue());
+        const auto* str = std::get_if<std::string>(&identifier.getValue());
         REQUIRE(str);
         CHECK(*str == "株式会社");
     }
@@ -141,7 +141,7 @@ TEST_CASE("Lex identifiers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
         CHECK(identifier.getTokenType() == pylir::TokenType::Identifier);
-        auto* str = std::get_if<std::string>(&identifier.getValue());
+        const auto* str = std::get_if<std::string>(&identifier.getValue());
         REQUIRE(str);
         CHECK(*str == "KADOKAWA");
     }
@@ -183,7 +183,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "a text");
         }
@@ -195,7 +195,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "a text");
         }
@@ -207,19 +207,19 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "a text");
         }
         SECTION("Triple double quote")
         {
-            pylir::Diag::Document document("\"\"\"a text\"\"\"");
+            pylir::Diag::Document document(R"("""a text""")");
             pylir::Lexer lexer(document);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "a text");
         }
@@ -236,20 +236,20 @@ TEST_CASE("Lex string literals", "[Lexer]")
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
         CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-        auto* str = std::get_if<std::string>(&first.getValue());
+        const auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "\na text\n");
         LEXER_EMITS("'a text\n'", pylir::Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL);
     }
     SECTION("Simple escapes")
     {
-        pylir::Diag::Document document("'\\\\\\'\\\"\\a\\b\\f\\n\\r\\t\\v\\newline'");
+        pylir::Diag::Document document(R"('\\\'\"\a\b\f\n\r\t\v\newline')");
         pylir::Lexer lexer(document);
         std::vector<pylir::Token> result(lexer.begin(), lexer.end());
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
         CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-        auto* str = std::get_if<std::string>(&first.getValue());
+        const auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "\\'\"\a\b\f\n\r\t\v\n");
     }
@@ -261,7 +261,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
         CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-        auto* str = std::get_if<std::string>(&first.getValue());
+        const auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "\U0001F574");
         LEXER_EMITS("'\\N'", pylir::Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N);
@@ -275,7 +275,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
         CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-        auto* str = std::get_if<std::string>(&first.getValue());
+        const auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "§");
     }
@@ -287,7 +287,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
         CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-        auto* str = std::get_if<std::string>(&first.getValue());
+        const auto* str = std::get_if<std::string>(&first.getValue());
         REQUIRE(str);
         CHECK(*str == "§");
     }
@@ -301,7 +301,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "§");
         }
@@ -313,7 +313,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "\U0001F574");
         }
@@ -324,13 +324,13 @@ TEST_CASE("Lex string literals", "[Lexer]")
     {
         SECTION("Immediately before")
         {
-            pylir::Diag::Document document("r'\\\\\\\"\\a\\b\\f\\n\\r\\t\\v\\newline\\u343\\N'");
+            pylir::Diag::Document document(R"(r'\\\"\a\b\f\n\r\t\v\newline\u343\N')");
             pylir::Lexer lexer(document);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::StringLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "\\\\\\\"\\a\\b\\f\\n\\r\\t\\v\\newline\\u343\\N");
         }
@@ -342,7 +342,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE(result.size() >= 2);
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::Identifier);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "r");
             auto& second = result[1];
@@ -362,7 +362,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::ByteLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "\xC2\xA7");
         }
@@ -374,7 +374,7 @@ TEST_CASE("Lex string literals", "[Lexer]")
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
             CHECK(first.getTokenType() == pylir::TokenType::ByteLiteral);
-            auto* str = std::get_if<std::string>(&first.getValue());
+            const auto* str = std::get_if<std::string>(&first.getValue());
             REQUIRE(str);
             CHECK(*str == "\\xC2\\xA7");
         }
@@ -394,7 +394,7 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
+        const auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
         CHECK(*apInt == pylir::BigInt(30));
     }
@@ -406,7 +406,7 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
+        const auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
         CHECK(*apInt == pylir::BigInt(2));
     }
@@ -418,7 +418,7 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
+        const auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
         CHECK(*apInt == pylir::BigInt(030));
     }
@@ -430,7 +430,7 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
+        const auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
         CHECK(*apInt == pylir::BigInt(0x30));
     }
@@ -442,7 +442,7 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
+        const auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
         CHECK(*apInt == pylir::BigInt(0x30));
         LEXER_EMITS("0x3__0", pylir::Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS);
@@ -455,7 +455,7 @@ TEST_CASE("Lex integers", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::IntegerLiteral);
-        auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
+        const auto* apInt = std::get_if<pylir::BigInt>(&number.getValue());
         REQUIRE(apInt);
         CHECK(apInt->isZero());
         LEXER_EMITS("00000000001", pylir::Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED);
@@ -473,7 +473,7 @@ TEST_CASE("Lex floats", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 3.14);
     }
@@ -485,7 +485,7 @@ TEST_CASE("Lex floats", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 10);
     }
@@ -497,7 +497,7 @@ TEST_CASE("Lex floats", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == .001);
     }
@@ -509,7 +509,7 @@ TEST_CASE("Lex floats", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 1e100);
     }
@@ -521,7 +521,7 @@ TEST_CASE("Lex floats", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 3.14e-10);
     }
@@ -533,7 +533,7 @@ TEST_CASE("Lex floats", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 0e0);
     }
@@ -545,7 +545,7 @@ TEST_CASE("Lex floats", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::FloatingPointLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 3.141593);
     }
@@ -562,7 +562,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 3.14);
     }
@@ -574,7 +574,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 10);
     }
@@ -586,7 +586,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 10);
     }
@@ -598,7 +598,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == .001);
     }
@@ -610,7 +610,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 1e100);
     }
@@ -622,7 +622,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 3.14e-10);
     }
@@ -634,7 +634,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 0e0);
     }
@@ -646,7 +646,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
         REQUIRE(result.size() == 2);
         auto& number = result[0];
         CHECK(number.getTokenType() == pylir::TokenType::ComplexLiteral);
-        auto* value = std::get_if<double>(&number.getValue());
+        const auto* value = std::get_if<double>(&number.getValue());
         REQUIRE(value);
         CHECK(*value == 3.141593);
     }

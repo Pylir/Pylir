@@ -56,11 +56,11 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
     {
         return builder.create<Py::ConstantOp>(loc, type, value);
     }
-    else if (mlir::arith::ConstantOp::isBuildableWith(value, type))
+    if (mlir::arith::ConstantOp::isBuildableWith(value, type))
     {
         return builder.create<mlir::arith::ConstantOp>(loc, type, value);
     }
-    else if (auto ref = value.dyn_cast<mlir::FlatSymbolRefAttr>())
+    if (auto ref = value.dyn_cast<mlir::FlatSymbolRefAttr>())
     {
         return builder.create<mlir::ConstantOp>(loc, type, ref);
     }

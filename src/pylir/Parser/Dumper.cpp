@@ -102,7 +102,7 @@ std::string pylir::Dumper::Builder::emit() const
         return m_title;
     }
     auto result = m_title;
-    for (auto& iter : tcb::span(m_children).first(m_children.size() - 1))
+    for (const auto& iter : tcb::span(m_children).first(m_children.size() - 1))
     {
         result += addMiddleChild(iter.first, iter.second);
     }
@@ -262,10 +262,9 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
             {
                 return "parenth empty";
             }
-            else
-            {
-                return createBuilder("parenth").add(*parenthForm.expression).emit();
-            }
+
+                            return createBuilder("parenth").add(*parenthForm.expression).emit();
+
         });
 }
 
@@ -349,7 +348,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ArgumentList& argument)
                     [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
                     [&](const Syntax::ArgumentList::PositionalItem::Star& star)
                     { return createBuilder("starred").add(*star.expression).emit(); }));
-        for (auto& [token, item] : argument.positionalArguments->rest)
+        for (const auto& [token, item] : argument.positionalArguments->rest)
         {
             positional.add(pylir::match(
                 item.variant, [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
@@ -364,7 +363,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ArgumentList& argument)
         auto keyword = createBuilder("keyword item {}", argument.starredAndKeywords->first.identifier.getValue())
                            .add(*argument.starredAndKeywords->first.expression);
         starred.add(keyword);
-        for (auto& [token, iter] : argument.starredAndKeywords->rest)
+        for (const auto& [token, iter] : argument.starredAndKeywords->rest)
         {
             starred.add(pylir::match(
                 iter,
@@ -383,7 +382,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ArgumentList& argument)
         auto starred = createBuilder("keyword arguments");
         auto mapped = createBuilder("mapped expression").add(*argument.keywordArguments->first.expression);
         starred.add(mapped);
-        for (auto& [token, iter] : argument.keywordArguments->rest)
+        for (const auto& [token, iter] : argument.keywordArguments->rest)
         {
             starred.add(pylir::match(
                 iter,
@@ -408,11 +407,11 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
     {
         return builder.emit();
     }
-    if (auto* comprehension = std::get_if<std::unique_ptr<Syntax::Comprehension>>(&call.variant))
+    if (const auto* comprehension = std::get_if<std::unique_ptr<Syntax::Comprehension>>(&call.variant))
     {
         return builder.add(**comprehension).emit();
     }
-    auto& [argument, comma] = pylir::get<std::pair<Syntax::ArgumentList, std::optional<BaseToken>>>(call.variant);
+    const auto& [argument, comma] = pylir::get<std::pair<Syntax::ArgumentList, std::optional<BaseToken>>>(call.variant);
     return builder.add(argument).emit();
 }
 
@@ -423,11 +422,11 @@ std::string pylir::Dumper::dump(const pylir::Syntax::AwaitExpr& awaitExpr)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::UExpr& uExpr)
 {
-    if (auto* power = std::get_if<Syntax::Power>(&uExpr.variant))
+    if (const auto* power = std::get_if<Syntax::Power>(&uExpr.variant))
     {
         return dump(*power);
     }
-    auto& [token, rhs] = pylir::get<std::pair<Token, std::unique_ptr<Syntax::UExpr>>>(uExpr.variant);
+    const auto& [token, rhs] = pylir::get<std::pair<Token, std::unique_ptr<Syntax::UExpr>>>(uExpr.variant);
     return createBuilder(FMT_STRING("unary {:q}"), token.getTokenType()).add(*rhs).emit();
 }
 
@@ -495,7 +494,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
     }
     auto result = createBuilder("comparison");
     result.add(comparison.left, "lhs");
-    for (auto& [token, rhs] : comparison.rest)
+    for (const auto& [token, rhs] : comparison.rest)
     {
         std::string name;
         if (token.secondToken)
@@ -560,7 +559,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Expression& expression)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::StarredItem& starredItem)
 {
-    if (auto* assignment = std::get_if<Syntax::AssignmentExpression>(&starredItem.variant))
+    if (const auto* assignment = std::get_if<Syntax::AssignmentExpression>(&starredItem.variant))
     {
         return dump(*assignment);
     }
@@ -571,13 +570,13 @@ std::string pylir::Dumper::dump(const pylir::Syntax::StarredItem& starredItem)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredExpression)
 {
-    if (auto* expression = std::get_if<Syntax::Expression>(&starredExpression.variant))
+    if (const auto* expression = std::get_if<Syntax::Expression>(&starredExpression.variant))
     {
         return dump(*expression);
     }
-    auto& item = pylir::get<Syntax::StarredExpression::Items>(starredExpression.variant);
+    const auto& item = pylir::get<Syntax::StarredExpression::Items>(starredExpression.variant);
     auto result = createBuilder("starred expression");
-    for (auto& iter : item.leading)
+    for (const auto& iter : item.leading)
     {
         result.add(iter.first);
     }
@@ -758,7 +757,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
             {
                 result.add(fmt::format("as {}", importAsAs.name->second.getValue()));
             }
-            for (auto& further : importAsAs.rest)
+            for (const auto& further : importAsAs.rest)
             {
                 result.add(dumpModule(further.module));
                 if (further.name)
@@ -782,7 +781,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
             {
                 result.add(importList.identifier.getValue());
             }
-            for (auto& further : importList.rest)
+            for (const auto& further : importList.rest)
             {
                 if (further.name)
                 {
@@ -808,7 +807,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FutureStmt& futureStmt)
     {
         result.add(futureStmt.identifier.getValue());
     }
-    for (auto& further : futureStmt.rest)
+    for (const auto& further : futureStmt.rest)
     {
         if (further.name)
         {
@@ -825,7 +824,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FutureStmt& futureStmt)
 std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentStmt& assignmentStmt)
 {
     auto result = createBuilder("assignment statement");
-    for (auto& iter : assignmentStmt.targets)
+    for (const auto& iter : assignmentStmt.targets)
     {
         result.add(iter.first);
     }
@@ -841,7 +840,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::YieldExpression& yieldExpre
         [&](const Syntax::ExpressionList& list) -> std::string
         {
             auto result = createBuilder("yield list").add(*list.firstExpr);
-            for (auto& iter : list.remainingExpr)
+            for (const auto& iter : list.remainingExpr)
             {
                 result.add(*iter.second);
             }
@@ -885,9 +884,9 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FileInput& fileInput)
     {
         builder.add(dumpVariables(fileInput.globals), "globals");
     }
-    for (auto& iter : fileInput.input)
+    for (const auto& iter : fileInput.input)
     {
-        if (auto* statement = std::get_if<Syntax::Statement>(&iter))
+        if (const auto* statement = std::get_if<Syntax::Statement>(&iter))
         {
             builder.add(*statement);
         }
@@ -920,7 +919,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Suite& suite)
         [&](const Syntax::Suite::MultiLine& multiLine)
         {
             auto builder = createBuilder("suite");
-            for (auto& iter : multiLine.statements)
+            for (const auto& iter : multiLine.statements)
             {
                 builder.add(iter);
             }
@@ -932,7 +931,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Suite& suite)
 std::string pylir::Dumper::dump(const pylir::Syntax::IfStmt& ifStmt)
 {
     auto builder = createBuilder("if stmt").add(ifStmt.condition).add(*ifStmt.suite);
-    for (auto& iter : ifStmt.elifs)
+    for (const auto& iter : ifStmt.elifs)
     {
         builder.add(iter.condition).add(*iter.suite);
     }
@@ -966,7 +965,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ForStmt& forStmt)
 std::string pylir::Dumper::dump(const pylir::Syntax::TryStmt& tryStmt)
 {
     auto builder = createBuilder("try stmt").add(*tryStmt.suite);
-    for (auto& iter : tryStmt.excepts)
+    for (const auto& iter : tryStmt.excepts)
     {
         auto except = createBuilder("except");
         if (iter.expression)
@@ -1003,7 +1002,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::WithStmt& withStmt)
         return builder.emit();
     };
     builder.add(dumpWithItem(withStmt.first));
-    for (auto& [token, item] : withStmt.rest)
+    for (const auto& [token, item] : withStmt.rest)
     {
         builder.add(dumpWithItem(item));
     }
@@ -1051,7 +1050,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ParameterList& parameterLis
                 {
                     temp.add(dumpParameter(*star.parameter), "starred");
                 }
-                for (auto& [token, item] : star.defParameters)
+                for (const auto& [token, item] : star.defParameters)
                 {
                     temp.add(dumpDefParameter(item));
                 }
@@ -1071,7 +1070,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ParameterList& parameterLis
             [&](const Syntax::ParameterList::NoPosOnly::DefParams& defParams)
             {
                 auto builder = createBuilder("no pos only").add(dumpDefParameter(defParams.first));
-                for (auto& [token, item] : defParams.rest)
+                for (const auto& [token, item] : defParams.rest)
                 {
                     builder.add(dumpDefParameter(item));
                 }
@@ -1089,7 +1088,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ParameterList& parameterLis
         [&](const Syntax::ParameterList::PosOnly& posOnly)
         {
             auto builder = createBuilder("pos only").add(dumpDefParameter(posOnly.first));
-            for (auto& [token, iter] : posOnly.rest)
+            for (const auto& [token, iter] : posOnly.rest)
             {
                 builder.add(dumpDefParameter(iter));
             }
@@ -1118,7 +1117,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
         title = fmt::format("function {}", funcDef.funcName.getValue());
     }
     auto builder = createBuilder("{}", title);
-    for (auto& iter : funcDef.decorators)
+    for (const auto& iter : funcDef.decorators)
     {
         builder.add(iter);
     }
@@ -1148,7 +1147,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
 std::string pylir::Dumper::dump(const Syntax::ClassDef& classDef)
 {
     auto builder = createBuilder("class {}", classDef.className.getValue());
-    for (auto& iter : classDef.decorators)
+    for (const auto& iter : classDef.decorators)
     {
         builder.add(iter);
     }

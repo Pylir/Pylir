@@ -710,7 +710,7 @@ struct Visitor
                                           .emitError()};
             },
             [&](auto&& other) -> std::enable_if_t<!std::is_lvalue_reference_v<decltype(other)>, Ret> {
-                return visit(std::move(other));
+                return visit(std::forward<decltype(other)>(other));
             });
     }
 
@@ -867,7 +867,7 @@ struct Visitor
                         .emitError()};
             },
             [&](auto&& value) -> std::enable_if_t<std::is_rvalue_reference_v<decltype(value)>, Ret> {
-                return construct(std::move(value));
+                return construct(std::forward<decltype(value)>(value));
             });
     }
 
@@ -893,7 +893,7 @@ struct Visitor
                                       .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
                                       .emitError()};
         }
-        return pylir::match(std::move(expression.variant), [&](auto&& value) { return visit(std::move(value)); });
+        return pylir::match(std::move(expression.variant), [&](auto&& value) { return visit(std::forward<decltype(value)>(value)); });
     }
 
     Ret visit(Syntax::UExpr&& expression)
@@ -1335,7 +1335,7 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
                 closeParentheses = *close;
             }
             return Syntax::ImportStmt{Syntax::ImportStmt::FromImportList{
-                from, std::move(*relative), *import, std::move(openParenth), IdentifierToken{std::move(*identifier)},
+                from, std::move(*relative), *import, openParenth, IdentifierToken{std::move(*identifier)},
                 std::move(name), std::move(rest), trailingComma, closeParentheses}};
         }
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};

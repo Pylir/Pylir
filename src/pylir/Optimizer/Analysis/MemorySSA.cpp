@@ -39,7 +39,7 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
         {
             return builder.create<MemoryDefOp>(lastDef, operation);
         }
-        else if (llvm::isa<mlir::MemoryEffects::Read>(iter.getEffect()))
+        if (llvm::isa<mlir::MemoryEffects::Read>(iter.getEffect()))
         {
             PYLIR_ASSERT(iter.getValue() && "Reading non mlir::Value is not yet supported");
             PYLIR_ASSERT(!read && "Multiple reads are not yet supported");
@@ -50,7 +50,7 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
     auto capturing = mlir::dyn_cast<pylir::CaptureInterface>(operation);
     for (auto& operand : operation->getOpOperands())
     {
-        auto opAccess = ssa.getMemoryAccess(operand.get().getDefiningOp());
+        auto *opAccess = ssa.getMemoryAccess(operand.get().getDefiningOp());
         if (!opAccess)
         {
             continue;
@@ -93,7 +93,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         return llvm::any_of(block->getPredecessors(),
                             [&](mlir::Block* pred)
                             {
-                                auto predMemBlock = m_blockMapping.lookup(pred);
+                                auto *predMemBlock = m_blockMapping.lookup(pred);
                                 if (!predMemBlock)
                                 {
                                     return true;
@@ -135,7 +135,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         }
         for (auto& op : block)
         {
-            auto result = maybeAddAccess(builder, *this, &op, lastDef);
+            auto *result = maybeAddAccess(builder, *this, &op, lastDef);
             if (!result)
             {
                 continue;

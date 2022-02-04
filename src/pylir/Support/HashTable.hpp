@@ -28,7 +28,7 @@ class HashTable
         std::size_t index;
         std::size_t hash;
 
-        bool empty() const
+        [[nodiscard]] bool empty() const
         {
             return index == EMPTY_INDEX;
         }
@@ -58,7 +58,7 @@ class HashTable
     std::size_t m_bucketCount{};
     Index* m_buckets{};
 
-    std::size_t mask() const
+    [[nodiscard]] std::size_t mask() const
     {
         return m_bucketCount - 1;
     }
@@ -168,6 +168,10 @@ public:
 
     HashTable& operator=(const HashTable& rhs)
     {
+        if (this == &rhs)
+        {
+            return *this;
+        }
         clear();
         m_bucketCount = rhs.m_bucketCount;
         m_buckets = allocateBuckets(m_bucketCount);
@@ -204,12 +208,12 @@ public:
     using iterator = pointer;
     using const_iterator = const_pointer;
 
-    bool empty() const
+    [[nodiscard]] bool empty() const
     {
         return m_values.size() == 0;
     }
 
-    size_type size() const
+    [[nodiscard]] size_type size() const
     {
         return m_values.size();
     }

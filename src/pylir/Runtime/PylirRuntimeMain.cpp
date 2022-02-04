@@ -1,4 +1,5 @@
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
 extern "C" void __init__();
 
 #ifdef _MSC_VER

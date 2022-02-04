@@ -83,7 +83,7 @@ void LoadForwardingPass::runOnOperation()
                 else if (auto attr = foldResult.dyn_cast<mlir::Attribute>())
                 {
                     mlir::OpBuilder builder(memoryFold);
-                    auto constant = memoryFold->getDialect()->materializeConstant(builder, attr, opResult.getType(),
+                    auto *constant = memoryFold->getDialect()->materializeConstant(builder, attr, opResult.getType(),
                                                                                   memoryFold->getLoc());
                     PYLIR_ASSERT(constant);
                     opResult.replaceAllUsesWith(constant->getResult(0));

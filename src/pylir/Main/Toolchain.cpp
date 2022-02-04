@@ -11,7 +11,7 @@
 bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, pylir::Toolchain::LinkerStyle style,
                                   llvm::ArrayRef<std::string> arguments) const
 {
-    auto& args = commandLine.getArgs();
+    const auto& args = commandLine.getArgs();
     std::string linkerPath;
     if (auto* arg = args.getLastArg(pylir::cli::OPT_ld_path_EQ))
     {
@@ -86,7 +86,7 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
                 case LinkerStyle::Wasm: llvm::errs() << "wasm-lld"; break;
             }
             llvm::errs() << ">";
-            for (auto& iter : arguments)
+            for (const auto& iter : arguments)
             {
                 llvm::errs() << " " << iter;
             }
@@ -117,7 +117,7 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
     if (commandLine.verbose() || commandLine.onlyPrint())
     {
         llvm::errs() << linkerPath;
-        for (auto& iter : arguments)
+        for (const auto& iter : arguments)
         {
             llvm::errs() << " " << iter;
         }

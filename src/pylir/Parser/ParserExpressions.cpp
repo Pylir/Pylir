@@ -1379,7 +1379,7 @@ tl::expected<pylir::Syntax::Primary, std::string>
         Syntax::ExpressionList expressionList;
         expressionList.firstExpr = std::make_unique<Syntax::Expression>(
             std::move(pylir::get<Syntax::Expression>(*slice->sliceList.firstExpr)));
-        expressionList.trailingComma = std::move(slice->sliceList.trailingComma);
+        expressionList.trailingComma = slice->sliceList.trailingComma;
 
         expressionList.remainingExpr.reserve(slice->sliceList.remainingExpr.size());
         std::transform(std::move_iterator(slice->sliceList.remainingExpr.begin()),
@@ -1391,8 +1391,8 @@ tl::expected<pylir::Syntax::Primary, std::string>
                                                                        pylir::get<Syntax::Expression>(*pair.second)))};
                        });
 
-        return Syntax::Primary{Syntax::Subscription{std::move(slice->primary), std::move(slice->openSquareBracket),
-                                                    std::move(expressionList), std::move(slice->closeSquareBracket)}};
+        return Syntax::Primary{Syntax::Subscription{std::move(slice->primary), slice->openSquareBracket,
+                                                    std::move(expressionList), slice->closeSquareBracket}};
     }
     return Syntax::Primary{std::move(*slice)};
 }

@@ -7,7 +7,9 @@ std::optional<pylir::Version> pylir::Version::parse(llvm::StringRef version)
     llvm::SmallVector<llvm::StringRef> splits;
     version.split(splits, '.');
     if (splits.empty())
+    {
         return {};
+    }
     Version result;
     result.original = version;
     if (splits[0].getAsInteger(10, result.majorVersion) || result.majorVersion < 0)

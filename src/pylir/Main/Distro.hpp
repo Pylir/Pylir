@@ -114,32 +114,32 @@ public:
         return DistroVal <= Other.DistroVal;
     }
 
-    bool IsRedhat() const
+    [[nodiscard]] bool IsRedhat() const
     {
         return DistroVal == Fedora || (DistroVal >= RHEL5 && DistroVal <= RHEL7);
     }
 
-    bool IsOpenSUSE() const
+    [[nodiscard]] bool IsOpenSUSE() const
     {
         return DistroVal == OpenSUSE;
     }
 
-    bool IsDebian() const
+    [[nodiscard]] bool IsDebian() const
     {
         return DistroVal >= DebianLenny && DistroVal <= DebianBookworm;
     }
 
-    bool IsUbuntu() const
+    [[nodiscard]] bool IsUbuntu() const
     {
         return DistroVal >= UbuntuHardy && DistroVal <= UbuntuJammy;
     }
 
-    bool IsAlpineLinux() const
+    [[nodiscard]] bool IsAlpineLinux() const
     {
         return DistroVal == AlpineLinux;
     }
 
-    bool IsGentoo() const
+    [[nodiscard]] bool IsGentoo() const
     {
         return DistroVal == Gentoo;
     }

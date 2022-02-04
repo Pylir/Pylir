@@ -143,7 +143,7 @@ pylir::LinuxToolchain::LinuxToolchain(const llvm::Triple& triple, const cli::Com
 
 bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
-    auto& args = commandLine.getArgs();
+    const auto& args = commandLine.getArgs();
     auto gccInstall = findGCCInstallation(m_triple, commandLine);
     if (!gccInstall)
     {
@@ -158,7 +158,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     }
     if (isPIE(commandLine))
     {
-        arguments.push_back("-pie");
+        arguments.emplace_back("-pie");
     }
     Distro distro(m_triple);
     if (distro.IsAlpineLinux())
@@ -190,7 +190,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     }
 
     arguments.emplace_back("--eh-frame-hdr");
-    auto* emulation = getEmulation(m_triple, commandLine);
+    const auto* emulation = getEmulation(m_triple, commandLine);
     if (!emulation)
     {
         llvm::errs() << pylir::Diag::formatLine(Diag::Error,
@@ -203,12 +203,12 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     arguments.emplace_back("-dynamic-linker");
     arguments.emplace_back(getDynamicLinker(m_triple, commandLine));
 
-    if (auto output = args.getLastArg(pylir::cli::OPT_o))
+    if (auto *output = args.getLastArg(pylir::cli::OPT_o))
     {
         arguments.emplace_back("-o");
         arguments.emplace_back(output->getValue());
     }
-    else if (auto input = args.getLastArg(pylir::cli::OPT_INPUT))
+    else if (auto *input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
         llvm::SmallString<20> path(input->getValue());
         llvm::sys::path::replace_extension(path, "");
@@ -266,7 +266,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
         arguments.push_back(("-L" + iter).str());
     }
 
-    for (auto arg : args)
+    for (auto *arg : args)
     {
         if (arg->getOption().matches(pylir::cli::OPT_l))
         {

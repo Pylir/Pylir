@@ -6,13 +6,15 @@
 #include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <utility>
+
 #include "PylirPyDialect.hpp"
 
 namespace pylir::Py::detail
 {
 struct IntImplAttrStorage : public mlir::AttributeStorage
 {
-    IntImplAttrStorage(BigInt value) : value(std::move(value)) {}
+    explicit IntImplAttrStorage(BigInt value) : value(std::move(value)) {}
 
     using KeyTy = BigInt;
 
@@ -74,7 +76,7 @@ struct SlotsAttrStorage : public mlir::AttributeStorage
 {
     using KeyTy = pylir::Py::SlotsMap;
 
-    SlotsAttrStorage(KeyTy&& map) : ::mlir::AttributeStorage(), map(std::move(map)) {}
+    explicit SlotsAttrStorage(KeyTy&& map) : ::mlir::AttributeStorage(), map(std::move(map)) {}
 
     bool operator==(const KeyTy& tblgenKey) const
     {
@@ -184,7 +186,7 @@ void pylir::Py::PylirPyDialect::printAttribute(::mlir::Attribute attr, ::mlir::D
 pylir::Py::IntAttr pylir::Py::IntAttr::get(::mlir::MLIRContext* context, BigInt value)
 {
     return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Int.name), {},
-                           IntImplAttr::get(context, value))
+                           IntImplAttr::get(context, std::move(value)))
         .cast<IntAttr>();
 }
 

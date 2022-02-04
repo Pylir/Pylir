@@ -32,7 +32,7 @@ class CommandLine
     friend struct pylir::Diag::LocationProvider<llvm::opt::Arg*, void>;
 
 public:
-    explicit CommandLine(std::string exe, int argc, char* argv[]);
+    explicit CommandLine(std::string exe, int argc, char** argv);
 
     explicit operator bool() const
     {
@@ -80,6 +80,7 @@ enum ID
 // Don't have much choice until this is fixed in LLVM
 using llvm::opt::HelpHidden;
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 static const llvm::opt::OptTable::Info InfoTable[] = {
 #define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) \
     {PREFIX, NAME,  HELPTEXT,    METAVAR,     OPT_##ID,  llvm::opt::Option::KIND##Class,                 \
@@ -97,7 +98,7 @@ struct LocationProvider<llvm::opt::Arg*, void>
 {
     static std::pair<std::size_t, std::size_t> getRange(llvm::opt::Arg* value, const void* context) noexcept
     {
-        auto* commandLine = reinterpret_cast<const pylir::cli::CommandLine*>(context);
+        const auto* commandLine = reinterpret_cast<const pylir::cli::CommandLine*>(context);
         return commandLine->m_argRanges.lookup(value);
     }
 };

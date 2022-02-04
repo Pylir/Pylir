@@ -33,7 +33,7 @@ public:
 
     void visit(const Atom& atom)
     {
-        if (auto* enclosure = std::get_if<std::unique_ptr<Enclosure>>(&atom.variant))
+        if (const auto* enclosure = std::get_if<std::unique_ptr<Enclosure>>(&atom.variant))
         {
             getImpl()->visit(**enclosure);
         }
@@ -84,7 +84,7 @@ public:
                     [&](const ArgumentList::PositionalItem::Star& star) { getImpl()->visit(*star.expression); });
             };
             handlePositionalItem(argumentList.positionalArguments->firstItem);
-            for (auto& [token, item] : argumentList.positionalArguments->rest)
+            for (const auto& [token, item] : argumentList.positionalArguments->rest)
             {
                 (void)token;
                 handlePositionalItem(item);
@@ -95,7 +95,7 @@ public:
         if (argumentList.starredAndKeywords)
         {
             handleKeywordItem(argumentList.starredAndKeywords->first);
-            for (auto& [token, variant] : argumentList.starredAndKeywords->rest)
+            for (const auto& [token, variant] : argumentList.starredAndKeywords->rest)
             {
                 (void)token;
                 pylir::match(variant, handleKeywordItem,
@@ -108,7 +108,7 @@ public:
             auto handleExpression = [&](const ArgumentList::KeywordArguments::Expression& expression)
             { getImpl()->visit(*expression.expression); };
             handleExpression(argumentList.keywordArguments->first);
-            for (auto& [token, variant] : argumentList.keywordArguments->rest)
+            for (const auto& [token, variant] : argumentList.keywordArguments->rest)
             {
                 (void)token;
                 pylir::match(variant, handleKeywordItem, handleExpression);
@@ -225,7 +225,7 @@ public:
     void visit(const Comparison& comparison)
     {
         getImpl()->visit(comparison.left);
-        for (auto& [op, expr] : comparison.rest)
+        for (const auto& [op, expr] : comparison.rest)
         {
             (void)op;
             getImpl()->visit(expr);
@@ -307,7 +307,7 @@ public:
             expression.variant,
             [&](const StarredExpression::Items& items)
             {
-                for (auto& [item, token] : items.leading)
+                for (const auto& [item, token] : items.leading)
                 {
                     (void)token;
                     getImpl()->visit(item);
@@ -390,7 +390,7 @@ public:
                                 { getImpl()->visit(datum.orExpr); });
                         };
                         handleKeyDatum(*commaList.firstExpr);
-                        for (auto& [token, expr] : commaList.remainingExpr)
+                        for (const auto& [token, expr] : commaList.remainingExpr)
                         {
                             (void)token;
                             handleKeyDatum(*expr);
@@ -435,7 +435,7 @@ public:
 
     void visit(const AssignmentStmt& assignmentStmt)
     {
-        for (auto& [targetList, token] : assignmentStmt.targets)
+        for (const auto& [targetList, token] : assignmentStmt.targets)
         {
             (void)token;
             getImpl()->visit(targetList);
@@ -446,7 +446,7 @@ public:
     void visit(const AugTarget& augTarget)
     {
         pylir::match(
-            augTarget.variant, [](const IdentifierToken) {}, [&](const auto& other) { getImpl()->visit(other); });
+            augTarget.variant, [](const IdentifierToken&) {}, [&](const auto& other) { getImpl()->visit(other); });
     }
 
     void visit(const AugmentedAssignmentStmt& augmentedAssignmentStmt)
@@ -527,7 +527,7 @@ public:
     {
         getImpl()->visit(ifStmt.condition);
         getImpl()->visit(*ifStmt.suite);
-        for (auto& elif : ifStmt.elifs)
+        for (const auto& elif : ifStmt.elifs)
         {
             getImpl()->visit(elif.condition);
             getImpl()->visit(*elif.suite);
@@ -562,7 +562,7 @@ public:
     void visit(const TryStmt& tryStmt)
     {
         getImpl()->visit(*tryStmt.suite);
-        for (auto& except : tryStmt.excepts)
+        for (const auto& except : tryStmt.excepts)
         {
             if (except.expression)
             {
@@ -591,7 +591,7 @@ public:
             }
         };
         handleWithItem(withStmt.first);
-        for (auto& [token, withItem] : withStmt.rest)
+        for (const auto& [token, withItem] : withStmt.rest)
         {
             (void)token;
             handleWithItem(withItem);
@@ -627,7 +627,7 @@ public:
                 {
                     getImpl()->visit(*star.parameter);
                 }
-                for (auto& [token, parameter] : star.defParameters)
+                for (const auto& [token, parameter] : star.defParameters)
                 {
                     (void)token;
                     getImpl()->visit(parameter);
@@ -646,7 +646,7 @@ public:
             [&](const ParameterList::NoPosOnly::DefParams& defParams)
             {
                 getImpl()->visit(defParams.first);
-                for (auto& [token, parameter] : defParams.rest)
+                for (const auto& [token, parameter] : defParams.rest)
                 {
                     (void)token;
                     getImpl()->visit(parameter);
@@ -661,7 +661,7 @@ public:
     void visit(const ParameterList::PosOnly& posOnly)
     {
         getImpl()->visit(posOnly.first);
-        for (auto& [token, parameter] : posOnly.rest)
+        for (const auto& [token, parameter] : posOnly.rest)
         {
             (void)token;
             getImpl()->visit(parameter);
@@ -736,7 +736,7 @@ public:
             suite.variant, [&](const Suite::SingleLine& singleLine) { getImpl()->visit(singleLine.stmtList); },
             [&](const Suite::MultiLine& multiLine)
             {
-                for (auto& iter : multiLine.statements)
+                for (const auto& iter : multiLine.statements)
                 {
                     getImpl()->visit(iter);
                 }
@@ -745,9 +745,9 @@ public:
 
     void visit(const FileInput& fileInput)
     {
-        for (auto& iter : fileInput.input)
+        for (const auto& iter : fileInput.input)
         {
-            if (auto* statement = std::get_if<Statement>(&iter))
+            if (const auto* statement = std::get_if<Statement>(&iter))
             {
                 getImpl()->visit(*statement);
             }

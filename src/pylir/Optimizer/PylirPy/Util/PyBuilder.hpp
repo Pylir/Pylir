@@ -14,7 +14,7 @@ class PyBuilder : public mlir::OpBuilder
 
     void implementBlock(mlir::Block* block)
     {
-        if (auto next = getBlock()->getNextNode())
+        if (auto* next = getBlock()->getNextNode())
         {
             block->insertBefore(next);
         }
@@ -36,7 +36,7 @@ public:
     {
     }
 
-    mlir::Location getCurrentLoc() const
+    [[nodiscard]] mlir::Location getCurrentLoc() const
     {
         return m_loc;
     }
@@ -141,6 +141,7 @@ public:
     }
 
     template <std::size_t n>
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     Py::ConstantOp createConstant(const char (&c)[n])
     {
         return create<Py::ConstantOp>(getPyStringAttr(c));

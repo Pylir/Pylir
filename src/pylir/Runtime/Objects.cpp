@@ -20,7 +20,7 @@ PyObject* PyObject::getSlot(int index)
 
 PyObject* PyObject::getSlot(std::string_view name)
 {
-    PySequence& slotsTuple = type(*this).getSlot(PyTypeObject::Slots)->cast<PySequence>();
+    auto& slotsTuple = type(*this).getSlot(PyTypeObject::Slots)->cast<PySequence>();
     for (std::size_t i = 0; i < slotsTuple.len(); i++)
     {
         auto& str = slotsTuple.getItem(i).cast<PyString>();
@@ -58,7 +58,7 @@ PyObject* PyObject::mroLookup(int index)
     auto& mro = type(*this).getSlot(PyTypeObject::MRO)->cast<PySequence>();
     for (auto* iter : mro)
     {
-        if (auto slot = iter->getSlot(index))
+        if (auto *slot = iter->getSlot(index))
         {
             return slot;
         }

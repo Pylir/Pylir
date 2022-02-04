@@ -52,6 +52,8 @@ public:
         const Diag::Document& document, int fileId = 0,
         std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback = [](auto&&) {});
 
+    ~Lexer() = default;
+
     Lexer(const Lexer&) = delete;
     Lexer& operator=(const Lexer&) = delete;
 
@@ -60,7 +62,7 @@ public:
 
     [[nodiscard]] iterator begin()
     {
-        return iterator(*this, 0);
+        return {*this, 0};
     }
 
     [[nodiscard]] const_iterator cbegin()
@@ -70,7 +72,7 @@ public:
 
     [[nodiscard]] iterator end()
     {
-        return iterator(*this, static_cast<std::size_t>(-1));
+        return {*this, static_cast<std::size_t>(-1)};
     }
 
     [[nodiscard]] const_iterator cend()
