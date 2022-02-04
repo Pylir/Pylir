@@ -581,11 +581,110 @@ mlir::Value pylir::CodeGen::visit(const Syntax::NotTest& expression)
         });
 }
 
-mlir::Value pylir::CodeGen::binOp(llvm::Twine method, mlir::Value lhs, mlir::Value rhs)
+mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, mlir::Value lhs, mlir::Value rhs)
 {
     auto tuple = m_builder.createMakeTuple({lhs, rhs});
     return Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, method, tuple, {}, m_currentExceptBlock,
                                       m_currentLandingPadBlock);
+}
+
+mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs, mlir::Value rhs)
+{
+    auto trueC = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
+    auto falseC = m_builder.create<mlir::arith::ConstantIntOp>(false, 1);
+    BlockPtr endBlock;
+    endBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+    if (method == "__eq__" || method == "__ne__")
+    {
+        auto isSame = m_builder.createIs(lhs, rhs);
+        BlockPtr continueNormal;
+        m_builder.create<mlir::CondBranchOp>(isSame, endBlock,
+                                             mlir::ValueRange{m_builder.createConstant(method == "__eq__")},
+                                             continueNormal, mlir::ValueRange{});
+        implementBlock(continueNormal);
+    }
+    auto lhsType = m_builder.createTypeOf(lhs);
+    auto rhsType = m_builder.createTypeOf(rhs);
+    auto sameType = m_builder.createIs(lhsType, rhsType);
+    BlockPtr normalMethodBlock;
+    normalMethodBlock->addArgument(m_builder.getI1Type(), m_builder.getCurrentLoc());
+    BlockPtr differentTypeBlock;
+    m_builder.create<mlir::CondBranchOp>(sameType, normalMethodBlock, mlir::ValueRange{trueC}, differentTypeBlock,
+                                         mlir::ValueRange{});
+
+    implementBlock(differentTypeBlock);
+    auto subclass = buildSubclassCheck(rhsType, lhsType);
+    BlockPtr isSubclassBlock;
+    m_builder.create<mlir::CondBranchOp>(subclass, isSubclassBlock, normalMethodBlock, mlir::ValueRange{falseC});
+
+    implementBlock(isSubclassBlock);
+    auto metaType = m_builder.createTypeRef();
+    auto rhsMroTuple = m_builder.createGetSlot(rhsType, metaType, "__mro__");
+    auto lookup = m_builder.createMROLookup(rhsMroTuple, revMethod);
+    BlockPtr hasReversedBlock;
+    m_builder.create<mlir::CondBranchOp>(lookup.success(), hasReversedBlock, normalMethodBlock,
+                                         mlir::ValueRange{falseC});
+
+    implementBlock(hasReversedBlock);
+    auto lhsMroTuple = m_builder.createGetSlot(lhsType, metaType, "__mro__");
+    auto lhsLookup = m_builder.createMROLookup(lhsMroTuple, revMethod);
+    BlockPtr callReversedBlock;
+    BlockPtr lhsHasReversedBlock;
+    m_builder.create<mlir::CondBranchOp>(lhsLookup.success(), lhsHasReversedBlock, callReversedBlock);
+
+    implementBlock(lhsHasReversedBlock);
+    auto sameImplementation = m_builder.createIs(lookup.result(), lhsLookup.result());
+    m_builder.create<mlir::CondBranchOp>(sameImplementation, normalMethodBlock, mlir::ValueRange{falseC},
+                                         callReversedBlock, mlir::ValueRange{});
+
+    implementBlock(callReversedBlock);
+    auto tuple = m_builder.createMakeTuple({rhs, lhs});
+    auto reverseResult = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, revMethod, tuple, {},
+                                                    m_currentExceptBlock, m_currentLandingPadBlock);
+    auto isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
+    m_builder.create<mlir::CondBranchOp>(isNotImplemented, normalMethodBlock, mlir::ValueRange{trueC}, endBlock,
+                                         mlir::ValueRange{reverseResult});
+
+    implementBlock(normalMethodBlock);
+    tuple = m_builder.createMakeTuple({lhs, rhs});
+    BlockPtr typeErrorBlock;
+    auto result = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, method, tuple, {}, typeErrorBlock,
+                                                m_currentExceptBlock, m_currentLandingPadBlock);
+    isNotImplemented = m_builder.createIs(result, m_builder.createNotImplementedRef());
+    BlockPtr maybeTryReverse;
+    m_builder.create<mlir::CondBranchOp>(isNotImplemented, maybeTryReverse, endBlock, mlir::ValueRange{result});
+
+    implementBlock(maybeTryReverse);
+    BlockPtr actuallyTryReverse;
+    m_builder.create<mlir::CondBranchOp>(normalMethodBlock->getArgument(0), typeErrorBlock, actuallyTryReverse);
+
+    implementBlock(actuallyTryReverse);
+    tuple = m_builder.createMakeTuple({rhs, lhs});
+    reverseResult = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, revMethod, tuple, {},
+                                                  typeErrorBlock, m_currentExceptBlock, m_currentLandingPadBlock);
+    isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
+    m_builder.create<mlir::CondBranchOp>(isNotImplemented, typeErrorBlock, endBlock, mlir::ValueRange{reverseResult});
+
+    implementBlock(typeErrorBlock);
+    if (method != "__eq__" && method != "__ne__")
+    {
+        auto typeError = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
+                                            m_currentLandingPadBlock);
+        raiseException(typeError);
+    }
+    else
+    {
+        mlir::Value isEqual = m_builder.createIs(lhs, rhs);
+        if (method == "__ne__")
+        {
+            isEqual = m_builder.create<mlir::arith::XOrIOp>(isEqual, trueC);
+        }
+        mlir::Value boolean = m_builder.createBoolFromI1(isEqual);
+        m_builder.create<mlir::BranchOp>(endBlock, boolean);
+    }
+
+    implementBlock(endBlock);
+    return endBlock->getArgument(0);
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
@@ -610,7 +709,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         {
             found->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
             auto rhsTry = BlockPtr{};
-            m_builder.create<mlir::CondBranchOp>(toI1(result), found, result, rhsTry, mlir::ValueRange{});
+            m_builder.create<mlir::CondBranchOp>(toI1(result), rhsTry, found, result);
             implementBlock(rhsTry);
         }
 
@@ -649,12 +748,12 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
             mlir::Value cmp;
             switch (comp)
             {
-                case Comp::Lt: cmp = binOp("__lt__", previousRHS, other); break;
-                case Comp::Gt: cmp = binOp("__gt__", previousRHS, other); break;
-                case Comp::Eq: cmp = binOp("__eq__", previousRHS, other); break;
-                case Comp::Ne: cmp = binOp("__ne__", previousRHS, other); break;
-                case Comp::Ge: cmp = binOp("__ge__", previousRHS, other); break;
-                case Comp::Le: cmp = binOp("__le__", previousRHS, other); break;
+                case Comp::Lt: cmp = binOp("__lt__", "__gt__", previousRHS, other); break;
+                case Comp::Gt: cmp = binOp("__gt__", "__lt__", previousRHS, other); break;
+                case Comp::Eq: cmp = binOp("__eq__", "__eq__", previousRHS, other); break;
+                case Comp::Ne: cmp = binOp("__ne__", "__ne__", previousRHS, other); break;
+                case Comp::Ge: cmp = binOp("__ge__", "__le__", previousRHS, other); break;
+                case Comp::Le: cmp = binOp("__le__", "__ge__", previousRHS, other); break;
                 case Comp::In: cmp = binOp("__contains__", previousRHS, other); break;
                 case Comp::Is: cmp = m_builder.createBoolFromI1(m_builder.createIs(previousRHS, other)); break;
             }
@@ -693,7 +792,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::OrExpr& orExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             m_builder.setCurrentLoc(getLoc(orExpr, binOp->bitOrToken));
-            return this->binOp("__or__", lhs, rhs);
+            return this->binOp("__or__", "__ror__", lhs, rhs);
         });
 }
 
@@ -706,7 +805,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::XorExpr& xorExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             m_builder.setCurrentLoc(getLoc(xorExpr, binOp->bitXorToken));
-            return this->binOp("__xor__", lhs, rhs);
+            return this->binOp("__xor__", "__rxor__", lhs, rhs);
         });
 }
 
@@ -719,7 +818,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AndExpr& andExpr)
             auto lhs = visit(*binOp->lhs);
             auto rhs = visit(binOp->rhs);
             m_builder.setCurrentLoc(getLoc(andExpr, binOp->bitAndToken));
-            return this->binOp("__and__", lhs, rhs);
+            return this->binOp("__and__", "__rand__", lhs, rhs);
         });
 }
 
@@ -734,8 +833,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ShiftExpr& shiftExpr)
             m_builder.setCurrentLoc(getLoc(shiftExpr, binOp->binToken));
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::ShiftLeft: return this->binOp("__lshift__", lhs, rhs);
-                case TokenType::ShiftRight: return this->binOp("__rshift__", lhs, rhs);
+                case TokenType::ShiftLeft: return this->binOp("__lshift__", "__rlshift__", lhs, rhs);
+                case TokenType::ShiftRight: return this->binOp("__rshift__", "__rrshift__", lhs, rhs);
                 default: PYLIR_UNREACHABLE;
             }
         });
@@ -752,8 +851,8 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AExpr& aExpr)
             m_builder.setCurrentLoc(getLoc(aExpr, binOp->binToken));
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::Plus: return this->binOp("__add__", lhs, rhs);
-                case TokenType::Minus: return this->binOp("__sub__", lhs, rhs);
+                case TokenType::Plus: return this->binOp("__add__", "__radd__", lhs, rhs);
+                case TokenType::Minus: return this->binOp("__sub__", "__rsub__", lhs, rhs);
                 default: PYLIR_UNREACHABLE;
             }
         });
@@ -770,10 +869,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
             m_builder.setCurrentLoc(getLoc(mExpr, binOp->binToken));
             switch (binOp->binToken.getTokenType())
             {
-                case TokenType::Star: return this->binOp("__mul__", lhs, rhs);
-                case TokenType::Divide: return this->binOp("__truediv__", lhs, rhs);
-                case TokenType::IntDivide: return this->binOp("__floordiv__", lhs, rhs);
-                case TokenType::Remainder: return this->binOp("__mod__", lhs, rhs);
+                case TokenType::Star: return this->binOp("__mul__", "__rmul__", lhs, rhs);
+                case TokenType::Divide: return this->binOp("__truediv__", "__rtruedev__", lhs, rhs);
+                case TokenType::IntDivide: return this->binOp("__floordiv__", "__rfloordiv__", lhs, rhs);
+                case TokenType::Remainder: return this->binOp("__mod__", "__rmod__", lhs, rhs);
                 default: PYLIR_UNREACHABLE;
             }
         },
@@ -782,7 +881,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
             auto lhs = visit(*atBin->lhs);
             auto rhs = visit(*atBin->rhs);
             m_builder.setCurrentLoc(getLoc(mExpr, atBin->atToken));
-            return this->binOp("__matmul__", lhs, rhs);
+            return this->binOp("__matmul__", "__rmatmul__", lhs, rhs);
         });
 }
 
@@ -822,7 +921,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Power& power)
     }
     auto rhs = visit(*power.rightHand->second);
     m_builder.setCurrentLoc(getLoc(power, power.rightHand->first));
-    return binOp("__pow__", lhs, rhs);
+    return binOp("__pow__", "__rpow__", lhs, rhs);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AwaitExpr& awaitExpr)

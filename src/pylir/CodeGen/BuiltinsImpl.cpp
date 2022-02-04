@@ -320,9 +320,45 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                          auto lhs = functionArgs[0];
                                                          auto rhs = functionArgs[1];
                                                          auto equal = m_builder.createIs(lhs, rhs);
-                                                         auto boolean = m_builder.createBoolFromI1(equal);
-                                                         m_builder.create<mlir::ReturnOp>(mlir::ValueRange{boolean});
+                                                         auto trueC = m_builder.createConstant(true);
+                                                         auto notImplemented = m_builder.createNotImplementedRef();
+                                                         auto select = m_builder.create<mlir::arith::SelectOp>(
+                                                             equal, trueC, notImplemented);
+                                                         m_builder.create<mlir::ReturnOp>(mlir::ValueRange{select});
                                                      });
+                    slots["__ne__"] = createFunction(
+                        "builtins.object.__ne__",
+                        {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                         FunctionParameter{"", FunctionParameter::PosOnly, false}},
+                        [&](mlir::ValueRange functionArgs)
+                        {
+                            auto lhs = functionArgs[0];
+                            auto rhs = functionArgs[1];
+                            auto tuple = m_builder.createMakeTuple({lhs, rhs});
+                            auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__eq__",
+                                                                     tuple, {}, nullptr, nullptr);
+                            auto notImplemented = m_builder.createNotImplementedRef();
+                            auto isNotImplemented = m_builder.createIs(result, notImplemented);
+                            auto* isImplementedBlock = new mlir::Block;
+                            auto* endBlock = new mlir::Block;
+                            endBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+                            m_builder.create<mlir::CondBranchOp>(isNotImplemented, endBlock,
+                                                                 mlir::ValueRange{notImplemented}, isImplementedBlock,
+                                                                 mlir::ValueRange{});
+
+                            implementBlock(isImplementedBlock);
+                            tuple = m_builder.createMakeTuple({m_builder.createBoolRef(), result});
+                            auto boolean = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
+                                                                      tuple, {}, nullptr, nullptr);
+                            mlir::Value i1 = m_builder.createBoolToI1(boolean);
+                            auto trueC = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
+                            i1 = m_builder.create<mlir::arith::XOrIOp>(i1, trueC);
+                            auto asBoolean = m_builder.createBoolFromI1(i1);
+                            m_builder.create<mlir::BranchOp>(endBlock, mlir::ValueRange{asBoolean});
+
+                            implementBlock(endBlock);
+                            m_builder.create<mlir::ReturnOp>(endBlock->getArgument(0));
+                        });
                     slots["__hash__"] = createFunction("builtins.object.__hash__",
                                                        {FunctionParameter{"", FunctionParameter::PosOnly, false}},
                                                        [&](mlir::ValueRange functionArgs)
@@ -785,6 +821,51 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                    auto asStr = m_builder.createIntToStr(self);
                                                    m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asStr});
                                                });
+            auto cmpImpl = [&](Py::IntCmpKind kind)
+            {
+                return [&, kind](mlir::ValueRange functionArguments)
+                {
+                    auto self = functionArguments[0];
+                    auto other = functionArguments[1];
+                    auto otherType = m_builder.createTypeOf(other);
+                    auto otherIsInt = buildSubclassCheck(otherType, m_builder.createIntRef());
+                    auto* otherIsIntBlock = new mlir::Block;
+                    auto* elseBlock = new mlir::Block;
+                    m_builder.create<mlir::CondBranchOp>(otherIsInt, otherIsIntBlock, elseBlock);
+
+                    implementBlock(elseBlock);
+                    m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createNotImplementedRef()});
+
+                    implementBlock(otherIsIntBlock);
+                    auto cmp = m_builder.createIntCmpOp(kind, self, other);
+                    auto boolean = m_builder.createBoolFromI1(cmp);
+                    m_builder.create<mlir::ReturnOp>(mlir::Value{boolean});
+                };
+            };
+            slots["__eq__"] =
+                createFunction("builtins.int.__eq__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               cmpImpl(Py::IntCmpKind::eq));
+            slots["__ne__"] =
+                createFunction("builtins.int.__ne__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               cmpImpl(Py::IntCmpKind::ne));
+            slots["__lt__"] =
+                createFunction("builtins.int.__lt__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               cmpImpl(Py::IntCmpKind::lt));
+            slots["__le__"] =
+                createFunction("builtins.int.__le__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               cmpImpl(Py::IntCmpKind::le));
+            slots["__gt__"] =
+                createFunction("builtins.int.__gt__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               cmpImpl(Py::IntCmpKind::gt));
+            slots["__ge__"] =
+                createFunction("builtins.int.__ge__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               cmpImpl(Py::IntCmpKind::ge));
             slots["__index__"] = createFunction("builtins.int.__index__", {{"", FunctionParameter::PosOnly, false}},
                                                 [&](mlir::ValueRange functionArguments)
                                                 {
