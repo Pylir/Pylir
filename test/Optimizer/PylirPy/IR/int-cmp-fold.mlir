@@ -66,7 +66,7 @@ func @test5(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test5
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = py.constant #py.int<5>
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp ge %[[C]], %[[ARG0]]
+// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp le %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 
@@ -81,7 +81,7 @@ func @test6(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test6
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = py.constant #py.int<5>
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp gt %[[C]], %[[ARG0]]
+// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp lt %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 func @test7(%arg0 : !py.dynamic) -> i1 {
@@ -95,7 +95,7 @@ func @test7(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test7
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = py.constant #py.int<5>
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp le %[[C]], %[[ARG0]]
+// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp ge %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 
@@ -110,5 +110,5 @@ func @test8(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test8
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = py.constant #py.int<5>
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp lt %[[C]], %[[ARG0]]
+// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp gt %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]

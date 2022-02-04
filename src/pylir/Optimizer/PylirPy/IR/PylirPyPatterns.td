@@ -10,9 +10,7 @@ def prependTuple : NativeCodeCall<"prependTuple($_builder, $_loc, $0, $1, $2)">;
 
 def prependTupleConst : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
-def IsTypeSlot : AttrConstraint<
-    CPred<"$_self.isa<::mlir::StringAttr>() && ::isTypeSlot($_self.cast<::mlir::StringAttr>().getValue())">,
-    "is type slot">;
+def IsTypeSlot : AttrConstraint<CPred<"::isTypeSlot($_self.cast<::mlir::StringAttr>().getValue())">, "is type slot">;
 
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
 
@@ -22,7 +20,8 @@ def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, $expansion
 def : Pat<(PylirPy_TuplePrependOp $input, (ConstantLikeMatcher PylirPy_TupleAttr:$args)),
           (prependTupleConst $input, $args)>;
 
-def : Pattern<(PylirPy_GetSlotOp:$loc $object, (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_)), IsTypeSlot:$slot),
+def : Pattern<(PylirPy_GetSlotOp:$loc $object,
+                (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_)), Confined<StrAttr, [IsTypeSlot]>:$slot),
     [(PylirPy_ConstantOp:$constant TypeRef), (PylirPy_GetSlotOp $object, $constant, $slot, (location $loc))]
 >;
 
@@ -58,13 +57,13 @@ def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp $input))
                 [(Arith_IndexCastOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
                 [(OnlyOneIsIndex $result__0, $input)]>;
 
-def IsConstant : Constraint<
-    CPred<"$0.getDefiningOp() && $0.getDefiningOp()->hasTrait<::mlir::OpTrait::ConstantLike>()">, "is constant">;
+def IsConstant : Constraint<CPred<"::mlir::matchPattern($0, ::mlir::m_Constant())">, "is constant">;
 
 class NotConstraint<Constraint con> : Constraint<Neg<con.predicate>, "not " # con.summary>;
 
-def : Pat<(PylirPy_IntCmpOp AnyAttrOf<[PylirPy_IntCmpEq, PylirPy_IntCmpNe]>:$kind, $lhs, $rhs),
-          (PylirPy_IntCmpOp $kind, $rhs, $lhs), [(IsConstant $lhs), (NotConstraint<IsConstant> $rhs)]>;
+def : Pat<(PylirPy_IntCmpOp $kind, $lhs, $rhs),
+        (PylirPy_IntCmpOp (NativeCodeCall<"reversePredicate($0)"> $kind), $rhs, $lhs),
+        [(IsConstant $lhs), (NotConstraint<IsConstant> $rhs)]>;
 
 def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
           (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
