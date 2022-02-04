@@ -409,12 +409,12 @@ mlir::Operation::operand_range pylir::Py::InvokeIndirectOp::getArgOperands()
     return operands();
 }
 
-mlir::LogicalResult
-    pylir::Py::InvokeIndirectOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
-                                                  ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                  ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+mlir::LogicalResult pylir::Py::InvokeIndirectOp::inferReturnTypes(
+    ::mlir::MLIRContext*, ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange operands, ::mlir::DictionaryAttr,
+    ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
 {
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
+    auto results = operands[0].getType().cast<mlir::FunctionType>().getResults();
+    inferredReturnTypes.append(results.begin(), results.end());
     return mlir::success();
 }
 

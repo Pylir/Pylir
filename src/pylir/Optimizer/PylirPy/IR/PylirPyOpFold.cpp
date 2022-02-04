@@ -718,6 +718,20 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
     return mlir::failure();
 }
 
+mlir::LogicalResult pylir::Py::InvokeIndirectOp::canonicalize(InvokeIndirectOp op, ::mlir::PatternRewriter& rewriter)
+{
+    mlir::FlatSymbolRefAttr symbolRefAttr;
+    if (!mlir::matchPattern(op.callee(), mlir::m_Constant(&symbolRefAttr)))
+    {
+        return mlir::failure();
+    }
+    auto func = op.callee().getType().cast<mlir::FunctionType>();
+    rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, func.getResults(), symbolRefAttr, op.operands(),
+                                              op.normalDestOperands(), op.unwindDestOperands(), op.happyPath(),
+                                              op.exceptionPath());
+    return mlir::success();
+}
+
 mlir::LogicalResult pylir::Py::GetSlotOp::foldUsage(mlir::Operation* lastClobber,
                                                     ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {

@@ -961,6 +961,8 @@ def PylirPy_InvokeIndirectOp : PylirPy_InvokeBase<"invoke_indirect",
         ` ` ` ` `label` $happyPath ( `(` $normalDestOperands^ `)` )?
                 `unwind` $exceptionPath ( `(` $unwindDestOperands^ `)` )?
     }];
+
+    let hasCanonicalizeMethod = 1;
 }
 
 def PylirPy_LandingPadOp : PylirPy_Op<"landingPad"> {
