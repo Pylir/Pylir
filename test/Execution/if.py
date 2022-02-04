@@ -20,3 +20,30 @@ if []:
 if object():
     print("Success")
 # CHECK: Success
+
+if True:
+    print("Success")
+else:
+    print("Failure")
+# CHECK: Success
+
+
+if False:
+    print("Failure")
+elif True:
+    print("Success")
+# CHECK: Success
+
+if False:
+    print("Failure")
+elif False:
+    print("Failure")
+# CHECK-NOT: Failure
+
+if False:
+    print("Failure")
+elif False:
+    print("Failure")
+else:
+    print("Success")
+# CHECK: Success
