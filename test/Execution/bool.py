@@ -34,3 +34,9 @@ print(bool([0]))
 
 print(bool(object()))
 # CHECK: True
+
+print(True + True)
+# CHECK: 2
+
+print(False + True)
+# CHECK: 1

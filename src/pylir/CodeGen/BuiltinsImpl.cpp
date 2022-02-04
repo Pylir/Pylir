@@ -222,6 +222,21 @@ mlir::Value implementLenBuiltin(pylir::Py::PyBuilder& builder, mlir::Value objec
 }
 } // namespace
 
+void pylir::CodeGen::binCheckOtherOp(mlir::Value other, const Py::Builtins::Builtin& builtin)
+{
+    auto otherType = m_builder.createTypeOf(other);
+    auto otherIsType = buildSubclassCheck(
+        otherType, m_builder.createConstant(mlir::FlatSymbolRefAttr::get(m_builder.getContext(), builtin.name)));
+    auto* otherIsTypeBlock = new mlir::Block;
+    auto* elseBlock = new mlir::Block;
+    m_builder.create<mlir::CondBranchOp>(otherIsType, otherIsTypeBlock, elseBlock);
+
+    implementBlock(elseBlock);
+    m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createNotImplementedRef()});
+
+    implementBlock(otherIsTypeBlock);
+}
+
 void pylir::CodeGen::createBuiltinsImpl()
 {
     createClass(m_builder.getTypeBuiltin(), {},
@@ -821,23 +836,25 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                    auto asStr = m_builder.createIntToStr(self);
                                                    m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asStr});
                                                });
+            slots["__add__"] =
+                createFunction("builtins.int.__add__",
+                               {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
+                               [&](mlir::ValueRange functionArguments)
+                               {
+                                   auto self = functionArguments[0];
+                                   auto other = functionArguments[1];
+                                   binCheckOtherOp(other, Py::Builtins::Int);
+                                   auto add = m_builder.createIntAdd(self, other);
+                                   m_builder.create<mlir::ReturnOp>(mlir::Value{add});
+                               });
             auto cmpImpl = [&](Py::IntCmpKind kind)
             {
                 return [&, kind](mlir::ValueRange functionArguments)
                 {
                     auto self = functionArguments[0];
                     auto other = functionArguments[1];
-                    auto otherType = m_builder.createTypeOf(other);
-                    auto otherIsInt = buildSubclassCheck(otherType, m_builder.createIntRef());
-                    auto* otherIsIntBlock = new mlir::Block;
-                    auto* elseBlock = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(otherIsInt, otherIsIntBlock, elseBlock);
-
-                    implementBlock(elseBlock);
-                    m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createNotImplementedRef()});
-
-                    implementBlock(otherIsIntBlock);
-                    auto cmp = m_builder.createIntCmpOp(kind, self, other);
+                    binCheckOtherOp(other, Py::Builtins::Int);
+                    auto cmp = m_builder.createIntCmp(kind, self, other);
                     auto boolean = m_builder.createBoolFromI1(cmp);
                     m_builder.create<mlir::ReturnOp>(mlir::Value{boolean});
                 };
@@ -877,7 +894,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                {
                                                    auto self = functionArguments[0];
                                                    auto zero = m_builder.createConstant(BigInt(0));
-                                                   auto cmp = m_builder.createIntCmpOp(Py::IntCmpKind::ne, self, zero);
+                                                   auto cmp = m_builder.createIntCmp(Py::IntCmpKind::ne, self, zero);
                                                    mlir::Value result = m_builder.createBoolFromI1(cmp);
                                                    m_builder.create<mlir::ReturnOp>(result);
                                                });

@@ -239,8 +239,10 @@ class CodeGen
 
     Py::GlobalValueOp createExternal(llvm::StringRef objectName);
 
+    void binCheckOtherOp(mlir::Value other, const Py::Builtins::Builtin& builtin);
+
     std::vector<UnpackResults> createOverload(const std::vector<FunctionParameter>& parameters, mlir::Value tuple,
-                                                mlir::Value dict, Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
+                                              mlir::Value dict, Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 
     template <class AST, class FallBackLocation>
     mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)

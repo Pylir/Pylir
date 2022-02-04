@@ -13,3 +13,6 @@ if 0:
 if 1:
     print("Success")
 # CHECK: Success
+
+print(5 + 7)
+# CHECK: 12
