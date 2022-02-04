@@ -829,6 +829,26 @@ bool isTypeSlot(llvm::StringRef ref)
     return set.contains(ref);
 }
 
+pylir::Py::IntCmpKindAttr invertPredicate(pylir::Py::IntCmpKindAttr kind)
+{
+    switch (kind.getValue())
+    {
+        case pylir::Py::IntCmpKind::eq:
+            return pylir::Py::IntCmpKindAttr::get(kind.getContext(), pylir::Py::IntCmpKind::ne);
+        case pylir::Py::IntCmpKind::ne:
+            return pylir::Py::IntCmpKindAttr::get(kind.getContext(), pylir::Py::IntCmpKind::eq);
+        case pylir::Py::IntCmpKind::lt:
+            return pylir::Py::IntCmpKindAttr::get(kind.getContext(), pylir::Py::IntCmpKind::ge);
+        case pylir::Py::IntCmpKind::le:
+            return pylir::Py::IntCmpKindAttr::get(kind.getContext(), pylir::Py::IntCmpKind::gt);
+        case pylir::Py::IntCmpKind::gt:
+            return pylir::Py::IntCmpKindAttr::get(kind.getContext(), pylir::Py::IntCmpKind::le);
+        case pylir::Py::IntCmpKind::ge:
+            return pylir::Py::IntCmpKindAttr::get(kind.getContext(), pylir::Py::IntCmpKind::lt);
+    }
+    PYLIR_UNREACHABLE;
+}
+
 #include "pylir/Optimizer/PylirPy/IR/PylirPyPatterns.cpp.inc"
 } // namespace
 

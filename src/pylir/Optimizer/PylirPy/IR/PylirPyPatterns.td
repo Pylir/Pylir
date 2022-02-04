@@ -66,4 +66,7 @@ class NotConstraint<Constraint con> : Constraint<Neg<con.predicate>, "not " # co
 def : Pat<(PylirPy_IntCmpOp AnyAttrOf<[PylirPy_IntCmpEq, PylirPy_IntCmpNe]>:$kind, $lhs, $rhs),
           (PylirPy_IntCmpOp $kind, $rhs, $lhs), [(IsConstant $lhs), (NotConstraint<IsConstant> $rhs)]>;
 
+def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
+          (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
+
 #endif
