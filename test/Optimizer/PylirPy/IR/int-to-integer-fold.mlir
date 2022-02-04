@@ -59,3 +59,27 @@ func @test5(%arg0 : i64) -> (i64, i1) {
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-DAG: %[[C1:.*]] = arith.constant true
 // CHECK: return %[[ARG0]], %[[C1]]
+
+func @test6(%arg0 : index) -> (i64, i1) {
+    %0 = py.int.fromInteger %arg0 : index
+    %1, %2 = py.int.toInteger %0 : i64
+    return %1, %2 : i64, i1
+}
+
+// CHECK-LABEL: @test6
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-DAG: %[[C1:.*]] = arith.constant true
+// CHECK-DAG: %[[RESULT:.*]] = arith.index_cast %[[ARG0]] : index to i64
+// CHECK: return %[[RESULT]], %[[C1]]
+
+func @test7(%arg0 : i64) -> (index, i1) {
+    %0 = py.int.fromInteger %arg0 : i64
+    %1, %2 = py.int.toInteger %0 : index
+    return %1, %2 : index, i1
+}
+
+// CHECK-LABEL: @test7
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-DAG: %[[C1:.*]] = arith.constant true
+// CHECK-DAG: %[[RESULT:.*]] = arith.index_cast %[[ARG0]] : i64 to index
+// CHECK: return %[[RESULT]], %[[C1]]
