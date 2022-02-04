@@ -52,5 +52,12 @@ def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp $input))
                 [(replaceWithValue $input), (Arith_ConstantOp ConstBoolAttrTrue)],
                 [(TypesMatch $result__0, $input)]>;
 
+def IsConstant : Constraint<
+    CPred<"$0.getDefiningOp() && $0.getDefiningOp()->hasTrait<::mlir::OpTrait::ConstantLike>()">, "is constant">;
+
+class NotConstraint<Constraint con> : Constraint<Neg<con.predicate>, "not " # con.summary>;
+
+def : Pat<(PylirPy_IntCmpOp AnyAttrOf<[PylirPy_IntCmpEq, PylirPy_IntCmpNe]>:$kind, $lhs, $rhs),
+          (PylirPy_IntCmpOp $kind, $rhs, $lhs), [(IsConstant $lhs), (NotConstraint<IsConstant> $rhs)]>;
 
 #endif
