@@ -847,7 +847,15 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AExpr& aExpr)
         [&](const std::unique_ptr<Syntax::AExpr::BinOp>& binOp) -> mlir::Value
         {
             auto lhs = visit(*binOp->lhs);
+            if (!lhs)
+            {
+                return {};
+            }
             auto rhs = visit(binOp->rhs);
+            if (!rhs)
+            {
+                return {};
+            }
             m_builder.setCurrentLoc(getLoc(aExpr, binOp->binToken));
             switch (binOp->binToken.getTokenType())
             {
