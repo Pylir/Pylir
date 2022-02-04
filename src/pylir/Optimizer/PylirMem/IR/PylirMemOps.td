@@ -53,6 +53,13 @@ def PylirMem_InitIntOp : PylirMem_Op<"initInt", [AlwaysBound]> {
     let assemblyFormat = "$memory `to` $initializer `:` type($initializer) attr-dict";
 }
 
+def PylirMem_InitIntAddOp : PylirMem_Op<"initIntAdd", [AlwaysBound]> {
+    let results = (outs DynamicType:$result);
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$lhs, DynamicType:$rhs);
+
+    let assemblyFormat = "$memory `to` $lhs `+` $rhs attr-dict";
+}
+
 def PylirMem_InitFloatOp : PylirMem_Op<"initFloat", [AlwaysBound]> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, F64:$initializer);

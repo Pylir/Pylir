@@ -196,6 +196,20 @@ struct IntFromIntegerOpConversion : mlir::OpRewritePattern<pylir::Py::IntFromInt
     }
 };
 
+struct IntAdOpConversion : mlir::OpRewritePattern<pylir::Py::IntAddOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::IntAddOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::IntAddOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        auto integer = rewriter.create<pylir::Py::ConstantOp>(
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Int.name));
+        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), integer);
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitIntAddOp>(op, mem, op.lhs(), op.rhs());
+        return mlir::success();
+    }
+};
+
 struct IntToStrOpConversion : mlir::OpRewritePattern<pylir::Py::IntToStrOp>
 {
     using mlir::OpRewritePattern<pylir::Py::IntToStrOp>::OpRewritePattern;
@@ -226,7 +240,7 @@ void ConvertPylirPyToPylirMem::runOnOperation()
         .addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
                       pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp, pylir::Py::BoolFromI1Op,
                       pylir::Py::IntFromIntegerOp, pylir::Py::StrConcatOp, pylir::Py::IntToStrOp, pylir::Py::StrCopyOp,
-                      pylir::Py::TuplePopFrontOp, pylir::Py::TuplePrependOp>();
+                      pylir::Py::TuplePopFrontOp, pylir::Py::TuplePrependOp, pylir::Py::IntAddOp>();
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.insert<MakeTupleOpConversion>(&getContext());
@@ -243,6 +257,7 @@ void ConvertPylirPyToPylirMem::runOnOperation()
     patterns.insert<StrCopyOpConversion>(&getContext());
     patterns.insert<TuplePrependOpConversion>(&getContext());
     patterns.insert<TuplePopOpConversion>(&getContext());
+    patterns.insert<IntAdOpConversion>(&getContext());
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target, std::move(patterns))))
     {
         signalPassFailure();

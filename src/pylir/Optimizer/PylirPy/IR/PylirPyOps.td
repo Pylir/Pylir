@@ -410,6 +410,12 @@ def PylirPy_IntCmpOp : PylirPy_Op<"int.cmp", [NoSideEffect]> {
     let assemblyFormat = "$pred $lhs `,` $rhs attr-dict";
 }
 
+def PylirPy_IntAddOp : PylirPy_AllocOp<"int.add", [NoCapture, Commutative, RuntimeType<"Int">]> {
+    let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
+
+    let assemblyFormat = "$lhs `,` $rhs attr-dict";
+}
+
 def PylirPy_IntToStrOp : PylirPy_AllocOp<"int.toStr", [NoCapture, RuntimeType<"Str">]> {
     let arguments = (ins DynamicType:$input);
     let results = (outs DynamicType:$result);

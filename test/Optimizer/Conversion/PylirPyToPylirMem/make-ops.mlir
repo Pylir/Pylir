@@ -169,3 +169,21 @@ func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[STR]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initStrFromInt %[[MEM]] to %[[ARG]]
 // CHECK-NEXT: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.int.add %arg0, %arg1
+    return %0 : !py.dynamic
+}
+
+// CHECK-LABEL: @make_int_from_add
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK-NEXT: %[[INT:.*]] = py.constant @builtins.int
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[INT]]
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initIntAdd %[[MEM]] to %[[ARG0]] + %[[ARG1]]
+// CHECK-NEXT: return %[[RESULT]]
