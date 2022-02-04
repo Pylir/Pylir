@@ -188,7 +188,7 @@ pylir::Py::IntAttr pylir::Py::IntAttr::get(::mlir::MLIRContext* context, BigInt 
         .cast<IntAttr>();
 }
 
-pylir::BigInt pylir::Py::IntAttr::getValue() const
+const pylir::BigInt& pylir::Py::IntAttr::getValue() const
 {
     return this->getBuiltinValue().cast<IntImplAttr>().getValue();
 }
@@ -659,7 +659,7 @@ void pylir::Py::TypeAttr::printMethod(::mlir::AsmPrinter& printer) const
     printer << "<slots: " << getSlots() << ">";
 }
 
-pylir::BigInt pylir::Py::IntImplAttr::getValue() const
+const pylir::BigInt& pylir::Py::IntImplAttr::getValue() const
 {
     return getImpl()->value;
 }

@@ -12,6 +12,11 @@ def PylirPy_IntImplAttr : PylirPy_Attr<"IntImpl"> {
     let parameters = (ins "::pylir::BigInt":$value);
 
     let genStorageClass = 0;
+    let genAccessors = 0;
+
+    let extraClassDeclaration = [{
+        const pylir::BigInt& getValue() const;
+    }];
 }
 
 def PylirPy_DictImplAttr : PylirPy_Attr<"DictImpl", [DeclareAttrInterfaceMethods<SubElementAttrInterface,

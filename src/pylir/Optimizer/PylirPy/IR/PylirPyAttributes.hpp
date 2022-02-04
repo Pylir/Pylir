@@ -97,7 +97,7 @@ public:
 
     void printMethod(::mlir::AsmPrinter& printer) const;
 
-    BigInt getValue() const;
+    const BigInt& getValue() const;
 };
 
 class BoolAttr : public ObjectAttr
