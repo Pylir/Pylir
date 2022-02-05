@@ -9,24 +9,6 @@
 
 #include "PylirPyOps.hpp"
 
-namespace llvm
-{
-template <>
-struct PointerLikeTypeTraits<pylir::Py::IterExpansion> : public PointerLikeTypeTraits<mlir::Value>
-{
-public:
-    static inline void* getAsVoidPointer(pylir::Py::IterExpansion value)
-    {
-        return const_cast<void*>(value.value.getAsOpaquePointer());
-    }
-
-    static inline pylir::Py::IterExpansion getFromVoidPointer(void* pointer)
-    {
-        return {mlir::Value::getFromOpaquePointer(pointer)};
-    }
-};
-} // namespace llvm
-
 namespace
 {
 template <class T>
@@ -333,6 +315,11 @@ llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* cont
             })
         .Default([&](auto) { result.emplace_back(nullptr); });
     return result;
+}
+
+pylir::Py::IntAttr add(pylir::Py::IntAttr lhs, pylir::Py::IntAttr rhs)
+{
+    return pylir::Py::IntAttr::get(lhs.getContext(), lhs.getValue() + rhs.getValue());
 }
 
 } // namespace

@@ -60,6 +60,13 @@ def PylirPy_TupleAttr : Attr<CPred<"$_self.isa<::pylir::Py::TupleAttr>()">, "pyt
     let convertFromStorage = "$_self";
 }
 
+def PylirPy_IntAttr : Attr<CPred<"$_self.isa<::pylir::Py::IntAttr>()">, "python int attribute"> {
+    let storageType = "::pylir::Py::IntAttr";
+    let returnType = "::pylir::BigInt";
+    let convertFromStorage = "$_self";
+    let constBuilderCall = "::pylir::Py::IntAttr::get($_builder.getContext(), ::pylir::BigInt($0))";
+}
+
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let mnemonic = "unbound";
     let summary = "python unbound value";
