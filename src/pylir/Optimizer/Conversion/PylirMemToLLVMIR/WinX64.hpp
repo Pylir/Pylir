@@ -3,11 +3,11 @@
 
 #include <llvm/ADT/DenseMap.h>
 
-#include "CABI.hpp"
+#include "PlatformABI.hpp"
 
 namespace pylir
 {
-class WinX64 final : public CABI
+class WinX64 final : public PlatformABI
 {
     enum Transformation
     {

@@ -5,24 +5,24 @@
 
 namespace pylir
 {
-class CABI
+class PlatformABI
 {
     mlir::DataLayout m_dataLayout;
 
 protected:
     // TODO use DataLayout exclusively once LLVM Dialect makes use of it
 
-    std::size_t getSizeOf(mlir::Type type) const;
-
-    explicit CABI(mlir::DataLayout dataLayout) : m_dataLayout(std::move(dataLayout)) {}
+    explicit PlatformABI(mlir::DataLayout dataLayout) : m_dataLayout(std::move(dataLayout)) {}
 
 public:
-    virtual ~CABI() = default;
+    virtual ~PlatformABI() = default;
 
-    CABI(const CABI&) = delete;
-    CABI& operator=(const CABI&) = delete;
-    CABI(CABI&&) = delete;
-    CABI& operator=(CABI&&) = delete;
+    PlatformABI(const PlatformABI&) = delete;
+    PlatformABI& operator=(const PlatformABI&) = delete;
+    PlatformABI(PlatformABI&&) = delete;
+    PlatformABI& operator=(PlatformABI&&) = delete;
+
+    std::size_t getSizeOf(mlir::Type type) const;
 
     virtual mlir::LLVM::LLVMFuncOp declareFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type returnType,
                                                llvm::StringRef name, mlir::TypeRange inputTypes) = 0;

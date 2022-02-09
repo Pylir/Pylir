@@ -167,4 +167,4 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
     PYLIR_UNREACHABLE;
 }
 
-pylir::WinX64::WinX64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}
+pylir::WinX64::WinX64(mlir::DataLayout dataLayout) : PlatformABI(std::move(dataLayout)) {}

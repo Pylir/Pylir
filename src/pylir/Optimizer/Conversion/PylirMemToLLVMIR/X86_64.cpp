@@ -347,4 +347,4 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
         });
 }
 
-pylir::X86_64::X86_64(mlir::DataLayout dataLayout) : CABI(std::move(dataLayout)) {}
+pylir::X86_64::X86_64(mlir::DataLayout dataLayout) : PlatformABI(std::move(dataLayout)) {}

@@ -3,7 +3,7 @@ add_mlir_conversion_library(PylirMemToLLVMIR
         PylirMemToLLVMIR.cpp
         WinX64.cpp
         X86_64.cpp
-        CABI.cpp
+        PlatformABI.cpp
 
         DEPENDS
         PylirConversionPassIncGen

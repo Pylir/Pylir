@@ -4,11 +4,11 @@
 #include <tuple>
 #include <variant>
 
-#include "CABI.hpp"
+#include "PlatformABI.hpp"
 
 namespace pylir
 {
-class X86_64 final : public CABI
+class X86_64 final : public PlatformABI
 {
     struct Unchanged
     {

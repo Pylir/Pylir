@@ -1,10 +1,10 @@
-#include "CABI.hpp"
-
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Support/Macros.hpp>
 
-std::size_t pylir::CABI::getSizeOf(mlir::Type type) const
+#include "PlatformABI.hpp"
+
+std::size_t pylir::PlatformABI::getSizeOf(mlir::Type type) const
 {
     // For now assumes sizeof == alignof for all primitives
     return llvm::TypeSwitch<mlir::Type, std::size_t>(type)
