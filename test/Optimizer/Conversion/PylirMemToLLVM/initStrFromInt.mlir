@@ -18,9 +18,10 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][0, 0]
 // CHECK-NEXT: llvm.store %{{.*}}, %[[GEP]]
 // CHECK-NEXT: %[[STRING:.*]] = llvm.bitcast %[[RESULT]]
+// CHECK-NEXT: %[[BUFFER:.*]] = llvm.getelementptr %[[STRING]][0, 1]
 // CHECK-NEXT: %[[INT:.*]] = llvm.bitcast %[[ARG0]]
 // CHECK-NEXT: %[[MP_INT_PTR:.*]] = llvm.getelementptr %[[INT]][0, 1]
-// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[STRING]][0, 1, 0]
+// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[BUFFER]][0, 0]
 // CHECK-NEXT: %[[TEN:.*]] = llvm.mlir.constant(10 : i32)
 // CHECK-NEXT: llvm.call @mp_radix_size_overestimate(%[[MP_INT_PTR]], %[[TEN]], %[[SIZE_PTR]])
 // CHECK-NEXT: %[[CAP:.*]] = llvm.load %[[SIZE_PTR]]
@@ -30,8 +31,8 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[ONE_I:.*]] = llvm.mlir.constant(1 : index)
 // CHECK-NEXT: %[[SIZE_1:.*]] = llvm.sub %[[SIZE]], %[[ONE_I]]
 // CHECK-NEXT: llvm.store %[[SIZE_1]], %[[SIZE_PTR]]
-// CHECK-NEXT: %[[CAP_PTR:.*]] = llvm.getelementptr %[[STRING]][0, 1, 1]
+// CHECK-NEXT: %[[CAP_PTR:.*]] = llvm.getelementptr %[[BUFFER]][0, 1]
 // CHECK-NEXT: llvm.store %[[CAP]], %[[CAP_PTR]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[STRING]][0, 1, 2]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER]][0, 2]
 // CHECK-NEXT: llvm.store %[[MEMORY]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[RESULT]]

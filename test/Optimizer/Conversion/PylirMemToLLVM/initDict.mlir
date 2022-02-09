@@ -14,11 +14,7 @@ func @foo() -> !py.dynamic {
 // CHECK-LABEL: llvm.func @foo
 // CHECK-NEXT: %[[DICT:.*]] = llvm.mlir.addressof @builtins.dict
 // CHECK-NEXT: %[[DICT_CAST:.*]] = llvm.bitcast %[[DICT]]
-// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][1]
-// CHECK-NEXT: %[[SIZE:.*]] = llvm.ptrtoint %[[GEP]]
-// CHECK-NEXT: %[[SLOTS:.*]] = llvm.mlir.constant(0 : index)
-// CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[SIZE]], %[[SLOTS]]
+// CHECK-NEXT: %[[BYTES:.*]] = llvm.mlir.constant(48 : index)
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)

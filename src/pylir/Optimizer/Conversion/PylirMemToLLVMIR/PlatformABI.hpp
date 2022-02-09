@@ -24,6 +24,8 @@ public:
 
     std::size_t getSizeOf(mlir::Type type) const;
 
+    std::size_t getAlignOf(mlir::Type type) const;
+
     virtual mlir::LLVM::LLVMFuncOp declareFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type returnType,
                                                llvm::StringRef name, mlir::TypeRange inputTypes) = 0;
 
@@ -31,5 +33,7 @@ public:
                                  mlir::ValueRange operands) = 0;
 
     virtual mlir::Type getInt(mlir::MLIRContext* context) const = 0;
+
+    virtual mlir::Type getSizeT(mlir::MLIRContext* context) const = 0;
 };
 } // namespace pylir::Dialect

@@ -38,5 +38,10 @@ public:
     {
         return mlir::IntegerType::get(context, 32);
     }
+
+    mlir::Type getSizeT(mlir::MLIRContext* context) const override
+    {
+        return mlir::IntegerType::get(context, 64);
+    }
 };
 } // namespace pylir::Dialect

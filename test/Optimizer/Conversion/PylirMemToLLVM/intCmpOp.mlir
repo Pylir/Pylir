@@ -9,8 +9,8 @@ func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
 // CHECK-NEXT: %[[LHS_BITCAST:.*]] = llvm.bitcast %[[LHS]]
-// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS_BITCAST]][0, 1]
+// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS_BITCAST]][0, 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(0 : i{{.*}})
@@ -26,8 +26,8 @@ func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
 // CHECK-NEXT: %[[LHS_BITCAST:.*]] = llvm.bitcast %[[LHS]]
-// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS_BITCAST]][0, 1]
+// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS_BITCAST]][0, 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(0 : i{{.*}})
@@ -43,8 +43,8 @@ func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
 // CHECK-NEXT: %[[LHS_BITCAST:.*]] = llvm.bitcast %[[LHS]]
-// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS_BITCAST]][0, 1]
+// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS_BITCAST]][0, 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(-1 : i{{.*}})
@@ -60,8 +60,8 @@ func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
 // CHECK-NEXT: %[[LHS_BITCAST:.*]] = llvm.bitcast %[[LHS]]
-// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS_BITCAST]][0, 1]
+// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS_BITCAST]][0, 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(1 : i{{.*}})
@@ -77,8 +77,8 @@ func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
 // CHECK-NEXT: %[[LHS_BITCAST:.*]] = llvm.bitcast %[[LHS]]
-// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS_BITCAST]][0, 1]
+// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS_BITCAST]][0, 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(1 : i{{.*}})
@@ -94,8 +94,8 @@ func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
 // CHECK-NEXT: %[[LHS_BITCAST:.*]] = llvm.bitcast %[[LHS]]
-// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS_BITCAST]][0, 1]
+// CHECK-NEXT: %[[RHS_BITCAST:.*]] = llvm.bitcast %[[RHS]]
 // CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS_BITCAST]][0, 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(-1 : i{{.*}})
