@@ -1,4 +1,3 @@
-#include "PylirGC.hpp"
 
 #include <cstdlib>
 

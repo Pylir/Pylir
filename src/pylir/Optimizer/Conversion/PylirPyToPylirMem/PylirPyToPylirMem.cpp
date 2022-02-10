@@ -19,7 +19,8 @@ struct MakeTupleOpConversion : mlir::OpRewritePattern<pylir::Py::MakeTupleOp>
     {
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
-        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
+        auto size = rewriter.create<mlir::arith::ConstantIndexOp>(op.getLoc(), op.arguments().size());
+        auto mem = rewriter.create<pylir::Mem::GCAllocTupleOp>(op.getLoc(), tuple, size);
         rewriter.replaceOpWithNewOp<pylir::Mem::InitTupleOp>(op, mem, op.arguments());
         return mlir::success();
     }
@@ -33,7 +34,10 @@ struct TuplePrependOpConversion : mlir::OpRewritePattern<pylir::Py::TuplePrepend
     {
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
-        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
+        auto prevTupleSize = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), op.tuple());
+        auto one = rewriter.create<mlir::arith::ConstantIndexOp>(op.getLoc(), 1);
+        auto plusOne = rewriter.create<mlir::arith::AddIOp>(op.getLoc(), prevTupleSize, one);
+        auto mem = rewriter.create<pylir::Mem::GCAllocTupleOp>(op.getLoc(), tuple, plusOne);
         rewriter.replaceOpWithNewOp<pylir::Mem::InitTuplePrependOp>(op, mem, op.input(), op.tuple());
         return mlir::success();
     }
@@ -47,7 +51,10 @@ struct TuplePopOpConversion : mlir::OpRewritePattern<pylir::Py::TuplePopFrontOp>
     {
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
-        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
+        auto prevTupleSize = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), op.tuple());
+        auto one = rewriter.create<mlir::arith::ConstantIndexOp>(op.getLoc(), 1);
+        auto minusOne = rewriter.create<mlir::arith::AddIOp>(op.getLoc(), prevTupleSize, one);
+        auto mem = rewriter.create<pylir::Mem::GCAllocTupleOp>(op.getLoc(), tuple, minusOne);
         auto zeroI = rewriter.create<mlir::arith::ConstantIndexOp>(op.getLoc(), 0);
         auto result = rewriter.create<pylir::Mem::InitTuplePopFrontOp>(op.getLoc(), mem, op.tuple());
         auto firstElement = rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), op.tuple(), zeroI);
@@ -162,7 +169,8 @@ struct ListToTupleOpConversion : mlir::OpRewritePattern<pylir::Py::ListToTupleOp
     {
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
-        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
+        auto len = rewriter.create<pylir::Py::ListLenOp>(op.getLoc(), op.list());
+        auto mem = rewriter.create<pylir::Mem::GCAllocTupleOp>(op.getLoc(), tuple, len);
         rewriter.replaceOpWithNewOp<pylir::Mem::InitTupleFromListOp>(op, mem, op.list());
         return mlir::success();
     }

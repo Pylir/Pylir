@@ -7,7 +7,8 @@ using namespace pylir::rt;
 static_assert(std::is_standard_layout_v<PyObject>);
 static_assert(std::is_standard_layout_v<PyTypeObject>);
 static_assert(std::is_standard_layout_v<PyFunction>);
-static_assert(std::is_standard_layout_v<PySequence>);
+static_assert(std::is_standard_layout_v<PyList>);
+static_assert(std::is_standard_layout_v<PyTuple>);
 static_assert(std::is_standard_layout_v<PyString>);
 static_assert(std::is_standard_layout_v<PyDict>);
 static_assert(std::is_standard_layout_v<PyInt>);
@@ -20,7 +21,7 @@ PyObject* PyObject::getSlot(int index)
 
 PyObject* PyObject::getSlot(std::string_view name)
 {
-    auto& slotsTuple = type(*this).getSlot(PyTypeObject::Slots)->cast<PySequence>();
+    auto& slotsTuple = type(*this).getSlot(PyTypeObject::Slots)->cast<PyTuple>();
     for (std::size_t i = 0; i < slotsTuple.len(); i++)
     {
         auto& str = slotsTuple.getItem(i).cast<PyString>();
@@ -39,7 +40,7 @@ void PyObject::setSlot(int index, PyObject& object)
 
 bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 {
-    auto& mro = type(object).getSlot(PyTypeObject::MRO)->cast<PySequence>();
+    auto& mro = type(object).getSlot(PyTypeObject::MRO)->cast<PyTuple>();
     return std::find(mro.begin(), mro.end(), &typeObject) != mro.end();
 }
 
@@ -55,10 +56,10 @@ bool PyObject::operator==(PyObject& other)
 
 PyObject* PyObject::mroLookup(int index)
 {
-    auto& mro = type(*this).getSlot(PyTypeObject::MRO)->cast<PySequence>();
+    auto& mro = type(*this).getSlot(PyTypeObject::MRO)->cast<PyTuple>();
     for (auto* iter : mro)
     {
-        if (auto *slot = iter->getSlot(index))
+        if (auto* slot = iter->getSlot(index))
         {
             return slot;
         }

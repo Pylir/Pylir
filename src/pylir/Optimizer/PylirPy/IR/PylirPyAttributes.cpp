@@ -251,8 +251,12 @@ mlir::Attribute pylir::Py::ListAttr::parseMethod(::mlir::AsmParser& parser, ::ml
 
 pylir::Py::TupleAttr pylir::Py::TupleAttr::get(::mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value)
 {
-    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Tuple.name), {},
-                           mlir::ArrayAttr::get(context, value))
+    return get(mlir::ArrayAttr::get(context, value));
+}
+
+pylir::Py::TupleAttr pylir::Py::TupleAttr::get(mlir::ArrayAttr value)
+{
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(value.getContext(), Builtins::Tuple.name), {}, value)
         .cast<TupleAttr>();
 }
 

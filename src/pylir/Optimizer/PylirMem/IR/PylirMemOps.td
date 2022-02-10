@@ -47,6 +47,20 @@ def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
     let assemblyFormat = "$typeObj attr-dict";
 }
 
+def PylirMem_GCAllocTupleOp : PylirMem_Op<"gcAllocTuple"> {
+    let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
+    let arguments = (ins DynamicType:$typeObj, Index:$length);
+
+    let assemblyFormat = "$typeObj `[` $length `]` attr-dict";
+}
+
+def PylirMem_StackAllocTupleOp : PylirMem_Op<"stackAllocTuple"> {
+    let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
+    let arguments = (ins DynamicType:$typeObj, IndexAttr:$length);
+
+    let assemblyFormat = "$typeObj `[` $length `]` attr-dict";
+}
+
 def PylirMem_InitIntOp : PylirMem_Op<"initInt", [AlwaysBound]> {
     let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, IntegerLike:$initializer);

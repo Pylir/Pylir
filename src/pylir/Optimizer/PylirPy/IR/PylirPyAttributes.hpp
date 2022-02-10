@@ -208,6 +208,8 @@ public:
 
     static TupleAttr get(::mlir::MLIRContext* context, llvm::ArrayRef<mlir::Attribute> value = {});
 
+    static TupleAttr get(mlir::ArrayAttr value);
+
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
         return {"tuple"};

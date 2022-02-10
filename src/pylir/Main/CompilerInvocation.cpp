@@ -1,6 +1,7 @@
 
 #include "CompilerInvocation.hpp"
 
+#include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
@@ -229,6 +230,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             }
 
             manager.addPass(std::move(pass));
+            manager.addPass(mlir::createReconcileUnrealizedCastsPass());
             manager.addPass(mlir::LLVM::createLegalizeForExportPass());
             if (mlir::failed(manager.run(*mlirModule)))
             {
@@ -353,7 +355,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                     action == pylir::CompilerInvocation::Assembly ? llvm::CGFT_AssemblyFile : llvm::CGFT_ObjectFile))
             {
                 std::string_view format = action == pylir::CompilerInvocation::Assembly ? "Assembly" : "Object file";
-                auto *arg = args.getLastArg(OPT_target_EQ);
+                auto* arg = args.getLastArg(OPT_target_EQ);
                 if (!arg)
                 {
                     arg = args.getLastArg(OPT_c, OPT_S);
@@ -550,7 +552,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
     const auto* targetM = llvm::TargetRegistry::lookupTarget(triple->str(), error);
     if (!targetM)
     {
-        auto *outputArg = args.getLastArg(OPT_target_EQ);
+        auto* outputArg = args.getLastArg(OPT_target_EQ);
         if (!outputArg)
         {
             llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
@@ -575,7 +577,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
                         .Default(std::nullopt);
     if (!optLevel)
     {
-        auto *optArg = args.getLastArg(OPT_O);
+        auto* optArg = args.getLastArg(OPT_O);
         llvm::errs() << commandLine
                             .createDiagnosticsBuilder(optArg, pylir::Diag::INVALID_OPTIMIZATION_LEVEL_N,
                                                       optArg->getAsString(args))

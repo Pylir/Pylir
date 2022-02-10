@@ -7,7 +7,7 @@ using namespace pylir::rt;
 namespace
 {
 
-PyObject& exceptHookImpl(PyFunction& function, PySequence& args, PyDict& keywords)
+PyObject& exceptHookImpl(PyFunction& function, PyTuple& args, PyDict& keywords)
 {
     // TODO: check arguments
     auto& exceptionType = args.getItem(0);

@@ -11,7 +11,8 @@ func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @make_tuple
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: %[[TUPLE:.*]] = py.constant @builtins.tuple
-// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[TUPLE]]
+// CHECK-NEXT: %[[SIZE:.*]] = arith.constant 1
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocTuple %[[TUPLE]][%[[SIZE]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initTuple %[[MEM]] to (%[[ARG]])
 // CHECK-NEXT: return %[[RESULT]]
 
@@ -113,7 +114,8 @@ func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @make_tuple_from_list
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: %[[TUPLE:.*]] = py.constant @builtins.tuple
-// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[TUPLE]]
+// CHECK-NEXT: %[[SIZE:.*]] = py.list.len %[[ARG]]
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocTuple %[[TUPLE]][%[[SIZE]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initTupleFromList %[[MEM]] to (* %[[ARG]])
 // CHECK-NEXT: return %[[RESULT]]
 

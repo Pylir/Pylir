@@ -10,17 +10,11 @@
 
 #include <unwind.h>
 
-#include "PylirGC.hpp"
+#include "Builtins.hpp"
 #include "Support.hpp"
 
 namespace pylir::rt
 {
-
-class PyTypeObject;
-class PySequence;
-class PyDict;
-class PyFunction;
-class PyObject;
 
 struct KeywordArg
 {
@@ -107,12 +101,6 @@ public:
 
 bool isinstance(PyObject& obj, PyObject& type);
 
-namespace Builtins
-{
-#define BUILTIN(name, symbol, ...) extern PyObject name asm(symbol);
-#include <pylir/Interfaces/Builtins.def>
-} // namespace Builtins
-
 class PyTypeObject
 {
     friend class PyObject;
@@ -133,7 +121,7 @@ public:
     };
 };
 
-using PyUniversalCC = PyObject& (*)(PyFunction&, PySequence&, PyDict&);
+using PyUniversalCC = PyObject& (*)(PyFunction&, PyTuple&, PyDict&);
 
 class PyFunction
 {
@@ -159,19 +147,20 @@ public:
     };
 };
 
-class PySequence
+class PyTuple
 {
-protected:
     PyObject m_base;
-    BufferComponent<PyObject*, MallocAllocator> m_buffer;
-
-    template <class InputIter>
-    PySequence(PyObject& type, InputIter begin, InputIter end) : m_base(type.cast<PyTypeObject>()), m_buffer(begin, end)
-    {
-    }
+    std::size_t m_size;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+    PyObject* m_trailing[];
+#pragma GCC diagnostic pop
 
 public:
-    explicit PySequence(PyObject& type) : m_base(type.cast<PyTypeObject>()) {}
+    explicit PyTuple(std::size_t size, PyObject& type = Builtins::Tuple)
+        : m_base(type.cast<PyTypeObject>()), m_size(size)
+    {
+    }
 
     /*implicit*/ operator PyObject&()
     {
@@ -180,54 +169,58 @@ public:
 
     PyObject** begin()
     {
-        return m_buffer.data();
+        return m_trailing;
     }
 
     PyObject** end()
     {
-        return m_buffer.data() + m_buffer.size();
+        return m_trailing + m_size;
     }
 
     std::size_t len()
     {
-        return m_buffer.size();
+        return m_size;
     }
 
     PyObject& getItem(std::size_t index)
     {
-        return *m_buffer[index];
+        return *m_trailing[index];
     }
 };
 
-class PyTuple : public PySequence
+class PyList
 {
+    PyObject m_base;
+    std::size_t m_size;
+    PyTuple* m_tuple;
+
 public:
-    PyTuple() : PySequence(Builtins::Tuple) {}
+    explicit PyList(PyObject& type = Builtins::List) : m_base(type.cast<PyTypeObject>()) {}
 
-    template <class... Args>
-    explicit PyTuple(Args&... args) : PyTuple()
+    /*implicit*/ operator PyObject&()
     {
-        m_buffer.reserve(sizeof...(Args));
-        (m_buffer.push_back(&args), ...);
+        return m_base;
     }
 
-    template <class InputIter>
-    explicit PyTuple(InputIter begin, InputIter end) : PySequence(Builtins::Tuple, begin, end)
+    PyObject** begin()
     {
+        return m_tuple->begin();
     }
 
-    // Dangerous! Don't use it to modify tuples received from python code. Python compiler assumes tuples are
-    // immutable. One may use it to construct a tuple however
-    void push_back(PyObject& object)
+    PyObject** end()
     {
-        m_buffer.push_back(&object);
+        return m_tuple->begin() + m_size;
     }
-};
 
-class PyList : public PySequence
-{
-public:
-    PyList() : PySequence(Builtins::List) {}
+    std::size_t len()
+    {
+        return m_size;
+    }
+
+    PyObject& getItem(std::size_t index)
+    {
+        return m_tuple->getItem(index);
+    }
 };
 
 class PyString
@@ -379,70 +372,6 @@ public:
     }
 };
 
-template <PyObject&>
-struct PyTypeTraits;
-
-template <>
-struct PyTypeTraits<Builtins::Type>
-{
-    using instanceType = PyTypeObject;
-    constexpr static std::size_t slotCount =
-        std::initializer_list<int>{
-#define TYPE_SLOT(x, ...) 0,
-#include <pylir/Interfaces/Slots.def>
-        }
-            .size();
-};
-
-template <>
-struct PyTypeTraits<Builtins::Function>
-{
-    using instanceType = PyFunction;
-    constexpr static std::size_t slotCount =
-        std::initializer_list<int>{
-#define FUNCTION_SLOT(x, ...) 0,
-#include <pylir/Interfaces/Slots.def>
-        }
-            .size();
-};
-
-#define NO_SLOT_TYPE(name, instance)                \
-    template <>                                     \
-    struct PyTypeTraits<Builtins::name>             \
-    {                                               \
-        using instanceType = instance;              \
-        constexpr static std::size_t slotCount = 0; \
-    }
-
-NO_SLOT_TYPE(Int, PyInt);
-NO_SLOT_TYPE(Bool, PyInt);
-// TODO: NO_SLOT_TYPE(Float, PyFloat);
-NO_SLOT_TYPE(Str, PyString);
-NO_SLOT_TYPE(Tuple, PySequence);
-NO_SLOT_TYPE(List, PySequence);
-// TODO: NO_SLOT_TYPE(Set, PySet);
-NO_SLOT_TYPE(Dict, PyDict);
-#undef NO_SLOT_TYPE
-
-namespace details
-{
-constexpr static std::size_t BaseExceptionSlotCount =
-    std::initializer_list<int>{
-#define BASEEXCEPTION_SLOT(x, ...) 0,
-#include <pylir/Interfaces/Slots.def>
-    }
-        .size();
-} // namespace details
-
-#define BUILTIN_EXCEPTION(name, ...)                                              \
-    template <>                                                                   \
-    struct PyTypeTraits<Builtins::name>                                           \
-    {                                                                             \
-        using instanceType = PyBaseException;                                     \
-        constexpr static std::size_t slotCount = details::BaseExceptionSlotCount; \
-    };
-#include <pylir/Interfaces/Builtins.def>
-
 template <PyObject& typeObject, std::size_t slotCount = PyTypeTraits<typeObject>::slotCount>
 class StaticInstance
 {
@@ -509,6 +438,33 @@ public:
     }
 };
 
+template <PyObject& type>
+struct Alloc
+{
+    template <class... Args>
+    decltype(auto) operator()(Args&&... args) const noexcept
+    {
+        // TODO: GC
+        using InstanceType = typename PyTypeTraits<type>::instanceType;
+        std::byte* memory = reinterpret_cast<std::byte*>(
+            std::malloc(sizeof(InstanceType) + sizeof(PyObject*) * PyTypeTraits<type>::slotCount));
+        return *new (memory) InstanceType(std::forward<Args>(args)...);
+    }
+};
+
+template <>
+struct Alloc<Builtins::Tuple>
+{
+    template <class... Args>
+    decltype(auto) operator()(std::size_t count, Args&&... args) const noexcept
+    {
+        // TODO: GC
+        using InstanceType = typename PyTypeTraits<Builtins::Tuple>::instanceType;
+        std::byte* memory = reinterpret_cast<std::byte*>(std::malloc(sizeof(InstanceType) + sizeof(PyObject*) * count));
+        return *new (memory) InstanceType(count, std::forward<Args>(args)...);
+    }
+};
+
 template <class... Args>
 PyObject& PyObject::operator()(Args&&... args)
 {
@@ -522,8 +478,7 @@ PyObject& PyObject::operator()(Args&&... args)
         }
         if (auto* pyF = call->dyn_cast<PyFunction>())
         {
-            auto& tuple = alloc<PyTuple>(*self);
-            auto& dict = alloc<PyDict>();
+            std::size_t tupleCount = 1;
             (
                 [&](auto&& arg)
                 {
@@ -531,11 +486,26 @@ PyObject& PyObject::operator()(Args&&... args)
                         std::is_same_v<PyObject&, decltype(arg)> || std::is_same_v<KeywordArg&&, decltype(arg)>);
                     if constexpr (std::is_same_v<PyObject&, decltype(arg)>)
                     {
-                        tuple.push_back(arg);
+                        tupleCount++;
+                    }
+                }(std::forward<Args>(args)),
+                ...);
+            auto& tuple = Alloc<Builtins::Tuple>{}(tupleCount);
+            auto& dict = Alloc<Builtins::Dict>{}();
+            auto iter = tuple.begin();
+            *iter++ = self;
+            (
+                [&](auto&& arg)
+                {
+                    static_assert(
+                        std::is_same_v<PyObject&, decltype(arg)> || std::is_same_v<KeywordArg&&, decltype(arg)>);
+                    if constexpr (std::is_same_v<PyObject&, decltype(arg)>)
+                    {
+                        *iter++ = &arg;
                     }
                     else
                     {
-                        dict.setItem(alloc<PyString>(arg.name), arg.arg);
+                        dict.setItem(Alloc<Builtins::Str>{}(arg.name), arg.arg);
                     }
                 }(std::forward<Args>(args)),
                 ...);
@@ -559,9 +529,15 @@ inline bool PyObject::isa<PyTypeObject>()
 }
 
 template <>
-inline bool PyObject::isa<PySequence>()
+inline bool PyObject::isa<PyList>()
 {
-    return isinstance(*this, Builtins::Tuple) || isinstance(*this, Builtins::List);
+    return isinstance(*this, Builtins::List);
+}
+
+template <>
+inline bool PyObject::isa<PyTuple>()
+{
+    return isinstance(*this, Builtins::Tuple);
 }
 
 template <>
