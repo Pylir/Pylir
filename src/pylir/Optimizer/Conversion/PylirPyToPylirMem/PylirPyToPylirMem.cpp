@@ -20,7 +20,7 @@ struct MakeTupleOpConversion : mlir::OpRewritePattern<pylir::Py::MakeTupleOp>
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
-        rewriter.replaceOpWithNewOp<pylir::Mem::InitTupleOp>(op, mem, op.arguments(), mlir::Value{});
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitTupleOp>(op, mem, op.arguments());
         return mlir::success();
     }
 };
@@ -34,7 +34,7 @@ struct TuplePrependOpConversion : mlir::OpRewritePattern<pylir::Py::TuplePrepend
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
-        rewriter.replaceOpWithNewOp<pylir::Mem::InitTuplePrependOp>(op, mem, op.input(), op.tuple(), mlir::Value{});
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitTuplePrependOp>(op, mem, op.input(), op.tuple());
         return mlir::success();
     }
 };
@@ -49,7 +49,7 @@ struct TuplePopOpConversion : mlir::OpRewritePattern<pylir::Py::TuplePopFrontOp>
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
         auto zeroI = rewriter.create<mlir::arith::ConstantIndexOp>(op.getLoc(), 0);
-        auto result = rewriter.create<pylir::Mem::InitTuplePopFrontOp>(op.getLoc(), mem, op.tuple(), mlir::Value{});
+        auto result = rewriter.create<pylir::Mem::InitTuplePopFrontOp>(op.getLoc(), mem, op.tuple());
         auto firstElement = rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), op.tuple(), zeroI);
         rewriter.replaceOp(op, {firstElement, result});
         return mlir::success();
@@ -65,7 +65,7 @@ struct MakeListOpConversion : mlir::OpRewritePattern<pylir::Py::MakeListOp>
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::List.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
-        rewriter.replaceOpWithNewOp<pylir::Mem::InitListOp>(op, mem, op.arguments(), mlir::Value{});
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitListOp>(op, mem, op.arguments());
         return mlir::success();
     }
 };
@@ -79,7 +79,7 @@ struct MakeSetOpConversion : mlir::OpRewritePattern<pylir::Py::MakeSetOp>
         auto set = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Set.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), set);
-        rewriter.replaceOpWithNewOp<pylir::Mem::InitSetOp>(op, mem, op.arguments(), mlir::Value{});
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitSetOp>(op, mem, op.arguments());
         return mlir::success();
     }
 };
@@ -163,7 +163,7 @@ struct ListToTupleOpConversion : mlir::OpRewritePattern<pylir::Py::ListToTupleOp
         auto tuple = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), tuple);
-        rewriter.replaceOpWithNewOp<pylir::Mem::InitTupleFromListOp>(op, mem, op.list(), mlir::Value{});
+        rewriter.replaceOpWithNewOp<pylir::Mem::InitTupleFromListOp>(op, mem, op.list());
         return mlir::success();
     }
 };
