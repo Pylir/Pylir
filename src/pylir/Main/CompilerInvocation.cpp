@@ -411,9 +411,12 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<mlir::LLVM::LLVMDialect>();
     m_mlirContext.emplace(registry);
-    m_mlirContext->enableMultithreading(args.hasArg(OPT_XmultiThread, OPT_XsingleThread, true));
+    m_mlirContext->enableMultithreading(args.hasArg(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
     m_mlirContext->getDiagEngine().registerHandler([](mlir::Diagnostic& diagnostic)
-                                                   { diagnostic.print(llvm::errs()); });
+                                                   {
+                                                       diagnostic.print(llvm::errs());
+                                                       llvm::errs() << '\n';
+                                                   });
 }
 
 mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::opt::InputArgList& args, Action action)
