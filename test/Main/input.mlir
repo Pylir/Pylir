@@ -14,4 +14,4 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
-// CHECK-LABEL: define %PyObject* @foo(%PyObject* %{{.*}})
+// CHECK-LABEL: define %PyObject addrspace({{[0-9]+}})* @foo(%PyObject addrspace({{[0-9]+}})* %{{.*}})

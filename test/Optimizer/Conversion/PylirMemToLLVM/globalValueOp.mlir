@@ -71,4 +71,4 @@ py.globalValue "private" const @barfoo = #py.list<[]>
 
 py.globalValue "private" const @sys.__excepthook__
 
-// CHECK: llvm.mlir.global external constant @sys.__excepthook__() : !llvm.struct<"PyObject"
+// CHECK: llvm.mlir.global external constant @sys.__excepthook__()
