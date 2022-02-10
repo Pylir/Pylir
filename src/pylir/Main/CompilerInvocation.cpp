@@ -29,6 +29,8 @@
 
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
+#include <pylir/LLVM/PlaceStatepoints.hpp>
+#include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
@@ -243,6 +245,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
         }
         case FileType::LLVM:
         {
+            pylir::linkInGCStrategy();
             if (type == LLVM)
             {
                 m_llvmContext = std::make_unique<llvm::LLVMContext>();
@@ -301,6 +304,8 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                     mpm = passBuilder.buildPerModuleDefaultPipeline(level);
                 }
             }
+
+            mpm.addPass(llvm::createModuleToFunctionPassAdaptor(pylir::PlaceStatepointsPass{}));
 
             if (args.hasArg(OPT_emit_llvm) || lto)
             {
@@ -412,11 +417,12 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::LLVM::LLVMDialect>();
     m_mlirContext.emplace(registry);
     m_mlirContext->enableMultithreading(args.hasArg(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
-    m_mlirContext->getDiagEngine().registerHandler([](mlir::Diagnostic& diagnostic)
-                                                   {
-                                                       diagnostic.print(llvm::errs());
-                                                       llvm::errs() << '\n';
-                                                   });
+    m_mlirContext->getDiagEngine().registerHandler(
+        [](mlir::Diagnostic& diagnostic)
+        {
+            diagnostic.print(llvm::errs());
+            llvm::errs() << '\n';
+        });
 }
 
 mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::opt::InputArgList& args, Action action)

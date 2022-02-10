@@ -25,6 +25,7 @@
 namespace
 {
 
+// Keep in sync with PylirGC.cpp
 constexpr unsigned REF_ADDRESS_SPACE = 1;
 
 bool needToBeRuntimeInit(pylir::Py::ObjectAttr attr)
@@ -2824,6 +2825,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
                                            mlir::LLVM::LLVMPointerType::get(builder.getI8Type())}));
     for (auto iter : module.getOps<mlir::LLVM::LLVMFuncOp>())
     {
+        // iter.setGC
         iter.setPersonalityAttr(mlir::FlatSymbolRefAttr::get(&getContext(), "pylir_personality_function"));
     }
     module->setAttr(mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
