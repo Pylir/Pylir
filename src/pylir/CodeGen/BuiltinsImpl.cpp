@@ -1,3 +1,4 @@
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
 #include <llvm/ADT/StringSet.h>
@@ -229,7 +230,7 @@ void pylir::CodeGen::binCheckOtherOp(mlir::Value other, const Py::Builtins::Buil
         otherType, m_builder.createConstant(mlir::FlatSymbolRefAttr::get(m_builder.getContext(), builtin.name)));
     auto* otherIsTypeBlock = new mlir::Block;
     auto* elseBlock = new mlir::Block;
-    m_builder.create<mlir::CondBranchOp>(otherIsType, otherIsTypeBlock, elseBlock);
+    m_builder.create<mlir::cf::CondBranchOp>(otherIsType, otherIsTypeBlock, elseBlock);
 
     implementBlock(elseBlock);
     m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createNotImplementedRef()});
@@ -262,7 +263,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
                             auto* isSelfBlock = new mlir::Block;
                             auto* constructBlock = new mlir::Block;
-                            m_builder.create<mlir::CondBranchOp>(selfIsType, isSelfBlock, constructBlock);
+                            m_builder.create<mlir::cf::CondBranchOp>(selfIsType, isSelfBlock, constructBlock);
 
                             implementBlock(isSelfBlock);
                             auto tupleLen = m_builder.createTupleLen(args);
@@ -275,7 +276,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                 m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, dictLen, zeroI);
                             auto andComb = m_builder.create<mlir::arith::AndIOp>(tupleHasOne, dictIsEmpty);
                             auto* typeOfBlock = new mlir::Block;
-                            m_builder.create<mlir::CondBranchOp>(andComb, typeOfBlock, constructBlock);
+                            m_builder.create<mlir::cf::CondBranchOp>(andComb, typeOfBlock, constructBlock);
 
                             implementBlock(typeOfBlock);
                             auto item = m_builder.createTupleGetItem(args, zeroI);
@@ -295,7 +296,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto isSubclass = buildSubclassCheck(resultType, self);
                             auto* isSubclassBlock = new mlir::Block;
                             auto* notSubclassBlock = new mlir::Block;
-                            m_builder.create<mlir::CondBranchOp>(isSubclass, isSubclassBlock, notSubclassBlock);
+                            m_builder.create<mlir::cf::CondBranchOp>(isSubclass, isSubclassBlock, notSubclassBlock);
 
                             implementBlock(notSubclassBlock);
                             m_builder.create<mlir::ReturnOp>(result);
@@ -357,9 +358,9 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto* isImplementedBlock = new mlir::Block;
                             auto* endBlock = new mlir::Block;
                             endBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-                            m_builder.create<mlir::CondBranchOp>(isNotImplemented, endBlock,
-                                                                 mlir::ValueRange{notImplemented}, isImplementedBlock,
-                                                                 mlir::ValueRange{});
+                            m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, endBlock,
+                                                                     mlir::ValueRange{notImplemented},
+                                                                     isImplementedBlock, mlir::ValueRange{});
 
                             implementBlock(isImplementedBlock);
                             tuple = m_builder.createMakeTuple({m_builder.createBoolRef(), result});
@@ -369,7 +370,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto trueC = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
                             i1 = m_builder.create<mlir::arith::XOrIOp>(i1, trueC);
                             auto asBoolean = m_builder.createBoolFromI1(i1);
-                            m_builder.create<mlir::BranchOp>(endBlock, mlir::ValueRange{asBoolean});
+                            m_builder.create<mlir::cf::BranchOp>(endBlock, mlir::ValueRange{asBoolean});
 
                             implementBlock(endBlock);
                             m_builder.create<mlir::ReturnOp>(endBlock->getArgument(0));
@@ -453,7 +454,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto isZero = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, len, zeroI);
                     auto* zeroLenBlock = new mlir::Block;
                     auto* contBlock = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(isZero, zeroLenBlock, contBlock);
+                    m_builder.create<mlir::cf::CondBranchOp>(isZero, zeroLenBlock, contBlock);
 
                     implementBlock(zeroLenBlock);
                     m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createConstant("")});
@@ -463,11 +464,11 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto* oneLenBlock = new mlir::Block;
                     contBlock = new mlir::Block;
                     contBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-                    m_builder.create<mlir::CondBranchOp>(isOne, oneLenBlock, contBlock, mlir::ValueRange{args});
+                    m_builder.create<mlir::cf::CondBranchOp>(isOne, oneLenBlock, contBlock, mlir::ValueRange{args});
 
                     implementBlock(oneLenBlock);
                     auto first = m_builder.createTupleGetItem(args, zeroI);
-                    m_builder.create<mlir::BranchOp>(contBlock, mlir::ValueRange{first});
+                    m_builder.create<mlir::cf::BranchOp>(contBlock, mlir::ValueRange{first});
 
                     implementBlock(contBlock);
                     auto tuple = m_builder.createMakeTuple({m_builder.createStrRef(), contBlock->getArgument(0)});
@@ -512,15 +513,15 @@ void pylir::CodeGen::createBuiltinsImpl()
                                 m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ugt, len, zero);
                             BlockPtr greaterZeroBlock, noneBlock, continueBlock;
                             continueBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-                            m_builder.create<mlir::CondBranchOp>(greaterZero, greaterZeroBlock, noneBlock);
+                            m_builder.create<mlir::cf::CondBranchOp>(greaterZero, greaterZeroBlock, noneBlock);
 
                             implementBlock(greaterZeroBlock);
                             auto firstElement = m_builder.createTupleGetItem(args, zero);
-                            m_builder.create<mlir::BranchOp>(continueBlock, mlir::ValueRange{firstElement});
+                            m_builder.create<mlir::cf::BranchOp>(continueBlock, mlir::ValueRange{firstElement});
 
                             implementBlock(noneBlock);
                             auto none = m_builder.createNoneRef();
-                            m_builder.create<mlir::BranchOp>(continueBlock, mlir::ValueRange{none});
+                            m_builder.create<mlir::cf::BranchOp>(continueBlock, mlir::ValueRange{none});
 
                             implementBlock(continueBlock);
                             m_builder.createSetSlot(self, selfType, "value", continueBlock->getArgument(0));
@@ -621,7 +622,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     mlir::Value isStr = m_builder.createIs(clazz, m_builder.createStrRef());
                     auto* subClass = new mlir::Block;
                     auto* normal = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(isStr, normal, subClass);
+                    m_builder.create<mlir::cf::CondBranchOp>(isStr, normal, subClass);
 
                     implementBlock(subClass);
                     {
@@ -646,7 +647,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto encoded = m_builder.create<mlir::arith::OrIOp>(args[1].parameterSet, args[2].parameterSet);
                     auto* singleArgBlock = new mlir::Block;
                     auto* encodedBlock = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(encoded, encodedBlock, singleArgBlock);
+                    m_builder.create<mlir::cf::CondBranchOp>(encoded, encodedBlock, singleArgBlock);
 
                     implementBlock(singleArgBlock);
                     auto object = args[0].parameterValue;
@@ -656,7 +657,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     isStr = buildSubclassCheck(strType, m_builder.createStrRef());
                     auto* notStrBlock = new mlir::Block;
                     auto* strBlock = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(isStr, strBlock, notStrBlock);
+                    m_builder.create<mlir::cf::CondBranchOp>(isStr, strBlock, notStrBlock);
 
                     implementBlock(notStrBlock);
                     auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
@@ -712,7 +713,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto lookup = m_builder.createDictTryGetItem(dict, key);
                             auto* exception = new mlir::Block;
                             auto* success = new mlir::Block;
-                            m_builder.create<mlir::CondBranchOp>(lookup.found(), success, exception);
+                            m_builder.create<mlir::cf::CondBranchOp>(lookup.found(), success, exception);
 
                             implementBlock(exception);
                             auto object = Py::buildException(m_builder.getCurrentLoc(), m_builder,
@@ -775,8 +776,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                     exitBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
                     auto leftParen = m_builder.createConstant("(");
                     auto* loopSetup = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(lessThanOne, exitBlock, mlir::ValueRange{leftParen}, loopSetup,
-                                                         mlir::ValueRange{});
+                    m_builder.create<mlir::cf::CondBranchOp>(lessThanOne, exitBlock, mlir::ValueRange{leftParen},
+                                                             loopSetup, mlir::ValueRange{});
 
                     implementBlock(loopSetup);
                     auto zero =
@@ -790,14 +791,14 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto* loopHeader = new mlir::Block;
                     loopHeader->addArguments({m_builder.getDynamicType(), m_builder.getIndexType()},
                                              {m_builder.getCurrentLoc(), m_builder.getCurrentLoc()});
-                    m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{concat, one});
+                    m_builder.create<mlir::cf::BranchOp>(loopHeader, mlir::ValueRange{concat, one});
 
                     implementBlock(loopHeader);
                     auto isLess = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult,
                                                                         loopHeader->getArgument(1), tupleLen);
                     auto* loopBody = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(isLess, loopBody, exitBlock,
-                                                         mlir::ValueRange{loopHeader->getArgument(0)});
+                    m_builder.create<mlir::cf::CondBranchOp>(isLess, loopBody, exitBlock,
+                                                             mlir::ValueRange{loopHeader->getArgument(0)});
 
                     implementBlock(loopBody);
                     auto obj = m_builder.createTupleGetItem(self, loopHeader->getArgument(1));
@@ -807,13 +808,13 @@ void pylir::CodeGen::createBuiltinsImpl()
                     concat = m_builder.createStrConcat(
                         {loopHeader->getArgument(0), m_builder.createConstant(", "), nextStr});
                     auto incremented = m_builder.create<mlir::arith::AddIOp>(loopHeader->getArgument(1), one);
-                    m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{concat, incremented});
+                    m_builder.create<mlir::cf::BranchOp>(loopHeader, mlir::ValueRange{concat, incremented});
 
                     implementBlock(exitBlock);
                     auto isOne = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, tupleLen, one);
                     auto* oneBlock = new mlir::Block;
                     auto* elseBlock = new mlir::Block;
-                    m_builder.create<mlir::CondBranchOp>(isOne, oneBlock, elseBlock);
+                    m_builder.create<mlir::cf::CondBranchOp>(isOne, oneBlock, elseBlock);
 
                     implementBlock(oneBlock);
                     concat = m_builder.createStrConcat({exitBlock->getArgument(0), m_builder.createConstant(",)")});
@@ -959,8 +960,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    auto falseStr = m_builder.createConstant("False");
                                    auto* successor = new mlir::Block;
                                    successor->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-                                   m_builder.create<mlir::CondBranchOp>(i1, successor, mlir::ValueRange{trueStr},
-                                                                        successor, mlir::ValueRange{falseStr});
+                                   m_builder.create<mlir::cf::CondBranchOp>(i1, successor, mlir::ValueRange{trueStr},
+                                                                            successor, mlir::ValueRange{falseStr});
                                    implementBlock(successor);
                                    m_builder.create<mlir::ReturnOp>(successor->getArgument(0));
                                });
@@ -986,8 +987,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                 auto* continueBlock = new mlir::Block;
                 continueBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
                 auto str = m_builder.createConstant(" ");
-                m_builder.create<mlir::CondBranchOp>(isNone, continueBlock, mlir::ValueRange{str}, continueBlock,
-                                                     mlir::ValueRange{sep});
+                m_builder.create<mlir::cf::CondBranchOp>(isNone, continueBlock, mlir::ValueRange{str}, continueBlock,
+                                                         mlir::ValueRange{sep});
                 implementBlock(continueBlock);
                 sep = continueBlock->getArgument(0);
             }
@@ -996,8 +997,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                 auto* continueBlock = new mlir::Block;
                 continueBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
                 auto str = m_builder.createConstant("\n");
-                m_builder.create<mlir::CondBranchOp>(isNone, continueBlock, mlir::ValueRange{str}, continueBlock,
-                                                     mlir::ValueRange{end});
+                m_builder.create<mlir::cf::CondBranchOp>(isNone, continueBlock, mlir::ValueRange{str}, continueBlock,
+                                                         mlir::ValueRange{end});
                 implementBlock(continueBlock);
                 end = continueBlock->getArgument(0);
             }
@@ -1009,8 +1010,8 @@ void pylir::CodeGen::createBuiltinsImpl()
             exitBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
             auto emptyStr = m_builder.createConstant("");
             auto* loopSetup = new mlir::Block;
-            m_builder.create<mlir::CondBranchOp>(lessThanOne, exitBlock, mlir::ValueRange{emptyStr}, loopSetup,
-                                                 mlir::ValueRange{});
+            m_builder.create<mlir::cf::CondBranchOp>(lessThanOne, exitBlock, mlir::ValueRange{emptyStr}, loopSetup,
+                                                     mlir::ValueRange{});
 
             implementBlock(loopSetup);
             auto zero = m_builder.create<mlir::arith::ConstantOp>(m_builder.getIndexType(), m_builder.getIndexAttr(0));
@@ -1022,14 +1023,14 @@ void pylir::CodeGen::createBuiltinsImpl()
             auto* loopHeader = new mlir::Block;
             loopHeader->addArguments({m_builder.getDynamicType(), m_builder.getIndexType()},
                                      {m_builder.getCurrentLoc(), m_builder.getCurrentLoc()});
-            m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{initialStr, one});
+            m_builder.create<mlir::cf::BranchOp>(loopHeader, mlir::ValueRange{initialStr, one});
 
             implementBlock(loopHeader);
             auto isLess = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult,
                                                                 loopHeader->getArgument(1), tupleLen);
             auto* loopBody = new mlir::Block;
-            m_builder.create<mlir::CondBranchOp>(isLess, loopBody, exitBlock,
-                                                 mlir::ValueRange{loopHeader->getArgument(0)});
+            m_builder.create<mlir::cf::CondBranchOp>(isLess, loopBody, exitBlock,
+                                                     mlir::ValueRange{loopHeader->getArgument(0)});
 
             implementBlock(loopBody);
             auto obj = m_builder.createTupleGetItem(objects, loopHeader->getArgument(1));
@@ -1038,7 +1039,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                       nullptr, nullptr);
             auto concat = m_builder.createStrConcat({loopHeader->getArgument(0), sep, nextStr});
             auto incremented = m_builder.create<mlir::arith::AddIOp>(loopHeader->getArgument(1), one);
-            m_builder.create<mlir::BranchOp>(loopHeader, mlir::ValueRange{concat, incremented});
+            m_builder.create<mlir::cf::BranchOp>(loopHeader, mlir::ValueRange{concat, incremented});
 
             implementBlock(exitBlock);
             concat = m_builder.createStrConcat({exitBlock->getArgument(0), end});
@@ -1071,7 +1072,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                        auto isStr = buildSubclassCheck(strType, m_builder.createStrRef());
                        auto* notStrBlock = new mlir::Block;
                        auto* strBlock = new mlir::Block;
-                       m_builder.create<mlir::CondBranchOp>(isStr, strBlock, notStrBlock);
+                       m_builder.create<mlir::cf::CondBranchOp>(isStr, strBlock, notStrBlock);
 
                        implementBlock(notStrBlock);
                        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,

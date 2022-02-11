@@ -1,9 +1,10 @@
 #include <mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h>
+#include <mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h>
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/Pattern.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
-#include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h>
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/IR/PatternMatch.h>
 #include <mlir/Transforms/DialectConversion.h>
@@ -2099,7 +2100,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
             auto zero = rewriter.create<mlir::arith::ConstantOp>(op.getLoc(), rewriter.getIndexType(),
                                                                  rewriter.getIndexAttr(0));
             condition->addArgument(getIndexType(), op.getLoc());
-            rewriter.create<mlir::BranchOp>(op.getLoc(), condition, mlir::ValueRange{zero});
+            rewriter.create<mlir::cf::BranchOp>(op.getLoc(), condition, mlir::ValueRange{zero});
         }
 
         condition->insertBefore(endBlock);
@@ -2108,7 +2109,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
                                                            condition->getArgument(0), len);
         auto unbound = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(), pylir::Py::UnboundAttr::get(getContext()));
         auto* body = new mlir::Block;
-        rewriter.create<mlir::CondBranchOp>(op.getLoc(), isLess, body, endBlock, mlir::ValueRange{unbound});
+        rewriter.create<mlir::cf::CondBranchOp>(op.getLoc(), isLess, body, endBlock, mlir::ValueRange{unbound});
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
@@ -2116,14 +2117,14 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         auto isEqual = rewriter.create<pylir::Py::StrEqualOp>(op.getLoc(), element, str);
         auto* foundIndex = new mlir::Block;
         auto* loop = new mlir::Block;
-        rewriter.create<mlir::CondBranchOp>(op.getLoc(), isEqual, foundIndex, loop, mlir::ValueRange{});
+        rewriter.create<mlir::cf::CondBranchOp>(op.getLoc(), isEqual, foundIndex, loop, mlir::ValueRange{});
         loop->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(loop);
         {
             auto one = rewriter.create<mlir::arith::ConstantOp>(op.getLoc(), rewriter.getIndexType(),
                                                                 rewriter.getIndexAttr(1));
             auto increment = rewriter.create<mlir::arith::AddIOp>(op.getLoc(), condition->getArgument(0), one);
-            rewriter.create<mlir::BranchOp>(op.getLoc(), condition, mlir::ValueRange{increment});
+            rewriter.create<mlir::cf::BranchOp>(op.getLoc(), condition, mlir::ValueRange{increment});
         }
 
         foundIndex->insertBefore(endBlock);
@@ -2137,7 +2138,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), pyObjectPtrPtr.getType(), pyObjectPtrPtr,
                                                       mlir::ValueRange{index});
         auto slot = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep);
-        rewriter.create<mlir::BranchOp>(op.getLoc(), endBlock, mlir::ValueRange{slot});
+        rewriter.create<mlir::cf::BranchOp>(op.getLoc(), endBlock, mlir::ValueRange{slot});
 
         rewriter.setInsertionPointToStart(endBlock);
         rewriter.replaceOp(op, endBlock->getArgument(0));
@@ -2168,7 +2169,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
             auto zero = rewriter.create<mlir::arith::ConstantOp>(op.getLoc(), rewriter.getIndexType(),
                                                                  rewriter.getIndexAttr(0));
             condition->addArgument(getIndexType(), op.getLoc());
-            rewriter.create<mlir::BranchOp>(op.getLoc(), condition, mlir::ValueRange{zero});
+            rewriter.create<mlir::cf::BranchOp>(op.getLoc(), condition, mlir::ValueRange{zero});
         }
 
         condition->insertBefore(endBlock);
@@ -2176,7 +2177,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto isLess = rewriter.create<mlir::arith::CmpIOp>(op.getLoc(), mlir::arith::CmpIPredicate::ult,
                                                            condition->getArgument(0), len);
         auto* body = new mlir::Block;
-        rewriter.create<mlir::CondBranchOp>(op.getLoc(), isLess, body, endBlock);
+        rewriter.create<mlir::cf::CondBranchOp>(op.getLoc(), isLess, body, endBlock);
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
@@ -2184,14 +2185,14 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto isEqual = rewriter.create<pylir::Py::StrEqualOp>(op.getLoc(), element, str);
         auto* foundIndex = new mlir::Block;
         auto* loop = new mlir::Block;
-        rewriter.create<mlir::CondBranchOp>(op.getLoc(), isEqual, foundIndex, loop, mlir::ValueRange{});
+        rewriter.create<mlir::cf::CondBranchOp>(op.getLoc(), isEqual, foundIndex, loop, mlir::ValueRange{});
         loop->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(loop);
         {
             auto one = rewriter.create<mlir::arith::ConstantOp>(op.getLoc(), rewriter.getIndexType(),
                                                                 rewriter.getIndexAttr(1));
             auto increment = rewriter.create<mlir::arith::AddIOp>(op.getLoc(), condition->getArgument(0), one);
-            rewriter.create<mlir::BranchOp>(op.getLoc(), condition, mlir::ValueRange{increment});
+            rewriter.create<mlir::cf::BranchOp>(op.getLoc(), condition, mlir::ValueRange{increment});
         }
 
         foundIndex->insertBefore(endBlock);
@@ -2205,7 +2206,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), pyObjectPtrPtr.getType(), pyObjectPtrPtr,
                                                       mlir::ValueRange{index});
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.value(), gep);
-        rewriter.create<mlir::BranchOp>(op.getLoc(), endBlock);
+        rewriter.create<mlir::cf::BranchOp>(op.getLoc(), endBlock);
 
         rewriter.eraseOp(op);
         return mlir::success();
@@ -2411,14 +2412,14 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
         {
             auto zero = createIndexConstant(rewriter, op.getLoc(), 0);
             auto hasNoSlots = rewriter.create<pylir::Py::IsUnboundValueOp>(op.getLoc(), slotsTuple);
-            rewriter.create<mlir::CondBranchOp>(op.getLoc(), hasNoSlots, endBlock, mlir::ValueRange{zero},
-                                                hasSlotsBlock, mlir::ValueRange{});
+            rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), hasNoSlots, endBlock, mlir::ValueRange{zero},
+                                                  hasSlotsBlock, mlir::ValueRange{});
         }
 
         hasSlotsBlock->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(hasSlotsBlock);
         auto len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), getIndexType(), slotsTuple);
-        rewriter.create<mlir::BranchOp>(op.getLoc(), endBlock, mlir::ValueRange{len});
+        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{len}, endBlock);
 
         rewriter.setInsertionPointToStart(endBlock);
         auto offset = pyTypeModel(op.getLoc(), rewriter, adaptor.typeObj()).offsetPtr(op.getLoc()).load(op.getLoc());
@@ -2762,6 +2763,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
 
     mlir::RewritePatternSet patternSet(&getContext());
     mlir::populateStdToLLVMConversionPatterns(converter, patternSet);
+    mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
     mlir::arith::populateArithmeticToLLVMConversionPatterns(converter, patternSet);
     patternSet.insert<ConstantOpConversion>(converter);
     patternSet.insert<GlobalValueOpConversion>(converter);

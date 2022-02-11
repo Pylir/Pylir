@@ -1,3 +1,4 @@
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/Transforms/DialectConversion.h>
 
@@ -56,7 +57,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
         auto *conditionBlock = new mlir::Block;
         conditionBlock->addArgument(rewriter.getIndexType(), loc);
-        rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
+        rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
 
         conditionBlock->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(conditionBlock);
@@ -65,7 +66,7 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         auto *body = new mlir::Block;
         auto unbound = rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::UnboundAttr::get(getContext()));
         auto falseConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
-        rewriter.create<mlir::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{unbound, falseConstant});
+        rewriter.create<mlir::cf::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{unbound, falseConstant});
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
@@ -74,14 +75,15 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.slotAttr());
         auto failure = rewriter.create<pylir::Py::IsUnboundValueOp>(loc, fetch);
         auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
-        auto *notFound = new mlir::Block;
-        rewriter.create<mlir::CondBranchOp>(loc, failure, notFound, endBlock, mlir::ValueRange{fetch, trueConstant});
+        auto* notFound = new mlir::Block;
+        rewriter.create<mlir::cf::CondBranchOp>(loc, failure, notFound, endBlock,
+                                                mlir::ValueRange{fetch, trueConstant});
 
         notFound->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(notFound);
         auto one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
         auto nextIter = rewriter.create<mlir::arith::AddIOp>(loc, conditionBlock->getArgument(0), one);
-        rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{nextIter});
+        rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock, mlir::ValueRange{nextIter});
 
         rewriter.replaceOp(op, endBlock->getArguments());
         return mlir::success();
@@ -104,30 +106,30 @@ struct LinearContainsPattern : mlir::OpRewritePattern<pylir::Py::LinearContainsO
         auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
         auto *conditionBlock = new mlir::Block;
         conditionBlock->addArgument(rewriter.getIndexType(), loc);
-        rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
+        rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
 
         conditionBlock->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(conditionBlock);
         auto isLess = rewriter.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
                                                            conditionBlock->getArgument(0), tupleSize);
-        auto *body = new mlir::Block;
+        auto* body = new mlir::Block;
         auto falseConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
-        rewriter.create<mlir::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{falseConstant});
+        rewriter.create<mlir::cf::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{falseConstant});
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
         auto entry = rewriter.create<pylir::Py::TupleGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
         auto isType = rewriter.create<pylir::Py::IsOp>(loc, entry, op.element());
-        auto *notFound = new mlir::Block;
+        auto* notFound = new mlir::Block;
         auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
-        rewriter.create<mlir::CondBranchOp>(loc, isType, endBlock, mlir::ValueRange{trueConstant}, notFound,
-                                            mlir::ValueRange{});
+        rewriter.create<mlir::cf::CondBranchOp>(loc, isType, endBlock, mlir::ValueRange{trueConstant}, notFound,
+                                                mlir::ValueRange{});
 
         notFound->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(notFound);
         auto one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
         auto nextIter = rewriter.create<mlir::arith::AddIOp>(loc, conditionBlock->getArgument(0), one);
-        rewriter.create<mlir::BranchOp>(loc, conditionBlock, mlir::ValueRange{nextIter});
+        rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock, mlir::ValueRange{nextIter});
 
         rewriter.replaceOp(op, endBlock->getArguments());
         return mlir::success();
@@ -208,7 +210,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             auto iterObject = pylir::Py::buildSpecialMethodCall(loc, rewriter, "__iter__", {iter.value()}, {},
                                                                 exceptionHandlerBlock, landingPadBlock);
             auto *condition = new mlir::Block;
-            rewriter.create<mlir::BranchOp>(loc, condition);
+            rewriter.create<mlir::cf::BranchOp>(loc, condition);
 
             condition->insertBefore(dest);
             rewriter.setInsertionPointToStart(condition);
@@ -219,13 +221,13 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
                                                           exceptionHandlerBlock, landingPad);
 
             rewriter.create<InsertOp>(loc, list, next);
-            rewriter.create<mlir::BranchOp>(loc, condition);
+            rewriter.create<mlir::cf::BranchOp>(loc, condition);
 
             landingPad->insertBefore(dest);
             rewriter.setInsertionPointToStart(landingPad);
             mlir::Value exceptionObject = rewriter.create<pylir::Py::LandingPadOp>(
                 loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
-            rewriter.create<mlir::BranchOp>(loc, stopIterationHandler, exceptionObject);
+            rewriter.create<mlir::cf::BranchOp>(loc, stopIterationHandler, exceptionObject);
             stopIterationHandler->insertBefore(dest);
             rewriter.setInsertionPointToStart(stopIterationHandler);
         }
@@ -237,7 +239,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             mlir::Block* happyPath = op.happyPath();
             if (!happyPath->getSinglePredecessor())
             {
-                rewriter.template create<mlir::BranchOp>(loc, happyPath);
+                rewriter.template create<mlir::cf::BranchOp>(loc, happyPath);
             }
             else
             {
@@ -277,7 +279,7 @@ void ExpandPyDialectPass::runOnOperation()
 
         auto* condition = new mlir::Block;
         condition->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
-        builder.create<mlir::BranchOp>(condition, self);
+        builder.create<mlir::cf::BranchOp>(condition, self);
 
         func.push_back(condition);
         builder.setInsertionPointToStart(condition);
@@ -289,7 +291,7 @@ void ExpandPyDialectPass::runOnOperation()
         exitBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
         auto unbound = builder.createConstant(builder.getUnboundAttr());
         auto* body = new mlir::Block;
-        builder.create<mlir::CondBranchOp>(lookup.success(), body, exitBlock, mlir::ValueRange{unbound});
+        builder.create<mlir::cf::CondBranchOp>(lookup.success(), body, exitBlock, mlir::ValueRange{unbound});
 
         func.push_back(body);
         builder.setInsertionPointToStart(body);
@@ -297,7 +299,7 @@ void ExpandPyDialectPass::runOnOperation()
         auto isFunction = builder.createIs(callableType, builder.createFunctionRef());
         auto* isFunctionBlock = new mlir::Block;
         auto* notFunctionBlock = new mlir::Block;
-        builder.create<mlir::CondBranchOp>(isFunction, isFunctionBlock, notFunctionBlock);
+        builder.create<mlir::cf::CondBranchOp>(isFunction, isFunctionBlock, notFunctionBlock);
 
         func.push_back(isFunctionBlock);
         builder.setInsertionPointToStart(isFunctionBlock);
@@ -313,7 +315,7 @@ void ExpandPyDialectPass::runOnOperation()
         mroTuple = builder.createGetSlot(callableType, builder.createTypeRef(), "__mro__");
         auto getMethod = builder.createMROLookup(mroTuple, "__get__");
         auto* isDescriptor = new mlir::Block;
-        builder.create<mlir::CondBranchOp>(getMethod.success(), isDescriptor, condition, lookup.result());
+        builder.create<mlir::cf::CondBranchOp>(getMethod.success(), isDescriptor, condition, lookup.result());
 
         func.push_back(isDescriptor);
         builder.setInsertionPointToStart(isDescriptor);
@@ -323,7 +325,7 @@ void ExpandPyDialectPass::runOnOperation()
         result =
             builder.create<mlir::CallOp>(func, mlir::ValueRange{getMethod.result(), tuple, emptyDict}).getResult(0);
         // TODO: check result is not unbound
-        builder.create<mlir::BranchOp>(condition, result);
+        builder.create<mlir::cf::BranchOp>(condition, result);
 
         func.push_back(exitBlock);
         builder.setInsertionPointToStart(exitBlock);
@@ -331,7 +333,8 @@ void ExpandPyDialectPass::runOnOperation()
     }
 
     mlir::ConversionTarget target(getContext());
-    target.addLegalDialect<pylir::Py::PylirPyDialect, mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
+    target.addLegalDialect<pylir::Py::PylirPyDialect, mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                           mlir::cf::ControlFlowDialect>();
     target.addLegalOp<mlir::FuncOp>();
     target.addDynamicallyLegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp,
                                  pylir::Py::MakeDictOp>(

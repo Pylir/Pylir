@@ -3,6 +3,7 @@
 
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
+#include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
@@ -415,6 +416,7 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::StandardOpsDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<mlir::LLVM::LLVMDialect>();
+    registry.insert<mlir::cf::ControlFlowDialect>();
     m_mlirContext.emplace(registry);
     m_mlirContext->enableMultithreading(args.hasArg(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
     m_mlirContext->getDiagEngine().registerHandler(

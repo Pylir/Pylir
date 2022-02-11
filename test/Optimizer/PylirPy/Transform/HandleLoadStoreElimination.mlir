@@ -72,17 +72,17 @@ py.globalHandle @foo
 
 func @test() -> !py.dynamic {
     %0 = test.random
-    cond_br %0, ^bb0, ^bb1
+    cf.cond_br %0, ^bb0, ^bb1
 
 ^bb0:
     %1 = py.constant #py.str<"text">
     py.store %1 into @foo
-    br ^merge
+    cf.br ^merge
 
 ^bb1:
     %2 = py.constant #py.str<"value">
     py.store %2 into @foo
-    br ^merge
+    cf.br ^merge
 
 ^merge:
     %3 = py.load @foo
@@ -90,18 +90,18 @@ func @test() -> !py.dynamic {
 }
 
 // CHECK-LABEL: func @test
-// CHECK: cond_br %{{.*}}, ^[[FIRST:.*]], ^[[SECOND:[[:alnum:]]+]]
+// CHECK: cf.cond_br %{{.*}}, ^[[FIRST:.*]], ^[[SECOND:[[:alnum:]]+]]
 
 // CHECK: ^[[FIRST]]
 // CHECK-NEXT: %[[C1:.*]] = py.constant #py.str<"text">
 // CHECK-NEXT: py.store %[[C1]] into @foo
-// CHECK-NEXT: br ^[[MERGE:[[:alnum:]]+]]
+// CHECK-NEXT: cf.br ^[[MERGE:[[:alnum:]]+]]
 // CHECK-SAME: %[[C1]]
 
 // CHECK: ^[[SECOND]]:
 // CHECK-NEXT: %[[C2:.*]] = py.constant #py.str<"value">
 // CHECK-NEXT: py.store %[[C2]] into @foo
-// CHECK-NEXT: br ^[[MERGE]]
+// CHECK-NEXT: cf.br ^[[MERGE]]
 // CHECK-SAME: %[[C2]]
 
 // CHECK: ^[[MERGE]]
@@ -119,16 +119,16 @@ func private @clobber()
 
 func @test() -> !py.dynamic {
     %0 = test.random
-    cond_br %0, ^bb0, ^bb1
+    cf.cond_br %0, ^bb0, ^bb1
 
 ^bb0:
     call @clobber() : () -> ()
-    br ^merge
+    cf.br ^merge
 
 ^bb1:
     %1 = py.constant #py.str<"value">
     py.store %1 into @foo
-    br ^merge
+    cf.br ^merge
 
 ^merge:
     %2 = py.load @foo
@@ -137,10 +137,10 @@ func @test() -> !py.dynamic {
 
 // CHECK-LABEL: func @test
 // CHECK: call @clobber
-// CHECK-NEXT: br ^[[MERGE:[[:alnum:]]+]]
+// CHECK-NEXT: cf.br ^[[MERGE:[[:alnum:]]+]]
 
 // CHECK: py.store %{{.*}} into @foo
-// CHECK-NEXT: br ^[[MERGE]]
+// CHECK-NEXT: cf.br ^[[MERGE]]
 
 // CHECK: ^[[MERGE]]:
 // CHECK-NEXT: %[[RESULT:.*]] = py.load @foo

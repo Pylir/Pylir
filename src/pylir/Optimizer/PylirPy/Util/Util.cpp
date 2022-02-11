@@ -1,5 +1,6 @@
 #include "Util.hpp"
 
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 
 #include "Builtins.hpp"
@@ -9,7 +10,7 @@ namespace
 void implementBlock(mlir::OpBuilder& builder, mlir::Block* block)
 {
     PYLIR_ASSERT(block);
-    if (auto *next = builder.getBlock()->getNextNode())
+    if (auto* next = builder.getBlock()->getNextNode())
     {
         block->insertBefore(next);
     }
@@ -25,7 +26,7 @@ void raiseException(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value ex
 {
     if (exceptionPath)
     {
-        builder.create<mlir::BranchOp>(loc, exceptionPath, exception);
+        builder.create<mlir::cf::BranchOp>(loc, exceptionPath, exception);
     }
     else
     {
@@ -51,7 +52,7 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
     auto failure = builder.create<pylir::Py::IsUnboundValueOp>(loc, result);
     auto* typeCall = new mlir::Block;
     auto* notBound = new mlir::Block;
-    builder.create<mlir::CondBranchOp>(loc, failure, notBound, typeCall);
+    builder.create<mlir::cf::CondBranchOp>(loc, failure, notBound, typeCall);
 
     implementBlock(builder, notBound);
     auto typeError = pylir::Py::buildException(loc, builder, pylir::Py::Builtins::TypeError.name, {}, landingPadBlock);
@@ -116,7 +117,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     auto mroTuple = builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__").result();
     auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
     auto *exec = new mlir::Block;
-    builder.create<mlir::CondBranchOp>(loc, lookup.success(), exec, notFoundPath);
+    builder.create<mlir::cf::CondBranchOp>(loc, lookup.success(), exec, notFoundPath);
 
     implementBlock(builder, exec);
     auto function = builder.create<Py::ConstantOp>(
@@ -125,7 +126,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     auto isFunction = builder.create<Py::IsOp>(loc, callableType, function);
     auto* isFunctionBlock = new mlir::Block;
     auto* notFunctionBlock = new mlir::Block;
-    builder.create<mlir::CondBranchOp>(loc, isFunction, isFunctionBlock, notFunctionBlock);
+    builder.create<mlir::cf::CondBranchOp>(loc, isFunction, isFunctionBlock, notFunctionBlock);
 
     implementBlock(builder, isFunctionBlock);
     auto fp = builder.create<Py::FunctionGetFunctionOp>(loc, lookup.result());
@@ -146,7 +147,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     }
     auto* exitBlock = new mlir::Block;
     exitBlock->addArgument(builder.getType<Py::DynamicType>(), loc);
-    builder.create<mlir::BranchOp>(loc, exitBlock, result);
+    builder.create<mlir::cf::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, notFunctionBlock);
     mroTuple = builder.create<Py::GetSlotOp>(loc, callableType, metaType, "__mro__");
@@ -154,20 +155,20 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     auto* isDescriptor = new mlir::Block;
     auto* mergeBlock = new mlir::Block;
     mergeBlock->addArgument(builder.getType<Py::DynamicType>(), loc);
-    builder.create<mlir::CondBranchOp>(loc, getMethod.success(), isDescriptor, mergeBlock,
-                                       mlir::ValueRange{lookup.result()});
+    builder.create<mlir::cf::CondBranchOp>(loc, getMethod.success(), isDescriptor, mergeBlock,
+                                           mlir::ValueRange{lookup.result()});
 
     implementBlock(builder, isDescriptor);
     auto selfType = builder.create<Py::TypeOfOp>(loc, popOp.element());
     result = buildCall(loc, builder, getMethod.result(),
                        builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{popOp.element(), selfType}),
                        emptyDict, exceptionPath, landingPadBlock);
-    builder.create<mlir::BranchOp>(loc, mergeBlock, result);
+    builder.create<mlir::cf::BranchOp>(loc, mergeBlock, result);
 
     implementBlock(builder, mergeBlock);
     result =
         buildCall(loc, builder, mergeBlock->getArgument(0), popOp.result(), kwargs, exceptionPath, landingPadBlock);
-    builder.create<mlir::BranchOp>(loc, exitBlock, result);
+    builder.create<mlir::cf::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, exitBlock);
     return exitBlock->getArgument(0);

@@ -7,23 +7,23 @@ py.globalValue @builtins.list = #py.type
 func @test4() -> index {
     %0 = py.constant #py.str<"test">
     %1 = py.makeList ()
-    br ^condition
+    cf.br ^condition
 
 ^condition: // pred: ^bb0, ^bb2
     %2 = test.random
-    cond_br %2, ^bb1, ^bb5
+    cf.cond_br %2, ^bb1, ^bb5
 
 ^bb1: // pred: ^condition
     %3 = test.random
-    cond_br %3, ^bb2, ^bb4
+    cf.cond_br %3, ^bb2, ^bb4
 
 ^bb2: // pred: ^bb1
     %unused = py.list.len %1
-    br ^condition
+    cf.br ^condition
 
 ^bb4: // pred: ^bb4
     py.list.append %1, %0
-    br ^bb5
+    cf.br ^bb5
 
 ^bb5: // pred: ^condition, ^bb4
     %5 = py.list.len %1
@@ -45,21 +45,21 @@ func @test4() -> index {
 func @test5() -> index {
     %0 = py.constant #py.str<"test">
     %1 = py.makeList ()
-    br ^back1
+    cf.br ^back1
 
 ^back1: // pred: ^bb0, ^bb2
-    br ^back2
+    cf.br ^back2
 
 ^back2: // pred: ^condition
-    br ^exit2
+    cf.br ^exit2
 
 ^exit2: // pred: ^bb1
     %2 = test.random
-    cond_br %2, ^back2, ^exit1
+    cf.cond_br %2, ^back2, ^exit1
 
 ^exit1: // pred: ^bb4
     %3 = test.random
-    cond_br %3, ^back1, ^bb5
+    cf.cond_br %3, ^back1, ^bb5
 
 ^bb5: // pred: ^condition, ^bb4
     %5 = py.list.len %1
@@ -76,14 +76,14 @@ func @test5() -> index {
 func @test6() {
     %0 = py.constant #py.str<"test">
     %1 = py.makeList ()
-    br ^bb2
+    cf.br ^bb2
 
 ^exit1:
     return
 
 ^bb2:
     %2 = test.random
-    cond_br %2, ^exit1, ^exit2
+    cf.cond_br %2, ^exit1, ^exit2
 
 ^exit2:
     return

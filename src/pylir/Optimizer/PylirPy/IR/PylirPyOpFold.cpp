@@ -1,3 +1,4 @@
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/StandardOps/IR/Ops.h>
 #include <mlir/IR/Matchers.h>
 
@@ -133,7 +134,7 @@ struct MakeExOpExceptionSimplifier : mlir::OpRewritePattern<ExOp>
         {
             auto newOp = rewriter.replaceOpWithNewOp<NormalOp>(op, op.arguments(), op.iterExpansion());
             rewriter.setInsertionPointAfter(newOp);
-            rewriter.create<mlir::BranchOp>(newOp.getLoc(), happyPath);
+            rewriter.create<mlir::cf::BranchOp>(newOp.getLoc(), happyPath);
             return mlir::success();
         }
         rewriter.mergeBlocks(happyPath, op->getBlock(), op.normalDestOperands());
@@ -158,7 +159,7 @@ struct MakeDictExOpSimplifier : mlir::OpRewritePattern<pylir::Py::MakeDictExOp>
             auto newOp =
                 rewriter.replaceOpWithNewOp<pylir::Py::MakeDictOp>(op, op.keys(), op.values(), op.mappingExpansion());
             rewriter.setInsertionPointAfter(newOp);
-            rewriter.create<mlir::BranchOp>(newOp.getLoc(), happyPath);
+            rewriter.create<mlir::cf::BranchOp>(newOp.getLoc(), happyPath);
             return mlir::success();
         }
         rewriter.mergeBlocks(happyPath, op->getBlock(), op.normalDestOperands());

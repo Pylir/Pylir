@@ -20,11 +20,11 @@ py.globalValue @builtins.bool = #py.type
 
 func @block_argument(%arg0 : i1) -> !py.dynamic {
     %c = py.constant #py.bool<False>
-    cond_br %arg0, ^true, ^false(%c : !py.dynamic)
+    cf.cond_br %arg0, ^true, ^false(%c : !py.dynamic)
 
 ^true:
     %u = py.constant #py.unbound
-    br ^false(%u : !py.dynamic)
+    cf.br ^false(%u : !py.dynamic)
 
 ^false(%0 : !py.dynamic):
     %1 = py.isUnboundValue %0

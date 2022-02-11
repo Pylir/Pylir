@@ -23,11 +23,11 @@ func @test() -> index {
 func @test2(%arg0 : i1) -> index {
     %0 = py.constant #py.str<"test">
     %1 = py.makeList ()
-    cond_br %arg0, ^bb1, ^bb2
+    cf.cond_br %arg0, ^bb1, ^bb2
 
 ^bb1:
     py.list.append %1, %0
-    br ^bb2
+    cf.br ^bb2
 
 ^bb2:
     %2 = py.list.len %1
@@ -51,15 +51,15 @@ func @test2(%arg0 : i1) -> index {
 func @test3() -> index {
     %0 = py.constant #py.str<"test">
     %1 = py.makeList ()
-    br ^condition
+    cf.br ^condition
 
 ^condition:
     %2 = test.random
-    cond_br %2, ^bb1, ^bb2
+    cf.cond_br %2, ^bb1, ^bb2
 
 ^bb1:
     py.list.append %1, %0
-    br ^condition
+    cf.br ^condition
 
 ^bb2:
     %3 = py.list.len %1

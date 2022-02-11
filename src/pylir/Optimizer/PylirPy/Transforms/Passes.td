@@ -7,7 +7,7 @@ include "mlir/Pass/PassBase.td"
 def ExpandPyDialect : Pass<"expand-py-dialect", "::mlir::ModuleOp"> {
     let summary = "Expands ops of the Py dialect to operations that can be lowered";
     let constructor = "::pylir::Py::createExpandPyDialectPass()";
-    let dependentDialects = ["::pylir::Py::PylirPyDialect", "::mlir::StandardOpsDialect"];
+    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 }
 
 def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {

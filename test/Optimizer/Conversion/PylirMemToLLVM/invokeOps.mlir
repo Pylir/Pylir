@@ -17,7 +17,7 @@ func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %1 = py.landingPad @builtins.BaseException
-    br ^bb2(%1 : !py.dynamic)
+    cf.br ^bb2(%1 : !py.dynamic)
 
 ^bb2(%e : !py.dynamic):
     return %e : !py.dynamic
