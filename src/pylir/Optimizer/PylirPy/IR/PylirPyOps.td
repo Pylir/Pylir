@@ -5,6 +5,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/Interfaces/RuntimeTypeInterface.td"
 include "pylir/Optimizer/Interfaces/MemoryFoldInterface.td"
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
@@ -13,40 +14,6 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
-
-def DynamicType : TypeAlias<PylirPy_DynamicType>;
-def PyFunctionType : Type<
-    And<[
-        FunctionType.predicate,
-        CPred<"$_self.cast<::mlir::FunctionType>().getNumResults() == 1">,
-        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getResult(0)", DynamicType.predicate>,
-        CPred<"$_self.cast<::mlir::FunctionType>().getNumInputs() == 3">,
-        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(0)", DynamicType.predicate>,
-        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(1)", DynamicType.predicate>,
-        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getInput(2)", DynamicType.predicate>
-    ]>>
-{
-    let summary = "python function";
-    let builderCall = [{
-        mlir::FunctionType::get(
-            $_builder.getContext(),
-            {$_builder.getType<pylir::Py::DynamicType>(),$_builder.getType<pylir::Py::DynamicType>(),
-             $_builder.getType<pylir::Py::DynamicType>()},{$_builder.getType<pylir::Py::DynamicType>()})
-    }];
-}
-def IntegerLike : TypeConstraint<Or<[Index.predicate, AnySignlessInteger.predicate]>>;
-
-def AlwaysBound : NativeOpTrait<"AlwaysBound"> {
-    let cppNamespace = "pylir::Py";
-}
-
-def NoCapture : NativeOpTrait<"NoCapture"> {
-    let cppNamespace = "pylir::Py";
-}
-
-class RuntimeType<string name> : NativeOpTrait<name # "RuntimeType"> {
-    let cppNamespace = "pylir::Py";
-}
 
 class PylirPy_Op<string mneomic, list<Trait> traits = []> :
     Op<PylirPy_Dialect, mneomic, traits> {

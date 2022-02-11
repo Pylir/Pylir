@@ -4,6 +4,9 @@
 
 include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.td"
 include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -11,24 +14,8 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 
-def DynamicType : Type<CPred<"$_self.isa<::pylir::Py::DynamicType>()">, "python dynamic type",
-                                                                            "::pylir::Py::DynamicType"> {
-    let builderCall = "$_builder.getType<::pylir::Py::DynamicType>()";
-}
-
-def MemoryType : TypeAlias<PylirMem_MemoryType>;
-
-def IntegerLike : TypeConstraint<Or<[Index.predicate, AnySignlessInteger.predicate]>>;
-
-def ObjectAttr : Attr<CPred<"$_self.isa<::pylir::Py::ObjectAttr>()">, "python object attribute"> {
-    let storageType = "::pylir::Py::ObjectAttr";
-    let returnType = "::pylir::Py::ObjectAttr";
-    let convertFromStorage = "$_self";
-}
-
-def AlwaysBound : NativeOpTrait<"AlwaysBound"> {
-    let cppNamespace = "pylir::Py";
-}
+defvar ObjectAttr = PylirPy_ObjectAttr;
+defvar MemoryType = PylirMem_MemoryType;
 
 class PylirMem_Op<string mnemonic, list<Trait> traits = []> :
     Op<PylirMem_Dialect, mnemonic, traits>;
