@@ -291,6 +291,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     arguments.emplace_back("--whole-archive");
     arguments.emplace_back(executablePath);
     arguments.emplace_back("--no-whole-archive");
+    arguments.emplace_back("-lunwind");
 
     switch (getStdlib(commandLine))
     {

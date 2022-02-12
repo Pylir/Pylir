@@ -1341,6 +1341,11 @@ protected:
         return getTypeConverter()->getPlatformABI().getSizeOf(type);
     }
 
+    [[nodiscard]] std::size_t alignOf(mlir::Type type) const
+    {
+        return getTypeConverter()->getPlatformABI().getAlignOf(type);
+    }
+
     [[nodiscard]] mlir::Type getInt() const
     {
         return getTypeConverter()->getPlatformABI().getInt(this->getContext());
@@ -2283,34 +2288,34 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
             catchType = rewriter.create<mlir::LLVM::BitcastOp>(
                 op.getLoc(), derivePointer(rewriter.getI8Type(), address.getType()), address);
         }
-        auto literal =
-            mlir::LLVM::LLVMStructType::getLiteral(getContext(), {catchType.getType(), rewriter.getI32Type()});
+        // We use a integer of pointer width instead of a pointer to keep it opaque to statepoint passes.
+        // Those do not support aggregates in aggregates.
+        auto literal = mlir::LLVM::LLVMStructType::getLiteral(
+            getContext(), {getIntPtrType(REF_ADDRESS_SPACE), rewriter.getI32Type()});
         auto landingPad = rewriter.create<mlir::LLVM::LandingpadOp>(op.getLoc(), literal, catchType);
         mlir::Value exceptionHeader = rewriter.create<mlir::LLVM::ExtractValueOp>(
-            op.getLoc(), catchType.getType(), landingPad, rewriter.getI32ArrayAttr({0}));
+            op.getLoc(), literal.getBody()[0], landingPad, rewriter.getI32ArrayAttr({0}));
         {
             // Itanium ABI mandates a pointer to the exception header be returned by the landing pad.
             // So we need to subtract the offset of the exception header inside of PyBaseException to get to it.
             auto pyBaseException = getPyBaseExceptionType();
             auto unwindHeader = getUnwindHeaderType();
-            const std::int32_t index = [&]
+            std::size_t offsetOf = 0;
+            for (const auto& iter : pyBaseException.getBody())
             {
-                auto body = getPyBaseExceptionType().getBody();
-                return std::find(body.begin(), body.end(), unwindHeader) - body.begin();
-            }();
-            auto null = rewriter.create<mlir::LLVM::NullOp>(
-                op.getLoc(), mlir::LLVM::LLVMPointerType::get(pyBaseException, REF_ADDRESS_SPACE));
-            auto gep =
-                rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), derivePointer(unwindHeader, null.getType()), null,
-                                                   mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, index});
-            mlir::Value byteOffset = rewriter.create<mlir::LLVM::PtrToIntOp>(op.getLoc(), getIndexType(), gep);
-            auto zeroI = createIndexConstant(rewriter, op.getLoc(), 0);
-            byteOffset = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), zeroI, byteOffset);
-            exceptionHeader =
-                rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), exceptionHeader.getType(), exceptionHeader, byteOffset);
+                offsetOf = llvm::alignTo(offsetOf, alignOf(iter));
+                if (iter == unwindHeader)
+                {
+                    break;
+                }
+                offsetOf += sizeOf(iter);
+            }
+            auto byteOffset = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), exceptionHeader.getType(),
+                                                                      rewriter.getI64IntegerAttr(offsetOf));
+            exceptionHeader = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), exceptionHeader, byteOffset);
         }
-        rewriter.replaceOpWithNewOp<mlir::LLVM::BitcastOp>(
-            op, derivePointer(getPyObjectType(), exceptionHeader.getType()), exceptionHeader);
+        rewriter.replaceOpWithNewOp<mlir::LLVM::IntToPtrOp>(op, pointer(getPyObjectType(), REF_ADDRESS_SPACE),
+                                                            exceptionHeader);
         return mlir::success();
     }
 };
@@ -2827,7 +2832,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
                                            mlir::LLVM::LLVMPointerType::get(builder.getI8Type())}));
     for (auto iter : module.getOps<mlir::LLVM::LLVMFuncOp>())
     {
-        // iter.setGC
+        iter.setGarbageCollectorAttr(mlir::StringAttr::get(&getContext(), "pylir-gc"));
         iter.setPersonalityAttr(mlir::FlatSymbolRefAttr::get(&getContext(), "pylir_personality_function"));
     }
     module->setAttr(mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),

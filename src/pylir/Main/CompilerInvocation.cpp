@@ -274,6 +274,12 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             llvm::ModuleAnalysisManager mam;
             llvm::PassBuilder passBuilder(m_targetMachine.get());
 
+            passBuilder.registerOptimizerLastEPCallback(
+                [](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
+                {
+                    mpm.addPass(pylir::PlaceStatepointsPass{});
+                });
+
             fam.registerPass([&] { return passBuilder.buildDefaultAAPipeline(); });
             passBuilder.registerModuleAnalyses(mam);
             passBuilder.registerCGSCCAnalyses(cgam);
@@ -305,8 +311,6 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                     mpm = passBuilder.buildPerModuleDefaultPipeline(level);
                 }
             }
-
-            mpm.addPass(llvm::createModuleToFunctionPassAdaptor(pylir::PlaceStatepointsPass{}));
 
             if (args.hasArg(OPT_emit_llvm) || lto)
             {

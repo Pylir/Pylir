@@ -35,13 +35,9 @@ func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[LANDING_PAD:.*]] = llvm.landingpad
 // CHECK-SAME: catch %[[BIT_CAST]]
 // CHECK-NEXT: %[[EXCEPTION_HEADER_i8:.*]] = llvm.extractvalue %[[LANDING_PAD]][0 : i32]
-// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[NULL]][0, {{[0-9]+}}]
-// CHECK-NEXT: %[[PTR_TO_INT:.*]] = llvm.ptrtoint %[[GEP]]
-// CHECK-NEXT: %[[ZERO_I:.*]] = llvm.mlir.constant(0 : index)
-// CHECK-NEXT: %[[NEG:.*]] = llvm.sub %[[ZERO_I]], %[[PTR_TO_INT]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[EXCEPTION_HEADER_i8]][%[[NEG]]]
-// CHECK-NEXT: %[[EXCEPTION_OBJECT:.*]] = llvm.bitcast %[[GEP]]
+// CHECK-NEXT: %[[OFFSETOF:.*]] = llvm.mlir.constant
+// CHECK-NEXT: %[[GEP:.*]] = llvm.sub %[[EXCEPTION_HEADER_i8]], %[[OFFSETOF]]
+// CHECK-NEXT: %[[EXCEPTION_OBJECT:.*]] = llvm.inttoptr %[[GEP]]
 // CHECK-NEXT: llvm.br ^[[DEST:[[:alnum:]]+]]
 // CHECK-SAME: %[[EXCEPTION_OBJECT]]
 // CHECK-NEXT: ^[[DEST]]
