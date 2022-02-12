@@ -56,8 +56,17 @@ public:
             llvm::SmallVector<llvm::StackMaps::Location> locations;
 
             CallSiteInfo(const llvm::MCExpr* programCounter, llvm::ArrayRef<llvm::StackMaps::Location> locations)
-                : programCounter(programCounter), locations(locations.begin(), locations.end())
+                : programCounter(programCounter)
             {
+                this->locations.reserve(locations.size());
+                std::copy_if(locations.begin(), locations.end(), std::back_inserter(this->locations),
+                             [](const llvm::StackMaps::Location& location)
+                             {
+                                 PYLIR_ASSERT(location.Type != llvm::StackMaps::Location::Unprocessed
+                                              && location.Type != llvm::StackMaps::Location::Register);
+                                 return location.Type == llvm::StackMaps::Location::Direct
+                                        || location.Type == llvm::StackMaps::Location::Indirect;
+                             });
                 std::sort(this->locations.begin(), this->locations.end(),
                           [](const llvm::StackMaps::Location& lhs, const llvm::StackMaps::Location& rhs) {
                               return std::tie(lhs.Type, lhs.Size, lhs.Reg, lhs.Offset)
@@ -106,8 +115,6 @@ public:
             os.emitInt32(iter.locations.size());
             for (const auto& location : iter.locations)
             {
-                PYLIR_ASSERT(location.Type == llvm::StackMaps::Location::Direct
-                             || location.Type == llvm::StackMaps::Location::Indirect);
                 PYLIR_ASSERT(location.Size == 8);
                 os.emitInt8(location.Type);
                 os.emitInt8(0); // padding
