@@ -761,6 +761,7 @@ public:
         mlir::Type returnType;
         llvm::SmallVector<mlir::Type> argumentTypes;
         std::string functionName;
+        llvm::SmallVector<llvm::StringRef> passThroughAttributes;
         switch (func)
         {
             case Runtime::Memcmp:
@@ -784,26 +785,31 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt(), REF_ADDRESS_SPACE), builder.getI64Type()};
                 functionName = "mp_init_u64";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::pylir_str_hash:
                 returnType = getIndexType();
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyStringType(), REF_ADDRESS_SPACE)};
                 functionName = "pylir_str_hash";
+                passThroughAttributes = {"readonly", "gc-leaf-function", "nounwind"};
                 break;
             case Runtime::pylir_print:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyStringType(), REF_ADDRESS_SPACE)};
                 functionName = "pylir_print";
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::pylir_raise:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE)};
                 functionName = "pylir_raise";
+                passThroughAttributes = {"noreturn"};
                 break;
             case Runtime::mp_init:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt(), REF_ADDRESS_SPACE)};
                 functionName = "mp_init";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::mp_unpack:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -815,6 +821,7 @@ public:
                                  getIndexType(),
                                  mlir::LLVM::LLVMPointerType::get(builder.getI8Type())};
                 functionName = "mp_unpack";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::mp_radix_size_overestimate:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -822,6 +829,7 @@ public:
                                  m_cabi->getInt(&getContext()),
                                  mlir::LLVM::LLVMPointerType::get(getIndexType(), REF_ADDRESS_SPACE)};
                 functionName = "mp_radix_size_overestimate";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::mp_to_radix:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -830,12 +838,14 @@ public:
                                  mlir::LLVM::LLVMPointerType::get(getIndexType(), REF_ADDRESS_SPACE),
                                  m_cabi->getInt(&getContext())};
                 functionName = "mp_to_radix";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::mp_cmp:
                 returnType = m_cabi->getInt(&getContext());
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt(), REF_ADDRESS_SPACE),
                                  mlir::LLVM::LLVMPointerType::get(getMPInt(), REF_ADDRESS_SPACE)};
                 functionName = "mp_cmp";
+                passThroughAttributes = {"inaccessiblememonly", "gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_add:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -843,12 +853,14 @@ public:
                                  mlir::LLVM::LLVMPointerType::get(getMPInt(), REF_ADDRESS_SPACE),
                                  mlir::LLVM::LLVMPointerType::get(getMPInt(), REF_ADDRESS_SPACE)};
                 functionName = "mp_add";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::pylir_int_get:
                 returnType = mlir::LLVM::LLVMStructType::getLiteral(
                     &getContext(), {getIndexType(), mlir::IntegerType::get(&getContext(), 1)});
                 argumentTypes = {mlir::LLVM::LLVMPointerType::get(getMPInt(), REF_ADDRESS_SPACE), getIndexType()};
                 functionName = "pylir_int_get";
+                passThroughAttributes = {"inaccessiblememonly", "gc-leaf-function", "nounwind"};
                 break;
             case Runtime::pylir_dict_lookup:
                 returnType = mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE);
@@ -876,6 +888,10 @@ public:
             mlir::OpBuilder::InsertionGuard guard{builder};
             builder.setInsertionPointToEnd(module.getBody());
             llvmFunc = m_cabi->declareFunc(builder, loc, returnType, functionName, argumentTypes);
+            if (!passThroughAttributes.empty())
+            {
+                llvmFunc.setPassthroughAttr(builder.getStrArrayAttr(passThroughAttributes));
+            }
         }
         return m_cabi->callFunc(builder, loc, llvmFunc, args);
     }
