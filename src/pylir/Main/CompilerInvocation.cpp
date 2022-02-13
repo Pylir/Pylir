@@ -630,7 +630,10 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::I
     std::vector<const char*> refs;
     refs.push_back("pylir (LLVM option parsing)");
 
-
+    // Allow callee saved registers for live-through and GC ptr values
+    refs.push_back("-fixup-allow-gcptr-in-csr");
+    // No restrictions on how many registers its allowed to use
+    refs.push_back("-max-registers-for-gc-values=1000");
 
     auto options = args.getAllArgValues(OPT_mllvm);
     std::transform(options.begin(), options.end(), std::back_inserter(refs),

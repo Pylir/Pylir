@@ -62,10 +62,9 @@ public:
                 std::copy_if(locations.begin(), locations.end(), std::back_inserter(this->locations),
                              [](const llvm::StackMaps::Location& location)
                              {
-                                 PYLIR_ASSERT(location.Type != llvm::StackMaps::Location::Unprocessed
-                                              && location.Type != llvm::StackMaps::Location::Register);
-                                 return location.Type == llvm::StackMaps::Location::Direct
-                                        || location.Type == llvm::StackMaps::Location::Indirect;
+                                 PYLIR_ASSERT(location.Type != llvm::StackMaps::Location::Unprocessed);
+                                 return location.Type != llvm::StackMaps::Location::Constant
+                                        && location.Type != llvm::StackMaps::Location::ConstantIndex;
                              });
                 std::sort(this->locations.begin(), this->locations.end(),
                           [](const llvm::StackMaps::Location& lhs, const llvm::StackMaps::Location& rhs) {

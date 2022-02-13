@@ -22,6 +22,7 @@ struct StackMap
     {
         enum class Type : std::uint8_t
         {
+            Register = 1,
             Direct = 2,
             Indirect = 3,
         } type;
@@ -86,6 +87,7 @@ void processRoots(F f)
     unw_context_t uc;
     unw_getcontext(&uc);
     unw_cursor_t cursor;
+    unw_init_local(&cursor, &uc);
     while (unw_step(&cursor) > 0)
     {
         unw_word_t programCounter;
@@ -97,9 +99,16 @@ void processRoots(F f)
         }
         for (const auto& iter : result->second)
         {
-            pylir::rt::PyObject* object;
+            pylir::rt::PyObject* object = nullptr;
             switch (iter.type)
             {
+                case StackMap::Location::Type::Register:
+                {
+                    unw_word_t rp;
+                    unw_get_reg(&cursor, iter.regNumber, &rp);
+                    object = reinterpret_cast<pylir::rt::PyObject*>(rp);
+                    break;
+                }
                 case StackMap::Location::Type::Direct:
                 {
                     unw_word_t rp;
@@ -129,9 +138,12 @@ void processRoots(F f)
         }
         for (const auto& iter : result->second)
         {
-            pylir::rt::PyObject* object;
+            pylir::rt::PyObject* object = nullptr;
             switch (iter.type)
             {
+                case StackMap::Location::Type::Register:
+                    object = reinterpret_cast<pylir::rt::PyObject*>(_Unwind_GetGR(context, iter.regNumber));
+                    break;
                 case StackMap::Location::Type::Direct:
                     object =
                         reinterpret_cast<pylir::rt::PyObject*>(_Unwind_GetGR(context, iter.regNumber) + iter.offset);
