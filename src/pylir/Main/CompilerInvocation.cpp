@@ -632,8 +632,14 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::I
 
     // Allow callee saved registers for live-through and GC ptr values
     refs.push_back("-fixup-allow-gcptr-in-csr");
-    // No restrictions on how many registers its allowed to use
-    refs.push_back("-max-registers-for-gc-values=1000");
+    if (args.getLastArgValue(OPT_O, "0") != "0")
+    {
+        // TODO: I am intending this as a suggestion to the register allocator, not a requirement. In O0 this will lead
+        //       to "out of registers" errors however. This might also just be a pass ordering issue or something else
+        //       however as the FixupStatepointCallerSaved is not ran
+        // No restrictions on how many registers its allowed to use
+        refs.push_back("-max-registers-for-gc-values=1000");
+    }
 
     auto options = args.getAllArgValues(OPT_mllvm);
     std::transform(options.begin(), options.end(), std::back_inserter(refs),
