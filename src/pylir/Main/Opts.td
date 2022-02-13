@@ -44,6 +44,10 @@ def fno_lto : F<"fno-lto", "Disable link time optimization">, Group<grp_codegen>
 def fpie : F<"fpie", "Enable Position Independent Executables">, Group<grp_codegen>;
 def fno_pie : F<"fno-pie", "Disable Position Independent Executables">, Group<grp_codegen>;
 
+def grp_backend : OptionGroup<"Backend">, HelpText<"Backend options">;
+
+def mllvm : JoinedOrSeparate<["-"], "mllvm">, HelpText<"Extra options to pass to LLVM">, MetaVarName<"<option>">, Group<grp_backend>;
+
 def grp_link : OptionGroup<"Linker">, HelpText<"Linker options">;
 
 defm ld_path : Eq<"ld-path", "Path to the linker executable to use">, MetaVarName<"<path>">, Group<grp_link>;

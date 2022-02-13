@@ -51,6 +51,8 @@ public:
 private:
     void ensureMLIRContext(const llvm::opt::InputArgList& args);
 
+    mlir::LogicalResult ensureLLVMInit(const llvm::opt::InputArgList& args);
+
     mlir::LogicalResult ensureOutputStream(const llvm::opt::InputArgList& args, Action action);
 
     mlir::LogicalResult finalizeOutputStream(mlir::LogicalResult result);

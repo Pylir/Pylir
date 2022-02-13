@@ -233,7 +233,6 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                 return mlir::failure();
             }
             mlir::registerLLVMDialectTranslation(*m_mlirContext);
-            m_llvmContext = std::make_unique<llvm::LLVMContext>();
             llvmModule = mlir::translateModuleToLLVMIR(*mlirModule, *m_llvmContext);
             [[fallthrough]];
         }
@@ -242,7 +241,10 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             pylir::linkInGCStrategy();
             if (type == LLVM)
             {
-                m_llvmContext = std::make_unique<llvm::LLVMContext>();
+                if (mlir::failed(ensureLLVMInit(args)))
+                {
+                    return mlir::failure();
+                }
                 llvm::SMDiagnostic diag;
                 llvmModule = llvm::parseIRFile(inputFile->getValue(), diag, *m_llvmContext);
                 if (diag.getSourceMgr())
@@ -548,6 +550,10 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
                                                                    const pylir::Toolchain& toolchain,
                                                                    llvm::Optional<llvm::Triple> triple)
 {
+    if (mlir::failed(ensureLLVMInit(args)))
+    {
+        return mlir::failure();
+    }
     if (m_targetMachine)
     {
         return mlir::success();
@@ -612,4 +618,23 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
     m_targetMachine = std::unique_ptr<llvm::TargetMachine>(
         targetM->createTargetMachine(triple->str(), "generic", "", targetOptions, relocation, {}, *optLevel));
     return mlir::success();
+}
+
+mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::InputArgList& args)
+{
+    if (m_llvmContext)
+    {
+        return mlir::success();
+    }
+    m_llvmContext = std::make_unique<llvm::LLVMContext>();
+    std::vector<const char*> refs;
+    refs.push_back("pylir (LLVM option parsing)");
+
+
+
+    auto options = args.getAllArgValues(OPT_mllvm);
+    std::transform(options.begin(), options.end(), std::back_inserter(refs),
+                   [](const std::string& str) { return str.c_str(); });
+    refs.push_back(nullptr);
+    return mlir::success(llvm::cl::ParseCommandLineOptions(refs.size() - 1, refs.data(), "", &llvm::errs()));
 }
