@@ -3,6 +3,7 @@
 
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
+#include <mlir/Dialect/Arithmetic/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
@@ -224,10 +225,11 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             {
                 return mlir::failure();
             }
+            manager.addNestedPass<mlir::FuncOp>(mlir::arith::createArithmeticExpandOpsPass());
             manager.addPass(pylir::Mem::createConvertPylirToLLVMPass(m_targetMachine->getTargetTriple(),
                                                                      m_targetMachine->createDataLayout()));
-            manager.addPass(mlir::createReconcileUnrealizedCastsPass());
-            manager.addPass(mlir::LLVM::createLegalizeForExportPass());
+            manager.addNestedPass<mlir::LLVM::LLVMFuncOp>(mlir::createReconcileUnrealizedCastsPass());
+            manager.addNestedPass<mlir::LLVM::LLVMFuncOp>(mlir::LLVM::createLegalizeForExportPass());
             if (mlir::failed(manager.run(*mlirModule)))
             {
                 return mlir::failure();
