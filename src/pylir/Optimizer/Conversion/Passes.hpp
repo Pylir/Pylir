@@ -2,6 +2,9 @@
 
 #include <mlir/Pass/Pass.h>
 
+#include <llvm/ADT/Triple.h>
+#include <llvm/IR/DataLayout.h>
+
 #include <memory>
 
 namespace pylir
@@ -13,7 +16,10 @@ namespace pylir::Mem
 {
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirToLLVMPass();
 
-}
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirToLLVMPass(llvm::Triple targetTriple,
+                                                                                  const llvm::DataLayout& dataLayout);
+
+} // namespace pylir::Mem
 
 namespace pylir
 {

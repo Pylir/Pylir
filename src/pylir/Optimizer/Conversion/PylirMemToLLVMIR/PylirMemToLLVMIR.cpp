@@ -2748,10 +2748,33 @@ struct InitDictOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
     }
 };
 
-struct ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
+class ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
+private:
+    llvm::Triple m_triple;
+    llvm::DataLayout m_dataLayout{""};
+
 protected:
     void runOnOperation() override;
+
+public:
+    ConvertPylirToLLVMPass() = default;
+
+    ConvertPylirToLLVMPass(llvm::Triple triple, const llvm::DataLayout& dataLayout)
+        : m_triple(std::move(triple)), m_dataLayout(dataLayout)
+    {
+    }
+
+    mlir::LogicalResult initializeOptions(llvm::StringRef options) override
+    {
+        if (mlir::failed(Pass::initializeOptions(options)))
+        {
+            return mlir::failure();
+        }
+        m_triple = llvm::Triple(m_targetTripleCLI.getValue());
+        m_dataLayout = llvm::DataLayout(m_dataLayoutCLI.getValue());
+        return mlir::success();
+    }
 };
 
 void ConvertPylirToLLVMPass::runOnOperation()
@@ -2769,8 +2792,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
                       mlir::LLVM::LinkageAttr::get(&getContext(), mlir::LLVM::linkage::Linkage::Internal));
     }
 
-    PylirTypeConverter converter(&getContext(), llvm::Triple(targetTriple.getValue()),
-                                 llvm::DataLayout(dataLayout.getValue()), module);
+    PylirTypeConverter converter(&getContext(), m_triple, m_dataLayout, module);
     converter.addConversion(
         [&](pylir::Py::DynamicType)
         { return mlir::LLVM::LLVMPointerType::get(converter.getPyObjectType(), REF_ADDRESS_SPACE); });
@@ -2852,9 +2874,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
         iter.setPersonalityAttr(mlir::FlatSymbolRefAttr::get(&getContext(), "pylir_personality_function"));
     }
     module->setAttr(mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
-                    mlir::StringAttr::get(&getContext(), dataLayout.getValue()));
+                    mlir::StringAttr::get(&getContext(), m_dataLayout.getStringRepresentation()));
     module->setAttr(mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
-                    mlir::StringAttr::get(&getContext(), targetTriple.getValue()));
+                    mlir::StringAttr::get(&getContext(), m_triple.str()));
     if (auto globalInit = converter.getGlobalInit())
     {
         builder.setInsertionPointToEnd(&globalInit.back());
@@ -2871,4 +2893,10 @@ void ConvertPylirToLLVMPass::runOnOperation()
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> pylir::Mem::createConvertPylirToLLVMPass()
 {
     return std::make_unique<ConvertPylirToLLVMPass>();
+}
+
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
+    pylir::Mem::createConvertPylirToLLVMPass(llvm::Triple targetTriple, const llvm::DataLayout& dataLayout)
+{
+    return std::make_unique<ConvertPylirToLLVMPass>(std::move(targetTriple), dataLayout);
 }

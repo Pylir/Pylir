@@ -224,15 +224,8 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             {
                 return mlir::failure();
             }
-            std::string passOptions = "target-triple=" + m_targetMachine->getTargetTriple().str()
-                                      + " data-layout=" + m_targetMachine->createDataLayout().getStringRepresentation();
-            auto pass = pylir::Mem::createConvertPylirToLLVMPass();
-            if (mlir::failed(pass->initializeOptions(passOptions)))
-            {
-                return mlir::failure();
-            }
-
-            manager.addPass(std::move(pass));
+            manager.addPass(pylir::Mem::createConvertPylirToLLVMPass(m_targetMachine->getTargetTriple(),
+                                                                     m_targetMachine->createDataLayout()));
             manager.addPass(mlir::createReconcileUnrealizedCastsPass());
             manager.addPass(mlir::LLVM::createLegalizeForExportPass());
             if (mlir::failed(manager.run(*mlirModule)))
