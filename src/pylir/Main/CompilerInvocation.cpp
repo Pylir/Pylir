@@ -527,7 +527,7 @@ mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::Logica
 
 void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mlir::OpPassManager& manager)
 {
-    manager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+    manager.addPass(mlir::createCanonicalizerPass());
     if (level != "0")
     {
         manager.addNestedPass<mlir::FuncOp>(pylir::Py::createHandleLoadStoreEliminationPass());
