@@ -73,7 +73,7 @@
         {                                                                           \
             if (!(__VA_ARGS__))                                                     \
             {                                                                       \
-                std::fprintf(stderr, __FILE__ ":%d: " #__VA_ARGS__ "\n", __LINE__); \
+                std::fprintf(stderr, __FILE__ ":%d: %s\n", __LINE__, #__VA_ARGS__); \
                 std::abort();                                                       \
             }                                                                       \
         } while (0)

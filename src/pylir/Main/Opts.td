@@ -43,6 +43,8 @@ def flto : F<"flto", "Enable link time optimization">, Group<grp_codegen>;
 def fno_lto : F<"fno-lto", "Disable link time optimization">, Group<grp_codegen>;
 def fpie : F<"fpie", "Enable Position Independent Executables">, Group<grp_codegen>;
 def fno_pie : F<"fno-pie", "Disable Position Independent Executables">, Group<grp_codegen>;
+def fgc_EQ : Joined<["-"], "fgc=">, HelpText<"Garbage collector to use">, MetaVarName<"<name>">, Group<grp_codegen>,
+            Values<"markAndSweep">;
 
 def grp_backend : OptionGroup<"Backend">, HelpText<"Backend options">;
 

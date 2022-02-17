@@ -38,6 +38,25 @@ void PyObject::setSlot(int index, PyObject& object)
     reinterpret_cast<PyObject**>(this)[m_type->m_offset + index] = &object;
 }
 
+void pylir::rt::destroyPyObject(PyObject& object)
+{
+    // TODO: Replace with switch if we got a layout type member in PyTypeObject to quickly find the underlying C++
+    //       type
+    if (auto* integer = object.dyn_cast<pylir::rt::PyInt>())
+    {
+        integer->~PyInt();
+    }
+    else if (auto* str = object.dyn_cast<pylir::rt::PyString>())
+    {
+        str->~PyString();
+    }
+    else if (auto* dict = object.dyn_cast<pylir::rt::PyDict>())
+    {
+        dict->~PyDict();
+    }
+    // All other types are trivially destructible
+}
+
 bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 {
     auto& mro = type(object).getSlot(PyTypeObject::MRO)->cast<PyTuple>();

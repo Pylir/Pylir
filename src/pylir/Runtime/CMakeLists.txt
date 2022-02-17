@@ -42,12 +42,14 @@ endfunction()
 
 get_sources(PylirSupport _ SOURCES DEFINES INCLUDES)
 
-add_library(PylirRuntime STATIC PylirGC.cpp Objects.cpp API.cpp ExceptionHandling.cpp Support.cpp SysModule.cpp ${SOURCES})
+add_library(PylirRuntime STATIC StackWalker.cpp Objects.cpp API.cpp ExceptionHandling.cpp Support.cpp SysModule.cpp ${SOURCES} Pages.cpp Pages.hpp)
 target_include_directories(PylirRuntime PUBLIC ${INCLUDES})
 target_compile_definitions(PylirRuntime PUBLIC ${DEFINES})
 if (PYLIR_SANITIZER OR PYLIR_COVERAGE)
-    target_compile_options(PylirRuntime PRIVATE -fno-sanitize=all -fno-profile-instr-generate -fno-coverage-mapping)
+    target_compile_options(PylirRuntime PUBLIC -fno-sanitize=all -fno-profile-instr-generate -fno-coverage-mapping)
 endif ()
+
+add_subdirectory(MarkAndSweep)
 
 if (MSVC)
     add_custom_command(TARGET PylirRuntime POST_BUILD

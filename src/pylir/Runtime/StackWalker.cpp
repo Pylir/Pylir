@@ -162,9 +162,3 @@ void processRoots(F f)
 }
 
 } // namespace
-
-void* pylir_gc_alloc(size_t size)
-{
-    PYLIR_ASSERT(&pylir_stack_map);
-    return std::malloc(size);
-}

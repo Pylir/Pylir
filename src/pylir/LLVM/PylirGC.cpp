@@ -3,10 +3,13 @@
 #include <llvm/CodeGen/AsmPrinter.h>
 #include <llvm/CodeGen/GCMetadataPrinter.h>
 #include <llvm/CodeGen/StackMaps.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCStreamer.h>
+#include <llvm/Target/TargetLoweringObjectFile.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include <pylir/Support/Macros.hpp>
 
@@ -45,8 +48,18 @@ public:
 
         auto* symbol = context.getOrCreateSymbol("pylir_stack_map");
         os.emitSymbolAttribute(symbol, llvm::MCSA_Global);
-        os.SwitchSection(context.getObjectFileInfo()->getReadOnlySection());
-        os.emitValueToAlignment(8);
+        llvm::SectionKind kind{};
+        switch (AP.TM.getRelocationModel())
+        {
+            case llvm::Reloc::Static:
+            case llvm::Reloc::ROPI:
+            case llvm::Reloc::RWPI:
+            case llvm::Reloc::ROPI_RWPI: kind = llvm::SectionKind::getReadOnly(); break;
+            default: kind = llvm::SectionKind::getReadOnlyWithRel(); break;
+        }
+        auto alignment = AP.getDataLayout().getPointerABIAlignment(0);
+        os.SwitchSection(AP.getObjFileLowering().getSectionForConstant(AP.getDataLayout(), kind, nullptr, alignment));
+        os.emitValueToAlignment(alignment.value());
         os.emitLabel(symbol);
         os.emitInt32(0x50594C52);
 

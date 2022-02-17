@@ -11,6 +11,7 @@
 #include <unwind.h>
 
 #include "Builtins.hpp"
+#include "GCInterface.hpp"
 #include "Support.hpp"
 
 namespace pylir::rt
@@ -98,6 +99,8 @@ public:
         return isa<T>() ? &cast<T>() : nullptr;
     }
 };
+
+void destroyPyObject(PyObject& object);
 
 bool isinstance(PyObject& obj, PyObject& type);
 
@@ -438,32 +441,38 @@ public:
     }
 };
 
+namespace details
+{
+
 template <PyObject& type>
-struct Alloc
+struct AllocType
 {
     template <class... Args>
     decltype(auto) operator()(Args&&... args) const noexcept
     {
-        // TODO: GC
         using InstanceType = typename PyTypeTraits<type>::instanceType;
-        std::byte* memory = reinterpret_cast<std::byte*>(
-            std::malloc(sizeof(InstanceType) + sizeof(PyObject*) * PyTypeTraits<type>::slotCount));
+        void* memory = pylir_gc_alloc(sizeof(InstanceType) + sizeof(PyObject*) * PyTypeTraits<type>::slotCount);
         return *new (memory) InstanceType(std::forward<Args>(args)...);
     }
 };
 
 template <>
-struct Alloc<Builtins::Tuple>
+struct AllocType<Builtins::Tuple>
 {
     template <class... Args>
     decltype(auto) operator()(std::size_t count, Args&&... args) const noexcept
     {
-        // TODO: GC
         using InstanceType = typename PyTypeTraits<Builtins::Tuple>::instanceType;
-        std::byte* memory = reinterpret_cast<std::byte*>(std::malloc(sizeof(InstanceType) + sizeof(PyObject*) * count));
+        std::byte* memory =
+            reinterpret_cast<std::byte*>(pylir_gc_alloc(sizeof(InstanceType) + sizeof(PyObject*) * count));
         return *new (memory) InstanceType(count, std::forward<Args>(args)...);
     }
 };
+
+} // namespace details
+
+template <PyObject& type>
+constexpr details::AllocType<type> alloc;
 
 template <class... Args>
 PyObject& PyObject::operator()(Args&&... args)
@@ -478,20 +487,9 @@ PyObject& PyObject::operator()(Args&&... args)
         }
         if (auto* pyF = call->dyn_cast<PyFunction>())
         {
-            std::size_t tupleCount = 1;
-            (
-                [&](auto&& arg)
-                {
-                    static_assert(
-                        std::is_same_v<PyObject&, decltype(arg)> || std::is_same_v<KeywordArg&&, decltype(arg)>);
-                    if constexpr (std::is_same_v<PyObject&, decltype(arg)>)
-                    {
-                        tupleCount++;
-                    }
-                }(std::forward<Args>(args)),
-                ...);
-            auto& tuple = Alloc<Builtins::Tuple>{}(tupleCount);
-            auto& dict = Alloc<Builtins::Dict>{}();
+            constexpr std::size_t tupleCount = (1 + ... + std::is_same_v<PyObject&, Args>);
+            auto& tuple = alloc<Builtins::Tuple>(tupleCount);
+            auto& dict = alloc<Builtins::Dict>();
             auto iter = tuple.begin();
             *iter++ = self;
             (
@@ -505,7 +503,7 @@ PyObject& PyObject::operator()(Args&&... args)
                     }
                     else
                     {
-                        dict.setItem(Alloc<Builtins::Str>{}(arg.name), arg.arg);
+                        dict.setItem(alloc<Builtins::Str>(arg.name), arg.arg);
                     }
                 }(std::forward<Args>(args)),
                 ...);

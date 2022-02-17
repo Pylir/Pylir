@@ -158,12 +158,12 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
 
     arguments.emplace_back("-Bstatic");
 
-    if (auto *output = args.getLastArg(pylir::cli::OPT_o))
+    if (auto* output = args.getLastArg(pylir::cli::OPT_o))
     {
         arguments.emplace_back("-o");
         arguments.emplace_back(output->getValue());
     }
-    else if (auto *input = args.getLastArg(pylir::cli::OPT_INPUT))
+    else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
         llvm::SmallString<20> path(input->getValue());
         llvm::sys::path::replace_extension(path, ".exe");
@@ -195,7 +195,7 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     }
     arguments.push_back(objectFile.str());
 
-    for (auto *arg : args)
+    for (auto* arg : args)
     {
         if (arg->getOption().matches(pylir::cli::OPT_l))
         {
@@ -209,16 +209,22 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
         }
     }
 
+    arguments.emplace_back("--start-group");
     llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
     llvm::sys::path::remove_filename(executablePath);
     llvm::sys::path::append(executablePath, "..", "lib", "pylir", m_triple.str());
     llvm::sys::path::append(executablePath, "libPylirRuntime.a");
     arguments.emplace_back(executablePath);
     llvm::sys::path::remove_filename(executablePath);
+    // TODO: Change to respect the command line option
+    llvm::sys::path::append(executablePath, "libPylirMarkAndSweep.a");
+    arguments.emplace_back(executablePath);
+    llvm::sys::path::remove_filename(executablePath);
     llvm::sys::path::append(executablePath, "libPylirRuntimeMain.a");
     arguments.emplace_back("--whole-archive");
     arguments.emplace_back(executablePath);
     arguments.emplace_back("--no-whole-archive");
+    arguments.emplace_back("--end-group");
 
     switch (getStdlib(commandLine))
     {

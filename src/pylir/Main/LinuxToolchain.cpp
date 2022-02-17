@@ -203,12 +203,12 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     arguments.emplace_back("-dynamic-linker");
     arguments.emplace_back(getDynamicLinker(m_triple, commandLine));
 
-    if (auto *output = args.getLastArg(pylir::cli::OPT_o))
+    if (auto* output = args.getLastArg(pylir::cli::OPT_o))
     {
         arguments.emplace_back("-o");
         arguments.emplace_back(output->getValue());
     }
-    else if (auto *input = args.getLastArg(pylir::cli::OPT_INPUT))
+    else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
         llvm::SmallString<20> path(input->getValue());
         llvm::sys::path::replace_extension(path, "");
@@ -266,7 +266,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
         arguments.push_back(("-L" + iter).str());
     }
 
-    for (auto *arg : args)
+    for (auto* arg : args)
     {
         if (arg->getOption().matches(pylir::cli::OPT_l))
         {
@@ -285,12 +285,18 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     llvm::sys::path::remove_filename(executablePath);
     llvm::sys::path::append(executablePath, "..", "lib", "pylir", m_triple.str());
     llvm::sys::path::append(executablePath, "libPylirRuntime.a");
+    arguments.emplace_back("--start-group");
+    arguments.emplace_back(executablePath);
+    llvm::sys::path::remove_filename(executablePath);
+    // TODO: Change to respect the command line option
+    llvm::sys::path::append(executablePath, "libPylirMarkAndSweep.a");
     arguments.emplace_back(executablePath);
     llvm::sys::path::remove_filename(executablePath);
     llvm::sys::path::append(executablePath, "libPylirRuntimeMain.a");
     arguments.emplace_back("--whole-archive");
     arguments.emplace_back(executablePath);
     arguments.emplace_back("--no-whole-archive");
+    arguments.emplace_back("--end-group");
     arguments.emplace_back("-lunwind");
 
     switch (getStdlib(commandLine))

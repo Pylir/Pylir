@@ -20,11 +20,11 @@ bool pylir::MSVCToolchain::link(const pylir::cli::CommandLine& commandLine, llvm
     }
     arguments.emplace_back("-nologo");
     arguments.emplace_back("/debug");
-    if (auto *output = args.getLastArg(pylir::cli::OPT_o))
+    if (auto* output = args.getLastArg(pylir::cli::OPT_o))
     {
         arguments.emplace_back("-out:" + std::string(output->getValue()));
     }
-    else if (auto *input = args.getLastArg(pylir::cli::OPT_INPUT))
+    else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
         llvm::SmallString<20> path(input->getValue());
         llvm::sys::path::replace_extension(path, ".exe");
@@ -41,9 +41,13 @@ bool pylir::MSVCToolchain::link(const pylir::cli::CommandLine& commandLine, llvm
     llvm::sys::path::append(executablePath, "PylirRuntime.lib");
     arguments.emplace_back(executablePath);
     llvm::sys::path::remove_filename(executablePath);
+    // TODO: Change to respect the command line option
+    llvm::sys::path::append(executablePath, "PylirMarkAndSweep.lib");
+    arguments.emplace_back(executablePath);
+    llvm::sys::path::remove_filename(executablePath);
     llvm::sys::path::append(executablePath, "PylirRuntimeMain.lib");
     arguments.push_back(("-wholearchive:" + executablePath).str());
-    for (auto *arg : args)
+    for (auto* arg : args)
     {
         if (arg->getOption().matches(pylir::cli::OPT_l))
         {
