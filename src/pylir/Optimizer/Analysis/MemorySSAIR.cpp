@@ -26,12 +26,12 @@ void pylir::MemSSA::MemorySSADialect::initialize()
 
 mlir::Optional<mlir::MutableOperandRange> pylir::MemSSA::MemoryBranchOp::getMutableSuccessorOperands(unsigned index)
 {
-    return branchArgsMutable()[index];
+    return getBranchArgsMutable()[index];
 }
 
 mlir::LogicalResult pylir::MemSSA::MemoryBranchOp::verify()
 {
-    if (branchArgs().size() != successors().size())
+    if (getBranchArgs().size() != getSuccessors().size())
     {
         return emitOpError("Expected branch arguments for every successor");
     }

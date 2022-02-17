@@ -31,18 +31,18 @@ void LoadForwardingPass::runOnOperation()
     memorySSA.getMemoryRegion().walk(
         [&](pylir::MemSSA::MemoryUseOp use)
         {
-            auto memoryFold = mlir::dyn_cast<pylir::MemoryFoldInterface>(use.instruction());
+            auto memoryFold = mlir::dyn_cast<pylir::MemoryFoldInterface>(use.getInstruction());
             if (!memoryFold)
             {
                 return;
             }
-            auto defOp = use.definition().getDefiningOp<pylir::MemSSA::MemoryDefOp>();
+            auto defOp = use.getDefinition().getDefiningOp<pylir::MemSSA::MemoryDefOp>();
             if (!defOp)
             {
                 return;
             }
             llvm::SmallVector<mlir::MemoryEffects::EffectInstance> effects;
-            if (auto memOp = llvm::dyn_cast<mlir::MemoryEffectOpInterface>(defOp.instruction()))
+            if (auto memOp = llvm::dyn_cast<mlir::MemoryEffectOpInterface>(defOp.getInstruction()))
             {
                 memOp.getEffects(effects);
             }
@@ -61,14 +61,14 @@ void LoadForwardingPass::runOnOperation()
                 {
                     return;
                 }
-                if (aliasAnalysis.alias(use.read(), iter.getValue()).isMay())
+                if (aliasAnalysis.alias(use.getRead(), iter.getValue()).isMay())
                 {
                     return;
                 }
             }
 
             llvm::SmallVector<mlir::OpFoldResult> results;
-            if (mlir::failed(memoryFold.foldUsage(defOp.instruction(), results)))
+            if (mlir::failed(memoryFold.foldUsage(defOp.getInstruction(), results)))
             {
                 return;
             }
@@ -83,8 +83,8 @@ void LoadForwardingPass::runOnOperation()
                 else if (auto attr = foldResult.dyn_cast<mlir::Attribute>())
                 {
                     mlir::OpBuilder builder(memoryFold);
-                    auto *constant = memoryFold->getDialect()->materializeConstant(builder, attr, opResult.getType(),
-                                                                                  memoryFold->getLoc());
+                    auto* constant = memoryFold->getDialect()->materializeConstant(builder, attr, opResult.getType(),
+                                                                                   memoryFold->getLoc());
                     PYLIR_ASSERT(constant);
                     opResult.replaceAllUsesWith(constant->getResult(0));
                     m_localLoadsReplaced++;

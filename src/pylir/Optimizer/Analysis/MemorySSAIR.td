@@ -11,6 +11,8 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 def MemorySSA_Dialect : Dialect {
     let name = "memSSA";
     let cppNamespace = "::pylir::MemSSA";
+
+    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 class MemorySSA_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type">

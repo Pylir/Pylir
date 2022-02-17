@@ -32,7 +32,7 @@ private:
 void HandleLoadStoreEliminationPass::runOnOperation()
 {
     bool changed = false;
-    auto *topLevel = getOperation();
+    auto* topLevel = getOperation();
     getContext().allowUnregisteredDialects();
     mlir::OperationState state(mlir::UnknownLoc::get(&getContext()), "__clobber_tracker");
     state.addTypes({pylir::Py::DynamicType::get(&getContext())});
@@ -134,8 +134,8 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
     {
         if (auto load = mlir::dyn_cast<pylir::Py::LoadOp>(op))
         {
-            unusedStores.erase(load.handleAttr());
-            auto& map = definitions[load.handleAttr()];
+            unusedStores.erase(load.getHandleAttr());
+            auto& map = definitions[load.getHandleAttr()];
             bool createdBlockArg;
             auto read = ssaBuilder.readVariable(load->getLoc(), load.getType(), map, &block, &createdBlockArg);
             if (read == clobberTracker)
@@ -159,7 +159,7 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
         }
         if (auto store = mlir::dyn_cast<pylir::Py::StoreOp>(op))
         {
-            auto [iter, inserted] = unusedStores.insert({store.handleAttr(), store});
+            auto [iter, inserted] = unusedStores.insert({store.getHandleAttr(), store});
             if (!inserted)
             {
                 m_storesRemoved++;
@@ -167,7 +167,7 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
                 iter->second = store;
                 changed = true;
             }
-            definitions[store.handleAttr()][&block] = store.value();
+            definitions[store.getHandleAttr()][&block] = store.getValue();
             continue;
         }
         auto mem = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op);

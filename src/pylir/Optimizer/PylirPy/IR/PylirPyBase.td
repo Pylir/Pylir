@@ -28,6 +28,8 @@ def PylirPy_Dialect : Dialect {
 
         void printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const;
     }];
+
+    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 #endif

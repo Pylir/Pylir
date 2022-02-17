@@ -34,7 +34,7 @@ void FoldHandlesPass::runOnOperation()
         bool hasSingleStore = false;
         bool hasLoads = false;
         auto users = userMap.getUsers(handle);
-        for (auto *op : users)
+        for (auto* op : users)
         {
             if (auto storeOp = mlir::dyn_cast<pylir::Py::StoreOp>(op))
             {
@@ -67,11 +67,11 @@ void FoldHandlesPass::runOnOperation()
             continue;
         }
         pylir::Py::ObjectAttr attr;
-        if (!mlir::matchPattern(singleStore.value(), mlir::m_Constant(&attr)))
+        if (!mlir::matchPattern(singleStore.getValue(), mlir::m_Constant(&attr)))
         {
             continue;
         }
-        for (auto *op : llvm::make_early_inc_range(users))
+        for (auto* op : llvm::make_early_inc_range(users))
         {
             // Turn any loads into constants referring to a py.globalValue
             if (!mlir::isa<pylir::Py::LoadOp>(op))
@@ -85,7 +85,7 @@ void FoldHandlesPass::runOnOperation()
         }
         singleStore->erase();
         pylir::Py::PyBuilder builder(handle);
-        auto globalValue = builder.createGlobalValue(handle.sym_name(), false, attr);
+        auto globalValue = builder.createGlobalValue(handle.getSymName(), false, attr);
         globalValue.setVisibility(handle.getVisibility());
         handle->erase();
         m_singleStoreHandlesConverted++;

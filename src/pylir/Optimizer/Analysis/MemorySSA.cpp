@@ -50,7 +50,7 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
     auto capturing = mlir::dyn_cast<pylir::CaptureInterface>(operation);
     for (auto& operand : operation->getOpOperands())
     {
-        auto *opAccess = ssa.getMemoryAccess(operand.get().getDefiningOp());
+        auto* opAccess = ssa.getMemoryAccess(operand.get().getDefiningOp());
         if (!opAccess)
         {
             continue;
@@ -93,7 +93,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         return llvm::any_of(block->getPredecessors(),
                             [&](mlir::Block* pred)
                             {
-                                auto *predMemBlock = m_blockMapping.lookup(pred);
+                                auto* predMemBlock = m_blockMapping.lookup(pred);
                                 if (!predMemBlock)
                                 {
                                     return true;
@@ -115,7 +115,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
             }
             memBlock = lookup->second;
         }
-        m_region->body().push_back(memBlock);
+        m_region->getBody().push_back(memBlock);
         builder.setInsertionPointToStart(memBlock);
         // If any of the predecessors have not yet been inserted
         // mark the block as open
@@ -135,7 +135,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         }
         for (auto& op : block)
         {
-            auto *result = maybeAddAccess(builder, *this, &op, lastDef);
+            auto* result = maybeAddAccess(builder, *this, &op, lastDef);
             if (!result)
             {
                 continue;
@@ -188,7 +188,7 @@ mlir::Value getLastClobber(mlir::Value location, mlir::AliasAnalysis& aliasAnaly
             return blockArg;
         }
         auto memDef = def.getDefiningOp<pylir::MemSSA::MemoryDefOp>();
-        auto modRef = aliasAnalysis.getModRef(memDef.instruction(), location);
+        auto modRef = aliasAnalysis.getModRef(memDef.getInstruction(), location);
         if (modRef.isMod())
         {
             return memDef;
@@ -212,7 +212,7 @@ void optimizeUsesInBlock(mlir::Block* block, mlir::AliasAnalysis& aliasAnalysis,
             dominatingDefs.push_back(access.getResult(0));
             continue;
         }
-        use.definitionMutable().assign(getLastClobber(use.read(), aliasAnalysis, dominatingDefs));
+        use.getDefinitionMutable().assign(getLastClobber(use.getRead(), aliasAnalysis, dominatingDefs));
     }
 }
 } // namespace
@@ -223,13 +223,13 @@ void pylir::MemorySSA::optimizeUses(mlir::AnalysisManager& analysisManager)
     auto& dominanceInfo = analysisManager.getAnalysis<mlir::DominanceInfo>();
 
     llvm::SmallVector<mlir::Value> dominatingDefs;
-    if (m_region->body().hasOneBlock())
+    if (m_region->getBody().hasOneBlock())
     {
-        optimizeUsesInBlock(&m_region->body().front(), aliasAnalysis, dominatingDefs);
+        optimizeUsesInBlock(&m_region->getBody().front(), aliasAnalysis, dominatingDefs);
         return;
     }
 
-    auto& tree = dominanceInfo.getDomTree(&m_region->body());
+    auto& tree = dominanceInfo.getDomTree(&m_region->getBody());
     for (auto* node : llvm::depth_first(tree.getRootNode()))
     {
         auto* block = node->getBlock();

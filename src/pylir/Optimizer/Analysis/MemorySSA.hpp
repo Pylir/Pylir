@@ -33,7 +33,7 @@ public:
 
     mlir::Region& getMemoryRegion()
     {
-        return m_region->body();
+        return m_region->getBody();
     }
 
     void dump() const;

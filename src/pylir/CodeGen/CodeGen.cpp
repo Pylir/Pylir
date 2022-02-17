@@ -624,7 +624,7 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
     auto rhsMroTuple = m_builder.createGetSlot(rhsType, metaType, "__mro__");
     auto lookup = m_builder.createMROLookup(rhsMroTuple, revMethod);
     BlockPtr hasReversedBlock;
-    m_builder.create<mlir::cf::CondBranchOp>(lookup.success(), hasReversedBlock, normalMethodBlock,
+    m_builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), hasReversedBlock, normalMethodBlock,
                                              mlir::ValueRange{falseC});
 
     implementBlock(hasReversedBlock);
@@ -632,10 +632,10 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
     auto lhsLookup = m_builder.createMROLookup(lhsMroTuple, revMethod);
     BlockPtr callReversedBlock;
     BlockPtr lhsHasReversedBlock;
-    m_builder.create<mlir::cf::CondBranchOp>(lhsLookup.success(), lhsHasReversedBlock, callReversedBlock);
+    m_builder.create<mlir::cf::CondBranchOp>(lhsLookup.getSuccess(), lhsHasReversedBlock, callReversedBlock);
 
     implementBlock(lhsHasReversedBlock);
-    auto sameImplementation = m_builder.createIs(lookup.result(), lhsLookup.result());
+    auto sameImplementation = m_builder.createIs(lookup.getResult(), lhsLookup.getResult());
     m_builder.create<mlir::cf::CondBranchOp>(sameImplementation, normalMethodBlock, mlir::ValueRange{falseC},
                                              callReversedBlock, mlir::ValueRange{});
 
@@ -1023,7 +1023,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         auto str = m_builder.createConstant(identifierToken.getValue());
         auto tryGet = m_builder.createDictTryGetItem(m_classNamespace, str);
         auto elseBlock = BlockPtr{};
-        m_builder.create<mlir::cf::CondBranchOp>(tryGet.found(), classNamespaceFound, tryGet.result(), elseBlock,
+        m_builder.create<mlir::cf::CondBranchOp>(tryGet.getFound(), classNamespaceFound, tryGet.getResult(), elseBlock,
                                                  mlir::ValueRange{});
         implementBlock(elseBlock);
 
@@ -2327,7 +2327,7 @@ std::vector<pylir::CodeGen::UnpackResults>
                 auto lookup = m_builder.createDictTryGetItem(dict, constant);
                 auto foundBlock = BlockPtr{};
                 auto notFoundBlock = BlockPtr{};
-                m_builder.create<mlir::cf::CondBranchOp>(lookup.found(), foundBlock, notFoundBlock);
+                m_builder.create<mlir::cf::CondBranchOp>(lookup.getFound(), foundBlock, notFoundBlock);
 
                 auto resultBlock = BlockPtr{};
                 resultBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
@@ -2342,8 +2342,8 @@ std::vector<pylir::CodeGen::UnpackResults>
                 {
                     auto isUnbound = m_builder.createIsUnboundValue(argValue);
                     auto boundBlock = BlockPtr{};
-                    m_builder.create<mlir::cf::CondBranchOp>(isUnbound, resultBlock, mlir::ValueRange{lookup.result()},
-                                                             boundBlock, mlir::ValueRange{});
+                    m_builder.create<mlir::cf::CondBranchOp>(
+                        isUnbound, resultBlock, mlir::ValueRange{lookup.getResult()}, boundBlock, mlir::ValueRange{});
 
                     implementBlock(boundBlock);
                     auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
@@ -2352,7 +2352,7 @@ std::vector<pylir::CodeGen::UnpackResults>
                 }
                 else
                 {
-                    m_builder.create<mlir::cf::BranchOp>(resultBlock, mlir::ValueRange{lookup.result()});
+                    m_builder.create<mlir::cf::BranchOp>(resultBlock, mlir::ValueRange{lookup.getResult()});
                 }
 
                 implementBlock(resultBlock);
@@ -2481,7 +2481,7 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::FuncOp impl
             // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this
             // also
             //      affects __defaults__
-            return lookup.result();
+            return lookup.getResult();
         });
     llvm::SmallVector<mlir::Value> args{closure};
     args.resize(1 + unpacked.size());

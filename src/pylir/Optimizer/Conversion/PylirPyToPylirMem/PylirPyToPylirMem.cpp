@@ -21,7 +21,7 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Dict.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict);
         auto init = rewriter.replaceOpWithNewOp<pylir::Mem::InitDictOp>(op, mem);
-        for (auto [key, value] : llvm::zip(op.keys(), op.values()))
+        for (auto [key, value] : llvm::zip(op.getKeys(), op.getValues()))
         {
             rewriter.create<pylir::Py::DictSetItemOp>(op.getLoc(), init, key, value);
         }

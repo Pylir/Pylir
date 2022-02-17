@@ -13,6 +13,8 @@ def PylirMem_Dialect : Dialect {
     let cppNamespace = "::pylir::Mem";
 
     let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 #endif

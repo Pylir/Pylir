@@ -22,30 +22,30 @@ class PylirMem_Op<string mnemonic, list<Trait> traits = []> :
 
 def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {
     let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
-    let arguments = (ins DynamicType:$typeObj);
+    let arguments = (ins DynamicType:$type_object);
 
-    let assemblyFormat = "$typeObj attr-dict";
+    let assemblyFormat = "$type_object attr-dict";
 }
 
 def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
     let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
-    let arguments = (ins ObjectAttr:$typeObj);
+    let arguments = (ins ObjectAttr:$type_object);
 
-    let assemblyFormat = "$typeObj attr-dict";
+    let assemblyFormat = "$type_object attr-dict";
 }
 
 def PylirMem_GCAllocTupleOp : PylirMem_Op<"gcAllocTuple"> {
     let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
-    let arguments = (ins DynamicType:$typeObj, Index:$length);
+    let arguments = (ins DynamicType:$type_object, Index:$length);
 
-    let assemblyFormat = "$typeObj `[` $length `]` attr-dict";
+    let assemblyFormat = "$type_object `[` $length `]` attr-dict";
 }
 
 def PylirMem_StackAllocTupleOp : PylirMem_Op<"stackAllocTuple"> {
     let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
-    let arguments = (ins DynamicType:$typeObj, IndexAttr:$length);
+    let arguments = (ins DynamicType:$type_object, IndexAttr:$length);
 
-    let assemblyFormat = "$typeObj `[` $length `]` attr-dict";
+    let assemblyFormat = "$type_object `[` $length `]` attr-dict";
 }
 
 def PylirMem_InitIntOp : PylirMem_Op<"initInt", [AlwaysBound]> {

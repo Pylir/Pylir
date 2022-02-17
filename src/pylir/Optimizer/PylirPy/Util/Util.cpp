@@ -78,7 +78,7 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
     }
     else
     {
-        auto *happyPath = new mlir::Block;
+        auto* happyPath = new mlir::Block;
         tuple = builder.create<Py::MakeTupleExOp>(loc, args, happyPath, mlir::ValueRange{}, landingPadBlock,
                                                   mlir::ValueRange{});
         implementBlock(builder, happyPath);
@@ -111,36 +111,36 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
         kwargs = emptyDict;
     }
     auto popOp = builder.create<Py::TuplePopFrontOp>(loc, tuple);
-    auto type = builder.create<Py::TypeOfOp>(loc, popOp.element());
+    auto type = builder.create<Py::TypeOfOp>(loc, popOp.getElement());
     auto metaType = builder.create<Py::ConstantOp>(
         loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Type.name));
-    auto mroTuple = builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__").result();
+    auto mroTuple = builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__").getResult();
     auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
-    auto *exec = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(loc, lookup.success(), exec, notFoundPath);
+    auto* exec = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(loc, lookup.getSuccess(), exec, notFoundPath);
 
     implementBlock(builder, exec);
     auto function = builder.create<Py::ConstantOp>(
         loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Function.name));
-    auto callableType = builder.create<Py::TypeOfOp>(loc, lookup.result());
+    auto callableType = builder.create<Py::TypeOfOp>(loc, lookup.getResult());
     auto isFunction = builder.create<Py::IsOp>(loc, callableType, function);
     auto* isFunctionBlock = new mlir::Block;
     auto* notFunctionBlock = new mlir::Block;
     builder.create<mlir::cf::CondBranchOp>(loc, isFunction, isFunctionBlock, notFunctionBlock);
 
     implementBlock(builder, isFunctionBlock);
-    auto fp = builder.create<Py::FunctionGetFunctionOp>(loc, lookup.result());
+    auto fp = builder.create<Py::FunctionGetFunctionOp>(loc, lookup.getResult());
     mlir::Value result;
     if (!landingPadBlock)
     {
-        result = builder.create<mlir::CallIndirectOp>(loc, fp, mlir::ValueRange{lookup.result(), tuple, kwargs})
+        result = builder.create<mlir::CallIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs})
                      .getResult(0);
     }
     else
     {
         auto* happyPath = new mlir::Block;
         result = builder
-                     .create<Py::InvokeIndirectOp>(loc, fp, mlir::ValueRange{lookup.result(), tuple, kwargs},
+                     .create<Py::InvokeIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs},
                                                    mlir::ValueRange{}, mlir::ValueRange{}, happyPath, landingPadBlock)
                      .getResult(0);
         implementBlock(builder, happyPath);
@@ -155,19 +155,19 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     auto* isDescriptor = new mlir::Block;
     auto* mergeBlock = new mlir::Block;
     mergeBlock->addArgument(builder.getType<Py::DynamicType>(), loc);
-    builder.create<mlir::cf::CondBranchOp>(loc, getMethod.success(), isDescriptor, mergeBlock,
-                                           mlir::ValueRange{lookup.result()});
+    builder.create<mlir::cf::CondBranchOp>(loc, getMethod.getSuccess(), isDescriptor, mergeBlock,
+                                           mlir::ValueRange{lookup.getResult()});
 
     implementBlock(builder, isDescriptor);
-    auto selfType = builder.create<Py::TypeOfOp>(loc, popOp.element());
-    result = buildCall(loc, builder, getMethod.result(),
-                       builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{popOp.element(), selfType}),
+    auto selfType = builder.create<Py::TypeOfOp>(loc, popOp.getElement());
+    result = buildCall(loc, builder, getMethod.getResult(),
+                       builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{popOp.getElement(), selfType}),
                        emptyDict, exceptionPath, landingPadBlock);
     builder.create<mlir::cf::BranchOp>(loc, mergeBlock, result);
 
     implementBlock(builder, mergeBlock);
     result =
-        buildCall(loc, builder, mergeBlock->getArgument(0), popOp.result(), kwargs, exceptionPath, landingPadBlock);
+        buildCall(loc, builder, mergeBlock->getArgument(0), popOp.getResult(), kwargs, exceptionPath, landingPadBlock);
     builder.create<mlir::cf::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, exitBlock);

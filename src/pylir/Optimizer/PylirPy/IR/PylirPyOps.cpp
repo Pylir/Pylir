@@ -15,7 +15,7 @@
 
 bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
 {
-    return static_cast<mlir::OperandRange>(typeObjectMutable()).getBeginOperandIndex() != index;
+    return static_cast<mlir::OperandRange>(getTypeObjectMutable()).getBeginOperandIndex() != index;
 }
 
 mlir::OpFoldResult pylir::Py::TuplePopFrontOp::getRuntimeType(unsigned int resultIndex)
@@ -29,12 +29,12 @@ mlir::OpFoldResult pylir::Py::TuplePopFrontOp::getRuntimeType(unsigned int resul
 
 mlir::OpFoldResult pylir::Py::MakeObjectOp::getRuntimeType(unsigned int)
 {
-    return typeObject();
+    return getTypeObject();
 }
 
 mlir::OpFoldResult pylir::Py::StrCopyOp::getRuntimeType(unsigned int)
 {
-    return typeObject();
+    return getTypeObject();
 }
 
 mlir::LogicalResult pylir::Py::StrConcatOp::inferReturnTypes(::mlir::MLIRContext* context,
@@ -59,9 +59,9 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::CallMethodExOp::getMutableS
 {
     if (index == 0)
     {
-        return normalDestOperandsMutable();
+        return getNormalDestOperandsMutable();
     }
-    return unwindDestOperandsMutable();
+    return getUnwindDestOperandsMutable();
 }
 
 namespace
@@ -220,8 +220,8 @@ mlir::LogicalResult pylir::Py::MakeTupleOp::inferReturnTypes(::mlir::MLIRContext
 void pylir::Py::MakeTupleOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    effects.emplace_back(mlir::MemoryEffects::Allocate::get(), result());
-    if (!iterExpansionAttr().empty())
+    effects.emplace_back(mlir::MemoryEffects::Allocate::get(), getResult());
+    if (!getIterExpansionAttr().empty())
     {
         effects.emplace_back(mlir::MemoryEffects::Read::get());
         effects.emplace_back(mlir::MemoryEffects::Write::get());
@@ -271,22 +271,22 @@ mlir::LogicalResult verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr nam
 
 mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, handleAttr(), symbolTable);
+    return verifySymbolUse<Py::GlobalHandleOp>(*this, getHandleAttr(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, handleAttr(), symbolTable);
+    return verifySymbolUse<Py::GlobalHandleOp>(*this, getHandleAttr(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::FuncOp>(*this, functionAttr(), symbolTable);
+    return verifySymbolUse<mlir::FuncOp>(*this, getFunctionAttr(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::MakeClassOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::FuncOp>(*this, initFuncAttr(), symbolTable);
+    return verifySymbolUse<mlir::FuncOp>(*this, getInitFuncAttr(), symbolTable);
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -368,45 +368,45 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
 
 mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, calleeAttr()));
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, getCalleeAttr()));
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeOp::getMutableSuccessorOperands(unsigned int index)
 {
     if (index == 0)
     {
-        return normalDestOperandsMutable();
+        return getNormalDestOperandsMutable();
     }
-    return unwindDestOperandsMutable();
+    return getUnwindDestOperandsMutable();
 }
 
 mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
 {
-    return calleeAttr();
+    return getCalleeAttr();
 }
 
 mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
 {
-    return operands();
+    return getCallOperands();
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeIndirectOp::getMutableSuccessorOperands(unsigned int index)
 {
     if (index == 0)
     {
-        return normalDestOperandsMutable();
+        return getNormalDestOperandsMutable();
     }
-    return unwindDestOperandsMutable();
+    return getUnwindDestOperandsMutable();
 }
 
 mlir::CallInterfaceCallable pylir::Py::InvokeIndirectOp::getCallableForCallee()
 {
-    return callee();
+    return getCallee();
 }
 
 mlir::Operation::operand_range pylir::Py::InvokeIndirectOp::getArgOperands()
 {
-    return operands();
+    return getCallOperands();
 }
 
 mlir::LogicalResult pylir::Py::InvokeIndirectOp::inferReturnTypes(
@@ -431,9 +431,9 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeTupleExOp::getMutableSu
 {
     if (index == 0)
     {
-        return normalDestOperandsMutable();
+        return getNormalDestOperandsMutable();
     }
-    return unwindDestOperandsMutable();
+    return getUnwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -470,9 +470,9 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeListExOp::getMutableSuc
 {
     if (index == 0)
     {
-        return normalDestOperandsMutable();
+        return getNormalDestOperandsMutable();
     }
-    return unwindDestOperandsMutable();
+    return getUnwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -509,9 +509,9 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeSetExOp::getMutableSucc
 {
     if (index == 0)
     {
-        return normalDestOperandsMutable();
+        return getNormalDestOperandsMutable();
     }
-    return unwindDestOperandsMutable();
+    return getUnwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -548,9 +548,9 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeDictExOp::getMutableSuc
 {
     if (index == 0)
     {
-        return normalDestOperandsMutable();
+        return getNormalDestOperandsMutable();
     }
-    return unwindDestOperandsMutable();
+    return getUnwindDestOperandsMutable();
 }
 
 void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -585,7 +585,7 @@ template <class T>
 llvm::SmallVector<pylir::Py::IterArg> getIterArgs(T op)
 {
     llvm::SmallVector<pylir::Py::IterArg> result(op.getNumOperands());
-    auto range = op.iterExpansion().template getAsValueRange<mlir::IntegerAttr>();
+    auto range = op.getIterExpansionAttr().template getAsValueRange<mlir::IntegerAttr>();
     auto begin = range.begin();
     for (const auto& pair : llvm::enumerate(op.getOperands()))
     {
@@ -633,7 +633,7 @@ llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetExOp::getIterArgs()
 
 bool pylir::Py::GlobalValueOp::isDeclaration()
 {
-    return !initializer();
+    return !getInitializerAttr();
 }
 
 namespace
@@ -718,7 +718,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference\n");
                 }
                 if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
-                         ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
+                    ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
                 {
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                     if (!lookup)
@@ -736,7 +736,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference\n");
                 }
                 if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
-                         ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
+                    ref && ref.getValue() != llvm::StringRef{pylir::Py::Builtins::None.name})
                 {
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                     if (!lookup)
@@ -773,7 +773,8 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     if (auto ref = result->second.dyn_cast<mlir::FlatSymbolRefAttr>())
                     {
                         auto lookup = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
-                        if (!lookup || !lookup.initializer() || !lookup.initializer()->isa<pylir::Py::TupleAttr>())
+                        if (!lookup || !lookup.getInitializerAttr()
+                            || !lookup.getInitializerAttr().isa<pylir::Py::TupleAttr>())
                         {
                             return op->emitOpError("Expected __slots__ to refer to a tuple\n");
                         }
@@ -809,51 +810,51 @@ mlir::LogicalResult pylir::Py::ConstantOp::verify()
             return uses.getOwner()->emitOpError("Write to a constant value is not allowed\n");
         }
     }
-    return ::verify(*this, constant());
+    return ::verify(*this, getConstantAttr());
 }
 
 mlir::LogicalResult pylir::Py::CallMethodExOp::verify()
 {
-    return verifyHasLandingpad(*this, exceptionPath());
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 mlir::LogicalResult pylir::Py::MakeTupleExOp::verify()
 {
-    return verifyHasLandingpad(*this, exceptionPath());
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 mlir::LogicalResult pylir::Py::MakeListExOp::verify()
 {
-    return verifyHasLandingpad(*this, exceptionPath());
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 mlir::LogicalResult pylir::Py::MakeSetExOp::verify()
 {
-    return verifyHasLandingpad(*this, exceptionPath());
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 mlir::LogicalResult pylir::Py::MakeDictExOp::verify()
 {
-    return verifyHasLandingpad(*this, exceptionPath());
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
 {
     if (!isDeclaration())
     {
-        return ::verify(*this, *initializer());
+        return ::verify(*this, getInitializerAttr());
     }
     return mlir::success();
 }
 
 mlir::LogicalResult pylir::Py::InvokeOp::verify()
 {
-    return verifyHasLandingpad(*this, exceptionPath());
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 mlir::LogicalResult pylir::Py::InvokeIndirectOp::verify()
 {
-    return verifyHasLandingpad(*this, exceptionPath());
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
