@@ -7,9 +7,9 @@
 namespace pylir::rt
 {
 
-tcb::span<PyObject*> getHandles();
+tcb::span<PyObject**> getHandles();
 
-tcb::span<PyObject* const> getCollections();
+tcb::span<PyObject*> getCollections();
 
 bool isGlobal(PyObject* object);
 

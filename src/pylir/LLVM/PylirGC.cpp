@@ -40,16 +40,10 @@ llvm::GCRegistry::Add<PylirGCStrategy> X("pylir-gc", "Garbage collector in Pylir
 
 class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
 {
-public:
-    bool emitStackMaps(llvm::StackMaps& SM, llvm::AsmPrinter& AP) override
+    void switchToPointerAlignedReadOnly(llvm::MCStreamer& os, llvm::AsmPrinter& printer)
     {
-        llvm::MCContext& context = AP.OutContext;
-        auto& os = *AP.OutStreamer;
-
-        auto* symbol = context.getOrCreateSymbol("pylir_stack_map");
-        os.emitSymbolAttribute(symbol, llvm::MCSA_Global);
         llvm::SectionKind kind{};
-        switch (AP.TM.getRelocationModel())
+        switch (printer.TM.getRelocationModel())
         {
             case llvm::Reloc::Static:
             case llvm::Reloc::ROPI:
@@ -57,9 +51,20 @@ public:
             case llvm::Reloc::ROPI_RWPI: kind = llvm::SectionKind::getReadOnly(); break;
             default: kind = llvm::SectionKind::getReadOnlyWithRel(); break;
         }
-        auto alignment = AP.getDataLayout().getPointerABIAlignment(0);
-        os.SwitchSection(AP.getObjFileLowering().getSectionForConstant(AP.getDataLayout(), kind, nullptr, alignment));
+        auto alignment = printer.getDataLayout().getPointerABIAlignment(0);
+        os.SwitchSection(
+            printer.getObjFileLowering().getSectionForConstant(printer.getDataLayout(), kind, nullptr, alignment));
         os.emitValueToAlignment(alignment.value());
+    }
+
+    void writeStackMap(llvm::StackMaps& stackMaps, llvm::AsmPrinter& printer)
+    {
+        llvm::MCContext& context = printer.OutContext;
+        auto& os = *printer.OutStreamer;
+
+        auto* symbol = context.getOrCreateSymbol("pylir_stack_map");
+        os.emitSymbolAttribute(symbol, llvm::MCSA_Global);
+        switchToPointerAlignedReadOnly(os, printer);
         os.emitLabel(symbol);
         os.emitInt32(0x50594C52);
 
@@ -95,9 +100,9 @@ public:
         };
 
         std::vector<CallSiteInfo> callSiteInfos;
-        auto currentFunction = SM.getFnInfos().begin();
+        auto currentFunction = stackMaps.getFnInfos().begin();
         std::size_t recordCount = 0;
-        for (auto& iter : SM.getCSInfos())
+        for (auto& iter : stackMaps.getCSInfos())
         {
             const auto* programCounter = llvm::MCBinaryExpr::createAdd(
                 llvm::MCSymbolRefExpr::create(currentFunction->first, context), iter.CSOffsetExpr, context);
@@ -117,17 +122,19 @@ public:
             callSiteInfos.emplace_back(programCounter, ref);
         }
 
+        auto pointerSize = printer.getDataLayout().getPointerSize();
+
         PYLIR_ASSERT(callSiteInfos.size() <= std::numeric_limits<std::uint32_t>::max());
         os.emitInt32(callSiteInfos.size());
 
         for (auto& iter : callSiteInfos)
         {
-            os.emitValue(iter.programCounter, 8);
+            os.emitValue(iter.programCounter, pointerSize);
             PYLIR_ASSERT(iter.locations.size() <= std::numeric_limits<std::uint32_t>::max());
             os.emitInt32(iter.locations.size());
             for (const auto& location : iter.locations)
             {
-                PYLIR_ASSERT(location.Size == 8);
+                PYLIR_ASSERT(location.Size == pointerSize);
                 os.emitInt8(location.Type);
                 os.emitInt8(0); // padding
                 os.emitInt16(location.Reg);
@@ -135,7 +142,79 @@ public:
             }
             os.emitInt32(0); // padding
         }
+    }
 
+    void writeGlobalMap(llvm::AsmPrinter& printer)
+    {
+        llvm::MCContext& context = printer.OutContext;
+
+        std::vector<llvm::MCSymbol*> roots;
+        std::vector<llvm::MCSymbol*> constants;
+        std::vector<llvm::MCSymbol*> collections;
+        for (const auto& iter : context.getSymbols())
+        {
+            auto* symbol = iter.getValue();
+            if (!symbol->isInSection())
+            {
+                continue;
+            }
+            auto& section = symbol->getSection();
+            auto name = section.getName();
+            if (name == "py_root")
+            {
+                roots.push_back(symbol);
+            }
+            else if (name == "py_const")
+            {
+                constants.push_back(symbol);
+            }
+            else if (name == "py_coll")
+            {
+                collections.push_back(symbol);
+            }
+        }
+
+        auto pointerSize = printer.getDataLayout().getPointerSize();
+
+        auto& os = *printer.OutStreamer;
+        switchToPointerAlignedReadOnly(os, printer);
+
+        auto emitMap = [&](const std::vector<llvm::MCSymbol*>& values, llvm::Twine name)
+        {
+            auto* symbol = context.getOrCreateSymbol("pylir$" + name);
+            os.emitSymbolAttribute(symbol, llvm::MCSA_Internal);
+            os.emitLabel(symbol);
+            for (const auto& iter : values)
+            {
+                os.emitSymbolValue(iter, pointerSize);
+            }
+            {
+                auto* rootsStart = context.getOrCreateSymbol("pylir_" + name + "_start");
+                os.emitSymbolAttribute(rootsStart, llvm::MCSA_Global);
+                os.emitLabel(rootsStart);
+                os.emitSymbolValue(symbol, pointerSize);
+            }
+            {
+                auto* rootsEnd = context.getOrCreateSymbol("pylir_" + name + "_end");
+                os.emitSymbolAttribute(rootsEnd, llvm::MCSA_Global);
+                os.emitLabel(rootsEnd);
+                os.emitValue(llvm::MCBinaryExpr::createAdd(
+                                 llvm::MCSymbolRefExpr::create(symbol, context),
+                                 llvm::MCConstantExpr::create(pointerSize * values.size(), context), context),
+                             pointerSize);
+            }
+        };
+
+        emitMap(roots, "roots");
+        emitMap(constants, "constants");
+        emitMap(collections, "collections");
+    }
+
+public:
+    bool emitStackMaps(llvm::StackMaps& stackMaps, llvm::AsmPrinter& printer) override
+    {
+        writeStackMap(stackMaps, printer);
+        writeGlobalMap(printer);
         return true;
     }
 };

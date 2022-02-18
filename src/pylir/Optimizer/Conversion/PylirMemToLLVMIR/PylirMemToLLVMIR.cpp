@@ -406,10 +406,9 @@ public:
             }
             default: llvm::errs() << triple.str() << " not yet implemented"; std::abort();
         }
-        bool coff = triple.isOSBinFormatCOFF();
-        m_rootSection = mlir::StringAttr::get(context, "py_root" + llvm::Twine(coff ? "$f" : ""));
-        m_collectionSection = mlir::StringAttr::get(context, "py_coll" + llvm::Twine(coff ? "$f" : ""));
-        m_constantSection = mlir::StringAttr::get(context, "py_const" + llvm::Twine(coff ? "$f" : ""));
+        m_rootSection = mlir::StringAttr::get(context, "py_root");
+        m_collectionSection = mlir::StringAttr::get(context, "py_coll");
+        m_constantSection = mlir::StringAttr::get(context, "py_const");
     }
 
     mlir::LLVM::LLVMStructType getPyObjectType(llvm::Optional<unsigned> slotSize = {})

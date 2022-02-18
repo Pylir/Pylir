@@ -41,8 +41,9 @@ void introspectObject(pylir::rt::PyObject* object, F f)
         {
             f(iter);
         }
+        return;
     }
-    else if (auto* list = object->dyn_cast<pylir::rt::PyList>())
+    if (auto* list = object->dyn_cast<pylir::rt::PyList>())
     {
         for (auto& iter : *list)
         {
@@ -96,9 +97,14 @@ void pylir::rt::MarkAndSweep::collect()
     std::vector<PyObject*> roots;
     auto [stackLower, stackUpper] = collectStackRoots(roots);
     auto handles = getHandles();
-    roots.resize(roots.size() + handles.size());
-    auto end = std::copy_if(handles.begin(), handles.end(), roots.end() - handles.size(), [](auto ptr) { return ptr; });
-    roots.resize(end - roots.begin());
+    roots.reserve(roots.size() + handles.size());
+    for (auto& iter : handles)
+    {
+        if (*iter)
+        {
+            roots.push_back(*iter);
+        }
+    }
     for (auto iter = roots.begin(); iter != roots.end();)
     {
         auto address = reinterpret_cast<std::uintptr_t>(*iter);

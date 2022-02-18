@@ -42,14 +42,7 @@ struct StackMap
 #pragma GCC diagnostic pop
 };
 
-extern "C" const StackMap pylir_default_stack_map = {0x50594C52, 0};
-
-#ifdef _MSC_VER
 extern "C" const StackMap pylir_stack_map;
-    #pragma comment(linker, "/alternatename:pylir_stack_map=pylir_default_stack_map")
-#else
-extern "C" const StackMap pylir_stack_map __attribute__((weak, alias("pylir_default_stack_map")));
-#endif
 
 namespace
 {
