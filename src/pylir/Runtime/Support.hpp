@@ -86,3 +86,11 @@ public:
 };
 
 } // namespace pylir::rt
+
+#ifdef _MSC_VER
+    #define PYLIR_WEAK_VAR(variable, alternative) \
+        variable;                                 \
+        __pragma(comment(linker, "/alternatename:" #variable "=" #alternative))
+#else
+    #define PYLIR_WEAK_VAR(variable, alternative) variable __attribute__((weak, alias(#alternative)))
+#endif
