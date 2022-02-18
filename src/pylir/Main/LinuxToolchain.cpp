@@ -203,6 +203,11 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     arguments.emplace_back("-dynamic-linker");
     arguments.emplace_back(getDynamicLinker(m_triple, commandLine));
 
+    for (auto& iter : getLLVMOptions(args))
+    {
+        arguments.push_back("--mllvm=" + iter);
+    }
+
     if (auto* output = args.getLastArg(pylir::cli::OPT_o))
     {
         arguments.emplace_back("-o");

@@ -51,7 +51,7 @@ public:
 private:
     void ensureMLIRContext(const llvm::opt::InputArgList& args);
 
-    mlir::LogicalResult ensureLLVMInit(const llvm::opt::InputArgList& args);
+    mlir::LogicalResult ensureLLVMInit(const llvm::opt::InputArgList& args, const pylir::Toolchain& toolchain);
 
     mlir::LogicalResult ensureOutputStream(const llvm::opt::InputArgList& args, Action action);
 
@@ -62,6 +62,9 @@ private:
     mlir::LogicalResult ensureTargetMachine(const llvm::opt::InputArgList& args, const cli::CommandLine& commandLine,
                                             const pylir::Toolchain& toolchain,
                                             llvm::Optional<llvm::Triple> triple = {});
+
+    mlir::LogicalResult compilation(llvm::opt::Arg* inputFile, const cli::CommandLine& commandLine,
+                                    const pylir::Toolchain& toolchain, Action action);
 
 public:
     CompilerInvocation() = default;

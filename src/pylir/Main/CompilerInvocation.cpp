@@ -53,10 +53,10 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
         return true;
     }
 #ifdef PYLIR_EMBEDDED_LLD
-    // --ld-path overrides -f[no-]integrated-ld unconditionally. If the embedded ld
+    // --lld-path overrides -f[no-]integrated-lld unconditionally. If the embedded lld
     // is used and -O4 enable LTO
-    bool enable = !args.hasArg(OPT_ld_path_EQ) && args.getLastArgValue(OPT_O, "0") == "4"
-                  && args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true);
+    bool enable = !args.hasArg(OPT_lld_path_EQ) && args.getLastArgValue(OPT_O, "0") == "4"
+                  && args.hasFlag(OPT_fintegrated_lld, OPT_fno_integrated_lld, true);
     if (commandLine.verbose())
     {
         if (enable)
@@ -64,7 +64,7 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
             llvm::errs() << "Enabling LTO as integrated LLD and -O4 was enabled\n";
         }
         else if (args.getLastArgValue(OPT_O, "0") == "4"
-                 && (args.hasArg(OPT_ld_path_EQ) || !args.hasFlag(OPT_fintegrated_ld, OPT_fno_integrated_ld, true)))
+                 && (args.hasArg(OPT_lld_path_EQ) || !args.hasFlag(OPT_fintegrated_lld, OPT_fno_integrated_lld, true)))
         {
             llvm::errs() << "LTO not enabled as integrated LLD is not used. Add '-flto' if your linker supports LTO\n";
         }
@@ -80,6 +80,44 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                                                              const cli::CommandLine& commandLine,
                                                              const pylir::Toolchain& toolchain,
                                                              CompilerInvocation::Action action)
+{
+    const auto& args = commandLine.getArgs();
+    if (!commandLine.onlyPrint())
+    {
+        if (mlir::failed(compilation(inputFile, commandLine, toolchain, action)))
+        {
+            return mlir::failure();
+        }
+    }
+    if (action != Link)
+    {
+        return finalizeOutputStream(mlir::success());
+    }
+    if (commandLine.onlyPrint())
+    {
+        if (mlir::failed(ensureOutputStream(args, action)))
+        {
+            return mlir::failure();
+        }
+    }
+    auto fileName = m_outputFile->TmpName;
+    m_outFileStream.reset();
+    if (auto error = m_outputFile->keep())
+    {
+        llvm::consumeError(std::move(error));
+        llvm::errs() << pylir::Diag::formatLine(
+            pylir::Diag::Error, fmt::format(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_outputFile->TmpName));
+        return mlir::failure();
+    }
+    bool success = toolchain.link(commandLine, fileName);
+    llvm::sys::fs::remove(fileName);
+    return mlir::success(success);
+}
+
+mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* inputFile,
+                                                           const cli::CommandLine& commandLine,
+                                                           const pylir::Toolchain& toolchain,
+                                                           CompilerInvocation::Action action)
 {
     auto inputExtension = llvm::sys::path::extension(inputFile->getValue());
     auto type = llvm::StringSwitch<FileType>(inputExtension)
@@ -243,7 +281,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             pylir::linkInGCStrategy();
             if (type == LLVM)
             {
-                if (mlir::failed(ensureLLVMInit(args)))
+                if (mlir::failed(ensureLLVMInit(args, toolchain)))
                 {
                     return mlir::failure();
                 }
@@ -271,11 +309,8 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             llvm::ModuleAnalysisManager mam;
             llvm::PassBuilder passBuilder(m_targetMachine.get());
 
-            passBuilder.registerOptimizerLastEPCallback(
-                [](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
-                {
-                    mpm.addPass(pylir::PlaceStatepointsPass{});
-                });
+            passBuilder.registerOptimizerLastEPCallback([](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
+                                                        { mpm.addPass(pylir::PlaceStatepointsPass{}); });
 
             fam.registerPass([&] { return passBuilder.buildDefaultAAPipeline(); });
             passBuilder.registerModuleAnalyses(mam);
@@ -387,22 +422,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             break;
         }
     }
-    if (action != Link)
-    {
-        return finalizeOutputStream(mlir::success());
-    }
-    auto fileName = m_outputFile->TmpName;
-    m_outFileStream.reset();
-    if (auto error = m_outputFile->keep())
-    {
-        llvm::consumeError(std::move(error));
-        llvm::errs() << pylir::Diag::formatLine(
-            pylir::Diag::Error, fmt::format(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_outputFile->TmpName));
-        return mlir::failure();
-    }
-    bool success = toolchain.link(commandLine, fileName);
-    llvm::sys::fs::remove(fileName);
-    return mlir::success(success);
+    return mlir::success();
 }
 
 void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList& args)
@@ -552,7 +572,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
                                                                    const pylir::Toolchain& toolchain,
                                                                    llvm::Optional<llvm::Triple> triple)
 {
-    if (mlir::failed(ensureLLVMInit(args)))
+    if (mlir::failed(ensureLLVMInit(args, toolchain)))
     {
         return mlir::failure();
     }
@@ -622,7 +642,8 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
     return mlir::success();
 }
 
-mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::InputArgList& args)
+mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::InputArgList& args,
+                                                              const pylir::Toolchain& toolchain)
 {
     if (m_llvmContext)
     {
@@ -632,20 +653,10 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::I
     std::vector<const char*> refs;
     refs.push_back("pylir (LLVM option parsing)");
 
-    // Allow callee saved registers for live-through and GC ptr values
-    refs.push_back("-fixup-allow-gcptr-in-csr");
-    if (args.getLastArgValue(OPT_O, "0") != "0")
-    {
-        // TODO: I am intending this as a suggestion to the register allocator, not a requirement. In O0 this will lead
-        //       to "out of registers" errors however. This might also just be a pass ordering issue or something else
-        //       however as the FixupStatepointCallerSaved is not ran
-        // No restrictions on how many registers its allowed to use
-        refs.push_back("-max-registers-for-gc-values=1000");
-    }
-
-    auto options = args.getAllArgValues(OPT_mllvm);
+    auto options = toolchain.getLLVMOptions(args);
     std::transform(options.begin(), options.end(), std::back_inserter(refs),
                    [](const std::string& str) { return str.c_str(); });
     refs.push_back(nullptr);
+    llvm::cl::ResetAllOptionOccurrences();
     return mlir::success(llvm::cl::ParseCommandLineOptions(refs.size() - 1, refs.data(), "", &llvm::errs()));
 }

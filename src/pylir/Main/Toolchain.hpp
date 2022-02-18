@@ -58,6 +58,8 @@ public:
     Toolchain(Toolchain&&) = delete;
     Toolchain& operator=(Toolchain&&) = delete;
 
+    std::vector<std::string> getLLVMOptions(const llvm::opt::InputArgList& args) const;
+
     [[nodiscard]] virtual bool link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const = 0;
 
     [[nodiscard]] bool isPIE(const pylir::cli::CommandLine& commandLine) const;

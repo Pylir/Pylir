@@ -13,22 +13,22 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
 {
     const auto& args = commandLine.getArgs();
     std::string linkerPath;
-    if (auto* arg = args.getLastArg(pylir::cli::OPT_ld_path_EQ))
+    if (auto* arg = args.getLastArg(pylir::cli::OPT_lld_path_EQ))
     {
         linkerPath = arg->getValue();
     }
 #ifndef PYLIR_EMBEDDED_LLD
     else
 #else
-    else if (!args.hasFlag(pylir::cli::OPT_fintegrated_ld, pylir::cli::OPT_fno_integrated_ld, true))
+    else if (!args.hasFlag(pylir::cli::OPT_fintegrated_lld, pylir::cli::OPT_fno_integrated_lld, true))
 #endif
     {
         std::vector<llvm::StringRef> candidates;
         switch (style)
         {
-            case LinkerStyle::MSVC: candidates = {"lld-link", "link"}; break;
-            case LinkerStyle::GNU: candidates = {"ld.lld", "ld"}; break;
-            case LinkerStyle::Mac: candidates = {"ld64.lld", "ld64"}; break;
+            case LinkerStyle::MSVC: candidates = {"lld-link"}; break;
+            case LinkerStyle::GNU: candidates = {"ld.lld"}; break;
+            case LinkerStyle::Mac: candidates = {"ld64.lld"}; break;
             case LinkerStyle::Wasm: candidates = {"wasm-lld"}; break;
         }
         std::vector<std::string> attempts;
@@ -90,6 +90,7 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
             {
                 llvm::errs() << " " << iter;
             }
+            llvm::errs() << '\n';
             if (commandLine.onlyPrint())
             {
                 return true;
@@ -149,4 +150,20 @@ pylir::Toolchain::RTLib pylir::Toolchain::getRTLib(const pylir::cli::CommandLine
 bool pylir::Toolchain::isPIE(const pylir::cli::CommandLine& commandLine) const
 {
     return commandLine.getArgs().hasFlag(pylir::cli::OPT_fpie, pylir::cli::OPT_fno_pie, defaultsToPIE());
+}
+
+std::vector<std::string> pylir::Toolchain::getLLVMOptions(const llvm::opt::InputArgList& args) const
+{
+    std::vector<std::string> result;
+    // Allow callee saved registers for live-through and GC ptr values
+    result.emplace_back("-fixup-allow-gcptr-in-csr");
+    if (args.getLastArgValue(pylir::cli::OPT_O, "0") != "0")
+    {
+        // No restrictions on how many registers its allowed to use
+        result.emplace_back("-max-registers-for-gc-values=1000");
+    }
+
+    auto options = args.getAllArgValues(pylir::cli::OPT_mllvm);
+    result.insert(result.end(), std::move_iterator(options.begin()), std::move_iterator(options.end()));
+    return result;
 }

@@ -156,6 +156,11 @@ bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llv
         default: PYLIR_UNREACHABLE;
     }
 
+    for (auto& iter : getLLVMOptions(args))
+    {
+        arguments.push_back("--Xlink=/mllvm:" + iter);
+    }
+
     arguments.emplace_back("-Bstatic");
 
     if (auto* output = args.getLastArg(pylir::cli::OPT_o))

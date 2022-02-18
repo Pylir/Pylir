@@ -2,6 +2,7 @@
 #include "MSVCToolchain.hpp"
 
 #include <llvm/Support/Path.h>
+#include <llvm/Support/raw_ostream.h>
 
 pylir::MSVCToolchain::MSVCToolchain(const llvm::Triple& triple, const cli::CommandLine& commandLine) : Toolchain(triple)
 {
@@ -13,7 +14,14 @@ pylir::MSVCToolchain::MSVCToolchain(const llvm::Triple& triple, const cli::Comma
 bool pylir::MSVCToolchain::link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
+
     std::vector<std::string> arguments;
+
+    for (auto& iter : getLLVMOptions(args))
+    {
+        arguments.push_back("/mllvm:" + iter);
+    }
+
     for (auto& iter : args.getAllArgValues(pylir::cli::OPT_L))
     {
         arguments.push_back("-libpath:" + iter);
@@ -63,6 +71,7 @@ bool pylir::MSVCToolchain::link(const pylir::cli::CommandLine& commandLine, llvm
             continue;
         }
     }
+
     return callLinker(commandLine, Toolchain::LinkerStyle::MSVC, arguments);
 }
 

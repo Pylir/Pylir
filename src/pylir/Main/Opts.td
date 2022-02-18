@@ -52,12 +52,12 @@ def mllvm : JoinedOrSeparate<["-"], "mllvm">, HelpText<"Extra options to pass to
 
 def grp_link : OptionGroup<"Linker">, HelpText<"Linker options">;
 
-defm ld_path : Eq<"ld-path", "Path to the linker executable to use">, MetaVarName<"<path>">, Group<grp_link>;
+defm lld_path : Eq<"lld-path", "Path to the linker executable to use">, MetaVarName<"<path>">, Group<grp_link>;
 def l : JoinedOrSeparate<["-"], "l">, HelpText<"Extra libraries to link with">, MetaVarName<"<name>">, Group<grp_link>;
 def L : JoinedOrSeparate<["-"], "L">, HelpText<"Add directory to library search path">, MetaVarName<"<dir>">, Group<grp_link>;
 def Wl : CommaJoined<["-"], "Wl,">, HelpText<"Flags to forward to the linker">, MetaVarName<"<flag>">, Group<grp_link>;
-def fno_integrated_ld : F<"fno-integrated-ld", "Don't use the builtin version of lld">, Group<grp_link>;
-def fintegrated_ld : F<"fintegrated-ld", "Use the builtin version of lld (default)">, Group<grp_link>;
+def fno_integrated_lld : F<"fno-integrated-lld", "Don't use the builtin version of lld">, Group<grp_link>;
+def fintegrated_lld : F<"fintegrated-lld", "Use the builtin version of lld (default)">, Group<grp_link>;
 defm sysroot : Eq<"sysroot", "Root directory of the system libraries">, Group<grp_link>;
 defm stdlib : Eq<"stdlib", "C++ standard library to use">, MetaVarName<"<name>">, Values<"libc++,libstdc++">,
     Group<grp_link>;
