@@ -54,7 +54,7 @@ class PyObject
     PyObject* methodLookup(int index);
 
 public:
-    explicit PyObject(PyTypeObject& type) : m_type(&type) {}
+    constexpr explicit PyObject(PyTypeObject& type) : m_type(&type) {}
 
     ~PyObject() = default;
     PyObject(const PyObject&) = delete;
@@ -64,7 +64,7 @@ public:
 
     friend PyObject& type(PyObject& obj)
     {
-        return *reinterpret_cast<PyObject*>(obj.m_type);
+        return *reinterpret_cast<PyObject*>(reinterpret_cast<std::uintptr_t>(obj.m_type) & ~std::uintptr_t{0b11});
     }
 
     PyObject* getSlot(int index);
@@ -98,6 +98,24 @@ public:
     {
         return isa<T>() ? &cast<T>() : nullptr;
     }
+
+    void clearMarking()
+    {
+        m_type = reinterpret_cast<PyTypeObject*>(reinterpret_cast<std::uintptr_t>(m_type) & ~std::uintptr_t(0b11));
+    }
+
+    template <class T>
+    void setMark(T value)
+    {
+        m_type = reinterpret_cast<PyTypeObject*>((reinterpret_cast<std::uintptr_t>(m_type) & ~std::uintptr_t(0b11))
+                                                 | static_cast<std::uintptr_t>(value));
+    }
+
+    template <class T>
+    T getMark()
+    {
+        return static_cast<T>(reinterpret_cast<std::uintptr_t>(m_type) & 0b11);
+    }
 };
 
 void destroyPyObject(PyObject& object);
@@ -112,7 +130,7 @@ class PyTypeObject
     std::size_t m_offset;
 
 public:
-    /*implicit*/ operator PyObject&()
+    /*implicit*/ operator PyObject&() noexcept
     {
         return m_base;
     }
@@ -122,6 +140,17 @@ public:
 #define TYPE_SLOT(x, y, ...) y,
 #include <pylir/Interfaces/Slots.def>
     };
+
+    template <class... Args>
+    PyObject& operator()(Args&&... args)
+    {
+        return m_base(std::forward<Args>(args)...);
+    }
+
+    [[nodiscard]] std::size_t getOffset() const noexcept
+    {
+        return m_offset;
+    }
 };
 
 using PyUniversalCC = PyObject& (*)(PyFunction&, PyTuple&, PyDict&);
@@ -134,9 +163,7 @@ class PyFunction
     PyUniversalCC m_function;
 
 public:
-    explicit PyFunction(PyUniversalCC function) : m_base(Builtins::Function.cast<PyTypeObject>()), m_function(function)
-    {
-    }
+    constexpr explicit PyFunction(PyUniversalCC function) : m_base(Builtins::Function), m_function(function) {}
 
     /*implicit*/ operator PyObject&()
     {
@@ -295,6 +322,16 @@ public:
     {
         m_table.erase(&key);
     }
+
+    auto begin()
+    {
+        return m_table.begin();
+    }
+
+    auto end()
+    {
+        return m_table.end();
+    }
 };
 
 class PyInt
@@ -375,7 +412,7 @@ public:
     }
 };
 
-template <PyObject& typeObject, std::size_t slotCount = PyTypeTraits<typeObject>::slotCount>
+template <PyTypeObject& typeObject, std::size_t slotCount = PyTypeTraits<typeObject>::slotCount>
 class StaticInstance
 {
     using InstanceType = typename PyTypeTraits<typeObject>::instanceType;
@@ -413,7 +450,7 @@ public:
     }
 };
 
-template <PyObject& typeObject>
+template <PyTypeObject& typeObject>
 class StaticInstance<typeObject, 0>
 {
     using InstanceType = typename PyTypeTraits<typeObject>::instanceType;
@@ -444,7 +481,7 @@ public:
 namespace details
 {
 
-template <PyObject& type>
+template <PyTypeObject& type>
 struct AllocType
 {
     template <class... Args>
@@ -471,7 +508,7 @@ struct AllocType<Builtins::Tuple>
 
 } // namespace details
 
-template <PyObject& type>
+template <PyTypeObject& type>
 constexpr details::AllocType<type> alloc;
 
 template <class... Args>

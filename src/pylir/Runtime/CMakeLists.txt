@@ -42,7 +42,7 @@ endfunction()
 
 get_sources(PylirSupport _ SOURCES DEFINES INCLUDES)
 
-add_library(PylirRuntime STATIC StackWalker.cpp Objects.cpp API.cpp ExceptionHandling.cpp Support.cpp SysModule.cpp ${SOURCES} Pages.cpp Pages.hpp)
+add_library(PylirRuntime STATIC Stack.cpp Objects.cpp API.cpp ExceptionHandling.cpp Support.cpp SysModule.cpp ${SOURCES} Pages.cpp Pages.hpp Globals.cpp)
 target_include_directories(PylirRuntime PUBLIC ${INCLUDES})
 target_compile_definitions(PylirRuntime PUBLIC ${DEFINES})
 if (PYLIR_SANITIZER OR PYLIR_COVERAGE)
@@ -62,6 +62,11 @@ if (MSVC)
             "$<TARGET_LINKER_FILE:PylirRuntime>"
             "$<TARGET_LINKER_FILE:unwind_static>")
     add_dependencies(PylirRuntime unwind_static)
+elseif (UNIX)
+    find_path(LIBUNWIND_INCLUDE_DIR libunwind.h REQUIRED)
+    find_library(LIBUNWIND_LIB unwind REQUIRED)
+    target_link_libraries(PylirRuntime PRIVATE ${LIBUNWIND_LIB})
+    target_include_directories(PylirRuntime PRIVATE ${LIBUNWIND_INCLUDE_DIR})
 endif ()
 
 add_library(PylirRuntimeMain STATIC PylirRuntimeMain.cpp)

@@ -17,6 +17,8 @@ class MarkAndSweep
 
 public:
     PyObject* alloc(std::size_t count);
+
+    void collect();
 };
 
 extern MarkAndSweep gc;

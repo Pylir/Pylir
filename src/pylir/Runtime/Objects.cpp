@@ -16,7 +16,7 @@ static_assert(std::is_standard_layout_v<PyBaseException>);
 
 PyObject* PyObject::getSlot(int index)
 {
-    return reinterpret_cast<PyObject**>(this)[m_type->m_offset + index];
+    return reinterpret_cast<PyObject**>(this)[reinterpret_cast<PyTypeObject&>(type(*this)).m_offset + index];
 }
 
 PyObject* PyObject::getSlot(std::string_view name)
@@ -35,7 +35,7 @@ PyObject* PyObject::getSlot(std::string_view name)
 
 void PyObject::setSlot(int index, PyObject& object)
 {
-    reinterpret_cast<PyObject**>(this)[m_type->m_offset + index] = &object;
+    reinterpret_cast<PyObject**>(this)[reinterpret_cast<PyTypeObject&>(type(*this)).m_offset + index] = &object;
 }
 
 void pylir::rt::destroyPyObject(PyObject& object)

@@ -572,3 +572,24 @@ void pylir::rt::BestFitTree::verifyTree()
     };
     checkHeight(checkHeight, m_root);
 }
+
+void pylir::rt::BestFitTree::sweep()
+{
+    for (auto& iter : m_pages)
+    {
+        for (auto* block = reinterpret_cast<BlockHeader*>(iter.get()); block->size; block = block->getNextBlock())
+        {
+            if (!block->isAllocated())
+            {
+                continue;
+            }
+            auto* object = reinterpret_cast<PyObject*>(block->getCell());
+            if (object->getMark<bool>())
+            {
+                object->clearMarking();
+                continue;
+            }
+            free(object);
+        }
+    }
+}

@@ -23,5 +23,7 @@ public:
     ~SegregatedFreeList();
 
     PyObject* nextCell();
+
+    void sweep();
 };
 } // namespace pylir::rt

@@ -343,6 +343,9 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         Dwarf
     };
     ExceptionModel m_exceptionModel;
+    mlir::StringAttr m_rootSection;
+    mlir::StringAttr m_collectionSection;
+    mlir::StringAttr m_constantSection;
 
     mlir::LLVM::LLVMArrayType getSlotEpilogue(unsigned slotSize = 0)
     {
@@ -403,6 +406,10 @@ public:
             }
             default: llvm::errs() << triple.str() << " not yet implemented"; std::abort();
         }
+        bool coff = triple.isOSBinFormatCOFF();
+        m_rootSection = mlir::StringAttr::get(context, "py_root" + llvm::Twine(coff ? "$f" : ""));
+        m_collectionSection = mlir::StringAttr::get(context, "py_coll" + llvm::Twine(coff ? "$f" : ""));
+        m_constantSection = mlir::StringAttr::get(context, "py_const" + llvm::Twine(coff ? "$f" : ""));
     }
 
     mlir::LLVM::LLVMStructType getPyObjectType(llvm::Optional<unsigned> slotSize = {})
@@ -1194,6 +1201,7 @@ public:
             builder.getUnknownLoc(), type, !needToBeRuntimeInit(objectAttr), mlir::LLVM::Linkage::Private, "const$",
             mlir::Attribute{}, 0, REF_ADDRESS_SPACE, true);
         globalOp.setUnnamedAddrAttr(mlir::LLVM::UnnamedAddrAttr::get(&getContext(), mlir::LLVM::UnnamedAddr::Global));
+        globalOp.setSectionAttr(globalOp.getConstant() ? getConstantSection() : getCollectionSection());
         m_symbolTable.insert(globalOp);
         m_globalConstants.insert({objectAttr, globalOp});
         initializeGlobal(globalOp, objectAttr, builder);
@@ -1215,6 +1223,21 @@ public:
     mlir::LLVM::LLVMFuncOp getGlobalInit()
     {
         return m_globalInit;
+    }
+
+    mlir::StringAttr getRootSection() const
+    {
+        return m_rootSection;
+    }
+
+    mlir::StringAttr getCollectionSection() const
+    {
+        return m_collectionSection;
+    }
+
+    mlir::StringAttr getConstantSection() const
+    {
+        return m_constantSection;
     }
 };
 
@@ -1384,6 +1407,21 @@ protected:
         return getTypeConverter()->getInstanceType(ref.getValue());
     }
 
+    [[nodiscard]] mlir::StringAttr getRootSection() const
+    {
+        return getTypeConverter()->getRootSection();
+    }
+
+    [[nodiscard]] mlir::StringAttr getCollectionSection() const
+    {
+        return getTypeConverter()->getCollectionSection();
+    }
+
+    [[nodiscard]] mlir::StringAttr getConstantSection() const
+    {
+        return getTypeConverter()->getConstantSection();
+    }
+
 private:
     [[nodiscard]] PylirTypeConverter* getTypeConverter() const
     {
@@ -1451,6 +1489,14 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
                                                                         mlir::Attribute{}, 0, REF_ADDRESS_SPACE, true);
         if (!op.isDeclaration())
         {
+            if (!global.getConstant())
+            {
+                global.setSectionAttr(getCollectionSection());
+            }
+            else
+            {
+                global.setSectionAttr(getConstantSection());
+            }
             initializeGlobal(global, *op.getInitializer(), rewriter);
         }
         return mlir::success();
@@ -1474,6 +1520,7 @@ struct GlobalHandleOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::
         auto global =
             rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, pointer(getPyObjectType(), REF_ADDRESS_SPACE), false,
                                                               linkage, op.getName(), mlir::Attribute{}, 0, 0, true);
+        global.setSectionAttr(getRootSection());
         rewriter.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
         auto null = rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), global.getType());
         rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), mlir::ValueRange{null});

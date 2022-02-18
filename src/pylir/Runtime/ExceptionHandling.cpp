@@ -158,7 +158,8 @@ std::uintptr_t readEncodedPointer(const std::uint8_t** data, std::uint8_t encodi
     return result;
 }
 
-pylir::rt::PyObject* readTypeObject(std::uint64_t typeIndex, const std::uint8_t* classInfo, std::uint8_t typeEncoding)
+pylir::rt::PyTypeObject* readTypeObject(std::uint64_t typeIndex, const std::uint8_t* classInfo,
+                                        std::uint8_t typeEncoding)
 {
     if (classInfo == nullptr)
     {
@@ -179,7 +180,7 @@ pylir::rt::PyObject* readTypeObject(std::uint64_t typeIndex, const std::uint8_t*
             PYLIR_UNREACHABLE;
     }
     classInfo -= typeIndex;
-    return reinterpret_cast<pylir::rt::PyObject*>(readEncodedPointer(&classInfo, typeEncoding));
+    return reinterpret_cast<pylir::rt::PyTypeObject*>(readEncodedPointer(&classInfo, typeEncoding));
 }
 
 struct Result

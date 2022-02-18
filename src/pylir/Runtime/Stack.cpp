@@ -1,3 +1,4 @@
+#include "Stack.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -80,9 +81,12 @@ const std::unordered_map<std::uintptr_t, tcb::span<const StackMap::Location>>& c
     return result;
 }
 
-template <class F>
-void processRoots(F f)
+} // namespace
+
+std::pair<std::uintptr_t, std::uintptr_t> pylir::rt::collectStackRoots(std::vector<PyObject*>& results)
 {
+    std::uintptr_t stackLowerBound = std::numeric_limits<std::uintptr_t>::max();
+    std::uintptr_t stackUpperBound = 0;
 #ifdef __linux__
     unw_context_t uc;
     unw_getcontext(&uc);
@@ -99,66 +103,97 @@ void processRoots(F f)
         }
         for (const auto& iter : result->second)
         {
-            pylir::rt::PyObject* object = nullptr;
             switch (iter.type)
             {
                 case StackMap::Location::Type::Register:
                 {
                     unw_word_t rp;
                     unw_get_reg(&cursor, iter.regNumber, &rp);
-                    object = reinterpret_cast<pylir::rt::PyObject*>(rp);
+                    if (!rp)
+                    {
+                        break;
+                    }
+                    results.push_back(reinterpret_cast<pylir::rt::PyObject*>(rp));
                     break;
                 }
                 case StackMap::Location::Type::Direct:
                 {
                     unw_word_t rp;
                     unw_get_reg(&cursor, iter.regNumber, &rp);
-                    object = reinterpret_cast<pylir::rt::PyObject*>(rp + iter.offset);
+                    auto* object = reinterpret_cast<pylir::rt::PyObject*>(rp + iter.offset);
+                    results.push_back(object);
+                    stackLowerBound = std::min(stackLowerBound, reinterpret_cast<std::uintptr_t>(object));
+                    stackUpperBound = std::max(stackUpperBound, reinterpret_cast<std::uintptr_t>(object));
                     break;
                 }
                 case StackMap::Location::Type::Indirect:
                 {
                     unw_word_t rp;
                     unw_get_reg(&cursor, iter.regNumber, &rp);
-                    object = *reinterpret_cast<pylir::rt::PyObject**>(rp + iter.offset);
+                    auto* object = *reinterpret_cast<pylir::rt::PyObject**>(rp + iter.offset);
+                    if (!object)
+                    {
+                        break;
+                    }
+                    results.push_back(object);
                     break;
                 }
             }
-            f(object);
         }
     }
 #else
-    auto* trace = +[](_Unwind_Context* context, void* closure)
+    auto trace = [&](_Unwind_Context* context)
     {
         uintptr_t programCounter = _Unwind_GetIP(context);
         auto result = counterToLoc().find(programCounter);
         if (result == counterToLoc().end())
         {
-            return _URC_NO_REASON;
+            return;
         }
         for (const auto& iter : result->second)
         {
-            pylir::rt::PyObject* object = nullptr;
             switch (iter.type)
             {
                 case StackMap::Location::Type::Register:
-                    object = reinterpret_cast<pylir::rt::PyObject*>(_Unwind_GetGR(context, iter.regNumber));
+                {
+                    auto* object = reinterpret_cast<pylir::rt::PyObject*>(_Unwind_GetGR(context, iter.regNumber));
+                    if (!object)
+                    {
+                        break;
+                    }
+                    results.push_back(object);
                     break;
+                }
                 case StackMap::Location::Type::Direct:
-                    object =
+                {
+                    auto* object =
                         reinterpret_cast<pylir::rt::PyObject*>(_Unwind_GetGR(context, iter.regNumber) + iter.offset);
+                    results.push_back(object);
+                    stackLowerBound = std::min(stackLowerBound, reinterpret_cast<std::uintptr_t>(object));
+                    stackUpperBound = std::max(stackUpperBound, reinterpret_cast<std::uintptr_t>(object));
                     break;
+                }
                 case StackMap::Location::Type::Indirect:
-                    object =
+                {
+                    auto* object =
                         *reinterpret_cast<pylir::rt::PyObject**>(_Unwind_GetGR(context, iter.regNumber) + iter.offset);
+                    if (!object)
+                    {
+                        break;
+                    }
+                    results.push_back(object);
                     break;
+                }
             }
-            (*reinterpret_cast<std::decay_t<F>*>(closure))(object);
         }
-        return _URC_NO_REASON;
     };
-    _Unwind_Backtrace(trace, reinterpret_cast<void*>(&f));
+    _Unwind_Backtrace(
+        +[](_Unwind_Context* context, void* lambda)
+        {
+            (*reinterpret_cast<decltype(trace)*>(lambda))(context);
+            return _URC_NO_REASON;
+        },
+        reinterpret_cast<void*>(&trace));
 #endif
+    return {stackLowerBound, stackUpperBound};
 }
-
-} // namespace

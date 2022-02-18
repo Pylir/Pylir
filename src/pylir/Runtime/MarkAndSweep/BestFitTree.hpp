@@ -144,6 +144,8 @@ public:
     PyObject* alloc(std::size_t size);
 
     void free(PyObject* object);
+
+    void sweep();
 };
 
 } // namespace pylir::rt
