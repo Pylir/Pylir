@@ -1698,10 +1698,7 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
 
             mlir::Value tupleMemory = rewriter.create<pylir::Mem::GCAllocTupleOp>(
                 op.getLoc(), mlir::Value{tuplePtr.typePtr(op.getLoc()).load(op.getLoc())}, newCapacity);
-            tupleMemory = rewriter
-                              .create<mlir::UnrealizedConversionCastOp>(
-                                  op.getLoc(), typeConverter->convertType(tupleMemory.getType()), tupleMemory)
-                              .getResult(0);
+            tupleMemory = unrealizedConversion(rewriter, tupleMemory);
 
             auto newTupleModel = pyTupleModel(op.getLoc(), rewriter, tupleMemory);
             newTupleModel.sizePtr(op.getLoc()).store(op.getLoc(), newCapacity);
@@ -2567,10 +2564,7 @@ struct InitListOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
         mlir::Value tupleInit =
             rewriter.create<pylir::Mem::InitTupleOp>(op.getLoc(), tupleMemory, adaptor.getInitializer());
         auto tuplePtr = list.tuplePtr(op.getLoc());
-        tupleInit = rewriter
-                        .create<mlir::UnrealizedConversionCastOp>(
-                            op.getLoc(), typeConverter->convertType(tupleInit.getType()), tupleInit)
-                        .getResult(0);
+        tupleInit = unrealizedConversion(rewriter, tupleInit);
         tupleInit = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), mlir::Value{tuplePtr}.getType().cast<mlir::LLVM::LLVMPointerType>().getElementType(),
             tupleInit);
