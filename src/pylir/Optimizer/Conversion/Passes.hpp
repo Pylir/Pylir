@@ -10,16 +10,13 @@
 namespace pylir
 {
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirPyToPylirMemPass();
-}
-
-namespace pylir::Mem
-{
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirToLLVMPass();
 
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirToLLVMPass(llvm::Triple targetTriple,
                                                                                   const llvm::DataLayout& dataLayout);
 
-} // namespace pylir::Mem
+std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createConvertPylirToLLVMPass();
+
+} // namespace pylir
 
 namespace pylir
 {

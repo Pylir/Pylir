@@ -7,7 +7,7 @@ include "mlir/Pass/PassBase.td"
 def ExpandPyDialect : Pass<"expand-py-dialect", "::mlir::ModuleOp"> {
     let summary = "Expands ops of the Py dialect to operations that can be lowered";
     let constructor = "::pylir::Py::createExpandPyDialectPass()";
-    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+    let dependentDialects = ["::pylir::Py::PylirPyDialect", "::mlir::arith::ArithmeticDialect"];
 }
 
 def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {
@@ -26,7 +26,6 @@ def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {
 def HandleLoadStoreElimination : Pass<"handle-load-store-elimination"> {
     let summary = "Eliminate loads and stores of handles";
     let constructor = "::pylir::Py::createHandleLoadStoreEliminationPass()";
-    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
     let statistics = [
         Statistic<"m_loadRemoved", "handle loads removed",

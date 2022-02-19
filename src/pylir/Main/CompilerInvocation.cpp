@@ -271,8 +271,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             manager.addNestedPass<mlir::FuncOp>(mlir::arith::createArithmeticExpandOpsPass());
-            manager.addPass(pylir::Mem::createConvertPylirToLLVMPass(m_targetMachine->getTargetTriple(),
-                                                                     m_targetMachine->createDataLayout()));
+            manager.addPass(pylir::createConvertPylirToLLVMPass(m_targetMachine->getTargetTriple(),
+                                                                m_targetMachine->createDataLayout()));
             manager.addNestedPass<mlir::LLVM::LLVMFuncOp>(mlir::createReconcileUnrealizedCastsPass());
             manager.addNestedPass<mlir::LLVM::LLVMFuncOp>(mlir::LLVM::createLegalizeForExportPass());
             if (mlir::failed(manager.run(*mlirModule)))

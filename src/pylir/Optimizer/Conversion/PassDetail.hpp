@@ -20,6 +20,11 @@ namespace mlir::LLVM
 class LLVMDialect;
 }
 
+namespace mlir::arith
+{
+class ArithmeticDialect;
+}
+
 namespace pylir
 {
 #define GEN_PASS_CLASSES
