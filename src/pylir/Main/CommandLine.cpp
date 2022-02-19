@@ -5,6 +5,32 @@
 
 #include <utility>
 
+#define PREFIX(NAME, VALUE) static const char* const NAME[] = VALUE;
+#include <pylir/Main/Opts.inc>
+#undef PREFIX
+
+// Don't have much choice until this is fixed in LLVM
+using llvm::opt::HelpHidden;
+
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
+static const llvm::opt::OptTable::Info InfoTable[] = {
+#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) \
+    {PREFIX,                                                                                             \
+     NAME,                                                                                               \
+     HELPTEXT,                                                                                           \
+     METAVAR,                                                                                            \
+     ::pylir::cli::OPT_##ID,                                                                             \
+     llvm::opt::Option::KIND##Class,                                                                     \
+     PARAM,                                                                                              \
+     FLAGS,                                                                                              \
+     ::pylir::cli::OPT_##GROUP,                                                                          \
+     ::pylir::cli::OPT_##ALIAS,                                                                          \
+     ALIASARGS,                                                                                          \
+     VALUES},
+#include <pylir/Main/Opts.inc>
+#undef OPTION
+};
+
 pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(InfoTable) {}
 
 pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv)
