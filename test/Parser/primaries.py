@@ -1,4 +1,4 @@
-# RUN: pylir %s -fsyntax-only -emit-ast 2>&1 | FileCheck %s
+# RUN: pylir %s -fsyntax-only -dump-ast | FileCheck %s
 
 a.b
 

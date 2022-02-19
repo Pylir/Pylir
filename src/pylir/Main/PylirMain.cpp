@@ -98,110 +98,46 @@ int pylir::main(int argc, char** argv)
     if (args.hasArg(OPT_fsyntax_only))
     {
         action = pylir::CompilerInvocation::SyntaxOnly;
-        if (args.hasArg(OPT_S))
+        auto* syntaxOnly = args.getLastArg(OPT_fsyntax_only);
+
+        auto diagActionWithIR = [&](llvm::opt::Arg* actionArg, std::string_view name)
         {
-            auto *assembly = args.getLastArg(OPT_S);
-            auto *syntaxOnly = args.getLastArg(OPT_fsyntax_only);
             llvm::errs() << commandLine
                                 .createDiagnosticsBuilder(
-                                    assembly, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, "Assembly")
-                                .addLabel(assembly, std::nullopt, pylir::Diag::WARNING_COLOUR)
+                                    actionArg, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, name)
+                                .addLabel(actionArg, std::nullopt, pylir::Diag::WARNING_COLOUR)
                                 .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
                                 .emitWarning();
+        };
+
+        if (auto* lastIR = args.getLastArg(OPT_emit_llvm, OPT_emit_mlir, OPT_emit_pylir))
+        {
+            std::string_view name;
+            switch (lastIR->getOption().getID())
+            {
+                case OPT_emit_llvm: name = "LLVM IR"; break;
+                case OPT_emit_mlir: name = "MLIR IR"; break;
+                case OPT_emit_pylir: name = "Pylir IR"; break;
+            }
+            diagActionWithIR(lastIR, name);
         }
-        else if (args.hasArg(OPT_c))
+        else if (auto* lastActionModifier = args.getLastArg(OPT_S, OPT_c))
         {
-            auto *objectFile = args.getLastArg(OPT_c);
-            auto *syntaxOnly = args.getLastArg(OPT_fsyntax_only);
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(
-                                    objectFile, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, "Object file")
-                                .addLabel(objectFile, std::nullopt, pylir::Diag::WARNING_COLOUR)
-                                .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
-                                .emitWarning();
+            diagActionWithIR(lastActionModifier,
+                             lastActionModifier->getOption().getID() == OPT_S ? "Assembly" : "Object file");
         }
     }
-    else if (args.hasArg(OPT_S))
+    else if (auto* arg = args.getLastArg(OPT_S, OPT_c))
+    {
+        action = arg->getOption().getID() == OPT_S ? pylir::CompilerInvocation::Assembly :
+                                                     pylir::CompilerInvocation::ObjectFile;
+    }
+    else if (args.hasArg(OPT_emit_llvm, OPT_emit_pylir, OPT_emit_mlir))
     {
         action = pylir::CompilerInvocation::Assembly;
     }
-    else if (args.hasArg(OPT_c))
-    {
-        action = pylir::CompilerInvocation::ObjectFile;
-    }
 
-    auto diagExlusiveIR = [&](ID first, std::string_view firstName, ID second, std::string_view secondName)
-    {
-        if (args.hasArg(second))
-        {
-            auto *lastArg = args.getLastArg(first, second);
-            auto *secondLast = lastArg->getOption().getID() == first ? args.getLastArg(second) : args.getLastArg(first);
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(lastArg,
-                                                          pylir::Diag::CANNOT_EMIT_N_IR_AND_N_IR_AT_THE_SAME_TIME,
-                                                          firstName, secondName)
-                                .addLabel(lastArg, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                .addLabel(secondLast, std::nullopt, pylir::Diag::NOTE_COLOUR)
-                                .emitError();
-            return false;
-        }
-        return true;
-    };
-
-    auto diagActionWithIR = [&](llvm::opt::Arg* arg, std::string_view name)
-    {
-        if (args.hasArg(OPT_fsyntax_only))
-        {
-            auto *syntaxOnly = args.getLastArg(OPT_fsyntax_only);
-            llvm::errs() << commandLine
-                                .createDiagnosticsBuilder(
-                                    arg, pylir::Diag::N_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, name)
-                                .addLabel(arg, std::nullopt, pylir::Diag::WARNING_COLOUR)
-                                .addLabel(syntaxOnly, std::nullopt, pylir::Diag::NOTE_COLOUR)
-                                .emitWarning();
-        }
-        if (action == pylir::CompilerInvocation::Link)
-        {
-            llvm::errs() << commandLine.createDiagnosticsBuilder(arg, pylir::Diag::CANNOT_EMIT_N_IR_WHEN_LINKING, name)
-                                .addLabel(arg, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                .emitError();
-            return false;
-        }
-        return true;
-    };
-
-    if (auto* emitLLVM = args.getLastArg(OPT_emit_llvm))
-    {
-        if (!diagExlusiveIR(OPT_emit_llvm, "LLVM", OPT_emit_mlir, "MLIR")
-            || !diagExlusiveIR(OPT_emit_llvm, "LLVM", OPT_emit_pylir, "Pylir"))
-        {
-            return -1;
-        }
-        if (!diagActionWithIR(emitLLVM, "LLVM"))
-        {
-            return -1;
-        }
-    }
-    else if (auto* emitMLIR = args.getLastArg(OPT_emit_mlir))
-    {
-        if (!diagExlusiveIR(OPT_emit_mlir, "MLIR", OPT_emit_pylir, "Pylir"))
-        {
-            return -1;
-        }
-        if (!diagActionWithIR(emitMLIR, "MLIR"))
-        {
-            return -1;
-        }
-    }
-    else if (auto* emitPylir = args.getLastArg(OPT_emit_pylir))
-    {
-        if (!diagActionWithIR(emitPylir, "Pylir"))
-        {
-            return -1;
-        }
-    }
-
-    if (auto *opt = args.getLastArg(OPT_O);
+    if (auto* opt = args.getLastArg(OPT_O);
         opt && opt->getValue() == std::string_view{"4"} && !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm)
         && (action == pylir::CompilerInvocation::Assembly || action == pylir::CompilerInvocation::ObjectFile)
         && !args.hasArg(OPT_flto, OPT_fno_lto))
@@ -214,7 +150,7 @@ int pylir::main(int argc, char** argv)
                             .emitWarning();
     }
 
-    if (auto *opt = args.getLastArg(OPT_flto, OPT_fno_lto);
+    if (auto* opt = args.getLastArg(OPT_flto, OPT_fno_lto);
         opt && opt->getOption().matches(OPT_flto) && !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm)
         && (action == pylir::CompilerInvocation::Assembly || action == pylir::CompilerInvocation::ObjectFile))
     {

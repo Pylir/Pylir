@@ -126,6 +126,13 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                     .Cases(".ll", ".bc", FileType::LLVM)
                     .Default(FileType::Python);
     const auto& args = commandLine.getArgs();
+
+    auto shouldOutput = [&args](pylir::cli::ID id)
+    {
+        auto* outputFormatArg = args.getLastArg(OPT_emit_llvm, OPT_emit_mlir, OPT_emit_pylir);
+        return outputFormatArg && outputFormatArg->getOption().getID() == id;
+    };
+
     mlir::OwningOpRef<mlir::ModuleOp> mlirModule;
     std::unique_ptr<llvm::Module> llvmModule;
     switch (type)
@@ -181,7 +188,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 }
                 m_fileInput = std::move(*tree);
             }
-            if (args.hasArg(OPT_emit_ast))
+            if (args.hasArg(OPT_dump_ast))
             {
                 pylir::Dumper dumper;
                 llvm::outs() << dumper.dump(*m_fileInput);
@@ -232,7 +239,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 manager.enableTiming();
             }
-            if (args.hasArg(OPT_emit_pylir))
+            if (shouldOutput(OPT_emit_pylir))
             {
                 if (mlir::failed(manager.run(*mlirModule)))
                 {
@@ -246,7 +253,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return finalizeOutputStream(mlir::success());
             }
             addOptimizationPasses(args.getLastArgValue(OPT_O, "0"), manager);
-            if (args.hasArg(OPT_emit_mlir))
+            if (shouldOutput(OPT_emit_mlir))
             {
                 if (mlir::failed(manager.run(*mlirModule)))
                 {
@@ -344,7 +351,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 }
             }
 
-            if (args.hasArg(OPT_emit_llvm) || lto)
+            if (shouldOutput(OPT_emit_llvm) || lto)
             {
                 // See
                 // https://github.com/llvm/llvm-project/blob/ea22fdd120aeb1bbb9ea96670d70193dc02b2c5f/clang/lib/CodeGen/BackendUtil.cpp#L1467
@@ -377,7 +384,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
 
             mpm.run(*llvmModule, mam);
 
-            if (args.hasArg(OPT_emit_llvm))
+            if (shouldOutput(OPT_emit_llvm))
             {
                 return finalizeOutputStream(mlir::success());
             }

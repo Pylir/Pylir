@@ -59,13 +59,6 @@ constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N = FMT_STRING("cannot assign
 
 constexpr auto UNKNOWN_FEATURE_N = FMT_STRING("unknown feature '{}'");
 
-constexpr auto CANNOT_EMIT_N_IR_AND_N_IR_AT_THE_SAME_TIME = FMT_STRING("cannot emit {} IR and {} IR at the same time");
-
-constexpr auto CANNOT_EMIT_N_IR_WHEN_LINKING = FMT_STRING("cannot emit {} IR when linking");
-
-constexpr auto N_IR_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
-    FMT_STRING("{} IR won't be emitted when only checking syntax");
-
 constexpr auto N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =
     FMT_STRING("{} won't be emitted when only checking syntax");
 
