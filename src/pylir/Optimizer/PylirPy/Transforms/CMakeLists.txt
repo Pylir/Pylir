@@ -5,5 +5,16 @@ add_public_tablegen_target(PylirPyTransformPassIncGen)
 
 add_library(PylirPyTransforms ExpandPyDialect.cpp FoldHandles.cpp HandleLoadStoreElimination.cpp)
 add_dependencies(PylirPyTransforms PylirPyTransformPassIncGen)
-target_link_libraries(PylirPyTransforms PUBLIC PylirPyDialect MLIRPass PRIVATE MLIRTransforms PylirPyUtil MLIRStandard PylirTransformsUtils)
+target_link_libraries(PylirPyTransforms
+        PUBLIC
+        MLIRPass
+        PRIVATE
+        PylirPyDialect
+        PylirPyUtil
+        PylirTransformsUtils
+        MLIRTransforms
+        MLIRStandard
+        MLIRArithmetic
+        MLIRControlFlow
+        )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)

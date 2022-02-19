@@ -42,7 +42,15 @@ endfunction()
 
 get_sources(PylirSupport _ SOURCES DEFINES INCLUDES)
 
-add_library(PylirRuntime STATIC Stack.cpp Objects.cpp API.cpp ExceptionHandling.cpp Support.cpp SysModule.cpp ${SOURCES} Pages.cpp Pages.hpp Globals.cpp)
+add_library(PylirRuntime STATIC ${SOURCES}
+        Stack.cpp
+        Objects.cpp
+        API.cpp
+        ExceptionHandling.cpp
+        Support.cpp
+        SysModule.cpp
+        Pages.cpp
+        Globals.cpp)
 target_include_directories(PylirRuntime PUBLIC ${INCLUDES})
 target_compile_definitions(PylirRuntime PUBLIC ${DEFINES})
 if (PYLIR_SANITIZER OR PYLIR_COVERAGE)

@@ -334,9 +334,6 @@ void ExpandPyDialectPass::runOnOperation()
     }
 
     mlir::ConversionTarget target(getContext());
-    target.addLegalDialect<pylir::Py::PylirPyDialect, mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
-                           mlir::cf::ControlFlowDialect>();
-    target.addLegalOp<mlir::FuncOp>();
     target.addDynamicallyLegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp,
                                  pylir::Py::MakeDictOp>(
         [](mlir::Operation* op) -> bool
@@ -350,6 +347,7 @@ void ExpandPyDialectPass::runOnOperation()
     target.addIllegalOp<pylir::Py::MakeClassOp, pylir::Py::LinearContainsOp, pylir::Py::CallMethodOp,
                         pylir::Py::CallMethodExOp, pylir::Py::MROLookupOp, pylir::Py::MakeTupleExOp,
                         pylir::Py::MakeListExOp, pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp>();
+    target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.add<LinearContainsPattern>(&getContext());
