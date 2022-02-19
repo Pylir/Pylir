@@ -1,6 +1,7 @@
 
 #include "CompilerInvocation.hpp"
 
+#include <mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/Arithmetic/Transforms/Passes.h>
@@ -271,6 +272,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             manager.addNestedPass<mlir::FuncOp>(mlir::arith::createArithmeticExpandOpsPass());
+            manager.addNestedPass<mlir::FuncOp>(mlir::arith::createConvertArithmeticToLLVMPass());
             manager.addPass(pylir::createConvertPylirToLLVMPass(m_targetMachine->getTargetTriple(),
                                                                 m_targetMachine->createDataLayout()));
             manager.addNestedPass<mlir::LLVM::LLVMFuncOp>(mlir::createReconcileUnrealizedCastsPass());

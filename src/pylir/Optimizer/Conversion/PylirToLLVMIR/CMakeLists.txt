@@ -14,7 +14,6 @@ add_mlir_conversion_library(PylirMemToLLVMIR
         MLIRPass
         MLIRTransforms
         MLIRStandardToLLVM
-        MLIRArithmeticToLLVM
         MLIRControlFlowToLLVM
         )
 

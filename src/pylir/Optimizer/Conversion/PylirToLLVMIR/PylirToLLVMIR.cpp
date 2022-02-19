@@ -1,4 +1,4 @@
-#include <mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h>
+
 #include <mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h>
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/Pattern.h>
@@ -2803,6 +2803,23 @@ struct InitDictOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
     }
 };
 
+struct ArithmeticSelectOpConversion : public ConvertPylirOpToLLVMPattern<mlir::arith::SelectOp>
+{
+    using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(mlir::arith::SelectOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        if (!op.getType().isa<pylir::Py::DynamicType, pylir::Mem::MemoryType>())
+        {
+            return mlir::failure();
+        }
+        rewriter.replaceOpWithNewOp<mlir::LLVM::SelectOp>(op, adaptor.getCondition(), adaptor.getTrueValue(),
+                                                          adaptor.getFalseValue());
+        return mlir::success();
+    }
+};
+
 class ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 private:
@@ -2862,7 +2879,6 @@ void ConvertPylirToLLVMPass::runOnOperation()
     mlir::RewritePatternSet patternSet(&getContext());
     mlir::populateStdToLLVMConversionPatterns(converter, patternSet);
     mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
-    mlir::arith::populateArithmeticToLLVMConversionPatterns(converter, patternSet);
     patternSet.insert<ConstantOpConversion>(converter);
     patternSet.insert<GlobalValueOpConversion>(converter);
     patternSet.insert<GlobalHandleOpConversion>(converter);
@@ -2911,6 +2927,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<IntGetIntegerOpConversion>(converter);
     patternSet.insert<IntCmpOpConversion>(converter);
     patternSet.insert<InitIntAddOpConversion>(converter);
+    patternSet.insert<ArithmeticSelectOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
