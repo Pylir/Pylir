@@ -1,5 +1,5 @@
 
-add_mlir_conversion_library(PylirMemToLLVMIR
+add_mlir_conversion_library(PylirToLLVMIR
         PylirToLLVMIR.cpp
         WinX64.cpp
         X86_64.cpp
@@ -18,6 +18,6 @@ add_mlir_conversion_library(PylirMemToLLVMIR
         )
 
 if (PYLIR_USE_PCH)
-    target_link_libraries(PylirMemToLLVMIR PRIVATE COMMON_PCH)
-    target_precompile_headers(PylirMemToLLVMIR PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
+    target_link_libraries(PylirToLLVMIR PRIVATE COMMON_PCH)
+    target_precompile_headers(PylirToLLVMIR PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
 endif ()

@@ -19,9 +19,17 @@ add_library(PylirMain
 target_link_libraries(PylirMain
         PUBLIC Diagnostics ${llvm_options} MLIRPass
         PRIVATE
-        CodeGen PylirMemToLLVMIR MLIRToLLVMIRTranslationRegistration ${llvm_all} PylirPyTransforms
-        PylirPyToPylirMem PylirMemToLLVMIR PylirTransforms PylirLLVMPasses MLIRReconcileUnrealizedCasts
-        MLIRArithmeticTransforms MLIRArithmeticToLLVM)
+        ${llvm_all}
+        MLIRReconcileUnrealizedCasts
+        MLIRArithmeticTransforms
+        MLIRArithmeticToLLVM
+        MLIRToLLVMIRTranslationRegistration
+        CodeGen
+        PylirToLLVMIR
+        PylirPyTransforms
+        PylirPyToPylirMem
+        PylirTransforms
+        PylirLLVMPasses)
 add_dependencies(PylirMain PylirMainOptsTableGen)
 target_compile_definitions(PylirMain PRIVATE PYLIR_VERSION="${PROJECT_VERSION}" PRIVATE PYLIR_DEFAULT_SYSROOT="${PYLIR_DEFAULT_SYSROOT}")
 if (PYLIR_EMBED_LLD)
