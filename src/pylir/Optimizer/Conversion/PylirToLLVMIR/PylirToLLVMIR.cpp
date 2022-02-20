@@ -328,6 +328,11 @@ struct PyTypeModel : PyObjectModel
     {
         return field<Pointer<>>(loc, 1);
     }
+
+    auto layoutPtr(mlir::Location loc)
+    {
+        return field<Pointer<PyObjectModel>>(loc, 2);
+    }
 };
 
 class PylirTypeConverter : public mlir::LLVMTypeConverter
@@ -346,6 +351,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     mlir::StringAttr m_rootSection;
     mlir::StringAttr m_collectionSection;
     mlir::StringAttr m_constantSection;
+    llvm::DenseMap<mlir::Attribute, mlir::FlatSymbolRefAttr> m_layoutTypeCache;
 
     mlir::LLVM::LLVMArrayType getSlotEpilogue(unsigned slotSize = 0)
     {
@@ -373,6 +379,18 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         }
         builder.setInsertionPointToEnd(&m_globalInit.back());
         section();
+    }
+
+    bool isSubtype(pylir::Py::TypeAttr subType, mlir::FlatSymbolRefAttr base)
+    {
+        const auto& map = subType.getSlots().getValue();
+        auto result = map.find("__mro__");
+        if (result == map.end())
+        {
+            return false;
+        }
+        auto tuple = dereference<pylir::Py::TupleAttr>(result->second).getValue();
+        return std::any_of(tuple.begin(), tuple.end(), [base](mlir::Attribute attr) { return attr == base; });
     }
 
 public:
@@ -409,6 +427,15 @@ public:
         m_rootSection = mlir::StringAttr::get(context, "py_root");
         m_collectionSection = mlir::StringAttr::get(context, "py_coll");
         m_constantSection = mlir::StringAttr::get(context, "py_const");
+
+        for (const auto& iter :
+             {pylir::Py::Builtins::Object, pylir::Py::Builtins::Tuple, pylir::Py::Builtins::List,
+              pylir::Py::Builtins::Type, pylir::Py::Builtins::Function, pylir::Py::Builtins::Str,
+              pylir::Py::Builtins::Int, pylir::Py::Builtins::Dict, pylir::Py::Builtins::BaseException})
+        {
+            auto ref = mlir::FlatSymbolRefAttr::get(&getContext(), iter.name);
+            m_layoutTypeCache[ref] = ref;
+        }
     }
 
     mlir::LLVM::LLVMStructType getPyObjectType(llvm::Optional<unsigned> slotSize = {})
@@ -651,23 +678,28 @@ public:
         if (slotSize)
         {
             return mlir::LLVM::LLVMStructType::getLiteral(
-                &getContext(), {mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getIndexType(),
-                                getSlotEpilogue(*slotSize)});
+                &getContext(),
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getIndexType(),
+                 mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getSlotEpilogue(*slotSize)});
         }
         auto pyType = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyType");
         if (!pyType.isInitialized())
         {
-            [[maybe_unused]] auto result =
-                pyType.setBody({mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getIndexType(),
-                                getSlotEpilogue()},
-                               false);
+            [[maybe_unused]] auto result = pyType.setBody(
+                {mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getIndexType(),
+                 mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getSlotEpilogue()},
+                false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return pyType;
     }
 
-    mlir::LLVM::LLVMStructType getInstanceType(llvm::StringRef builtinsName)
+    mlir::LLVM::LLVMStructType getBuiltinsInstanceType(llvm::StringRef builtinsName)
     {
+        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Object.name})
+        {
+            return getPyObjectType();
+        }
         if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Tuple.name})
         {
             return getPyTupleType();
@@ -688,8 +720,7 @@ public:
         {
             return getPyStringType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Int.name}
-            || builtinsName == llvm::StringRef{pylir::Py::Builtins::Bool.name})
+        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Int.name})
         {
             return getPyIntType();
         }
@@ -697,19 +728,55 @@ public:
         {
             return getPyDictType();
         }
-        static auto builtinExceptionClasses = []
-        {
-            llvm::StringSet<> set;
-#define BUILTIN_EXCEPTION(x, id, ...) set.insert(id);
-#define BUILTIN(...)
-#include <pylir/Interfaces/Builtins.def>
-            return set;
-        }();
-        if (builtinExceptionClasses.contains(builtinsName))
+        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::BaseException.name})
         {
             return getPyBaseExceptionType();
         }
-        return getPyObjectType();
+        PYLIR_UNREACHABLE;
+    }
+
+    mlir::FlatSymbolRefAttr getLayoutType(pylir::Py::TypeAttr type)
+    {
+        if (auto result = m_layoutTypeCache.lookup(type))
+        {
+            return result;
+        }
+        const auto& map = type.getSlots().getValue();
+        mlir::FlatSymbolRefAttr winner;
+        auto result = map.find("__mro__");
+        if (result == map.end())
+        {
+            winner = mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Py::Builtins::Object.name);
+        }
+        else
+        {
+            for (const auto& iter : dereference<pylir::Py::TupleAttr>(result->second).getValue().drop_front())
+            {
+                mlir::FlatSymbolRefAttr candidate = getLayoutType(iter.cast<mlir::FlatSymbolRefAttr>());
+                if (!winner)
+                {
+                    winner = candidate;
+                    continue;
+                }
+                if (isSubtype(dereference<pylir::Py::TypeAttr>(candidate), winner))
+                {
+                    winner = candidate;
+                }
+            }
+        }
+        m_layoutTypeCache[type] = winner;
+        return winner;
+    }
+
+    mlir::FlatSymbolRefAttr getLayoutType(mlir::FlatSymbolRefAttr type)
+    {
+        if (auto result = m_layoutTypeCache.lookup(type))
+        {
+            return result;
+        }
+        auto layout = getLayoutType(dereference<pylir::Py::TypeAttr>(type));
+        m_layoutTypeCache[type] = layout;
+        return layout;
     }
 
     mlir::LLVM::LLVMStructType typeOf(pylir::Py::ObjectAttr objectAttr)
@@ -1114,14 +1181,20 @@ public:
             .Case(
                 [&](pylir::Py::TypeAttr)
                 {
-                    auto instanceType = getInstanceType(global.getName());
+                    auto layoutType = getLayoutType(mlir::FlatSymbolRefAttr::get(global));
 
-                    auto asCount = builder.create<mlir::LLVM::ConstantOp>(
-                        global.getLoc(), getIndexType(),
-                        builder.getI32IntegerAttr(getPlatformABI().getSizeOf(instanceType)
-                                                  / (getPointerBitwidth() / 8)));
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asCount,
-                                                                      builder.getI32ArrayAttr({1}));
+                    {
+                        auto instanceType = getBuiltinsInstanceType(layoutType.getValue());
+                        auto asCount = builder.create<mlir::LLVM::ConstantOp>(
+                            global.getLoc(), getIndexType(),
+                            builder.getI32IntegerAttr(getPlatformABI().getSizeOf(instanceType)
+                                                      / (getPointerBitwidth() / 8)));
+                        undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asCount,
+                                                                          builder.getI32ArrayAttr({1}));
+                    }
+                    auto layoutRef = getConstant(global.getLoc(), layoutType, builder);
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, layoutRef,
+                                                                      builder.getI32ArrayAttr({2}));
                 })
             .Case(
                 [&](pylir::Py::FunctionAttr function)
@@ -1132,17 +1205,15 @@ public:
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, address,
                                                                       builder.getI32ArrayAttr({1}));
                 });
-        auto result = llvm::find_if(typeObjectAttr.getSlots().getValue(),
-                                    [](auto pair) { return pair.first.getValue() == "__slots__"; });
-        if (result != typeObjectAttr.getSlots().getValue().end())
+        const auto& map = typeObjectAttr.getSlots().getValue();
+        if (auto result = map.find("__slots__"); result != map.end())
         {
-            for (auto slot : llvm::enumerate(dereference<pylir::Py::TupleAttr>(result->second).getValue()))
+            for (const auto& slot : llvm::enumerate(dereference<pylir::Py::TupleAttr>(result->second).getValue()))
             {
-                auto element = llvm::find_if(
-                    objectAttr.getSlots().getValue(), [&](auto pair)
-                    { return pair.first.getValue() == slot.value().cast<pylir::Py::StringAttr>().getValue(); });
                 mlir::Value value;
-                if (element == objectAttr.getSlots().getValue().end())
+                const auto& initMap = objectAttr.getSlots().getValue();
+                if (auto element = initMap.find(slot.value().cast<pylir::Py::StringAttr>().getValue());
+                    element == objectAttr.getSlots().getValue().end())
                 {
                     value = builder.create<mlir::LLVM::NullOp>(
                         global.getLoc(), mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE));
@@ -1152,8 +1223,9 @@ public:
                     value = getConstant(global.getLoc(), element->second, builder);
                 }
                 auto indices = builder.getI32ArrayAttr(
-                    {static_cast<int>(global.getType().cast<mlir::LLVM::LLVMStructType>().getBody().size() - 1),
-                     static_cast<int>(slot.index())});
+                    {static_cast<std::int32_t>(global.getType().cast<mlir::LLVM::LLVMStructType>().getBody().size()
+                                               - 1),
+                     static_cast<std::int32_t>(slot.index())});
                 undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, value, indices);
             }
         }
@@ -1401,9 +1473,19 @@ protected:
         return getTypeConverter()->template dereference<Attr>(attr);
     }
 
-    [[nodiscard]] mlir::Type getInstanceType(mlir::FlatSymbolRefAttr ref) const
+    [[nodiscard]] mlir::Type getBuiltinsInstanceType(mlir::FlatSymbolRefAttr ref) const
     {
-        return getTypeConverter()->getInstanceType(ref.getValue());
+        return getTypeConverter()->getBuiltinsInstanceType(ref.getValue());
+    }
+
+    [[nodiscard]] mlir::FlatSymbolRefAttr getLayoutType(mlir::FlatSymbolRefAttr ref) const
+    {
+        return getTypeConverter()->getLayoutType(ref);
+    }
+
+    [[nodiscard]] mlir::FlatSymbolRefAttr getLayoutType(pylir::Py::TypeAttr attr) const
+    {
+        return getTypeConverter()->getLayoutType(attr);
     }
 
     [[nodiscard]] mlir::StringAttr getRootSection() const
@@ -2021,17 +2103,17 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         {
             return mlir::failure();
         }
-        pylir::Py::ObjectAttr typeObject;
+        pylir::Py::TypeAttr typeObject;
         auto ref = constant.getConstant().dyn_cast<mlir::FlatSymbolRefAttr>();
-        typeObject = dereference<pylir::Py::ObjectAttr>(constant.getConstant());
+        typeObject = dereference<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
             return mlir::failure();
         }
 
-        auto iter = llvm::find_if(typeObject.getSlots().getValue(),
-                                  [](auto pair) { return pair.first.getValue() == "__slots__"; });
-        if (iter == typeObject.getSlots().getValue().end())
+        auto& map = typeObject.getSlots().getValue();
+        auto iter = map.find("__slots__");
+        if (iter == map.end())
         {
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
             return mlir::success();
@@ -2058,11 +2140,11 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         mlir::Type instanceType;
         if (ref)
         {
-            instanceType = getInstanceType(ref);
+            instanceType = getBuiltinsInstanceType(getLayoutType(ref));
         }
         else
         {
-            instanceType = getPyObjectType();
+            instanceType = getBuiltinsInstanceType(getLayoutType(typeObject));
         }
         mlir::Value i8Ptr = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), derivePointer(rewriter.getI8Type(), adaptor.getObject().getType()), adaptor.getObject());
@@ -2091,17 +2173,17 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         {
             return mlir::failure();
         }
-        pylir::Py::ObjectAttr typeObject;
+        pylir::Py::TypeAttr typeObject;
         auto ref = constant.getConstant().dyn_cast<mlir::FlatSymbolRefAttr>();
-        typeObject = dereference<pylir::Py::ObjectAttr>(constant.getConstant());
+        typeObject = dereference<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
             return mlir::failure();
         }
 
-        auto iter = llvm::find_if(typeObject.getSlots().getValue(),
-                                  [](auto pair) { return pair.first.getValue() == "__slots__"; });
-        if (iter == typeObject.getSlots().getValue().end())
+        auto& map = typeObject.getSlots().getValue();
+        auto iter = map.find("__slots__");
+        if (iter == map.end())
         {
             rewriter.eraseOp(op);
             return mlir::success();
@@ -2128,11 +2210,11 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         mlir::Type instanceType;
         if (ref)
         {
-            instanceType = getInstanceType(ref);
+            instanceType = getBuiltinsInstanceType(getLayoutType(ref));
         }
         else
         {
-            instanceType = getPyObjectType();
+            instanceType = getBuiltinsInstanceType(getLayoutType(typeObject));
         }
         mlir::Value i8Ptr = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), derivePointer(rewriter.getI8Type(), adaptor.getObject().getType()), adaptor.getObject());
@@ -2422,18 +2504,18 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         {
             return mlir::failure();
         }
-        pylir::Py::ObjectAttr typeAttr;
+        pylir::Py::TypeAttr typeAttr;
         auto ref = constant.getConstant().dyn_cast<mlir::FlatSymbolRefAttr>();
-        typeAttr = dereference<pylir::Py::ObjectAttr>(constant.getConstant());
+        typeAttr = dereference<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeAttr)
         {
             return mlir::failure();
         }
 
         std::size_t slotLen = 0;
-        auto iter = llvm::find_if(typeAttr.getSlots().getValue(),
-                                  [](auto pair) { return pair.first.getValue() == "__slots__"; });
-        if (iter != typeAttr.getSlots().getValue().end())
+        auto& map = typeAttr.getSlots().getValue();
+        auto iter = map.find("__slots__");
+        if (iter != map.end())
         {
             slotLen = dereference<pylir::Py::TupleAttr>(iter->second).getValue().size();
         }
@@ -2443,11 +2525,11 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         mlir::Type instanceType;
         if (ref)
         {
-            instanceType = getInstanceType(ref);
+            instanceType = getBuiltinsInstanceType(getLayoutType(ref));
         }
         else
         {
-            instanceType = getPyObjectType();
+            instanceType = getBuiltinsInstanceType(getLayoutType(typeAttr));
         }
         auto inBytes = createIndexConstant(rewriter, op.getLoc(),
                                            sizeOf(instanceType) + sizeOf(pointer(getPyObjectType())) * slotLen);

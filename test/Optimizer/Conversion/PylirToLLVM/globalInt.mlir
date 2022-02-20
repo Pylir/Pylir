@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.int = #py.type
 
 func @test() -> !py.dynamic {

@@ -128,6 +128,7 @@ class PyTypeObject
 
     PyObject m_base;
     std::size_t m_offset;
+    PyTypeObject* m_layoutType;
 
 public:
     /*implicit*/ operator PyObject&() noexcept
@@ -560,49 +561,49 @@ inline bool PyObject::isa()
 template <>
 inline bool PyObject::isa<PyTypeObject>()
 {
-    return isinstance(*this, Builtins::Type);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Type;
 }
 
 template <>
 inline bool PyObject::isa<PyList>()
 {
-    return isinstance(*this, Builtins::List);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::List;
 }
 
 template <>
 inline bool PyObject::isa<PyTuple>()
 {
-    return isinstance(*this, Builtins::Tuple);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Tuple;
 }
 
 template <>
 inline bool PyObject::isa<PyDict>()
 {
-    return isinstance(*this, Builtins::Dict);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Dict;
 }
 
 template <>
 inline bool PyObject::isa<PyFunction>()
 {
-    return type(*this).is(Builtins::Function);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Function;
 }
 
 template <>
 inline bool PyObject::isa<PyString>()
 {
-    return isinstance(*this, Builtins::Str);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Str;
 }
 
 template <>
 inline bool PyObject::isa<PyInt>()
 {
-    return isinstance(*this, Builtins::Int);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Int;
 }
 
 template <>
 inline bool PyObject::isa<PyBaseException>()
 {
-    return isinstance(*this, Builtins::BaseException);
+    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::BaseException;
 }
 
 } // namespace pylir::rt

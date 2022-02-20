@@ -2,6 +2,7 @@
 
 py.globalValue @builtins.type = #py.type<slots: #py.slots<{"__slots__" to #py.tuple<(#py.str<"__slots__">)>}>>
 py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func @foo() -> !py.dynamic {
@@ -17,7 +18,7 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[TUPLE_CAST:.*]] = llvm.bitcast %[[TUPLE]]
 // CHECK-NEXT: %[[I8:.*]] = llvm.bitcast %[[TUPLE_CAST]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[I8]][16]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[I8]][{{[0-9]+}}]
 // CHECK-NEXT: %[[OBJECT_PTR:.*]] = llvm.bitcast %[[GEP]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[OBJECT_PTR]][0]
 // CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]]

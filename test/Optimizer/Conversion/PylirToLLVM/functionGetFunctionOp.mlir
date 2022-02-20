@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type // stub
+py.globalValue @builtins.object = #py.type // stub
 py.globalValue @builtins.function = #py.type // stub
 py.globalValue @builtins.None = #py.type // stub
 py.globalValue @builtins.str = #py.type // stub
