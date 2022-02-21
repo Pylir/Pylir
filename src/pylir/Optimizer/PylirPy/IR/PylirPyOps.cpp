@@ -284,11 +284,6 @@ mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableC
     return verifySymbolUse<mlir::FuncOp>(*this, getFunctionAttr(), symbolTable);
 }
 
-mlir::LogicalResult pylir::Py::MakeClassOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
-{
-    return verifySymbolUse<mlir::FuncOp>(*this, getInitFuncAttr(), symbolTable);
-}
-
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                    llvm::ArrayRef<::pylir::Py::IterArg> args)
 {

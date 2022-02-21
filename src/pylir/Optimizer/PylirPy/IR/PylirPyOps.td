@@ -717,14 +717,6 @@ def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [DeclareOpInterfaceMethods<Symbo
     }];
 }
 
-def PylirPy_MakeClassOp : PylirPy_Op<"makeClass", [DeclareOpInterfaceMethods<SymbolUserOpInterface>, AlwaysBound]> {
-    let arguments = (ins FlatSymbolRefAttr:$init_func, DynamicType:$name, DynamicType:$bases, DynamicType:$keywords);
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
-
-    let assemblyFormat = "$name `,` $init_func `,` $bases `,` $keywords attr-dict";
-}
-
 def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, DeclareOpInterfaceMethods<RuntimeTypeInterface>]> {
     let arguments = (ins DynamicType:$type_object);
 

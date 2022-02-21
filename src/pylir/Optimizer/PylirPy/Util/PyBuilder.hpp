@@ -408,12 +408,6 @@ public:
         return create<Py::MakeFuncOp>(function);
     }
 
-    Py::MakeClassOp createMakeClass(mlir::FlatSymbolRefAttr initFunc, mlir::Value name, mlir::Value bases,
-                                    mlir::Value keywords)
-    {
-        return create<Py::MakeClassOp>(initFunc, name, bases, keywords);
-    }
-
     Py::MakeObjectOp createMakeObject(mlir::Value typeObject)
     {
         return create<Py::MakeObjectOp>(typeObject);

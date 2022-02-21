@@ -2120,8 +2120,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         visit(*classDef.suite);
         m_builder.create<mlir::ReturnOp>(m_classNamespace);
     }
-    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
-    writeIdentifier(classDef.className, value);
+    //TODO:
+//    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
+//    writeIdentifier(classDef.className, value);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::AsyncForStmt& asyncForStmt) {}

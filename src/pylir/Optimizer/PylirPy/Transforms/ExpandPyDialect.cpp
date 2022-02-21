@@ -344,9 +344,9 @@ void ExpandPyDialectPass::runOnOperation()
                     [](auto op) { return op.getIterExpansion().empty(); })
                 .Default(false);
         });
-    target.addIllegalOp<pylir::Py::MakeClassOp, pylir::Py::LinearContainsOp, pylir::Py::CallMethodOp,
-                        pylir::Py::CallMethodExOp, pylir::Py::MROLookupOp, pylir::Py::MakeTupleExOp,
-                        pylir::Py::MakeListExOp, pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp>();
+    target.addIllegalOp<pylir::Py::LinearContainsOp, pylir::Py::CallMethodOp, pylir::Py::CallMethodExOp,
+                        pylir::Py::MROLookupOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp,
+                        pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp>();
     target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
     mlir::RewritePatternSet patterns(&getContext());

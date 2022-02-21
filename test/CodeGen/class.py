@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
+# XFAIL: *
+
 x = 0
 
 
