@@ -136,6 +136,8 @@ public:
         return m_base;
     }
 
+    constexpr static auto& layoutTypeObject = Builtins::Type;
+
     enum Slots
     {
 #define TYPE_SLOT(x, y, ...) y,
@@ -171,6 +173,8 @@ public:
         return m_base;
     }
 
+    constexpr static auto& layoutTypeObject = Builtins::Function;
+
     enum Slots
     {
 #define FUNCTION_SLOT(x, y, ...) y,
@@ -192,6 +196,8 @@ public:
         : m_base(type.cast<PyTypeObject>()), m_size(size)
     {
     }
+
+    constexpr static auto& layoutTypeObject = Builtins::Tuple;
 
     /*implicit*/ operator PyObject&()
     {
@@ -233,6 +239,8 @@ public:
         return m_base;
     }
 
+    constexpr static auto& layoutTypeObject = Builtins::List;
+
     PyObject** begin()
     {
         return m_tuple->begin();
@@ -264,6 +272,8 @@ public:
         : m_base(type.cast<PyTypeObject>()), m_buffer(string.begin(), string.end())
     {
     }
+
+    constexpr static auto& layoutTypeObject = Builtins::Str;
 
     /*implicit*/ operator PyObject&()
     {
@@ -298,6 +308,8 @@ class PyDict
 
 public:
     explicit PyDict(PyObject& type = Builtins::Dict) : m_base(type.cast<PyTypeObject>()) {}
+
+    constexpr static auto& layoutTypeObject = Builtins::Dict;
 
     /*implicit*/ operator PyObject&()
     {
@@ -341,6 +353,8 @@ class PyInt
     BigInt m_integer;
 
 public:
+    constexpr static auto& layoutTypeObject = Builtins::Int;
+
     /*implicit*/ operator PyObject&()
     {
         return m_base;
@@ -372,6 +386,8 @@ public:
     {
         return m_base;
     }
+
+    constexpr static auto& layoutTypeObject = Builtins::BaseException;
 
     enum Slots
     {
@@ -551,59 +567,16 @@ PyObject& PyObject::operator()(Args&&... args)
     }
 }
 
+template <>
+inline bool PyObject::isa<PyObject>()
+{
+    return true;
+}
+
 template <class T>
 inline bool PyObject::isa()
 {
-    static_assert(sizeof(T) && false, "No specialization available");
-    PYLIR_UNREACHABLE;
-}
-
-template <>
-inline bool PyObject::isa<PyTypeObject>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Type;
-}
-
-template <>
-inline bool PyObject::isa<PyList>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::List;
-}
-
-template <>
-inline bool PyObject::isa<PyTuple>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Tuple;
-}
-
-template <>
-inline bool PyObject::isa<PyDict>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Dict;
-}
-
-template <>
-inline bool PyObject::isa<PyFunction>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Function;
-}
-
-template <>
-inline bool PyObject::isa<PyString>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Str;
-}
-
-template <>
-inline bool PyObject::isa<PyInt>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::Int;
-}
-
-template <>
-inline bool PyObject::isa<PyBaseException>()
-{
-    return type(*this).cast<PyTypeObject>().m_layoutType == &Builtins::BaseException;
+    return type(*this).cast<PyTypeObject>().m_layoutType == &T::layoutTypeObject;
 }
 
 } // namespace pylir::rt
