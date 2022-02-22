@@ -48,11 +48,11 @@ def ReadAttr : MemorySSA_Attr<"Read"> {
 
 def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>,
                                              DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
-    let arguments = (ins FlatSymbolRefAttr:$functionName);
+    let arguments = (ins FlatSymbolRefAttr:$function_name);
     let results = (outs);
 
     let regions = (region AnyRegion:$body);
-    let assemblyFormat = "$functionName attr-dict-with-keyword $body";
+    let assemblyFormat = "$function_name attr-dict-with-keyword $body";
 }
 
 def MemoryLiveOnEntryOp : MemorySSA_Op<"liveOnEntry"> {
@@ -77,12 +77,12 @@ def MemoryDefOp : MemorySSA_Op<"def"> {
 }
 
 def MemoryBranchOp : MemorySSA_Op<"br", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {
-    let arguments = (ins VariadicOfVariadic<MemoryDefType, "argSizes">:$branchArgs, I32ElementsAttr:$argSizes);
+    let arguments = (ins VariadicOfVariadic<MemoryDefType, "arg_sizes">:$branch_args, I32ElementsAttr:$arg_sizes);
     let results = (outs);
 
     let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
 
-    let assemblyFormat = "$successors $branchArgs attr-dict";
+    let assemblyFormat = "$successors $branch_args attr-dict";
 
     let hasVerifier = 1;
 }
