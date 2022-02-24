@@ -25,6 +25,27 @@ class PylirPy_AllocOp<string mnemonic, list<Trait> traits = []> :
     let results = (outs Arg<DynamicType,"",[MemAlloc]>:$result);
 }
 
+class AddExceptionHandling<Op op, list<Trait> traits = []> : PylirPy_Op<!strconcat(op.opName, "Ex"),
+!listconcat(op.traits, [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments], traits)> {
+
+    assert !eq(!size(op.successors), 0), "Op mustn't already have successors";
+
+    let results = op.results;
+    let regions = op.regions;
+    let arguments = !con(op.arguments,
+                        (ins Variadic<DynamicType>:$normal_dest_operands, Variadic<DynamicType>:$unwind_dest_operands));
+    let successors = (successor AnySuccessor:$happy_path, AnySuccessor:$exception_path);
+
+    let assemblyFormat = !strconcat(op.assemblyFormat, [{
+        `\n` ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `)`)?
+                     `unwind` $exception_path ( `(` $unwind_dest_operands^ `)`)?
+    }]);
+
+    let hasVerifier = 1;
+
+    let extraClassDeclaration = op.extraClassDeclaration;
+}
+
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
     let arguments = (ins AnyPyAttribute:$constant);
 
@@ -423,8 +444,10 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
     let hasFolder = 1;
 }
 
-class PylirPy_CallMethodBase<string mnemonic, list<Trait> traits = []> : PylirPy_Op<mnemonic, traits> {
+def PylirPy_CallMethodOp : PylirPy_Op<"callMethod"> {
+
     let results = (outs DynamicType:$result);
+    let arguments = (ins DynamicType:$method, DynamicType:$args, DynamicType:$keywords);
 
     let description = [{
         This op attempts to call `$callable` using an iterative chain of method lookups of `__call__` and descriptors
@@ -432,31 +455,12 @@ class PylirPy_CallMethodBase<string mnemonic, list<Trait> traits = []> : PylirPy
         `$callable` is typically the result of a `py.mroLookup` for a specific method in the type object of `$self`.
         `$args` and `$keywords` correspond to the positional and keyword arguments respectively.
     }];
+
+    let assemblyFormat = "$method`(``*` `` $args `,` `*` `` `*` `` $keywords `)` attr-dict";
 }
 
-def PylirPy_CallMethodOp : PylirPy_CallMethodBase<"callMethod"> {
-    let arguments = (ins DynamicType:$method, DynamicType:$args, DynamicType:$keywords);
-    let assemblyFormat = "$method`(``*` $args `,` `*` `*` $keywords `)` attr-dict";
-}
-
-def PylirPy_CallMethodExOp : PylirPy_CallMethodBase<"callMethodEx", [Terminator, AttrSizedOperandSegments,
-                                                                     DeclareOpInterfaceMethods<BranchOpInterface>,
-                                                                     DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-    let successors = (successor AnySuccessor:$happy_path, AnySuccessor:$exception_path);
-
-    let arguments = (ins
-                        DynamicType:$method, DynamicType:$args, DynamicType:$keywords,
-                        Variadic<DynamicType>:$normal_dest_operands,
-                        Variadic<DynamicType>:$unwind_dest_operands);
-
-    let hasVerifier = 1;
-
-    let assemblyFormat = [{
-        $method `(` `*` $args `,` `*` `*` $keywords `)` attr-dict
-        `\n` ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `)`)?
-                     `unwind` $exception_path ( `(` $unwind_dest_operands^ `)`)?
-    }];
-}
+def PylirPy_CallMethodExOp : AddExceptionHandling<PylirPy_CallMethodOp,
+                                                    [DeclareOpInterfaceMethods<InferTypeOpInterface>]>;
 
 def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
     let arguments = (ins DynamicType:$mro_tuple, DynamicType:$element);
@@ -474,16 +478,6 @@ def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
 }
 
 // Make ops
-
-class PylirPy_MakeExOp<string mnemonic, list<Trait> traits = []> :
-    PylirPy_Op<mnemonic, !listconcat(traits,[Terminator, AttrSizedOperandSegments,
-                                                 DeclareOpInterfaceMethods<BranchOpInterface>,
-                                                 DeclareOpInterfaceMethods<InferTypeOpInterface>,
-                                                 AlwaysBound])> {
-    let successors = (successor AnySuccessor:$happy_path, AnySuccessor:$exception_path);
-
-    let hasVerifier = 1;
-}
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound,
                                                    DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -522,12 +516,7 @@ def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [DeclareOpInterfaceMethods<Inf
     }];
 }
 
-def PylirPy_MakeTupleExOp : PylirPy_MakeExOp<"makeTupleEx", [RuntimeType<"Tuple">]> {
-    let arguments = (ins Variadic<DynamicType>:$arguments,
-                         I32ArrayAttr:$iter_expansion,
-                         Variadic<DynamicType>:$normal_dest_operands,
-                         Variadic<DynamicType>:$unwind_dest_operands
-                         );
+def PylirPy_MakeTupleExOp : AddExceptionHandling<PylirPy_MakeTupleOp> {
 
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
@@ -538,17 +527,7 @@ def PylirPy_MakeTupleExOp : PylirPy_MakeExOp<"makeTupleEx", [RuntimeType<"Tuple"
          )>
     ];
 
-    let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict `\n`
-        ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `)` )?
-                `unwind` $exception_path ( `(` $unwind_dest_operands^ `)` )?
-    }];
-
     let hasCanonicalizer = 1;
-
-    let extraClassDeclaration = [{
-        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
-    }];
 }
 
 def PylirPy_MakeListOp : PylirPy_Op<"makeList",
@@ -573,15 +552,7 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList",
     }];
 }
 
-def PylirPy_MakeListExOp : PylirPy_MakeExOp<"makeListEx", [RuntimeType<"List">]> {
-    let arguments = (ins Variadic<DynamicType>:$arguments,
-                         I32ArrayAttr:$iter_expansion,
-                         Variadic<DynamicType>:$normal_dest_operands,
-                         Variadic<DynamicType>:$unwind_dest_operands
-                         );
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
-
+def PylirPy_MakeListExOp : AddExceptionHandling<PylirPy_MakeListOp> {
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
                        "mlir::Block*":$happy_path,
@@ -591,17 +562,7 @@ def PylirPy_MakeListExOp : PylirPy_MakeExOp<"makeListEx", [RuntimeType<"List">]>
          )>
     ];
 
-    let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict `\n`
-        ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `)` )?
-                `unwind` $exception_path ( `(` $unwind_dest_operands^ `)` )?
-    }];
-
     let hasCanonicalizer = 1;
-
-    let extraClassDeclaration = [{
-        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
-    }];
 }
 
 def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",
@@ -627,15 +588,7 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",
     }];
 }
 
-def PylirPy_MakeSetExOp : PylirPy_MakeExOp<"makeSetEx", [RuntimeType<"Set">]> {
-    let arguments = (ins Variadic<DynamicType>:$arguments,
-                         I32ArrayAttr:$iter_expansion,
-                         Variadic<DynamicType>:$normal_dest_operands,
-                         Variadic<DynamicType>:$unwind_dest_operands
-                         );
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
-
+def PylirPy_MakeSetExOp : AddExceptionHandling<PylirPy_MakeSetOp> {
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
                        "mlir::Block*":$happy_path,
@@ -645,17 +598,7 @@ def PylirPy_MakeSetExOp : PylirPy_MakeExOp<"makeSetEx", [RuntimeType<"Set">]> {
          )>
     ];
 
-    let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict `\n`
-        ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `)` )?
-                `unwind` $exception_path ( `(` $unwind_dest_operands^ `)` )?
-    }];
-
     let hasCanonicalizer = 1;
-
-    let extraClassDeclaration = [{
-        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
-    }];
 }
 
 def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
@@ -678,16 +621,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
     }];
 }
 
-def PylirPy_MakeDictExOp : PylirPy_MakeExOp<"makeDictEx", [RuntimeType<"Dict">]> {
-    let arguments = (ins Variadic<DynamicType>:$keys,
-                         Variadic<DynamicType>:$values,
-                         I32ArrayAttr:$mapping_expansion,
-                         Variadic<DynamicType>:$normal_dest_operands,
-                         Variadic<DynamicType>:$unwind_dest_operands
-                         );
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
-
+def PylirPy_MakeDictExOp : AddExceptionHandling<PylirPy_MakeDictOp> {
     let builders = [
         OpBuilder<(ins "const std::vector<::pylir::Py::DictArg>&":$keyValues,
                        "mlir::Block*":$happy_path,
@@ -696,12 +630,6 @@ def PylirPy_MakeDictExOp : PylirPy_MakeExOp<"makeDictEx", [RuntimeType<"Dict">]>
                        "mlir::ValueRange":$unwind_dest_operands
          )>
     ];
-
-    let assemblyFormat = [{
-        custom<MappingArguments>($keys, $values, $mapping_expansion) attr-dict `\n`
-        ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `)` )?
-                `unwind` $exception_path ( `(` $unwind_dest_operands^ `)` )?
-    }];
 
     let hasCanonicalizer = 1;
 }

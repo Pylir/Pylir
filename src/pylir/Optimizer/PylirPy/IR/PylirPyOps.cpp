@@ -228,6 +228,14 @@ void pylir::Py::MakeTupleOp::getEffects(
     }
 }
 
+void pylir::Py::MakeTupleExOp::getEffects(
+    ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
+{
+    effects.emplace_back(mlir::MemoryEffects::Allocate::get(), getResult());
+    effects.emplace_back(mlir::MemoryEffects::Read::get());
+    effects.emplace_back(mlir::MemoryEffects::Write::get());
+}
+
 mlir::LogicalResult pylir::Py::MakeListOp::inferReturnTypes(::mlir::MLIRContext* context,
                                                             ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
                                                             ::mlir::DictionaryAttr, ::mlir::RegionRange,
