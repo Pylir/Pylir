@@ -64,6 +64,62 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::CallMethodExOp::getMutableS
     return getUnwindDestOperandsMutable();
 }
 
+mlir::MutableOperandRange pylir::Py::YieldOp::getMutableSuccessorOperands(::mlir::Optional<unsigned int>)
+{
+    return getResultsMutable();
+}
+
+namespace
+{
+void typeSwitchSuccessorRegions(::mlir::Optional<unsigned int> index, ::mlir::ArrayRef<::mlir::Attribute> operands,
+                                ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions,
+                                llvm::MutableArrayRef<mlir::Region> specializations)
+{
+    if (index)
+    {
+        regions.emplace_back();
+        return;
+    }
+    auto typeObject = operands[0];
+    if (typeObject)
+    {
+        for (auto [region, type] : llvm::zip_first(specializations, operands.drop_front()))
+        {
+            if (type == typeObject)
+            {
+                regions.emplace_back(&region);
+                return;
+            }
+        }
+    }
+    std::transform(specializations.begin(), specializations.end(), std::back_inserter(regions),
+                   [](mlir::Region& reg) { return &reg; });
+}
+} // namespace
+
+void pylir::Py::TypeSwitchOp::getSuccessorRegions(::mlir::Optional<unsigned int> index,
+                                                  ::mlir::ArrayRef<::mlir::Attribute> operands,
+                                                  ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions)
+{
+    typeSwitchSuccessorRegions(index, operands, regions, getSpecializations());
+}
+
+void pylir::Py::TypeSwitchExOp::getSuccessorRegions(::mlir::Optional<unsigned int> index,
+                                                    ::mlir::ArrayRef<::mlir::Attribute> operands,
+                                                    ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions)
+{
+    typeSwitchSuccessorRegions(index, operands, regions, getSpecializations());
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::TypeSwitchExOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return getNormalDestOperandsMutable();
+    }
+    return getUnwindDestOperandsMutable();
+}
+
 namespace
 {
 bool parseIterArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
@@ -204,6 +260,31 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
                               i++;
                           });
     printer << ')';
+}
+
+bool parseTypeSwitchSpecializations(mlir::OpAsmParser& parser,
+                                    llvm::SmallVectorImpl<std::unique_ptr<mlir::Region>>& regions,
+                                    llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& types)
+{
+    while (!parser.parseOptionalKeyword("case"))
+    {
+        if (parser.parseOperand(types.emplace_back())
+            || parser.parseRegion(*regions.emplace_back(std::make_unique<mlir::Region>())))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void printTypeSwitchSpecializations(mlir::OpAsmPrinter& printer, mlir::Operation*,
+                                    llvm::MutableArrayRef<mlir::Region> regions, mlir::OperandRange types)
+{
+    for (auto [type, region] : llvm::zip(types, regions))
+    {
+        printer << " case " << type << ' ';
+        printer.printRegion(region);
+    }
 }
 
 } // namespace
@@ -814,6 +895,24 @@ mlir::LogicalResult pylir::Py::ConstantOp::verify()
         }
     }
     return ::verify(*this, getConstantAttr());
+}
+
+mlir::LogicalResult pylir::Py::TypeSwitchOp::verify()
+{
+    if (getSpecializations().size() != getSpecializationTypes().size())
+    {
+        return emitOpError("Expected specialization type for every specialization");
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::TypeSwitchExOp::verify()
+{
+    if (getSpecializations().size() != getSpecializationTypes().size())
+    {
+        return emitOpError("Expected specialization type for every specialization");
+    }
+    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 mlir::LogicalResult pylir::Py::CallMethodExOp::verify()

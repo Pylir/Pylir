@@ -427,6 +427,32 @@ def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCapture]> {
     let assemblyFormat = "$string attr-dict";
 }
 
+def PylirPy_YieldOp : PylirPy_Op<"yield",
+    [ReturnLike, DeclareOpInterfaceMethods<RegionBranchTerminatorOpInterface>, Terminator, NoSideEffect]> {
+
+    let arguments = (ins Variadic<AnyType>:$results);
+    let results = (outs);
+
+    let assemblyFormat = "$results `:` type($results) attr-dict";
+}
+
+def PylirPy_TypeSwitchOp : PylirPy_Op<"typeSwitch",
+    [DeclareOpInterfaceMethods<RegionBranchOpInterface>, RecursiveSideEffects, NoRegionArguments]> {
+
+    let results = (outs Variadic<AnyType>:$results);
+    let regions = (region AnyRegion:$generic, VariadicRegion<AnyRegion>:$specializations);
+    let arguments = (ins DynamicType:$type_object, Variadic<DynamicType>:$specialization_types);
+
+    let hasVerifier = 1;
+
+    let assemblyFormat = [{
+        $type_object $generic custom<TypeSwitchSpecializations>($specializations, $specialization_types) `:`
+        type($results) attr-dict
+    }];
+}
+
+def PylirPy_TypeSwitchExOp : AddExceptionHandling<PylirPy_TypeSwitchOp>;
+
 // linear searches
 
 def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
