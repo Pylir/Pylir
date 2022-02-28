@@ -880,10 +880,23 @@ def PylirPy_InvokeIndirectOp : PylirPy_InvokeBase<"invoke_indirect",
     let hasCanonicalizeMethod = 1;
 }
 
-def PylirPy_LandingPadOp : PylirPy_Op<"landingPad"> {
+def PylirPy_LandingPadOp : PylirPy_Op<"landingPad", [AlwaysBound]> {
     let arguments = (ins FlatSymbolRefAttr:$catch_type);
 
+    let hasVerifier = 1;
+
     let assemblyFormat = "$catch_type attr-dict";
+}
+
+def PylirPy_LandingPadBrOp : PylirPy_Op<"landingPad.br",
+    [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {
+    let arguments = (ins Variadic<DynamicType>:$arguments);
+    let results = (outs);
+    let successors = (successor AnySuccessor:$handler);
+
+    let hasVerifier = 1;
+
+    let assemblyFormat = "$handler ( `(` $arguments^ `)` )? attr-dict";
 }
 
 #endif

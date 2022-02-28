@@ -67,6 +67,9 @@ func @type_switch(%trueValue : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %0 = py.landingPad @builtins.BaseException
+    py.landingPad.br ^handler
+
+^handler:
     return %0 : !py.dynamic
 }
 
@@ -86,4 +89,6 @@ func @type_switch(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: return %[[ARG0]]
 // CHECK-NEXT: ^[[FAILURE]]:
 // CHECK-NEXT: %[[EXCEPTION:.*]] = py.landingPad @builtins.BaseException
+// CHECK-NEXT: py.landingPad.br ^[[HANDLER:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[HANDLER]]:
 // CHECK-NEXT: return %[[EXCEPTION]]

@@ -289,6 +289,11 @@ void printTypeSwitchSpecializations(mlir::OpAsmPrinter& printer, mlir::Operation
 
 } // namespace
 
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::LandingPadBrOp::getMutableSuccessorOperands(unsigned int)
+{
+    return getArgumentsMutable();
+}
+
 mlir::LogicalResult pylir::Py::MakeTupleOp::inferReturnTypes(::mlir::MLIRContext* context,
                                                              ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
                                                              ::mlir::DictionaryAttr, ::mlir::RegionRange,
@@ -877,7 +882,7 @@ mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwind
 {
     if (unwindBlock->empty() || !mlir::isa<pylir::Py::LandingPadOp>(unwindBlock->front()))
     {
-        return op->emitOpError("Expected 'py.landingPad' as first non-const operation in unwind block");
+        return op->emitOpError("Expected 'py.landingPad' as first operation in unwind block");
     }
     return mlir::success();
 }
@@ -945,6 +950,24 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
     if (!isDeclaration())
     {
         return ::verify(*this, getInitializerAttr());
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::LandingPadOp::verify()
+{
+    if (!mlir::isa<pylir::Py::LandingPadBrOp>((*this)->getBlock()->getTerminator()))
+    {
+        return emitOpError("Block starting with `py.landingPad` has to terminate with `py.landingPad.br`");
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::LandingPadBrOp::verify()
+{
+    if (!mlir::isa<pylir::Py::LandingPadOp>((*this)->getBlock()->front()))
+    {
+        return emitOpError("Block ending with `py.landingPad.br` has to start with `py.landingPad`");
     }
     return mlir::success();
 }

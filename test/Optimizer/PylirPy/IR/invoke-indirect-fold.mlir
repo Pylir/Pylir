@@ -15,8 +15,14 @@ func @test() {
 
 ^bb1:
     %1 = py.landingPad @builtins.BaseException
+    py.landingPad.br ^handler
+
+^handler:
     return
 }
 
 // CHECK-LABEL: @test
 // CHECK: py.invoke @foo() : () -> ()
+
+// CHECK: py.landingPad @builtins.BaseException
+// CHECK-NEXT: py.landingPad.br

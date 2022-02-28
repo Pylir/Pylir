@@ -2468,6 +2468,18 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
     }
 };
 
+struct LandingPadBrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::LandingPadBrOp>
+{
+    using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::LandingPadBrOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOpWithNewOp<mlir::LLVM::BrOp>(op, adaptor.getArguments(), op.getHandler());
+        return mlir::success();
+    }
+};
+
 struct GCAllocTupleConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocTupleOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::GCAllocTupleOp>::ConvertPylirOpToLLVMPattern;
@@ -3004,6 +3016,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<IntCmpOpConversion>(converter);
     patternSet.insert<InitIntAddOpConversion>(converter);
     patternSet.insert<ArithmeticSelectOpConversion>(converter);
+    patternSet.insert<LandingPadBrOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

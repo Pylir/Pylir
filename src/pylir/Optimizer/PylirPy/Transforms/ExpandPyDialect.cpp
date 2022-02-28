@@ -227,7 +227,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             rewriter.setInsertionPointToStart(landingPad);
             mlir::Value exceptionObject = rewriter.create<pylir::Py::LandingPadOp>(
                 loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
-            rewriter.create<mlir::cf::BranchOp>(loc, stopIterationHandler, exceptionObject);
+            rewriter.create<pylir::Py::LandingPadBrOp>(loc, exceptionObject, stopIterationHandler);
             stopIterationHandler->insertBefore(dest);
             rewriter.setInsertionPointToStart(stopIterationHandler);
         }

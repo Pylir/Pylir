@@ -15,7 +15,7 @@ func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -43,7 +43,7 @@ func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -71,7 +71,7 @@ func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -99,7 +99,7 @@ func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -127,7 +127,7 @@ func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -155,7 +155,7 @@ func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -182,7 +182,7 @@ func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic
@@ -209,7 +209,7 @@ func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^failure:
     %3 = py.landingPad @builtins.BaseException
-    cf.br ^bb3(%3 : !py.dynamic)
+    py.landingPad.br ^bb3(%3)
 
 ^bb3(%e : !py.dynamic):
     return %e : !py.dynamic

@@ -2640,6 +2640,6 @@ pylir::CodeGen::BlockPtr pylir::CodeGen::createLandingPadBlock(mlir::Block* exce
     BlockPtr landingPad;
     m_builder.setInsertionPointToStart(landingPad);
     mlir::Value exceptionObject = m_builder.create<pylir::Py::LandingPadOp>(typeToCatch);
-    m_builder.create<mlir::cf::BranchOp>(exceptionHandlerBlock, exceptionObject);
+    m_builder.create<pylir::Py::LandingPadBrOp>(exceptionObject, exceptionHandlerBlock);
     return landingPad;
 }
