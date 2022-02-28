@@ -453,6 +453,24 @@ public:
         return create<Py::IntToStrOp>(object);
     }
 
+    Py::YieldOp createYield(mlir::ValueRange values)
+    {
+        return create<Py::YieldOp>(values);
+    }
+
+    Py::TypeSwitchOp createTypeSwitch(mlir::TypeRange results, mlir::Value typeObject)
+    {
+        return create<Py::TypeSwitchOp>(results, typeObject, mlir::ValueRange{}, 0);
+    }
+
+    Py::TypeSwitchExOp createTypeSwitchEx(mlir::TypeRange results, mlir::Value typeObject, mlir::Block* happyPath,
+                                          llvm::ArrayRef<mlir::Value> normalOperands, mlir::Block* unwindPath,
+                                          llvm::ArrayRef<mlir::Value> unwindOperands)
+    {
+        return create<Py::TypeSwitchExOp>(results, typeObject, mlir::ValueRange{}, normalOperands, unwindOperands,
+                                          happyPath, unwindPath, 0);
+    }
+
     Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant = false,
                                         llvm::Optional<Py::ObjectAttr> initializer = {}, bool external = false)
     {

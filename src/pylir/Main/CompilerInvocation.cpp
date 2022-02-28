@@ -573,6 +573,7 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
         manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());
     }
+    manager.addPass(pylir::Py::createLowerTypeSwitchPass());
     manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
 }
 

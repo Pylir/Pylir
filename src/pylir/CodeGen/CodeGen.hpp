@@ -5,6 +5,7 @@
 #include <mlir/IR/OwningOpRef.h>
 
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/SmallPtrSet.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
@@ -14,8 +15,6 @@
 #include <pylir/Parser/Syntax.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/ValueReset.hpp>
-
-#include <llvm/ADT/ScopeExit.h>
 
 #include <stack>
 #include <tuple>
@@ -29,6 +28,7 @@ class CodeGen
     Py::PyBuilder m_builder;
     mlir::ModuleOp m_module;
     mlir::FuncOp m_currentFunc;
+    mlir::Region* m_currentRegion{};
     Diag::Document* m_document;
     mlir::Value m_classNamespace{};
     std::unordered_map<std::string, std::size_t> m_implNames;
@@ -212,9 +212,9 @@ class CodeGen
     };
 
     std::vector<UnpackResults> unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
-                                                const std::vector<FunctionParameter>& parameters,
-                                                llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
-                                                llvm::function_ref<mlir::Value(std::string_view)> kwDefault = {});
+                                                  const std::vector<FunctionParameter>& parameters,
+                                                  llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
+                                                  llvm::function_ref<mlir::Value(std::string_view)> kwDefault = {});
 
     mlir::FuncOp buildFunctionCC(llvm::Twine name, mlir::FuncOp implementation,
                                  const std::vector<FunctionParameter>& parameters);
@@ -259,6 +259,8 @@ class CodeGen
 
     void assignTarget(const Syntax::Target& target, mlir::Value value);
 
+    mlir::Value typeSensitiveRegion(mlir::Value typeObject, llvm::function_ref<void()> region);
+
     mlir::Value binOp(llvm::StringRef method, mlir::Value lhs, mlir::Value rhs);
 
     mlir::Value binOp(llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs, mlir::Value rhs);
@@ -288,12 +290,13 @@ class CodeGen
     {
         auto tuple =
             std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
-                            pylir::valueResetMany(m_currentFunc, m_currentLoop, m_currentExceptBlock,
+                            pylir::valueResetMany(m_currentFunc, m_currentRegion, m_currentLoop, m_currentExceptBlock,
                                                   m_currentLandingPadBlock, std::move(m_functionScope), m_qualifiers));
         m_currentLoop = {nullptr, nullptr};
         m_currentExceptBlock = nullptr;
         m_currentLandingPadBlock = nullptr;
         m_currentFunc = funcOp;
+        m_currentRegion = &m_currentFunc.getBody();
         m_module.push_back(m_currentFunc);
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
         m_functionScope.emplace(Scope{{},
@@ -313,7 +316,7 @@ class CodeGen
 
     void implementBlock(mlir::Block* block)
     {
-        m_currentFunc.push_back(block);
+        m_currentRegion->push_back(block);
         m_builder.setInsertionPointToStart(block);
     }
 

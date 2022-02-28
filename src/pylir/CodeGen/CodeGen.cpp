@@ -606,85 +606,111 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
         implementBlock(continueNormal);
     }
     auto lhsType = m_builder.createTypeOf(lhs);
-    auto rhsType = m_builder.createTypeOf(rhs);
-    auto sameType = m_builder.createIs(lhsType, rhsType);
-    BlockPtr normalMethodBlock;
-    normalMethodBlock->addArgument(m_builder.getI1Type(), m_builder.getCurrentLoc());
-    BlockPtr differentTypeBlock;
-    m_builder.create<mlir::cf::CondBranchOp>(sameType, normalMethodBlock, mlir::ValueRange{trueC}, differentTypeBlock,
-                                             mlir::ValueRange{});
-
-    implementBlock(differentTypeBlock);
-    auto subclass = buildSubclassCheck(rhsType, lhsType);
-    BlockPtr isSubclassBlock;
-    m_builder.create<mlir::cf::CondBranchOp>(subclass, isSubclassBlock, normalMethodBlock, mlir::ValueRange{falseC});
-
-    implementBlock(isSubclassBlock);
-    auto metaType = m_builder.createTypeRef();
-    auto rhsMroTuple = m_builder.createGetSlot(rhsType, metaType, "__mro__");
-    auto lookup = m_builder.createMROLookup(rhsMroTuple, revMethod);
-    BlockPtr hasReversedBlock;
-    m_builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), hasReversedBlock, normalMethodBlock,
-                                             mlir::ValueRange{falseC});
-
-    implementBlock(hasReversedBlock);
-    auto lhsMroTuple = m_builder.createGetSlot(lhsType, metaType, "__mro__");
-    auto lhsLookup = m_builder.createMROLookup(lhsMroTuple, revMethod);
-    BlockPtr callReversedBlock;
-    BlockPtr lhsHasReversedBlock;
-    m_builder.create<mlir::cf::CondBranchOp>(lhsLookup.getSuccess(), lhsHasReversedBlock, callReversedBlock);
-
-    implementBlock(lhsHasReversedBlock);
-    auto sameImplementation = m_builder.createIs(lookup.getResult(), lhsLookup.getResult());
-    m_builder.create<mlir::cf::CondBranchOp>(sameImplementation, normalMethodBlock, mlir::ValueRange{falseC},
-                                             callReversedBlock, mlir::ValueRange{});
-
-    implementBlock(callReversedBlock);
-    auto tuple = m_builder.createMakeTuple({rhs, lhs});
-    auto reverseResult = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, revMethod, tuple, {},
-                                                    m_currentExceptBlock, m_currentLandingPadBlock);
-    auto isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
-    m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, normalMethodBlock, mlir::ValueRange{trueC}, endBlock,
-                                             mlir::ValueRange{reverseResult});
-
-    implementBlock(normalMethodBlock);
-    tuple = m_builder.createMakeTuple({lhs, rhs});
-    BlockPtr typeErrorBlock;
-    auto result = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, method, tuple, {}, typeErrorBlock,
-                                                m_currentExceptBlock, m_currentLandingPadBlock);
-    isNotImplemented = m_builder.createIs(result, m_builder.createNotImplementedRef());
-    BlockPtr maybeTryReverse;
-    m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, maybeTryReverse, endBlock, mlir::ValueRange{result});
-
-    implementBlock(maybeTryReverse);
-    BlockPtr actuallyTryReverse;
-    m_builder.create<mlir::cf::CondBranchOp>(normalMethodBlock->getArgument(0), typeErrorBlock, actuallyTryReverse);
-
-    implementBlock(actuallyTryReverse);
-    tuple = m_builder.createMakeTuple({rhs, lhs});
-    reverseResult = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, revMethod, tuple, {},
-                                                  typeErrorBlock, m_currentExceptBlock, m_currentLandingPadBlock);
-    isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
-    m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, typeErrorBlock, endBlock,
-                                             mlir::ValueRange{reverseResult});
-
-    implementBlock(typeErrorBlock);
-    if (method != "__eq__" && method != "__ne__")
-    {
-        auto typeError = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
-                                            m_currentLandingPadBlock);
-        raiseException(typeError);
-    }
-    else
-    {
-        mlir::Value isEqual = m_builder.createIs(lhs, rhs);
-        if (method == "__ne__")
+    auto outer = typeSensitiveRegion(
+        lhsType,
+        [&]
         {
-            isEqual = m_builder.create<mlir::arith::XOrIOp>(isEqual, trueC);
-        }
-        mlir::Value boolean = m_builder.createBoolFromI1(isEqual);
-        m_builder.create<mlir::cf::BranchOp>(endBlock, boolean);
-    }
+            auto rhsType = m_builder.createTypeOf(rhs);
+            auto inner = typeSensitiveRegion(
+                rhsType,
+                [&]
+                {
+                    auto sameType = m_builder.createIs(lhsType, rhsType);
+                    BlockPtr normalMethodBlock;
+                    normalMethodBlock->addArgument(m_builder.getI1Type(), m_builder.getCurrentLoc());
+                    BlockPtr differentTypeBlock;
+                    m_builder.create<mlir::cf::CondBranchOp>(sameType, normalMethodBlock, mlir::ValueRange{trueC},
+                                                             differentTypeBlock, mlir::ValueRange{});
+
+                    implementBlock(differentTypeBlock);
+                    auto subclass = buildSubclassCheck(rhsType, lhsType);
+                    BlockPtr isSubclassBlock;
+                    m_builder.create<mlir::cf::CondBranchOp>(subclass, isSubclassBlock, normalMethodBlock,
+                                                             mlir::ValueRange{falseC});
+
+                    implementBlock(isSubclassBlock);
+                    auto metaType = m_builder.createTypeRef();
+                    auto rhsMroTuple = m_builder.createGetSlot(rhsType, metaType, "__mro__");
+                    auto lookup = m_builder.createMROLookup(rhsMroTuple, revMethod);
+                    BlockPtr hasReversedBlock;
+                    m_builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), hasReversedBlock, normalMethodBlock,
+                                                             mlir::ValueRange{falseC});
+
+                    implementBlock(hasReversedBlock);
+                    auto lhsMroTuple = m_builder.createGetSlot(lhsType, metaType, "__mro__");
+                    auto lhsLookup = m_builder.createMROLookup(lhsMroTuple, revMethod);
+                    BlockPtr callReversedBlock;
+                    BlockPtr lhsHasReversedBlock;
+                    m_builder.create<mlir::cf::CondBranchOp>(lhsLookup.getSuccess(), lhsHasReversedBlock,
+                                                             callReversedBlock);
+
+                    implementBlock(lhsHasReversedBlock);
+                    auto sameImplementation = m_builder.createIs(lookup.getResult(), lhsLookup.getResult());
+                    m_builder.create<mlir::cf::CondBranchOp>(sameImplementation, normalMethodBlock,
+                                                             mlir::ValueRange{falseC}, callReversedBlock,
+                                                             mlir::ValueRange{});
+
+                    auto* yieldBlock = new mlir::Block;
+                    yieldBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+
+                    implementBlock(callReversedBlock);
+                    auto tuple = m_builder.createMakeTuple({rhs, lhs});
+                    auto reverseResult =
+                        Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, revMethod, tuple, {},
+                                                   m_currentExceptBlock, m_currentLandingPadBlock);
+                    auto isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
+                    m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, normalMethodBlock,
+                                                             mlir::ValueRange{trueC}, yieldBlock,
+                                                             mlir::ValueRange{reverseResult});
+
+                    implementBlock(normalMethodBlock);
+                    tuple = m_builder.createMakeTuple({lhs, rhs});
+                    BlockPtr typeErrorBlock;
+                    auto result =
+                        Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, method, tuple, {},
+                                                      typeErrorBlock, m_currentExceptBlock, m_currentLandingPadBlock);
+                    isNotImplemented = m_builder.createIs(result, m_builder.createNotImplementedRef());
+                    BlockPtr maybeTryReverse;
+                    m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, maybeTryReverse, yieldBlock,
+                                                             mlir::ValueRange{result});
+
+                    implementBlock(maybeTryReverse);
+                    BlockPtr actuallyTryReverse;
+                    m_builder.create<mlir::cf::CondBranchOp>(normalMethodBlock->getArgument(0), typeErrorBlock,
+                                                             actuallyTryReverse);
+
+                    implementBlock(actuallyTryReverse);
+                    tuple = m_builder.createMakeTuple({rhs, lhs});
+                    reverseResult =
+                        Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, revMethod, tuple, {},
+                                                      typeErrorBlock, m_currentExceptBlock, m_currentLandingPadBlock);
+                    isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
+                    m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, typeErrorBlock, yieldBlock,
+                                                             mlir::ValueRange{reverseResult});
+
+                    implementBlock(typeErrorBlock);
+                    if (method != "__eq__" && method != "__ne__")
+                    {
+                        auto typeError = Py::buildException(m_builder.getCurrentLoc(), m_builder,
+                                                            Py::Builtins::TypeError.name, {}, m_currentLandingPadBlock);
+                        raiseException(typeError);
+                    }
+                    else
+                    {
+                        mlir::Value isEqual = m_builder.createIs(lhs, rhs);
+                        if (method == "__ne__")
+                        {
+                            isEqual = m_builder.create<mlir::arith::XOrIOp>(isEqual, trueC);
+                        }
+                        mlir::Value boolean = m_builder.createBoolFromI1(isEqual);
+                        m_builder.create<mlir::cf::BranchOp>(yieldBlock, boolean);
+                    }
+                    implementBlock(yieldBlock);
+                    m_builder.createYield(yieldBlock->getArgument(0));
+                });
+            m_builder.createYield(inner);
+        });
+    m_builder.create<mlir::cf::BranchOp>(endBlock, outer);
 
     implementBlock(endBlock);
     return endBlock->getArgument(0);
@@ -2120,9 +2146,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         visit(*classDef.suite);
         m_builder.create<mlir::ReturnOp>(m_classNamespace);
     }
-    //TODO:
-//    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
-//    writeIdentifier(classDef.className, value);
+    // TODO:
+    //    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
+    //    writeIdentifier(classDef.className, value);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::AsyncForStmt& asyncForStmt) {}
@@ -2642,4 +2668,31 @@ pylir::CodeGen::BlockPtr pylir::CodeGen::createLandingPadBlock(mlir::Block* exce
     mlir::Value exceptionObject = m_builder.create<pylir::Py::LandingPadOp>(typeToCatch);
     m_builder.create<pylir::Py::LandingPadBrOp>(exceptionObject, exceptionHandlerBlock);
     return landingPad;
+}
+
+mlir::Value pylir::CodeGen::typeSensitiveRegion(mlir::Value typeObject, llvm::function_ref<void()> region)
+{
+    mlir::Block* continueBlock = nullptr;
+    mlir::Operation* op;
+    if (m_currentLandingPadBlock)
+    {
+        continueBlock = new mlir::Block;
+        op = m_builder.createTypeSwitchEx(m_builder.getDynamicType(), typeObject, continueBlock, {},
+                                          m_currentLandingPadBlock, {});
+    }
+    else
+    {
+        op = m_builder.createTypeSwitch(m_builder.getDynamicType(), typeObject);
+    }
+
+    {
+        mlir::OpBuilder::InsertionGuard guard{m_builder};
+        auto many = pylir::valueResetMany(m_currentLandingPadBlock, m_currentExceptBlock, m_currentRegion);
+        m_currentRegion = &op->getRegion(0);
+        m_currentLandingPadBlock = m_currentExceptBlock = nullptr;
+        auto* entryBlock = new mlir::Block;
+        implementBlock(entryBlock);
+        region();
+    }
+    return op->getResult(0);
 }
