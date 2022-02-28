@@ -26,7 +26,8 @@ class PylirPy_AllocOp<string mnemonic, list<Trait> traits = []> :
 }
 
 class AddExceptionHandling<Op op, list<Trait> traits = []> : PylirPy_Op<!strconcat(op.opName, "Ex"),
-!listconcat(op.traits, [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments], traits)> {
+    !listconcat(op.traits, [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments,
+                            ExceptionHandling], traits)> {
 
     assert !eq(!size(op.successors), 0), "Op mustn't already have successors";
 
@@ -40,8 +41,6 @@ class AddExceptionHandling<Op op, list<Trait> traits = []> : PylirPy_Op<!strconc
         `\n` ` ` ` ` `label` $happy_path ( `(` $normal_dest_operands^ `)`)?
                      `unwind` $exception_path ( `(` $unwind_dest_operands^ `)`)?
     }]);
-
-    let hasVerifier = 1;
 
     let extraClassDeclaration = op.extraClassDeclaration;
 }
@@ -451,7 +450,9 @@ def PylirPy_TypeSwitchOp : PylirPy_Op<"typeSwitch",
     }];
 }
 
-def PylirPy_TypeSwitchExOp : AddExceptionHandling<PylirPy_TypeSwitchOp>;
+def PylirPy_TypeSwitchExOp : AddExceptionHandling<PylirPy_TypeSwitchOp> {
+    let hasVerifier = 1;
+}
 
 // linear searches
 
@@ -835,14 +836,12 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator, ReturnLike]> {
 class PylirPy_InvokeBase<string mnemonic,list<Trait> traits = []> : PylirPy_Op<mnemonic,
                                             !listconcat(traits,[Terminator, DeclareOpInterfaceMethods<CallOpInterface>,
                                              DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments,
-                                             AlwaysBound])> {
+                                             AlwaysBound, ExceptionHandling])> {
     let summary = "invoke operation";
 
     let successors = (successor AnySuccessor:$happy_path, AnySuccessor:$exception_path);
 
     let results = (outs Variadic<AnyType>:$results);
-
-    let hasVerifier = 1;
 }
 
 def PylirPy_InvokeOp : PylirPy_InvokeBase<"invoke",[DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
@@ -886,6 +885,13 @@ def PylirPy_LandingPadOp : PylirPy_Op<"landingPad", [AlwaysBound]> {
     let hasVerifier = 1;
 
     let assemblyFormat = "$catch_type attr-dict";
+
+    let extraClassDeclaration = [{
+        mlir::Block* getHandler()
+        {
+            return (*this)->getBlock()->getSuccessor(0);
+        }
+    }];
 }
 
 def PylirPy_LandingPadBrOp : PylirPy_Op<"landingPad.br",

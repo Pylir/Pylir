@@ -177,8 +177,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
 {
     using mlir::OpRewritePattern<TargetOp>::OpRewritePattern;
 
-    constexpr static bool hasExceptions = std::disjunction_v<std::is_same<TargetOp, pylir::Py::MakeListExOp>,
-                                                             std::is_same<TargetOp, pylir::Py::MakeSetExOp>>;
+    constexpr static bool hasExceptions = TargetOp::template hasTrait<pylir::Py::ExceptionHandling>();
 
     void rewrite(TargetOp op, mlir::PatternRewriter& rewriter) const override
     {
@@ -187,8 +186,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
         if constexpr (hasExceptions)
         {
             landingPadBlock = op.getExceptionPath();
-            PYLIR_ASSERT(landingPadBlock->getNumSuccessors() == 1);
-            exceptionHandlerBlock = landingPadBlock->getSuccessor(0);
+            exceptionHandlerBlock = pylir::Py::getLandingPad(op).getHandler();
         }
         auto block = op->getBlock();
         auto dest = block->splitBlock(op);

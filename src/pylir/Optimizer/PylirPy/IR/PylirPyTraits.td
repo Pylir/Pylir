@@ -14,4 +14,8 @@ class RuntimeType<string name> : NativeOpTrait<name # "RuntimeType"> {
     let cppNamespace = "pylir::Py";
 }
 
+def ExceptionHandling : NativeOpTrait<"ExceptionHandling"> {
+    let cppNamespace = "pylir::Py";
+}
+
 #endif

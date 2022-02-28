@@ -878,7 +878,9 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
         .Default(mlir::success());
 }
 
-mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock)
+} // namespace
+
+mlir::LogicalResult pylir::Py::details::verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock)
 {
     if (unwindBlock->empty() || !mlir::isa<pylir::Py::LandingPadOp>(unwindBlock->front()))
     {
@@ -886,8 +888,6 @@ mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwind
     }
     return mlir::success();
 }
-
-} // namespace
 
 mlir::LogicalResult pylir::Py::ConstantOp::verify()
 {
@@ -917,32 +917,7 @@ mlir::LogicalResult pylir::Py::TypeSwitchExOp::verify()
     {
         return emitOpError("Expected specialization type for every specialization");
     }
-    return verifyHasLandingpad(*this, getExceptionPath());
-}
-
-mlir::LogicalResult pylir::Py::CallMethodExOp::verify()
-{
-    return verifyHasLandingpad(*this, getExceptionPath());
-}
-
-mlir::LogicalResult pylir::Py::MakeTupleExOp::verify()
-{
-    return verifyHasLandingpad(*this, getExceptionPath());
-}
-
-mlir::LogicalResult pylir::Py::MakeListExOp::verify()
-{
-    return verifyHasLandingpad(*this, getExceptionPath());
-}
-
-mlir::LogicalResult pylir::Py::MakeSetExOp::verify()
-{
-    return verifyHasLandingpad(*this, getExceptionPath());
-}
-
-mlir::LogicalResult pylir::Py::MakeDictExOp::verify()
-{
-    return verifyHasLandingpad(*this, getExceptionPath());
+    return mlir::success();
 }
 
 mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
@@ -970,16 +945,6 @@ mlir::LogicalResult pylir::Py::LandingPadBrOp::verify()
         return emitOpError("Block ending with `py.landingPad.br` has to start with `py.landingPad`");
     }
     return mlir::success();
-}
-
-mlir::LogicalResult pylir::Py::InvokeOp::verify()
-{
-    return verifyHasLandingpad(*this, getExceptionPath());
-}
-
-mlir::LogicalResult pylir::Py::InvokeIndirectOp::verify()
-{
-    return verifyHasLandingpad(*this, getExceptionPath());
 }
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>

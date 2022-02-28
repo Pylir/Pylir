@@ -8,6 +8,9 @@
 
 namespace pylir::Py
 {
+
+class LandingPadOp;
+
 template <class ConcreteType>
 class AlwaysBound : public mlir::OpTrait::TraitBase<ConcreteType, AlwaysBound>
 {
@@ -26,6 +29,20 @@ public:
     bool capturesOperand(unsigned int)
     {
         return false;
+    }
+};
+
+namespace details
+{
+mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock);
+
+} // namespace details
+template <class ConcreteType>
+class ExceptionHandling : public mlir::OpTrait::TraitBase<ConcreteType, ExceptionHandling>
+{
+    static mlir::LogicalResult verifyTrait(mlir::Operation* operation)
+    {
+        return details::verifyHasLandingpad(operation, operation->getSuccessor(1));
     }
 };
 

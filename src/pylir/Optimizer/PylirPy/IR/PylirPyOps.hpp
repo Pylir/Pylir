@@ -41,3 +41,13 @@ using IterArg = std::variant<mlir::Value, IterExpansion>;
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.h.inc>
+
+namespace pylir::Py
+{
+template <class Op>
+LandingPadOp getLandingPad(Op op)
+{
+    static_assert(Op::template hasTrait<ExceptionHandling>());
+    return mlir::cast<LandingPadOp>(&op->getSuccessor(1)->front());
+}
+} // namespace pylir::Py
