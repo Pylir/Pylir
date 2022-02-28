@@ -131,16 +131,19 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
         {
             os.emitValue(iter.programCounter, pointerSize);
             PYLIR_ASSERT(iter.locations.size() <= std::numeric_limits<std::uint32_t>::max());
-            os.emitInt32(iter.locations.size());
+            os.emitULEB128IntValue(iter.locations.size());
             for (const auto& location : iter.locations)
             {
                 PYLIR_ASSERT(location.Size == pointerSize);
                 os.emitInt8(location.Type);
-                os.emitInt8(0); // padding
-                os.emitInt16(location.Reg);
-                os.emitInt32(location.Offset);
+                os.emitULEB128IntValue(location.Reg);
+                switch (location.Type)
+                {
+                    case llvm::StackMaps::Location::Direct:
+                    case llvm::StackMaps::Location::Indirect: os.emitSLEB128IntValue(location.Offset); break;
+                    default: break;
+                }
             }
-            os.emitInt32(0); // padding
         }
     }
 

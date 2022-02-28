@@ -27,19 +27,9 @@ struct StackMap
             Direct = 2,
             Indirect = 3,
         } type;
-        std::uint16_t regNumber;
-        std::uint32_t offset;
+        int regNumber;
+        std::intptr_t offset;
     };
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-    struct CallSite
-    {
-        std::uintptr_t programCounter;
-        std::uint32_t locationCount;
-        alignas(Location) char trailing[];
-    };
-    alignas(CallSite) char trailing[];
-#pragma GCC diagnostic pop
 };
 
 extern "C" const StackMap pylir_default_stack_map = {0x50594C52, 0};
@@ -49,26 +39,33 @@ extern "C" const StackMap PYLIR_WEAK_VAR(pylir_stack_map, pylir_default_stack_ma
 namespace
 {
 
-const std::unordered_map<std::uintptr_t, tcb::span<const StackMap::Location>>& counterToLoc()
+const std::unordered_map<std::uintptr_t, std::vector<StackMap::Location>>& counterToLoc()
 {
-    static std::unordered_map<std::uintptr_t, tcb::span<const StackMap::Location>> result = []
+    static std::unordered_map<std::uintptr_t, std::vector<StackMap::Location>> result = []
     {
-        std::unordered_map<std::uintptr_t, tcb::span<const StackMap::Location>> result;
         const auto& debug = pylir_stack_map;
         PYLIR_ASSERT(debug.magic == 0x50594C52);
-        const char* curr = debug.trailing;
+        const auto* curr = reinterpret_cast<const std::uint8_t*>(&debug + 1);
+        std::unordered_map<std::uintptr_t, std::vector<StackMap::Location>> result(debug.callSiteCount);
         for (std::size_t i = 0; i < debug.callSiteCount; i++)
         {
-            const auto* callSite = reinterpret_cast<const StackMap::CallSite*>(curr);
-            auto programCounter = callSite->programCounter;
-            auto locationCount = callSite->locationCount;
-            curr = callSite->trailing;
-            result.emplace(std::piecewise_construct, std::forward_as_tuple(programCounter),
-                           std::forward_as_tuple(reinterpret_cast<const StackMap::Location*>(curr), locationCount));
-            curr += sizeof(StackMap::Location) * locationCount;
-            if (auto align = reinterpret_cast<std::uintptr_t>(curr) % alignof(StackMap::CallSite))
+            std::uintptr_t programCounter;
+            std::memcpy(&programCounter, curr, sizeof(std::uintptr_t));
+            curr += sizeof(std::uintptr_t);
+            auto locationCount = pylir::rt::readULEB128(&curr);
+            auto& vec = result.emplace(programCounter, locationCount).first->second;
+            for (std::size_t j = 0; j < locationCount; j++)
             {
-                curr += alignof(StackMap::CallSite) - align;
+                auto type = static_cast<StackMap::Location::Type>(*curr++);
+                int regNumber = pylir::rt::readULEB128(&curr);
+                std::intptr_t offset = 0;
+                switch (type)
+                {
+                    case StackMap::Location::Type::Direct:
+                    case StackMap::Location::Type::Indirect: offset = pylir::rt::readSLEB128(&curr);
+                    default: break;
+                }
+                vec[j] = StackMap::Location{type, regNumber, offset};
             }
         }
         return result;

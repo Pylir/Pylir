@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "API.hpp"
+#include "Support.hpp"
 
 void pylir_raise(pylir::rt::PyBaseException& exception)
 {
@@ -50,52 +51,6 @@ enum
     DW_EH_PE_omit = 0xFF
 };
 
-/// Read a uleb128 encoded value and advance pointer
-/// See Variable Length Data Appendix C in:
-/// @link http://dwarfstd.org/Dwarf4.pdf @unlink
-/// @param data reference variable holding memory pointer to decode from
-/// @returns decoded value
-std::uintptr_t readULEB128(const std::uint8_t** data)
-{
-    std::uintptr_t result = 0;
-    std::uintptr_t shift = 0;
-    unsigned char byte;
-    const uint8_t* p = *data;
-    do
-    {
-        byte = *p++;
-        result |= static_cast<std::uintptr_t>(byte & 0x7F) << shift;
-        shift += 7;
-    } while (byte & 0x80);
-    *data = p;
-    return result;
-}
-
-/// Read a sleb128 encoded value and advance pointer
-/// See Variable Length Data Appendix C in:
-/// @link http://dwarfstd.org/Dwarf4.pdf @unlink
-/// @param data reference variable holding memory pointer to decode from
-/// @returns decoded value
-std::intptr_t readSLEB128(const std::uint8_t** data)
-{
-    std::uintptr_t result = 0;
-    std::uintptr_t shift = 0;
-    unsigned char byte;
-    const uint8_t* p = *data;
-    do
-    {
-        byte = *p++;
-        result |= static_cast<std::uintptr_t>(byte & 0x7F) << shift;
-        shift += 7;
-    } while (byte & 0x80);
-    *data = p;
-    if ((byte & 0x40) && (shift < (sizeof(result) << 3)))
-    {
-        result |= static_cast<std::uintptr_t>(~0) << shift;
-    }
-    return static_cast<std::intptr_t>(result);
-}
-
 template <class AsType>
 std::uintptr_t readPointerHelper(const std::uint8_t*& p)
 {
@@ -117,8 +72,8 @@ std::uintptr_t readEncodedPointer(const std::uint8_t** data, std::uint8_t encodi
     switch (encoding & 0x0F)
     {
         case DW_EH_PE_absptr: result = readPointerHelper<std::uintptr_t>(p); break;
-        case DW_EH_PE_uleb128: result = readULEB128(&p); break;
-        case DW_EH_PE_sleb128: result = static_cast<std::uintptr_t>(readSLEB128(&p)); break;
+        case DW_EH_PE_uleb128: result = pylir::rt::readULEB128(&p); break;
+        case DW_EH_PE_sleb128: result = static_cast<std::uintptr_t>(pylir::rt::readSLEB128(&p)); break;
         case DW_EH_PE_udata2: result = readPointerHelper<std::uint16_t>(p); break;
         case DW_EH_PE_udata4: result = readPointerHelper<std::uint32_t>(p); break;
         case DW_EH_PE_udata8: result = readPointerHelper<std::uint64_t>(p); break;
@@ -230,11 +185,11 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
     std::uint8_t typeEncoding = *exceptionTable++;
     if (typeEncoding != DW_EH_PE_omit)
     {
-        auto classInfoOffset = readULEB128(&exceptionTable);
+        auto classInfoOffset = pylir::rt::readULEB128(&exceptionTable);
         classInfo = exceptionTable + classInfoOffset;
     }
     std::uint8_t callSiteEncoding = *exceptionTable++;
-    auto callSiteTableLength = static_cast<std::uint32_t>(readULEB128(&exceptionTable));
+    auto callSiteTableLength = static_cast<std::uint32_t>(pylir::rt::readULEB128(&exceptionTable));
     const auto* callSiteTableStart = exceptionTable;
     const auto* callSiteTableEnd = callSiteTableStart + callSiteTableLength;
     const auto* actionTableStart = callSiteTableEnd;
@@ -243,7 +198,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
         auto start = readEncodedPointer(&callSitePtr, callSiteEncoding);
         auto length = readEncodedPointer(&callSitePtr, callSiteEncoding);
         auto landingPad = readEncodedPointer(&callSitePtr, callSiteEncoding);
-        auto actionEntry = readULEB128(&callSitePtr);
+        auto actionEntry = pylir::rt::readULEB128(&callSitePtr);
         if (offset >= (start + length))
         {
             continue;
@@ -264,7 +219,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
         while (true)
         {
             // auto* actionRecord = action;
-            std::int32_t typeIndex = readSLEB128(&action);
+            std::int32_t typeIndex = pylir::rt::readSLEB128(&action);
             if (typeIndex > 0)
             {
                 // catch clauses
@@ -292,7 +247,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
                 hasCleanUp = true;
             }
             const auto* temp = action;
-            auto actionOffset = readSLEB128(&temp);
+            auto actionOffset = pylir::rt::readSLEB128(&temp);
             if (actionOffset == 0)
             {
                 return {hasCleanUp && (actions & _UA_CLEANUP_PHASE) ? _URC_HANDLER_FOUND : _URC_CONTINUE_UNWIND,

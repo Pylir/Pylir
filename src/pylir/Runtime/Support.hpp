@@ -3,6 +3,7 @@
 #include <pylir/Support/Macros.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <type_traits>
 #include <utility>
@@ -84,6 +85,10 @@ public:
         return m_callable;
     }
 };
+
+std::uintptr_t readULEB128(const std::uint8_t** data);
+
+std::intptr_t readSLEB128(const std::uint8_t** data);
 
 } // namespace pylir::rt
 
