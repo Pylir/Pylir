@@ -725,6 +725,11 @@ bool pylir::Py::GlobalValueOp::isDeclaration()
     return !getInitializerAttr();
 }
 
+pylir::Py::LandingPadBrOp pylir::Py::LandingPadOp::getLandingPadBrOp()
+{
+    return mlir::cast<pylir::Py::LandingPadBrOp>((*this)->getBlock()->getTerminator());
+}
+
 namespace
 {
 

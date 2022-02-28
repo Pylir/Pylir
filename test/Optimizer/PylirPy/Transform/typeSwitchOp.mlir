@@ -56,9 +56,12 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 }
 
 func @type_switch(%trueValue : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant @builtins.BaseException
     %nothing = py.typeSwitchEx %trueValue {
         %value = call @foo(%trueValue) : (!py.dynamic) -> !py.dynamic
         py.yield %value : !py.dynamic
+    } case %0 {
+        py.raise %trueValue
     } : !py.dynamic
     label ^success unwind ^failure
 
@@ -66,15 +69,22 @@ func @type_switch(%trueValue : !py.dynamic) -> !py.dynamic {
     return %trueValue : !py.dynamic
 
 ^failure:
-    %0 = py.landingPad @builtins.BaseException
-    py.landingPad.br ^handler
+    %1 = py.landingPad @builtins.BaseException
+    py.landingPad.br ^handler(%1)
 
-^handler:
-    return %0 : !py.dynamic
+^handler(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: func @type_switch
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-NEXT: %[[BASE:.*]] = py.constant @builtins.BaseException
+// CHECK-NEXT: %[[IS:.*]] = py.is %[[ARG0]], %[[BASE]]
+// CHECK-NEXT: cf.cond_br %[[IS]], ^[[BASE_IMPL:.*]], ^[[CONTINUE:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[BASE_IMPL]]:
+// CHECK-NEXT: cf.br ^[[HANDLER:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG0]]
+// CHECK-NEXT: ^[[CONTINUE]]:
 // CHECK-NEXT: cf.br ^[[GENERIC:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[GENERIC]]:
 // CHECK-NEXT: %[[INVOKE:.*]] = py.invoke @foo(%[[ARG0]])
@@ -89,6 +99,8 @@ func @type_switch(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: return %[[ARG0]]
 // CHECK-NEXT: ^[[FAILURE]]:
 // CHECK-NEXT: %[[EXCEPTION:.*]] = py.landingPad @builtins.BaseException
-// CHECK-NEXT: py.landingPad.br ^[[HANDLER:[[:alnum:]]+]]
-// CHECK-NEXT: ^[[HANDLER]]:
+// CHECK-NEXT: py.landingPad.br ^[[HANDLER]]
+// CHECK-SAME: %[[EXCEPTION]]
+// CHECK-NEXT: ^[[HANDLER]]
+// CHECK-SAME: %[[EXCEPTION:[[:alnum:]]+]]
 // CHECK-NEXT: return %[[EXCEPTION]]

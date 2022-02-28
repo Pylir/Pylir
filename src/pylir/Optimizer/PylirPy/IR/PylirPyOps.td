@@ -891,6 +891,8 @@ def PylirPy_LandingPadOp : PylirPy_Op<"landingPad", [AlwaysBound]> {
         {
             return (*this)->getBlock()->getSuccessor(0);
         }
+
+        pylir::Py::LandingPadBrOp getLandingPadBrOp();
     }];
 }
 

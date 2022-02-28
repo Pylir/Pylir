@@ -39,6 +39,27 @@ bool addExceptionHandling(mlir::PatternRewriter& rewriter, mlir::Operation* oper
 
                 return true;
             })
+        .Case(
+            [&](pylir::Py::RaiseOp raiseOp)
+            {
+                rewriter.setInsertionPoint(raiseOp);
+                auto landingPadOp = pylir::Py::getLandingPad(typeSwitch);
+                auto operands = llvm::to_vector(landingPadOp.getLandingPadBrOp().getArguments());
+                for (auto& iter : operands)
+                {
+                    if (iter == landingPadOp)
+                    {
+                        iter = raiseOp.getException();
+                    }
+                    else if (auto arg = iter.dyn_cast<mlir::BlockArgument>();
+                             arg && arg.getParentBlock() == landingPadOp->getBlock())
+                    {
+                        iter = typeSwitch.getUnwindDestOperands()[arg.getArgNumber()];
+                    }
+                }
+                rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(raiseOp, landingPadOp.getHandler(), operands);
+                return true;
+            })
         .Default(false);
 }
 
@@ -125,6 +146,7 @@ protected:
             signalPassFailure();
             return;
         }
+        [] {}();
     }
 };
 } // namespace
