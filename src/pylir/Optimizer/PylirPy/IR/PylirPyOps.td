@@ -445,7 +445,7 @@ def PylirPy_TypeSwitchOp : PylirPy_Op<"typeSwitch",
     let hasVerifier = 1;
 
     let assemblyFormat = [{
-        $type_object $generic custom<TypeSwitchSpecializations>($specializations, $specialization_types) `:`
+        $type_object ($generic^)? custom<TypeSwitchSpecializations>($specializations, $specialization_types) `:`
         type($results) attr-dict
     }];
 }

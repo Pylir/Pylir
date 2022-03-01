@@ -115,9 +115,16 @@ struct TypeSwitchOpConversion : public mlir::OpRewritePattern<Op>
             rewriter.setInsertionPointToStart(continueBlock);
         }
 
-        rewriter.create<mlir::cf::BranchOp>(op.getLoc(), &op.getGeneric().front());
-        changeTerminators(op.getGeneric());
-        rewriter.inlineRegionBefore(op.getGeneric(), endBlock);
+        if (auto& region = op.getGeneric(); !region.empty())
+        {
+            rewriter.create<mlir::cf::BranchOp>(op.getLoc(), &op.getGeneric().front());
+            changeTerminators(op.getGeneric());
+            rewriter.inlineRegionBefore(op.getGeneric(), endBlock);
+        }
+        else
+        {
+            rewriter.create<pylir::Py::UnreachableOp>(op.getLoc());
+        }
 
         rewriter.setInsertionPointToStart(endBlock);
         rewriter.replaceOp(op, endBlock->getArguments());
@@ -146,7 +153,6 @@ protected:
             signalPassFailure();
             return;
         }
-        [] {}();
     }
 };
 } // namespace

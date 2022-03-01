@@ -913,6 +913,10 @@ mlir::LogicalResult pylir::Py::TypeSwitchOp::verify()
     {
         return emitOpError("Expected specialization type for every specialization");
     }
+    if (getGeneric().empty() && getSpecializations().empty())
+    {
+        return emitOpError("'py.TypeSwitch' can't be completely empty");
+    }
     return mlir::success();
 }
 
@@ -921,6 +925,10 @@ mlir::LogicalResult pylir::Py::TypeSwitchExOp::verify()
     if (getSpecializations().size() != getSpecializationTypes().size())
     {
         return emitOpError("Expected specialization type for every specialization");
+    }
+    if (getGeneric().empty() && getSpecializations().empty())
+    {
+        return emitOpError("'py.TypeSwitchEx' can't be completely empty");
     }
     return mlir::success();
 }

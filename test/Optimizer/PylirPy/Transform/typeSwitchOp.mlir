@@ -104,3 +104,41 @@ func @type_switch(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: ^[[HANDLER]]
 // CHECK-SAME: %[[EXCEPTION:[[:alnum:]]+]]
 // CHECK-NEXT: return %[[EXCEPTION]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.object = #py.type
+py.globalValue @builtins.bool = #py.type
+
+func @type_switch(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant @builtins.type
+    %1 = py.constant @builtins.bool
+    %2 = py.typeSwitch %arg0 case %0 {
+        py.yield %0 : !py.dynamic
+    } case %1 {
+        py.yield %0 : !py.dynamic
+    } : !py.dynamic
+    return %2 : !py.dynamic
+}
+
+// CHECK-LABEL: func @type_switch
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-NEXT: %[[TYPE:.*]] = py.constant @builtins.type
+// CHECK-NEXT: %[[BOOL:.*]] = py.constant @builtins.bool
+// CHECK-NEXT: %[[IS:.*]] = py.is %[[ARG0]], %[[TYPE]]
+// CHECK-NEXT: cf.cond_br %[[IS]], ^[[TYPE_BLOCK:.*]], ^[[CONTINUE:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[TYPE_BLOCK]]:
+// CHECK-NEXT: cf.br ^[[END:[[:alnum:]]+]]
+// CHECK-SAME: %[[TYPE]]
+// CHECK-NEXT: ^[[CONTINUE]]:
+// CHECK-NEXT: %[[IS:.*]] = py.is %[[ARG0]], %[[BOOL]]
+// CHECK-NEXT: cf.cond_br %[[IS]], ^[[BOOL_BLOCK:.*]], ^[[CONTINUE:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[BOOL_BLOCK]]:
+// CHECK-NEXT: cf.br ^[[END]]
+// CHECK-SAME: %[[TYPE]]
+// CHECK-NEXT: ^[[CONTINUE]]:
+// CHECK-NEXT: py.unreachable
+// CHECK-NEXT: ^[[END]]
+// CHECK-SAME: %[[RESULT:[[:alnum:]]+]]
+// CHECK-NEXT: return %[[RESULT]]
