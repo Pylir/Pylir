@@ -907,4 +907,10 @@ def PylirPy_LandingPadBrOp : PylirPy_Op<"landingPad.br",
     let assemblyFormat = "$handler ( `(` $arguments^ `)` )? attr-dict";
 }
 
+def PylirPy_UnreachableOp : PylirPy_Op<"unreachable", [Terminator]> {
+    let results = (outs);
+
+    let assemblyFormat = "attr-dict";
+}
+
 #endif

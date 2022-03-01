@@ -2908,6 +2908,18 @@ struct ArithmeticSelectOpConversion : public ConvertPylirOpToLLVMPattern<mlir::a
     }
 };
 
+struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::UnreachableOp>
+{
+    using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::UnreachableOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
+        return mlir::success();
+    }
+};
+
 class ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 private:
@@ -3017,6 +3029,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitIntAddOpConversion>(converter);
     patternSet.insert<ArithmeticSelectOpConversion>(converter);
     patternSet.insert<LandingPadBrOpConversion>(converter);
+    patternSet.insert<UnreachableOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
