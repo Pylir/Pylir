@@ -30,7 +30,7 @@ func @test4() -> index {
     return %5 : index
 }
 
-// CHECK-LABEL: memSSA.region @test4
+// CHECK-LABEL: memSSA.module @test4
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF1:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: %[[LIST_DEF:.*]] = py.makeList
@@ -66,7 +66,7 @@ func @test5() -> index {
     return %5 : index
 }
 
-// CHECK-LABEL: memSSA.region @test5
+// CHECK-LABEL: memSSA.module @test5
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF1:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: %[[LIST_DEF:.*]] = py.makeList
@@ -89,4 +89,4 @@ func @test6() {
     return
 }
 
-// CHECK-LABEL: memSSA.region @test6
+// CHECK-LABEL: memSSA.module @test6

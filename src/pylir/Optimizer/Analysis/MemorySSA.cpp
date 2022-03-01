@@ -82,7 +82,7 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
 void pylir::MemorySSA::createIR(mlir::Operation* operation)
 {
     mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
-    m_region = builder.create<MemSSA::MemoryRegionOp>(mlir::FlatSymbolRefAttr::get(operation));
+    m_region = builder.create<MemSSA::MemoryModuleOp>(mlir::FlatSymbolRefAttr::get(operation));
     PYLIR_ASSERT(operation->getNumRegions() == 1);
     auto& region = operation->getRegion(0);
     SSABuilder::DefinitionsMap lastDefs;

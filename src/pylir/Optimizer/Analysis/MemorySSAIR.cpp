@@ -58,12 +58,12 @@ mlir::Attribute pylir::MemSSA::ReadAttr::parse(::mlir::AsmParser& parser, ::mlir
     return {};
 }
 
-mlir::RegionKind pylir::MemSSA::MemoryRegionOp::getRegionKind(unsigned int)
+mlir::RegionKind pylir::MemSSA::MemoryModuleOp::getRegionKind(unsigned int)
 {
     return mlir::RegionKind::SSACFG;
 }
 
-llvm::StringRef pylir::MemSSA::MemoryRegionOp::getDefaultDialect()
+llvm::StringRef pylir::MemSSA::MemoryModuleOp::getDefaultDialect()
 {
     return pylir::MemSSA::MemorySSADialect::getDialectNamespace();
 }

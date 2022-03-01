@@ -46,7 +46,7 @@ def ReadAttr : MemorySSA_Attr<"Read"> {
     let constBuilderCall = "::pylir::MemSSA::ReadAttr::get($_builder.getContext(), $0)";
 }
 
-def MemoryRegionOp : MemorySSA_Op<"region", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>,
+def MemoryModuleOp : MemorySSA_Op<"module", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>,
                                              DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
     let arguments = (ins FlatSymbolRefAttr:$function_name);
     let results = (outs);

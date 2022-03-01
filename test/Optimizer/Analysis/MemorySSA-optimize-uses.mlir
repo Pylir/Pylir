@@ -14,7 +14,7 @@ func @test() -> index {
     return %3 : index
 }
 
-// CHECK-LABEL: memSSA.region @test
+// CHECK-LABEL: memSSA.module @test
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY:.*]])
 // CHECK-NEXT: %[[DICT1:.*]] = py.makeDict ()
