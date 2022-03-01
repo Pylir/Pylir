@@ -24,11 +24,7 @@
                     __builtin_unreachable(); \
                 while (0)
 
-            #define PYLIR_ASSERT(...) \
-                if (__VA_ARGS__)      \
-                    ;                 \
-                else                  \
-                    __builtin_unreachable()
+            #define PYLIR_ASSERT(...) (void)0
 
         #elif defined(_MSC_VER)
 
@@ -41,9 +37,9 @@
 
         #else
 
-            #define PYLIR_UNREACHABLE
+            #define PYLIR_UNREACHABLE (void)0
 
-            #define PYLIR_ASSERT(...)
+            #define PYLIR_ASSERT(...) (void)0
 
         #endif
 
