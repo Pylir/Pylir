@@ -13,6 +13,11 @@
 
 #include "MemorySSAIR.hpp"
 
+namespace mlir
+{
+class ImplicitLocOpBuilder;
+}
+
 namespace pylir
 {
 

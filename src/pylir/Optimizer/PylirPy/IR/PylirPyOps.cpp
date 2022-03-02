@@ -72,7 +72,7 @@ mlir::MutableOperandRange pylir::Py::YieldOp::getMutableSuccessorOperands(::mlir
 namespace
 {
 void typeSwitchSuccessorRegions(::mlir::Optional<unsigned int> index, ::mlir::ArrayRef<::mlir::Attribute> operands,
-                                ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions,
+                                ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions, mlir::Region& generic,
                                 llvm::MutableArrayRef<mlir::Region> specializations)
 {
     if (index)
@@ -91,6 +91,15 @@ void typeSwitchSuccessorRegions(::mlir::Optional<unsigned int> index, ::mlir::Ar
                 return;
             }
         }
+        if (!generic.empty())
+        {
+            regions.emplace_back(&generic);
+            return;
+        }
+    }
+    if (!generic.empty())
+    {
+        regions.emplace_back(&generic);
     }
     std::transform(specializations.begin(), specializations.end(), std::back_inserter(regions),
                    [](mlir::Region& reg) { return &reg; });
@@ -101,14 +110,14 @@ void pylir::Py::TypeSwitchOp::getSuccessorRegions(::mlir::Optional<unsigned int>
                                                   ::mlir::ArrayRef<::mlir::Attribute> operands,
                                                   ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions)
 {
-    typeSwitchSuccessorRegions(index, operands, regions, getSpecializations());
+    typeSwitchSuccessorRegions(index, operands, regions, getGeneric(), getSpecializations());
 }
 
 void pylir::Py::TypeSwitchExOp::getSuccessorRegions(::mlir::Optional<unsigned int> index,
                                                     ::mlir::ArrayRef<::mlir::Attribute> operands,
                                                     ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions)
 {
-    typeSwitchSuccessorRegions(index, operands, regions, getSpecializations());
+    typeSwitchSuccessorRegions(index, operands, regions, getGeneric(), getSpecializations());
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::TypeSwitchExOp::getMutableSuccessorOperands(unsigned int index)

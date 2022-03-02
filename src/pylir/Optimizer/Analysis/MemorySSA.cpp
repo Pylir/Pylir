@@ -77,23 +77,17 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
     return builder.create<MemoryDefOp>(lastDef, operation);
 }
 
-} // namespace
-
-void pylir::MemorySSA::createIR(mlir::Operation* operation)
+void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
+                llvm::DenseMap<mlir::Block*, mlir::Block*>& blockMapping, pylir::MemorySSA& ssa,
+                pylir::SSABuilder& ssaBuilder, pylir::SSABuilder::DefinitionsMap& lastDefs,
+                llvm::DenseMap<mlir::Operation*, mlir::Operation*>& results, mlir::Block* regionEndBlock)
 {
-    mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
-    m_region = builder.create<MemSSA::MemoryModuleOp>(mlir::FlatSymbolRefAttr::get(operation));
-    PYLIR_ASSERT(operation->getNumRegions() == 1);
-    auto& region = operation->getRegion(0);
-    SSABuilder::DefinitionsMap lastDefs;
-    pylir::SSABuilder ssaBuilder;
-
     auto hasUnresolvedPredecessors = [&](mlir::Block* block)
     {
         return llvm::any_of(block->getPredecessors(),
                             [&](mlir::Block* pred)
                             {
-                                auto* predMemBlock = m_blockMapping.lookup(pred);
+                                auto* predMemBlock = blockMapping.lookup(pred);
                                 if (!predMemBlock)
                                 {
                                     return true;
@@ -102,20 +96,18 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
                             });
     };
 
-    // Insert entry block that has no predecessors
-    m_blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
     for (auto& block : region)
     {
         mlir::Block* memBlock;
         {
-            auto [lookup, inserted] = m_blockMapping.insert({&block, nullptr});
+            auto [lookup, inserted] = blockMapping.insert({&block, nullptr});
             if (inserted)
             {
                 lookup->second = new mlir::Block;
             }
             memBlock = lookup->second;
         }
-        m_region->getBody().push_back(memBlock);
+        ssa.getMemoryRegion().push_back(memBlock);
         builder.setInsertionPointToStart(memBlock);
         // If any of the predecessors have not yet been inserted
         // mark the block as open
@@ -127,32 +119,63 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         mlir::Value lastDef;
         if (memBlock->isEntryBlock())
         {
-            lastDef = builder.create<MemSSA::MemoryLiveOnEntryOp>();
+            lastDef = builder.create<pylir::MemSSA::MemoryLiveOnEntryOp>();
         }
         else
         {
-            lastDef = ssaBuilder.readVariable(builder.getLoc(), builder.getType<MemSSA::DefType>(), lastDefs, memBlock);
+            lastDef = ssaBuilder.readVariable(builder.getLoc(), builder.getType<pylir::MemSSA::DefType>(), lastDefs,
+                                              memBlock);
         }
         for (auto& op : block)
         {
-            auto* result = maybeAddAccess(builder, *this, &op, lastDef);
+            auto* result = maybeAddAccess(builder, ssa, &op, lastDef);
             if (!result)
             {
                 continue;
             }
-            m_results.insert({&op, result});
-            if (auto def = mlir::dyn_cast_or_null<MemSSA::MemoryDefOp>(result))
+            results.insert({&op, result});
+            if (auto def = mlir::dyn_cast_or_null<pylir::MemSSA::MemoryDefOp>(result))
             {
                 lastDef = def;
             }
+            llvm::SmallVector<mlir::Region*> subRegions;
+            for (auto& iter : op.getRegions())
+            {
+                if (!iter.empty())
+                {
+                    subRegions.push_back(&iter);
+                }
+            }
+            if (subRegions.empty())
+            {
+                continue;
+            }
+            auto* continueRegion = new mlir::Block;
+            auto entryBlocks = llvm::map_range(subRegions, [&](mlir::Region* subRegion)
+                                               { return blockMapping[&subRegion->front()] = new mlir::Block; });
+            builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(subRegions.size()),
+                                                          llvm::to_vector(entryBlocks));
+            for (auto& iter : subRegions)
+            {
+                fillRegion(*iter, builder, blockMapping, ssa, ssaBuilder, lastDefs, results, continueRegion);
+            }
+            builder.setInsertionPointToStart(continueRegion);
+            memBlock = continueRegion;
         }
         lastDefs[memBlock] = lastDef;
+
+        if (auto regionTerm = mlir::dyn_cast<mlir::RegionBranchTerminatorOpInterface>(block.getTerminator()))
+        {
+            PYLIR_ASSERT(regionEndBlock);
+            builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(1), regionEndBlock);
+            continue;
+        }
 
         llvm::SmallVector<mlir::Block*> memSuccessors;
         llvm::SmallVector<mlir::Block*> sealAfter;
         for (auto* succ : block.getSuccessors())
         {
-            auto [lookup, inserted] = m_blockMapping.insert({succ, nullptr});
+            auto [lookup, inserted] = blockMapping.insert({succ, nullptr});
             if (inserted)
             {
                 lookup->second = new mlir::Block;
@@ -169,10 +192,26 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
             }
             memSuccessors.push_back(lookup->second);
         }
-        builder.create<MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(memSuccessors.size()),
-                                               memSuccessors);
+        builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(memSuccessors.size()),
+                                                      memSuccessors);
         llvm::for_each(sealAfter, [&](mlir::Block* lookup) { ssaBuilder.sealBlock(lookup); });
     }
+}
+
+} // namespace
+
+void pylir::MemorySSA::createIR(mlir::Operation* operation)
+{
+    mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
+    m_region = builder.create<MemSSA::MemoryModuleOp>(mlir::FlatSymbolRefAttr::get(operation));
+    PYLIR_ASSERT(operation->getNumRegions() == 1);
+    auto& region = operation->getRegion(0);
+    SSABuilder::DefinitionsMap lastDefs;
+    pylir::SSABuilder ssaBuilder;
+
+    // Insert entry block that has no predecessors
+    m_blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
+    fillRegion(region, builder, m_blockMapping, *this, ssaBuilder, lastDefs, m_results, nullptr);
 }
 
 namespace
