@@ -41,6 +41,11 @@ mlir::LogicalResult pylir::MemSSA::MemoryBranchOp::verify()
 void pylir::MemSSA::InstructionAttr::print(::mlir::AsmPrinter& printer) const
 {
     printer.getStream() << "// ";
+    if (getInstruction()->getNumRegions() != 0)
+    {
+        printer.getStream() << getInstruction()->getRegisteredInfo()->getStringRef();
+        return;
+    }
     getInstruction()->print(printer.getStream(), mlir::OpPrintingFlags{}.useLocalScope());
 }
 

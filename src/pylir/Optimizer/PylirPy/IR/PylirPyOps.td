@@ -432,11 +432,11 @@ def PylirPy_YieldOp : PylirPy_Op<"yield",
     let arguments = (ins Variadic<AnyType>:$results);
     let results = (outs);
 
-    let assemblyFormat = "$results `:` type($results) attr-dict";
+    let assemblyFormat = "($results^ `:` type($results))? attr-dict";
 }
 
 def PylirPy_TypeSwitchOp : PylirPy_Op<"typeSwitch",
-    [DeclareOpInterfaceMethods<RegionBranchOpInterface>, RecursiveSideEffects, NoRegionArguments]> {
+    [DeclareOpInterfaceMethods<RegionBranchOpInterface>, RecursiveSideEffects, NoRegionArguments, NoCapture]> {
 
     let results = (outs Variadic<AnyType>:$results);
     let regions = (region AnyRegion:$generic, VariadicRegion<AnyRegion>:$specializations);
@@ -445,8 +445,8 @@ def PylirPy_TypeSwitchOp : PylirPy_Op<"typeSwitch",
     let hasVerifier = 1;
 
     let assemblyFormat = [{
-        $type_object ($generic^)? custom<TypeSwitchSpecializations>($specializations, $specialization_types) `:`
-        type($results) attr-dict
+        $type_object ($generic^)? custom<TypeSwitchSpecializations>($specializations, $specialization_types)
+        custom<OptionalTypeList>(type($results)) attr-dict
     }];
 }
 

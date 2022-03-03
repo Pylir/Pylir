@@ -296,6 +296,24 @@ void printTypeSwitchSpecializations(mlir::OpAsmPrinter& printer, mlir::Operation
     }
 }
 
+bool parseOptionalTypeList(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::Type>& types)
+{
+    if (!parser.parseOptionalColon())
+    {
+        return static_cast<bool>(parser.parseTypeList(types));
+    }
+    return false;
+}
+
+void printOptionalTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::TypeRange types)
+{
+    if (types.empty())
+    {
+        return;
+    }
+    printer << " : " << types;
+}
+
 } // namespace
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::LandingPadBrOp::getMutableSuccessorOperands(unsigned int)

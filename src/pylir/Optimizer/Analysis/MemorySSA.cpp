@@ -28,7 +28,8 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
     {
         memoryEffectOpInterface.getEffects(effects);
     }
-    if (memoryEffectOpInterface && effects.empty())
+    if ((memoryEffectOpInterface && effects.empty())
+        || (!memoryEffectOpInterface && operation->hasTrait<mlir::OpTrait::HasRecursiveSideEffects>()))
     {
         return nullptr;
     }
@@ -80,7 +81,8 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
 void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
                 llvm::DenseMap<mlir::Block*, mlir::Block*>& blockMapping, pylir::MemorySSA& ssa,
                 pylir::SSABuilder& ssaBuilder, pylir::SSABuilder::DefinitionsMap& lastDefs,
-                llvm::DenseMap<mlir::Operation*, mlir::Operation*>& results, mlir::Block* regionEndBlock)
+                llvm::DenseMap<mlir::Operation*, mlir::Operation*>& results,
+                llvm::ArrayRef<mlir::Block*> regionSuccessors)
 {
     auto hasUnresolvedPredecessors = [&](mlir::Block* block)
     {
@@ -129,45 +131,105 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
         for (auto& op : block)
         {
             auto* result = maybeAddAccess(builder, ssa, &op, lastDef);
-            if (!result)
+            if (result)
             {
-                continue;
-            }
-            results.insert({&op, result});
-            if (auto def = mlir::dyn_cast_or_null<pylir::MemSSA::MemoryDefOp>(result))
-            {
-                lastDef = def;
-            }
-            llvm::SmallVector<mlir::Region*> subRegions;
-            for (auto& iter : op.getRegions())
-            {
-                if (!iter.empty())
+                results.insert({&op, result});
+                if (auto def = mlir::dyn_cast_or_null<pylir::MemSSA::MemoryDefOp>(result))
                 {
-                    subRegions.push_back(&iter);
+                    lastDef = def;
                 }
             }
-            if (subRegions.empty())
+            auto regionBranchOp = mlir::dyn_cast<mlir::RegionBranchOpInterface>(&op);
+            if (!regionBranchOp)
             {
                 continue;
             }
+            lastDefs[memBlock] = lastDef;
+            llvm::SmallVector<mlir::RegionSuccessor> successors;
+            regionBranchOp.getSuccessorRegions(llvm::None, successors);
+            PYLIR_ASSERT(!successors.empty());
             auto* continueRegion = new mlir::Block;
-            auto entryBlocks = llvm::map_range(subRegions, [&](mlir::Region* subRegion)
-                                               { return blockMapping[&subRegion->front()] = new mlir::Block; });
-            builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(subRegions.size()),
-                                                          llvm::to_vector(entryBlocks));
-            for (auto& iter : subRegions)
+
+            llvm::SmallVector<mlir::Block*> regionEntries;
+
+            auto getRegionSuccBlocks = [&](const llvm::SmallVector<mlir::RegionSuccessor>& successors)
             {
-                fillRegion(*iter, builder, blockMapping, ssa, ssaBuilder, lastDefs, results, continueRegion);
+                return llvm::to_vector(
+                    llvm::map_range(successors,
+                                    [&](const mlir::RegionSuccessor& succ)
+                                    {
+                                        if (succ.isParent())
+                                        {
+                                            return continueRegion;
+                                        }
+                                        auto result = blockMapping.insert({&succ.getSuccessor()->front(), nullptr});
+                                        if (result.second)
+                                        {
+                                            result.first->second = new mlir::Block;
+                                            // We have to conservatively mark region entries as open simply due to
+                                            // having absolutely no way to tell whether all their predecessors
+                                            // have been visited, due not being able to get a list of all predecessors!
+                                            // We only get successors of a region once we are filling it in.
+                                            // After we are done filling in all regions of the operation however we can
+                                            // be sure all their predecessors have been filled
+                                            ssaBuilder.markOpenBlock(result.first->second);
+                                            regionEntries.push_back(result.first->second);
+                                        }
+                                        return result.first->second;
+                                    }));
+            };
+
+            auto entryBlocks = getRegionSuccBlocks(successors);
+            builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(entryBlocks.size()),
+                                                          entryBlocks);
+
+            llvm::SmallVector<mlir::Region*> workList;
+
+            auto fillWorkList = [&](const llvm::SmallVector<mlir::RegionSuccessor>& successors)
+            {
+                for (auto& iter : llvm::reverse(successors))
+                {
+                    if (!iter.isParent())
+                    {
+                        workList.push_back(iter.getSuccessor());
+                    }
+                }
+            };
+
+            fillWorkList(successors);
+
+            llvm::DenseSet<mlir::Region*> seen;
+            while (!workList.empty())
+            {
+                auto succ = workList.pop_back_val();
+                if (!seen.insert(succ).second)
+                {
+                    continue;
+                }
+                llvm::SmallVector<mlir::RegionSuccessor> subRegionSuccessors;
+                regionBranchOp.getSuccessorRegions(succ->getRegionNumber(), subRegionSuccessors);
+                fillRegion(*succ, builder, blockMapping, ssa, ssaBuilder, lastDefs, results,
+                           getRegionSuccBlocks(subRegionSuccessors));
+                fillWorkList(subRegionSuccessors);
             }
+            for (auto& iter : regionEntries)
+            {
+                ssaBuilder.sealBlock(iter);
+            }
+
+            ssa.getMemoryRegion().push_back(continueRegion);
             builder.setInsertionPointToStart(continueRegion);
             memBlock = continueRegion;
+
+            lastDef = ssaBuilder.readVariable(builder.getLoc(), builder.getType<pylir::MemSSA::DefType>(), lastDefs,
+                                              memBlock);
         }
         lastDefs[memBlock] = lastDef;
 
         if (auto regionTerm = mlir::dyn_cast<mlir::RegionBranchTerminatorOpInterface>(block.getTerminator()))
         {
-            PYLIR_ASSERT(regionEndBlock);
-            builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(1), regionEndBlock);
+            builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(regionSuccessors.size()),
+                                                          regionSuccessors);
             continue;
         }
 
