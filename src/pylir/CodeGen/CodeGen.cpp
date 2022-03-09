@@ -1,7 +1,7 @@
 #include "CodeGen.hpp"
 
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
@@ -79,7 +79,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     }
     if (needsTerminator())
     {
-        m_builder.create<mlir::ReturnOp>();
+        m_builder.create<mlir::func::ReturnOp>();
     }
 
     return m_module;
@@ -194,7 +194,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
             {
                 executeFinallyBlocks(false);
                 auto none = m_builder.createNoneRef();
-                m_builder.create<mlir::ReturnOp>(mlir::ValueRange{none});
+                m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{none});
                 m_builder.clearInsertionPoint();
                 return;
             }
@@ -204,7 +204,7 @@ void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
                 return;
             }
             executeFinallyBlocks(true);
-            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{value});
+            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{value});
             m_builder.clearInsertionPoint();
         },
         [&](const Syntax::BreakStmt& breakStmt)
@@ -1999,8 +1999,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 auto metaType = m_builder.createTypeOf(closureType);
                 auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
                 auto cell = m_builder
-                                .create<mlir::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
-                                                              mlir::ValueRange{newMethod, tuple, emptyDict})
+                                .create<mlir::func::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
+                                                                    mlir::ValueRange{newMethod, tuple, emptyDict})
                                 ->getResult(0);
                 m_functionScope->identifiers.emplace(name.getValue(), Identifier{cell});
                 closures.erase(name);
@@ -2024,8 +2024,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             auto metaType = m_builder.createTypeOf(closureType);
             auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
             auto cell = m_builder
-                            .create<mlir::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
-                                                          mlir::ValueRange{newMethod, tuple, emptyDict})
+                            .create<mlir::func::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
+                                                                mlir::ValueRange{newMethod, tuple, emptyDict})
                             ->getResult(0);
             m_functionScope->identifiers.emplace(iter.getValue(), Identifier{cell});
         }
@@ -2046,7 +2046,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         visit(*funcDef.suite);
         if (needsTerminator())
         {
-            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
+            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
         }
         func = buildFunctionCC(formImplName(qualifiedName + "$cc"), func, functionParameters);
     }
@@ -2144,7 +2144,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         m_classNamespace = func.getArgument(1);
 
         visit(*classDef.suite);
-        m_builder.create<mlir::ReturnOp>(m_classNamespace);
+        m_builder.create<mlir::func::ReturnOp>(m_classNamespace);
     }
     // TODO:
     //    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
@@ -2515,8 +2515,8 @@ mlir::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::FuncOp impl
     std::transform(unpacked.begin(), unpacked.end(), args.begin() + 1,
                    [](const UnpackResults& unpackResults) { return unpackResults.parameterValue; });
 
-    auto result = m_builder.create<mlir::CallOp>(implementation, args);
-    m_builder.create<mlir::ReturnOp>(result->getResults());
+    auto result = m_builder.create<mlir::func::CallOp>(implementation, args);
+    m_builder.create<mlir::func::ReturnOp>(result->getResults());
     return cc;
 }
 

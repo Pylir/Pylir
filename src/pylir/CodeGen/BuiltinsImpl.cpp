@@ -1,5 +1,5 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 
 #include <llvm/ADT/StringSet.h>
 
@@ -148,7 +148,7 @@ pylir::Py::GlobalValueOp
         }
         if (needsTerminator())
         {
-            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
+            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
         }
     }
     if (parameters.size() != 2 || parameters[0].kind != FunctionParameter::PosRest
@@ -236,7 +236,7 @@ void pylir::CodeGen::binCheckOtherOp(mlir::Value other, const Py::Builtins::Buil
     m_builder.create<mlir::cf::CondBranchOp>(otherIsType, otherIsTypeBlock, elseBlock);
 
     implementBlock(elseBlock);
-    m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createNotImplementedRef()});
+    m_builder.create<mlir::func::ReturnOp>(mlir::Value{m_builder.createNotImplementedRef()});
 
     implementBlock(otherIsTypeBlock);
 }
@@ -284,7 +284,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             implementBlock(typeOfBlock);
                             auto item = m_builder.createTupleGetItem(args, zeroI);
                             auto typeOf = m_builder.createTypeOf(item);
-                            m_builder.create<mlir::ReturnOp>(mlir::ValueRange{typeOf});
+                            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{typeOf});
 
                             implementBlock(constructBlock);
                             auto mro = m_builder.createGetSlot(self, m_builder.createTypeRef(), "__mro__");
@@ -302,14 +302,14 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<mlir::cf::CondBranchOp>(isSubclass, isSubclassBlock, notSubclassBlock);
 
                             implementBlock(notSubclassBlock);
-                            m_builder.create<mlir::ReturnOp>(result);
+                            m_builder.create<mlir::func::ReturnOp>(result);
 
                             implementBlock(isSubclassBlock);
                             [[maybe_unused]] auto initRes = Py::buildSpecialMethodCall(
                                 m_builder.getCurrentLoc(), m_builder, "__init__",
                                 m_builder.createTuplePrepend(self, args), kw, nullptr, nullptr);
                             // TODO: Check initRes is None
-                            m_builder.create<mlir::ReturnOp>(result);
+                            m_builder.create<mlir::func::ReturnOp>(result);
                         });
                 });
 
@@ -328,7 +328,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                   [[maybe_unused]] auto kw = functionArgs[2];
                                                   // TODO: How to handle non `type` derived type objects?
                                                   auto obj = m_builder.createMakeObject(clazz);
-                                                  m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
+                                                  m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{obj});
                                               });
             slots["__init__"] =
                 createFunction("builtins.object.__init__", {FunctionParameter{"", FunctionParameter::PosOnly, false}});
@@ -344,7 +344,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    auto trueC = m_builder.createConstant(true);
                                    auto notImplemented = m_builder.createNotImplementedRef();
                                    auto select = m_builder.create<mlir::arith::SelectOp>(equal, trueC, notImplemented);
-                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{select});
+                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{select});
                                });
             slots["__ne__"] =
                 createFunction("builtins.object.__ne__",
@@ -377,7 +377,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    m_builder.create<mlir::cf::BranchOp>(endBlock, mlir::ValueRange{asBoolean});
 
                                    implementBlock(endBlock);
-                                   m_builder.create<mlir::ReturnOp>(endBlock->getArgument(0));
+                                   m_builder.create<mlir::func::ReturnOp>(endBlock->getArgument(0));
                                });
             slots["__hash__"] =
                 createFunction("builtins.object.__hash__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
@@ -386,7 +386,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    auto self = functionArgs[0];
                                    auto hash = m_builder.createObjectHash(self);
                                    auto result = m_builder.createIntFromInteger(hash);
-                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{result});
                                });
             mlir::FuncOp objectReprFunc;
             Py::GlobalValueOp objectReprObj;
@@ -404,7 +404,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     mlir::Value concat = m_builder.createStrConcat({m_builder.createConstant("<"), name,
                                                                     m_builder.createConstant(" object at "), str,
                                                                     m_builder.createConstant(">")});
-                    m_builder.create<mlir::ReturnOp>(concat);
+                    m_builder.create<mlir::func::ReturnOp>(concat);
                 },
                 &objectReprFunc);
             slots["__str__"] = createFunction(
@@ -414,7 +414,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto self = functionArgs[0];
                     auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__",
                                                              m_builder.createMakeTuple({self}), {}, nullptr, nullptr);
-                    m_builder.create<mlir::ReturnOp>(result);
+                    m_builder.create<mlir::func::ReturnOp>(result);
                 });
         });
     auto baseException = createClass(
@@ -431,7 +431,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    [[maybe_unused]] auto args = functionArgs[1];
                                    auto obj = m_builder.createMakeObject(clazz);
                                    m_builder.createSetSlot(obj, m_builder.createBaseExceptionRef(), "args", args);
-                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
+                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{obj});
                                });
             slots["__init__"] = createFunction("builtins.BaseException.__init__",
                                                {FunctionParameter{"", FunctionParameter::PosOnly, false},
@@ -460,7 +460,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     m_builder.create<mlir::cf::CondBranchOp>(isZero, zeroLenBlock, contBlock);
 
                     implementBlock(zeroLenBlock);
-                    m_builder.create<mlir::ReturnOp>(mlir::Value{m_builder.createConstant("")});
+                    m_builder.create<mlir::func::ReturnOp>(mlir::Value{m_builder.createConstant("")});
 
                     implementBlock(contBlock);
                     auto isOne = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::eq, len, oneI);
@@ -477,7 +477,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto tuple = m_builder.createMakeTuple({m_builder.createStrRef(), contBlock->getArgument(0)});
                     auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__", tuple,
                                                              {}, nullptr, nullptr);
-                    m_builder.create<mlir::ReturnOp>(result);
+                    m_builder.create<mlir::func::ReturnOp>(result);
                 });
             slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
 #define BASEEXCEPTION_SLOT(name, ...) m_builder.getPyStringAttr(#name),
@@ -538,15 +538,16 @@ void pylir::CodeGen::createBuiltinsImpl()
                     slots["__new__"] = createFunction(
                         "builtins.NoneType.__new__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
                         [&](mlir::ValueRange)
-                        { m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()}); });
+                        { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()}); });
                     slots["__repr__"] = createFunction(
                         "builtins.NoneType.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                        [&](mlir::ValueRange)
-                        { m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createConstant("None")}); });
+                        [&](mlir::ValueRange) {
+                            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant("None")});
+                        });
                     slots["__bool__"] = createFunction(
                         "builtins.NoneType.__bool__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
                         [&](mlir::ValueRange)
-                        { m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createConstant(false)}); });
+                        { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant(false)}); });
                 });
     m_builder.createGlobalValue(Py::Builtins::None.name, true, Py::ObjectAttr::get(m_builder.getNoneTypeBuiltin()),
                                 true);
@@ -557,37 +558,38 @@ void pylir::CodeGen::createBuiltinsImpl()
             slots["__new__"] = createFunction(
                 "builtins.NotImplementedType.__new__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
                 [&](mlir::ValueRange)
-                { m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createNotImplementedRef()}); });
-            slots["__repr__"] = createFunction(
-                "builtins.NotImplementedType.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                [&](mlir::ValueRange)
-                { m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createConstant("NotImplemented")}); });
+                { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNotImplementedRef()}); });
+            slots["__repr__"] = createFunction("builtins.NotImplementedType.__repr__",
+                                               {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+                                               [&](mlir::ValueRange) {
+                                                   m_builder.create<mlir::func::ReturnOp>(
+                                                       mlir::ValueRange{m_builder.createConstant("NotImplemented")});
+                                               });
         });
     m_builder.createGlobalValue(Py::Builtins::NotImplemented.name, true,
                                 Py::ObjectAttr::get(m_builder.getNotImplementedTypeBuiltin()), true);
-    createClass(
-        m_builder.getFunctionBuiltin(), {},
-        [&](SlotMapImpl& slots)
-        {
-            slots["__call__"] = createFunction(
-                "builtins.function.__call__",
-                {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                 FunctionParameter{"", FunctionParameter::PosRest, false},
-                 FunctionParameter{"", FunctionParameter::KeywordRest, false}},
-                [&](mlir::ValueRange functionArguments)
+    createClass(m_builder.getFunctionBuiltin(), {},
+                [&](SlotMapImpl& slots)
                 {
-                    auto self = functionArguments[0];
-                    auto args = functionArguments[1];
-                    auto kw = functionArguments[2];
-                    auto callable = m_builder.createFunctionGetFunction(self);
-                    auto result = m_builder.create<mlir::CallIndirectOp>(callable, mlir::ValueRange{self, args, kw});
-                    m_builder.create<mlir::ReturnOp>(result.getResults());
-                });
-            slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
+                    slots["__call__"] = createFunction("builtins.function.__call__",
+                                                       {FunctionParameter{"", FunctionParameter::PosOnly, false},
+                                                        FunctionParameter{"", FunctionParameter::PosRest, false},
+                                                        FunctionParameter{"", FunctionParameter::KeywordRest, false}},
+                                                       [&](mlir::ValueRange functionArguments)
+                                                       {
+                                                           auto self = functionArguments[0];
+                                                           auto args = functionArguments[1];
+                                                           auto kw = functionArguments[2];
+                                                           auto callable = m_builder.createFunctionGetFunction(self);
+                                                           auto result = m_builder.create<mlir::func::CallIndirectOp>(
+                                                               callable, mlir::ValueRange{self, args, kw});
+                                                           m_builder.create<mlir::func::ReturnOp>(result.getResults());
+                                                       });
+                    slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
 #define FUNCTION_SLOT(x, ...) m_builder.getPyStringAttr(#x),
 #include <pylir/Interfaces/Slots.def>
-            }));
-        });
+                    }));
+                });
     createClass(m_builder.getCellBuiltin(), {},
                 [&](SlotMapImpl& slots)
                 {
@@ -605,7 +607,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                           auto obj = m_builder.createMakeObject(clazz);
                                                           // TODO: check args for size, if len 0, set cell_content to
                                                           // unbound, if len 1 set to the value else error
-                                                          m_builder.create<mlir::ReturnOp>(mlir::ValueRange{obj});
+                                                          m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{obj});
                                                       });
                 });
     createClass(
@@ -632,9 +634,9 @@ void pylir::CodeGen::createBuiltinsImpl()
                         llvm::SmallVector args{functionObj};
                         args.push_back(m_builder.createStrRef());
                         args.append(functionArguments.begin() + 1, functionArguments.end());
-                        auto call = m_builder.create<mlir::CallOp>(newFunction, args).getResult(0);
+                        auto call = m_builder.create<mlir::func::CallOp>(newFunction, args).getResult(0);
                         auto result = m_builder.createStrCopy(call, clazz);
-                        m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                        m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{result});
                     }
 
                     implementBlock(normal);
@@ -668,7 +670,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     raiseException(exception);
 
                     implementBlock(strBlock);
-                    m_builder.create<mlir::ReturnOp>(str);
+                    m_builder.create<mlir::func::ReturnOp>(str);
 
                     implementBlock(encodedBlock);
                     // TODO:
@@ -681,7 +683,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                    // TODO: check its str or subclass
                                                    auto hash = m_builder.createStrHash(self);
                                                    auto result = m_builder.createIntFromInteger(hash);
-                                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{result});
                                                });
             slots["__eq__"] =
                 createFunction("builtins.str.__eq__",
@@ -693,13 +695,13 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    // TODO: check both are str or subclass
                                    auto equal = m_builder.createStrEqual(lhs, rhs);
                                    auto result = m_builder.createBoolFromI1(equal);
-                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{result});
+                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{result});
                                });
             slots["__str__"] = createFunction("builtins.str.__str__", {{"", FunctionParameter::PosOnly, false}},
                                               [&](mlir::ValueRange functionArguments)
                                               {
                                                   auto self = functionArguments[0];
-                                                  m_builder.create<mlir::ReturnOp>(self);
+                                                  m_builder.create<mlir::func::ReturnOp>(self);
                                               });
         });
     createClass(m_builder.getDictBuiltin(), {},
@@ -724,7 +726,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.createRaise(object);
 
                             implementBlock(success);
-                            m_builder.create<mlir::ReturnOp>(lookup.getResult());
+                            m_builder.create<mlir::func::ReturnOp>(lookup.getResult());
                         });
 
                     slots["__setitem__"] = createFunction("builtins.dict.__setitem__",
@@ -747,7 +749,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                            // TODO: maybe check its dict
                                            auto len = m_builder.createDictLen(self);
                                            auto integer = m_builder.createIntFromInteger(len);
-                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
+                                           m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{integer});
                                        });
                 });
     // Stubs
@@ -762,7 +764,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                   // TODO: maybe check its tuple
                                                   auto len = m_builder.createTupleLen(self);
                                                   auto integer = m_builder.createIntFromInteger(len);
-                                                  m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
+                                                  m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{integer});
                                               });
             slots["__repr__"] = createFunction(
                 "builtins.tuple.__repr__", {{"", FunctionParameter::PosOnly, false}},
@@ -821,11 +823,11 @@ void pylir::CodeGen::createBuiltinsImpl()
 
                     implementBlock(oneBlock);
                     concat = m_builder.createStrConcat({exitBlock->getArgument(0), m_builder.createConstant(",)")});
-                    m_builder.create<mlir::ReturnOp>(mlir::Value{concat});
+                    m_builder.create<mlir::func::ReturnOp>(mlir::Value{concat});
 
                     implementBlock(elseBlock);
                     concat = m_builder.createStrConcat({exitBlock->getArgument(0), m_builder.createConstant(")")});
-                    m_builder.create<mlir::ReturnOp>(mlir::Value{concat});
+                    m_builder.create<mlir::func::ReturnOp>(mlir::Value{concat});
                 });
         });
     auto integer = createClass(
@@ -838,7 +840,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                    auto self = functionArguments[0];
                                                    // TODO: check its int
                                                    auto asStr = m_builder.createIntToStr(self);
-                                                   m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asStr});
+                                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{asStr});
                                                });
             slots["__add__"] =
                 createFunction("builtins.int.__add__",
@@ -849,7 +851,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    auto other = functionArguments[1];
                                    binCheckOtherOp(other, Py::Builtins::Int);
                                    auto add = m_builder.createIntAdd(self, other);
-                                   m_builder.create<mlir::ReturnOp>(mlir::Value{add});
+                                   m_builder.create<mlir::func::ReturnOp>(mlir::Value{add});
                                });
             auto cmpImpl = [&](Py::IntCmpKind kind)
             {
@@ -860,7 +862,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     binCheckOtherOp(other, Py::Builtins::Int);
                     auto cmp = m_builder.createIntCmp(kind, self, other);
                     auto boolean = m_builder.createBoolFromI1(cmp);
-                    m_builder.create<mlir::ReturnOp>(mlir::Value{boolean});
+                    m_builder.create<mlir::func::ReturnOp>(mlir::Value{boolean});
                 };
             };
             slots["__eq__"] =
@@ -891,7 +893,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                 [&](mlir::ValueRange functionArguments)
                                                 {
                                                     auto self = functionArguments[0];
-                                                    m_builder.create<mlir::ReturnOp>(self);
+                                                    m_builder.create<mlir::func::ReturnOp>(self);
                                                 });
             slots["__bool__"] = createFunction("builtins.int.__bool__", {{"", FunctionParameter::PosOnly, false}},
                                                [&](mlir::ValueRange functionArguments)
@@ -900,7 +902,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                    auto zero = m_builder.createConstant(BigInt(0));
                                                    auto cmp = m_builder.createIntCmp(Py::IntCmpKind::ne, self, zero);
                                                    mlir::Value result = m_builder.createBoolFromI1(cmp);
-                                                   m_builder.create<mlir::ReturnOp>(result);
+                                                   m_builder.create<mlir::func::ReturnOp>(result);
                                                });
         });
     createClass(m_builder.getListBuiltin(), {},
@@ -914,7 +916,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                            // TODO: maybe check its list
                                            auto len = m_builder.createListLen(self);
                                            auto integer = m_builder.createIntFromInteger(len);
-                                           m_builder.create<mlir::ReturnOp>(mlir::ValueRange{integer});
+                                           m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{integer});
                                        });
                 });
     createClass(
@@ -931,7 +933,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto boolResult = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__bool__",
                                                                     m_builder.createMakeTuple({value}), {},
                                                                     notFoundBlock, nullptr, nullptr);
-                    m_builder.create<mlir::ReturnOp>(boolResult);
+                    m_builder.create<mlir::func::ReturnOp>(boolResult);
 
                     implementBlock(notFoundBlock);
                     notFoundBlock = new mlir::Block;
@@ -940,17 +942,17 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto zero = m_builder.create<mlir::arith::ConstantIndexOp>(0);
                     auto notEqual = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ne, index, zero);
                     auto asBool = m_builder.createBoolFromI1(notEqual);
-                    m_builder.create<mlir::ReturnOp>(mlir::ValueRange{asBool});
+                    m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{asBool});
 
                     implementBlock(notFoundBlock);
-                    m_builder.create<mlir::ReturnOp>(mlir::ValueRange{m_builder.createConstant(true)});
+                    m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant(true)});
                 },
                 nullptr, m_builder.getTupleAttr({m_builder.getPyBoolAttr(false)}), {});
             slots["__bool__"] = createFunction("builtins.bool.__bool__", {{"", FunctionParameter::PosOnly, false}},
                                                [&](mlir::ValueRange functionArguments)
                                                {
                                                    auto self = functionArguments[0];
-                                                   m_builder.create<mlir::ReturnOp>(self);
+                                                   m_builder.create<mlir::func::ReturnOp>(self);
                                                });
             slots["__repr__"] =
                 createFunction("builtins.bool.__repr__", {{"", FunctionParameter::PosOnly, false}},
@@ -966,7 +968,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    m_builder.create<mlir::cf::CondBranchOp>(i1, successor, mlir::ValueRange{trueStr},
                                                                             successor, mlir::ValueRange{falseStr});
                                    implementBlock(successor);
-                                   m_builder.create<mlir::ReturnOp>(successor->getArgument(0));
+                                   m_builder.create<mlir::func::ReturnOp>(successor->getArgument(0));
                                });
         });
 
@@ -1059,7 +1061,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                    {
                        auto object = functionArguments[0];
                        auto result = implementLenBuiltin(m_builder, object, nullptr);
-                       m_builder.create<mlir::ReturnOp>(result);
+                       m_builder.create<mlir::func::ReturnOp>(result);
                    });
     createFunction(m_builder.getReprBuiltin().getValue(),
                    {
@@ -1083,7 +1085,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                        raiseException(exception);
 
                        implementBlock(strBlock);
-                       m_builder.create<mlir::ReturnOp>(result);
+                       m_builder.create<mlir::func::ReturnOp>(result);
                    });
     createExternal("sys.__excepthook__");
 }

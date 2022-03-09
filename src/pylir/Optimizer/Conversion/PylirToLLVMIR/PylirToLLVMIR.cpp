@@ -1,9 +1,9 @@
 
 #include <mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h>
+#include <mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h>
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/Pattern.h>
 #include <mlir/Conversion/LLVMCommon/TypeConverter.h>
-#include <mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/IR/PatternMatch.h>
@@ -2977,7 +2977,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     conversionTarget.addLegalOp<mlir::ModuleOp>();
 
     mlir::RewritePatternSet patternSet(&getContext());
-    mlir::populateStdToLLVMConversionPatterns(converter, patternSet);
+    mlir::populateFuncToLLVMConversionPatterns(converter, patternSet);
     mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
     patternSet.insert<ConstantOpConversion>(converter);
     patternSet.insert<GlobalValueOpConversion>(converter);

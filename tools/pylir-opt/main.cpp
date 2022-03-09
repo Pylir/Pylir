@@ -3,7 +3,7 @@
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/InitAllDialects.h>
 #include <mlir/InitAllPasses.h>
-#include <mlir/Support/MlirOptMain.h>
+#include <mlir/Tools/mlir-opt/MlirOptMain.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>

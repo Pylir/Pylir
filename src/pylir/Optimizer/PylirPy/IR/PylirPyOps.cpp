@@ -37,24 +37,6 @@ mlir::OpFoldResult pylir::Py::StrCopyOp::getRuntimeType(unsigned int)
     return getTypeObject();
 }
 
-mlir::LogicalResult pylir::Py::StrConcatOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                             ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                             ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                             ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
-mlir::LogicalResult
-    pylir::Py::CallMethodExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
-                                                ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::CallMethodExOp::getMutableSuccessorOperands(unsigned int index)
 {
     if (index == 0)
@@ -71,13 +53,14 @@ mlir::MutableOperandRange pylir::Py::YieldOp::getMutableSuccessorOperands(::mlir
 
 namespace
 {
-void typeSwitchSuccessorRegions(::mlir::Optional<unsigned int> index, ::mlir::ArrayRef<::mlir::Attribute> operands,
+void typeSwitchSuccessorRegions(::mlir::Optional<unsigned int> index, mlir::ResultRange resultRange,
+                                ::mlir::ArrayRef<::mlir::Attribute> operands,
                                 ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions, mlir::Region& generic,
                                 llvm::MutableArrayRef<mlir::Region> specializations)
 {
     if (index)
     {
-        regions.emplace_back();
+        regions.emplace_back(resultRange);
         return;
     }
     auto typeObject = operands[0];
@@ -110,14 +93,14 @@ void pylir::Py::TypeSwitchOp::getSuccessorRegions(::mlir::Optional<unsigned int>
                                                   ::mlir::ArrayRef<::mlir::Attribute> operands,
                                                   ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions)
 {
-    typeSwitchSuccessorRegions(index, operands, regions, getGeneric(), getSpecializations());
+    typeSwitchSuccessorRegions(index, getResults(), operands, regions, getGeneric(), getSpecializations());
 }
 
 void pylir::Py::TypeSwitchExOp::getSuccessorRegions(::mlir::Optional<unsigned int> index,
                                                     ::mlir::ArrayRef<::mlir::Attribute> operands,
                                                     ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions)
 {
-    typeSwitchSuccessorRegions(index, operands, regions, getGeneric(), getSpecializations());
+    typeSwitchSuccessorRegions(index, getResults(), operands, regions, getGeneric(), getSpecializations());
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::TypeSwitchExOp::getMutableSuccessorOperands(unsigned int index)
@@ -321,15 +304,6 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::LandingPadBrOp::getMutableS
     return getArgumentsMutable();
 }
 
-mlir::LogicalResult pylir::Py::MakeTupleOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                             ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                             ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                             ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
 void pylir::Py::MakeTupleOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
@@ -347,33 +321,6 @@ void pylir::Py::MakeTupleExOp::getEffects(
     effects.emplace_back(mlir::MemoryEffects::Allocate::get(), getResult());
     effects.emplace_back(mlir::MemoryEffects::Read::get());
     effects.emplace_back(mlir::MemoryEffects::Write::get());
-}
-
-mlir::LogicalResult pylir::Py::MakeListOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                            ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                            ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                            ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::Py::MakeSetOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                           ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                           ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                           ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::Py::MakeDictOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                            ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                            ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                            ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
 }
 
 namespace
@@ -534,15 +481,6 @@ mlir::LogicalResult pylir::Py::InvokeIndirectOp::inferReturnTypes(
     return mlir::success();
 }
 
-mlir::LogicalResult
-    pylir::Py::MakeTupleExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
-                                               ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                               ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeTupleExOp::getMutableSuccessorOperands(unsigned int index)
 {
     if (index == 0)
@@ -571,15 +509,6 @@ void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
     }
     build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
-}
-
-mlir::LogicalResult
-    pylir::Py::MakeListExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
-                                              ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                              ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeListExOp::getMutableSuccessorOperands(unsigned int index)
@@ -612,15 +541,6 @@ void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
           unwindDestOperands, happyPath, unwindPath);
 }
 
-mlir::LogicalResult pylir::Py::MakeSetExOp::inferReturnTypes(::mlir::MLIRContext* context,
-                                                             ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange,
-                                                             ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                                             ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
-}
-
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeSetExOp::getMutableSuccessorOperands(unsigned int index)
 {
     if (index == 0)
@@ -649,15 +569,6 @@ void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
     }
     build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
-}
-
-mlir::LogicalResult
-    pylir::Py::MakeDictExOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
-                                              ::mlir::ValueRange, ::mlir::DictionaryAttr, ::mlir::RegionRange,
-                                              ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    inferredReturnTypes.push_back(Py::DynamicType::get(context));
-    return mlir::success();
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeDictExOp::getMutableSuccessorOperands(unsigned int index)

@@ -1,5 +1,5 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Matchers.h>
 
 #include <llvm/ADT/StringSet.h>

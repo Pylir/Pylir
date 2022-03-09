@@ -13,7 +13,7 @@ add_mlir_conversion_library(PylirToLLVMIR
         MLIRLLVMIR
         MLIRPass
         MLIRTransforms
-        MLIRStandardToLLVM
+        MLIRFuncToLLVM
         MLIRControlFlowToLLVM
         )
 

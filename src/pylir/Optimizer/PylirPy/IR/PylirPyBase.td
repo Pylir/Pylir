@@ -12,7 +12,7 @@ def PylirPy_Dialect : Dialect {
     }];
     let cppNamespace = "::pylir::Py";
 
-    let dependentDialects = ["::mlir::arith::ArithmeticDialect", "::mlir::StandardOpsDialect",
+    let dependentDialects = ["::mlir::arith::ArithmeticDialect", "::mlir::func::FuncDialect",
                              "::mlir::cf::ControlFlowDialect"];
 
     let hasConstantMaterializer = 1;

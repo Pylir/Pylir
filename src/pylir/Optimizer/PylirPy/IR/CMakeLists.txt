@@ -20,7 +20,7 @@ add_public_tablegen_target(PylirPyPatternsIncGen)
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp)
 add_dependencies(PylirPyDialect PylirPyOpsIncGen PylirPyPatternsIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
-        PylirPyRuntimeTypeInterface PylirCaptureInterface PRIVATE MLIRStandard MLIRArithmetic MLIRControlFlow)
+        PylirPyRuntimeTypeInterface PylirCaptureInterface PRIVATE MLIRFunc MLIRArithmetic MLIRControlFlow)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)
     target_link_libraries(PylirPyDialect PRIVATE COMMON_PCH)

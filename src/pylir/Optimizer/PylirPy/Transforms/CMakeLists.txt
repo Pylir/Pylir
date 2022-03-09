@@ -13,8 +13,5 @@ target_link_libraries(PylirPyTransforms
         PylirPyUtil
         PylirTransformsUtils
         MLIRTransforms
-        MLIRStandard
-        MLIRArithmetic
-        MLIRControlFlow
         )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)

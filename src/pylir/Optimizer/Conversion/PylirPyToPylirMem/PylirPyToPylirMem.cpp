@@ -40,7 +40,7 @@ protected:
 void ConvertPylirPyToPylirMem::runOnOperation()
 {
     mlir::ConversionTarget target(getContext());
-    target.addLegalDialect<pylir::Py::PylirPyDialect, pylir::Mem::PylirMemDialect, mlir::StandardOpsDialect,
+    target.addLegalDialect<pylir::Py::PylirPyDialect, pylir::Mem::PylirMemDialect, mlir::func::FuncDialect,
                            mlir::arith::ArithmeticDialect>();
 
     target

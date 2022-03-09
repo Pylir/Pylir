@@ -10,7 +10,7 @@ def ExpandPyDialect : Pass<"expand-py-dialect", "::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::Py::PylirPyDialect",
                              "::mlir::arith::ArithmeticDialect",
                              "::mlir::cf::ControlFlowDialect",
-                             "::mlir::StandardOpsDialect"];
+                             "::mlir::func::FuncDialect"];
 }
 
 def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {

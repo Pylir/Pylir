@@ -16,13 +16,13 @@ bool addExceptionHandling(mlir::PatternRewriter& rewriter, mlir::Operation* oper
 {
     mlir::OpBuilder::InsertionGuard guard{rewriter};
     return llvm::TypeSwitch<mlir::Operation*, bool>(operation)
-        .Case<mlir::CallIndirectOp, mlir::CallOp>(
+        .Case<mlir::func::CallIndirectOp, mlir::func::CallOp>(
             [&](auto callOp)
             {
                 auto* endBlock = rewriter.splitBlock(callOp->getBlock(), std::next(mlir::Block::iterator{callOp}));
                 rewriter.setInsertionPointAfter(callOp);
 
-                if constexpr (std::is_same_v<decltype(callOp), mlir::CallOp>)
+                if constexpr (std::is_same_v<decltype(callOp), mlir::func::CallOp>)
                 {
                     rewriter.replaceOpWithNewOp<pylir::Py::InvokeOp>(
                         callOp, callOp.getResultTypes(), callOp.getCalleeAttr(), callOp.operands(),

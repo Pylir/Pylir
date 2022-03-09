@@ -1,5 +1,5 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/TypeSwitch.h>
@@ -21,7 +21,8 @@ struct CallMethodPattern : mlir::OpRewritePattern<pylir::Py::CallMethodOp>
 
     mlir::LogicalResult matchAndRewrite(pylir::Py::CallMethodOp op, mlir::PatternRewriter& rewriter) const override
     {
-        rewriter.replaceOpWithNewOp<mlir::CallOp>(op, pylir::Py::pylirCallIntrinsic, op.getType(), op.getOperands());
+        rewriter.replaceOpWithNewOp<mlir::func::CallOp>(op, pylir::Py::pylirCallIntrinsic, op.getType(),
+                                                        op.getOperands());
         return mlir::success();
     }
 };
@@ -304,10 +305,10 @@ void ExpandPyDialectPass::runOnOperation()
         auto fp = builder.createFunctionGetFunction(lookup.getResult());
         mlir::Value result =
             builder
-                .create<mlir::CallIndirectOp>(
+                .create<mlir::func::CallIndirectOp>(
                     fp, mlir::ValueRange{lookup.getResult(), builder.createTuplePrepend(self, args), kws})
                 .getResult(0);
-        builder.create<mlir::ReturnOp>(result);
+        builder.create<mlir::func::ReturnOp>(result);
 
         func.push_back(notFunctionBlock);
         builder.setInsertionPointToStart(notFunctionBlock);
@@ -321,14 +322,14 @@ void ExpandPyDialectPass::runOnOperation()
         selfType = builder.createTypeOf(self);
         auto tuple = builder.createMakeTuple({self, selfType});
         auto emptyDict = builder.createConstant(builder.getDictAttr());
-        result =
-            builder.create<mlir::CallOp>(func, mlir::ValueRange{getMethod.getResult(), tuple, emptyDict}).getResult(0);
+        result = builder.create<mlir::func::CallOp>(func, mlir::ValueRange{getMethod.getResult(), tuple, emptyDict})
+                     .getResult(0);
         // TODO: check result is not unbound
         builder.create<mlir::cf::BranchOp>(condition, result);
 
         func.push_back(exitBlock);
         builder.setInsertionPointToStart(exitBlock);
-        builder.create<mlir::ReturnOp>(exitBlock->getArgument(0));
+        builder.create<mlir::func::ReturnOp>(exitBlock->getArgument(0));
     }
 
     mlir::ConversionTarget target(getContext());

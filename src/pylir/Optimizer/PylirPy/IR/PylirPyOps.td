@@ -314,8 +314,7 @@ def PylirPy_StrCopyOp : PylirPy_AllocOp<"str.copy", [NoCapture, DeclareOpInterfa
     }];
 }
 
-def PylirPy_StrConcatOp : PylirPy_AllocOp<"str.concat", [DeclareOpInterfaceMethods<InferTypeOpInterface>,
-                                                         NoCapture, RuntimeType<"Str">]> {
+def PylirPy_StrConcatOp : PylirPy_AllocOp<"str.concat", [NoCapture, RuntimeType<"Str">]> {
     let arguments = (ins Variadic<DynamicType>:$strings);
 
     let assemblyFormat = "$strings attr-dict";
@@ -452,6 +451,12 @@ def PylirPy_TypeSwitchOp : PylirPy_Op<"typeSwitch",
 
 def PylirPy_TypeSwitchExOp : AddExceptionHandling<PylirPy_TypeSwitchOp> {
     let hasVerifier = 1;
+
+    let extraClassDeclaration = [{
+        bool areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs) {
+          return lhs == rhs;
+        }
+    }];
 }
 
 // linear searches
@@ -486,8 +491,7 @@ def PylirPy_CallMethodOp : PylirPy_Op<"callMethod"> {
     let assemblyFormat = "$method`(``*` `` $args `,` `*` `` `*` `` $keywords `)` attr-dict";
 }
 
-def PylirPy_CallMethodExOp : AddExceptionHandling<PylirPy_CallMethodOp,
-                                                    [DeclareOpInterfaceMethods<InferTypeOpInterface>]>;
+def PylirPy_CallMethodExOp : AddExceptionHandling<PylirPy_CallMethodOp>;
 
 def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
     let arguments = (ins DynamicType:$mro_tuple, DynamicType:$element);
@@ -506,8 +510,7 @@ def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
 
 // Make ops
 
-def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound,
-                                                   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [AlwaysBound, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
                                                    RuntimeType<"Tuple">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iter_expansion
@@ -557,8 +560,7 @@ def PylirPy_MakeTupleExOp : AddExceptionHandling<PylirPy_MakeTupleOp> {
     let hasCanonicalizer = 1;
 }
 
-def PylirPy_MakeListOp : PylirPy_Op<"makeList",
-    [DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound, RuntimeType<"List">]> {
+def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, RuntimeType<"List">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iter_expansion
                          );
@@ -592,8 +594,7 @@ def PylirPy_MakeListExOp : AddExceptionHandling<PylirPy_MakeListOp> {
     let hasCanonicalizer = 1;
 }
 
-def PylirPy_MakeSetOp : PylirPy_Op<"makeSet",
-    [DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound, RuntimeType<"Set">]> {
+def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, RuntimeType<"Set">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iter_expansion
                          );
@@ -628,9 +629,7 @@ def PylirPy_MakeSetExOp : AddExceptionHandling<PylirPy_MakeSetOp> {
     let hasCanonicalizer = 1;
 }
 
-def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments,
-                                                 DeclareOpInterfaceMethods<InferTypeOpInterface>, AlwaysBound,
-                                                 RuntimeType<"Dict">]> {
+def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, AlwaysBound, RuntimeType<"Dict">]> {
     let arguments = (ins
                         Variadic<DynamicType>:$keys,
                         Variadic<DynamicType>:$values,

@@ -1,7 +1,7 @@
 #include "Util.hpp"
 
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 
 #include "Builtins.hpp"
 
@@ -88,8 +88,8 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
     auto newMethod = builder.create<Py::GetSlotOp>(loc, typeObj, metaType, "__new__");
 
     auto obj = builder
-                   .create<mlir::CallIndirectOp>(loc, builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
-                                                 mlir::ValueRange{newMethod, tuple, dict})
+                   .create<mlir::func::CallIndirectOp>(loc, builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
+                                                       mlir::ValueRange{newMethod, tuple, dict})
                    ->getResult(0);
     auto objType = builder.create<Py::TypeOfOp>(loc, obj);
     auto context =
@@ -133,8 +133,9 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     mlir::Value result;
     if (!landingPadBlock)
     {
-        result = builder.create<mlir::CallIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs})
-                     .getResult(0);
+        result =
+            builder.create<mlir::func::CallIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs})
+                .getResult(0);
     }
     else
     {

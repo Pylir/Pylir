@@ -1,7 +1,7 @@
 
 #include "PylirPyDialect.hpp"
 
-#include <mlir/Dialect/StandardOps/IR/Ops.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Transforms/InliningUtils.h>
 
 #include <llvm/ADT/TypeSwitch.h>
@@ -60,9 +60,10 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
     {
         return builder.create<mlir::arith::ConstantOp>(loc, type, value);
     }
-    if (auto ref = value.dyn_cast<mlir::FlatSymbolRefAttr>())
+    if (auto ref = value.dyn_cast<mlir::FlatSymbolRefAttr>();
+        ref && mlir::func::ConstantOp::isBuildableWith(value, type))
     {
-        return builder.create<mlir::ConstantOp>(loc, type, ref);
+        return builder.create<mlir::func::ConstantOp>(loc, type, ref);
     }
     return nullptr;
 }
