@@ -383,7 +383,7 @@ public:
         return objectAttr.getType().getValue() == llvm::StringRef{Builtins::Type.name};
     }
 
-    static TypeAttr get(mlir::MLIRContext* context, ::pylir::Py::SlotsAttr slots = {});
+    static TypeAttr get(mlir::MLIRContext* context, mlir::Attribute mroTuple = {}, ::pylir::Py::SlotsAttr slots = {});
 
     static constexpr ::llvm::StringLiteral getMnemonic()
     {
@@ -393,5 +393,9 @@ public:
     static ::mlir::Attribute parseMethod(::mlir::AsmParser& parser, ::mlir::Type type);
 
     void printMethod(::mlir::AsmPrinter& printer) const;
+
+    // If its a SymbolRefAttr it must refer to a tuple
+    // Otherwise it must be a Py::TupleAttr
+    [[nodiscard]] mlir::Attribute getMRO() const;
 };
 } // namespace pylir::Py

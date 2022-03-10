@@ -59,7 +59,7 @@ void pylir::rt::destroyPyObject(PyObject& object)
 
 bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
 {
-    auto& mro = type(object).getSlot(PyTypeObject::MRO)->cast<PyTuple>();
+    auto& mro = type(object).cast<PyTypeObject>().getMROTuple();
     return std::find(mro.begin(), mro.end(), &typeObject) != mro.end();
 }
 
@@ -75,7 +75,7 @@ bool PyObject::operator==(PyObject& other)
 
 PyObject* PyObject::mroLookup(int index)
 {
-    auto& mro = type(*this).getSlot(PyTypeObject::MRO)->cast<PyTuple>();
+    auto& mro = type(*this).cast<PyTypeObject>().getMROTuple();
     for (auto* iter : mro)
     {
         if (auto* slot = iter->getSlot(index))

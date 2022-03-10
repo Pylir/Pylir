@@ -16,11 +16,14 @@ py.globalValue const @builtins.tuple = #py.type // stub
 // CHECK-NEXT: %[[LAYOUT:.*]] = llvm.mlir.addressof @builtins.type
 // CHECK-NEXT: %[[CAST:.*]] = llvm.bitcast %[[LAYOUT]]
 // CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[CAST]], %[[UNDEF2]][2 : i32]
+// CHECK-NEXT: %[[MRO:.*]] = llvm.mlir.addressof
+// CHECK-NEXT: %[[CAST:.*]] = llvm.bitcast %[[MRO]]
+// CHECK-NEXT: %[[UNDEF4:.*]] = llvm.insertvalue %[[CAST]], %[[UNDEF3]][3 : i32]
 // CHECK-NEXT: %[[ADDRESS:.*]] = llvm.mlir.addressof
 // CHECK-NEXT: %[[BITCAST:.*]] = llvm.bitcast %[[ADDRESS]]
-// CHECK-NEXT: %[[UNDEF4:.*]] = llvm.insertvalue %[[BITCAST]], %[[UNDEF3]][3 : i32, 0 : i32]
+// CHECK-NEXT: %[[UNDEF5:.*]] = llvm.insertvalue %[[BITCAST]], %[[UNDEF4]][4 : i32, 0 : i32]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[UNDEF5:.*]] = llvm.insertvalue %[[NULL]], %[[UNDEF4]][3 : i32, 1 : i32]
+// CHECK-NEXT: %[[UNDEF6:.*]] = llvm.insertvalue %[[NULL]], %[[UNDEF5]][4 : i32, 1 : i32]
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[UNDEF6:.*]] = llvm.insertvalue %[[NULL]], %[[UNDEF5]][3 : i32, 2 : i32]
-// CHECK-NEXT: llvm.return %[[UNDEF6]]
+// CHECK-NEXT: %[[UNDEF7:.*]] = llvm.insertvalue %[[NULL]], %[[UNDEF6]][4 : i32, 2 : i32]
+// CHECK-NEXT: llvm.return %[[UNDEF7]]

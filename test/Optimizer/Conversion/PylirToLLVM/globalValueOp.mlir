@@ -34,6 +34,7 @@ py.globalValue @bar = #py.tuple<(@foo, @builtins.type)>
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.tuple = #py.type
 
 py.globalValue @foo = #py.str<"test">
 

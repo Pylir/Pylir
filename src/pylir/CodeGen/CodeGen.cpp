@@ -629,15 +629,14 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
                                                              mlir::ValueRange{falseC});
 
                     implementBlock(isSubclassBlock);
-                    auto metaType = m_builder.createTypeRef();
-                    auto rhsMroTuple = m_builder.createGetSlot(rhsType, metaType, "__mro__");
+                    auto rhsMroTuple = m_builder.createTypeMRO(rhsType);
                     auto lookup = m_builder.createMROLookup(rhsMroTuple, revMethod);
                     BlockPtr hasReversedBlock;
                     m_builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), hasReversedBlock, normalMethodBlock,
                                                              mlir::ValueRange{falseC});
 
                     implementBlock(hasReversedBlock);
-                    auto lhsMroTuple = m_builder.createGetSlot(lhsType, metaType, "__mro__");
+                    auto lhsMroTuple = m_builder.createTypeMRO(lhsType);
                     auto lhsLookup = m_builder.createMROLookup(lhsMroTuple, revMethod);
                     BlockPtr callReversedBlock;
                     BlockPtr lhsHasReversedBlock;
@@ -2625,8 +2624,7 @@ mlir::Value pylir::CodeGen::makeDict(const std::vector<Py::DictArg>& args)
 
 mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Value type, mlir::Value base)
 {
-    auto metaType = m_builder.createTypeOf(type);
-    auto mro = m_builder.createGetSlot(type, metaType, "__mro__");
+    auto mro = m_builder.createTypeMRO(type);
     return m_builder.createLinearContains(mro, base);
 }
 

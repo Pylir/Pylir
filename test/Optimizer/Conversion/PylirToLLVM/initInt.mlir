@@ -2,6 +2,7 @@
 
 py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.int = #py.type
+py.globalValue const @builtins.tuple = #py.type
 
 func @foo(%value : i64) -> !py.dynamic {
     %0 = py.constant @builtins.int

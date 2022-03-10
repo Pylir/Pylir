@@ -333,6 +333,11 @@ struct PyTypeModel : PyObjectModel
     {
         return field<Pointer<PyObjectModel>>(loc, 2);
     }
+
+    auto mroPtr(mlir::Location loc)
+    {
+        return field<Pointer<PyObjectModel>>(loc, 3);
+    }
 };
 
 class PylirTypeConverter : public mlir::LLVMTypeConverter
@@ -383,13 +388,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
 
     bool isSubtype(pylir::Py::TypeAttr subType, mlir::FlatSymbolRefAttr base)
     {
-        const auto& map = subType.getSlots().getValue();
-        auto result = map.find("__mro__");
-        if (result == map.end())
-        {
-            return false;
-        }
-        auto tuple = dereference<pylir::Py::TupleAttr>(result->second).getValue();
+        auto tuple = dereference<pylir::Py::TupleAttr>(subType.getMRO()).getValue();
         return std::any_of(tuple.begin(), tuple.end(), [base](mlir::Attribute attr) { return attr == base; });
     }
 
@@ -680,6 +679,7 @@ public:
             return mlir::LLVM::LLVMStructType::getLiteral(
                 &getContext(),
                 {mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getIndexType(),
+                 mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE),
                  mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getSlotEpilogue(*slotSize)});
         }
         auto pyType = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyType");
@@ -687,6 +687,7 @@ public:
         {
             [[maybe_unused]] auto result = pyType.setBody(
                 {mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getIndexType(),
+                 mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE),
                  mlir::LLVM::LLVMPointerType::get(getPyObjectType(), REF_ADDRESS_SPACE), getSlotEpilogue()},
                 false);
             PYLIR_ASSERT(mlir::succeeded(result));
@@ -741,16 +742,16 @@ public:
         {
             return result;
         }
-        const auto& map = type.getSlots().getValue();
         mlir::FlatSymbolRefAttr winner;
-        auto result = map.find("__mro__");
-        if (result == map.end())
+        auto mro = dereference<pylir::Py::TupleAttr>(type.getMRO()).getValue();
+        if (mro.empty())
         {
+            // TODO: This is a special case that I should probably disallow at one point instead
             winner = mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Py::Builtins::Object.name);
         }
         else
         {
-            for (const auto& iter : dereference<pylir::Py::TupleAttr>(result->second).getValue().drop_front())
+            for (const auto& iter : mro.drop_front())
             {
                 mlir::FlatSymbolRefAttr candidate = getLayoutType(iter.cast<mlir::FlatSymbolRefAttr>());
                 if (!winner)
@@ -1179,7 +1180,7 @@ public:
                         });
                 })
             .Case(
-                [&](pylir::Py::TypeAttr)
+                [&](pylir::Py::TypeAttr attr)
                 {
                     auto layoutType = getLayoutType(mlir::FlatSymbolRefAttr::get(global));
 
@@ -1195,6 +1196,9 @@ public:
                     auto layoutRef = getConstant(global.getLoc(), layoutType, builder);
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, layoutRef,
                                                                       builder.getI32ArrayAttr({2}));
+                    auto mroConstant = getConstant(global.getLoc(), attr.getMRO(), builder);
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, mroConstant,
+                                                                      builder.getI32ArrayAttr({3}));
                 })
             .Case(
                 [&](pylir::Py::FunctionAttr function)
@@ -2004,6 +2008,20 @@ struct ObjectIdOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Obje
     {
         rewriter.replaceOpWithNewOp<mlir::LLVM::PtrToIntOp>(op, typeConverter->convertType(op.getType()),
                                                             adaptor.getObject());
+        return mlir::success();
+    }
+};
+
+struct TypeMROOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TypeMROOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::TypeMROOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::TypeMROOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOp(
+            op, mlir::Value{
+                    pyTypeModel(op.getLoc(), rewriter, adaptor.getTypeObject()).mroPtr(op.getLoc()).load(op.getLoc())});
         return mlir::success();
     }
 };
@@ -3030,6 +3048,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<ArithmeticSelectOpConversion>(converter);
     patternSet.insert<LandingPadBrOpConversion>(converter);
     patternSet.insert<UnreachableOpConversion>(converter);
+    patternSet.insert<TypeMROOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

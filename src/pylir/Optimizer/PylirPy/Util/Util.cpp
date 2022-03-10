@@ -112,9 +112,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     }
     auto popOp = builder.create<Py::TuplePopFrontOp>(loc, tuple);
     auto type = builder.create<Py::TypeOfOp>(loc, popOp.getElement());
-    auto metaType = builder.create<Py::ConstantOp>(
-        loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Type.name));
-    auto mroTuple = builder.create<Py::GetSlotOp>(loc, type, metaType, "__mro__").getResult();
+    auto mroTuple = builder.create<Py::TypeMROOp>(loc, type).getResult();
     auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
     auto* exec = new mlir::Block;
     builder.create<mlir::cf::CondBranchOp>(loc, lookup.getSuccess(), exec, notFoundPath);
@@ -151,7 +149,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     builder.create<mlir::cf::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, notFunctionBlock);
-    mroTuple = builder.create<Py::GetSlotOp>(loc, callableType, metaType, "__mro__");
+    mroTuple = builder.create<Py::TypeMROOp>(loc, callableType);
     auto getMethod = builder.create<Py::MROLookupOp>(loc, mroTuple, "__get__");
     auto* isDescriptor = new mlir::Block;
     auto* mergeBlock = new mlir::Block;

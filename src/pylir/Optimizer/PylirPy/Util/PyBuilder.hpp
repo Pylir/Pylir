@@ -57,6 +57,11 @@ public:
         return Py::ObjectAttr::get(type, slots, builtinValue);
     }
 
+    Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {}, ::pylir::Py::SlotsAttr slots = {})
+    {
+        return Py::TypeAttr::get(context, mroTuple, slots);
+    }
+
     Py::IntAttr getIntAttr(BigInt bigInt)
     {
         return Py::IntAttr::get(getContext(), std::move(bigInt));
@@ -254,6 +259,11 @@ public:
     Py::ObjectIdOp createObjectId(mlir::Value object)
     {
         return create<Py::ObjectIdOp>(object);
+    }
+
+    Py::TypeMROOp createTypeMRO(mlir::Value typeObject)
+    {
+        return create<Py::TypeMROOp>(typeObject);
     }
 
     Py::StrCopyOp createStrCopy(mlir::Value string, mlir::Value typeObject)

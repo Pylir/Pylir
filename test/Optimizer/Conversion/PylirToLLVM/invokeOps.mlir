@@ -6,6 +6,7 @@ func @foo() -> !py.dynamic {
 }
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
 func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {

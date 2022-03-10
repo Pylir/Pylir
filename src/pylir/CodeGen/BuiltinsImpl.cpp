@@ -38,9 +38,8 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
         PYLIR_ASSERT(bases.size() == 1 && "Multiply inheritance not yet implemented");
         const auto& map = bases[0].getInitializer()->getSlots().getValue();
         {
-            auto result = map.find("__mro__");
-            PYLIR_ASSERT(result != map.end());
-            auto array = m_module.lookupSymbol<Py::GlobalValueOp>(result->second.cast<mlir::FlatSymbolRefAttr>())
+            auto baseMro = bases[0].getInitializerAttr().cast<pylir::Py::TypeAttr>().getMRO();
+            auto array = m_module.lookupSymbol<Py::GlobalValueOp>(baseMro.cast<mlir::FlatSymbolRefAttr>())
                              .getInitializer()
                              ->cast<Py::TupleAttr>()
                              .getValue();
@@ -81,7 +80,6 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
 #define TYPE_SLOT(x, ...) set.insert(#x);
 #include <pylir/Interfaces/Slots.def>
                 set.erase("__slots__");
-                set.erase("__mro__");
                 set.erase("__name__");
                 return set;
             }();
@@ -95,7 +93,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
             }
         }
     }
-    slots["__mro__"] = createGlobalConstant(m_builder.getTupleAttr(mro));
+    auto mroTuple = createGlobalConstant(m_builder.getTupleAttr(mro));
     slots["__name__"] = createGlobalConstant(m_builder.getPyStringAttr(className.getValue()));
     pylir::Py::SlotsMap converted;
     std::transform(slots.begin(), slots.end(), std::inserter(converted, converted.end()),
@@ -109,8 +107,8 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
                    });
     return m_builder.createGlobalValue(
         className.getValue(), true,
-        m_builder.getObjectAttr(m_builder.getTypeBuiltin(),
-                                Py::SlotsAttr::get(m_builder.getContext(), std::move(converted))),
+        m_builder.getTypeAttr(mlir::FlatSymbolRefAttr::get(mroTuple),
+                              Py::SlotsAttr::get(m_builder.getContext(), std::move(converted))),
         true);
 }
 
@@ -287,7 +285,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{typeOf});
 
                             implementBlock(constructBlock);
-                            auto mro = m_builder.createGetSlot(self, m_builder.createTypeRef(), "__mro__");
+                            auto mro = m_builder.createTypeMRO(self);
                             // TODO: can this even not succeed?
                             auto newMethod = m_builder.createMROLookup(mro, "__new__").getResult();
 

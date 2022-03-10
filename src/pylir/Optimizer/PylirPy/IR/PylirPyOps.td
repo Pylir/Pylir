@@ -269,6 +269,8 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, RuntimeType
     }];
 }
 
+// Function ops
+
 def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEffect]> {
     let arguments = (ins DynamicType:$function);
     let results = (outs PyFunctionType:$result);
@@ -282,6 +284,8 @@ def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEf
 
     let hasFolder = 1;
 }
+
+// Object ops
 
 def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoSideEffect]> {
     let arguments = (ins DynamicType:$object);
@@ -299,6 +303,14 @@ def PylirPy_ObjectIdOp : PylirPy_Op<"object.id", [NoSideEffect]> {
     let results = (outs Index:$id);
 
     let assemblyFormat = "$object attr-dict";
+}
+
+// Type ops
+
+def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound, RuntimeType<"Tuple">]> {
+	let arguments = (ins DynamicType:$type_object);
+
+	let assemblyFormat = "$type_object attr-dict";
 }
 
 // Str ops

@@ -637,9 +637,15 @@ mlir::Attribute pylir::Py::FunctionAttr::getDict() const
     return begin->second;
 }
 
-pylir::Py::TypeAttr pylir::Py::TypeAttr::get(mlir::MLIRContext* context, ::pylir::Py::SlotsAttr slots)
+pylir::Py::TypeAttr pylir::Py::TypeAttr::get(mlir::MLIRContext* context, mlir::Attribute mroTuple,
+                                             ::pylir::Py::SlotsAttr slots)
 {
-    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Type.name), slots).cast<TypeAttr>();
+    if (!mroTuple)
+    {
+        mroTuple = Py::TupleAttr::get(context);
+    }
+    return ObjectAttr::get(mlir::FlatSymbolRefAttr::get(context, Builtins::Type.name), slots, mroTuple)
+        .cast<TypeAttr>();
 }
 
 mlir::Attribute pylir::Py::TypeAttr::parseMethod(::mlir::AsmParser& parser, ::mlir::Type)
@@ -649,20 +655,77 @@ mlir::Attribute pylir::Py::TypeAttr::parseMethod(::mlir::AsmParser& parser, ::ml
         return get(parser.getContext());
     }
     Py::SlotsAttr slots;
-    if (parser.parseKeyword("slots") || parser.parseColon() || parser.parseAttribute(slots) || parser.parseGreater())
+    mlir::Attribute mroTuple;
+    llvm::SMLoc loc;
+    auto action = [&](llvm::StringRef keyword) -> mlir::LogicalResult
+    {
+        if (keyword == "slots")
+        {
+            if (slots)
+            {
+                return parser.emitError(loc, "'slots' can only appear once");
+            }
+            return parser.parseAttribute(slots);
+        }
+        if (keyword == "mro")
+        {
+            if (mroTuple)
+            {
+                return parser.emitError(loc, "'slots' can only appear once");
+            }
+            return parser.parseAttribute(mroTuple);
+        }
+        return mlir::failure();
+    };
+    loc = parser.getCurrentLocation();
+    llvm::StringRef result;
+    if (parser.parseKeyword(&result) || parser.parseColon() || mlir::failed(action(result)))
     {
         return {};
     }
-    return get(parser.getContext(), slots);
+    while (!parser.parseOptionalComma())
+    {
+        loc = parser.getCurrentLocation();
+        if (parser.parseKeyword(&result) || parser.parseColon() || mlir::failed(action(result)))
+        {
+            return {};
+        }
+    }
+    if (parser.parseGreater())
+    {
+        return {};
+    }
+    return get(parser.getContext(), mroTuple, slots);
 }
 
 void pylir::Py::TypeAttr::printMethod(::mlir::AsmPrinter& printer) const
 {
-    if (getSlots().getValue().empty())
+    auto slots = getSlots().getValue();
+    auto mro = getMRO();
+    bool mroDefault = mro.isa<pylir::Py::TupleAttr>() && mro.cast<pylir::Py::TupleAttr>().getValue().empty();
+    if (slots.empty() && mroDefault)
     {
         return;
     }
-    printer << "<slots: " << getSlots() << ">";
+    printer << "<";
+    if (!slots.empty())
+    {
+        printer << "slots: " << getSlots();
+        if (!mroDefault)
+        {
+            printer << ", mro: " << mro;
+        }
+    }
+    else
+    {
+        printer << "mro: " << mro;
+    }
+    printer << ">";
+}
+
+mlir::Attribute pylir::Py::TypeAttr::getMRO() const
+{
+    return getBuiltinValue();
 }
 
 const pylir::BigInt& pylir::Py::IntImplAttr::getValue() const

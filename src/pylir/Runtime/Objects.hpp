@@ -129,6 +129,7 @@ class PyTypeObject
     PyObject m_base;
     std::size_t m_offset;
     PyTypeObject* m_layoutType;
+    PyTuple* m_mroTuple;
 
 public:
     /*implicit*/ operator PyObject&() noexcept
@@ -153,6 +154,11 @@ public:
     [[nodiscard]] std::size_t getOffset() const noexcept
     {
         return m_offset;
+    }
+
+    [[nodiscard]] PyTuple& getMROTuple() const noexcept
+    {
+        return *m_mroTuple;
     }
 };
 

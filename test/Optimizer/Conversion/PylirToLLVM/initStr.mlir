@@ -3,6 +3,7 @@
 
 py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.str = #py.type
+py.globalValue const @builtins.tuple = #py.type
 
 func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant @builtins.str

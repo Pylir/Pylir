@@ -284,7 +284,7 @@ void ExpandPyDialectPass::runOnOperation()
         builder.setInsertionPointToStart(condition);
         self = condition->getArgument(0);
         auto selfType = builder.createTypeOf(self);
-        auto mroTuple = builder.createGetSlot(selfType, builder.createTypeRef(), "__mro__");
+        auto mroTuple = builder.createTypeMRO(selfType);
         auto lookup = builder.createMROLookup(mroTuple, "__call__");
         auto* exitBlock = new mlir::Block;
         exitBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
@@ -312,7 +312,7 @@ void ExpandPyDialectPass::runOnOperation()
 
         func.push_back(notFunctionBlock);
         builder.setInsertionPointToStart(notFunctionBlock);
-        mroTuple = builder.createGetSlot(callableType, builder.createTypeRef(), "__mro__");
+        mroTuple = builder.createTypeMRO(callableType);
         auto getMethod = builder.createMROLookup(mroTuple, "__get__");
         auto* isDescriptor = new mlir::Block;
         builder.create<mlir::cf::CondBranchOp>(getMethod.getSuccess(), isDescriptor, condition, lookup.getResult());

@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 py.globalValue const @builtins.type = #py.type
+py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
 
@@ -23,6 +24,7 @@ func @lookup(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue const @builtins.type = #py.type
+py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
 
