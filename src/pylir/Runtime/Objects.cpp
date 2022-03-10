@@ -16,7 +16,7 @@ static_assert(std::is_standard_layout_v<PyBaseException>);
 
 PyObject* PyObject::getSlot(int index)
 {
-    return reinterpret_cast<PyObject**>(this)[reinterpret_cast<PyTypeObject&>(type(*this)).m_offset + index];
+    return reinterpret_cast<PyObject**>(this)[type(*this).m_offset + index];
 }
 
 PyObject* PyObject::getSlot(std::string_view name)
@@ -35,13 +35,11 @@ PyObject* PyObject::getSlot(std::string_view name)
 
 void PyObject::setSlot(int index, PyObject& object)
 {
-    reinterpret_cast<PyObject**>(this)[reinterpret_cast<PyTypeObject&>(type(*this)).m_offset + index] = &object;
+    reinterpret_cast<PyObject**>(this)[type(*this).m_offset + index] = &object;
 }
 
 void pylir::rt::destroyPyObject(PyObject& object)
 {
-    // TODO: Replace with switch if we got a layout type member in PyTypeObject to quickly find the underlying C++
-    //       type
     if (auto* integer = object.dyn_cast<pylir::rt::PyInt>())
     {
         integer->~PyInt();
@@ -57,9 +55,9 @@ void pylir::rt::destroyPyObject(PyObject& object)
     // All other types are trivially destructible
 }
 
-bool pylir::rt::isinstance(PyObject& object, PyObject& typeObject)
+bool pylir::rt::isinstance(PyObject& object, PyTypeObject& typeObject)
 {
-    auto& mro = type(object).cast<PyTypeObject>().getMROTuple();
+    auto& mro = type(object).getMROTuple();
     return std::find(mro.begin(), mro.end(), &typeObject) != mro.end();
 }
 
@@ -75,7 +73,7 @@ bool PyObject::operator==(PyObject& other)
 
 PyObject* PyObject::mroLookup(int index)
 {
-    auto& mro = type(*this).cast<PyTypeObject>().getMROTuple();
+    auto& mro = type(*this).getMROTuple();
     for (auto* iter : mro)
     {
         if (auto* slot = iter->getSlot(index))

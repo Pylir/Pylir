@@ -1,6 +1,10 @@
 
 #pragma once
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wunused-private-field"
+
 #include <pylir/Support/BigInt.hpp>
 #include <pylir/Support/HashTable.hpp>
 
@@ -45,16 +49,24 @@ inline Keyword operator""_kw(const char* s, std::size_t n)
     return Keyword{std::string_view{s, n}};
 }
 
+struct PyObjectStorage
+{
+    PyTypeObject* type;
+};
+
 class PyObject
 {
-    PyTypeObject* m_type;
+    PyObjectStorage& getStorage()
+    {
+        return *reinterpret_cast<PyObjectStorage*>(this);
+    }
 
     PyObject* mroLookup(int index);
 
     PyObject* methodLookup(int index);
 
 public:
-    constexpr explicit PyObject(PyTypeObject& type) : m_type(&type) {}
+    constexpr PyObject() = default;
 
     ~PyObject() = default;
     PyObject(const PyObject&) = delete;
@@ -62,9 +74,10 @@ public:
     PyObject& operator=(const PyObject&) = delete;
     PyObject& operator=(PyObject&&) noexcept = delete;
 
-    friend PyObject& type(PyObject& obj)
+    friend PyTypeObject& type(PyObject& obj)
     {
-        return *reinterpret_cast<PyObject*>(reinterpret_cast<std::uintptr_t>(obj.m_type) & ~std::uintptr_t{0b11});
+        return *reinterpret_cast<PyTypeObject*>(reinterpret_cast<std::uintptr_t>(obj.getStorage().type)
+                                                & ~std::uintptr_t{0b11});
     }
 
     PyObject* getSlot(int index);
@@ -89,7 +102,6 @@ public:
     template <class T>
     T& cast()
     {
-        // TODO: static_assert(std::is_pointer_interconvertible_base_of_v<PyObject, T>);
         return *reinterpret_cast<T*>(this);
     }
 
@@ -101,42 +113,39 @@ public:
 
     void clearMarking()
     {
-        m_type = reinterpret_cast<PyTypeObject*>(reinterpret_cast<std::uintptr_t>(m_type) & ~std::uintptr_t(0b11));
+        getStorage().type = reinterpret_cast<PyTypeObject*>(reinterpret_cast<std::uintptr_t>(getStorage().type)
+                                                            & ~std::uintptr_t(0b11));
     }
 
     template <class T>
     void setMark(T value)
     {
-        m_type = reinterpret_cast<PyTypeObject*>((reinterpret_cast<std::uintptr_t>(m_type) & ~std::uintptr_t(0b11))
-                                                 | static_cast<std::uintptr_t>(value));
+        getStorage().type = reinterpret_cast<PyTypeObject*>(
+            (reinterpret_cast<std::uintptr_t>(getStorage().type) & ~std::uintptr_t(0b11))
+            | static_cast<std::uintptr_t>(value));
     }
 
     template <class T>
     T getMark()
     {
-        return static_cast<T>(reinterpret_cast<std::uintptr_t>(m_type) & 0b11);
+        return static_cast<T>(reinterpret_cast<std::uintptr_t>(getStorage().type) & 0b11);
     }
 };
 
 void destroyPyObject(PyObject& object);
 
-bool isinstance(PyObject& obj, PyObject& type);
+bool isinstance(PyObject& obj, PyTypeObject& type);
 
-class PyTypeObject
+class PyTypeObject : public PyObject
 {
     friend class PyObject;
 
-    PyObject m_base;
+    PyObjectStorage m_base;
     std::size_t m_offset;
     PyTypeObject* m_layoutType;
     PyTuple* m_mroTuple;
 
 public:
-    /*implicit*/ operator PyObject&() noexcept
-    {
-        return m_base;
-    }
-
     constexpr static auto& layoutTypeObject = Builtins::Type;
 
     enum Slots
@@ -144,12 +153,6 @@ public:
 #define TYPE_SLOT(x, y, ...) y,
 #include <pylir/Interfaces/Slots.def>
     };
-
-    template <class... Args>
-    PyObject& operator()(Args&&... args)
-    {
-        return m_base(std::forward<Args>(args)...);
-    }
 
     [[nodiscard]] std::size_t getOffset() const noexcept
     {
@@ -164,20 +167,15 @@ public:
 
 using PyUniversalCC = PyObject& (*)(PyFunction&, PyTuple&, PyDict&);
 
-class PyFunction
+class PyFunction : public PyObject
 {
     friend class PyObject;
 
-    PyObject m_base;
+    PyObjectStorage m_base;
     PyUniversalCC m_function;
 
 public:
-    constexpr explicit PyFunction(PyUniversalCC function) : m_base(Builtins::Function), m_function(function) {}
-
-    /*implicit*/ operator PyObject&()
-    {
-        return m_base;
-    }
+    constexpr explicit PyFunction(PyUniversalCC function) : m_base{&Builtins::Function}, m_function(function) {}
 
     constexpr static auto& layoutTypeObject = Builtins::Function;
 
@@ -188,9 +186,9 @@ public:
     };
 };
 
-class PyTuple
+class PyTuple : public PyObject
 {
-    PyObject m_base;
+    PyObjectStorage m_base;
     std::size_t m_size;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
@@ -198,17 +196,9 @@ class PyTuple
 #pragma GCC diagnostic pop
 
 public:
-    explicit PyTuple(std::size_t size, PyObject& type = Builtins::Tuple)
-        : m_base(type.cast<PyTypeObject>()), m_size(size)
-    {
-    }
+    explicit PyTuple(std::size_t size, PyTypeObject& type = Builtins::Tuple) : m_base{&type}, m_size(size) {}
 
     constexpr static auto& layoutTypeObject = Builtins::Tuple;
-
-    /*implicit*/ operator PyObject&()
-    {
-        return m_base;
-    }
 
     PyObject** begin()
     {
@@ -231,19 +221,14 @@ public:
     }
 };
 
-class PyList
+class PyList : public PyObject
 {
-    PyObject m_base;
+    PyObjectStorage m_base;
     std::size_t m_size;
     PyTuple* m_tuple;
 
 public:
-    explicit PyList(PyObject& type = Builtins::List) : m_base(type.cast<PyTypeObject>()) {}
-
-    /*implicit*/ operator PyObject&()
-    {
-        return m_base;
-    }
+    explicit PyList(PyTypeObject& type = Builtins::List) : m_base{&type} {}
 
     constexpr static auto& layoutTypeObject = Builtins::List;
 
@@ -268,23 +253,18 @@ public:
     }
 };
 
-class PyString
+class PyString : public PyObject
 {
-    PyObject m_base;
+    PyObjectStorage m_base;
     BufferComponent<char, MallocAllocator> m_buffer;
 
 public:
-    explicit PyString(std::string_view string, PyObject& type = Builtins::Str)
-        : m_base(type.cast<PyTypeObject>()), m_buffer(string.begin(), string.end())
+    explicit PyString(std::string_view string, PyTypeObject& type = Builtins::Str)
+        : m_base{&type}, m_buffer(string.begin(), string.end())
     {
     }
 
     constexpr static auto& layoutTypeObject = Builtins::Str;
-
-    /*implicit*/ operator PyObject&()
-    {
-        return m_base;
-    }
 
     friend bool operator==(PyString& lhs, std::string_view sv)
     {
@@ -307,20 +287,15 @@ public:
     }
 };
 
-class PyDict
+class PyDict : public PyObject
 {
-    PyObject m_base;
+    PyObjectStorage m_base;
     HashTable<PyObject*, PyObject*, PyObjectHasher, PyObjectEqual, MallocAllocator> m_table;
 
 public:
-    explicit PyDict(PyObject& type = Builtins::Dict) : m_base(type.cast<PyTypeObject>()) {}
+    explicit PyDict(PyTypeObject& type = Builtins::Dict) : m_base{&type} {}
 
     constexpr static auto& layoutTypeObject = Builtins::Dict;
-
-    /*implicit*/ operator PyObject&()
-    {
-        return m_base;
-    }
 
     PyObject* tryGetItem(PyObject& key)
     {
@@ -353,18 +328,13 @@ public:
     }
 };
 
-class PyInt
+class PyInt : public PyObject
 {
-    PyObject m_base;
+    PyObjectStorage m_base;
     BigInt m_integer;
 
 public:
     constexpr static auto& layoutTypeObject = Builtins::Int;
-
-    /*implicit*/ operator PyObject&()
-    {
-        return m_base;
-    }
 
     bool boolean()
     {
@@ -378,20 +348,15 @@ public:
     }
 };
 
-class PyBaseException
+class PyBaseException : public PyObject
 {
-    PyObject m_base;
+    PyObjectStorage m_base;
     std::uintptr_t m_landingPad;
     _Unwind_Exception m_unwindHeader;
     std::uint32_t m_typeIndex;
 
 public:
     constexpr static std::uint64_t EXCEPTION_CLASS = 0x50594C5250590000; // PYLRPY\0\0
-
-    /*implicit*/ operator PyObject&()
-    {
-        return m_base;
-    }
 
     constexpr static auto& layoutTypeObject = Builtins::BaseException;
 
@@ -547,7 +512,7 @@ PyObject& PyObject::operator()(Args&&... args)
         }
         if (auto* pyF = call->dyn_cast<PyFunction>())
         {
-            constexpr std::size_t tupleCount = (1 + ... + std::is_same_v<PyObject&, Args>);
+            constexpr std::size_t tupleCount = (1 + ... + std::is_base_of_v<PyObject, std::remove_reference_t<Args>>);
             auto& tuple = alloc<Builtins::Tuple>(tupleCount);
             auto& dict = alloc<Builtins::Dict>();
             auto iter = tuple.begin();
@@ -556,14 +521,15 @@ PyObject& PyObject::operator()(Args&&... args)
                 [&](auto&& arg)
                 {
                     static_assert(
-                        std::is_same_v<PyObject&, decltype(arg)> || std::is_same_v<KeywordArg&&, decltype(arg)>);
-                    if constexpr (std::is_same_v<PyObject&, decltype(arg)>)
+                        std::is_base_of_v<PyObject, std::remove_reference_t<
+                                                        decltype(arg)>> || std::is_same_v<KeywordArg&&, decltype(arg)>);
+                    if constexpr (std::is_same_v<KeywordArg&&, decltype(arg)>)
                     {
-                        *iter++ = &arg;
+                        dict.setItem(alloc<Builtins::Str>(arg.name), arg.arg);
                     }
                     else
                     {
-                        dict.setItem(alloc<Builtins::Str>(arg.name), arg.arg);
+                        *iter++ = &arg;
                     }
                 }(std::forward<Args>(args)),
                 ...);
@@ -582,7 +548,9 @@ inline bool PyObject::isa<PyObject>()
 template <class T>
 inline bool PyObject::isa()
 {
-    return type(*this).cast<PyTypeObject>().m_layoutType == &T::layoutTypeObject;
+    return type(*this).m_layoutType == &T::layoutTypeObject;
 }
 
 } // namespace pylir::rt
+
+#pragma GCC diagnostic pop

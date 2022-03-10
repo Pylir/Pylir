@@ -2,8 +2,6 @@
 
 #include <pylir/Runtime/MarkAndSweep/BestFitTree.hpp>
 
-static auto& objectType = reinterpret_cast<pylir::rt::PyTypeObject&>(pylir::rt::Builtins::Object);
-
 // The tests are not really proper automated unit tests but more additional integration tests for the ease of debugging
 // as well as just checking that it does not crash
 
@@ -23,7 +21,7 @@ TEST_CASE("BestFitTree inserts", "[BestFitTree]")
     std::reverse(objects.begin(), objects.end());
     for (auto& iter : objects)
     {
-        tree.free(reinterpret_cast<pylir::rt::PyObject*>(iter));
+        tree.free(iter);
     }
     objects.clear();
     for (std::size_t i = 0; i < count; i++)
@@ -36,16 +34,16 @@ TEST_CASE("BestFitTree inserts", "[BestFitTree]")
     }
     for (auto& iter : objects)
     {
-        tree.free(reinterpret_cast<pylir::rt::PyObject*>(iter));
+        tree.free(iter);
     }
 }
 
 TEST_CASE("BestFitTree coalescing", "[BestFitTree]")
 {
     pylir::rt::BestFitTree tree{128};
-    auto* first = new (tree.alloc(400)) pylir::rt::PyObject(objectType);
-    auto* second = new (tree.alloc(200)) pylir::rt::PyObject(objectType);
-    auto* third = new (tree.alloc(200)) pylir::rt::PyObject(objectType);
+    auto* first = new (tree.alloc(400)) pylir::rt::PyTuple(0);
+    auto* second = new (tree.alloc(200)) pylir::rt::PyTuple(0);
+    auto* third = new (tree.alloc(200)) pylir::rt::PyTuple(0);
     tree.free(first);
     tree.free(second);
     tree.free(third);
