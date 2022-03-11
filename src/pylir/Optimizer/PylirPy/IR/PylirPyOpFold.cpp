@@ -549,18 +549,22 @@ mlir::OpFoldResult pylir::Py::IntFromIntegerOp::fold(::llvm::ArrayRef<::mlir::At
 mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
                                                     ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
-    // TODO: Think about index and whether its worth using
-    if (!getResult().getType().isa<mlir::IntegerType>())
-    {
-        return mlir::failure();
-    }
     auto integer = operands[0].dyn_cast_or_null<Py::IntAttr>();
     if (!integer)
     {
         return mlir::failure();
     }
+    std::size_t bitWidth;
+    if (getResult().getType().isa<mlir::IndexType>())
+    {
+        bitWidth = mlir::DataLayout::closest(*this).getTypeSizeInBits(getResult().getType());
+    }
+    else
+    {
+        bitWidth = getResult().getType().getIntOrFloatBitWidth();
+    }
     auto optional = integer.getValue().tryGetInteger<std::uintmax_t>();
-    if (!optional || *optional > (1uLL << (getResult().getType().getIntOrFloatBitWidth() - 1)))
+    if (!optional || *optional > (1uLL << (bitWidth - 1)))
     {
         results.emplace_back(mlir::IntegerAttr::get(getResult().getType(), 0));
         results.emplace_back(mlir::BoolAttr::get(getContext(), false));

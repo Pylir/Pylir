@@ -83,3 +83,14 @@ func @test7(%arg0 : i64) -> (index, i1) {
 // CHECK-DAG: %[[C1:.*]] = arith.constant true
 // CHECK-DAG: %[[RESULT:.*]] = arith.index_cast %[[ARG0]] : i64 to index
 // CHECK: return %[[RESULT]], %[[C1]]
+
+func @test8() -> (index, i1) {
+    %0 = py.constant #py.int<5>
+    %1, %valid = py.int.toInteger %0 : index
+    return %1, %valid : index, i1
+}
+
+// CHECK-LABEL: @test8
+// CHECK-DAG: %[[C1:.*]] = arith.constant 5 : index
+// CHECK-DAG: %[[C2:.*]] = arith.constant true
+// CHECK-NEXT: return %[[C1]], %[[C2]]
