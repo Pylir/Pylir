@@ -15,6 +15,14 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
+class AttrInterfaceInstance<AttrInterface interface>
+	: Attr<CPred<"$_self.isa<" # interface.cppNamespace # "::" # interface.cppClassName # ">()">,
+		interface.cppClassName # " instance"> {
+	let storageType = interface.cppNamespace # "::" # interface.cppClassName;
+	let returnType = storageType;
+	let convertFromStorage = "$_self";
+}
+
 class PylirPy_Op<string mneomic, list<Trait> traits = []> :
     Op<PylirPy_Dialect, mneomic, traits> {
     let results = (outs DynamicType:$result);
@@ -46,7 +54,8 @@ class AddExceptionHandling<Op op, list<Trait> traits = []> : PylirPy_Op<!strconc
 }
 
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect]> {
-    let arguments = (ins AnyPyAttribute:$constant);
+    let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, SymbolRefAttr,
+                                    AttrInterfaceInstance<ObjectAttrInterface>]>:$constant);
 
     let assemblyFormat = [{
         $constant attr-dict
@@ -755,7 +764,7 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility,
             UnitAttr:$constant,
-            OptionalAttr<PylirPy_ObjectAttr>:$initializer);
+            OptionalAttr<AttrInterfaceInstance<ObjectAttrInterface>>:$initializer);
 
     let results = (outs);
 

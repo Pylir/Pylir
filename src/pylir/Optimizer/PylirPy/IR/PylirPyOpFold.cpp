@@ -222,17 +222,17 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
 
 namespace
 {
-pylir::Py::ObjectAttr resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
+pylir::Py::ObjectAttrInterface resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
 {
     auto ref = attr.dyn_cast_or_null<mlir::SymbolRefAttr>();
     if (!ref)
     {
-        return attr.dyn_cast_or_null<pylir::Py::ObjectAttr>();
+        return attr.dyn_cast_or_null<pylir::Py::ObjectAttrInterface>();
     }
     auto value = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
     if (!value || (!value.getConstant() && onlyConstGlobal))
     {
-        return attr.dyn_cast_or_null<pylir::Py::ObjectAttr>();
+        return attr.dyn_cast_or_null<pylir::Py::ObjectAttrInterface>();
     }
     return value.getInitializerAttr();
 }
@@ -319,9 +319,9 @@ llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* cont
     return result;
 }
 
-pylir::Py::IntAttr add(pylir::Py::IntAttr lhs, pylir::Py::IntAttr rhs)
+pylir::Py::IntAttr add(pylir::Py::IntAttrInterface lhs, pylir::Py::IntAttrInterface rhs)
 {
-    return pylir::Py::IntAttr::get(lhs.getContext(), lhs.getValue() + rhs.getValue());
+    return pylir::Py::IntAttr::get(lhs.getContext(), lhs.getIntegerValue() + rhs.getIntegerValue());
 }
 
 } // namespace
@@ -330,7 +330,7 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
 {
     if (auto input = resolveValue(*this, operands[0], false))
     {
-        return input.getType();
+        return input.getTypeObject();
     }
     auto opResult = getObject().dyn_cast<mlir::OpResult>();
     if (!opResult)
@@ -352,13 +352,13 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
     {
         return nullptr;
     }
-    const auto& map = object.getSlots().getValue();
-    auto result = map.find(getSlotAttr());
-    if (result == map.end())
+    const auto& map = object.getSlots();
+    auto result = map.get(getSlotAttr());
+    if (!result)
     {
         return Py::UnboundAttr::get(getContext());
     }
-    return result->second;
+    return result;
 }
 
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -549,7 +549,7 @@ mlir::OpFoldResult pylir::Py::IntFromIntegerOp::fold(::llvm::ArrayRef<::mlir::At
 mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
                                                     ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
-    auto integer = operands[0].dyn_cast_or_null<Py::IntAttr>();
+    auto integer = operands[0].dyn_cast_or_null<Py::IntAttrInterface>();
     if (!integer)
     {
         return mlir::failure();
@@ -563,7 +563,7 @@ mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Att
     {
         bitWidth = getResult().getType().getIntOrFloatBitWidth();
     }
-    auto optional = integer.getValue().tryGetInteger<std::uintmax_t>();
+    auto optional = integer.getIntegerValue().tryGetInteger<std::uintmax_t>();
     if (!optional || *optional > (1uLL << (bitWidth - 1)))
     {
         results.emplace_back(mlir::IntegerAttr::get(getResult().getType(), 0));
@@ -660,11 +660,11 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
         {
             return mlir::failure();
         }
-        const auto& map = object.getSlots().getValue();
-        auto result = map.find(getSlotAttr());
-        if (result != map.end())
+        const auto& map = object.getSlots();
+        auto result = map.get(getSlotAttr());
+        if (result)
         {
-            results.emplace_back(result->second);
+            results.emplace_back(result);
             results.emplace_back(mlir::BoolAttr::get(getContext(), true));
             return mlir::success();
         }
@@ -704,7 +704,7 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
         Py::Builtins::Float.name, Py::Builtins::Int.name,   Py::Builtins::Bool.name,
         Py::Builtins::Str.name,   Py::Builtins::Tuple.name,
     };
-    if (!getConstant() && immutableTypes.contains(getInitializer()->getType().getValue()))
+    if (!getConstant() && immutableTypes.contains(getInitializer()->getTypeObject().getValue()))
     {
         setConstantAttr(mlir::UnitAttr::get(getContext()));
         return mlir::success();

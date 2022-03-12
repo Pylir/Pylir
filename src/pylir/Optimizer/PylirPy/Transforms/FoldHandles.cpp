@@ -66,7 +66,7 @@ void FoldHandlesPass::runOnOperation()
         {
             continue;
         }
-        pylir::Py::ObjectAttr attr;
+        pylir::Py::ObjectAttrInterface attr;
         if (!mlir::matchPattern(singleStore.getValue(), mlir::m_Constant(&attr)))
         {
             continue;

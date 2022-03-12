@@ -1,9 +1,9 @@
 // RUN: pylir-opt %s --load-forwarding --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<slots: #py.slots<{"__slots__" to #py.tuple<(#py.str<"__slots__">)>}>>
+py.globalValue @builtins.type = #py.type<slots: {__slots__ = #py.tuple<(#py.str<"__slots__">)>}>
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.tuple = #py.type
-py.globalValue @foo = #py.type<slots: #py.slots<{"__slots__" to #py.tuple<(#py.str<"test">)>}>>
+py.globalValue @foo = #py.type<slots: {__slots__ = #py.tuple<(#py.str<"test">)>}>
 
 func @test_get_slot() -> !py.dynamic {
     %0 = py.constant @foo

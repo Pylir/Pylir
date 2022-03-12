@@ -673,7 +673,7 @@ namespace
 
 mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
 {
-    auto object = attribute.dyn_cast<pylir::Py::ObjectAttr>();
+    auto object = attribute.dyn_cast<pylir::Py::ObjectAttrInterface>();
     if (!object)
     {
         if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
@@ -689,13 +689,13 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
         }
         return mlir::success();
     }
-    if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, object.getType()))
+    if (!mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, object.getTypeObject()))
     {
-        return op->emitOpError("Type of attribute '") << object.getType() << "' not found\n";
+        return op->emitOpError("Type of attribute '") << object.getTypeObject() << "' not found\n";
     }
-    for (auto [name, value] : object.getSlots().getValue())
+    for (auto iter : object.getSlots())
     {
-        if (mlir::failed(verify(op, value)))
+        if (mlir::failed(verify(op, iter.getValue())))
         {
             return mlir::failure();
         }
@@ -741,11 +741,11 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                 {
                     return op->emitOpError("Expected function attribute to refer to a function\n");
                 }
-                if (!functionAttr.getKWDefaults())
+                if (!functionAttr.getKwDefaults())
                 {
                     return op->emitOpError("Expected __kwdefaults__ in function attribute\n");
                 }
-                if (!functionAttr.getKWDefaults().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
+                if (!functionAttr.getKwDefaults().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
                 {
                     return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference\n");
                 }
@@ -798,11 +798,9 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
         .Case(
             [&](pylir::Py::TypeAttr typeAttr) -> mlir::LogicalResult
             {
-                auto result = llvm::find_if(typeAttr.getSlots().getValue(),
-                                            [](auto pair) { return pair.first.getValue() == "__slots__"; });
-                if (result != typeAttr.getSlots().getValue().end())
+                if (auto result = typeAttr.getSlots().get("__slots__"); result)
                 {
-                    if (auto ref = result->second.dyn_cast<mlir::FlatSymbolRefAttr>())
+                    if (auto ref = result.dyn_cast<mlir::FlatSymbolRefAttr>())
                     {
                         auto lookup = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
                         if (!lookup || !lookup.getInitializerAttr()
@@ -811,7 +809,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                             return op->emitOpError("Expected __slots__ to refer to a tuple\n");
                         }
                     }
-                    else if (!result->second.isa<pylir::Py::TupleAttr>())
+                    else if (!result.isa<pylir::Py::TupleAttr>())
                     {
                         return op->emitOpError("Expected __slots__ to be a tuple or symbol reference\n");
                     }

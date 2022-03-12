@@ -77,10 +77,10 @@ py.globalValue @a = #py.type
 
 // CHECK-LABEL: test_objects
 func @test_objects() -> !py.dynamic {
-    %0 = py.constant #py.obj<type: @a>
-    %1 = py.constant #py.obj<type: @a, value: #py.int<1>>
-    %2 = py.constant #py.obj<type: @a, value: #py.int<1>, slots: #py.slots<{"__dict__" to #py.dict<{}>}>>
-    %3 = py.constant #py.obj<type: @a, slots: #py.slots<{"__dict__" to #py.dict<{}>}>, value: #py.int<1>>
-    %4 = py.constant #py.obj<type: @a, slots: #py.slots<{"__dict__" to #py.dict<{}>}>>
+    %0 = py.constant #py.obj<typeObject = @a>
+    %1 = py.constant #py.obj<typeObject = @a, builtinValue = #py.int<1>>
+    %2 = py.constant #py.obj<typeObject = @a, builtinValue = #py.int<1>, slots = {__dict__ = #py.dict<{}>}>
+    %3 = py.constant #py.obj<typeObject = @a, slots = {__dict__ = #py.dict<{}>}, builtinValue = #py.int<1>>
+    %4 = py.constant #py.obj<typeObject = @a, slots = {__dict__ = #py.dict<{}>}>
     return %4 : !py.dynamic
 }

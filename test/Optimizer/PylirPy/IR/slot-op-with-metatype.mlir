@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
 py.globalValue const @const$ = #py.tuple<(#py.str<"__slots__">)>
-py.globalValue @builtins.type = #py.type<slots: #py.slots<{"__slots__" to @const$}>>
+py.globalValue @builtins.type = #py.type<slots: {__slots__ = @const$}>
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
@@ -22,7 +22,7 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue const @const$ = #py.tuple<(#py.str<"__slots__">)>
-py.globalValue @builtins.type = #py.type<slots: #py.slots<{"__slots__" to @const$}>>
+py.globalValue @builtins.type = #py.type<slots: {__slots__ = @const$}>
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 

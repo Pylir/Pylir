@@ -51,15 +51,15 @@ public:
         return Py::UnboundAttr::get(getContext());
     }
 
-    Py::ObjectAttr getObjectAttr(mlir::FlatSymbolRefAttr type, ::pylir::Py::SlotsAttr slots = {},
+    Py::ObjectAttr getObjectAttr(mlir::FlatSymbolRefAttr type, mlir::DictionaryAttr slots = {},
                                  mlir::Attribute builtinValue = {})
     {
         return Py::ObjectAttr::get(type, slots, builtinValue);
     }
 
-    Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {}, ::pylir::Py::SlotsAttr slots = {})
+    Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {}, mlir::DictionaryAttr slots = {})
     {
-        return Py::TypeAttr::get(context, mroTuple, slots);
+        return Py::TypeAttr::get(context, mroTuple, {}, slots);
     }
 
     Py::IntAttr getIntAttr(BigInt bigInt)
@@ -74,12 +74,12 @@ public:
 
     Py::FloatAttr getFloatAttr(double value)
     {
-        return Py::FloatAttr::get(getContext(), value);
+        return Py::FloatAttr::get(getContext(), llvm::APFloat(value));
     }
 
-    Py::StringAttr getPyStringAttr(llvm::StringRef value)
+    Py::StrAttr getStrAttr(llvm::StringRef value)
     {
-        return Py::StringAttr::get(getContext(), value);
+        return Py::StrAttr::get(getContext(), value);
     }
 
     Py::TupleAttr getTupleAttr(llvm::ArrayRef<mlir::Attribute> value = {})
@@ -106,7 +106,7 @@ public:
                                      mlir::Attribute defaults = {}, mlir::Attribute kwDefaults = {},
                                      mlir::Attribute dict = {})
     {
-        return Py::FunctionAttr::get(value, qualName, defaults, kwDefaults, dict);
+        return Py::FunctionAttr::get(context, value, qualName, defaults, kwDefaults, dict);
     }
 
     Py::DynamicType getDynamicType()
@@ -149,12 +149,12 @@ public:
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     Py::ConstantOp createConstant(const char (&c)[n])
     {
-        return create<Py::ConstantOp>(getPyStringAttr(c));
+        return create<Py::ConstantOp>(getStrAttr(c));
     }
 
     Py::ConstantOp createConstant(llvm::StringRef string)
     {
-        return create<Py::ConstantOp>(getPyStringAttr(string));
+        return create<Py::ConstantOp>(getStrAttr(string));
     }
 
     template <class Integer>
@@ -482,10 +482,10 @@ public:
     }
 
     Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant = false,
-                                        llvm::Optional<Py::ObjectAttr> initializer = {}, bool external = false)
+                                        Py::ObjectAttrInterface initializer = {}, bool external = false)
     {
         return create<Py::GlobalValueOp>(symbolName, external ? mlir::StringAttr{} : getStringAttr("private"), constant,
-                                         initializer.getValueOr(Py::ObjectAttr{}));
+                                         initializer);
     }
 
     Py::GlobalHandleOp createGlobalHandle(llvm::StringRef symbolName)

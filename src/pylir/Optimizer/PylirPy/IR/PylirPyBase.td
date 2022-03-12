@@ -19,14 +19,10 @@ def PylirPy_Dialect : Dialect {
     let hasCanonicalizer = 1;
 
     let useDefaultTypePrinterParser = 1;
-    let useDefaultAttributePrinterParser = 0;
+    let useDefaultAttributePrinterParser = 1;
 
     let extraClassDeclaration = [{
         void initializeAttributes();
-
-        mlir::Attribute parseAttribute(::mlir::DialectAsmParser& parser, ::mlir::Type type) const;
-
-        void printAttribute(::mlir::Attribute attr, ::mlir::DialectAsmPrinter& os) const;
     }];
 
     let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;

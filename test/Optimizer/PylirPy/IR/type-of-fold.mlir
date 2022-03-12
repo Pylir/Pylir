@@ -16,7 +16,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
 func @constant_obj() -> !py.dynamic {
-    %0 = py.constant #py.obj<type: @a>
+    %0 = py.constant #py.obj<typeObject = @a>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }

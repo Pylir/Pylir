@@ -13,12 +13,23 @@ mlir_tablegen(PylirPyOpsEnums.cpp.inc -gen-enum-defs)
 add_public_tablegen_target(PylirPyOpsIncGen)
 add_dependencies(mlir-headers PylirPyOpsIncGen)
 
+set(LLVM_TARGET_DEFINITIONS ObjectAttrInterface.td)
+mlir_tablegen(ObjectAttrInterface.h.inc -gen-attr-interface-decls)
+mlir_tablegen(ObjectAttrInterface.cpp.inc -gen-attr-interface-defs)
+add_public_tablegen_target(ObjectAttrInterfaceIncGen)
+
+set(LLVM_TARGET_DEFINITIONS IntAttrInterface.td)
+mlir_tablegen(IntAttrInterface.h.inc -gen-attr-interface-decls)
+mlir_tablegen(IntAttrInterface.cpp.inc -gen-attr-interface-defs)
+add_public_tablegen_target(IntAttrInterfaceIncGen)
+
 set(LLVM_TARGET_DEFINITIONS PylirPyPatterns.td)
 mlir_tablegen(PylirPyPatterns.cpp.inc -gen-rewriters)
 add_public_tablegen_target(PylirPyPatternsIncGen)
 
-add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp)
-add_dependencies(PylirPyDialect PylirPyOpsIncGen PylirPyPatternsIncGen)
+add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
+        ObjectAttrInterface.cpp IntAttrInterface.cpp)
+add_dependencies(PylirPyDialect PylirPyOpsIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen IntAttrInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
         PylirPyRuntimeTypeInterface PylirCaptureInterface PRIVATE MLIRFunc MLIRArithmetic MLIRControlFlow)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)

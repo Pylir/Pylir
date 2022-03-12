@@ -3,75 +3,163 @@
 #define PYLIR_PY_ATTR_TABLEGEN
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
+include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.td"
+include "pylir/Optimizer/PylirPy/IR/IntAttrInterface.td"
 include "mlir/IR/SubElementInterfaces.td"
 
 class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
     AttrDef<PylirPy_Dialect, name, traits, baseCppClass>;
 
-def PylirPy_IntImplAttr : PylirPy_Attr<"IntImpl"> {
-    let parameters = (ins "::pylir::BigInt":$value);
+defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr", "::mlir::DictionaryAttr::get($_ctx, {})">;
 
-    let genStorageClass = 0;
-    let genAccessors = 0;
+def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [
+	DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>, ObjectAttrInterface]> {
+	let mnemonic = "obj";
 
-    let extraClassDeclaration = [{
-        const pylir::BigInt& getValue() const;
-    }];
+	let parameters = (ins "::mlir::FlatSymbolRefAttr":$typeObject,
+						  SlotsMap:$slots,
+						  OptionalParameter<"::mlir::Attribute">:$builtinValue);
+
+	let builders = [
+		AttrBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$typeObject,
+											CArg<"::mlir::DictionaryAttr", "{}">:$slots,
+											CArg<"::mlir::Attribute", "{}">:$builtinValue), [{
+			return Base::get(typeObject.getContext(), typeObject,
+						slots ? slots : mlir::DictionaryAttr::getWithSorted(typeObject.getContext(), {}), builtinValue);
+		}]>
+	];
+
+	let assemblyFormat = "`<`struct(params)`>`";
 }
 
-def PylirPy_DictImplAttr : PylirPy_Attr<"DictImpl", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-                                                                            ["replaceImmediateSubAttribute"]>]> {
-    let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>">:$value);
+class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::mlir::FlatSymbolRefAttr",
+	"::mlir::FlatSymbolRefAttr::get($_ctx, ::pylir::Py::Builtins::" # name # ".name)", description>;
+
+class ParamSpec<AttrOrTypeParameter m_type, string m_name, string m_defaultArg = ""> {
+	AttrOrTypeParameter type = m_type;
+	string name = m_name;
+	string defaultArg = m_defaultArg;
+}
+
+class ParamSpecBuilder<list<ParamSpec> spec, code extraCode = ""> : AttrBuilder<!dag(ins,
+											!foreach(x, spec, CArg<x.type.cppType, !if(x.type.isOptional, "{}", x.defaultArg)>),
+															!foreach(x, spec, x.name)),
+	!interleave(!foreach(x, !filter(x, spec, x.type.isOptional),
+					x.name # " = " # x.name # " ? " # x.name # " : " # !subst("$_ctx", "$_ctxt", x.type.defaultValue) # ";\n"),
+							"") # extraCode #
+	"return Base::get($_ctxt, " # !interleave(!foreach(x, spec, x.name), ", ") # ");"
+>;
+
+class ParamSpecDag<list<ParamSpec> spec> {
+	dag result = !dag(ins, !foreach(x, spec, x.type), !foreach(x, spec, x.name));
+}
+
+class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = [], string extraBuilderCode = "">
+	: PylirPy_Attr<name, traits> {
+
+	let parameters = ParamSpecDag<spec>.result;
 
     let skipDefaultBuilders = 1;
 
-    let extraClassDeclaration = [{
-        static ::pylir::Py::DictImplAttr get(::mlir::MLIRContext* context, llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> attributes = {});
+    let builders = [ParamSpecBuilder<spec, extraBuilderCode>];
+}
 
-        static ::pylir::Py::DictImplAttr getUniqued(::mlir::MLIRContext* context, llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> attributes = {});
+class TypeObjectSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = [], string extraBuilderCode = "">
+    : AttrSpecBuilder<name,
+    !listconcat(parameters, [ParamSpec<DefaultType<name>, "typeObject">, ParamSpec<SlotsMap, "slots">]),
+    !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+										["replaceImmediateSubAttribute"]>, ObjectAttrInterface]),
+										extraBuilderCode>;
+
+
+class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = []>
+    : AttrSpecBuilder<name,
+    !listconcat(parameters, [ParamSpec<DefaultType<name>, "typeObject">]),
+    !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+										["replaceImmediateSubAttribute"]>, ObjectAttrInterface])>;
+
+def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
+	ParamSpec<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">, "value">],
+	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
+	let mnemonic = "int";
+}
+
+def PylirPy_BoolAttr : TypeObjectSlotsAttr<"Bool", [ParamSpec<AttrParameter<"bool", "">, "value">],
+	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
+	let mnemonic = "bool";
+}
+
+def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter<"">, "value">]> {
+	let mnemonic = "float";
+
+    let extraClassDeclaration = [{
+        double getDoubleValue() const
+        {
+            return getValue().convertToDouble();
+        }
     }];
 }
 
-def PylirPy_SlotsAttr : PylirPy_Attr<"Slots", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-                                                                            ["replaceImmediateSubAttribute"]>]> {
-    let mnemonic = "slots";
-    let parameters = (ins "llvm::MapVector<mlir::StringAttr, mlir::Attribute>":$value);
-
-    let genStorageClass = 0;
-    let genAccessors = 0;
-    let skipDefaultBuilders = 1;
-
-    let extraClassDeclaration = [{
-        static SlotsAttr get(::mlir::MLIRContext* context, pylir::Py::SlotsMap&& map);
-
-        const pylir::Py::SlotsMap& getValue() const;
-    }];
+def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<StringRefParameter<>, "value">]> {
+	let mnemonic = "str";
 }
 
-def PylirPy_ObjectAttr : Attr<CPred<"$_self.isa<::pylir::Py::ObjectAttr>()">, "python object attribute"> {
-    let storageType = "::pylir::Py::ObjectAttr";
-    let returnType = "::pylir::Py::ObjectAttr";
-    let convertFromStorage = "$_self";
+def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
+	[ParamSpec<ArrayRefParameter<"::mlir::Attribute">, "value", "{}">]> {
+	let mnemonic = "tuple";
+
+	let extraClassDeclaration = [{
+		::mlir::DictionaryAttr getSlots() const
+    	{
+            return ::mlir::DictionaryAttr::getWithSorted(getContext(), {});
+		}
+	}];
 }
 
-def PylirPy_TupleAttr : Attr<CPred<"$_self.isa<::pylir::Py::TupleAttr>()">, "python tuple attribute"> {
-    let storageType = "::pylir::Py::TupleAttr";
-    let returnType = "::pylir::Py::TupleAttr";
-    let convertFromStorage = "$_self";
+def PylirPy_ListAttr : TypeObjectSlotsAttr<"List",
+	[ParamSpec<ArrayRefParameter<"::mlir::Attribute">, "value", "{}">]> {
+	let mnemonic = "list";
 }
 
-def PylirPy_IntAttr : Attr<CPred<"$_self.isa<::pylir::Py::IntAttr>()">, "python int attribute"> {
-    let storageType = "::pylir::Py::IntAttr";
-    let returnType = "::pylir::BigInt";
-    let convertFromStorage = "$_self";
-    let constBuilderCall = "::pylir::Py::IntAttr::get($_builder.getContext(), ::pylir::BigInt($0))";
+def PylirPy_SetAttr : TypeObjectSlotsAttr<"Set",
+	[ParamSpec<ArrayRefParameter<"::mlir::Attribute">, "value", "{}">], [], [{
+		std::vector<mlir::Attribute> temp = value.vec();
+        temp.erase(std::unique(temp.begin(), temp.end()), temp.end());
+		value = temp;
+	}]> {
+	let mnemonic = "set";
+}
+
+def PylirPy_DictAttr : TypeObjectSlotsAttr<"Dict",
+	[ParamSpec<ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>">, "value", "{}">], [], [{
+		auto vector = value.vec();
+		vector.erase(std::unique(vector.begin(), vector.end(),
+                        [](const auto& lhs, const auto& rhs) { return lhs.first == rhs.first; }), vector.end());
+		value = vector;
+	}]> {
+    let mnemonic = "dict";
+}
+
+def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
+	[ParamSpec<AttrParameter<"mlir::FlatSymbolRefAttr", "">, "value">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::StrAttr::get($_ctx, \"\")">, "qualName">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctx, pylir::Py::Builtins::None.name)">, "defaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctx, pylir::Py::Builtins::None.name)">, "kwDefaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
+	 ], [DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>,
+	     DeclareAttrInterfaceMethods<ObjectAttrInterface>]>
+{
+	let mnemonic = "function";
+}
+
+def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
+	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctx, {})">, "mroTuple">]> {
+	let mnemonic = "type";
 }
 
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let mnemonic = "unbound";
     let summary = "python unbound value";
 }
-
-def AnyPyAttribute : AnyAttrOf<[PylirPy_ObjectAttr, PylirPy_UnboundAttr, SymbolRefAttr]>;
 
 #endif

@@ -16,9 +16,9 @@
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/ValueReset.hpp>
 
+#include <map>
 #include <stack>
 #include <tuple>
-#include <unordered_map>
 
 namespace pylir
 {
@@ -219,10 +219,9 @@ class CodeGen
     mlir::FuncOp buildFunctionCC(llvm::Twine name, mlir::FuncOp implementation,
                                  const std::vector<FunctionParameter>& parameters);
 
-    Py::GlobalValueOp createGlobalConstant(Py::ObjectAttr value);
+    Py::GlobalValueOp createGlobalConstant(Py::ObjectAttrInterface value);
 
-    using SlotMapImpl =
-        std::unordered_map<std::string_view, std::variant<mlir::FlatSymbolRefAttr, mlir::SymbolOpInterface>>;
+    using SlotMapImpl = std::map<std::string_view, std::variant<mlir::FlatSymbolRefAttr, mlir::SymbolOpInterface>>;
 
     Py::GlobalValueOp createClass(mlir::FlatSymbolRefAttr className,
                                   llvm::MutableArrayRef<Py::GlobalValueOp> bases = {},
