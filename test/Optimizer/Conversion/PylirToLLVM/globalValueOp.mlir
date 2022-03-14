@@ -1,10 +1,10 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @foo = #py.tuple<()>
-py.globalValue @bar = #py.tuple<(@foo, @builtins.type)>
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.object = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @foo = #py.tuple<value = ()>
+py.globalValue @bar = #py.tuple<value = (@foo, @builtins.type)>
 
 // CHECK-LABEL: llvm.mlir.global external constant @foo
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
@@ -32,11 +32,11 @@ py.globalValue @bar = #py.tuple<(@foo, @builtins.type)>
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
 
-py.globalValue @foo = #py.str<"test">
+py.globalValue @foo = #py.str<value = "test">
 
 // CHECK: llvm.mlir.global private unnamed_addr constant @[[BUFFER:buffer\$[[:alnum:]]*]]("test")
 
@@ -55,14 +55,14 @@ py.globalValue @foo = #py.str<"test">
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.list = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @builtins.list = #py.type<>
 
-py.globalValue @bar = #py.list<[]>
-py.globalValue const @foo = #py.list<[]>
-py.globalValue "private" @foobar = #py.list<[]>
-py.globalValue "private" const @barfoo = #py.list<[]>
+py.globalValue @bar = #py.list<value = []>
+py.globalValue const @foo = #py.list<value = []>
+py.globalValue "private" @foobar = #py.list<value = []>
+py.globalValue "private" const @barfoo = #py.list<value = []>
 
 // CHECK: llvm.mlir.global external @bar
 // CHECK: llvm.mlir.global external constant @foo

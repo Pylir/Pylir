@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.BaseException = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.BaseException = #py.type<>
 
 func private @foo()
 

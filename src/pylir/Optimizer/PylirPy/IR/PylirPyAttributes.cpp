@@ -10,6 +10,36 @@
 
 #include "PylirPyDialect.hpp"
 
+template <>
+struct mlir::FieldParser<llvm::APFloat>
+{
+    static mlir::FailureOr<llvm::APFloat> parse(mlir::AsmParser& parser)
+    {
+        double value;
+        if (parser.parseFloat(value))
+        {
+            return mlir::failure();
+        }
+        return llvm::APFloat(value);
+    }
+};
+
+template <>
+struct mlir::FieldParser<pylir::BigInt>
+{
+    static mlir::FailureOr<pylir::BigInt> parse(mlir::AsmParser& parser)
+    {
+        llvm::APInt apInt;
+        if (parser.parseInteger(apInt))
+        {
+            return mlir::failure();
+        }
+        llvm::SmallString<10> str;
+        apInt.toStringSigned(str);
+        return pylir::BigInt(std::string{str.data(), str.size()});
+    }
+};
+
 namespace pylir
 {
 llvm::hash_code hash_value(const pylir::BigInt& bigInt)
@@ -31,316 +61,6 @@ void pylir::Py::PylirPyDialect::initializeAttributes()
 #define GET_ATTRDEF_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.cpp.inc"
         >();
-}
-
-void pylir::Py::IntAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<" << getValue().toString() << ">";
-}
-
-mlir::Attribute pylir::Py::IntAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    llvm::APInt apInt;
-    if (parser.parseLess() || parser.parseInteger(apInt) || parser.parseGreater())
-    {
-        return {};
-    }
-    llvm::SmallString<10> str;
-    apInt.toStringSigned(str);
-    return IntAttr::get(parser.getContext(), BigInt(std::string{str.data(), str.size()}));
-}
-
-void pylir::Py::ListAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<[";
-    llvm::interleaveComma(getValue(), printer);
-    printer << "]>";
-}
-
-mlir::Attribute pylir::Py::ListAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    llvm::SmallVector<mlir::Attribute> attrs;
-    if (parser.parseLess()
-        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Square,
-                                          [&] { return parser.parseAttribute(attrs.emplace_back()); })
-        || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), attrs);
-}
-
-void pylir::Py::TupleAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<(";
-    llvm::interleaveComma(getValue(), printer);
-    printer << ")>";
-}
-
-mlir::Attribute pylir::Py::TupleAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    llvm::SmallVector<mlir::Attribute> attrs;
-    if (parser.parseLess()
-        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Paren,
-                                          [&] { return parser.parseAttribute(attrs.emplace_back()); })
-        || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), attrs);
-}
-
-void pylir::Py::DictAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<{";
-    llvm::interleaveComma(getValue(), printer, [&](auto&& pair) { printer << pair.first << " to " << pair.second; });
-    printer << "}>";
-}
-
-mlir::Attribute pylir::Py::DictAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    llvm::SmallVector<std::pair<mlir::Attribute, mlir::Attribute>> attrs;
-    if (parser.parseLess()
-        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
-                                          [&]
-                                          {
-                                              return mlir::failure(parser.parseAttribute(attrs.emplace_back().first)
-                                                                   || parser.parseKeyword("to")
-                                                                   || parser.parseAttribute(attrs.back().second));
-                                          })
-        || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), attrs);
-}
-
-mlir::Attribute pylir::Py::BoolAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    if (parser.parseLess())
-    {
-        return {};
-    }
-    llvm::StringRef keyword;
-    auto loc = parser.getCurrentLocation();
-    if (parser.parseKeyword(&keyword))
-    {
-        return {};
-    }
-    if (keyword != "True" && keyword != "False")
-    {
-        parser.emitError(loc, "Expected 'True' or 'False' instead of ") << keyword;
-        return {};
-    }
-    if (parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), keyword == "True");
-}
-
-void pylir::Py::BoolAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<" << (getValue() ? "True" : "False") << ">";
-}
-
-mlir::Attribute pylir::Py::FloatAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    double value;
-    if (parser.parseLess() || parser.parseFloat(value) || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), llvm::APFloat(value));
-}
-
-void pylir::Py::FloatAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<" << getValue() << ">";
-}
-
-mlir::Attribute pylir::Py::StrAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    std::string value;
-    if (parser.parseLess() || parser.parseString(&value) || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), value);
-}
-
-void pylir::Py::StrAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<\"";
-    llvm::printEscapedString(getValue(), printer.getStream());
-    printer << "\">";
-}
-
-void pylir::Py::SetAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<{";
-    llvm::interleaveComma(getValue(), printer);
-    printer << "}>";
-}
-
-mlir::Attribute pylir::Py::SetAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    llvm::SmallVector<mlir::Attribute> attrs;
-    if (parser.parseLess()
-        || parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
-                                          [&] { return parser.parseAttribute(attrs.emplace_back()); })
-        || parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), attrs);
-}
-
-mlir::Attribute pylir::Py::FunctionAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    mlir::FlatSymbolRefAttr symbol;
-    if (parser.parseLess() || parser.parseAttribute(symbol))
-    {
-        return {};
-    }
-    mlir::Attribute defaults;
-    mlir::Attribute kwDefaults;
-    mlir::Attribute dict;
-    mlir::Attribute qualName;
-    while (!parser.parseOptionalComma())
-    {
-        mlir::Attribute attribute;
-        llvm::StringRef keyword;
-        auto loc = parser.getCurrentLocation();
-        if (parser.parseKeyword(&keyword) || parser.parseColon() || parser.parseAttribute(attribute))
-        {
-            return {};
-        }
-        if (keyword == "__defaults__")
-        {
-            defaults = attribute;
-        }
-        else if (keyword == "__kwdefaults__")
-        {
-            kwDefaults = attribute;
-        }
-        else if (keyword == "__dict__")
-        {
-            dict = attribute;
-        }
-        else if (keyword == "__qualname__")
-        {
-            qualName = attribute;
-        }
-        else
-        {
-            parser.emitError(loc, "Invalid keyword '") << keyword << "'";
-            return {};
-        }
-    }
-    if (parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), symbol, qualName, defaults, kwDefaults, dict);
-}
-
-void pylir::Py::FunctionAttr::print(::mlir::AsmPrinter& printer) const
-{
-    printer << "<" << getValue();
-    if (auto qualName = getQualName(); !qualName.isa<Py::StrAttr>() || !qualName.cast<Py::StrAttr>().getValue().empty())
-    {
-        printer << ", __qualname__: " << qualName;
-    }
-    if (auto defaults = getDefaults(); defaults != mlir::FlatSymbolRefAttr::get(getContext(), Builtins::None.name))
-    {
-        printer << ", __defaults__: " << defaults;
-    }
-    if (auto kwDefaults = getKwDefaults();
-        kwDefaults != mlir::FlatSymbolRefAttr::get(getContext(), Builtins::None.name))
-    {
-        printer << ", __kwdefaults__: " << kwDefaults;
-    }
-    if (auto dict = getDict())
-    {
-        printer << ", __dict__: " << dict;
-    }
-    printer << ">";
-}
-
-mlir::Attribute pylir::Py::TypeAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
-{
-    if (parser.parseOptionalLess())
-    {
-        return get(parser.getContext());
-    }
-    mlir::DictionaryAttr slots;
-    mlir::Attribute mroTuple;
-    llvm::SMLoc loc;
-    auto action = [&](llvm::StringRef keyword) -> mlir::LogicalResult
-    {
-        if (keyword == "slots")
-        {
-            if (slots)
-            {
-                return parser.emitError(loc, "'slots' can only appear once");
-            }
-            return parser.parseAttribute(slots);
-        }
-        if (keyword == "mro")
-        {
-            if (mroTuple)
-            {
-                return parser.emitError(loc, "'slots' can only appear once");
-            }
-            return parser.parseAttribute(mroTuple);
-        }
-        return mlir::failure();
-    };
-    loc = parser.getCurrentLocation();
-    llvm::StringRef result;
-    if (parser.parseKeyword(&result) || parser.parseColon() || mlir::failed(action(result)))
-    {
-        return {};
-    }
-    while (!parser.parseOptionalComma())
-    {
-        loc = parser.getCurrentLocation();
-        if (parser.parseKeyword(&result) || parser.parseColon() || mlir::failed(action(result)))
-        {
-            return {};
-        }
-    }
-    if (parser.parseGreater())
-    {
-        return {};
-    }
-    return get(parser.getContext(), mroTuple, {}, slots);
-}
-
-void pylir::Py::TypeAttr::print(::mlir::AsmPrinter& printer) const
-{
-    auto slots = getSlots();
-    auto mro = getMroTuple();
-    bool mroDefault = mro.isa<pylir::Py::TupleAttr>() && mro.cast<pylir::Py::TupleAttr>().getValue().empty();
-    if (slots.empty() && mroDefault)
-    {
-        return;
-    }
-    printer << "<";
-    if (!slots.empty())
-    {
-        printer << "slots: " << slots;
-        if (!mroDefault)
-        {
-            printer << ", mro: " << mro;
-        }
-    }
-    else
-    {
-        printer << "mro: " << mro;
-    }
-    printer << ">";
 }
 
 const pylir::BigInt& pylir::Py::IntAttr::getIntegerValue() const

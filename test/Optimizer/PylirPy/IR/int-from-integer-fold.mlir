@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.int = #py.type<>
 
 func @test() -> !py.dynamic {
     %0 = arith.constant 5 : i64
@@ -10,5 +10,5 @@ func @test() -> !py.dynamic {
 }
 
 // CHECK-LABEL: @test
-// CHECK-NEXT: %[[C:.*]] = py.constant #py.int<5>
+// CHECK-NEXT: %[[C:.*]] = py.constant #py.int<value = 5>
 // CHECK-NEXT: return %[[C]]

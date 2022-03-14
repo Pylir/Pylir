@@ -1,12 +1,12 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.object = #py.type<>
+py.globalValue @builtins.int = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
 
 func @test() -> !py.dynamic {
-    %0 = py.constant #py.int<5>
+    %0 = py.constant #py.int<value = 5>
     return %0 : !py.dynamic
 }
 

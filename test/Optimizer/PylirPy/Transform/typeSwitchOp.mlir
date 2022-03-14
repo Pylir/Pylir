@@ -1,8 +1,8 @@
 // RUN: pylir-opt %s --lower-type-switch --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.bool = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.object = #py.type<>
+py.globalValue @builtins.bool = #py.type<>
 
 func @type_switch(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant @builtins.type
@@ -45,10 +45,10 @@ func @type_switch(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.bool = #py.type
-py.globalValue @builtins.BaseException = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.object = #py.type<>
+py.globalValue @builtins.bool = #py.type<>
+py.globalValue @builtins.BaseException = #py.type<>
 
 func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant #py.unbound
@@ -107,9 +107,9 @@ func @type_switch(%trueValue : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.bool = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.object = #py.type<>
+py.globalValue @builtins.bool = #py.type<>
 
 func @type_switch(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant @builtins.type

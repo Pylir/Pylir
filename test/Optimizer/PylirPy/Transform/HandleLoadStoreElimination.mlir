@@ -1,12 +1,12 @@
 // RUN: pylir-opt %s -pass-pipeline='builtin.func(handle-load-store-elimination)' --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 py.globalHandle @foo
 
 func @test() -> !py.dynamic {
-    %0 = py.constant #py.str<"value">
+    %0 = py.constant #py.str<value = "value">
     py.store %0 into @foo
     %1 = py.load @foo
     return %1 : !py.dynamic
@@ -19,14 +19,14 @@ func @test() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 py.globalHandle @foo
 
 func @test() -> !py.dynamic {
-    %0 = py.constant #py.str<"value">
-    %1 = py.constant #py.str<"value">
+    %0 = py.constant #py.str<value = "value">
+    %1 = py.constant #py.str<value = "value">
     py.store %0 into @foo
     py.store %1 into @foo
     %2 = py.load @foo
@@ -41,15 +41,15 @@ func @test() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 func private @clobber()
 
 py.globalHandle @foo
 
 func @test() -> !py.dynamic {
-    %0 = py.constant #py.str<"value">
+    %0 = py.constant #py.str<value = "value">
     py.store %0 into @foo
     call @clobber() : () -> ()
     %1 = py.load @foo
@@ -65,8 +65,8 @@ func @test() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 py.globalHandle @foo
 
@@ -75,12 +75,12 @@ func @test() -> !py.dynamic {
     cf.cond_br %0, ^bb0, ^bb1
 
 ^bb0:
-    %1 = py.constant #py.str<"text">
+    %1 = py.constant #py.str<value = "text">
     py.store %1 into @foo
     cf.br ^merge
 
 ^bb1:
-    %2 = py.constant #py.str<"value">
+    %2 = py.constant #py.str<value = "value">
     py.store %2 into @foo
     cf.br ^merge
 
@@ -93,13 +93,13 @@ func @test() -> !py.dynamic {
 // CHECK: cf.cond_br %{{.*}}, ^[[FIRST:.*]], ^[[SECOND:[[:alnum:]]+]]
 
 // CHECK: ^[[FIRST]]
-// CHECK-NEXT: %[[C1:.*]] = py.constant #py.str<"text">
+// CHECK-NEXT: %[[C1:.*]] = py.constant #py.str<value = "text">
 // CHECK-NEXT: py.store %[[C1]] into @foo
 // CHECK-NEXT: cf.br ^[[MERGE:[[:alnum:]]+]]
 // CHECK-SAME: %[[C1]]
 
 // CHECK: ^[[SECOND]]:
-// CHECK-NEXT: %[[C2:.*]] = py.constant #py.str<"value">
+// CHECK-NEXT: %[[C2:.*]] = py.constant #py.str<value = "value">
 // CHECK-NEXT: py.store %[[C2]] into @foo
 // CHECK-NEXT: cf.br ^[[MERGE]]
 // CHECK-SAME: %[[C2]]
@@ -110,8 +110,8 @@ func @test() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 py.globalHandle @foo
 
@@ -126,7 +126,7 @@ func @test() -> !py.dynamic {
     cf.br ^merge
 
 ^bb1:
-    %1 = py.constant #py.str<"value">
+    %1 = py.constant #py.str<value = "value">
     py.store %1 into @foo
     cf.br ^merge
 

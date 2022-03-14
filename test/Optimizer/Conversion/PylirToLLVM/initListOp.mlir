@@ -1,9 +1,9 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file | FileCheck %s
 
 
-py.globalValue const @builtins.type = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.list = #py.type
+py.globalValue const @builtins.type = #py.type<>
+py.globalValue const @builtins.tuple = #py.type<>
+py.globalValue const @builtins.list = #py.type<>
 
 func @foo() -> !py.dynamic {
     %0 = py.constant @builtins.list

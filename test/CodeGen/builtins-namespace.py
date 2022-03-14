@@ -19,5 +19,5 @@ def foo():
 
 # CHECK-LABEL: func private @"foo$impl[0]"
 
-# CHECK: %[[FIVE:.*]] = py.constant #py.int<5>
+# CHECK: %[[FIVE:.*]] = py.constant #py.int<value = 5>
 # CHECK: return %[[FIVE]]

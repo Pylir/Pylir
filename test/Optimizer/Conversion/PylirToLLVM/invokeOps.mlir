@@ -5,9 +5,9 @@ func @foo() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.BaseException = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @builtins.BaseException = #py.type<>
 
 func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
     %result = py.invoke @foo() : () -> !py.dynamic

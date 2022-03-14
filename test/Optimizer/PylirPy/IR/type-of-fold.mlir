@@ -12,8 +12,8 @@ func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @a = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @a = #py.type<>
 
 func @constant_obj() -> !py.dynamic {
     %0 = py.constant #py.obj<typeObject = @a>
@@ -27,8 +27,8 @@ func @constant_obj() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @a = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @a = #py.type<>
 
 func @global_value() -> !py.dynamic {
     %0 = py.constant @a
@@ -42,11 +42,11 @@ func @global_value() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.int = #py.type<>
 
 func @int_attr() -> !py.dynamic {
-    %0 = py.constant #py.int<5>
+    %0 = py.constant #py.int<value = 5>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
@@ -57,11 +57,11 @@ func @int_attr() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.float = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.float = #py.type<>
 
 func @float_attr() -> !py.dynamic {
-    %0 = py.constant #py.float<5.0>
+    %0 = py.constant #py.float<value = 5.0>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
@@ -72,11 +72,11 @@ func @float_attr() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.bool = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.bool = #py.type<>
 
 func @bool_attr() -> !py.dynamic {
-    %0 = py.constant #py.bool<True>
+    %0 = py.constant #py.bool<value = True>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
@@ -87,11 +87,11 @@ func @bool_attr() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
 
 func @tuple_attr() -> !py.dynamic {
-    %0 = py.constant #py.tuple<()>
+    %0 = py.constant #py.tuple<value = ()>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
@@ -102,11 +102,11 @@ func @tuple_attr() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.list = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.list = #py.type<>
 
 func @list_attr() -> !py.dynamic {
-    %0 = py.constant #py.list<[]>
+    %0 = py.constant #py.list<value = []>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
@@ -117,11 +117,11 @@ func @list_attr() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.dict = #py.type<>
 
 func @dict_attr() -> !py.dynamic {
-    %0 = py.constant #py.dict<{}>
+    %0 = py.constant #py.dict<value = {}>
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
@@ -132,8 +132,8 @@ func @dict_attr() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
 
 func @list_to_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.list.toTuple %arg0
@@ -147,8 +147,8 @@ func @list_to_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
 
 func @make_tuple() -> !py.dynamic {
     %0 = py.makeTuple ()
@@ -162,8 +162,8 @@ func @make_tuple() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
 
 func @prepend_tuple(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.tuple.prepend %arg0, %arg1
@@ -177,8 +177,8 @@ func @prepend_tuple(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
 
 func @tuple_pop_front(%arg0 : !py.dynamic) -> !py.dynamic {
     %element, %result = py.tuple.popFront %arg0
@@ -192,9 +192,9 @@ func @tuple_pop_front(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.BaseException = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @builtins.BaseException = #py.type<>
 
 func @make_tuple_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTupleEx (*%arg0)
@@ -221,8 +221,8 @@ func @make_tuple_ex(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.list = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.list = #py.type<>
 
 func @make_list() -> !py.dynamic {
     %0 = py.makeList ()
@@ -236,9 +236,9 @@ func @make_list() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.list = #py.type
-py.globalValue @builtins.BaseException = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.list = #py.type<>
+py.globalValue @builtins.BaseException = #py.type<>
 
 func @make_list_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeListEx (*%arg0)
@@ -266,8 +266,8 @@ func @make_list_ex(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.dict = #py.type<>
 
 func @make_dict() -> !py.dynamic {
     %0 = py.makeDict ()
@@ -281,9 +281,9 @@ func @make_dict() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.BaseException = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.dict = #py.type<>
+py.globalValue @builtins.BaseException = #py.type<>
 
 func @make_dict_ex(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeDictEx (**%arg0)
@@ -311,14 +311,14 @@ func @make_dict_ex(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 func private @test(%self : !py.dynamic, %tuple : !py.dynamic, %dict : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant #py.int<0>
+    %0 = py.constant #py.int<value = 0>
     return %0 : !py.dynamic
 }
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.None = #py.type
-py.globalValue @builtins.function = #py.type
-py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.None = #py.type<>
+py.globalValue @builtins.function = #py.type<>
+py.globalValue @builtins.int = #py.type<>
 
 func @make_function() -> !py.dynamic {
     %0 = py.makeFunc @test
@@ -332,8 +332,8 @@ func @make_function() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.bool = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.bool = #py.type<>
 
 func @bool_from_I1(%arg0 : i1) -> !py.dynamic {
     %0 = py.bool.fromI1 %arg0
@@ -347,8 +347,8 @@ func @bool_from_I1(%arg0 : i1) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 func @int_to_str(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.int.toStr %arg0
@@ -362,8 +362,8 @@ func @int_to_str(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 func @str_concat(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
     %0 = py.str.concat %arg0, %arg1, %arg2
@@ -377,8 +377,8 @@ func @str_concat(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) 
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.str.copy %arg0 : %arg1

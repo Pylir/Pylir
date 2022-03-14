@@ -4,18 +4,18 @@ func @bar() {
     return
 }
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.bool = #py.type
-py.globalValue @builtins.BaseException = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.bool = #py.type<>
+py.globalValue @builtins.BaseException = #py.type<>
 
 // CHECK-LABEL: func @foo
 func @foo() -> !py.dynamic {
-    %0 = py.constant #py.bool<True>
+    %0 = py.constant #py.bool<value = True>
     py.invoke @bar() : () -> ()
         label ^happy unwind ^exception(%0)
 
 ^happy:
-    %1 = py.constant #py.bool<False>
+    %1 = py.constant #py.bool<value = False>
     return %1 : !py.dynamic
 
 ^exception(%2 : !py.dynamic):

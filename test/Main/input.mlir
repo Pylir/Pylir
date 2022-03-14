@@ -1,11 +1,11 @@
 // RUN: pylir %s -o - -S -emit-llvm | FileCheck %s
 
-py.globalValue const @const$ = #py.tuple<(#py.str<"__slots__">)>
-py.globalValue @builtins.type = #py.type<slots: {__slots__ = @const$}>
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.function = #py.type
-py.globalValue @builtins.dict = #py.type
+py.globalValue const @const$ = #py.tuple<value = (#py.str<value = "__slots__">)>
+py.globalValue @builtins.type = #py.type<slots = {__slots__ = @const$}>
+py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.function = #py.type<>
+py.globalValue @builtins.dict = #py.type<>
 
 func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.typeOf %arg0

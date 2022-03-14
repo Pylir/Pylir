@@ -1,10 +1,10 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
 func @test(%arg0 : !py.dynamic) -> index {
-    %0 = py.constant #py.str<"test">
+    %0 = py.constant #py.str<value = "test">
     %1 = py.constant @builtins.str
     %2 = py.makeList ()
     py.typeSwitch %arg0 {

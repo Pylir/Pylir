@@ -2,12 +2,12 @@
 
 func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.None = #py.type
-py.globalValue @builtins.function = #py.type
-py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.None = #py.type<>
+py.globalValue @builtins.function = #py.type<>
+py.globalValue @builtins.str = #py.type<>
 
-py.globalValue @bar = #py.function<@foo>
+py.globalValue @bar = #py.function<value = @foo>
 
 func @test() -> ((!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic) {
     %0 = py.constant @bar

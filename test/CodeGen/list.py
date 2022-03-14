@@ -9,20 +9,20 @@
 
 [7]
 
-# CHECK: %[[OP1:.*]] = py.constant #py.int<7>
+# CHECK: %[[OP1:.*]] = py.constant #py.int<value = 7>
 # CHECK: makeList
 # CHECK-SAME: %[[OP1]]
 
 [5, 3]
 
-# CHECK: %[[OP1:.*]] = py.constant #py.int<5>
-# CHECK: %[[OP2:.*]] = py.constant #py.int<3>
+# CHECK: %[[OP1:.*]] = py.constant #py.int<value = 5>
+# CHECK: %[[OP2:.*]] = py.constant #py.int<value = 3>
 # CHECK: makeList
 # CHECK-SAME: %[[OP1]], %[[OP2]]
 
 [*(), 3]
 
-# CHECK: %[[OP1:.*]] = py.constant #py.tuple<()>
-# CHECK: %[[OP2:.*]] = py.constant #py.int<3>
+# CHECK: %[[OP1:.*]] = py.constant #py.tuple<value = ()>
+# CHECK: %[[OP2:.*]] = py.constant #py.int<value = 3>
 # CHECK: makeList
 # CHECK-SAME: *%[[OP1]], %[[OP2]]

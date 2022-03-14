@@ -78,15 +78,51 @@ class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait>
     !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
 										["replaceImmediateSubAttribute"]>, ObjectAttrInterface])>;
 
-def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
-	ParamSpec<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">, "value">],
-	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
-	let mnemonic = "int";
+class CustomPrint<AttrOrTypeParameter x, string elementParse = ?, string elementPrint = ?>
+	: AttrOrTypeParameter<x.cppType, x.summary, x.cppAccessorType>
+{
+	let allocator = x.allocator;
+	let comparator = x.comparator;
+	let cppStorageType = x.cppStorageType;
+	let syntax = x.syntax;
+	let isOptional = x.isOptional;
+	let defaultValue = x.defaultValue;
+
+	let parser = elementParse;
+	let printer = elementPrint;
 }
 
-def PylirPy_BoolAttr : TypeObjectSlotsAttr<"Bool", [ParamSpec<AttrParameter<"bool", "">, "value">],
+def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
+	ParamSpec<CustomPrint<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">,
+											?, "$_printer << $_self.toString();">, "value">],
+	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
+	let mnemonic = "int";
+
+	let assemblyFormat = "`<`struct(params)`>`";
+}
+
+def PylirPy_BoolAttr : TypeObjectSlotsAttr<"Bool", [ParamSpec<CustomPrint<AttrParameter<"bool", "">, [{
+	[&]() -> mlir::FailureOr<bool> {
+		llvm::StringRef keyword;
+        auto loc = $_parser.getCurrentLocation();
+        if ($_parser.parseKeyword(&keyword))
+        {
+            return mlir::failure();
+        }
+        if (keyword != "True" && keyword != "False")
+        {
+            $_parser.emitError(loc, "Expected 'True' or 'False' instead of ") << keyword;
+            return mlir::failure();
+        }
+        return keyword == "True";
+	}()
+}], [{
+	$_printer << ($_self ? "True" : "False");
+}]>, "value">],
 	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
 	let mnemonic = "bool";
+
+	let assemblyFormat = "`<`struct(params)`>`";
 }
 
 def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter<"">, "value">]> {
@@ -98,14 +134,49 @@ def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter
             return getValue().convertToDouble();
         }
     }];
+
+    let assemblyFormat = "`<`struct(params)`>`";
 }
 
-def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<StringRefParameter<>, "value">]> {
+def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRefParameter<>, ?, [{
+	$_printer << "\"";
+	llvm::printEscapedString($_self, $_printer.getStream());
+	$_printer << "\"";
+}]>, "value">]> {
 	let mnemonic = "str";
+
+	let assemblyFormat = "`<`struct(params)`>`";
+}
+
+class ListPrint<string type, string delim, string elementParse = "", string elementPrint = ""> : ArrayRefParameter<type>
+{
+	let parser = [{
+		[&]() -> mlir::FailureOr<llvm::SmallVector<}] # type # [{>> {
+			llvm::SmallVector<}] # type # [{> array;
+			if ($_parser.parseCommaSeparatedList(::mlir::AsmParser::Delimiter::}] # delim # [{, [&]() -> mlir::ParseResult {
+					auto temp = }] # !if(!empty(elementParse), "::mlir::FieldParser<" # type # ">::parse($_parser)", elementParse) # [{;
+					if (mlir::succeeded(temp))
+					{
+						array.push_back(std::move(*temp));
+					}
+					return static_cast<mlir::LogicalResult>(temp);
+				}))
+			{
+				return ::mlir::failure();
+			}
+			return array;
+		}()
+	}];
+
+	let printer = [{
+		$_printer << '}] # !cond(!eq(delim, "Paren") : "(", !eq(delim, "Square") : "[", !eq(delim, "Braces") : "{") # [{';
+		llvm::interleaveComma($_self, $_printer, [&](auto&& x){ }] # !if(!empty(elementPrint), "$_printer << x;", !subst("$_self", "x", elementPrint)) # [{; });
+		$_printer << '}] # !cond(!eq(delim, "Paren") : ")", !eq(delim, "Square") : "]", !eq(delim, "Braces") : "}") # [{';
+	}];
 }
 
 def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
-	[ParamSpec<ArrayRefParameter<"::mlir::Attribute">, "value", "{}">]> {
+	[ParamSpec<ListPrint<"::mlir::Attribute", "Paren">, "value", "{}">]> {
 	let mnemonic = "tuple";
 
 	let extraClassDeclaration = [{
@@ -114,30 +185,49 @@ def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
             return ::mlir::DictionaryAttr::getWithSorted(getContext(), {});
 		}
 	}];
+
+	let assemblyFormat = "`<`struct(params)`>`";
 }
 
 def PylirPy_ListAttr : TypeObjectSlotsAttr<"List",
-	[ParamSpec<ArrayRefParameter<"::mlir::Attribute">, "value", "{}">]> {
+	[ParamSpec<ListPrint<"::mlir::Attribute", "Square">, "value", "{}">]> {
 	let mnemonic = "list";
+
+	let assemblyFormat = "`<`struct(params)`>`";
 }
 
 def PylirPy_SetAttr : TypeObjectSlotsAttr<"Set",
-	[ParamSpec<ArrayRefParameter<"::mlir::Attribute">, "value", "{}">], [], [{
+	[ParamSpec<ListPrint<"::mlir::Attribute", "Braces">, "value", "{}">], [], [{
 		std::vector<mlir::Attribute> temp = value.vec();
         temp.erase(std::unique(temp.begin(), temp.end()), temp.end());
 		value = temp;
 	}]> {
 	let mnemonic = "set";
+
+	let assemblyFormat = "`<`struct(params)`>`";
 }
 
 def PylirPy_DictAttr : TypeObjectSlotsAttr<"Dict",
-	[ParamSpec<ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>">, "value", "{}">], [], [{
+	[ParamSpec<ListPrint<"std::pair<mlir::Attribute, mlir::Attribute>", "Braces", [{
+		[&]() -> mlir::FailureOr<std::pair<mlir::Attribute, mlir::Attribute>> {
+			mlir::Attribute first, second;
+			if ($_parser.parseAttribute(first) || $_parser.parseKeyword("to") || $_parser.parseAttribute(second))
+			{
+				return mlir::failure();
+			}
+			return std::pair{first, second};
+		}()
+	}], [{
+		$_printer << $_self.first << " to " << $_self.second;
+	}]>, "value", "{}">], [], [{
 		auto vector = value.vec();
 		vector.erase(std::unique(vector.begin(), vector.end(),
                         [](const auto& lhs, const auto& rhs) { return lhs.first == rhs.first; }), vector.end());
 		value = vector;
 	}]> {
     let mnemonic = "dict";
+
+    let assemblyFormat = "`<`struct(params)`>`";
 }
 
 def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
@@ -150,11 +240,15 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	     DeclareAttrInterfaceMethods<ObjectAttrInterface>]>
 {
 	let mnemonic = "function";
+
+	let assemblyFormat = "`<`struct(params)`>`";
 }
 
 def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
 	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctx, {})">, "mroTuple">]> {
 	let mnemonic = "type";
+
+	let assemblyFormat = "`<`struct(params)`>`";
 }
 
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {

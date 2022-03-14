@@ -1,10 +1,10 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.int = #py.type<>
 
 func @test() -> (i64, i1) {
-    %0 = py.constant #py.int<5>
+    %0 = py.constant #py.int<value = 5>
     %1, %valid = py.int.toInteger %0 : i64
     return %1, %valid : i64, i1
 }
@@ -16,7 +16,7 @@ func @test() -> (i64, i1) {
 
 
 func @test2() -> (i64, i1) {
-    %0 = py.constant #py.int<534567452345234523154235234523463462345345234523937628376129387126381253128735>
+    %0 = py.constant #py.int<value = 534567452345234523154235234523463462345345234523937628376129387126381253128735>
     %1, %valid = py.int.toInteger %0 : i64
     return %1, %valid : i64, i1
 }
@@ -85,7 +85,7 @@ func @test7(%arg0 : i64) -> (index, i1) {
 // CHECK: return %[[RESULT]], %[[C1]]
 
 func @test8() -> (index, i1) {
-    %0 = py.constant #py.int<5>
+    %0 = py.constant #py.int<value = 5>
     %1, %valid = py.int.toInteger %0 : index
     return %1, %valid : index, i1
 }

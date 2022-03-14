@@ -42,9 +42,9 @@ def bar(param):
 # skipping tuple case for now
 
 # CHECK: ^[[SUITE_BLOCK]]:
-# CHECK: %[[ONE:.*]] = py.constant #py.int<1>
+# CHECK: %[[ONE:.*]] = py.constant #py.int<value = 1>
 # CHECK: return %[[ONE]]
 
 # CHECK: ^[[SKIP_BLOCK]]:
-# CHECK: %[[ZERO:.*]] = py.constant #py.int<0>
+# CHECK: %[[ZERO:.*]] = py.constant #py.int<value = 0>
 # CHECK: return %[[ZERO]]

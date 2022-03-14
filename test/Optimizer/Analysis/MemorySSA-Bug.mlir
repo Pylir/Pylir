@@ -1,11 +1,11 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.list = #py.type
+py.globalValue @builtins.type = #py.type<>
+py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.list = #py.type<>
 
 func @test4() -> index {
-    %0 = py.constant #py.str<"test">
+    %0 = py.constant #py.str<value = "test">
     %1 = py.makeList ()
     cf.br ^condition
 
@@ -43,7 +43,7 @@ func @test4() -> index {
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
 func @test5() -> index {
-    %0 = py.constant #py.str<"test">
+    %0 = py.constant #py.str<value = "test">
     %1 = py.makeList ()
     cf.br ^back1
 
@@ -74,7 +74,7 @@ func @test5() -> index {
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
 func @test6() {
-    %0 = py.constant #py.str<"test">
+    %0 = py.constant #py.str<value = "test">
     %1 = py.makeList ()
     cf.br ^bb2
 
