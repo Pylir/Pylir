@@ -154,11 +154,11 @@ Op doTypeObjectSlotsReplace(Op op, ::llvm::ArrayRef<std::pair<size_t, ::mlir::At
     {
         if (index == offset)
         {
-            type = attr.cast<mlir::FlatSymbolRefAttr>();
+            type = attr.template cast<mlir::FlatSymbolRefAttr>();
         }
         else if (index == offset + 1)
         {
-            slots = attr.cast<mlir::DictionaryAttr>();
+            slots = attr.template cast<mlir::DictionaryAttr>();
         }
     }
     return Op::get(op.getContext(), std::forward<Args>(prior)..., type, slots);
