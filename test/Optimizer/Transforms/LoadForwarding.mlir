@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s --load-forwarding --split-input-file | FileCheck %s
+// RUN: pylir-opt %s -pass-pipeline='builtin.func(load-forwarding)' --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type<slots = {__slots__ = #py.tuple<value = (#py.str<value = "__slots__">)>}>
 py.globalValue @builtins.str = #py.type<>

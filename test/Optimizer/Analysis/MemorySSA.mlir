@@ -11,7 +11,7 @@ func @test() -> index {
     return %2 : index
 }
 
-// CHECK-LABEL: memSSA.module @test
+// CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
@@ -34,7 +34,7 @@ func @test2(%arg0 : i1) -> index {
     return %2 : index
 }
 
-// CHECK-LABEL: memSSA.module @test2
+// CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
@@ -66,7 +66,7 @@ func @test3() -> index {
     return %3 : index
 }
 
-// CHECK-LABEL: memSSA.module @test3
+// CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
@@ -98,7 +98,10 @@ func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
-// CHECK-LABEL: @test4
+// skip @bar
+// CHECK-LABEL: memSSA.module
+
+// CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: py.setSlot "test"

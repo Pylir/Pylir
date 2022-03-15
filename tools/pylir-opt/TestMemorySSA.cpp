@@ -19,12 +19,8 @@ protected:
 
 void TestMemorySSA::runOnOperation()
 {
-    for (auto func : getOperation().getOps<mlir::FuncOp>())
+    for (auto func : getOperation().getOps<mlir::FunctionOpInterface>())
     {
-        if (func.isDeclaration())
-        {
-            continue;
-        }
         llvm::outs() << getChildAnalysis<pylir::MemorySSA>(func);
     }
 }

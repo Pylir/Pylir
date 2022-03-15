@@ -265,9 +265,18 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
 void pylir::MemorySSA::createIR(mlir::Operation* operation)
 {
     mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
-    m_region = builder.create<MemSSA::MemoryModuleOp>(mlir::FlatSymbolRefAttr::get(operation));
+    m_region = builder.create<MemSSA::MemoryModuleOp>();
     PYLIR_ASSERT(operation->getNumRegions() == 1);
     auto& region = operation->getRegion(0);
+    if (region.empty())
+    {
+        auto* block = new mlir::Block;
+        m_region->getBody().push_back(block);
+        builder.setInsertionPointToStart(block);
+        builder.create<pylir::MemSSA::MemoryLiveOnEntryOp>();
+        builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::ArrayRef<mlir::ValueRange>{}, mlir::BlockRange{});
+        return;
+    }
     SSABuilder::DefinitionsMap lastDefs;
     pylir::SSABuilder ssaBuilder;
 

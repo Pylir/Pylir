@@ -17,7 +17,7 @@ func @test(%arg0 : !py.dynamic) -> index {
     return %3 : index
 }
 
-// CHECK-LABEL: memSSA.module @test
+// CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[ENTRY]])
 // CHECK-NEXT: py.makeList

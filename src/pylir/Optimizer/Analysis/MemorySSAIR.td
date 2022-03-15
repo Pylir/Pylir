@@ -48,11 +48,11 @@ def ReadAttr : MemorySSA_Attr<"Read"> {
 
 def MemoryModuleOp : MemorySSA_Op<"module", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>,
                                              DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
-    let arguments = (ins FlatSymbolRefAttr:$function_name);
+    let arguments = (ins);
     let results = (outs);
 
     let regions = (region AnyRegion:$body);
-    let assemblyFormat = "$function_name attr-dict-with-keyword $body";
+    let assemblyFormat = "attr-dict-with-keyword $body";
 }
 
 def MemoryLiveOnEntryOp : MemorySSA_Op<"liveOnEntry"> {

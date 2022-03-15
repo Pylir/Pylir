@@ -19,11 +19,6 @@ protected:
 
 void LoadForwardingPass::runOnOperation()
 {
-    if (getOperation().isDeclaration())
-    {
-        markAllAnalysesPreserved();
-        return;
-    }
     auto& memorySSA = getAnalysisManager().getAnalysis<pylir::MemorySSA>();
     auto& aliasAnalysis = getAnalysisManager().getAnalysis<mlir::AliasAnalysis>();
     bool changed = false;
