@@ -23,6 +23,8 @@ def PylirPy_Dialect : Dialect {
 
     let extraClassDeclaration = [{
         void initializeAttributes();
+
+        void initializeTypes();
     }];
 
     let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;

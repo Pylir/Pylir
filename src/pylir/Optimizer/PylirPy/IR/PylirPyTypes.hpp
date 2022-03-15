@@ -4,6 +4,16 @@
 #include <mlir/IR/TypeRange.h>
 #include <mlir/IR/Types.h>
 
+#include "ObjectTypeInterface.hpp"
+
+namespace pylir::Py
+{
+template <class ConcreteType>
+class ObjectType : public mlir::TypeTrait::TraitBase<ConcreteType, ObjectType>
+{
+};
+} // namespace pylir::Py
+
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.h.inc"
 

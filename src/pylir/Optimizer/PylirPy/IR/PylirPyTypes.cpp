@@ -8,3 +8,11 @@
 
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"
+
+void pylir::Py::PylirPyDialect::initializeTypes()
+{
+    addTypes<
+#define GET_TYPEDEF_LIST
+#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"
+        >();
+}

@@ -68,14 +68,14 @@ def : Pat<(PylirPy_IntCmpOp $kind, $lhs, $rhs),
 def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
           (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
 
-def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $op, (ConstantLikeMatcher AttrInterfaceInstance<IntAttrInterface>:$first)),
-            (ConstantLikeMatcher AttrInterfaceInstance<IntAttrInterface>:$second)),
+def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $op, (ConstantLikeMatcher IntAttrInterface:$first)),
+            (ConstantLikeMatcher IntAttrInterface:$second)),
             [(PylirPy_ConstantOp:$constant
             (NativeCodeCall<"add($0.cast<::pylir::Py::IntAttrInterface>(), $1.cast<::pylir::Py::IntAttrInterface>())">
             $first, $second)), (PylirPy_IntAddOp $op, $constant)]>;
 
-def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $x, (ConstantLikeMatcher AttrInterfaceInstance<IntAttrInterface>:$first)),
-                                (PylirPy_IntAddOp $y, (ConstantLikeMatcher AttrInterfaceInstance<IntAttrInterface>:$second))),
+def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $x, (ConstantLikeMatcher IntAttrInterface:$first)),
+                                (PylirPy_IntAddOp $y, (ConstantLikeMatcher IntAttrInterface:$second))),
             [(PylirPy_ConstantOp:$constant
             (NativeCodeCall<"add($0.cast<::pylir::Py::IntAttrInterface>(), $1.cast<::pylir::Py::IntAttrInterface>())">
              $first, $second)),

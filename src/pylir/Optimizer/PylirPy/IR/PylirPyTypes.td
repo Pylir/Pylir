@@ -3,13 +3,91 @@
 #define PYLIR_PY_TYPES_TABLEGEN
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
+include "pylir/Optimizer/Util/TablegenUtil.td"
+include "pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.td"
 
-class PylirPy_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type"> :
-    TypeDef<PylirPy_Dialect, name, traits, baseCppClass>;
+class PylirPy_Type<string name, list<Trait> traits = []> : TypeDef<PylirPy_Dialect, name, traits>;
 
-def PylirPy_DynamicType : PylirPy_Type<"Dynamic"> {
+class PylirPy_ObjectType<string name, list<Trait> traits = []>
+	: PylirPy_Type<name, !listconcat(traits, [ObjectTypeInterface])>;
+
+def PylirPy_DynamicType : PylirPy_ObjectType<"Dynamic"> {
     let mnemonic = "dynamic";
     let summary = "dynamic type";
+
+    let extraClassDeclaration = [{
+        mlir::FlatSymbolRefAttr getTypeObject() const
+        {
+            return {};
+        }
+
+        ::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
+        {
+            return {};
+        }
+    }];
+}
+
+defvar TypeObjectSlotsDag = (ins "::mlir::FlatSymbolRefAttr":$typeObject, ListPrint<"std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>", "Braces", [{
+									[&]() -> mlir::FailureOr<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>>
+									{
+										mlir::StringAttr first;
+										pylir::Py::ObjectTypeInterface second;
+                                        if ($_parser.parseAttribute(first) || $_parser.parseEqual() || $_parser.parseType(second))
+                                        {
+                                            return mlir::failure();
+                                        }
+                                        return std::pair{first, second};
+									}()
+                            	}], [{
+                            	    $_printer << $_self.first << " = " << $_self.second;
+                            	}]>:$slots);
+
+def PylirPy_ClassType : PylirPy_ObjectType<"Class"> {
+	let mnemonic = "class";
+	let summary = "class type";
+
+	let parameters = TypeObjectSlotsDag;
+
+	let assemblyFormat = "`<` struct(params) `>`";
+}
+
+def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
+	let mnemonic = "tuple";
+	let summary = "tuple type";
+
+	let parameters = (ins "mlir::FlatSymbolRefAttr":$typeObject, ListPrint<"pylir::Py::ObjectTypeInterface", "Paren">:$elements);
+
+	let assemblyFormat = "`<` params `>`";
+
+	let extraClassDeclaration = [{
+		::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
+		{
+            return {};
+        }
+	}];
+}
+
+def PylirPy_VariantType : PylirPy_ObjectType<"Variant"> {
+	let mnemonic = "variant";
+	let summary = "variant type";
+
+	let parameters = (ins ArrayRefParameter<"pylir::Py::ObjectTypeInterface">:$elements);
+
+	let assemblyFormat = "`<` params `>`";
+
+	let extraClassDeclaration = [{
+
+		mlir::FlatSymbolRefAttr getTypeObject() const
+        {
+            return {};
+		}
+
+		::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
+		{
+            return {};
+        }
+	}];
 }
 
 defvar DynamicType = TypeAlias<PylirPy_DynamicType>;

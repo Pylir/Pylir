@@ -41,10 +41,7 @@ void pylir::Py::PylirPyDialect::initialize()
 #define GET_OP_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc"
         >();
-    addTypes<
-#define GET_TYPEDEF_LIST
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"
-        >();
+    initializeTypes();
     initializeAttributes();
     addInterfaces<PylirPyInlinerInterface>();
 }

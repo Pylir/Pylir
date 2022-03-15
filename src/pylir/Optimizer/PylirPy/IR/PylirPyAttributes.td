@@ -5,6 +5,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.td"
 include "pylir/Optimizer/PylirPy/IR/IntAttrInterface.td"
+include "pylir/Optimizer/Util/TablegenUtil.td"
 include "mlir/IR/SubElementInterfaces.td"
 
 class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
@@ -35,29 +36,10 @@ def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [
 class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::mlir::FlatSymbolRefAttr",
 	"::mlir::FlatSymbolRefAttr::get($_ctx, ::pylir::Py::Builtins::" # name # ".name)", description>;
 
-class ParamSpec<AttrOrTypeParameter m_type, string m_name, string m_defaultArg = ""> {
-	AttrOrTypeParameter type = m_type;
-	string name = m_name;
-	string defaultArg = m_defaultArg;
-}
-
-class ParamSpecBuilder<list<ParamSpec> spec, code extraCode = ""> : AttrBuilder<!dag(ins,
-											!foreach(x, spec, CArg<x.type.cppType, !if(x.type.isOptional, "{}", x.defaultArg)>),
-															!foreach(x, spec, x.name)),
-	!interleave(!foreach(x, !filter(x, spec, x.type.isOptional),
-					x.name # " = " # x.name # " ? " # x.name # " : " # !subst("$_ctx", "$_ctxt", x.type.defaultValue) # ";\n"),
-							"") # extraCode #
-	"return Base::get($_ctxt, " # !interleave(!foreach(x, spec, x.name), ", ") # ");"
->;
-
-class ParamSpecDag<list<ParamSpec> spec> {
-	dag result = !dag(ins, !foreach(x, spec, x.type), !foreach(x, spec, x.name));
-}
-
 class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = [], string extraBuilderCode = "">
 	: PylirPy_Attr<name, traits> {
 
-	let parameters = ParamSpecDag<spec>.result;
+	let parameters = !dag(ins, !foreach(x, spec, x.type), !foreach(x, spec, x.name));
 
     let skipDefaultBuilders = 1;
 
@@ -77,20 +59,6 @@ class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait>
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "typeObject">]),
     !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
 										["replaceImmediateSubAttribute"]>, ObjectAttrInterface])>;
-
-class CustomPrint<AttrOrTypeParameter x, string elementParse = ?, string elementPrint = ?>
-	: AttrOrTypeParameter<x.cppType, x.summary, x.cppAccessorType>
-{
-	let allocator = x.allocator;
-	let comparator = x.comparator;
-	let cppStorageType = x.cppStorageType;
-	let syntax = x.syntax;
-	let isOptional = x.isOptional;
-	let defaultValue = x.defaultValue;
-
-	let parser = elementParse;
-	let printer = elementPrint;
-}
 
 def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
 	ParamSpec<CustomPrint<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">,
@@ -146,33 +114,6 @@ def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRe
 	let mnemonic = "str";
 
 	let assemblyFormat = "`<`struct(params)`>`";
-}
-
-class ListPrint<string type, string delim, string elementParse = "", string elementPrint = ""> : ArrayRefParameter<type>
-{
-	let parser = [{
-		[&]() -> mlir::FailureOr<llvm::SmallVector<}] # type # [{>> {
-			llvm::SmallVector<}] # type # [{> array;
-			if ($_parser.parseCommaSeparatedList(::mlir::AsmParser::Delimiter::}] # delim # [{, [&]() -> mlir::ParseResult {
-					auto temp = }] # !if(!empty(elementParse), "::mlir::FieldParser<" # type # ">::parse($_parser)", elementParse) # [{;
-					if (mlir::succeeded(temp))
-					{
-						array.push_back(std::move(*temp));
-					}
-					return static_cast<mlir::LogicalResult>(temp);
-				}))
-			{
-				return ::mlir::failure();
-			}
-			return array;
-		}()
-	}];
-
-	let printer = [{
-		$_printer << '}] # !cond(!eq(delim, "Paren") : "(", !eq(delim, "Square") : "[", !eq(delim, "Braces") : "{") # [{';
-		llvm::interleaveComma($_self, $_printer, [&](auto&& x){ }] # !if(!empty(elementPrint), "$_printer << x;", !subst("$_self", "x", elementPrint)) # [{; });
-		$_printer << '}] # !cond(!eq(delim, "Paren") : ")", !eq(delim, "Square") : "]", !eq(delim, "Braces") : "}") # [{';
-	}];
 }
 
 def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
