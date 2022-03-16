@@ -13,7 +13,7 @@ struct Builtin
     bool isPublic;
 };
 
-#define BUILTIN(x, s, isPublic) constexpr Builtin x = {s, isPublic};
+#define BUILTIN(x, s, isPublic, ...) constexpr Builtin x = {s, isPublic};
 #include <pylir/Interfaces/Builtins.def>
 
 constexpr std::array allBuiltins = {

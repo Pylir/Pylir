@@ -14,7 +14,6 @@ add_mlir_conversion_library(PylirToLLVMIR
         MLIRPass
         MLIRTransforms
         MLIRFuncToLLVM
-        MLIRControlFlowToLLVM
         )
 
 if (PYLIR_USE_PCH)

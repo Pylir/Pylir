@@ -12,7 +12,7 @@
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
-#include <pylir/Optimizer/PylirPy/Interfaces/RuntimeTypeInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
 #include <variant>
 

@@ -1,6 +1,5 @@
 #include "Util.hpp"
 
-#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 
 #include "Builtins.hpp"
@@ -26,7 +25,7 @@ void raiseException(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value ex
 {
     if (exceptionPath)
     {
-        builder.create<mlir::cf::BranchOp>(loc, exceptionPath, exception);
+        builder.create<pylir::Py::BranchOp>(loc, exceptionPath, exception);
     }
     else
     {
@@ -40,19 +39,21 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
     mlir::Value result;
     if (!landingPadBlock)
     {
-        result = builder.create<pylir::Py::CallMethodOp>(loc, self, tuple, kwargs);
+        result = builder.create<pylir::Py::CallMethodOp>(loc, builder.getType<pylir::Py::UnknownType>(), self, tuple,
+                                                         kwargs);
     }
     else
     {
         auto* happyPath = new mlir::Block;
-        result = builder.create<pylir::Py::CallMethodExOp>(loc, self, tuple, kwargs, mlir::ValueRange{},
-                                                           mlir::ValueRange{}, happyPath, landingPadBlock);
+        result = builder.create<pylir::Py::CallMethodExOp>(loc, builder.getType<pylir::Py::UnknownType>(), self, tuple,
+                                                           kwargs, mlir::ValueRange{}, mlir::ValueRange{}, happyPath,
+                                                           landingPadBlock);
         implementBlock(builder, happyPath);
     }
     auto failure = builder.create<pylir::Py::IsUnboundValueOp>(loc, result);
     auto* typeCall = new mlir::Block;
     auto* notBound = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(loc, failure, notBound, typeCall);
+    builder.create<pylir::Py::CondBranchOp>(loc, failure, notBound, typeCall);
 
     implementBlock(builder, notBound);
     auto typeError = pylir::Py::buildException(loc, builder, pylir::Py::Builtins::TypeError.name, {}, landingPadBlock);
@@ -67,36 +68,49 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
 mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& builder, std::string_view kind,
                                       std::vector<Py::IterArg> args, mlir::Block* landingPadBlock)
 {
-    auto typeObj = builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
+    auto typeObj = builder.create<Py::ConstantOp>(
+        loc,
+        builder.getType<pylir::Py::ClassType>(
+            mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Type.name), llvm::None),
+        mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
     args.emplace(args.begin(), typeObj);
     mlir::Value tuple;
     if (!landingPadBlock
         || std::none_of(args.begin(), args.end(),
                         [](const Py::IterArg& arg) { return std::holds_alternative<Py::IterExpansion>(arg); }))
     {
-        tuple = builder.create<Py::MakeTupleOp>(loc, args);
+        tuple = builder.create<Py::MakeTupleOp>(loc, builder.getType<pylir::Py::UnknownType>(), args);
     }
     else
     {
         auto* happyPath = new mlir::Block;
-        tuple = builder.create<Py::MakeTupleExOp>(loc, args, happyPath, mlir::ValueRange{}, landingPadBlock,
-                                                  mlir::ValueRange{});
+        tuple = builder.create<Py::MakeTupleExOp>(loc, builder.getType<pylir::Py::UnknownType>(), args, happyPath,
+                                                  mlir::ValueRange{}, landingPadBlock, mlir::ValueRange{});
         implementBlock(builder, happyPath);
     }
     auto dict = builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(builder.getContext(), {}));
-    auto metaType = builder.create<Py::TypeOfOp>(loc, typeObj);
-    auto newMethod = builder.create<Py::GetSlotOp>(loc, typeObj, metaType, "__new__");
+    auto metaType = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), typeObj);
+    auto newMethod =
+        builder.create<Py::GetSlotOp>(loc, builder.getType<pylir::Py::UnknownType>(), typeObj, metaType, "__new__");
 
-    auto obj = builder
-                   .create<mlir::func::CallIndirectOp>(loc, builder.create<Py::FunctionGetFunctionOp>(loc, newMethod),
-                                                       mlir::ValueRange{newMethod, tuple, dict})
-                   ->getResult(0);
-    auto objType = builder.create<Py::TypeOfOp>(loc, obj);
-    auto context =
-        builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
+    auto obj =
+        builder
+            .create<Py::CallIndirectOp>(
+                loc, builder.create<Py::FunctionGetFunctionOp>(loc, getUniversalCCType(loc.getContext()), newMethod),
+                mlir::ValueRange{newMethod, tuple, dict})
+            ->getResult(0);
+    auto objType = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), obj);
+    auto context = builder.create<Py::ConstantOp>(
+        loc,
+        builder.getType<Py::ClassType>(mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::NoneType.name),
+                                       llvm::None),
+        mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
     builder.create<Py::SetSlotOp>(loc, obj, objType, "__context__", context);
-    auto cause =
-        builder.create<Py::ConstantOp>(loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
+    auto cause = builder.create<Py::ConstantOp>(
+        loc,
+        builder.getType<Py::ClassType>(mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::NoneType.name),
+                                       llvm::None),
+        mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::None.name));
     builder.create<Py::SetSlotOp>(loc, obj, objType, "__cause__", cause);
     return obj;
 }
@@ -110,30 +124,36 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     {
         kwargs = emptyDict;
     }
-    auto popOp = builder.create<Py::TuplePopFrontOp>(loc, tuple);
-    auto type = builder.create<Py::TypeOfOp>(loc, popOp.getElement());
-    auto mroTuple = builder.create<Py::TypeMROOp>(loc, type).getResult();
-    auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
+    auto popOp = builder.create<Py::TuplePopFrontOp>(loc, builder.getType<pylir::Py::UnknownType>(),
+                                                     builder.getType<pylir::Py::UnknownType>(), tuple);
+    auto type = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), popOp.getElement());
+    auto mroTuple = builder.create<Py::TypeMROOp>(loc, builder.getType<pylir::Py::UnknownType>(), type).getResult();
+    auto lookup = builder.create<Py::MROLookupOp>(loc, builder.getType<pylir::Py::UnknownType>(), builder.getI1Type(),
+                                                  mroTuple, methodName.str());
     auto* exec = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(loc, lookup.getSuccess(), exec, notFoundPath);
+    builder.create<Py::CondBranchOp>(loc, lookup.getSuccess(), exec, notFoundPath);
 
     implementBlock(builder, exec);
     auto function = builder.create<Py::ConstantOp>(
-        loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Function.name));
-    auto callableType = builder.create<Py::TypeOfOp>(loc, lookup.getResult());
+        loc,
+        builder.getType<Py::ClassType>(mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::Type.name),
+                                       llvm::None),
+        mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Function.name));
+    auto callableType =
+        builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), lookup.getResult());
     auto isFunction = builder.create<Py::IsOp>(loc, callableType, function);
     auto* isFunctionBlock = new mlir::Block;
     auto* notFunctionBlock = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(loc, isFunction, isFunctionBlock, notFunctionBlock);
+    builder.create<Py::CondBranchOp>(loc, isFunction, isFunctionBlock, notFunctionBlock);
 
     implementBlock(builder, isFunctionBlock);
-    auto fp = builder.create<Py::FunctionGetFunctionOp>(loc, lookup.getResult());
+    auto fp =
+        builder.create<Py::FunctionGetFunctionOp>(loc, getUniversalCCType(builder.getContext()), lookup.getResult());
     mlir::Value result;
     if (!landingPadBlock)
     {
-        result =
-            builder.create<mlir::func::CallIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs})
-                .getResult(0);
+        result = builder.create<Py::CallIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs})
+                     .getResult(0);
     }
     else
     {
@@ -145,29 +165,31 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
         implementBlock(builder, happyPath);
     }
     auto* exitBlock = new mlir::Block;
-    exitBlock->addArgument(builder.getType<Py::DynamicType>(), loc);
-    builder.create<mlir::cf::BranchOp>(loc, exitBlock, result);
+    exitBlock->addArgument(builder.getType<Py::UnknownType>(), loc);
+    builder.create<Py::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, notFunctionBlock);
-    mroTuple = builder.create<Py::TypeMROOp>(loc, callableType);
-    auto getMethod = builder.create<Py::MROLookupOp>(loc, mroTuple, "__get__");
+    mroTuple = builder.create<Py::TypeMROOp>(loc, builder.getType<pylir::Py::UnknownType>(), callableType);
+    auto getMethod = builder.create<Py::MROLookupOp>(loc, builder.getType<pylir::Py::UnknownType>(),
+                                                     builder.getI1Type(), mroTuple, "__get__");
     auto* isDescriptor = new mlir::Block;
     auto* mergeBlock = new mlir::Block;
-    mergeBlock->addArgument(builder.getType<Py::DynamicType>(), loc);
-    builder.create<mlir::cf::CondBranchOp>(loc, getMethod.getSuccess(), isDescriptor, mergeBlock,
-                                           mlir::ValueRange{lookup.getResult()});
+    mergeBlock->addArgument(builder.getType<Py::UnknownType>(), loc);
+    builder.create<Py::CondBranchOp>(loc, getMethod.getSuccess(), isDescriptor, mergeBlock,
+                                     mlir::ValueRange{lookup.getResult()});
 
     implementBlock(builder, isDescriptor);
-    auto selfType = builder.create<Py::TypeOfOp>(loc, popOp.getElement());
+    auto selfType = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), popOp.getElement());
     result = buildCall(loc, builder, getMethod.getResult(),
-                       builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{popOp.getElement(), selfType}),
+                       builder.create<Py::MakeTupleOp>(loc, builder.getType<pylir::Py::UnknownType>(),
+                                                       std::vector<Py::IterArg>{popOp.getElement(), selfType}),
                        emptyDict, exceptionPath, landingPadBlock);
-    builder.create<mlir::cf::BranchOp>(loc, mergeBlock, result);
+    builder.create<Py::BranchOp>(loc, mergeBlock, result);
 
     implementBlock(builder, mergeBlock);
     result =
         buildCall(loc, builder, mergeBlock->getArgument(0), popOp.getResult(), kwargs, exceptionPath, landingPadBlock);
-    builder.create<mlir::cf::BranchOp>(loc, exitBlock, result);
+    builder.create<Py::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, exitBlock);
     return exitBlock->getArgument(0);
@@ -185,10 +207,4 @@ mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilde
     auto exception = Py::buildException(loc, builder, Py::Builtins::TypeError.name, {}, landingPadBlock);
     raiseException(loc, builder, exception, exceptionPath);
     return result;
-}
-
-mlir::FunctionType pylir::Py::getUniversalFunctionType(mlir::MLIRContext* context)
-{
-    auto dynamic = Py::DynamicType::get(context);
-    return mlir::FunctionType::get(context, {/*closure=*/dynamic, /* *args=*/dynamic, /* **kw=*/dynamic}, {dynamic});
 }

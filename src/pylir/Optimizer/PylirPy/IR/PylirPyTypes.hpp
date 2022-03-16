@@ -6,14 +6,6 @@
 
 #include "ObjectTypeInterface.hpp"
 
-namespace pylir::Py
-{
-template <class ConcreteType>
-class ObjectType : public mlir::TypeTrait::TraitBase<ConcreteType, ObjectType>
-{
-};
-} // namespace pylir::Py
-
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.h.inc"
 
@@ -21,7 +13,9 @@ namespace pylir::Py
 {
 inline mlir::FunctionType getUniversalCCType(mlir::MLIRContext* context)
 {
-    auto dynamicType = Py::DynamicType::get(context);
-    return mlir::FunctionType::get(context, mlir::TypeRange{dynamicType, dynamicType, dynamicType}, {dynamicType});
+    auto unknownType = Py::UnknownType::get(context);
+    return mlir::FunctionType::get(context, mlir::TypeRange{unknownType, unknownType, unknownType}, {unknownType});
 }
+
+pylir::Py::ObjectTypeInterface joinTypes(pylir::Py::ObjectTypeInterface lhs, pylir::Py::ObjectTypeInterface rhs);
 } // namespace pylir::Py

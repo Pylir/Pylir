@@ -11,4 +11,4 @@ function(add_interface name)
     target_link_libraries(PylirPy${name} PUBLIC MLIRIR)
 endfunction()
 
-add_interface(RuntimeTypeInterface)
+add_interface(TypeRefineableInterface)

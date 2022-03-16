@@ -1,4 +1,4 @@
-#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
+
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/TypeSwitch.h>
@@ -16,23 +16,23 @@ bool addExceptionHandling(mlir::PatternRewriter& rewriter, mlir::Operation* oper
 {
     mlir::OpBuilder::InsertionGuard guard{rewriter};
     return llvm::TypeSwitch<mlir::Operation*, bool>(operation)
-        .Case<mlir::func::CallIndirectOp, mlir::func::CallOp>(
+        .Case<pylir::Py::CallIndirectOp, pylir::Py::CallOp>(
             [&](auto callOp)
             {
                 auto* endBlock = rewriter.splitBlock(callOp->getBlock(), std::next(mlir::Block::iterator{callOp}));
                 rewriter.setInsertionPointAfter(callOp);
 
-                if constexpr (std::is_same_v<decltype(callOp), mlir::func::CallOp>)
+                if constexpr (std::is_same_v<decltype(callOp), pylir::Py::CallOp>)
                 {
                     rewriter.replaceOpWithNewOp<pylir::Py::InvokeOp>(
-                        callOp, callOp.getResultTypes(), callOp.getCalleeAttr(), callOp.operands(),
+                        callOp, callOp.getResultTypes(), callOp.getCalleeAttr(), callOp.getCallOperands(),
                         typeSwitch.getNormalDestOperands(), typeSwitch.getUnwindDestOperands(), endBlock,
                         typeSwitch.getExceptionPath());
                 }
                 else
                 {
                     rewriter.replaceOpWithNewOp<pylir::Py::InvokeIndirectOp>(
-                        callOp, callOp.getResultTypes(), callOp.getCallee(), callOp.operands(),
+                        callOp, callOp.getResultTypes(), callOp.getCallee(), callOp.getCallOperands(),
                         typeSwitch.getNormalDestOperands(), typeSwitch.getUnwindDestOperands(), endBlock,
                         typeSwitch.getExceptionPath());
                 }
@@ -44,7 +44,7 @@ bool addExceptionHandling(mlir::PatternRewriter& rewriter, mlir::Operation* oper
             {
                 rewriter.setInsertionPoint(raiseOp);
                 auto landingPadOp = pylir::Py::getLandingPad(typeSwitch);
-                auto operands = llvm::to_vector(landingPadOp.getLandingPadBrOp().getArguments());
+                auto operands = llvm::to_vector(landingPadOp.getBranchOp().getArguments());
                 for (auto& iter : operands)
                 {
                     if (iter == landingPadOp)
@@ -57,7 +57,7 @@ bool addExceptionHandling(mlir::PatternRewriter& rewriter, mlir::Operation* oper
                         iter = typeSwitch.getUnwindDestOperands()[arg.getArgNumber()];
                     }
                 }
-                rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(raiseOp, landingPadOp.getHandler(), operands);
+                rewriter.replaceOpWithNewOp<pylir::Py::BranchOp>(raiseOp, landingPadOp.getHandler(), operands);
                 return true;
             })
         .Default(false);
@@ -94,7 +94,7 @@ struct TypeSwitchOpConversion : public mlir::OpRewritePattern<Op>
                 {
                     mlir::OpBuilder::InsertionGuard guard{rewriter};
                     rewriter.setInsertionPoint(yield);
-                    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(yield, yield.getResults(), endBlock);
+                    rewriter.replaceOpWithNewOp<pylir::Py::BranchOp>(yield, yield.getResults(), endBlock);
                 }
             }
         };
@@ -106,7 +106,7 @@ struct TypeSwitchOpConversion : public mlir::OpRewritePattern<Op>
             auto isEqual = rewriter.create<pylir::Py::IsOp>(op.getLoc(), typeObject, typeMatch);
             auto* regionBlock = &region.front();
             auto* continueBlock = new mlir::Block;
-            rewriter.create<mlir::cf::CondBranchOp>(op.getLoc(), isEqual, regionBlock, continueBlock);
+            rewriter.create<pylir::Py::CondBranchOp>(op.getLoc(), isEqual, regionBlock, continueBlock);
 
             changeTerminators(region);
             rewriter.inlineRegionBefore(region, endBlock);
@@ -117,7 +117,7 @@ struct TypeSwitchOpConversion : public mlir::OpRewritePattern<Op>
 
         if (auto& region = op.getGeneric(); !region.empty())
         {
-            rewriter.create<mlir::cf::BranchOp>(op.getLoc(), &op.getGeneric().front());
+            rewriter.create<pylir::Py::BranchOp>(op.getLoc(), &op.getGeneric().front());
             changeTerminators(op.getGeneric());
             rewriter.inlineRegionBefore(op.getGeneric(), endBlock);
         }
@@ -130,7 +130,7 @@ struct TypeSwitchOpConversion : public mlir::OpRewritePattern<Op>
         rewriter.replaceOp(op, endBlock->getArguments());
         if constexpr (exceptionHandling)
         {
-            rewriter.create<mlir::cf::BranchOp>(op.getLoc(), op.getHappyPath());
+            rewriter.create<pylir::Py::BranchOp>(op.getLoc(), op.getHappyPath());
         }
         return mlir::success();
     }

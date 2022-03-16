@@ -13,6 +13,7 @@ def prependTupleConst : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, 
 def IsTypeSlot : AttrConstraint<CPred<"::isTypeSlot($_self.cast<::mlir::StringAttr>().getValue())">, "is type slot">;
 
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
+defvar TypeClass = "$_builder.getType<::pylir::Py::ClassType>(" # !subst("$0", TypeRef.value, TypeRef.attr.constBuilderCall) # ", llvm::None)";
 
 def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, $expansion)),
           (prependTuple $input, $args, $expansion)>;
@@ -22,11 +23,11 @@ def : Pat<(PylirPy_TuplePrependOp $input, (ConstantLikeMatcher PylirPy_TupleAttr
 
 def : Pattern<(PylirPy_GetSlotOp:$loc $object,
                 (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_)), Confined<StrAttr, [IsTypeSlot]>:$slot),
-    [(PylirPy_ConstantOp:$constant TypeRef), (PylirPy_GetSlotOp $object, $constant, $slot, (location $loc))]
+    [(PylirPy_ConstantOp:$constant TypeRef, (returnType TypeClass)), (PylirPy_GetSlotOp $object, $constant, $slot, (location $loc))]
 >;
 
 def : Pattern<(PylirPy_SetSlotOp:$loc $object, (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_)), IsTypeSlot:$slot, $value),
-    [(PylirPy_ConstantOp:$constant TypeRef), (PylirPy_SetSlotOp $object, $constant, $slot, $value, (location $loc))]
+    [(PylirPy_ConstantOp:$constant TypeRef, (returnType TypeClass)), (PylirPy_SetSlotOp $object, $constant, $slot, $value, (location $loc))]
 >;
 
 defvar Arith_CmpIEq = !head(!filter(x, Arith_CmpIPredicateAttr.enumerants, !eq(x.symbol, "eq")));

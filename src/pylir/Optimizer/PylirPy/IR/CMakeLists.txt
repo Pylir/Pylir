@@ -37,7 +37,7 @@ add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.c
 add_dependencies(PylirPyDialect PylirPyOpsIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen IntAttrInterfaceIncGen
         ObjectTypeInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
-        PylirPyRuntimeTypeInterface PylirCaptureInterface PRIVATE MLIRFunc MLIRArithmetic MLIRControlFlow)
+        PylirCaptureInterface PylirPyTypeRefineableInterface PRIVATE MLIRFunc MLIRArithmetic)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)
     target_link_libraries(PylirPyDialect PRIVATE COMMON_PCH)

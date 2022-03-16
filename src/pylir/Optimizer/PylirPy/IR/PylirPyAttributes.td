@@ -197,4 +197,8 @@ def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let summary = "python unbound value";
 }
 
+def AnyPylirAttr : AnyAttrOf<[PylirPy_UnboundAttr, SymbolRefAttr, ObjectAttrInterface]> {
+	let valueType = NoneType;
+}
+
 #endif

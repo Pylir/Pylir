@@ -11,9 +11,26 @@ class PylirPy_Type<string name, list<Trait> traits = []> : TypeDef<PylirPy_Diale
 class PylirPy_ObjectType<string name, list<Trait> traits = []>
 	: PylirPy_Type<name, !listconcat(traits, [ObjectTypeInterface])>;
 
-def PylirPy_DynamicType : PylirPy_ObjectType<"Dynamic"> {
-    let mnemonic = "dynamic";
-    let summary = "dynamic type";
+def PylirPy_UnknownType : PylirPy_ObjectType<"Unknown"> {
+    let mnemonic = "unknown";
+    let summary = "unknown type";
+
+    let extraClassDeclaration = [{
+        mlir::FlatSymbolRefAttr getTypeObject() const
+        {
+            return {};
+        }
+
+        ::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
+        {
+            return {};
+        }
+    }];
+}
+
+def PylirPy_UnboundType : PylirPy_ObjectType<"Unbound"> {
+    let mnemonic = "unbound";
+    let summary = "unbound type";
 
     let extraClassDeclaration = [{
         mlir::FlatSymbolRefAttr getTypeObject() const
@@ -90,7 +107,11 @@ def PylirPy_VariantType : PylirPy_ObjectType<"Variant"> {
 	}];
 }
 
-defvar DynamicType = TypeAlias<PylirPy_DynamicType>;
+class BuiltinType<string name> : TypeAlias<PylirPy_ClassType> {
+	let builderCall = "$_builder.getType<::pylir::Py::ClassType>(mlir::FlatSymbolRefAttr::get($_builder.getContext(), pylir::Py::Builtins::" # name # ".name), llvm::None)";
+}
+
+defvar DynamicType = ObjectTypeInterfaceC;
 defvar IntegerLike = TypeConstraint<Or<[Index.predicate, AnySignlessInteger.predicate]>>;
 def PyFunctionType : Type<
     And<[
@@ -104,12 +125,6 @@ def PyFunctionType : Type<
     ]>>
 {
     let summary = "python function";
-    let builderCall = [{
-        mlir::FunctionType::get(
-            $_builder.getContext(),
-            {$_builder.getType<pylir::Py::DynamicType>(),$_builder.getType<pylir::Py::DynamicType>(),
-             $_builder.getType<pylir::Py::DynamicType>()},{$_builder.getType<pylir::Py::DynamicType>()})
-    }];
 }
 
 #endif

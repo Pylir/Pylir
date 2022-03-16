@@ -13,28 +13,18 @@
 
 #include "PylirPyAttributes.hpp"
 
+namespace
+{
+bool objectTypesCompatible(mlir::Type lhs, mlir::Type rhs)
+{
+    return (lhs == rhs) || (lhs.isa<pylir::Py::ObjectTypeInterface>() && rhs.isa<pylir::Py::ObjectTypeInterface>());
+}
+
+} // namespace
+
 bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
 {
     return static_cast<mlir::OperandRange>(getTypeObjectMutable()).getBeginOperandIndex() != index;
-}
-
-mlir::OpFoldResult pylir::Py::TuplePopFrontOp::getRuntimeType(unsigned int resultIndex)
-{
-    if (resultIndex == 0)
-    {
-        return nullptr;
-    }
-    return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name);
-}
-
-mlir::OpFoldResult pylir::Py::MakeObjectOp::getRuntimeType(unsigned int)
-{
-    return getTypeObject();
-}
-
-mlir::OpFoldResult pylir::Py::StrCopyOp::getRuntimeType(unsigned int)
-{
-    return getTypeObject();
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::CallMethodExOp::getMutableSuccessorOperands(unsigned int index)
@@ -44,6 +34,11 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::CallMethodExOp::getMutableS
         return getNormalDestOperandsMutable();
     }
     return getUnwindDestOperandsMutable();
+}
+
+bool pylir::Py::CallMethodExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
 }
 
 mlir::MutableOperandRange pylir::Py::YieldOp::getMutableSuccessorOperands(::mlir::Optional<unsigned int>)
@@ -96,6 +91,11 @@ void pylir::Py::TypeSwitchOp::getSuccessorRegions(::mlir::Optional<unsigned int>
     typeSwitchSuccessorRegions(index, getResults(), operands, regions, getGeneric(), getSpecializations());
 }
 
+bool pylir::Py::TypeSwitchOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
+}
+
 void pylir::Py::TypeSwitchExOp::getSuccessorRegions(::mlir::Optional<unsigned int> index,
                                                     ::mlir::ArrayRef<::mlir::Attribute> operands,
                                                     ::mlir::SmallVectorImpl<::mlir::RegionSuccessor>& regions)
@@ -110,6 +110,11 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::TypeSwitchExOp::getMutableS
         return getNormalDestOperandsMutable();
     }
     return getUnwindDestOperandsMutable();
+}
+
+bool pylir::Py::TypeSwitchExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
 }
 
 namespace
@@ -256,11 +261,12 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
 
 bool parseTypeSwitchSpecializations(mlir::OpAsmParser& parser,
                                     llvm::SmallVectorImpl<std::unique_ptr<mlir::Region>>& regions,
-                                    llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& types)
+                                    llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& typeObjects,
+                                    llvm::SmallVectorImpl<mlir::Type>& types)
 {
     while (!parser.parseOptionalKeyword("case"))
     {
-        if (parser.parseOperand(types.emplace_back())
+        if (parser.parseOperand(typeObjects.emplace_back()) || parser.parseColonType(types.emplace_back())
             || parser.parseRegion(*regions.emplace_back(std::make_unique<mlir::Region>())))
         {
             return true;
@@ -270,38 +276,101 @@ bool parseTypeSwitchSpecializations(mlir::OpAsmParser& parser,
 }
 
 void printTypeSwitchSpecializations(mlir::OpAsmPrinter& printer, mlir::Operation*,
-                                    llvm::MutableArrayRef<mlir::Region> regions, mlir::OperandRange types)
+                                    llvm::MutableArrayRef<mlir::Region> regions, mlir::OperandRange typeObjects,
+                                    mlir::TypeRange types)
 {
-    for (auto [type, region] : llvm::zip(types, regions))
+    for (auto [typeObject, region, type] : llvm::zip(typeObjects, regions, types))
     {
-        printer << " case " << type << ' ';
+        printer << " case " << typeObject << " : " << type << ' ';
         printer.printRegion(region);
     }
 }
 
-bool parseOptionalTypeList(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::Type>& types)
+template <class... Args,
+          std::enable_if_t<(std::is_convertible_v<Args&, llvm::SmallVectorImpl<mlir::Type>&> && ...)>* = nullptr>
+bool parseOptionalTypeList(mlir::OpAsmParser& parser, Args&... types)
 {
-    if (!parser.parseOptionalColon())
+    if (parser.parseOptionalColon())
     {
-        return static_cast<bool>(parser.parseTypeList(types));
+        return false;
     }
-    return false;
+    std::array<llvm::SmallVectorImpl<mlir::Type>*, sizeof...(Args)> array = {&types...};
+    if constexpr (sizeof...(Args) == 1)
+    {
+        return static_cast<bool>(parser.parseTypeList(*array[0]));
+    }
+    else
+    {
+        auto parseOnce = [&](llvm::SmallVectorImpl<mlir::Type>& list)
+        { return parser.parseLParen() || parser.parseTypeList(list) || parser.parseRParen(); };
+        if (parseOnce(*array[0]))
+        {
+            return true;
+        }
+        for (std::size_t i = 1; i < array.size(); i++)
+        {
+            if (parser.parseComma() || parseOnce(*array[i]))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
-void printOptionalTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::TypeRange types)
+template <class... Args, std::enable_if_t<(std::is_convertible_v<Args, mlir::TypeRange> && ...)>* = nullptr>
+void printOptionalTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, Args... types)
 {
-    if (types.empty())
+    if ((types.empty() && ...))
     {
         return;
     }
-    printer << " : " << types;
+    std::array<mlir::TypeRange, sizeof...(Args)> array = {types...};
+    printer << " : ";
+    if constexpr (sizeof...(types) == 1)
+    {
+        printer << array[0];
+    }
+    else
+    {
+        llvm::interleaveComma(array, printer.getStream(), [&](mlir::TypeRange type) { printer << '(' << type << ')'; });
+    }
 }
 
 } // namespace
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::LandingPadBrOp::getMutableSuccessorOperands(unsigned int)
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::BranchOp::getMutableSuccessorOperands(unsigned int)
 {
     return getArgumentsMutable();
+}
+
+bool pylir::Py::BranchOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
+}
+
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::CondBranchOp::getMutableSuccessorOperands(unsigned int index)
+{
+    if (index == 0)
+    {
+        return getTrueArgsMutable();
+    }
+    return getFalseArgsMutable();
+}
+
+mlir::Block* pylir::Py::CondBranchOp::getSuccessorForOperands(::mlir::ArrayRef<::mlir::Attribute> operands)
+{
+    auto boolean = operands[0].dyn_cast_or_null<mlir::BoolAttr>();
+    if (!boolean)
+    {
+        return nullptr;
+    }
+    return boolean.getValue() ? getTrueBranch() : getFalseBranch();
+}
+
+bool pylir::Py::CondBranchOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
 }
 
 void pylir::Py::MakeTupleOp::getEffects(
@@ -353,7 +422,7 @@ mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableC
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                   llvm::ArrayRef<::pylir::Py::IterArg> args)
+                                   Py::ObjectTypeInterface type, llvm::ArrayRef<::pylir::Py::IterArg> args)
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
@@ -367,7 +436,7 @@ void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
+    build(odsBuilder, odsState, type, values, odsBuilder.getI32ArrayAttr(iterExpansion));
 }
 
 void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -429,6 +498,31 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion));
 }
 
+mlir::LogicalResult pylir::Py::CallOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, getCalleeAttr()));
+}
+
+mlir::CallInterfaceCallable pylir::Py::CallOp::getCallableForCallee()
+{
+    return getCalleeAttr();
+}
+
+mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
+{
+    return getCallOperands();
+}
+
+mlir::CallInterfaceCallable pylir::Py::CallIndirectOp::getCallableForCallee()
+{
+    return getCallee();
+}
+
+mlir::Operation::operand_range pylir::Py::CallIndirectOp::getArgOperands()
+{
+    return getCallOperands();
+}
+
 mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, getCalleeAttr()));
@@ -441,6 +535,11 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeOp::getMutableSuccess
         return getNormalDestOperandsMutable();
     }
     return getUnwindDestOperandsMutable();
+}
+
+bool pylir::Py::InvokeOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
 }
 
 mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
@@ -462,6 +561,11 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeIndirectOp::getMutabl
     return getUnwindDestOperandsMutable();
 }
 
+bool pylir::Py::InvokeIndirectOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
+}
+
 mlir::CallInterfaceCallable pylir::Py::InvokeIndirectOp::getCallableForCallee()
 {
     return getCallee();
@@ -470,15 +574,6 @@ mlir::CallInterfaceCallable pylir::Py::InvokeIndirectOp::getCallableForCallee()
 mlir::Operation::operand_range pylir::Py::InvokeIndirectOp::getArgOperands()
 {
     return getCallOperands();
-}
-
-mlir::LogicalResult pylir::Py::InvokeIndirectOp::inferReturnTypes(
-    ::mlir::MLIRContext*, ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange operands, ::mlir::DictionaryAttr,
-    ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    auto results = operands[0].getType().cast<mlir::FunctionType>().getResults();
-    inferredReturnTypes.append(results.begin(), results.end());
-    return mlir::success();
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeTupleExOp::getMutableSuccessorOperands(unsigned int index)
@@ -490,10 +585,15 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeTupleExOp::getMutableSu
     return getUnwindDestOperandsMutable();
 }
 
+bool pylir::Py::MakeTupleExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
+}
+
 void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                     llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
-                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
-                                     mlir::ValueRange unwindDestOperands)
+                                     Py::ObjectTypeInterface type, llvm::ArrayRef<::pylir::Py::IterArg> args,
+                                     mlir::Block* happyPath, mlir::ValueRange normalDestOperands,
+                                     mlir::Block* unwindPath, mlir::ValueRange unwindDestOperands)
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
@@ -507,7 +607,7 @@ void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+    build(odsBuilder, odsState, type, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
 }
 
@@ -518,6 +618,11 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeListExOp::getMutableSuc
         return getNormalDestOperandsMutable();
     }
     return getUnwindDestOperandsMutable();
+}
+
+bool pylir::Py::MakeListExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
 }
 
 void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -550,6 +655,11 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeSetExOp::getMutableSucc
     return getUnwindDestOperandsMutable();
 }
 
+bool pylir::Py::MakeSetExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
+}
+
 void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                    llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
                                    mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
@@ -578,6 +688,11 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeDictExOp::getMutableSuc
         return getNormalDestOperandsMutable();
     }
     return getUnwindDestOperandsMutable();
+}
+
+bool pylir::Py::MakeDictExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+{
+    return objectTypesCompatible(lhs, rhs);
 }
 
 void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -663,9 +778,9 @@ bool pylir::Py::GlobalValueOp::isDeclaration()
     return !getInitializerAttr();
 }
 
-pylir::Py::LandingPadBrOp pylir::Py::LandingPadOp::getLandingPadBrOp()
+pylir::Py::BranchOp pylir::Py::LandingPadOp::getBranchOp()
 {
-    return mlir::cast<pylir::Py::LandingPadBrOp>((*this)->getBlock()->getTerminator());
+    return mlir::cast<pylir::Py::BranchOp>((*this)->getBlock()->getTerminator());
 }
 
 namespace
@@ -880,18 +995,9 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
 
 mlir::LogicalResult pylir::Py::LandingPadOp::verify()
 {
-    if (!mlir::isa<pylir::Py::LandingPadBrOp>((*this)->getBlock()->getTerminator()))
+    if (!mlir::isa<pylir::Py::BranchOp>((*this)->getBlock()->getTerminator()))
     {
-        return emitOpError("Block starting with `py.landingPad` has to terminate with `py.landingPad.br`");
-    }
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::Py::LandingPadBrOp::verify()
-{
-    if (!mlir::isa<pylir::Py::LandingPadOp>((*this)->getBlock()->front()))
-    {
-        return emitOpError("Block ending with `py.landingPad.br` has to start with `py.landingPad`");
+        return emitOpError("Block starting with `py.landingPad` has to terminate with `py.br`");
     }
     return mlir::success();
 }

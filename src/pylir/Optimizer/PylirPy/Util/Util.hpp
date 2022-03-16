@@ -20,8 +20,6 @@ mlir::Value buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder,
                                    mlir::Block* PYLIR_NULLABLE exceptionPath,
                                    mlir::Block* PYLIR_NULLABLE landingPadBlock);
 
-mlir::FunctionType getUniversalFunctionType(mlir::MLIRContext* context);
-
 constexpr std::string_view pylirCallIntrinsic = "$pylir_call";
 
 } // namespace pylir::Py

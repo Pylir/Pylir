@@ -4,16 +4,16 @@
 #endif
 
 #ifndef BUILTIN_TYPE
-#define BUILTIN_TYPE(...) BUILTIN(__VA_ARGS__)
+#define BUILTIN_TYPE(...) BUILTIN(__VA_ARGS__, Type)
 #endif
 
 #ifndef BUILTIN_EXCEPTION
 #define BUILTIN_EXCEPTION(...) BUILTIN_TYPE(__VA_ARGS__)
 #endif
 
-BUILTIN(None, "builtins.None", true)
+BUILTIN(None, "builtins.None", true, NoneType)
 BUILTIN_TYPE(NoneType, "builtins.NoneType", false)
-BUILTIN(NotImplemented, "builtins.NotImplemented", true)
+BUILTIN(NotImplemented, "builtins.NotImplemented", true, NotImplementedType)
 BUILTIN_TYPE(NotImplementedType, "builtins.NotImplementedType", false)
 BUILTIN_TYPE(Type, "builtins.type", true)
 BUILTIN_TYPE(Object, "builtins.object", true)
@@ -38,9 +38,9 @@ BUILTIN_EXCEPTION(IndexError, "builtins.IndexError", true)
 BUILTIN_EXCEPTION(StopIteration, "builtins.StopIteration", true)
 BUILTIN_EXCEPTION(ArithmeticError, "builtins.ArithmeticError", true)
 BUILTIN_EXCEPTION(OverflowError, "builtins.OverflowError", true)
-BUILTIN(Print, "builtins.print", true)
-BUILTIN(Len, "builtins.len", true)
-BUILTIN(Repr, "builtins.repr", true)
+BUILTIN(Print, "builtins.print", true, Function)
+BUILTIN(Len, "builtins.len", true, Function)
+BUILTIN(Repr, "builtins.repr", true, Function)
 
 #undef BUILTIN
 #undef BUILTIN_TYPE

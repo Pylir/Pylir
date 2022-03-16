@@ -21,129 +21,129 @@ class PylirMem_Op<string mnemonic, list<Trait> traits = []> :
     Op<PylirMem_Dialect, mnemonic, traits>;
 
 def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {
-    let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
     let arguments = (ins DynamicType:$type_object);
+    let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
 
-    let assemblyFormat = "$type_object attr-dict";
+    let assemblyFormat = "$type_object attr-dict `:` type($type_object)";
 }
 
 def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
-    let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
     let arguments = (ins ObjectAttr:$type_object);
+    let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
 
     let assemblyFormat = "$type_object attr-dict";
 }
 
 def PylirMem_GCAllocTupleOp : PylirMem_Op<"gcAllocTuple"> {
-    let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
     let arguments = (ins DynamicType:$type_object, Index:$length);
+    let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
 
-    let assemblyFormat = "$type_object `[` $length `]` attr-dict";
+    let assemblyFormat = "$type_object `[` $length `]` attr-dict `:` type($type_object)";
 }
 
 def PylirMem_StackAllocTupleOp : PylirMem_Op<"stackAllocTuple"> {
-    let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
     let arguments = (ins DynamicType:$type_object, IndexAttr:$length);
+    let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
 
-    let assemblyFormat = "$type_object `[` $length `]` attr-dict";
+    let assemblyFormat = "$type_object `[` $length `]` attr-dict `:` type($type_object)";
 }
 
 def PylirMem_InitIntOp : PylirMem_Op<"initInt", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, IntegerLike:$initializer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` $initializer `:` type($initializer) attr-dict";
+    let assemblyFormat = "$memory `to` $initializer `:` type($initializer) attr-dict `:` type($result)";
 }
 
 def PylirMem_InitIntAddOp : PylirMem_Op<"initIntAdd", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$lhs, DynamicType:$rhs);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` $lhs `+` $rhs attr-dict";
+    let assemblyFormat = "$memory `to` $lhs `+` $rhs attr-dict `:` `(` type($lhs) `,` type($rhs) `)` `->` type($result)";
 }
 
 def PylirMem_InitFloatOp : PylirMem_Op<"initFloat", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, F64:$initializer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` $initializer attr-dict";
+    let assemblyFormat = "$memory `to` $initializer attr-dict `:` type($result)";
 }
 
 def PylirMem_InitTupleOp : PylirMem_Op<"initTuple", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `(` $initializer `)` attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `(` $initializer `)` attr-dict `:` functional-type($initializer, $result)";
 }
 
 def PylirMem_InitTuplePrependOp : PylirMem_Op<"initTuplePrepend", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$element, DynamicType:$tuple);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `(` $element `,` $tuple `)` attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `(` $element `,` $tuple `)` attr-dict `:` `(` type($element) `,` type($tuple) `)` `->` type($result)";
 }
 
 def PylirMem_InitTuplePopFrontOp : PylirMem_Op<"initTuplePopFront", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$tuple);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `(` $tuple `)` attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `(` $tuple `)` attr-dict `:` functional-type($tuple, $result)";
 }
 
 def PylirMem_InitTupleFromListOp : PylirMem_Op<"initTupleFromList"> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$initializer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `(` `*` $initializer `)` attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `(` `*` $initializer `)` attr-dict `:` functional-type($initializer, $result)";
 }
 
 def PylirMem_InitListOp : PylirMem_Op<"initList", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `[` $initializer `]` attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `[` $initializer `]` attr-dict `:` functional-type($initializer, $result)";
 }
 
 def PylirMem_InitSetOp : PylirMem_Op<"initSet", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `{` $initializer `}` attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `{` $initializer `}` attr-dict `:` functional-type($initializer, $result)";
 }
 
 def PylirMem_InitDictOp : PylirMem_Op<"initDict", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory attr-dict";
+    let assemblyFormat = "$memory attr-dict `:` type($result)";
 }
 
 def PylirMem_InitStrOp : PylirMem_Op<"initStr", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$strings);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory (`to` $strings^)? attr-dict";
+    let assemblyFormat = "$memory (`to` $strings^)? attr-dict `:` functional-type($strings, $result)";
 }
 
 def PylirMem_InitStrFromIntOp : PylirMem_Op<"initStrFromInt", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$integer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` $integer attr-dict";
+    let assemblyFormat = "$memory `to` $integer attr-dict `:` functional-type($integer, $result)";
 }
 
 def PylirMem_InitFuncOp : PylirMem_Op<"initFunc", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, FlatSymbolRefAttr:$initializer);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` $initializer attr-dict";
+    let assemblyFormat = "$memory `to` $initializer attr-dict `:` type($result)";
 }
 
 def PylirMem_InitObjectOp : PylirMem_Op<"initObject", [AlwaysBound]> {
-    let results = (outs DynamicType:$result);
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory attr-dict";
+    let assemblyFormat = "$memory attr-dict `:` type($result)";
 }
 
 #endif

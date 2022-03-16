@@ -13,7 +13,7 @@ def ObjectTypeInterface : TypeInterface<"ObjectTypeInterface"> {
     ];
 }
 
-def ObejctTypeInterfaceC : Type<CPred<"$_self.isa<::pylir::Py::ObjectTypeInterface>()">, "ObjectTypeInterface instance",
+def ObjectTypeInterfaceC : Type<CPred<"$_self.isa<::pylir::Py::ObjectTypeInterface>()">, "ObjectTypeInterface instance",
 	"::pylir::Py::ObjectTypeInterface">;
 
 #endif

@@ -1,5 +1,5 @@
 
-#include <mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h>
+
 #include <mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h>
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/Pattern.h>
@@ -2267,9 +2267,12 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
-        auto slotsTuple =
-            rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
+            op.getLoc(),
+            rewriter.getType<pylir::Py::ClassType>(
+                mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name), llvm::None),
+            mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
+        auto slotsTuple = rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), rewriter.getType<pylir::Py::UnknownType>(),
+                                                                adaptor.getTypeObject(), typeRef, "__slots__");
         mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
         len = unrealizedConversion(rewriter, len);
         auto* condition = new mlir::Block;
@@ -2289,7 +2292,8 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
-        auto element = rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), slotsTuple, condition->getArgument(0));
+        auto element = rewriter.create<pylir::Py::TupleGetItemOp>(
+            op.getLoc(), rewriter.getType<pylir::Py::UnknownType>(), slotsTuple, condition->getArgument(0));
         auto isEqual = rewriter.create<pylir::Py::StrEqualOp>(op.getLoc(), element, str);
         auto* foundIndex = new mlir::Block;
         auto* loop = new mlir::Block;
@@ -2335,9 +2339,12 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
-        auto slotsTuple =
-            rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
+            op.getLoc(),
+            rewriter.getType<pylir::Py::ClassType>(
+                mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name), llvm::None),
+            mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
+        auto slotsTuple = rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), rewriter.getType<pylir::Py::UnknownType>(),
+                                                                adaptor.getTypeObject(), typeRef, "__slots__");
         mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
         len = unrealizedConversion(rewriter, len);
         auto* condition = new mlir::Block;
@@ -2356,7 +2363,8 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
-        auto element = rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), slotsTuple, condition->getArgument(0));
+        auto element = rewriter.create<pylir::Py::TupleGetItemOp>(
+            op.getLoc(), rewriter.getType<pylir::Py::UnknownType>(), slotsTuple, condition->getArgument(0));
         auto isEqual = rewriter.create<pylir::Py::StrEqualOp>(op.getLoc(), element, str);
         auto* foundIndex = new mlir::Block;
         auto* loop = new mlir::Block;
@@ -2396,6 +2404,52 @@ struct RaiseOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::RaiseOp
     {
         createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_raise, {adaptor.getException()});
         rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
+        return mlir::success();
+    }
+};
+
+struct CallOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::CallOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::CallOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::CallOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        llvm::SmallVector<mlir::Type> resultTypes;
+        [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
+        PYLIR_ASSERT(mlir::succeeded(result));
+        rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(op, resultTypes, adaptor.getCalleeAttr(),
+                                                        adaptor.getCallOperands());
+        return mlir::success();
+    }
+};
+
+struct CallIndirectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::CallIndirectOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::CallIndirectOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::CallIndirectOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        llvm::SmallVector<mlir::Type> resultTypes;
+        [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
+        PYLIR_ASSERT(mlir::succeeded(result));
+        llvm::SmallVector<mlir::Value> operands{adaptor.getCallee()};
+        operands.append(adaptor.getCallOperands().begin(), adaptor.getCallOperands().end());
+        rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(op, resultTypes, operands);
+
+        return mlir::success();
+    }
+};
+
+struct ReturnOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ReturnOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::ReturnOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::ReturnOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOpWithNewOp<mlir::LLVM::ReturnOp>(op, adaptor.getOperands());
         return mlir::success();
     }
 };
@@ -2489,14 +2543,27 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
     }
 };
 
-struct LandingPadBrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::LandingPadBrOp>
+struct BranchOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::BranchOp>
 {
     using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::LandingPadBrOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::BranchOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         rewriter.replaceOpWithNewOp<mlir::LLVM::BrOp>(op, adaptor.getArguments(), op.getHandler());
+        return mlir::success();
+    }
+};
+
+struct CondBranchOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::CondBranchOp>
+{
+    using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::CondBranchOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOpWithNewOp<mlir::LLVM::CondBrOp>(op, adaptor.getCondition(), op.getTrueBranch(),
+                                                          adaptor.getTrueArgs(), op.getFalseBranch(), adaptor.getFalseArgs());
         return mlir::success();
     }
 };
@@ -2592,9 +2659,12 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
 
         rewriter.setInsertionPointToEnd(block);
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
-        auto slotsTuple =
-            rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
+            op.getLoc(),
+            rewriter.getType<pylir::Py::ClassType>(
+                mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name), llvm::None),
+            mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
+        auto slotsTuple = rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), rewriter.getType<pylir::Py::UnknownType>(),
+                                                                adaptor.getTypeObject(), typeRef, "__slots__");
         auto* hasSlotsBlock = new mlir::Block;
         {
             auto zero = createIndexConstant(rewriter, op.getLoc(), 0);
@@ -2677,7 +2747,7 @@ struct InitListOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name), rewriter);
         auto tupleMemory = rewriter.create<pylir::Mem::GCAllocTupleOp>(op.getLoc(), tupleType, size);
         mlir::Value tupleInit =
-            rewriter.create<pylir::Mem::InitTupleOp>(op.getLoc(), tupleMemory, adaptor.getInitializer());
+            rewriter.create<pylir::Mem::InitTupleOp>(op.getLoc(), op.getType(), tupleMemory, adaptor.getInitializer());
         auto tuplePtr = list.tuplePtr(op.getLoc());
         tupleInit = unrealizedConversion(rewriter, tupleInit);
         tupleInit = rewriter.create<mlir::LLVM::BitcastOp>(
@@ -2912,23 +2982,6 @@ struct InitDictOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
     }
 };
 
-struct ArithmeticSelectOpConversion : public ConvertPylirOpToLLVMPattern<mlir::arith::SelectOp>
-{
-    using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
-
-    mlir::LogicalResult matchAndRewrite(mlir::arith::SelectOp op, OpAdaptor adaptor,
-                                        mlir::ConversionPatternRewriter& rewriter) const override
-    {
-        if (!op.getType().isa<pylir::Py::DynamicType, pylir::Mem::MemoryType>())
-        {
-            return mlir::failure();
-        }
-        rewriter.replaceOpWithNewOp<mlir::LLVM::SelectOp>(op, adaptor.getCondition(), adaptor.getTrueValue(),
-                                                          adaptor.getFalseValue());
-        return mlir::success();
-    }
-};
-
 struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::UnreachableOp>
 {
     using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
@@ -2987,7 +3040,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
 
     PylirTypeConverter converter(&getContext(), m_triple, m_dataLayout, module);
     converter.addConversion(
-        [&](pylir::Py::DynamicType)
+        [&](pylir::Py::ObjectTypeInterface)
         { return mlir::LLVM::LLVMPointerType::get(converter.getPyObjectType(), REF_ADDRESS_SPACE); });
     converter.addConversion(
         [&](pylir::Mem::MemoryType)
@@ -2999,7 +3052,6 @@ void ConvertPylirToLLVMPass::runOnOperation()
 
     mlir::RewritePatternSet patternSet(&getContext());
     mlir::populateFuncToLLVMConversionPatterns(converter, patternSet);
-    mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
     patternSet.insert<ConstantOpConversion>(converter);
     patternSet.insert<GlobalValueOpConversion>(converter);
     patternSet.insert<GlobalHandleOpConversion>(converter);
@@ -3041,6 +3093,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitStrFromIntOpConversion>(converter);
     patternSet.insert<InvokeOpConversion>(converter);
     patternSet.insert<InvokeIndirectOpConversion>(converter);
+    patternSet.insert<CallOpConversion>(converter);
+    patternSet.insert<CallIndirectOpConversion>(converter);
+    patternSet.insert<ReturnOpConversion>(converter);
     patternSet.insert<LandingPadOpConversion>(converter);
     patternSet.insert<BoolToI1OpConversion>(converter);
     patternSet.insert<InitTuplePrependOpConversion>(converter);
@@ -3048,8 +3103,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<IntGetIntegerOpConversion>(converter);
     patternSet.insert<IntCmpOpConversion>(converter);
     patternSet.insert<InitIntAddOpConversion>(converter);
-    patternSet.insert<ArithmeticSelectOpConversion>(converter);
-    patternSet.insert<LandingPadBrOpConversion>(converter);
+    patternSet.insert<BranchOpConversion>(converter);
+    patternSet.insert<CondBranchOpConversion>(converter);
     patternSet.insert<UnreachableOpConversion>(converter);
     patternSet.insert<TypeMROOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))

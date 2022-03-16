@@ -49,7 +49,7 @@ void pylir::Py::PylirPyDialect::initialize()
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
                                                                 ::mlir::Type type, ::mlir::Location loc)
 {
-    if (type.isa<Py::DynamicType>())
+    if (type.isa<Py::ObjectTypeInterface>())
     {
         return builder.create<Py::ConstantOp>(loc, type, value);
     }

@@ -109,9 +109,9 @@ public:
         return Py::FunctionAttr::get(context, value, qualName, defaults, kwDefaults, dict);
     }
 
-    Py::DynamicType getDynamicType()
+    Py::UnknownType getUnknownType()
     {
-        return getType<Py::DynamicType>();
+        return getType<Py::UnknownType>();
     }
 
     using mlir::OpBuilder::create;
@@ -132,17 +132,31 @@ public:
     mlir::FlatSymbolRefAttr get##name##Builtin()                  \
     {                                                             \
         return mlir::FlatSymbolRefAttr::get(getContext(), (str)); \
-    }                                                             \
-                                                                  \
-    Py::ConstantOp create##name##Ref()                            \
-    {                                                             \
-        return create<Py::ConstantOp>(get##name##Builtin());      \
+    }
+#include <pylir/Interfaces/Builtins.def>
+
+#define BUILTIN(name, _1, _2, type, ...)                                                                 \
+    Py::ConstantOp create##name##Ref()                                                                   \
+    {                                                                                                    \
+        return create<Py::ConstantOp>(getType<::pylir::Py::ClassType>(get##type##Builtin(), llvm::None), \
+                                      get##name##Builtin());                                             \
     }
 #include <pylir/Interfaces/Builtins.def>
 
     Py::ConstantOp createConstant(mlir::Attribute constant)
     {
-        return create<Py::ConstantOp>(constant);
+        if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            return create<Py::ConstantOp>(getUnknownType(), ref);
+        }
+        else if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
+        {
+            return create<Py::ConstantOp>(unbound);
+        }
+        else
+        {
+            return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
+        }
     }
 
     template <std::size_t n>
@@ -178,12 +192,12 @@ public:
 
     Py::TypeOfOp createTypeOf(mlir::Value value)
     {
-        return create<Py::TypeOfOp>(value);
+        return create<Py::TypeOfOp>(getUnknownType(), value);
     }
 
     Py::GetSlotOp createGetSlot(mlir::Value object, mlir::Value typeObject, llvm::StringRef slot)
     {
-        return create<Py::GetSlotOp>(object, typeObject, slot);
+        return create<Py::GetSlotOp>(getUnknownType(), object, typeObject, slot);
     }
 
     Py::SetSlotOp createSetSlot(mlir::Value object, mlir::Value typeObject, llvm::StringRef slot, mlir::Value value)
@@ -193,7 +207,7 @@ public:
 
     Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index)
     {
-        return create<Py::DictTryGetItemOp>(dict, index);
+        return create<Py::DictTryGetItemOp>(getUnknownType(), getI1Type(), dict, index);
     }
 
     Py::DictSetItemOp createDictSetItem(mlir::Value dict, mlir::Value key, mlir::Value value)
@@ -213,7 +227,7 @@ public:
 
     Py::TupleGetItemOp createTupleGetItem(mlir::Value tuple, mlir::Value index)
     {
-        return create<Py::TupleGetItemOp>(tuple, index);
+        return create<Py::TupleGetItemOp>(getUnknownType(), tuple, index);
     }
 
     Py::TupleLenOp createTupleLen(mlir::Value tuple)
@@ -223,12 +237,12 @@ public:
 
     Py::TuplePrependOp createTuplePrepend(mlir::Value element, mlir::Value tuple)
     {
-        return create<Py::TuplePrependOp>(element, tuple);
+        return create<Py::TuplePrependOp>(getUnknownType(), element, tuple);
     }
 
     Py::TuplePopFrontOp createTuplePopFront(mlir::Value tuple)
     {
-        return create<Py::TuplePopFrontOp>(tuple);
+        return create<Py::TuplePopFrontOp>(getUnknownType(), tuple);
     }
 
     Py::ListAppendOp createListAppend(mlir::Value list, mlir::Value item)
@@ -243,12 +257,17 @@ public:
 
     Py::ListToTupleOp createListToTuple(mlir::Value list)
     {
-        return create<Py::ListToTupleOp>(list);
+        return create<Py::ListToTupleOp>(getUnknownType(), list);
+    }
+
+    Py::FunctionGetFunctionOp createFunctionGetFunction(mlir::Type functionType, mlir::Value function)
+    {
+        return create<Py::FunctionGetFunctionOp>(functionType, function);
     }
 
     Py::FunctionGetFunctionOp createFunctionGetFunction(mlir::Value function)
     {
-        return create<Py::FunctionGetFunctionOp>(function);
+        return create<Py::FunctionGetFunctionOp>(getUniversalCCType(context), function);
     }
 
     Py::ObjectHashOp createObjectHash(mlir::Value object)
@@ -263,12 +282,12 @@ public:
 
     Py::TypeMROOp createTypeMRO(mlir::Value typeObject)
     {
-        return create<Py::TypeMROOp>(typeObject);
+        return create<Py::TypeMROOp>(getUnknownType(), typeObject);
     }
 
     Py::StrCopyOp createStrCopy(mlir::Value string, mlir::Value typeObject)
     {
-        return create<Py::StrCopyOp>(string, typeObject);
+        return create<Py::StrCopyOp>(getUnknownType(), string, typeObject);
     }
 
     Py::StrHashOp createStrHash(mlir::Value string)
@@ -288,7 +307,7 @@ public:
 
     Py::MROLookupOp createMROLookup(mlir::Value mroTuple, llvm::StringRef attribute)
     {
-        return create<Py::MROLookupOp>(mroTuple, attribute);
+        return create<Py::MROLookupOp>(getUnknownType(), getI1Type(), mroTuple, attribute);
     }
 
     Py::LinearContainsOp createLinearContains(mlir::Value mroTuple, mlir::Value element)
@@ -298,7 +317,7 @@ public:
 
     Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<Py::IterArg> args = {})
     {
-        return create<Py::MakeTupleOp>(args);
+        return create<Py::MakeTupleOp>(getUnknownType(), args);
     }
 
     Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<mlir::Value> args, mlir::ArrayAttr iterExpansion)
@@ -307,20 +326,21 @@ public:
         {
             iterExpansion = getI32ArrayAttr({});
         }
-        return create<Py::MakeTupleOp>(args, iterExpansion);
+        return create<Py::MakeTupleOp>(getUnknownType(), args, iterExpansion);
     }
 
     Py::MakeTupleExOp createMakeTupleEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* happyPath,
                                         mlir::Block* unwindPath, llvm::ArrayRef<mlir::Value> normalOps = {},
                                         llvm::ArrayRef<mlir::Value> unwindOps = {})
     {
-        return create<Py::MakeTupleExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
+        return create<Py::MakeTupleExOp>(getUnknownType(), args, happyPath, normalOps, unwindPath, unwindOps);
     }
 
     Py::MakeTupleExOp createMakeTupleEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
     {
         auto* happyPath = new mlir::Block;
-        auto op = create<Py::MakeTupleExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
+        auto op = create<Py::MakeTupleExOp>(getUnknownType(), args, happyPath, mlir::ValueRange{}, unwindPath,
+                                            mlir::ValueRange{});
         implementBlock(happyPath);
         return op;
     }
@@ -420,7 +440,7 @@ public:
 
     Py::MakeObjectOp createMakeObject(mlir::Value typeObject)
     {
-        return create<Py::MakeObjectOp>(typeObject);
+        return create<Py::MakeObjectOp>(getUnknownType(), typeObject);
     }
 
     Py::IsOp createIs(mlir::Value lhs, mlir::Value rhs)
@@ -500,7 +520,7 @@ public:
 
     Py::LoadOp createLoad(mlir::FlatSymbolRefAttr handle)
     {
-        return create<Py::LoadOp>(handle);
+        return create<Py::LoadOp>(getUnknownType(), handle);
     }
 
     Py::IsUnboundValueOp createIsUnboundValue(mlir::Value value)
