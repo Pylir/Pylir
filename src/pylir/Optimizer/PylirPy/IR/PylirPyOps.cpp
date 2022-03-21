@@ -1,5 +1,6 @@
 #include "PylirPyOps.hpp"
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OpImplementation.h>
@@ -315,7 +316,7 @@ mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableColl
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::FuncOp>(*this, getFunctionAttr(), symbolTable);
+    return verifySymbolUse<mlir::func::FuncOp>(*this, getFunctionAttr(), symbolTable);
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,

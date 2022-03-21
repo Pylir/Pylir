@@ -2,7 +2,7 @@
 #ifndef PYLIR_PY_PATTERNS_TABLEGEN
 #define PYLIR_PY_PATTERNS_TABLEGEN
 
-include "mlir/IR/OpBase.td"
+include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Arithmetic/IR/ArithmeticOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 

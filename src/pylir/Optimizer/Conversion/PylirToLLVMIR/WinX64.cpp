@@ -89,8 +89,8 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
         builder.setInsertionPointToStart(&builder.getBlock()->getParent()->front());
         paramBegin = 1;
         auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
-        returnSlot =
-            builder.create<mlir::LLVM::AllocaOp>(loc, func.getType().getParams().front(), one, mlir::IntegerAttr{});
+        returnSlot = builder.create<mlir::LLVM::AllocaOp>(loc, func.getFunctionType().getParams().front(), one,
+                                                          mlir::IntegerAttr{});
         arguments.push_back(returnSlot);
     }
 
@@ -101,7 +101,8 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
             case Nothing: arguments.push_back(operands[i]); break;
             case IntegerRegister:
             {
-                auto integerPointerType = mlir::LLVM::LLVMPointerType::get(func.getType().getParams()[paramBegin + i]);
+                auto integerPointerType =
+                    mlir::LLVM::LLVMPointerType::get(func.getFunctionType().getParams()[paramBegin + i]);
                 if (auto load = operands[i].getDefiningOp<mlir::LLVM::LoadOp>())
                 {
                     auto casted = builder.create<mlir::LLVM::BitcastOp>(loc, integerPointerType, load.getAddr());

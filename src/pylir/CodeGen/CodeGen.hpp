@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OwningOpRef.h>
@@ -27,7 +28,7 @@ class CodeGen
 {
     Py::PyBuilder m_builder;
     mlir::ModuleOp m_module;
-    mlir::FuncOp m_currentFunc;
+    mlir::func::FuncOp m_currentFunc;
     mlir::Region* m_currentRegion{};
     Diag::Document* m_document;
     mlir::Value m_classNamespace{};

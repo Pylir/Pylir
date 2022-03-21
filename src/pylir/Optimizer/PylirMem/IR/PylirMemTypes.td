@@ -5,6 +5,7 @@
 include "pylir/Optimizer/PylirMem/IR/PylirMemBase.td"
 include "mlir/IR/SubElementInterfaces.td"
 include "mlir/IR/BuiltinTypeInterfaces.td"
+include "mlir/IR/AttrTypeBase.td"
 
 class PylirMem_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type"> :
     TypeDef<PylirMem_Dialect, name, traits, baseCppClass>;

@@ -3,6 +3,7 @@
 #define PYLIR_MEMORY_SSA_TABLEGEN
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/RegionKindInterface.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -35,6 +36,7 @@ def InstrAttr : MemorySSA_Attr<"Instruction"> {
     let convertFromStorage = "$_self.getInstruction()";
 
     let constBuilderCall = "::pylir::MemSSA::InstructionAttr::get($_builder.getContext(), $0)";
+    let hasCustomAssemblyFormat = 1;
 }
 
 def ReadAttr : MemorySSA_Attr<"Read"> {
@@ -44,6 +46,7 @@ def ReadAttr : MemorySSA_Attr<"Read"> {
     let convertFromStorage = "$_self.getRead()";
 
     let constBuilderCall = "::pylir::MemSSA::ReadAttr::get($_builder.getContext(), $0)";
+    let hasCustomAssemblyFormat = 1;
 }
 
 def MemoryModuleOp : MemorySSA_Op<"module", [IsolatedFromAbove, DeclareOpInterfaceMethods<RegionKindInterface>,

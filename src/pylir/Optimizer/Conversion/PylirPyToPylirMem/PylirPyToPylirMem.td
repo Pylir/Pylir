@@ -5,6 +5,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 include "pylir/Optimizer/PylirMem/IR/PylirMemOps.td"
 include "mlir/Dialect/Arithmetic/IR/ArithmeticOps.td"
+include "mlir/IR/PatternBase.td"
 
 defvar TupleRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.tuple">;
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;

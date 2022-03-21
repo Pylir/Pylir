@@ -1,7 +1,7 @@
 #ifndef PYLIR_TABLEGEN_UTIL
 #define PYLIR_TABLEGEN_UTIL
 
-include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
 
 class ParamSpec<AttrOrTypeParameter m_type, string m_name, string m_defaultArg = ""> {
 	AttrOrTypeParameter type = m_type;

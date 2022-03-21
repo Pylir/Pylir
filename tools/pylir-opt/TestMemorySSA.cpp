@@ -1,3 +1,4 @@
+#include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
 
 #include <llvm/ADT/TypeSwitch.h>
