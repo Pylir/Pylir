@@ -38,11 +38,4 @@ def HandleLoadStoreElimination : Pass<"handle-load-store-elimination"> {
     ];
 }
 
-def LowerTypeSwitch : Pass<"lower-type-switch"> {
-    let summary = "Lower type switch to pure CFG";
-    let constructor = "::pylir::Py::createLowerTypeSwitchPass()";
-
-    let dependentDialects = ["::pylir::Py::PylirPyDialect", "::mlir::cf::ControlFlowDialect"];
-}
-
 #endif

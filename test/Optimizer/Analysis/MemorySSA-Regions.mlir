@@ -3,15 +3,13 @@
 py.globalValue @builtins.type = #py.type<>
 py.globalValue @builtins.str = #py.type<>
 
-func @test(%arg0 : !py.dynamic) -> index {
+func @test(%arg0 : i1) -> index {
     %0 = py.constant #py.str<value = "test">
     %1 = py.constant @builtins.str
     %2 = py.makeList ()
-    py.typeSwitch %arg0 {
-        py.yield
-    } case %1 {
+    scf.if %arg0 {
+    } else {
         py.list.append %2, %0
-        py.yield
     }
     %3 = py.list.len %2
     return %3 : index

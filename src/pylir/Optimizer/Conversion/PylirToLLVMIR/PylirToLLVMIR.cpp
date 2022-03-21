@@ -2986,7 +2986,7 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
 {
     using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::UnreachableOp op, OpAdaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::UnreachableOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
