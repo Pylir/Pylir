@@ -7,7 +7,9 @@ def TypeRefineableInterface : OpInterface<"TypeRefineableInterface"> {
     let cppNamespace = "::pylir::Py";
 
     let methods = [
-        InterfaceMethod<[{}], "::llvm::SmallVector<::pylir::Py::ObjectTypeInterface>", "refineTypes", (ins)>
+        InterfaceMethod<[{}], "::llvm::SmallVector<::pylir::Py::ObjectTypeInterface>", "refineTypes",
+                                (ins "llvm::ArrayRef<pylir::Py::ObjectTypeInterface>":$inputTypes,
+                                     "::mlir::SymbolTable&":$symbolTable)>
     ];
 }
 

@@ -67,7 +67,7 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect,
 
     private:
 
-        static pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant);
+        static pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table = nullptr);
     }];
 }
 

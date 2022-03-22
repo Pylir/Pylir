@@ -38,4 +38,15 @@ def HandleLoadStoreElimination : Pass<"handle-load-store-elimination"> {
     ];
 }
 
+def Monomorph : Pass<"monomorph", "::mlir::ModuleOp"> {
+	let summary = "Monomorph module";
+	let constructor = "::pylir::Py::createMonomorphPass()";
+	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+	let statistics = [
+		Statistic<"m_typesRefined", "Types refined", "Amount of types of operations which have been made more specific">,
+		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specified types">,
+	];
+}
+
 #endif

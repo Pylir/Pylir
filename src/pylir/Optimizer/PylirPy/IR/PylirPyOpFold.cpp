@@ -735,8 +735,13 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
 
 mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, ::mlir::PatternRewriter& rewriter)
 {
-    pylir::Py::FunctionAttr functionAttr;
-    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&functionAttr)))
+    mlir::Attribute attribute;
+    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
+    {
+        return mlir::failure();
+    }
+    auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
+    if (!functionAttr)
     {
         return mlir::failure();
     }
@@ -746,8 +751,13 @@ mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, :
 
 mlir::LogicalResult pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp op, ::mlir::PatternRewriter& rewriter)
 {
-    pylir::Py::FunctionAttr functionAttr;
-    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&functionAttr)))
+    mlir::Attribute attribute;
+    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
+    {
+        return mlir::failure();
+    }
+    auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
+    if (!functionAttr)
     {
         return mlir::failure();
     }
@@ -835,8 +845,20 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
     return mlir::success();
 }
 
-pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attribute constant)
+pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table)
 {
+    if (table)
+    {
+        if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            auto globalVal = table->lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
+            if (globalVal.isDeclaration())
+            {
+                return pylir::Py::UnknownType::get(constant.getContext());
+            }
+            return typeOfConstant(globalVal.getInitializerAttr(), table);
+        }
+    }
     if (constant.isa<pylir::Py::UnboundAttr>())
     {
         return pylir::Py::UnboundType::get(constant.getContext());
@@ -846,7 +868,7 @@ pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attri
         llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
         for (const auto& iter : tuple.getValue())
         {
-            elementTypes.push_back(typeOfConstant(iter));
+            elementTypes.push_back(typeOfConstant(iter, table));
         }
         return pylir::Py::TupleType::get(constant.getContext(), tuple.getTypeObject(), elementTypes);
     }
@@ -867,29 +889,28 @@ void pylir::Py::ConstantOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     build(odsBuilder, odsState, UnboundType::get(odsBuilder.getContext()), unboundAttr);
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::ConstantOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable& table)
 {
-    auto object = resolveValue(*this, getConstantAttr(), false);
-    if (!object)
-    {
-        return {pylir::Py::UnboundType::get(getContext())};
-    }
-    return {typeOfConstant(object)};
+    return {typeOfConstant(getConstantAttr(), &table)};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::ListToTupleOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::ListToTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable&)
 {
     return {
         Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), llvm::None)};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::MakeTupleExOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable&)
 {
     return {
         Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), llvm::None)};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::MakeObjectOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::MakeObjectOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable&)
 {
     mlir::FlatSymbolRefAttr type;
     if (!mlir::matchPattern(getTypeObject(), mlir::m_Constant(&type)))
@@ -899,7 +920,9 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::MakeObjectOp::refin
     return {Py::ClassType::get(getContext(), type, llvm::None)};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::MakeTupleOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+                                        mlir::SymbolTable&)
 {
     if (!getIterExpansionAttr().empty())
     {
@@ -907,15 +930,16 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::MakeTupleOp::refine
                                    llvm::None)};
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
-    for (auto iter : getArguments())
+    for (auto iter : argumentTypes)
     {
-        elementTypes.push_back(iter.getType().cast<pylir::Py::ObjectTypeInterface>());
+        elementTypes.push_back(iter);
     }
     return {Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
                                elementTypes)};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::StrCopyOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::StrCopyOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable&)
 {
     mlir::FlatSymbolRefAttr type;
     if (!mlir::matchPattern(getTypeObject(), mlir::m_Constant(&type)))
@@ -925,9 +949,11 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::StrCopyOp::refineTy
     return {Py::ClassType::get(getContext(), type, llvm::None)};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::TupleGetItemOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+                                           mlir::SymbolTable&)
 {
-    auto tupleType = getTuple().getType().dyn_cast<pylir::Py::TupleType>();
+    auto tupleType = argumentTypes[0].dyn_cast<pylir::Py::TupleType>();
     if (!tupleType)
     {
         return {Py::UnknownType::get(getContext())};
@@ -954,9 +980,11 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::TupleGetItemOp::ref
     return {tupleType.getElements()[zExtValue]};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::TuplePopFrontOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::TuplePopFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+                                            mlir::SymbolTable&)
 {
-    auto tupleType = getTuple().getType().dyn_cast<Py::TupleType>();
+    auto tupleType = argumentTypes[0].dyn_cast<Py::TupleType>();
     if (!tupleType)
     {
         return {Py::UnknownType::get(getContext()),
@@ -977,20 +1005,23 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::TuplePopFrontOp::re
     return res;
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::TuplePrependOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+                                           mlir::SymbolTable&)
 {
-    auto tupleType = getTuple().getType().dyn_cast<Py::TupleType>();
+    auto tupleType = argumentTypes[1].dyn_cast<Py::TupleType>();
     if (!tupleType)
     {
         return {Py::UnknownType::get(getContext())};
     }
     llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());
-    elements.insert(elements.begin(), getInput().getType());
+    elements.insert(elements.begin(), argumentTypes[0]);
     return {
         Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elements)};
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::TypeMROOp::refineTypes()
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::TypeMROOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable&)
 {
     return {
         Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), llvm::None)};
