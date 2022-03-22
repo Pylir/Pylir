@@ -609,20 +609,19 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
     normalMethodBlock->addArgument(m_builder.getI1Type(), m_builder.getCurrentLoc());
     BlockPtr differentTypeBlock;
     m_builder.create<Py::CondBranchOp>(sameType, normalMethodBlock, mlir::ValueRange{trueC}, differentTypeBlock,
-                                                       mlir::ValueRange{});
+                                       mlir::ValueRange{});
 
     implementBlock(differentTypeBlock);
     auto subclass = buildSubclassCheck(rhsType, lhsType);
     BlockPtr isSubclassBlock;
-    m_builder.create<Py::CondBranchOp>(subclass, isSubclassBlock, normalMethodBlock,
-                                                       mlir::ValueRange{falseC});
+    m_builder.create<Py::CondBranchOp>(subclass, isSubclassBlock, normalMethodBlock, mlir::ValueRange{falseC});
 
     implementBlock(isSubclassBlock);
     auto rhsMroTuple = m_builder.createTypeMRO(rhsType);
     auto lookup = m_builder.createMROLookup(rhsMroTuple, revMethod);
     BlockPtr hasReversedBlock;
     m_builder.create<Py::CondBranchOp>(lookup.getSuccess(), hasReversedBlock, normalMethodBlock,
-                                                       mlir::ValueRange{falseC});
+                                       mlir::ValueRange{falseC});
 
     implementBlock(hasReversedBlock);
     auto lhsMroTuple = m_builder.createTypeMRO(lhsType);
@@ -634,7 +633,7 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
     implementBlock(lhsHasReversedBlock);
     auto sameImplementation = m_builder.createIs(lookup.getResult(), lhsLookup.getResult());
     m_builder.create<Py::CondBranchOp>(sameImplementation, normalMethodBlock, mlir::ValueRange{falseC},
-                                             callReversedBlock, mlir::ValueRange{});
+                                       callReversedBlock, mlir::ValueRange{});
 
     implementBlock(callReversedBlock);
     auto tuple = m_builder.createMakeTuple({rhs, lhs});
@@ -642,7 +641,7 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
                                                     m_currentExceptBlock, m_currentLandingPadBlock);
     auto isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
     m_builder.create<Py::CondBranchOp>(isNotImplemented, normalMethodBlock, mlir::ValueRange{trueC}, endBlock,
-                                             mlir::ValueRange{reverseResult});
+                                       mlir::ValueRange{reverseResult});
 
     implementBlock(normalMethodBlock);
     tuple = m_builder.createMakeTuple({lhs, rhs});
@@ -651,21 +650,18 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
                                                 m_currentExceptBlock, m_currentLandingPadBlock);
     isNotImplemented = m_builder.createIs(result, m_builder.createNotImplementedRef());
     BlockPtr maybeTryReverse;
-    m_builder.create<Py::CondBranchOp>(isNotImplemented, maybeTryReverse, endBlock,
-                                                       mlir::ValueRange{result});
+    m_builder.create<Py::CondBranchOp>(isNotImplemented, maybeTryReverse, endBlock, mlir::ValueRange{result});
 
     implementBlock(maybeTryReverse);
     BlockPtr actuallyTryReverse;
-    m_builder.create<Py::CondBranchOp>(normalMethodBlock->getArgument(0), typeErrorBlock,
-                                                       actuallyTryReverse);
+    m_builder.create<Py::CondBranchOp>(normalMethodBlock->getArgument(0), typeErrorBlock, actuallyTryReverse);
 
     implementBlock(actuallyTryReverse);
     tuple = m_builder.createMakeTuple({rhs, lhs});
     reverseResult = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, revMethod, tuple, {},
                                                   typeErrorBlock, m_currentExceptBlock, m_currentLandingPadBlock);
     isNotImplemented = m_builder.createIs(reverseResult, m_builder.createNotImplementedRef());
-    m_builder.create<Py::CondBranchOp>(isNotImplemented, typeErrorBlock, endBlock,
-                                                       mlir::ValueRange{reverseResult});
+    m_builder.create<Py::CondBranchOp>(isNotImplemented, typeErrorBlock, endBlock, mlir::ValueRange{reverseResult});
 
     implementBlock(typeErrorBlock);
     if (method != "__eq__" && method != "__ne__")
@@ -1972,10 +1968,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
                 auto metaType = m_builder.createTypeOf(closureType);
                 auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
-                auto cell = m_builder
-                                .create<Py::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
-                                                            mlir::ValueRange{newMethod, tuple, emptyDict})
-                                ->getResult(0);
+                mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
                 m_functionScope->identifiers.emplace(name.getValue(), Identifier{cell});
                 closures.erase(name);
             }
@@ -1997,10 +1990,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
             auto metaType = m_builder.createTypeOf(closureType);
             auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
-            auto cell = m_builder
-                            .create<Py::CallIndirectOp>(m_builder.createFunctionGetFunction(newMethod),
-                                                        mlir::ValueRange{newMethod, tuple, emptyDict})
-                            ->getResult(0);
+            mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
             m_functionScope->identifiers.emplace(iter.getValue(), Identifier{cell});
         }
         if (!funcDef.nonLocalVariables.empty())
@@ -2119,9 +2109,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         visit(*classDef.suite);
         m_builder.create<Py::ReturnOp>(m_classNamespace);
     }
-    //TODO:
-//    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
-//    writeIdentifier(classDef.className, value);
+    // TODO:
+    //    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
+    //    writeIdentifier(classDef.className, value);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::AsyncForStmt& asyncForStmt) {}

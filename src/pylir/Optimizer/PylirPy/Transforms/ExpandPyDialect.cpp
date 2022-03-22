@@ -306,12 +306,8 @@ void ExpandPyDialectPass::runOnOperation()
 
         func.push_back(isFunctionBlock);
         builder.setInsertionPointToStart(isFunctionBlock);
-        auto fp = builder.createFunctionGetFunction(lookup.getResult());
-        mlir::Value result =
-            builder
-                .create<pylir::Py::CallIndirectOp>(
-                    fp, mlir::ValueRange{lookup.getResult(), builder.createTuplePrepend(self, args), kws})
-                .getResult(0);
+        mlir::Value result = builder.createFunctionCall(
+            lookup.getResult(), {lookup.getResult(), builder.createTuplePrepend(self, args), kws});
         builder.create<pylir::Py::ReturnOp>(result);
 
         func.push_back(notFunctionBlock);

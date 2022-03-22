@@ -285,18 +285,21 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, DeclareOpIn
 
 // Function ops
 
-def PylirPy_FunctionGetFunctionOp : PylirPy_Op<"function.getFunction", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$function);
-    let results = (outs PyFunctionType:$result);
+def PylirPy_FunctionCallOp : PylirPy_Op<"function.call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
+    let arguments = (ins DynamicType:$function, Variadic<DynamicType>:$call_operands);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$function attr-dict `:` functional-type($function, $result)";
-
-    let description = [{
-        This op retrieves the internal function that `$function` wraps. If `$function` is not really a
-        function the behaviour is undefined.
+    let assemblyFormat = [{
+        $function `(` $call_operands `)` attr-dict `:` type($function) `(` type($call_operands) `)` `->` type($result)
     }];
 
-    let hasFolder = 1;
+    let hasCanonicalizeMethod = 1;
+}
+
+def PylirPy_FunctionInvokeOp : AddExceptionHandling<PylirPy_FunctionCallOp, "function.invoke"> {
+	let summary = "invoke operation";
+
+	let hasCanonicalizeMethod = 1;
 }
 
 // Object ops
@@ -835,7 +838,7 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator, ReturnLike]> {
 // Control Flow
 
 class PylirPy_CallBase<string mnemonic,list<Trait> traits = []> : PylirPy_Op<mnemonic,
-                                            !listconcat(traits,[DeclareOpInterfaceMethods<CallOpInterface>])> {
+                                            !listconcat(traits, [DeclareOpInterfaceMethods<CallOpInterface>])> {
     let summary = "call operation";
 
     let results = (outs Variadic<AnyType>:$results);
@@ -864,25 +867,8 @@ def PylirPy_CallOp : PylirPy_CallBase<"call", [DeclareOpInterfaceMethods<SymbolU
         }]>];
 }
 
-def PylirPy_CallIndirectOp : PylirPy_CallBase<"call_indirect",
-                                       [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-    let arguments = (ins FunctionType:$callee, Variadic<AnyType>:$call_operands);
-
-    let assemblyFormat = [{
-        $callee `(` $call_operands `)` attr-dict `:` type($callee) `,` type($call_operands)
-    }];
-
-    let hasCanonicalizeMethod = 1;
-}
-
 def PylirPy_InvokeOp : AddExceptionHandling<PylirPy_CallOp, "invoke"> {
 	let summary = "invoke operation";
-}
-
-def PylirPy_InvokeIndirectOp : AddExceptionHandling<PylirPy_CallIndirectOp, "invoke_indirect"> {
-	let summary = "invoke operation";
-
-	let hasCanonicalizeMethod = 1;
 }
 
 def PylirPy_ReturnOp : PylirPy_Op<"return", [NoSideEffect, ReturnLike, Terminator]> {

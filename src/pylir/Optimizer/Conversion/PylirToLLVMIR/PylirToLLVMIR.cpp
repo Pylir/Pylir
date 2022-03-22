@@ -1973,21 +1973,6 @@ struct BoolToI1OpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Bool
     }
 };
 
-struct FunctionGetFunctionOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>
-{
-    using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionGetFunctionOp>::ConvertPylirOpToLLVMPattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::FunctionGetFunctionOp op, OpAdaptor adaptor,
-                                        mlir::ConversionPatternRewriter& rewriter) const override
-    {
-        rewriter.replaceOp(
-            op,
-            mlir::Value{
-                pyFunctionModel(op.getLoc(), rewriter, adaptor.getFunction()).funcPtr(op.getLoc()).load(op.getLoc())});
-        return mlir::success();
-    }
-};
-
 struct ObjectHashOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ObjectHashOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::ObjectHashOp>::ConvertPylirOpToLLVMPattern;
@@ -2424,17 +2409,19 @@ struct CallOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::CallOp>
     }
 };
 
-struct CallIndirectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::CallIndirectOp>
+struct FunctionCallOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionCallOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::CallIndirectOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionCallOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::CallIndirectOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::FunctionCallOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         llvm::SmallVector<mlir::Type> resultTypes;
         [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
         PYLIR_ASSERT(mlir::succeeded(result));
-        llvm::SmallVector<mlir::Value> operands{adaptor.getCallee()};
+        auto callee =
+            pyFunctionModel(op.getLoc(), rewriter, adaptor.getFunction()).funcPtr(op.getLoc()).load(op.getLoc());
+        llvm::SmallVector<mlir::Value> operands{callee};
         operands.append(adaptor.getCallOperands().begin(), adaptor.getCallOperands().end());
         rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(op, resultTypes, operands);
 
@@ -2471,17 +2458,19 @@ struct InvokeOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Invoke
     }
 };
 
-struct InvokeIndirectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::InvokeIndirectOp>
+struct FunctionInvokeOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionInvokeOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::InvokeIndirectOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionInvokeOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::InvokeIndirectOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::FunctionInvokeOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         llvm::SmallVector<mlir::Type> resultTypes;
         [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
         PYLIR_ASSERT(mlir::succeeded(result));
-        llvm::SmallVector<mlir::Value> operands{adaptor.getCallee()};
+        auto callee =
+            pyFunctionModel(op.getLoc(), rewriter, adaptor.getFunction()).funcPtr(op.getLoc()).load(op.getLoc());
+        llvm::SmallVector<mlir::Value> operands{callee};
         operands.append(adaptor.getCallOperands().begin(), adaptor.getCallOperands().end());
         rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(op, resultTypes, operands, op.getHappyPath(),
                                                           adaptor.getNormalDestOperands(), op.getExceptionPath(),
@@ -2563,7 +2552,8 @@ struct CondBranchOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Co
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         rewriter.replaceOpWithNewOp<mlir::LLVM::CondBrOp>(op, adaptor.getCondition(), op.getTrueBranch(),
-                                                          adaptor.getTrueArgs(), op.getFalseBranch(), adaptor.getFalseArgs());
+                                                          adaptor.getTrueArgs(), op.getFalseBranch(),
+                                                          adaptor.getFalseArgs());
         return mlir::success();
     }
 };
@@ -2986,7 +2976,7 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
 {
     using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::UnreachableOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::UnreachableOp op, OpAdaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         rewriter.replaceOpWithNewOp<mlir::LLVM::UnreachableOp>(op);
@@ -3062,7 +3052,6 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<TypeOfOpConversion>(converter);
     patternSet.insert<TupleGetItemOpConversion>(converter);
     patternSet.insert<TupleLenOpConversion>(converter);
-    patternSet.insert<FunctionGetFunctionOpConversion>(converter);
     patternSet.insert<GetSlotOpConstantConversion>(converter, 2);
     patternSet.insert<GetSlotOpConversion>(converter);
     patternSet.insert<SetSlotOpConstantConversion>(converter, 2);
@@ -3092,9 +3081,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<PrintOpConversion>(converter);
     patternSet.insert<InitStrFromIntOpConversion>(converter);
     patternSet.insert<InvokeOpConversion>(converter);
-    patternSet.insert<InvokeIndirectOpConversion>(converter);
+    patternSet.insert<FunctionInvokeOpConversion>(converter);
     patternSet.insert<CallOpConversion>(converter);
-    patternSet.insert<CallIndirectOpConversion>(converter);
+    patternSet.insert<FunctionCallOpConversion>(converter);
     patternSet.insert<ReturnOpConversion>(converter);
     patternSet.insert<LandingPadOpConversion>(converter);
     patternSet.insert<BoolToI1OpConversion>(converter);

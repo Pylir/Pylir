@@ -411,12 +411,12 @@ mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
     return getCallOperands();
 }
 
-mlir::CallInterfaceCallable pylir::Py::CallIndirectOp::getCallableForCallee()
+mlir::CallInterfaceCallable pylir::Py::FunctionCallOp::getCallableForCallee()
 {
-    return getCallee();
+    return getFunction();
 }
 
-mlir::Operation::operand_range pylir::Py::CallIndirectOp::getArgOperands()
+mlir::Operation::operand_range pylir::Py::FunctionCallOp::getArgOperands()
 {
     return getCallOperands();
 }
@@ -450,7 +450,7 @@ mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
     return getCallOperands();
 }
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeIndirectOp::getMutableSuccessorOperands(unsigned int index)
+mlir::Optional<mlir::MutableOperandRange> pylir::Py::FunctionInvokeOp::getMutableSuccessorOperands(unsigned int index)
 {
     if (index == 0)
     {
@@ -459,17 +459,17 @@ mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeIndirectOp::getMutabl
     return getUnwindDestOperandsMutable();
 }
 
-bool pylir::Py::InvokeIndirectOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+bool pylir::Py::FunctionInvokeOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
 {
     return objectTypesCompatible(lhs, rhs);
 }
 
-mlir::CallInterfaceCallable pylir::Py::InvokeIndirectOp::getCallableForCallee()
+mlir::CallInterfaceCallable pylir::Py::FunctionInvokeOp::getCallableForCallee()
 {
-    return getCallee();
+    return getFunction();
 }
 
-mlir::Operation::operand_range pylir::Py::InvokeIndirectOp::getArgOperands()
+mlir::Operation::operand_range pylir::Py::FunctionInvokeOp::getArgOperands()
 {
     return getCallOperands();
 }

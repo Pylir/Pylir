@@ -93,12 +93,8 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
     auto newMethod =
         builder.create<Py::GetSlotOp>(loc, builder.getType<pylir::Py::UnknownType>(), typeObj, metaType, "__new__");
 
-    auto obj =
-        builder
-            .create<Py::CallIndirectOp>(
-                loc, builder.create<Py::FunctionGetFunctionOp>(loc, getUniversalCCType(loc.getContext()), newMethod),
-                mlir::ValueRange{newMethod, tuple, dict})
-            ->getResult(0);
+    auto obj = builder.create<Py::FunctionCallOp>(loc, builder.getType<pylir::Py::UnknownType>(), newMethod,
+                                                  mlir::ValueRange{newMethod, tuple, dict});
     auto objType = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), obj);
     auto context = builder.create<Py::ConstantOp>(
         loc,
@@ -147,21 +143,19 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     builder.create<Py::CondBranchOp>(loc, isFunction, isFunctionBlock, notFunctionBlock);
 
     implementBlock(builder, isFunctionBlock);
-    auto fp =
-        builder.create<Py::FunctionGetFunctionOp>(loc, getUniversalCCType(builder.getContext()), lookup.getResult());
     mlir::Value result;
     if (!landingPadBlock)
     {
-        result = builder.create<Py::CallIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs})
-                     .getResult(0);
+        result = builder.create<Py::FunctionCallOp>(loc, builder.getType<pylir::Py::UnknownType>(), lookup.getResult(),
+                                                    mlir::ValueRange{lookup.getResult(), tuple, kwargs});
     }
     else
     {
         auto* happyPath = new mlir::Block;
-        result = builder
-                     .create<Py::InvokeIndirectOp>(loc, fp, mlir::ValueRange{lookup.getResult(), tuple, kwargs},
-                                                   mlir::ValueRange{}, mlir::ValueRange{}, happyPath, landingPadBlock)
-                     .getResult(0);
+        result =
+            builder.create<Py::FunctionInvokeOp>(loc, builder.getType<pylir::Py::UnknownType>(), lookup.getResult(),
+                                                 mlir::ValueRange{lookup.getResult(), tuple, kwargs},
+                                                 mlir::ValueRange{}, mlir::ValueRange{}, happyPath, landingPadBlock);
         implementBlock(builder, happyPath);
     }
     auto* exitBlock = new mlir::Block;

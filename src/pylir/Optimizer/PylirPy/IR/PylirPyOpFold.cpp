@@ -537,20 +537,6 @@ mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribu
     return nullptr;
 }
 
-mlir::OpFoldResult pylir::Py::FunctionGetFunctionOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
-{
-    auto attr = resolveValue(*this, operands[0], false).dyn_cast_or_null<Py::FunctionAttr>();
-    if (!attr)
-    {
-        if (auto makeFuncOp = getFunction().getDefiningOp<Py::MakeFuncOp>())
-        {
-            return makeFuncOp.getFunctionAttr();
-        }
-        return nullptr;
-    }
-    return attr.getValue();
-}
-
 mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
     auto boolean = operands[0].dyn_cast_or_null<Py::BoolAttr>();
@@ -747,27 +733,25 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
     return mlir::failure();
 }
 
-mlir::LogicalResult pylir::Py::CallIndirectOp::canonicalize(CallIndirectOp op, ::mlir::PatternRewriter& rewriter)
+mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, ::mlir::PatternRewriter& rewriter)
 {
-    mlir::FlatSymbolRefAttr symbolRefAttr;
-    if (!mlir::matchPattern(op.getCallee(), mlir::m_Constant(&symbolRefAttr)))
+    pylir::Py::FunctionAttr functionAttr;
+    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&functionAttr)))
     {
         return mlir::failure();
     }
-    auto func = op.getCallee().getType().cast<mlir::FunctionType>();
-    rewriter.replaceOpWithNewOp<Py::CallOp>(op, func.getResults(), symbolRefAttr, op.getCallOperands());
+    rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), functionAttr.getValue(), op.getCallOperands());
     return mlir::success();
 }
 
-mlir::LogicalResult pylir::Py::InvokeIndirectOp::canonicalize(InvokeIndirectOp op, ::mlir::PatternRewriter& rewriter)
+mlir::LogicalResult pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp op, ::mlir::PatternRewriter& rewriter)
 {
-    mlir::FlatSymbolRefAttr symbolRefAttr;
-    if (!mlir::matchPattern(op.getCallee(), mlir::m_Constant(&symbolRefAttr)))
+    pylir::Py::FunctionAttr functionAttr;
+    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&functionAttr)))
     {
         return mlir::failure();
     }
-    auto func = op.getCallee().getType().cast<mlir::FunctionType>();
-    rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, func.getResults(), symbolRefAttr, op.getCallOperands(),
+    rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, op.getType(), functionAttr.getValue(), op.getCallOperands(),
                                               op.getNormalDestOperands(), op.getUnwindDestOperands(), op.getHappyPath(),
                                               op.getExceptionPath());
     return mlir::success();
@@ -1010,24 +994,6 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface> pylir::Py::TypeMROOp::refineTy
 {
     return {
         Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), llvm::None)};
-}
-
-mlir::LogicalResult pylir::Py::CallIndirectOp::inferReturnTypes(
-    ::mlir::MLIRContext*, ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange operands, ::mlir::DictionaryAttr,
-    ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    auto results = operands[0].getType().cast<mlir::FunctionType>().getResults();
-    inferredReturnTypes.append(results.begin(), results.end());
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::Py::InvokeIndirectOp::inferReturnTypes(
-    ::mlir::MLIRContext*, ::llvm::Optional<::mlir::Location>, ::mlir::ValueRange operands, ::mlir::DictionaryAttr,
-    ::mlir::RegionRange, ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
-{
-    auto results = operands[0].getType().cast<mlir::FunctionType>().getResults();
-    inferredReturnTypes.append(results.begin(), results.end());
-    return mlir::success();
 }
 
 namespace

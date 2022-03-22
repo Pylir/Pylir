@@ -260,14 +260,9 @@ public:
         return create<Py::ListToTupleOp>(getUnknownType(), list);
     }
 
-    Py::FunctionGetFunctionOp createFunctionGetFunction(mlir::Type functionType, mlir::Value function)
+    Py::FunctionCallOp createFunctionCall(mlir::Value function, llvm::ArrayRef<mlir::Value> arguments)
     {
-        return create<Py::FunctionGetFunctionOp>(functionType, function);
-    }
-
-    Py::FunctionGetFunctionOp createFunctionGetFunction(mlir::Value function)
-    {
-        return create<Py::FunctionGetFunctionOp>(getUniversalCCType(context), function);
+        return create<Py::FunctionCallOp>(getUnknownType(), function, arguments);
     }
 
     Py::ObjectHashOp createObjectHash(mlir::Value object)
@@ -524,11 +519,12 @@ public:
                                     unwindPath);
     }
 
-    Py::InvokeIndirectOp createInvokeIndirect(mlir::Value callee, llvm::ArrayRef<mlir::Value> operands,
+    Py::FunctionInvokeOp createFunctionInvoke(mlir::Value callee, llvm::ArrayRef<mlir::Value> operands,
                                               mlir::Block* happyPath, llvm::ArrayRef<mlir::Value> normalOperands,
                                               mlir::Block* unwindPath, llvm::ArrayRef<mlir::Value> unwindOperands)
     {
-        return create<Py::InvokeIndirectOp>(callee, operands, normalOperands, unwindOperands, happyPath, unwindPath);
+        return create<Py::FunctionInvokeOp>(getUnknownType(), callee, operands, normalOperands, unwindOperands,
+                                            happyPath, unwindPath);
     }
 };
 } // namespace pylir::Py
