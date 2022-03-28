@@ -1,4 +1,7 @@
 #include <mlir/IR/BlockAndValueMapping.h>
+#include <mlir/IR/RegionGraphTraits.h>
+
+#include <llvm/ADT/PostOrderIterator.h>
 
 #include <pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -114,7 +117,7 @@ public:
         return m_calculatedSpecializations.insert({std::move(specialization), std::move(finishedAnalysis)});
     }
 
-    const llvm::DenseMap<FunctionSpecialization, FinishedAnalysis>& getCalculatedSpecializations() const
+    [[nodiscard]] const llvm::DenseMap<FunctionSpecialization, FinishedAnalysis>& getCalculatedSpecializations() const
     {
         return m_calculatedSpecializations;
     }
@@ -248,7 +251,7 @@ class MonomorphFunctionImpl
             return;
         }
         // TODO: handle `py.is` as condition to terminators
-        for (auto iter : terminator->getSuccessors())
+        for (auto* iter : terminator->getSuccessors())
         {
             if (m_inWorkList.insert(iter).second)
             {
@@ -263,10 +266,13 @@ public:
         : m_symbolTable(&symbolTable),
           m_functionOp(interface),
           m_argTypes(std::move(argTypes)),
-          m_workList({&interface.getBody().front()}),
-          m_currentOp(m_workList.front()->begin()),
           m_returnType(pylir::Py::UnboundType::get(interface->getContext()))
     {
+        std::deque<mlir::Block*> rpo;
+        std::copy(llvm::po_begin(&interface.getBody()), llvm::po_end(&interface.getBody()), std::front_inserter(rpo));
+        std::for_each(rpo.begin() + 1, rpo.end(), [&](mlir::Block* block) { m_inWorkList.insert(block); });
+        m_workList = std::queue{std::move(rpo)};
+        m_currentOp = m_workList.front()->begin();
         PYLIR_ASSERT(m_argTypes.size() == interface.getNumArguments());
         for (auto [arg, type] : llvm::zip(interface.getArguments(), m_argTypes))
         {
@@ -323,7 +329,7 @@ public:
                 }
 
                 llvm::SmallVector<pylir::Py::ObjectTypeInterface> operandTypes(m_currentOp->getNumOperands());
-                for (auto& iter : llvm::enumerate(m_currentOp->getOperands()))
+                for (const auto& iter : llvm::enumerate(m_currentOp->getOperands()))
                 {
                     if (iter.value().getType().isa<pylir::Py::ObjectTypeInterface>())
                     {
@@ -373,7 +379,7 @@ class ExecutionFrame
     std::size_t parentFrame;
 
 public:
-    ExecutionFrame(MonomorphFunctionImpl&& monomorphFunction, std::size_t parentFrame = -1)
+    explicit ExecutionFrame(MonomorphFunctionImpl&& monomorphFunction, std::size_t parentFrame = -1)
         : monomorphFunction(std::move(monomorphFunction)), parentFrame(parentFrame)
     {
     }
@@ -393,7 +399,7 @@ public:
         returnType = pylir::Py::joinTypes(returnType, result);
     }
 
-    std::size_t getParentFrame() const
+    [[nodiscard]] std::size_t getParentFrame() const
     {
         return parentFrame;
     }
@@ -403,7 +409,7 @@ public:
         return std::move(monomorphFunction);
     }
 
-    const MonomorphFunctionImpl& getMonomorphFunction() const&
+    [[nodiscard]] const MonomorphFunctionImpl& getMonomorphFunction() const&
     {
         return monomorphFunction;
     }
@@ -439,7 +445,7 @@ void Monomorph::runOnOperation()
                 auto& funcSpecs = pylir::get<std::vector<FunctionSpecialization>>(continuation);
                 for (auto& funcSpec : funcSpecs)
                 {
-                    if (auto result = info.lookup(funcSpec))
+                    if (const auto* result = info.lookup(funcSpec))
                     {
                         currentExecutionStack[parentFrame].addCallResult(result->returnType);
                         continue;
@@ -479,7 +485,7 @@ void Monomorph::runOnOperation()
     };
 
     llvm::DenseMap<FunctionSpecialization, Clone> functionClones;
-    for (auto& [key, value] : info.getCalculatedSpecializations())
+    for (const auto& [key, value] : info.getCalculatedSpecializations())
     {
         auto funcOp = mlir::cast<mlir::FunctionOpInterface>(key.function);
         if (llvm::equal(funcOp.getArgumentTypes(), key.argTypes))
@@ -509,7 +515,7 @@ void Monomorph::runOnOperation()
         functionClones.insert({key, {clone, std::move(mapping)}});
     }
 
-    for (auto& [key, value] : info.getCalculatedSpecializations())
+    for (const auto& [key, value] : info.getCalculatedSpecializations())
     {
         mlir::BlockAndValueMapping* mapping = nullptr;
         {
@@ -519,7 +525,7 @@ void Monomorph::runOnOperation()
                 mapping = &result->second.mapping;
             }
         }
-        for (auto& [value, lattice] : value.lattices)
+        for (const auto& [value, lattice] : value.lattices)
         {
             auto valueToUse = value;
             if (mapping)
