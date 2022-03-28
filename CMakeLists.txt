@@ -64,6 +64,11 @@ if (POLICY CMP0116)
     cmake_policy(SET CMP0116 OLD)
 endif ()
 
+# Remove once cmake fixes the bug for clang-cl not working as ASM compiler
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 OLD)
+endif()
+
 find_package(Threads REQUIRED)
 link_libraries(Threads::Threads)
 # revision 47e3f946367381c57c5219456a0de8a70f8073bb
