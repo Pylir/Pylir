@@ -330,6 +330,8 @@ def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound,
 	let results = (outs DynamicType:$result);
 
 	let assemblyFormat = "$type_object attr-dict `:` functional-type($type_object, $result)";
+
+	let hasFolder = 1;
 }
 
 // Str ops

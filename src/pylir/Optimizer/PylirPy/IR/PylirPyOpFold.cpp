@@ -666,6 +666,16 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
     return nullptr;
 }
 
+mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute> attributes)
+{
+    auto object = resolveValue(*this, attributes[0], false).dyn_cast_or_null<pylir::Py::TypeAttr>();
+    if (!object)
+    {
+        return nullptr;
+    }
+    return object.getMroTuple();
+}
+
 mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute>,
                                                  ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {

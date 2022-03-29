@@ -70,22 +70,11 @@ namespace
 struct Lattice
 {
     pylir::Py::ObjectTypeInterface type;
-    llvm::DenseSet<mlir::Attribute> value;
 
     bool merge(const Lattice& rhs)
     {
-        auto prevSize = value.size();
-        if (rhs.value.empty())
-        {
-            value.clear();
-        }
-        else
-        {
-            value.insert(rhs.value.begin(), rhs.value.end());
-        }
-        auto changed = value.size() != prevSize;
         auto newType = pylir::Py::joinTypes(type, rhs.type);
-        changed = changed | newType != type;
+        bool changed = newType != type;
         type = newType;
         return changed;
     }
@@ -99,7 +88,7 @@ struct FinishedAnalysis
 
 class MonomorphModuleInfo
 {
-    llvm::DenseMap<FunctionSpecialization, FinishedAnalysis> m_calculatedSpecializations;
+    llvm::MapVector<FunctionSpecialization, FinishedAnalysis> m_calculatedSpecializations;
 
 public:
     [[nodiscard]] const FinishedAnalysis* lookup(const FunctionSpecialization& specialization) const
@@ -117,7 +106,7 @@ public:
         return m_calculatedSpecializations.insert({std::move(specialization), std::move(finishedAnalysis)});
     }
 
-    [[nodiscard]] const llvm::DenseMap<FunctionSpecialization, FinishedAnalysis>& getCalculatedSpecializations() const
+    [[nodiscard]] const llvm::MapVector<FunctionSpecialization, FinishedAnalysis>& getCalculatedSpecializations() const
     {
         return m_calculatedSpecializations;
     }
@@ -182,27 +171,85 @@ class MonomorphFunctionImpl
             return {FunctionSpecialization{functionOpInterface, std::move(argTypes)}};
         }
 
-        auto lattice = m_lattices.find(callee.get<mlir::Value>());
-        if (lattice == m_lattices.end())
+        auto pessimize = [&]
         {
             for (auto iter : callOp->getResults())
             {
-                addLattice(iter, Lattice{pylir::Py::UnknownType::get(m_functionOp.getContext()), {}});
+                addLattice(iter, Lattice{pylir::Py::UnknownType::get(m_functionOp.getContext())});
             }
+        };
+
+        auto mroLookup = callee.get<mlir::Value>().getDefiningOp<pylir::Py::MROLookupOp>();
+        if (!mroLookup)
+        {
+            pessimize();
+            return {};
+        }
+        auto mroTuple = mroLookup.getMroTuple().getDefiningOp<pylir::Py::TypeMROOp>();
+        if (!mroTuple)
+        {
+            pessimize();
+            return {};
+        }
+        auto typeOf = mroTuple.getTypeObject().getDefiningOp<pylir::Py::TypeOfOp>();
+        if (!typeOf)
+        {
+            pessimize();
+            return {};
+        }
+        auto result = m_lattices.find(typeOf.getObject());
+        if (result == m_lattices.end())
+        {
+            pessimize();
             return {};
         }
         std::vector<FunctionSpecialization> results;
-        for (auto iter : lattice->second.value)
+        auto calcFunc = [&](mlir::FlatSymbolRefAttr type) -> mlir::FunctionOpInterface
         {
-            if (auto ref = iter.dyn_cast<mlir::FlatSymbolRefAttr>())
+            auto typeObject = m_symbolTable->lookup<pylir::Py::GlobalValueOp>(type.getAttr());
+            if (typeObject.isDeclaration())
             {
-                iter = m_symbolTable->lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).getInitializerAttr();
+                return {};
             }
-            if (auto func = iter.dyn_cast<pylir::Py::FunctionAttr>())
+            auto slots = typeObject.getInitializerAttr().getSlots();
+            auto slot = slots.get(mroLookup.getSlotAttr()).dyn_cast_or_null<pylir::Py::FunctionAttr>();
+            if (!slot)
             {
-                results.push_back({m_symbolTable->lookup(func.getValue().getAttr()), argTypes});
+                return {};
+            }
+            return m_symbolTable->lookup<mlir::FunctionOpInterface>(slot.getValue().getAttr());
+        };
+        auto type = result->second.type;
+        if (auto var = type.dyn_cast<pylir::Py::VariantType>())
+        {
+            for (auto& iter : var.getElements())
+            {
+                auto typeObject = iter.getTypeObject();
+                if (!typeObject)
+                {
+                    pessimize();
+                    return {};
+                }
+                auto func = calcFunc(typeObject);
+                if (!func)
+                {
+                    pessimize();
+                    return {};
+                }
+                results.push_back({func, argTypes});
             }
         }
+        else if (auto typeObject = type.getTypeObject())
+        {
+            auto func = calcFunc(typeObject);
+            if (!func)
+            {
+                pessimize();
+                return {};
+            }
+            results = {{func, std::move(argTypes)}};
+        }
+
         return results;
     }
 
@@ -276,7 +323,7 @@ public:
         PYLIR_ASSERT(m_argTypes.size() == interface.getNumArguments());
         for (auto [arg, type] : llvm::zip(interface.getArguments(), m_argTypes))
         {
-            addLattice(arg, {type, {}});
+            addLattice(arg, {type});
         }
     }
 
@@ -302,7 +349,7 @@ public:
                         stage = RunStage::Initial;
                         PYLIR_ASSERT(callable->getNumResults() == 1);
                         PYLIR_ASSERT(returnType);
-                        addLattice(callable->getResult(0), {returnType, {}});
+                        addLattice(callable->getResult(0), {returnType});
                     }
                     else if (auto specs = evalCallOp(callable); !specs.empty())
                     {
@@ -322,7 +369,7 @@ public:
                     {
                         if (iter.getType().isa<pylir::Py::ObjectTypeInterface>())
                         {
-                            addLattice(iter, {iter.getType(), {}});
+                            addLattice(iter, {iter.getType()});
                         }
                     }
                     continue;
@@ -340,7 +387,7 @@ public:
                 PYLIR_ASSERT(results.size() == m_currentOp->getNumResults());
                 for (auto [res, type] : llvm::zip(m_currentOp->getResults(), results))
                 {
-                    addLattice(res, {type, {}});
+                    addLattice(res, {type});
                 }
             }
             m_workList.pop();
