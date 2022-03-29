@@ -2,6 +2,7 @@
 #include <mlir/IR/RegionGraphTraits.h>
 
 #include <llvm/ADT/PostOrderIterator.h>
+#include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -84,6 +85,7 @@ struct FinishedAnalysis
 {
     pylir::Py::ObjectTypeInterface returnType;
     llvm::DenseMap<mlir::Value, Lattice> lattices;
+    llvm::DenseMap<mlir::Operation*, llvm::DenseSet<FunctionSpecialization>> callSites;
 };
 
 class MonomorphModuleInfo
@@ -126,9 +128,21 @@ class MonomorphFunctionImpl
     std::queue<mlir::Block*> m_workList;
     llvm::DenseSet<mlir::Block*> m_inWorkList;
     llvm::DenseMap<mlir::Value, Lattice> m_lattices;
+    llvm::DenseMap<mlir::Operation*, llvm::DenseSet<FunctionSpecialization>> m_callSites;
     mlir::Block::iterator m_currentOp;
     bool m_inBlockChanged = false;
     pylir::Py::ObjectTypeInterface m_returnType;
+
+    void addCallSite(mlir::CallOpInterface callOp, const std::vector<FunctionSpecialization>& calls)
+    {
+        auto result = m_callSites.find(callOp);
+        if (result == m_callSites.end())
+        {
+            m_callSites.insert({callOp, {calls.begin(), calls.end()}});
+            return;
+        }
+        result->second.insert(calls.begin(), calls.end());
+    }
 
     void addLattice(mlir::Value value, const Lattice& lattice)
     {
@@ -353,6 +367,7 @@ public:
                     }
                     else if (auto specs = evalCallOp(callable); !specs.empty())
                     {
+                        addCallSite(callable, specs);
                         return {std::move(specs)};
                     }
                 }
@@ -415,6 +430,11 @@ public:
     llvm::DenseMap<mlir::Value, Lattice>&& getLattices() &&
     {
         return std::move(m_lattices);
+    }
+
+    llvm::DenseMap<mlir::Operation*, llvm::DenseSet<FunctionSpecialization>>&& getCallSites() &&
+    {
+        return std::move(m_callSites);
     }
 };
 
@@ -515,7 +535,8 @@ void Monomorph::runOnOperation()
                 {currentExecutionStack.back().getMonomorphFunction().getFunctionOp(),
                  std::move(currentExecutionStack.back()).getMonomorphFunction().getArgTypes()},
                 FinishedAnalysis{returnType,
-                                 std::move(currentExecutionStack.back()).getMonomorphFunction().getLattices()});
+                                 std::move(currentExecutionStack.back()).getMonomorphFunction().getLattices(),
+                                 std::move(currentExecutionStack.back()).getMonomorphFunction().getCallSites()});
             if (currentExecutionStack.back().getParentFrame() < currentExecutionStack.size())
             {
                 currentExecutionStack[currentExecutionStack.back().getParentFrame()].addCallResult(returnType);
@@ -585,6 +606,47 @@ void Monomorph::runOnOperation()
             }
             valueToUse.setType(lattice.type);
             m_typesRefined++;
+        }
+
+        auto setCallee = [](mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
+        {
+            llvm::TypeSwitch<mlir::Operation*>(op)
+                .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>([&](auto&& op) { op.setCalleeAttr(callee); })
+                .Case(
+                    [&](pylir::Py::FunctionCallOp op)
+                    {
+                        mlir::OpBuilder builder(op);
+                        auto newCall = builder.create<pylir::Py::CallOp>(op.getLoc(), op->getResultTypes(), callee,
+                                                                         op.getCallOperands());
+                        op->replaceAllUsesWith(newCall);
+                        op->erase();
+                    })
+                .Case(
+                    [&](pylir::Py::FunctionInvokeOp op)
+                    {
+                        mlir::OpBuilder builder(op);
+                        auto newCall = builder.create<pylir::Py::InvokeOp>(
+                            op.getLoc(), op->getResultTypes(), callee, op.getCallOperands(), op.getNormalDestOperands(),
+                            op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
+                        op->replaceAllUsesWith(newCall);
+                        op->erase();
+                    });
+        };
+
+        for (const auto& [call, specs] : value.callSites)
+        {
+            if (specs.size() == 1)
+            {
+                auto clone = functionClones.find(*specs.begin());
+                if (clone == functionClones.end())
+                {
+                    continue;
+                }
+                setCallee(call, mlir::FlatSymbolRefAttr::get(clone->second.clone));
+                continue;
+            }
+            // TODO:
+            PYLIR_UNREACHABLE;
         }
     }
 }
