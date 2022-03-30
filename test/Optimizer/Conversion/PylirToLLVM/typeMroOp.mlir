@@ -1,8 +1,8 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @test(%arg : !py.dynamic) -> !py.dynamic {
-    %0 = py.type.mro %arg
-    return %0 : !py.dynamic
+func @test(%arg : !py.unknown) -> !py.unknown {
+    %0 = py.type.mro %arg : (!py.unknown) -> !py.unknown
+    return %0 : !py.unknown
 }
 
 // CHECK: @test

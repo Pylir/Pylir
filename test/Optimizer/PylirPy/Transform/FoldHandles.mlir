@@ -1,19 +1,19 @@
 // RUN: pylir-opt %s --fold-handles --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.int = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
 py.globalHandle "private" @foo
 
 func @test() {
-    %0 = py.constant #py.int<value = 5>
-    py.store %0 into @foo
+    %0 = py.constant(#py.int<value = 5>) : !py.unknown
+    py.store %0 into @foo : !py.unknown
     return
 }
 
-func @bar() -> !py.dynamic {
-    %0 = py.load @foo
-    return %0 : !py.dynamic
+func @bar() -> !py.unknown {
+    %0 = py.load @foo : !py.unknown
+    return %0 : !py.unknown
 }
 
 // CHECK: py.globalValue "private" @foo = #py.int<value = 5>
@@ -23,19 +23,19 @@ func @bar() -> !py.dynamic {
 // CHECK: return
 
 // CHECK-LABEL: @bar
-// CHECK-NEXT: %[[C:.*]] = py.constant @foo
+// CHECK-NEXT: %[[C:.*]] = py.constant(@foo)
 // CHECK-NEXT: return %[[C]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.int = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
 py.globalHandle "private" @foo
 
 func @test() {
-    %0 = py.constant #py.int<value = 5>
-    py.store %0 into @foo
+    %0 = py.constant(#py.int<value = 5>) : !py.unknown
+    py.store %0 into @foo : !py.unknown
     return
 }
 

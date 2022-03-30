@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @test(%arg : !py.dynamic) -> i1 {
-    %0 = py.bool.toI1 %arg
+func @test(%arg : !py.unknown) -> i1 {
+    %0 = py.bool.toI1 %arg : !py.unknown
     return %0 : i1
 }
 

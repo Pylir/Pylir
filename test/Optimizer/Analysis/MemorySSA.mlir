@@ -1,13 +1,13 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
 
 func @test() -> index {
-    %0 = py.constant #py.str<value = "test">
+    %0 = py.constant(#py.str<value = "test">) : !py.unknown
     %1 = py.makeList ()
-    py.list.append %1, %0
-    %2 = py.list.len %1
+    py.list.append %1, %0 : !py.class<@builtins.list>, !py.unknown
+    %2 = py.list.len %1 : !py.class<@builtins.list>
     return %2 : index
 }
 
@@ -21,16 +21,16 @@ func @test() -> index {
 // CHECK-NEXT: // {{.*}} py.list.len
 
 func @test2(%arg0 : i1) -> index {
-    %0 = py.constant #py.str<value = "test">
+    %0 = py.constant(#py.str<value = "test">) : !py.unknown
     %1 = py.makeList ()
     cf.cond_br %arg0, ^bb1, ^bb2
 
 ^bb1:
-    py.list.append %1, %0
+    py.list.append %1, %0 : !py.class<@builtins.list>, !py.unknown
     cf.br ^bb2
 
 ^bb2:
-    %2 = py.list.len %1
+    %2 = py.list.len %1 : !py.class<@builtins.list>
     return %2 : index
 }
 
@@ -49,7 +49,7 @@ func @test2(%arg0 : i1) -> index {
 // CHECK-NEXT: // {{.*}} py.list.len
 
 func @test3() -> index {
-    %0 = py.constant #py.str<value = "test">
+    %0 = py.constant(#py.str<value = "test">) : !py.unknown
     %1 = py.makeList ()
     cf.br ^condition
 
@@ -58,11 +58,11 @@ func @test3() -> index {
     cf.cond_br %2, ^bb1, ^bb2
 
 ^bb1:
-    py.list.append %1, %0
+    py.list.append %1, %0 : !py.class<@builtins.list>, !py.unknown
     cf.br ^condition
 
 ^bb2:
-    %3 = py.list.len %1
+    %3 = py.list.len %1 : !py.class<@builtins.list>
     return %3 : index
 }
 
@@ -84,18 +84,18 @@ func @test3() -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
 
 func private @bar()
 
-func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant #py.str<value = "value">
-    %1 = py.typeOf %arg0
-    py.setSlot "test" of %arg0 : %1 to %0
+func @test4(%arg0 : !py.unknown) -> !py.unknown {
+    %0 = py.constant(#py.str<value = "value">) : !py.unknown
+    %1 = py.typeOf %arg0 : (!py.unknown) -> !py.unknown
+    py.setSlot "test" of %arg0 : %1 to %0 : !py.unknown, !py.unknown, !py.unknown
     call @bar() : () -> ()
-    %2 = py.getSlot "test" from %arg0 : %1
-    return %2 : !py.dynamic
+    %2 = py.getSlot "test" from %arg0 : %1 : (!py.unknown, !py.unknown) -> !py.unknown
+    return %2 : !py.unknown
 }
 
 // skip @bar

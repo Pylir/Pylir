@@ -7,9 +7,6 @@
 
 #include "PylirPyDialect.hpp"
 
-#define GET_TYPEDEF_CLASSES
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"
-
 void pylir::Py::PylirPyDialect::initializeTypes()
 {
     addTypes<
@@ -57,3 +54,49 @@ pylir::Py::ObjectTypeInterface pylir::Py::joinTypes(pylir::Py::ObjectTypeInterfa
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> temp(elementTypes.begin(), elementTypes.end());
     return pylir::Py::VariantType::get(lhs.getContext(), temp);
 }
+
+namespace
+{
+mlir::LogicalResult parseSlotSuffix(
+    mlir::AsmParser& parser,
+    mlir::FailureOr<llvm::SmallVector<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>>>& result)
+{
+    result = llvm::SmallVector<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>>{};
+    if (parser.parseOptionalComma())
+    {
+        return mlir::success();
+    }
+    if (parser.parseCommaSeparatedList(::mlir::AsmParser::Delimiter::Braces,
+                                       [&]() -> mlir::ParseResult
+                                       {
+                                           auto temp = std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>{};
+                                           if (parser.parseAttribute(temp.first) || parser.parseEqual()
+                                               || parser.parseType(temp.second))
+                                           {
+                                               return mlir::failure();
+                                           }
+                                           result->push_back(std::move(temp));
+                                           return mlir::success();
+                                       }))
+    {
+        return ::mlir::failure();
+    }
+    return mlir::success();
+}
+
+void printSlotSuffix(mlir::AsmPrinter& parser,
+                     llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> result)
+{
+    if (result.empty())
+    {
+        return;
+    }
+    parser << ", {";
+    llvm::interleaveComma(result, parser.getStream(),
+                          [&](const auto& pair) { parser << pair.first << " = " << pair.second; });
+    parser << "}";
+}
+} // namespace
+
+#define GET_TYPEDEF_CLASSES
+#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"

@@ -7,11 +7,10 @@ def foo():
         return x
 
 # CHECK-LABEL: func private @"foo$impl[0]"
-# CHECK: %[[CELL:.*]] = py.constant @builtins.cell
+# CHECK: %[[CELL:.*]] = py.constant(@builtins.cell)
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[CELL]])
 # CHECK: %[[NEW_METHOD:.*]] = py.getSlot "__new__" from %[[CELL]]
-# CHECK: %[[CALLABLE:.*]] = py.function.getFunction %[[NEW_METHOD]]
-# CHECK: %[[X:.*]] = call_indirect %[[CALLABLE]](%[[NEW_METHOD]], %[[TUPLE]], %{{[[:alnum:]]+}})
+# CHECK: %[[X:.*]] = py.function.call %[[NEW_METHOD]](%[[NEW_METHOD]], %[[TUPLE]], %{{[[:alnum:]]+}})
 
 # CHECK: %[[BAR:.*]] = py.makeFunc @"foo.<locals>.bar$cc[0]"
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[X]])

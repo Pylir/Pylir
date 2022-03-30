@@ -2,9 +2,9 @@
 
 py.globalValue @builtins.tuple = #py.tuple<value = ()>
 
-func @constants() -> !py.dynamic {
-    %0 = py.constant #py.tuple<value = ()>
-    return %0 : !py.dynamic
+func @constants() -> !py.unknown {
+    %0 = py.constant(#py.tuple<value = ()>) : !py.unknown
+    return %0 : !py.unknown
 }
 
 // CHECK: llvm.mlir.global private unnamed_addr constant @[[CONSTANT:const\$[[:alnum:]]*]]

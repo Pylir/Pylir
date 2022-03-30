@@ -2,9 +2,9 @@
 
 py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<value = (#py.str<value = "__slots__">,#py.str<value = "__eq__">,#py.str<value = "__hash__">)>}>
 
-py.globalValue const @builtins.object = #py.type<> // stub
-py.globalValue const @builtins.str = #py.type<> // stub
-py.globalValue const @builtins.tuple = #py.type<> // stub
+py.globalValue const @builtins.object = #py.type // stub
+py.globalValue const @builtins.str = #py.type // stub
+py.globalValue const @builtins.tuple = #py.type // stub
 
 // CHECK-LABEL: @builtins.type
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef

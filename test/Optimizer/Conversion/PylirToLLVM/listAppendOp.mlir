@@ -1,11 +1,11 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file | FileCheck %s
 
-py.globalValue const @builtins.type = #py.type<>
-py.globalValue const @builtins.list = #py.type<>
-py.globalValue const @builtins.tuple = #py.type<>
+py.globalValue const @builtins.type = #py.type
+py.globalValue const @builtins.list = #py.type
+py.globalValue const @builtins.tuple = #py.type
 
-func @foo(%list : !py.dynamic, %item : !py.dynamic) {
-    py.list.append %list, %item
+func @foo(%list : !py.unknown, %item : !py.unknown) {
+    py.list.append %list, %item : !py.unknown, !py.unknown
     return
 }
 

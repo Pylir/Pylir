@@ -1,16 +1,16 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.dict = #py.type<>
-py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.str = #py.type
 
 func @test() -> index {
-    %0 = py.constant #py.str<value = "test">
+    %0 = py.constant(#py.str<value = "test">) : !py.unknown
     %1 = py.makeDict ()
     %2 = py.makeDict ()
-    py.dict.setItem %1[%0] to %0
-    py.dict.setItem %2[%0] to %0
-    %3 = py.dict.len %1
+    py.dict.setItem %1[%0] to %0 : !py.class<@builtins.dict>, !py.unknown, !py.unknown
+    py.dict.setItem %2[%0] to %0 : !py.class<@builtins.dict>, !py.unknown, !py.unknown
+    %3 = py.dict.len %1 : !py.class<@builtins.dict>
     return %3 : index
 }
 

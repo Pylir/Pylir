@@ -189,7 +189,7 @@ def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
 	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctx, {})">, "mroTuple">]> {
 	let mnemonic = "type";
 
-	let assemblyFormat = "`<`struct(params)`>`";
+	let assemblyFormat = "(`<`struct(params)^`>`)?";
 }
 
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {

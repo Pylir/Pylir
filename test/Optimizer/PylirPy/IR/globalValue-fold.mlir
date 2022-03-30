@@ -1,11 +1,11 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.int = #py.type<>
-py.globalValue @builtins.float = #py.type<>
-py.globalValue @builtins.bool = #py.type<>
-py.globalValue @builtins.str = #py.type<>
-py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+py.globalValue @builtins.bool = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.tuple = #py.type
 
 py.globalValue @g1 = #py.int<value = 3>
 py.globalValue @g2 = #py.float<value = 5.0>

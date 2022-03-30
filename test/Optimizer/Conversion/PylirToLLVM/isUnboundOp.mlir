@@ -3,8 +3,8 @@
 py.globalHandle @handle
 
 func @test() -> i1 {
-    %0 = py.load @handle
-    %1 = py.isUnboundValue %0
+    %0 = py.load @handle : !py.unknown
+    %1 = py.isUnboundValue %0 : !py.unknown
     return %1 : i1
 }
 

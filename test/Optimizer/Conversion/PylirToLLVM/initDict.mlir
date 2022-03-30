@@ -1,15 +1,15 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 
-py.globalValue const @builtins.type = #py.type<>
-py.globalValue const @builtins.dict = #py.type<>
-py.globalValue const @builtins.tuple = #py.type<>
+py.globalValue const @builtins.type = #py.type
+py.globalValue const @builtins.dict = #py.type
+py.globalValue const @builtins.tuple = #py.type
 
-func @foo() -> !py.dynamic {
-    %0 = py.constant @builtins.dict
-    %1 = pyMem.gcAllocObject %0
-    %2 = pyMem.initDict %1
-    return %2 : !py.dynamic
+func @foo() -> !py.unknown {
+    %0 = py.constant(@builtins.dict) : !py.unknown
+    %1 = pyMem.gcAllocObject %0 : !py.unknown
+    %2 = pyMem.initDict %1 : !py.unknown
+    return %2 : !py.unknown
 }
 
 // CHECK-LABEL: llvm.func @foo

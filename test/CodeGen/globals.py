@@ -6,7 +6,7 @@
 # CHECK-DAG: globalHandle "private" @foo
 
 # CHECK-LABEL: @__init__
-# CHECK: %[[UNBOUND:.*]] = py.constant #py.unbound
+# CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
 # CHECK-DAG: py.store %[[UNBOUND]] into @x
 # CHECK-DAG: py.store %[[UNBOUND]] into @y
 # CHECK-DAG: py.store %[[UNBOUND]] into @z
@@ -14,7 +14,7 @@
 
 x = 2
 
-# CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<value = 2>
+# CHECK-DAG: %[[VALUE:.*]] = py.constant(#py.int<value = 2>)
 # CHECK: py.store %[[VALUE]] into @x
 
 x
@@ -29,9 +29,9 @@ def foo():
 
 (z := 3)
 
-# CHECK-DAG: %[[VALUE:.*]] = py.constant #py.int<value = 3>
+# CHECK-DAG: %[[VALUE:.*]] = py.constant(#py.int<value = 3>)
 # CHECK: py.store %[[VALUE]] into @z
 
 # CHECK-LABEL: func private @"foo$impl[0]"
-# CHECK: %[[VALUE:.*]] = py.constant #py.int<value = 3>
+# CHECK: %[[VALUE:.*]] = py.constant(#py.int<value = 3>)
 # CHECK: py.store %[[VALUE]] into @y

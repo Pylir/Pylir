@@ -1,14 +1,14 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.tuple = #py.type<>
-py.globalValue @builtins.object = #py.type<>
-py.globalValue @builtins.dict = #py.type<>
-py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.object = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.str = #py.type
 
-func @test() -> !py.dynamic {
-    %0 = py.constant #py.dict<value = {#py.str<value = "Hello"> to #py.str<value = "World">}>
-    return %0 : !py.dynamic
+func @test() -> !py.unknown {
+    %0 = py.constant(#py.dict<value = {#py.str<value = "Hello"> to #py.str<value = "World">}>) : !py.unknown
+    return %0 : !py.unknown
 }
 
 // CHECK-LABEL: llvm.func internal @"$__GLOBAL_INIT__"

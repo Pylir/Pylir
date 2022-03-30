@@ -1,8 +1,8 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.object = #py.type<>
-py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.object = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @foo = #py.tuple<value = ()>
 py.globalValue @bar = #py.tuple<value = (@foo, @builtins.type)>
 
@@ -32,9 +32,9 @@ py.globalValue @bar = #py.tuple<value = (@foo, @builtins.type)>
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.str = #py.type<>
-py.globalValue @builtins.tuple = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.tuple = #py.type
 
 py.globalValue @foo = #py.str<value = "test">
 
@@ -55,9 +55,9 @@ py.globalValue @foo = #py.str<value = "test">
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.tuple = #py.type<>
-py.globalValue @builtins.list = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.list = #py.type
 
 py.globalValue @bar = #py.list<value = []>
 py.globalValue const @foo = #py.list<value = []>

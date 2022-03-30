@@ -1,21 +1,21 @@
 // RUN: pylir-opt %s -expand-py-dialect --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.bool = #py.type<>
-py.globalValue @builtins.function = #py.type<>
-py.globalValue @builtins.dict = #py.type<>
-py.globalValue @one = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
+py.globalValue @builtins.function = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @one = #py.type
 
-func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant @one
-    %1 = py.linearContains %0 in %tuple
+func @linear_search(%tuple : !py.unknown) -> !py.class<@builtins.bool> {
+    %0 = py.constant(@one) : !py.unknown
+    %1 = py.linearContains %0 in %tuple : !py.unknown, !py.unknown
     %2 = py.bool.fromI1 %1
-    return %2 : !py.dynamic
+    return %2 : !py.class<@builtins.bool>
 }
 
 // CHECK-LABEL: @linear_search
 // CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
-// CHECK: %[[ONE:.*]] = py.constant @one
+// CHECK: %[[ONE:.*]] = py.constant(@one)
 // CHECK: %[[TUPLE_LEN:.*]] = py.tuple.len %[[TUPLE]]
 // CHECK: %[[ZERO:.*]] = arith.constant 0
 // CHECK: br ^[[CONDITION:[[:alnum:]]+]]

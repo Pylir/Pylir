@@ -52,7 +52,7 @@ def PylirMem_InitIntOp : PylirMem_Op<"initInt", [AlwaysBound]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, IntegerLike:$initializer);
     let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` $initializer `:` type($initializer) attr-dict `:` type($result)";
+    let assemblyFormat = "$memory `to` $initializer attr-dict `:` functional-type($initializer, $result)";
 }
 
 def PylirMem_InitIntAddOp : PylirMem_Op<"initIntAdd", [AlwaysBound]> {

@@ -1,27 +1,27 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @foo() -> !py.dynamic {
-    %0 = py.constant #py.unbound
-    return %0 : !py.dynamic
+func @foo() -> !py.unknown {
+    %0 = py.constant(#py.unbound) : !py.unknown
+    return %0 : !py.unknown
 }
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.tuple = #py.type<>
-py.globalValue @builtins.BaseException = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.BaseException = #py.type
 
-func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
-    %result = py.invoke @foo() : () -> !py.dynamic
+func @invoke_test(%trueValue : !py.unknown) -> !py.unknown {
+    %result = py.invoke @foo() : () -> !py.unknown
         label ^success unwind ^failure
 
 ^success:
-    return %trueValue : !py.dynamic
+    return %trueValue : !py.unknown
 
 ^failure:
-    %1 = py.landingPad @builtins.BaseException
-    py.landingPad.br ^bb2(%1)
+    %1 = py.landingPad @builtins.BaseException : !py.unknown
+    py.br ^bb2(%1 : !py.unknown)
 
-^bb2(%e : !py.dynamic):
-    return %e : !py.dynamic
+^bb2(%e : !py.unknown):
+    return %e : !py.unknown
 }
 
 // CHECK-LABEL: llvm.func @invoke_test

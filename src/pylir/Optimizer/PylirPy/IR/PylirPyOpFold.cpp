@@ -371,6 +371,14 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     {
         return input.getTypeObject();
     }
+    if (auto makeObjectOp = getObject().getDefiningOp<pylir::Py::MakeObjectOp>())
+    {
+        return makeObjectOp.getTypeObject();
+    }
+    if (auto strCopy = getObject().getDefiningOp<pylir::Py::StrCopyOp>())
+    {
+        return strCopy.getTypeObject();
+    }
     auto inputType = getObject().getType().dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
     if (!inputType)
     {

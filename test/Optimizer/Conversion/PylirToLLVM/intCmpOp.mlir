@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp eq %lhs, %rhs
+func @test_eq(%lhs : !py.unknown, %rhs : !py.unknown) -> i1 {
+    %0 = py.int.cmp eq %lhs, %rhs : !py.unknown, !py.unknown
     return %0 : i1
 }
 
@@ -17,8 +17,8 @@ func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp ne %lhs, %rhs
+func @test_ne(%lhs : !py.unknown, %rhs : !py.unknown) -> i1 {
+    %0 = py.int.cmp ne %lhs, %rhs : !py.unknown, !py.unknown
     return %0 : i1
 }
 
@@ -34,8 +34,8 @@ func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp lt %lhs, %rhs
+func @test_lt(%lhs : !py.unknown, %rhs : !py.unknown) -> i1 {
+    %0 = py.int.cmp lt %lhs, %rhs : !py.unknown, !py.unknown
     return %0 : i1
 }
 
@@ -51,8 +51,8 @@ func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp le %lhs, %rhs
+func @test_le(%lhs : !py.unknown, %rhs : !py.unknown) -> i1 {
+    %0 = py.int.cmp le %lhs, %rhs : !py.unknown, !py.unknown
     return %0 : i1
 }
 
@@ -68,8 +68,8 @@ func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp gt %lhs, %rhs
+func @test_gt(%lhs : !py.unknown, %rhs : !py.unknown) -> i1 {
+    %0 = py.int.cmp gt %lhs, %rhs : !py.unknown, !py.unknown
     return %0 : i1
 }
 
@@ -85,8 +85,8 @@ func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp ge %lhs, %rhs
+func @test_ge(%lhs : !py.unknown, %rhs : !py.unknown) -> i1 {
+    %0 = py.int.cmp ge %lhs, %rhs : !py.unknown, !py.unknown
     return %0 : i1
 }
 

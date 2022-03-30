@@ -45,28 +45,14 @@ def PylirPy_UnboundType : PylirPy_ObjectType<"Unbound"> {
     }];
 }
 
-defvar TypeObjectSlotsDag = (ins "::mlir::FlatSymbolRefAttr":$typeObject, ListPrint<"std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>", "Braces", [{
-									[&]() -> mlir::FailureOr<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>>
-									{
-										mlir::StringAttr first;
-										pylir::Py::ObjectTypeInterface second;
-                                        if ($_parser.parseAttribute(first) || $_parser.parseEqual() || $_parser.parseType(second))
-                                        {
-                                            return mlir::failure();
-                                        }
-                                        return std::pair{first, second};
-									}()
-                            	}], [{
-                            	    $_printer << $_self.first << " = " << $_self.second;
-                            	}]>:$slots);
-
 def PylirPy_ClassType : PylirPy_ObjectType<"Class"> {
 	let mnemonic = "class";
 	let summary = "class type";
 
-	let parameters = TypeObjectSlotsDag;
+	let parameters = (ins "::mlir::FlatSymbolRefAttr":$typeObject,
+						  ArrayRefParameter<"std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>">:$slots);
 
-	let assemblyFormat = "`<` struct(params) `>`";
+	let assemblyFormat = "`<` $typeObject custom<SlotSuffix>($slots) `>`";
 }
 
 def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {

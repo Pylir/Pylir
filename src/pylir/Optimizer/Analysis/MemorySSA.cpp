@@ -187,7 +187,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
 
             auto fillWorkList = [&](const llvm::SmallVector<mlir::RegionSuccessor>& successors)
             {
-                for (auto& iter : llvm::reverse(successors))
+                for (const auto& iter : llvm::reverse(successors))
                 {
                     if (!iter.isParent())
                     {
@@ -201,7 +201,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
             llvm::DenseSet<mlir::Region*> seen;
             while (!workList.empty())
             {
-                auto succ = workList.pop_back_val();
+                auto* succ = workList.pop_back_val();
                 if (!seen.insert(succ).second)
                 {
                     continue;
@@ -226,7 +226,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
         }
         lastDefs[memBlock] = lastDef;
 
-        if (auto regionTerm = mlir::dyn_cast<mlir::RegionBranchTerminatorOpInterface>(block.getTerminator()))
+        if (block.getTerminator()->hasTrait<mlir::OpTrait::ReturnLike>())
         {
             builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::SmallVector<mlir::ValueRange>(regionSuccessors.size()),
                                                           regionSuccessors);
@@ -282,7 +282,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
 
     // Insert entry block that has no predecessors
     m_blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
-    fillRegion(region, builder, m_blockMapping, *this, ssaBuilder, lastDefs, m_results, nullptr);
+    fillRegion(region, builder, m_blockMapping, *this, ssaBuilder, lastDefs, m_results, {});
 }
 
 namespace

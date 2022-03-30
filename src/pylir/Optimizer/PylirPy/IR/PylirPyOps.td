@@ -353,7 +353,7 @@ def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoCapture, AlwaysBound]> {
     let arguments = (ins Variadic<DynamicType>:$strings);
     let results = (outs BuiltinType<"Str">:$result);
 
-    let assemblyFormat = "$strings attr-dict `:` type($strings)";
+    let assemblyFormat = "$strings attr-dict (`:` type($strings)^)?";
 
     let description = [{
         Creates a new string by concatenating all `$strings` from left to right. If any of the operands are not
@@ -404,7 +404,7 @@ def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
     let arguments = (ins DynamicType:$input);
     let results = (outs IntegerLike:$result, I1:$success);
 
-    let assemblyFormat = "$input attr-dict `:` functional-type(operands, results)";
+    let assemblyFormat = "$input attr-dict `:` functional-type($input, $result)";
 
     let description = [{
         Converts a python integer into an arbitrary integer-like. If the result type is not capable of representing the
@@ -435,14 +435,14 @@ def PylirPy_IntCmpOp : PylirPy_Op<"int.cmp", [NoSideEffect]> {
     let assemblyFormat = "$pred $lhs `,` $rhs attr-dict `:` type(operands)";
 }
 
-def PylirPy_IntAddOp : PylirPy_Op<"int.add", [NoCapture, Commutative, AlwaysBound]> {
+def PylirPy_IntAddOp : PylirPy_Op<"int.add", [NoCapture, Commutative, AlwaysBound, NoSideEffect]> {
     let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
     let results = (outs BuiltinType<"Int">:$result);
 
     let assemblyFormat = "$lhs `,` $rhs attr-dict `:` type(operands)";
 }
 
-def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCapture, AlwaysBound]> {
+def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCapture, AlwaysBound, NoSideEffect]> {
     let arguments = (ins DynamicType:$input);
     let results = (outs BuiltinType<"Str">:$result);
 
@@ -573,7 +573,7 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound]> {
     let results = (outs Res<BuiltinType<"List">, "", [MemAlloc, MemWrite]>:$result);
 
     let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict custom<OptionalTypeList>(type($arguments))
+        custom<IterArguments>($arguments, $iter_expansion) attr-dict ( `:` type($arguments)^)?
     }];
 
     let builders = [
@@ -612,7 +612,7 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound]> {
     ];
 
     let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict `:` type($arguments)
+        custom<IterArguments>($arguments, $iter_expansion) attr-dict (`:` type($arguments)^)?
     }];
 
     let hasCanonicalizer = 1;

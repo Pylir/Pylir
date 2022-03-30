@@ -4,7 +4,7 @@
 
 object
 
-# CHECK: py.constant @builtins.object
+# CHECK: py.constant(@builtins.object)
 
 # CHECK: %[[VALUE:.*]] = py.load @BaseException
 # CHECK: py.store %[[VALUE]] into @x
@@ -19,5 +19,5 @@ def foo():
 
 # CHECK-LABEL: func private @"foo$impl[0]"
 
-# CHECK: %[[FIVE:.*]] = py.constant #py.int<value = 5>
+# CHECK: %[[FIVE:.*]] = py.constant(#py.int<value = 5>)
 # CHECK: return %[[FIVE]]

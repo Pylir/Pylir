@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @strEqual(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.str.equal %lhs, %rhs
+func @strEqual(%lhs : !py.unknown, %rhs : !py.unknown) -> i1 {
+    %0 = py.str.equal %lhs, %rhs : !py.unknown, !py.unknown
     return %0 : i1
 }
 

@@ -1,17 +1,17 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.str = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
 
 func @test(%arg0 : i1) -> index {
-    %0 = py.constant #py.str<value = "test">
-    %1 = py.constant @builtins.str
+    %0 = py.constant(#py.str<value = "test">) : !py.unknown
+    %1 = py.constant(@builtins.str) : !py.unknown
     %2 = py.makeList ()
     scf.if %arg0 {
     } else {
-        py.list.append %2, %0
+        py.list.append %2, %0 : !py.class<@builtins.list>, !py.unknown
     }
-    %3 = py.list.len %2
+    %3 = py.list.len %2 : !py.class<@builtins.list>
     return %3 : index
 }
 

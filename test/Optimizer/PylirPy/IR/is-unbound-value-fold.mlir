@@ -1,74 +1,69 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.bool = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
-func @entry_block(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.isUnboundValue %arg0
-    %1 = py.bool.fromI1 %0
-    return %1 : !py.dynamic
+func @entry_block(%arg0 : !py.unknown) -> i1 {
+    %0 = py.isUnboundValue %arg0 : !py.unknown
+    return %0 : i1
 }
 
 // CHECK-LABEL: @entry_block
-// CHECK: %[[CONST:.*]] = py.constant #py.bool<value = False>
+// CHECK: %[[CONST:.*]] = arith.constant false
 // CHECK: return %[[CONST]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.bool = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
-func @block_argument(%arg0 : i1) -> !py.dynamic {
-    %c = py.constant #py.bool<value = False>
-    cf.cond_br %arg0, ^true, ^false(%c : !py.dynamic)
+func @block_argument(%arg0 : i1) -> i1 {
+    %c = py.constant(#py.bool<value = False>) : !py.unknown
+    cf.cond_br %arg0, ^true, ^false(%c : !py.unknown)
 
 ^true:
-    %u = py.constant #py.unbound
-    cf.br ^false(%u : !py.dynamic)
+    %u = py.constant(#py.unbound) : !py.unknown
+    cf.br ^false(%u : !py.unknown)
 
-^false(%0 : !py.dynamic):
-    %1 = py.isUnboundValue %0
-    %2 = py.bool.fromI1 %1
-    return %2 : !py.dynamic
+^false(%0 : !py.unknown):
+    %1 = py.isUnboundValue %0 : !py.unknown
+    return %1 : i1
 }
 
 // CHECK-LABEL: @block_argument
 // ...
 // CHECK: %[[I1:.*]] = py.isUnboundValue
-// CHECK: %[[BOOL:.*]] = py.bool.fromI1 %[[I1]]
-// CHECK: return %[[BOOL]]
+// CHECK: return %[[I1]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.bool = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
-func @normal_op(%arg0 : () -> !py.dynamic) -> !py.dynamic {
-    %0 = call_indirect %arg0() : () -> !py.dynamic
-    %1 = py.isUnboundValue %0
-    %2 = py.bool.fromI1 %1
-    return %2 : !py.dynamic
+func @normal_op(%arg0 : () -> !py.unknown) -> i1 {
+    %0 = call_indirect %arg0() : () -> !py.unknown
+    %1 = py.isUnboundValue %0 : !py.unknown
+    return %1 : i1
 }
 
 // CHECK-LABEL: @normal_op
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[C:.*]] = py.constant #py.bool<value = False>
+// CHECK: %[[C:.*]] = arith.constant false
 // CHECK: call_indirect %arg0
 // CHECK: return %[[C]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.bool = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.bool = #py.type
 
 py.globalHandle @a
 
-func @load_op(%arg0 : !py.dynamic) -> !py.dynamic {
-    py.store %arg0 into @a
-    %0 = py.load @a
-    %1 = py.isUnboundValue %0
-    %2 = py.bool.fromI1 %1
-    return %2 : !py.dynamic
+func @load_op(%arg0 : !py.unknown) -> i1 {
+    py.store %arg0 into @a : !py.unknown
+    %0 = py.load @a : !py.unknown
+    %1 = py.isUnboundValue %0 : !py.unknown
+    return %1 : i1
 }
 
 // CHECK-LABEL: @load_op
@@ -76,5 +71,4 @@ func @load_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: py.store %[[ARG0]] into @a
 // CHECK: %[[LOADED:.*]] = py.load @a
 // CHECK: %[[UNBOUND:.*]] = py.isUnboundValue %[[LOADED]]
-// CHECK: %[[RESULT:.*]] = py.bool.fromI1 %[[UNBOUND]]
-// CHECK: return %[[RESULT]]
+// CHECK: return %[[UNBOUND]]

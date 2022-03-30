@@ -26,8 +26,8 @@ def bar(param):
 # CHECK-NEXT: br ^[[EXCEPTION_HANDLER:[[:alnum:]]+]]
 # CHECK: ^[[EXCEPTION_HANDLER]](
 # CHECK-SAME: %[[EXCEPTION:[[:alnum:]]+]]
-# CHECK-NEXT: %[[MATCHING:.*]] = py.constant @builtins.TypeError
-# CHECK-NEXT: %[[TUPLE_TYPE:.*]] = py.constant @builtins.tuple
+# CHECK-NEXT: %[[MATCHING:.*]] = py.constant(@builtins.TypeError)
+# CHECK-NEXT: %[[TUPLE_TYPE:.*]] = py.constant(@builtins.tuple)
 # CHECK-NEXT: %[[MATCHING_TYPE:.*]] = py.typeOf %[[MATCHING]]
 # CHECK-NEXT: %[[IS_TUPLE:.*]] = py.is %[[MATCHING_TYPE]], %[[TUPLE_TYPE]]
 # CHECK-NEXT: cond_br %[[IS_TUPLE]], ^[[TUPLE_BLOCK:.*]], ^[[EXCEPTION_BLOCK:[[:alnum:]]+]]
@@ -42,9 +42,9 @@ def bar(param):
 # skipping tuple case for now
 
 # CHECK: ^[[SUITE_BLOCK]]:
-# CHECK: %[[ONE:.*]] = py.constant #py.int<value = 1>
+# CHECK: %[[ONE:.*]] = py.constant(#py.int<value = 1>)
 # CHECK: return %[[ONE]]
 
 # CHECK: ^[[SKIP_BLOCK]]:
-# CHECK: %[[ZERO:.*]] = py.constant #py.int<value = 0>
+# CHECK: %[[ZERO:.*]] = py.constant(#py.int<value = 0>)
 # CHECK: return %[[ZERO]]
