@@ -558,6 +558,7 @@ void Monomorph::runOnOperation()
         mlir::BlockAndValueMapping mapping;
     };
 
+    bool changed = false;
     llvm::DenseMap<FunctionSpecialization, Clone> functionClones;
     for (const auto& [key, value] : info.getCalculatedSpecializations())
     {
@@ -568,10 +569,12 @@ void Monomorph::runOnOperation()
             {
                 m_typesRefined++;
                 funcOp.setType(mlir::FunctionType::get(&getContext(), funcOp.getArgumentTypes(), value.returnType));
+                changed = true;
             }
             continue;
         }
 
+        changed = true;
         m_functionsCloned++;
         mlir::BlockAndValueMapping mapping;
         auto clone = mlir::cast<mlir::FunctionOpInterface>(funcOp->clone(mapping));
@@ -607,6 +610,7 @@ void Monomorph::runOnOperation()
             }
             valueToUse.setType(lattice.type);
             m_typesRefined++;
+            changed = true;
         }
 
         auto setCallee = [](mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
@@ -643,12 +647,17 @@ void Monomorph::runOnOperation()
                 {
                     continue;
                 }
+                changed = true;
                 setCallee(call, mlir::FlatSymbolRefAttr::get(clone->second.clone));
                 continue;
             }
             // TODO:
             PYLIR_UNREACHABLE;
         }
+    }
+    if (!changed)
+    {
+        markAllAnalysesPreserved();
     }
 }
 
