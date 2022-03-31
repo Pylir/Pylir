@@ -5,6 +5,8 @@
 #include <llvm/ADT/SetVector.h>
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+
 #include "PylirPyDialect.hpp"
 
 void pylir::Py::PylirPyDialect::initializeTypes()

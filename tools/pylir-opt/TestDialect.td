@@ -22,4 +22,10 @@ def RandomOp : Test_Op<"random", [NoSideEffect]> {
     let assemblyFormat = "attr-dict";
 }
 
+def UseOp : Test_Op<"use"> {
+	let arguments = (ins Variadic<AnyType>:$arguments);
+
+	let assemblyFormat = "`(` $arguments `)` attr-dict ( `:` type($arguments)^ )?";
+}
+
 #endif

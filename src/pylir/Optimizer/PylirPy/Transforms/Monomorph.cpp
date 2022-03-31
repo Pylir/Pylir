@@ -226,17 +226,22 @@ class MonomorphFunctionImpl
                 return {};
             }
             auto slots = typeObject.getInitializerAttr().getSlots();
-            auto slot = slots.get(mroLookup.getSlotAttr()).dyn_cast_or_null<pylir::Py::FunctionAttr>();
-            if (!slot)
+            auto slot = slots.get(mroLookup.getSlotAttr());
+            if (auto ref = slot.dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
+            {
+                slot = m_symbolTable->lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).getInitializerAttr();
+            }
+            auto func = slot.dyn_cast_or_null<pylir::Py::FunctionAttr>();
+            if (!func)
             {
                 return {};
             }
-            return m_symbolTable->lookup<mlir::FunctionOpInterface>(slot.getValue().getAttr());
+            return m_symbolTable->lookup<mlir::FunctionOpInterface>(func.getValue().getAttr());
         };
         auto type = result->second.type;
         if (auto var = type.dyn_cast<pylir::Py::VariantType>())
         {
-            for (auto& iter : var.getElements())
+            for (const auto& iter : var.getElements())
             {
                 auto typeObject = iter.getTypeObject();
                 if (!typeObject)
@@ -382,9 +387,10 @@ public:
                 {
                     for (auto iter : m_currentOp->getResults())
                     {
-                        if (iter.getType().isa<pylir::Py::ObjectTypeInterface>())
+                        if (iter.getType().isa<pylir::Py::ObjectTypeInterface>()
+                            && m_lattices.try_emplace(iter, Lattice{iter.getType()}).second)
                         {
-                            addLattice(iter, {iter.getType()});
+                            m_inBlockChanged = true;
                         }
                     }
                     continue;
@@ -569,17 +575,12 @@ void Monomorph::runOnOperation()
         m_functionsCloned++;
         mlir::BlockAndValueMapping mapping;
         auto clone = mlir::cast<mlir::FunctionOpInterface>(funcOp->clone(mapping));
+        mlir::cast<mlir::SymbolOpInterface>(*clone).setPrivate();
         symbolTable.insert(clone);
         llvm::SmallVector<mlir::Type> argTypes(key.argTypes.begin(), key.argTypes.end());
         clone.setType(mlir::FunctionType::get(&getContext(), argTypes, value.returnType));
-        for (auto [blockArg, newType] : llvm::zip(clone.front().getArguments(), key.argTypes))
-        {
-            if (blockArg.getType() != newType)
-            {
-                blockArg.setType(newType);
-                m_typesRefined++;
-            }
-        }
+        // Changing the function type also requires changing the block arguments of the entry block, but this is done
+        // below through the lattices
         functionClones.insert({key, {clone, std::move(mapping)}});
     }
 

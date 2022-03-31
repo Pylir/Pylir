@@ -33,9 +33,6 @@ def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [
 	let assemblyFormat = "`<`$typeObject (`,`struct($slots, $builtinValue)^)? `>`";
 }
 
-class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::mlir::FlatSymbolRefAttr",
-	"::mlir::FlatSymbolRefAttr::get($_ctx, ::pylir::Py::Builtins::" # name # ".name)", description>;
-
 class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = [], string extraBuilderCode = "">
 	: PylirPy_Attr<name, traits> {
 

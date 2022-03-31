@@ -59,9 +59,9 @@ def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
 	let mnemonic = "tuple";
 	let summary = "tuple type";
 
-	let parameters = (ins "mlir::FlatSymbolRefAttr":$typeObject, ListPrint<"pylir::Py::ObjectTypeInterface", "Paren">:$elements);
+	let parameters = (ins DefaultType<"Tuple">:$typeObject, ListPrint<"pylir::Py::ObjectTypeInterface", "Paren">:$elements);
 
-	let assemblyFormat = "`<` params `>`";
+	let assemblyFormat = "`<` $elements (`,` $typeObject^)? `>`";
 
 	let extraClassDeclaration = [{
 		::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const

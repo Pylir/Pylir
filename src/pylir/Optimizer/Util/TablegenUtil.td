@@ -26,6 +26,8 @@ class UseableAttrInterface<string name> : AttrInterface<name>,
     let convertFromStorage = "$_self";
 }
 
+class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::mlir::FlatSymbolRefAttr",
+	"::mlir::FlatSymbolRefAttr::get($_ctx, ::pylir::Py::Builtins::" # name # ".name)", description>;
 
 class CustomPrint<AttrOrTypeParameter x, string elementParse = ?, string elementPrint = ?>
 	: AttrOrTypeParameter<x.cppType, x.summary, x.cppAccessorType>
