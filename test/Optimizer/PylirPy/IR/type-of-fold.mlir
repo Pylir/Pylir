@@ -16,7 +16,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
 func @constant_obj() -> !py.unknown {
-    %0 = py.constant(#py.obj<typeObject = @a>) : !py.unknown
+    %0 = py.constant(#py.obj<@a>) : !py.unknown
     %1 = py.typeOf %0 : (!py.unknown) -> !py.unknown
     return %1 : !py.unknown
 }

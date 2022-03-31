@@ -1,12 +1,12 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue const @tuple = #py.tuple<value = (#py.str<value = "__slots__">)>
+py.globalValue const @tuple = #py.tuple<(#py.str<"__slots__">)>
 py.globalValue const @builtins.type = #py.type<slots = {__slots__ = @tuple}>
 py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.str = #py.type
 
 func @test1() -> (!py.unknown, i1) {
-    %0 = py.constant(#py.tuple<value = (@builtins.type)>) : !py.unknown
+    %0 = py.constant(#py.tuple<(@builtins.type)>) : !py.unknown
     %1, %found = py.mroLookup "__slots__" in %0 : (!py.unknown) -> !py.unknown
     return %1, %found : !py.unknown, i1
 }
@@ -17,7 +17,7 @@ func @test1() -> (!py.unknown, i1) {
 // CHECK: return %[[C1]], %[[C2]]
 
 func @test2() -> (!py.unknown, i1) {
-    %0 = py.constant(#py.tuple<value = ()>) : !py.unknown
+    %0 = py.constant(#py.tuple<()>) : !py.unknown
     %1, %found = py.mroLookup "__slots__" in %0 : (!py.unknown) -> !py.unknown
     return %1, %found : !py.unknown, i1
 }

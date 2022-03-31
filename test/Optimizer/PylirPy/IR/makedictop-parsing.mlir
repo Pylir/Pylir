@@ -9,10 +9,10 @@ py.globalValue @builtins.list = #py.type
 
 // CHECK-LABEL: @makedictop_test
 func @makedictop_test() -> !py.unknown {
-    %0 = py.constant(#py.int<value = 0>) : !py.unknown
-    %1 = py.constant(#py.dict<value = {#py.str<value = "a"> to #py.int<value = 3>, #py.str<value = "b"> to #py.list<value = [#py.int<value = 5>]>}>) : !py.unknown
-    %2 = py.constant(#py.str<value = "string">) : !py.unknown
-    %3 = py.constant(#py.tuple<value = (#py.int<value = 0>,#py.int<value = 2>)>) : !py.unknown
+    %0 = py.constant(#py.int<0>) : !py.unknown
+    %1 = py.constant(#py.dict<{#py.str<"a"> to #py.int<3>, #py.str<"b"> to #py.list<[#py.int<5>]>}>) : !py.unknown
+    %2 = py.constant(#py.str<"string">) : !py.unknown
+    %3 = py.constant(#py.tuple<(#py.int<0>,#py.int<2>)>) : !py.unknown
     %4 = py.makeDict (%0 : %2,**%1,%2 : %3) : (!py.unknown, !py.unknown, !py.unknown), (!py.unknown, !py.unknown)
     py.return %4 : !py.class<@builtins.dict>
 }

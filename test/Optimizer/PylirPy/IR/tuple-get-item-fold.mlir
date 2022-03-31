@@ -4,7 +4,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func @test() -> !py.unknown {
-    %0 = py.constant(#py.tuple<value = (@builtins.tuple)>) : !py.unknown
+    %0 = py.constant(#py.tuple<(@builtins.tuple)>) : !py.unknown
     %1 = arith.constant 0 : index
     %2 = py.tuple.getItem %0[%1] : (!py.unknown) -> !py.unknown
     return %2 : !py.unknown

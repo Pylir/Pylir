@@ -6,7 +6,7 @@ py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func @test() -> !py.unknown {
-    %0 = py.constant(#py.int<value = 5>) : !py.unknown
+    %0 = py.constant(#py.int<5>) : !py.unknown
     return %0 : !py.unknown
 }
 

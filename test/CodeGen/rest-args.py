@@ -48,7 +48,7 @@ def bar(a, *args, k, **kwd):
 # CHECK: %[[TUPLE_ARG:.*]] = py.list.toTuple %[[LIST]]
 
 # processing of k...
-# CHECK: %[[CONSTANT:.*]] = py.constant(#py.str<value = "k">)
+# CHECK: %[[CONSTANT:.*]] = py.constant(#py.str<"k">)
 # CHECK: py.dict.delItem %[[CONSTANT]] from %[[DICT]]
 
 # CHECK: call @"bar$impl[0]"(%[[SELF]], %[[BAR_A:[[:alnum:]]+]], %[[TUPLE_ARG]], %[[BAR_K:[[:alnum:]]+]], %[[DICT]])

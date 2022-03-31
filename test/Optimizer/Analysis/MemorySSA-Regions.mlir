@@ -4,7 +4,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
 func @test(%arg0 : i1) -> index {
-    %0 = py.constant(#py.str<value = "test">) : !py.unknown
+    %0 = py.constant(#py.str<"test">) : !py.unknown
     %1 = py.constant(@builtins.str) : !py.unknown
     %2 = py.makeList ()
     scf.if %arg0 {

@@ -7,7 +7,7 @@ py.globalValue @builtins.str = #py.type // stub
 py.globalValue @builtins.None = #py.type // stub
 py.globalValue @builtins.tuple = #py.type
 
-py.globalValue @foo = #py.function<value = @bar>
+py.globalValue @foo = #py.function<@bar>
 
 func @bar(%arg0 : !py.unknown, %arg1 : !py.unknown, %arg2 : !py.unknown) -> !py.unknown {
     return %arg0 : !py.unknown

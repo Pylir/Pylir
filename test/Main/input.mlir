@@ -1,6 +1,6 @@
 // RUN: pylir %s -o - -S -emit-llvm | FileCheck %s
 
-py.globalValue const @const$ = #py.tuple<value = (#py.str<value = "__slots__">)>
+py.globalValue const @const$ = #py.tuple<(#py.str<"__slots__">)>
 py.globalValue @builtins.type = #py.type<slots = {__slots__ = @const$}>
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type

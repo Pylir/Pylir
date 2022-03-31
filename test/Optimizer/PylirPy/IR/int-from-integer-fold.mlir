@@ -10,5 +10,5 @@ func @test() -> !py.class<@builtins.int> {
 }
 
 // CHECK-LABEL: @test
-// CHECK-NEXT: %[[C:.*]] = py.constant(#py.int<value = 5>)
+// CHECK-NEXT: %[[C:.*]] = py.constant(#py.int<5>)
 // CHECK-NEXT: return %[[C]]

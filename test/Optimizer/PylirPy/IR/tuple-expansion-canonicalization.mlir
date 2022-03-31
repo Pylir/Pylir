@@ -5,7 +5,7 @@ py.globalValue @builtins.int = #py.type
 
 func @make_tuple_op(%arg0 : !py.unknown) -> !py.unknown {
     %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<value = 3>) : !py.unknown
+    %1 = py.constant(#py.int<3>) : !py.unknown
     %2 = py.makeTuple (%1, *%0) : (!py.unknown, !py.unknown) -> !py.unknown
     return %2 : !py.unknown
 }
@@ -23,7 +23,7 @@ py.globalValue @builtins.int = #py.type
 
 func @make_list_op(%arg0 : !py.unknown) -> !py.unknown {
     %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<value = 3>) : !py.unknown
+    %1 = py.constant(#py.int<3>) : !py.unknown
     %2 = py.makeList (%1, *%0) : !py.unknown, !py.unknown
     py.return %2 : !py.class<@builtins.list>
 }
@@ -41,7 +41,7 @@ py.globalValue @builtins.int = #py.type
 
 func @make_set_op(%arg0 : !py.unknown) -> !py.unknown {
     %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<value = 3>) : !py.unknown
+    %1 = py.constant(#py.int<3>) : !py.unknown
     %2 = py.makeSet (%1, *%0) : !py.unknown, !py.unknown
     py.return %2 : !py.class<@builtins.set>
 }
@@ -60,14 +60,14 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func @make_tuple_op_constant(%arg0 : !py.unknown) -> !py.unknown {
-    %1 = py.constant(#py.tuple<value = (#py.int<value = 3>, #py.str<value = "test">)>) : !py.unknown
+    %1 = py.constant(#py.tuple<(#py.int<3>, #py.str<"test">)>) : !py.unknown
     %2 = py.makeTuple (%arg0, *%1) : (!py.unknown, !py.unknown) -> !py.unknown
     return %2 : !py.unknown
 }
 
 // CHECK-LABEL: @make_tuple_op_constant
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK: %[[CONST1:.*]] = py.constant(#py.int<value = 3>)
-// CHECK: %[[CONST2:.*]] = py.constant(#py.str<value = "test">)
+// CHECK: %[[CONST1:.*]] = py.constant(#py.int<3>)
+// CHECK: %[[CONST2:.*]] = py.constant(#py.str<"test">)
 // CHECK: %[[RESULT:.*]] = py.makeTuple (%[[ARG]], %[[CONST1]], %[[CONST2]])
 // CHECK: return %[[RESULT]]

@@ -7,7 +7,7 @@ py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 
 func @test() -> !py.unknown {
-    %0 = py.constant(#py.dict<value = {#py.str<value = "Hello"> to #py.str<value = "World">}>) : !py.unknown
+    %0 = py.constant(#py.dict<{#py.str<"Hello"> to #py.str<"World">}>) : !py.unknown
     return %0 : !py.unknown
 }
 

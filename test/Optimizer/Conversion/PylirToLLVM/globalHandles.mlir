@@ -1,11 +1,11 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.tuple = #py.tuple<value = ()>
+py.globalValue @builtins.tuple = #py.tuple<()>
 
 py.globalHandle @handle
 
 func @test() -> !py.unknown {
-    %0 = py.constant(#py.tuple<value = ()>) : !py.unknown
+    %0 = py.constant(#py.tuple<()>) : !py.unknown
     py.store %0 into @handle : !py.unknown
     %1 = py.load @handle : !py.unknown
     return %1 : !py.unknown

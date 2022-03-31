@@ -18,7 +18,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.bool = #py.type
 
 func @block_argument(%arg0 : i1) -> i1 {
-    %c = py.constant(#py.bool<value = False>) : !py.unknown
+    %c = py.constant(#py.bool<False>) : !py.unknown
     cf.cond_br %arg0, ^true, ^false(%c : !py.unknown)
 
 ^true:

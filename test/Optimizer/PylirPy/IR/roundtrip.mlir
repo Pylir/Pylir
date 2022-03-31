@@ -10,12 +10,12 @@ py.globalValue @builtins.BaseException = #py.type
 
 // CHECK-LABEL: func @foo
 func @foo() -> !py.unknown {
-    %0 = py.constant(#py.bool<value = True>) : !py.unknown
+    %0 = py.constant(#py.bool<True>) : !py.unknown
     py.invoke @bar() : () -> ()
         label ^happy unwind ^exception(%0 : !py.unknown)
 
 ^happy:
-    %1 = py.constant(#py.bool<value = False>) : !py.unknown
+    %1 = py.constant(#py.bool<False>) : !py.unknown
     return %1 : !py.unknown
 
 ^exception(%2 : !py.unknown):

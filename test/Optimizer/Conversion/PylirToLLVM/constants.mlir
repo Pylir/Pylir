@@ -1,9 +1,9 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.tuple = #py.tuple<value = ()>
+py.globalValue @builtins.tuple = #py.tuple<()>
 
 func @constants() -> !py.unknown {
-    %0 = py.constant(#py.tuple<value = ()>) : !py.unknown
+    %0 = py.constant(#py.tuple<()>) : !py.unknown
     return %0 : !py.unknown
 }
 

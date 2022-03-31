@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue const @tuple = #py.tuple<value = (#py.str<value = "__slots__">)>
+py.globalValue const @tuple = #py.tuple<(#py.str<"__slots__">)>
 py.globalValue const @builtins.type = #py.type<slots = {__slots__ = @tuple}>
 py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.str = #py.type

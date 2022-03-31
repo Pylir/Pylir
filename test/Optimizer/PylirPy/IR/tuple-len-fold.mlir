@@ -7,7 +7,7 @@ py.globalValue @builtins.float = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func @constant_tuple() -> index {
-    %0 = py.constant(#py.tuple<value = (#py.int<value = 0>, #py.str<value = "text">, #py.float<value = 5.0>)>) : !py.unknown
+    %0 = py.constant(#py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>) : !py.unknown
     %1 = py.tuple.len %0 : !py.unknown
     return %1 : index
 }
@@ -24,7 +24,7 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.float = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-py.globalValue @foo = #py.tuple<value = (#py.int<value = 0>, #py.str<value = "text">, #py.float<value = 5.0>)>
+py.globalValue @foo = #py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>
 
 func @constant_tuple() -> index {
     %0 = py.constant(@foo) : !py.unknown

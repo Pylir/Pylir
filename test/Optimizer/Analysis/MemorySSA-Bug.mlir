@@ -5,7 +5,7 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.list = #py.type
 
 func @test4() -> index {
-    %0 = py.constant(#py.str<value = "test">) : !py.unknown
+    %0 = py.constant(#py.str<"test">) : !py.unknown
     %1 = py.makeList ()
     cf.br ^condition
 
@@ -43,7 +43,7 @@ func @test4() -> index {
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
 func @test5() -> index {
-    %0 = py.constant(#py.str<value = "test">) : !py.unknown
+    %0 = py.constant(#py.str<"test">) : !py.unknown
     %1 = py.makeList ()
     cf.br ^back1
 
@@ -74,7 +74,7 @@ func @test5() -> index {
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
 func @test6() {
-    %0 = py.constant(#py.str<value = "test">) : !py.unknown
+    %0 = py.constant(#py.str<"test">) : !py.unknown
     %1 = py.makeList ()
     cf.br ^bb2
 
