@@ -396,9 +396,34 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion));
 }
 
+namespace
+{
+mlir::LogicalResult verifyCall(::mlir::SymbolTableCollection& symbolTable, mlir::Operation* call,
+                               mlir::ValueRange callOperands, mlir::FlatSymbolRefAttr callee)
+{
+    auto funcOp = symbolTable.lookupNearestSymbolFrom<mlir::FunctionOpInterface>(call, callee);
+    if (!funcOp)
+    {
+        return call->emitOpError("failed to find function named '") << callee << "'";
+    }
+    auto argumentTypes = funcOp.getArgumentTypes();
+    llvm::SmallVector<mlir::Type> operandTypes;
+    for (auto iter : callOperands)
+    {
+        operandTypes.push_back(iter.getType());
+    }
+    if (!std::equal(argumentTypes.begin(), argumentTypes.end(), operandTypes.begin(), operandTypes.end(),
+                    &objectTypesCompatible))
+    {
+        return call->emitOpError("call operand types are not compatible with argument types of '") << callee << "'";
+    }
+    return mlir::success();
+}
+} // namespace
+
 mlir::LogicalResult pylir::Py::CallOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, getCalleeAttr()));
+    return verifyCall(symbolTable, *this, getCallOperands(), getCalleeAttr());
 }
 
 mlir::CallInterfaceCallable pylir::Py::CallOp::getCallableForCallee()
@@ -423,7 +448,7 @@ mlir::Operation::operand_range pylir::Py::FunctionCallOp::getArgOperands()
 
 mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return mlir::success(symbolTable.lookupNearestSymbolFrom<mlir::FuncOp>(*this, getCalleeAttr()));
+    return verifyCall(symbolTable, *this, getCallOperands(), getCalleeAttr());
 }
 
 mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeOp::getMutableSuccessorOperands(unsigned int index)
