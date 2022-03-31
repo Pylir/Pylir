@@ -880,7 +880,9 @@ def PylirPy_ReturnOp : PylirPy_Op<"return", [NoSideEffect, ReturnLike, Terminato
     build($_builder, $_state, llvm::None);
   }]>];
 
-  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+  let assemblyFormat = "$operands attr-dict (`:` type($operands)^)?";
+
+  let hasVerifier = 1;
 }
 
 def PylirPy_LandingPadOp : PylirPy_Op<"landingPad", [AlwaysBound]> {

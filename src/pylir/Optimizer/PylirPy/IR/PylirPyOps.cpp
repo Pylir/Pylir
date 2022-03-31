@@ -865,6 +865,28 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
     return mlir::success();
 }
 
+mlir::LogicalResult pylir::Py::ReturnOp::verify()
+{
+    auto parent = mlir::dyn_cast_or_null<mlir::FunctionOpInterface>((*this)->getParentOp());
+    if (!parent)
+    {
+        return (*this)->emitOpError("expected inside of a function op");
+    }
+    llvm::SmallVector<mlir::Type> operandTypes;
+    for (auto iter : operands())
+    {
+        operandTypes.push_back(iter.getType());
+    }
+    auto resultTypes = parent.getResultTypes();
+    if (!std::equal(resultTypes.begin(), resultTypes.end(), operandTypes.begin(), operandTypes.end(),
+                    &objectTypesCompatible))
+    {
+        return (*this)->emitOpError("operands are not compatible with enclosed function '")
+               << parent.getName() << "'s return types";
+    }
+    return mlir::success();
+}
+
 mlir::LogicalResult pylir::Py::LandingPadOp::verify()
 {
     if (!mlir::isa<pylir::Py::BranchOp>((*this)->getBlock()->getTerminator()))
