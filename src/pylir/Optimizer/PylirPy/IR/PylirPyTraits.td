@@ -10,10 +10,6 @@ def NoCapture : NativeOpTrait<"NoCapture"> {
     let cppNamespace = "pylir::Py";
 }
 
-class RuntimeType<string name> : NativeOpTrait<name # "RuntimeType"> {
-    let cppNamespace = "pylir::Py";
-}
-
 def ExceptionHandling : NativeOpTrait<"ExceptionHandling"> {
     let cppNamespace = "pylir::Py";
 }
