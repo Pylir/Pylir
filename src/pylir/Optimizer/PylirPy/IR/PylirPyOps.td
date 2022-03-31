@@ -939,6 +939,8 @@ def PylirPy_CondBranchOp : PylirPy_Op<"cond_br",
                 falseOperands);
 	}]>];
 
+	let hasCanonicalizer = 1;
+
     let assemblyFormat = "$condition `,` $true_branch ( `(` $true_args^ `:` type($true_args) `)` )? `,` $false_branch ( `(` $false_args^ `:` type($false_args) `)` )? attr-dict";
 }
 

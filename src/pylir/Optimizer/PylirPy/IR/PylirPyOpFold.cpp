@@ -203,6 +203,24 @@ struct NoopBranchRemove : mlir::OpRewritePattern<pylir::Py::BranchOp>
     }
 };
 
+struct ConstantBranchRemove : mlir::OpRewritePattern<pylir::Py::CondBranchOp>
+{
+    using mlir::OpRewritePattern<pylir::Py::CondBranchOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::CondBranchOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        mlir::BoolAttr condition;
+        if (!mlir::matchPattern(op.getCondition(), mlir::m_Constant(&condition)))
+        {
+            return mlir::failure();
+        }
+        rewriter.replaceOpWithNewOp<pylir::Py::BranchOp>(
+            op, condition.getValue() ? op.getTrueBranch() : op.getFalseBranch(),
+            condition.getValue() ? op.getTrueArgs() : op.getFalseArgs());
+        return mlir::success();
+    }
+};
+
 } // namespace
 
 void pylir::Py::MakeTupleOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
@@ -252,6 +270,12 @@ void pylir::Py::MakeDictExOp::getCanonicalizationPatterns(::mlir::RewritePattern
 void pylir::Py::BranchOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results, ::mlir::MLIRContext* context)
 {
     results.insert<NoopBranchRemove>(context);
+}
+
+void pylir::Py::CondBranchOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
+                                                          ::mlir::MLIRContext* context)
+{
+    results.insert<ConstantBranchRemove>(context);
 }
 
 mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
