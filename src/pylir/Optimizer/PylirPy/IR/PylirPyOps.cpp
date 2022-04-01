@@ -907,7 +907,7 @@ mlir::LogicalResult pylir::Py::ReturnOp::verify()
                     &objectTypesCompatible))
     {
         return (*this)->emitOpError("operands are not compatible with enclosed function '")
-               << parent.getName() << "'s return types";
+               << mlir::FlatSymbolRefAttr::get(parent) << "'s return types";
     }
     return mlir::success();
 }
