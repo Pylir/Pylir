@@ -1732,6 +1732,51 @@ struct TupleLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Tupl
     }
 };
 
+struct TupleContainsOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TupleContainsOp>
+{
+    using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::TupleContainsOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto* block = op->getBlock();
+        auto* endBlock = rewriter.splitBlock(block, mlir::Block::iterator{op});
+        endBlock->addArgument(rewriter.getI1Type(), op.getLoc());
+        rewriter.setInsertionPointToEnd(block);
+
+        auto tupleModel = pyTupleModel(op.getLoc(), rewriter, adaptor.getTuple());
+        auto size = tupleModel.sizePtr(op.getLoc()).load(op.getLoc());
+        auto zero = createIndexConstant(rewriter, op.getLoc(), 0);
+
+        auto* conditionBlock = new mlir::Block;
+        conditionBlock->addArgument(getIndexType(), op.getLoc());
+        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), zero, conditionBlock);
+
+        conditionBlock->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(conditionBlock);
+        auto cmp = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::ne,
+                                                       conditionBlock->getArgument(0), size);
+        auto* body = new mlir::Block;
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), cmp, body, endBlock, mlir::ValueRange{cmp});
+
+        body->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(body);
+        auto element = mlir::Value{
+            tupleModel.trailingPtr(op.getLoc()).at(op.getLoc(), conditionBlock->getArgument(0)).load(op.getLoc())};
+        auto isElement = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, element,
+                                                             adaptor.getElement());
+        auto one = createIndexConstant(rewriter, op.getLoc(), 1);
+        mlir::Value incremented = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), conditionBlock->getArgument(0), one);
+        mlir::Value trueV =
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(true));
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), isElement, endBlock, trueV, conditionBlock, incremented);
+
+        rewriter.setInsertionPointToStart(endBlock);
+        rewriter.replaceOp(op, endBlock->getArgument(0));
+        return mlir::success();
+    }
+};
+
 struct ListLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListLenOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::ListLenOp>::ConvertPylirOpToLLVMPattern;
@@ -3096,6 +3141,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<CondBranchOpConversion>(converter);
     patternSet.insert<UnreachableOpConversion>(converter);
     patternSet.insert<TypeMROOpConversion>(converter);
+    patternSet.insert<TupleContainsOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

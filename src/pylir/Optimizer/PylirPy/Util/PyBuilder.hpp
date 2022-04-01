@@ -305,9 +305,9 @@ public:
         return create<Py::MROLookupOp>(getUnknownType(), getI1Type(), mroTuple, attribute);
     }
 
-    Py::LinearContainsOp createLinearContains(mlir::Value mroTuple, mlir::Value element)
+    Py::TupleContainsOp createTupleContains(mlir::Value tuple, mlir::Value element)
     {
-        return create<Py::LinearContainsOp>(mroTuple, element);
+        return create<Py::TupleContainsOp>(tuple, element);
     }
 
     Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<Py::IterArg> args = {})

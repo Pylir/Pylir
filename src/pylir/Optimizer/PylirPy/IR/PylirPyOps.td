@@ -239,6 +239,22 @@ def PylirPy_TuplePopFrontOp : PylirPy_Op<"tuple.popFront", [NoSideEffect, Always
     let hasCanonicalizeMethod = 1;
 }
 
+def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$tuple, DynamicType:$element);
+    let results = (outs I1:$success);
+
+    let assemblyFormat = "$element `in` $tuple attr-dict `:` type(operands)";
+
+    let description = [{
+        This op does a linear search through the given tuple, checking whether `$element` is contained within. Equality
+        is determined via identity comparison.
+        If it is `$success` returns `true`, `false` otherwise. This is used to check whether a type is a subclass
+        of another. If `$tuple` is not really a tuple (or subclass of) the behaviour is undefined.
+    }];
+
+    let hasFolder = 1;
+}
+
 // List ops
 
 def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
@@ -497,21 +513,6 @@ def PylirPy_CallMethodOp : PylirPy_Op<"callMethod"> {
 }
 
 def PylirPy_CallMethodExOp : AddExceptionHandling<PylirPy_CallMethodOp>;
-
-def PylirPy_LinearContainsOp : PylirPy_Op<"linearContains", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$mro_tuple, DynamicType:$element);
-    let results = (outs I1:$success);
-
-    let assemblyFormat = "$element `in` $mro_tuple attr-dict `:` type(operands)";
-
-    let description = [{
-        This op does a linear search through the given tuple, checking whether `$element` is contained within.
-        If it is `$success` returns `true`, `false` otherwise. This is used to check whether a type is a subclass
-        of another. If `$mro_tuple` is not really a tuple (or subclass of) the behaviour is undefined.
-    }];
-
-    let hasFolder = 1;
-}
 
 // Make ops
 

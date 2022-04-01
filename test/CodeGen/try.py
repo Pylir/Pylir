@@ -36,7 +36,7 @@ def bar(param):
 # subclass of BaseException check...
 # CHECK: %[[EXCEPTION_TYPE:.*]] = py.typeOf %[[EXCEPTION]]
 # CHECK: %[[MRO:.*]] = py.type.mro %[[EXCEPTION_TYPE]]
-# CHECK: %[[IS_SUBCLASS:.*]] = py.linearContains %[[MATCHING]] in %[[MRO]]
+# CHECK: %[[IS_SUBCLASS:.*]] = py.tuple.contains %[[MATCHING]] in %[[MRO]]
 # CHECK: cond_br %[[IS_SUBCLASS]], ^[[SUITE_BLOCK:.*]], ^[[SKIP_BLOCK:[[:alnum:]]+]]
 
 # skipping tuple case for now

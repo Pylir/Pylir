@@ -2589,7 +2589,7 @@ mlir::Value pylir::CodeGen::makeDict(const std::vector<Py::DictArg>& args)
 mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Value type, mlir::Value base)
 {
     auto mro = m_builder.createTypeMRO(type);
-    return m_builder.createLinearContains(mro, base);
+    return m_builder.createTupleContains(mro, base);
 }
 
 void pylir::CodeGen::buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,

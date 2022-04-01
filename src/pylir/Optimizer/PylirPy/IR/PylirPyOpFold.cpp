@@ -737,9 +737,9 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
     return mlir::success();
 }
 
-mlir::OpFoldResult pylir::Py::LinearContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto tupleOperands = resolveTupleOperands(*this, getMroTuple());
+    auto tupleOperands = resolveTupleOperands(*this, getTuple());
     bool hadWildcard = false;
     for (auto& op : tupleOperands)
     {
