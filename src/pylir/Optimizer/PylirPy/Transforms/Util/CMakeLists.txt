@@ -1,0 +1,3 @@
+
+add_library(PylirPyTransformsUtil InlinerUtil.cpp)
+target_link_libraries(PylirPyTransformsUtil PRIVATE MLIRTransforms PylirPyDialect)

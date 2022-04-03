@@ -15,3 +15,5 @@ target_link_libraries(PylirPyTransforms
         MLIRTransforms
         )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)
+
+add_subdirectory(Util)

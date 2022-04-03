@@ -7,6 +7,11 @@
 
 #include <memory>
 
+namespace pylir::Py
+{
+class PylirPyDialect;
+}
+
 namespace
 {
 #define GEN_PASS_CLASSES

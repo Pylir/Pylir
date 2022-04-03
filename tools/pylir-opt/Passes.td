@@ -9,4 +9,9 @@ def TestMemorySSA : Pass<"test-memory-ssa","::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::MemSSA::MemorySSADialect"];
 }
 
+def TestInlinerInterface : Pass<"test-inliner-interface", "::mlir::ModuleOp"> {
+	let constructor = "::createTestInlinerInterface()";
+	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+}
+
 #endif
