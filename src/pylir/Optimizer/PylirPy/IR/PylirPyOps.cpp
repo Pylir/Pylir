@@ -56,6 +56,67 @@ mlir::Operation* cloneWithoutExceptionHandlingImpl(mlir::OpBuilder& builder, T e
 
 } // namespace
 
+namespace pylir::Py::details
+{
+mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::Operation* operation,
+                                                const mlir::OperationName& invokeVersion, ::mlir::Block* happyPath,
+                                                mlir::Block* exceptionPath, mlir::ValueRange unwindOperands,
+                                                llvm::StringRef attrSizedSegmentName, llvm::ArrayRef<int> shape)
+{
+    mlir::OperationState state(operation->getLoc(), invokeVersion);
+    state.addTypes(operation->getResultTypes());
+    state.addSuccessors(happyPath);
+    state.addSuccessors(exceptionPath);
+    auto vector = llvm::to_vector(operation->getOperands());
+    vector.insert(vector.end(), unwindOperands.begin(), unwindOperands.end());
+    state.addOperands(vector);
+    llvm::SmallVector<mlir::NamedAttribute> attributes;
+    for (auto& iter : operation->getAttrs())
+    {
+        attributes.push_back(iter);
+        if (iter.getName() == attrSizedSegmentName)
+        {
+            llvm::SmallVector<std::int32_t> sizes;
+            for (auto integer : iter.getValue().template cast<mlir::DenseIntElementsAttr>())
+            {
+                sizes.push_back(integer.getZExtValue());
+            }
+            sizes.push_back(0);
+            sizes.push_back(unwindOperands.size());
+            attributes.back().setValue(builder.getI32VectorAttr(sizes));
+        }
+    }
+    if (!operation->hasTrait<mlir::OpTrait::AttrSizedOperandSegments>())
+    {
+        auto numOperands = operation->getNumOperands();
+        llvm::SmallVector<std::int32_t> values;
+        while (!shape.empty() && shape.front() > 0)
+        {
+            numOperands -= shape.front();
+            values.push_back(shape.front());
+            shape = shape.drop_front();
+        }
+        auto index = values.size();
+        while (!shape.empty() && shape.back() > 0)
+        {
+            numOperands -= shape.back();
+            values.insert(values.begin() + index, shape.back());
+            shape = shape.drop_back();
+        }
+        PYLIR_ASSERT(shape.size() <= 1);
+        if (shape.size() == 1)
+        {
+            values.insert(values.begin() + index, numOperands);
+        }
+        values.push_back(0);
+        values.push_back(unwindOperands.size());
+        attributes.emplace_back(builder.getStringAttr(attrSizedSegmentName), builder.getI32VectorAttr(values));
+    }
+    state.addAttributes(attributes);
+    return builder.createOperation(state);
+}
+} // namespace pylir::Py::details
+
 bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
 {
     return static_cast<mlir::OperandRange>(getTypeObjectMutable()).getBeginOperandIndex() != index;

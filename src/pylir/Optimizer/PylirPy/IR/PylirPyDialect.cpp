@@ -70,7 +70,16 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
 
         for (auto& iter : inlinedBlocks)
         {
-            //TODO: turn calls into invoke ops
+            for (auto op : llvm::make_early_inc_range(iter.getOps<pylir::Py::AddableExceptionHandlingInterface>()))
+            {
+                auto* block = op->getBlock();
+                auto* successBlock = block->splitBlock(mlir::Block::iterator{op});
+                auto builder = mlir::OpBuilder::atBlockEnd(block);
+                auto* newOp = op.cloneWithExceptionHandling(builder, successBlock, invoke.getExceptionPath(),
+                                                            invoke.getUnwindDestOperands());
+                op->replaceAllUsesWith(newOp);
+                op.erase();
+            }
             auto raise = mlir::dyn_cast<pylir::Py::RaiseOp>(iter.getTerminator());
             if (!raise)
             {

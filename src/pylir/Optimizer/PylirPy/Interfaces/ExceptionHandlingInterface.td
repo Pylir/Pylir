@@ -15,4 +15,14 @@ def ExceptionHandlingInterface : OpInterface<"ExceptionHandlingInterface"> {
     ];
 }
 
+def AddableExceptionHandlingInterface : OpInterface<"AddableExceptionHandlingInterface"> {
+    let cppNamespace = "::pylir::Py";
+
+    let methods = [
+        InterfaceMethod<[{}], "::mlir::Operation*", "cloneWithExceptionHandling",
+            (ins "::mlir::OpBuilder&":$builder, "::mlir::Block*":$happy_path, "::mlir::Block*":$exception_path,
+                 "::mlir::ValueRange":$unwind_operands)>,
+    ];
+}
+
 #endif

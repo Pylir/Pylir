@@ -18,9 +18,14 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 
 class PylirPy_Op<string mneomic, list<Trait> traits = []> : Op<PylirPy_Dialect, mneomic, traits>;
 
+class AddableExceptionHandling<string params> : ParamNativeOpTrait<"AddableExceptionHandling","::pylir::Py::" # params> {
+    let cppNamespace = "pylir::Py";
+}
+
 class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(opName), !strconcat(op.opName, "Ex"), opName),
-    !listconcat(op.traits, [Terminator, DeclareOpInterfaceMethods<BranchOpInterface, ["areTypesCompatible"]>,
-                            AttrSizedOperandSegments, DeclareOpInterfaceMethods<ExceptionHandlingInterface>])> {
+    !listconcat(!filter(x, op.traits, !not(!isa<AddableExceptionHandling>(x))),
+    [Terminator, DeclareOpInterfaceMethods<BranchOpInterface, ["areTypesCompatible"]>, AttrSizedOperandSegments,
+        DeclareOpInterfaceMethods<ExceptionHandlingInterface>])> {
 
     assert !eq(!size(op.successors), 0), "Op mustn't already have successors";
 
@@ -323,7 +328,8 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, DeclareOpIn
 
 // Function ops
 
-def PylirPy_FunctionCallOp : PylirPy_Op<"function.call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
+def PylirPy_FunctionCallOp : PylirPy_Op<"function.call", [DeclareOpInterfaceMethods<CallOpInterface>,
+														  AddableExceptionHandling<"FunctionInvokeOp, 1, -1">]> {
     let arguments = (ins DynamicType:$function, Variadic<DynamicType>:$call_operands);
     let results = (outs DynamicType:$result);
 
@@ -518,7 +524,7 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
     let hasFolder = 1;
 }
 
-def PylirPy_CallMethodOp : PylirPy_Op<"callMethod"> {
+def PylirPy_CallMethodOp : PylirPy_Op<"callMethod", [AddableExceptionHandling<"CallMethodExOp, 1, 1, 1">]> {
 
     let arguments = (ins DynamicType:$method, DynamicType:$args, DynamicType:$keywords);
     let results = (outs DynamicType:$result);
@@ -539,7 +545,8 @@ def PylirPy_CallMethodExOp : AddExceptionHandling<PylirPy_CallMethodOp>;
 // Make ops
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [AlwaysBound, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-													DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
+													DeclareOpInterfaceMethods<TypeRefineableInterface>,
+													AddableExceptionHandling<"MakeTupleExOp, -1">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iter_expansion
                          );
@@ -589,7 +596,8 @@ def PylirPy_MakeTupleExOp : AddExceptionHandling<PylirPy_MakeTupleOp> {
     let hasCanonicalizer = 1;
 }
 
-def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound]> {
+def PylirPy_MakeListOp : PylirPy_Op<"makeList",
+	[AlwaysBound, AddableExceptionHandling<"MakeListExOp, -1">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iter_expansion
                          );
@@ -623,7 +631,7 @@ def PylirPy_MakeListExOp : AddExceptionHandling<PylirPy_MakeListOp> {
     let hasCanonicalizer = 1;
 }
 
-def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound]> {
+def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHandling<"MakeSetExOp, -1">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iter_expansion
                          );
@@ -658,7 +666,8 @@ def PylirPy_MakeSetExOp : AddExceptionHandling<PylirPy_MakeSetOp> {
     let hasCanonicalizer = 1;
 }
 
-def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, AlwaysBound]> {
+def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, AlwaysBound,
+	AddableExceptionHandling<"MakeDictExOp">]> {
     let arguments = (ins
                         Variadic<DynamicType>:$keys,
                         Variadic<DynamicType>:$values,
@@ -869,7 +878,8 @@ class PylirPy_CallBase<string mnemonic,list<Trait> traits = []> : PylirPy_Op<mne
     let results = (outs Variadic<AnyType>:$results);
 }
 
-def PylirPy_CallOp : PylirPy_CallBase<"call", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_CallOp : PylirPy_CallBase<"call", [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+	AddableExceptionHandling<"InvokeOp, -1">]> {
     let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$call_operands);
 
     let assemblyFormat = [{

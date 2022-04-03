@@ -46,7 +46,9 @@ func @__init__() -> !py.unknown {
 // CHECK-NEXT: ^[[CONTINUE]]
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
 // CHECK-NEXT: test.use(%[[EX]])
-// CHECK-NEXT: %[[EX:.*]] = py.call @create_exception()
+// CHECK-NEXT: %[[EX:.*]] = py.invoke @create_exception()
+// CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[LANDINGPAD:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[SUCCESS]]
 // CHECK-NEXT: py.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
 // CHECK-NEXT: py.br ^[[HANDLER:.*]](
@@ -59,5 +61,9 @@ func @__init__() -> !py.unknown {
 // CHECK-NEXT: py.br ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[CONTINUE]]:
 // CHECK-NEXT: py.return %[[EX]]
-// CHECK: ^[[HANDLER]](%[[EX:[[:alnum:]]+]]: {{.*}}):
+// CHECK-NEXT: ^[[LANDINGPAD]]:
+// CHECK-NEXT: %[[EX:.*]] = py.landingPad
+// CHECK-NEXT: py.br ^[[HANDLER]]
+// CHECK-SAME: %[[EX]]
+// CHECK-NEXT: ^[[HANDLER]](%[[EX:[[:alnum:]]+]]: {{.*}}):
 // CHECK-NEXT: py.return %[[EX]]
