@@ -36,13 +36,5 @@ namespace details
 mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock);
 
 } // namespace details
-template <class ConcreteType>
-class ExceptionHandling : public mlir::OpTrait::TraitBase<ConcreteType, ExceptionHandling>
-{
-    static mlir::LogicalResult verifyTrait(mlir::Operation* operation)
-    {
-        return details::verifyHasLandingpad(operation, operation->getSuccessor(1));
-    }
-};
 
 } // namespace pylir::Py

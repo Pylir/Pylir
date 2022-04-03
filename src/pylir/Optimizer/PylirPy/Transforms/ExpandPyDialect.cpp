@@ -133,7 +133,7 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
 {
     using mlir::OpRewritePattern<TargetOp>::OpRewritePattern;
 
-    constexpr static bool hasExceptions = TargetOp::template hasTrait<pylir::Py::ExceptionHandling>();
+    constexpr static bool hasExceptions = TargetOp::template hasTrait<pylir::Py::ExceptionHandlingInterface::Trait>();
 
     void rewrite(TargetOp op, mlir::PatternRewriter& rewriter) const override
     {

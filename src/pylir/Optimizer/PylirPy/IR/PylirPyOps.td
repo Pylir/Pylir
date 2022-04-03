@@ -7,6 +7,7 @@ include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.td"
+include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 include "pylir/Optimizer/Interfaces/MemoryFoldInterface.td"
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -19,7 +20,7 @@ class PylirPy_Op<string mneomic, list<Trait> traits = []> : Op<PylirPy_Dialect, 
 
 class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(opName), !strconcat(op.opName, "Ex"), opName),
     !listconcat(op.traits, [Terminator, DeclareOpInterfaceMethods<BranchOpInterface, ["areTypesCompatible"]>,
-                            AttrSizedOperandSegments, ExceptionHandling])> {
+                            AttrSizedOperandSegments, DeclareOpInterfaceMethods<ExceptionHandlingInterface>])> {
 
     assert !eq(!size(op.successors), 0), "Op mustn't already have successors";
 
@@ -49,6 +50,11 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
                 return getNormalDestOperandsMutable();
             }
             return getUnwindDestOperandsMutable();
+        }
+
+        mlir::Operation* $cppClass::cloneWithoutExceptionHandling(::mlir::OpBuilder& builder)
+        {
+            return cloneWithoutExceptionHandlingImpl(builder, *this, "}] # op.opDialect.name # "." # op.opName #[{");
         }
     }];
 }

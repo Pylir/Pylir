@@ -13,6 +13,7 @@
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
 #include <variant>
@@ -48,7 +49,7 @@ namespace pylir::Py
 template <class Op>
 LandingPadOp getLandingPad(Op op)
 {
-    static_assert(Op::template hasTrait<ExceptionHandling>());
+    static_assert(Op::template hasTrait<ExceptionHandlingInterface::Trait>());
     return mlir::cast<LandingPadOp>(&op->getSuccessor(1)->front());
 }
 } // namespace pylir::Py
