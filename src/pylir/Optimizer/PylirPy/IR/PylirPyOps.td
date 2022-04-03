@@ -35,6 +35,22 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
     }]);
 
     let extraClassDeclaration = op.extraClassDeclaration;
+
+    let extraClassDefinition = [{
+        bool $cppClass::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
+        {
+            return objectTypesCompatible(lhs, rhs);
+        }
+
+        mlir::Optional<mlir::MutableOperandRange> $cppClass::getMutableSuccessorOperands(unsigned int index)
+        {
+            if (index == 0)
+            {
+                return getNormalDestOperandsMutable();
+            }
+            return getUnwindDestOperandsMutable();
+        }
+    }];
 }
 
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect,

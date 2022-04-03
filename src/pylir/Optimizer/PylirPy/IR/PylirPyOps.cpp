@@ -28,20 +28,6 @@ bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
     return static_cast<mlir::OperandRange>(getTypeObjectMutable()).getBeginOperandIndex() != index;
 }
 
-bool pylir::Py::CallMethodExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
-}
-
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::CallMethodExOp::getMutableSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return getNormalDestOperandsMutable();
-    }
-    return getUnwindDestOperandsMutable();
-}
-
 namespace
 {
 bool parseIterArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
@@ -451,20 +437,6 @@ mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCol
     return verifyCall(symbolTable, *this, getCallOperands(), getCalleeAttr());
 }
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::InvokeOp::getMutableSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return getNormalDestOperandsMutable();
-    }
-    return getUnwindDestOperandsMutable();
-}
-
-bool pylir::Py::InvokeOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
-}
-
 mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
 {
     return getCalleeAttr();
@@ -475,20 +447,6 @@ mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
     return getCallOperands();
 }
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::FunctionInvokeOp::getMutableSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return getNormalDestOperandsMutable();
-    }
-    return getUnwindDestOperandsMutable();
-}
-
-bool pylir::Py::FunctionInvokeOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
-}
-
 mlir::CallInterfaceCallable pylir::Py::FunctionInvokeOp::getCallableForCallee()
 {
     return getFunction();
@@ -497,20 +455,6 @@ mlir::CallInterfaceCallable pylir::Py::FunctionInvokeOp::getCallableForCallee()
 mlir::Operation::operand_range pylir::Py::FunctionInvokeOp::getArgOperands()
 {
     return getCallOperands();
-}
-
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeTupleExOp::getMutableSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return getNormalDestOperandsMutable();
-    }
-    return getUnwindDestOperandsMutable();
-}
-
-bool pylir::Py::MakeTupleExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
 }
 
 void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -534,20 +478,6 @@ void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
           unwindDestOperands, happyPath, unwindPath);
 }
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeListExOp::getMutableSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return getNormalDestOperandsMutable();
-    }
-    return getUnwindDestOperandsMutable();
-}
-
-bool pylir::Py::MakeListExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
-}
-
 void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                     llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
@@ -569,20 +499,6 @@ void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
           unwindDestOperands, happyPath, unwindPath);
 }
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeSetExOp::getMutableSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return getNormalDestOperandsMutable();
-    }
-    return getUnwindDestOperandsMutable();
-}
-
-bool pylir::Py::MakeSetExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
-}
-
 void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                    llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
                                    mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
@@ -602,20 +518,6 @@ void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
     }
     build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
-}
-
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::MakeDictExOp::getMutableSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return getNormalDestOperandsMutable();
-    }
-    return getUnwindDestOperandsMutable();
-}
-
-bool pylir::Py::MakeDictExOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
 }
 
 void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
