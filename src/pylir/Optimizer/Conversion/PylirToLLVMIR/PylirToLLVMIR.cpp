@@ -2486,57 +2486,47 @@ struct ReturnOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Return
     }
 };
 
-struct InvokeOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::InvokeOp>
+template <class T>
+struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::InvokeOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<T>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::InvokeOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(T op, typename T::Adaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         llvm::SmallVector<mlir::Type> resultTypes;
-        [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
+        [[maybe_unused]] auto result = this->typeConverter->convertTypes(op->getResultTypes(), resultTypes);
         PYLIR_ASSERT(mlir::succeeded(result));
-        rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(
-            op, resultTypes, adaptor.getCalleeAttr(), adaptor.getCallOperands(), op.getHappyPath(),
-            adaptor.getNormalDestOperands(), op.getExceptionPath(), adaptor.getUnwindDestOperands());
-        return mlir::success();
-    }
-};
+        auto ip = rewriter.saveInsertionPoint();
+        auto* endBlock =
+            rewriter.createBlock(op->getParentRegion(), mlir::Region::iterator{op->getBlock()->getNextNode()});
+        rewriter.restoreInsertionPoint(ip);
+        if constexpr (std::is_same_v<T, pylir::Py::InvokeOp>)
+        {
+            rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(
+                op, resultTypes, adaptor.getCalleeAttr(), adaptor.getCallOperands(), op.getHappyPath(),
+                adaptor.getNormalDestOperands(), endBlock, mlir::ValueRange{});
+        }
+        else
+        {
+            auto callee = this->pyFunctionModel(op.getLoc(), rewriter, adaptor.getFunction())
+                              .funcPtr(op.getLoc())
+                              .load(op.getLoc());
+            llvm::SmallVector<mlir::Value> operands{callee};
+            operands.append(adaptor.getCallOperands().begin(), adaptor.getCallOperands().end());
+            rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(op, resultTypes, operands, op.getHappyPath(),
+                                                              adaptor.getNormalDestOperands(), endBlock,
+                                                              mlir::ValueRange{});
+        }
 
-struct FunctionInvokeOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FunctionInvokeOp>
-{
-    using ConvertPylirOpToLLVMPattern<pylir::Py::FunctionInvokeOp>::ConvertPylirOpToLLVMPattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::FunctionInvokeOp op, OpAdaptor adaptor,
-                                        mlir::ConversionPatternRewriter& rewriter) const override
-    {
-        llvm::SmallVector<mlir::Type> resultTypes;
-        [[maybe_unused]] auto result = typeConverter->convertTypes(op->getResultTypes(), resultTypes);
-        PYLIR_ASSERT(mlir::succeeded(result));
-        auto callee =
-            pyFunctionModel(op.getLoc(), rewriter, adaptor.getFunction()).funcPtr(op.getLoc()).load(op.getLoc());
-        llvm::SmallVector<mlir::Value> operands{callee};
-        operands.append(adaptor.getCallOperands().begin(), adaptor.getCallOperands().end());
-        rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(op, resultTypes, operands, op.getHappyPath(),
-                                                          adaptor.getNormalDestOperands(), op.getExceptionPath(),
-                                                          adaptor.getUnwindDestOperands());
-
-        return mlir::success();
-    }
-};
-
-struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::LandingPadOp>
-{
-    using ConvertPylirOpToLLVMPattern<pylir::Py::LandingPadOp>::ConvertPylirOpToLLVMPattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::LandingPadOp op, OpAdaptor adaptor,
-                                        mlir::ConversionPatternRewriter& rewriter) const override
-    {
+        rewriter.setInsertionPointToStart(endBlock);
         mlir::Value catchType;
         {
             mlir::OpBuilder::InsertionGuard guard{rewriter};
             rewriter.setInsertionPointToStart(&op->getParentRegion()->front());
-            mlir::Value address = getConstant(op.getLoc(), adaptor.getCatchTypeAttr(), rewriter);
+            mlir::Value address = this->getConstant(
+                op.getLoc(), mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::BaseException.name),
+                rewriter);
             while (auto cast = address.getDefiningOp<mlir::LLVM::BitcastOp>())
             {
                 address = cast.getArg().getDefiningOp<mlir::LLVM::AddressOfOp>();
@@ -2548,31 +2538,34 @@ struct LandingPadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::La
         // We use a integer of pointer width instead of a pointer to keep it opaque to statepoint passes.
         // Those do not support aggregates in aggregates.
         auto literal = mlir::LLVM::LLVMStructType::getLiteral(
-            getContext(), {getIntPtrType(REF_ADDRESS_SPACE), rewriter.getI32Type()});
+            this->getContext(), {this->getIntPtrType(REF_ADDRESS_SPACE), rewriter.getI32Type()});
         auto landingPad = rewriter.create<mlir::LLVM::LandingpadOp>(op.getLoc(), literal, catchType);
         mlir::Value exceptionHeader = rewriter.create<mlir::LLVM::ExtractValueOp>(
             op.getLoc(), literal.getBody()[0], landingPad, rewriter.getI32ArrayAttr({0}));
         {
             // Itanium ABI mandates a pointer to the exception header be returned by the landing pad.
             // So we need to subtract the offset of the exception header inside of PyBaseException to get to it.
-            auto pyBaseException = getPyBaseExceptionType();
-            auto unwindHeader = getUnwindHeaderType();
+            auto pyBaseException = this->getPyBaseExceptionType();
+            auto unwindHeader = this->getUnwindHeaderType();
             std::size_t offsetOf = 0;
             for (const auto& iter : pyBaseException.getBody())
             {
-                offsetOf = llvm::alignTo(offsetOf, alignOf(iter));
+                offsetOf = llvm::alignTo(offsetOf, this->alignOf(iter));
                 if (iter == unwindHeader)
                 {
                     break;
                 }
-                offsetOf += sizeOf(iter);
+                offsetOf += this->sizeOf(iter);
             }
             auto byteOffset = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), exceptionHeader.getType(),
                                                                       rewriter.getI64IntegerAttr(offsetOf));
             exceptionHeader = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), exceptionHeader, byteOffset);
         }
-        rewriter.replaceOpWithNewOp<mlir::LLVM::IntToPtrOp>(op, pointer(getPyObjectType(), REF_ADDRESS_SPACE),
-                                                            exceptionHeader);
+        auto exceptionObject = rewriter.create<mlir::LLVM::IntToPtrOp>(
+            op.getLoc(), this->pointer(this->getPyObjectType(), REF_ADDRESS_SPACE), exceptionHeader);
+        auto ops = llvm::to_vector(op.getUnwindDestOperands());
+        ops.insert(ops.begin(), exceptionObject);
+        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), ops, op.getExceptionPath());
         return mlir::success();
     }
 };
@@ -3125,12 +3118,11 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitStrOpConversion>(converter);
     patternSet.insert<PrintOpConversion>(converter);
     patternSet.insert<InitStrFromIntOpConversion>(converter);
-    patternSet.insert<InvokeOpConversion>(converter);
-    patternSet.insert<FunctionInvokeOpConversion>(converter);
+    patternSet.insert<InvokeOpsConversion<pylir::Py::InvokeOp>>(converter);
+    patternSet.insert<InvokeOpsConversion<pylir::Py::FunctionInvokeOp>>(converter);
     patternSet.insert<CallOpConversion>(converter);
     patternSet.insert<FunctionCallOpConversion>(converter);
     patternSet.insert<ReturnOpConversion>(converter);
-    patternSet.insert<LandingPadOpConversion>(converter);
     patternSet.insert<BoolToI1OpConversion>(converter);
     patternSet.insert<InitTuplePrependOpConversion>(converter);
     patternSet.insert<InitTuplePopFrontOpConversion>(converter);

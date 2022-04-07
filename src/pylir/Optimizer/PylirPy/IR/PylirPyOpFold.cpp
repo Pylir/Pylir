@@ -167,8 +167,7 @@ struct NoopBranchRemove : mlir::OpRewritePattern<pylir::Py::BranchOp>
 
     mlir::LogicalResult matchAndRewrite(pylir::Py::BranchOp op, mlir::PatternRewriter& rewriter) const override
     {
-        if (mlir::isa<pylir::Py::LandingPadOp>(op->getBlock()->front())
-            || op.getSuccessor()->getSinglePredecessor() != op->getBlock())
+        if (op.getSuccessor()->getSinglePredecessor() != op->getBlock())
         {
             return mlir::failure();
         }

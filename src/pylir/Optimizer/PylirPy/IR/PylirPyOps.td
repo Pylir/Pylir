@@ -54,7 +54,7 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
             {
                 return getNormalDestOperandsMutable();
             }
-            return getUnwindDestOperandsMutable();
+            return llvm::None;
         }
 
         mlir::Operation* $cppClass::cloneWithoutExceptionHandling(::mlir::OpBuilder& builder)
@@ -916,24 +916,6 @@ def PylirPy_ReturnOp : PylirPy_Op<"return", [NoSideEffect, ReturnLike, Terminato
   let assemblyFormat = "$operands attr-dict (`:` type($operands)^)?";
 
   let hasVerifier = 1;
-}
-
-def PylirPy_LandingPadOp : PylirPy_Op<"landingPad", [AlwaysBound]> {
-    let arguments = (ins FlatSymbolRefAttr:$catch_type);
-    let results = (outs DynamicType:$result);
-
-    let hasVerifier = 1;
-
-    let assemblyFormat = "$catch_type attr-dict `:` type($result)";
-
-    let extraClassDeclaration = [{
-        mlir::Block* getHandler()
-        {
-            return (*this)->getBlock()->getSuccessor(0);
-        }
-
-        pylir::Py::BranchOp getBranchOp();
-    }];
 }
 
 def PylirPy_BranchOp : PylirPy_Op<"br",

@@ -13,11 +13,7 @@ func @make_tuple_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     return %2 : !py.unknown
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -41,11 +37,7 @@ func @make_tuple_ex_op(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     return %2 : !py.unknown
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -69,11 +61,7 @@ func @make_list_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     py.return %2 : !py.class<@builtins.list>
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -97,11 +85,7 @@ func @make_list_ex_op(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     py.return %2 : !py.class<@builtins.list>
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -125,11 +109,7 @@ func @make_set_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     py.return %2 : !py.class<@builtins.set>
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -153,11 +133,7 @@ func @make_set_ex_op(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     py.return %2 : !py.class<@builtins.set>
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -180,11 +156,7 @@ func @make_dict_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     py.return %2 : !py.class<@builtins.dict>
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -207,11 +179,7 @@ func @make_dict_ex_op(%arg0 : !py.unknown) -> !py.unknown {
 ^happy:
     py.return %2 : !py.class<@builtins.dict>
 
-^failure:
-    %3 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb3(%3 : !py.unknown)
-
-^bb3(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 

@@ -21,14 +21,10 @@ func @__init__() -> !py.unknown {
 	%1 = py.call @inline_foo(%0) : (i1) -> !py.unknown
 	test.use(%1) : !py.unknown
 	%2 = py.invoke @inline_foo(%0) : (i1) -> !py.unknown
-		label ^continue unwind ^failure
+		label ^continue unwind ^retException
 
 ^continue:
 	py.return %2 : !py.unknown
-
-^failure:
-	%3 = py.landingPad @builtins.BaseException : !py.unknown
-	py.br ^retException(%3 : !py.unknown)
 
 ^retException(%e : !py.unknown):
 	py.return %e : !py.unknown
@@ -47,7 +43,7 @@ func @__init__() -> !py.unknown {
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
 // CHECK-NEXT: test.use(%[[EX]])
 // CHECK-NEXT: %[[EX:.*]] = py.invoke @create_exception()
-// CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[LANDINGPAD:[[:alnum:]]+]]
+// CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[HANDLER:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[SUCCESS]]
 // CHECK-NEXT: py.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
@@ -61,9 +57,5 @@ func @__init__() -> !py.unknown {
 // CHECK-NEXT: py.br ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[CONTINUE]]:
 // CHECK-NEXT: py.return %[[EX]]
-// CHECK-NEXT: ^[[LANDINGPAD]]:
-// CHECK-NEXT: %[[EX:.*]] = py.landingPad
-// CHECK-NEXT: py.br ^[[HANDLER]]
-// CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[HANDLER]](%[[EX:[[:alnum:]]+]]: {{.*}}):
 // CHECK-NEXT: py.return %[[EX]]

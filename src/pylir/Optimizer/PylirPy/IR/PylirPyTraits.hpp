@@ -31,10 +31,4 @@ public:
     }
 };
 
-namespace details
-{
-mlir::LogicalResult verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock);
-
-} // namespace details
-
 } // namespace pylir::Py

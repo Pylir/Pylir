@@ -66,7 +66,7 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
         {
             return;
         }
-        auto handler = invoke.getExceptionPath()->getSuccessor(0);
+        auto* handler = invoke.getExceptionPath();
 
         for (auto& iter : inlinedBlocks)
         {
@@ -86,9 +86,9 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
                 continue;
             }
             mlir::OpBuilder builder(raise);
-            // TODO: This has horrible consequences and will not always work. I'll have to rethinking my modelling of
-            //       InvokeOp
-            builder.create<pylir::Py::BranchOp>(raise.getLoc(), handler, raise.getException());
+            auto ops = llvm::to_vector(invoke.getUnwindDestOperands());
+            ops.insert(ops.begin(), raise.getException());
+            builder.create<pylir::Py::BranchOp>(raise.getLoc(), handler, ops);
             raise.erase();
         }
     }

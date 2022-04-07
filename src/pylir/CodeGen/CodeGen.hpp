@@ -52,13 +52,11 @@ class CodeGen
     } m_currentLoop{nullptr, nullptr};
 
     mlir::Block* m_currentExceptBlock = nullptr;
-    mlir::Block* m_currentLandingPadBlock = nullptr;
     struct FinallyBlocks
     {
         const Syntax::TryStmt::Finally* PYLIR_NON_NULL finallySuite;
         Loop parentLoop;
         mlir::Block* parentExceptBlock;
-        mlir::Block* parentLandingPadBlock;
     };
     std::vector<FinallyBlocks> m_finallyBlocks;
 
@@ -166,8 +164,6 @@ class CodeGen
             return lhs.get() == rhs;
         }
     };
-
-    BlockPtr createLandingPadBlock(mlir::Block* exceptionHandlerBlock, mlir::FlatSymbolRefAttr typeToCatch = {});
 
     mlir::Value toI1(mlir::Value value);
 
@@ -291,10 +287,9 @@ class CodeGen
         auto tuple =
             std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
                             pylir::valueResetMany(m_currentFunc, m_currentRegion, m_currentLoop, m_currentExceptBlock,
-                                                  m_currentLandingPadBlock, std::move(m_functionScope), m_qualifiers));
+                                                  std::move(m_functionScope), m_qualifiers));
         m_currentLoop = {nullptr, nullptr};
         m_currentExceptBlock = nullptr;
-        m_currentLandingPadBlock = nullptr;
         m_currentFunc = funcOp;
         m_currentRegion = &m_currentFunc.getBody();
         m_module.push_back(m_currentFunc);

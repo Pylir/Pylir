@@ -133,16 +133,13 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
 {
     using mlir::OpRewritePattern<TargetOp>::OpRewritePattern;
 
-    constexpr static bool hasExceptions = TargetOp::template hasTrait<pylir::Py::ExceptionHandlingInterface::Trait>();
-
     void rewrite(TargetOp op, mlir::PatternRewriter& rewriter) const override
     {
-        mlir::Block* landingPadBlock = nullptr;
         mlir::Block* exceptionHandlerBlock = nullptr;
-        if constexpr (hasExceptions)
+        auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*op);
+        if (exceptionHandler)
         {
-            landingPadBlock = op.getExceptionPath();
-            exceptionHandlerBlock = pylir::Py::getLandingPad(op).getHandler();
+            exceptionHandlerBlock = exceptionHandler.getExceptionPath();
         }
         auto block = op->getBlock();
         auto dest = block->splitBlock(op);
@@ -161,8 +158,8 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
                 continue;
             }
             begin++;
-            auto iterObject = pylir::Py::buildSpecialMethodCall(loc, rewriter, "__iter__", {iter.value()}, {},
-                                                                exceptionHandlerBlock, landingPadBlock);
+            auto iterObject =
+                pylir::Py::buildSpecialMethodCall(loc, rewriter, "__iter__", {iter.value()}, {}, exceptionHandlerBlock);
             auto* condition = new mlir::Block;
             rewriter.create<pylir::Py::BranchOp>(loc, condition);
 
@@ -170,35 +167,45 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             rewriter.setInsertionPointToStart(condition);
             auto* stopIterationHandler = new mlir::Block;
             stopIterationHandler->addArgument(rewriter.getType<pylir::Py::UnknownType>(), loc);
-            auto* landingPad = new mlir::Block;
-            auto next = pylir::Py::buildSpecialMethodCall(loc, rewriter, "__next__", iterObject, {},
-                                                          exceptionHandlerBlock, landingPad);
+            auto next =
+                pylir::Py::buildSpecialMethodCall(loc, rewriter, "__next__", iterObject, {}, stopIterationHandler);
 
             rewriter.create<InsertOp>(loc, list, next);
             rewriter.create<pylir::Py::BranchOp>(loc, condition);
 
-            landingPad->insertBefore(dest);
-            rewriter.setInsertionPointToStart(landingPad);
-            mlir::Value exceptionObject = rewriter.create<pylir::Py::LandingPadOp>(
-                loc, rewriter.getType<pylir::Py::UnknownType>(),
-                mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
-            rewriter.create<pylir::Py::BranchOp>(loc, exceptionObject, stopIterationHandler);
             stopIterationHandler->insertBefore(dest);
             rewriter.setInsertionPointToStart(stopIterationHandler);
+            auto stopIterationType = rewriter.create<pylir::Py::ConstantOp>(
+                loc, rewriter.getType<pylir::Py::UnknownType>(),
+                mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
+            auto typeOf = rewriter.create<pylir::Py::TypeOfOp>(loc, rewriter.getType<pylir::Py::UnknownType>(),
+                                                               stopIterationHandler->getArgument(0));
+            auto isStopIteration = rewriter.create<pylir::Py::IsOp>(loc, stopIterationType, typeOf);
+            auto* continueBlock = new mlir::Block;
+            auto* reraiseBlock = new mlir::Block;
+            rewriter.create<pylir::Py::CondBranchOp>(loc, isStopIteration, continueBlock, reraiseBlock);
+
+            reraiseBlock->insertBefore(dest);
+            rewriter.setInsertionPointToStart(reraiseBlock);
+            rewriter.create<pylir::Py::RaiseOp>(loc, stopIterationHandler->getArgument(0));
+
+            continueBlock->insertBefore(dest);
+            rewriter.setInsertionPointToStart(continueBlock);
         }
         rewriter.mergeBlocks(dest, rewriter.getBlock());
 
-        if constexpr (hasExceptions)
+        if (exceptionHandlerBlock)
         {
             rewriter.setInsertionPointAfter(op);
-            mlir::Block* happyPath = op.getHappyPath();
+            mlir::Block* happyPath = exceptionHandler.getHappyPath();
             if (!happyPath->getSinglePredecessor())
             {
                 rewriter.template create<pylir::Py::BranchOp>(loc, happyPath);
             }
             else
             {
-                rewriter.mergeBlocks(happyPath, op->getBlock(), op.getNormalDestOperands());
+                rewriter.mergeBlocks(happyPath, op->getBlock(),
+                                     static_cast<mlir::OperandRange>(exceptionHandler.getNormalDestOperandsMutable()));
             }
         }
         rewriter.replaceOp(op, {list});

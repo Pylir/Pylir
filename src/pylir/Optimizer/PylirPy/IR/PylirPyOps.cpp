@@ -697,11 +697,6 @@ bool pylir::Py::GlobalValueOp::isDeclaration()
     return !getInitializerAttr();
 }
 
-pylir::Py::BranchOp pylir::Py::LandingPadOp::getBranchOp()
-{
-    return mlir::cast<pylir::Py::BranchOp>((*this)->getBlock()->getTerminator());
-}
-
 namespace
 {
 
@@ -855,15 +850,6 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
 
 } // namespace
 
-mlir::LogicalResult pylir::Py::details::verifyHasLandingpad(mlir::Operation* op, mlir::Block* unwindBlock)
-{
-    if (unwindBlock->empty() || !mlir::isa<pylir::Py::LandingPadOp>(unwindBlock->front()))
-    {
-        return op->emitOpError("Expected 'py.landingPad' as first operation in unwind block");
-    }
-    return mlir::success();
-}
-
 mlir::LogicalResult pylir::Py::ConstantOp::verify()
 {
     for (auto& uses : getOperation()->getUses())
@@ -904,15 +890,6 @@ mlir::LogicalResult pylir::Py::ReturnOp::verify()
     {
         return (*this)->emitOpError("operands are not compatible with enclosed function '")
                << mlir::FlatSymbolRefAttr::get(parent) << "'s return types";
-    }
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::Py::LandingPadOp::verify()
-{
-    if (!mlir::isa<pylir::Py::BranchOp>((*this)->getBlock()->getTerminator()))
-    {
-        return emitOpError("Block starting with `py.landingPad` has to terminate with `py.br`");
     }
     return mlir::success();
 }

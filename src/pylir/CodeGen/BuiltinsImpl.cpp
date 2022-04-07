@@ -210,16 +210,14 @@ mlir::Value implementLenBuiltin(pylir::Py::PyBuilder& builder, mlir::Value objec
     if (notFoundBlock)
     {
         result = pylir::Py::buildTrySpecialMethodCall(builder.getCurrentLoc(), builder, "__len__", tuple, {},
-                                                      notFoundBlock, nullptr, nullptr);
+                                                      notFoundBlock, nullptr);
     }
     else
     {
-        result =
-            pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__len__", tuple, {}, nullptr, nullptr);
+        result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__len__", tuple, {}, nullptr);
     }
     tuple = builder.createMakeTuple({result});
-    result =
-        pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__index__", tuple, {}, nullptr, nullptr);
+    result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__index__", tuple, {}, nullptr);
     // TODO: Check not negative && fits in host size_t
     return result;
 }
@@ -293,7 +291,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto result = Py::buildSpecialMethodCall(
                                 m_builder.getCurrentLoc(), m_builder, "__call__",
                                 m_builder.createTuplePrepend(newMethod, m_builder.createTuplePrepend(self, args)), kw,
-                                nullptr, nullptr);
+                                nullptr);
                             auto resultType = m_builder.createTypeOf(result);
                             auto isSubclass = buildSubclassCheck(resultType, self);
                             auto* isSubclassBlock = new mlir::Block;
@@ -304,9 +302,9 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.create<Py::ReturnOp>(result);
 
                             implementBlock(isSubclassBlock);
-                            [[maybe_unused]] auto initRes = Py::buildSpecialMethodCall(
-                                m_builder.getCurrentLoc(), m_builder, "__init__",
-                                m_builder.createTuplePrepend(self, args), kw, nullptr, nullptr);
+                            [[maybe_unused]] auto initRes =
+                                Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__init__",
+                                                           m_builder.createTuplePrepend(self, args), kw, nullptr);
                             // TODO: Check initRes is None
                             m_builder.create<Py::ReturnOp>(result);
                         });
@@ -358,8 +356,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto lhs = functionArgs[0];
                     auto rhs = functionArgs[1];
                     auto tuple = m_builder.createMakeTuple({lhs, rhs});
-                    auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__eq__", tuple, {},
-                                                             nullptr, nullptr);
+                    auto result =
+                        Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__eq__", tuple, {}, nullptr);
                     auto notImplemented = m_builder.createNotImplementedRef();
                     auto isNotImplemented = m_builder.createIs(result, notImplemented);
                     auto* isImplementedBlock = new mlir::Block;
@@ -371,7 +369,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     implementBlock(isImplementedBlock);
                     tuple = m_builder.createMakeTuple({m_builder.createBoolRef(), result});
                     auto boolean = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__", tuple,
-                                                              {}, nullptr, nullptr);
+                                                              {}, nullptr);
                     mlir::Value i1 = m_builder.createBoolToI1(boolean);
                     auto trueC = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
                     i1 = m_builder.create<mlir::arith::XOrIOp>(i1, trueC);
@@ -413,10 +411,11 @@ void pylir::CodeGen::createBuiltinsImpl()
                 "builtins.object.__str__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
                 [&](mlir::ValueRange functionArgs)
                 {
-                    auto self = functionArgs[0];
-                    auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__",
-                                                             m_builder.createMakeTuple({self}), {}, nullptr, nullptr);
-                    m_builder.create<Py::ReturnOp>(result);
+                                   auto self = functionArgs[0];
+                                   auto result =
+                                       Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__",
+                                                                  m_builder.createMakeTuple({self}), {}, nullptr);
+                                   m_builder.create<Py::ReturnOp>(result);
                 });
         });
     auto baseException = createClass(
@@ -478,7 +477,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     implementBlock(contBlock);
                     auto tuple = m_builder.createMakeTuple({m_builder.createStrRef(), contBlock->getArgument(0)});
                     auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__", tuple,
-                                                             {}, nullptr, nullptr);
+                                                             {}, nullptr);
                     m_builder.create<Py::ReturnOp>(result);
                 });
             slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
@@ -654,7 +653,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     implementBlock(singleArgBlock);
                     auto object = args[0].parameterValue;
                     auto str = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__str__",
-                                                          m_builder.createMakeTuple({object}), {}, nullptr, nullptr);
+                                                          m_builder.createMakeTuple({object}), {}, nullptr);
                     auto strType = m_builder.createTypeOf(str);
                     isStr = buildSubclassCheck(strType, m_builder.createStrRef());
                     auto* notStrBlock = new mlir::Block;
@@ -787,7 +786,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto firstObj = m_builder.createTupleGetItem(self, zero);
                     auto initialStr = Py::buildSpecialMethodCall(
                         m_builder.getCurrentLoc(), m_builder, "__call__",
-                        m_builder.createMakeTuple({m_builder.createReprRef(), firstObj}), {}, nullptr, nullptr);
+                        m_builder.createMakeTuple({m_builder.createReprRef(), firstObj}), {}, nullptr);
                     auto concat = m_builder.createStrConcat({leftParen, initialStr});
 
                     auto* loopHeader = new mlir::Block;
@@ -806,7 +805,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                     auto obj = m_builder.createTupleGetItem(self, loopHeader->getArgument(1));
                     auto nextStr = Py::buildSpecialMethodCall(
                         m_builder.getCurrentLoc(), m_builder, "__call__",
-                        m_builder.createMakeTuple({m_builder.createReprRef(), obj}), {}, nullptr, nullptr);
+                        m_builder.createMakeTuple({m_builder.createReprRef(), obj}), {}, nullptr);
                     concat = m_builder.createStrConcat(
                         {loopHeader->getArgument(0), m_builder.createConstant(", "), nextStr});
                     auto incremented = m_builder.create<mlir::arith::AddIOp>(loopHeader->getArgument(1), one);
@@ -927,9 +926,9 @@ void pylir::CodeGen::createBuiltinsImpl()
                 {
                     auto value = functionArguments[1];
                     auto* notFoundBlock = new mlir::Block;
-                    auto boolResult = Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__bool__",
-                                                                    m_builder.createMakeTuple({value}), {},
-                                                                    notFoundBlock, nullptr, nullptr);
+                    auto boolResult =
+                        Py::buildTrySpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__bool__",
+                                                      m_builder.createMakeTuple({value}), {}, notFoundBlock, nullptr);
                     m_builder.create<Py::ReturnOp>(boolResult);
 
                     implementBlock(notFoundBlock);
@@ -1020,7 +1019,7 @@ void pylir::CodeGen::createBuiltinsImpl()
             auto firstObj = m_builder.createTupleGetItem(objects, zero);
             auto initialStr = Py::buildSpecialMethodCall(
                 m_builder.getCurrentLoc(), m_builder, "__call__",
-                m_builder.createMakeTuple({m_builder.createStrRef(), firstObj}), {}, nullptr, nullptr);
+                m_builder.createMakeTuple({m_builder.createStrRef(), firstObj}), {}, nullptr);
 
             auto* loopHeader = new mlir::Block;
             loopHeader->addArguments({m_builder.getType<Py::UnknownType>(), m_builder.getIndexType()},
@@ -1036,9 +1035,9 @@ void pylir::CodeGen::createBuiltinsImpl()
 
             implementBlock(loopBody);
             auto obj = m_builder.createTupleGetItem(objects, loopHeader->getArgument(1));
-            auto nextStr = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
-                                                      m_builder.createMakeTuple({m_builder.createStrRef(), obj}), {},
-                                                      nullptr, nullptr);
+            auto nextStr =
+                Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
+                                           m_builder.createMakeTuple({m_builder.createStrRef(), obj}), {}, nullptr);
             auto concat = m_builder.createStrConcat({loopHeader->getArgument(0), sep, nextStr});
             auto incremented = m_builder.create<mlir::arith::AddIOp>(loopHeader->getArgument(1), one);
             m_builder.create<Py::BranchOp>(loopHeader, mlir::ValueRange{concat, incremented});
@@ -1069,7 +1068,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                        auto object = functionArguments[0];
                        auto tuple = m_builder.createMakeTuple({object});
                        auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__", tuple,
-                                                                {}, nullptr, nullptr);
+                                                                {}, nullptr);
                        auto strType = m_builder.createTypeOf(result);
                        auto isStr = buildSubclassCheck(strType, m_builder.createStrRef());
                        auto* notStrBlock = new mlir::Block;

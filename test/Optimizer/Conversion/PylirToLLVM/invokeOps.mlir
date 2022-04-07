@@ -16,11 +16,7 @@ func @invoke_test(%trueValue : !py.unknown) -> !py.unknown {
 ^success:
     return %trueValue : !py.unknown
 
-^failure:
-    %1 = py.landingPad @builtins.BaseException : !py.unknown
-    py.br ^bb2(%1 : !py.unknown)
-
-^bb2(%e : !py.unknown):
+^failure(%e : !py.unknown):
     return %e : !py.unknown
 }
 
@@ -30,8 +26,6 @@ func @invoke_test(%trueValue : !py.unknown) -> !py.unknown {
 // CHECK-NEXT: %[[BIT_CAST:.*]] = llvm.bitcast %[[BASE_EXCEPTION]]
 // CHECK-NEXT: %[[BIT_CAST:.*]] = llvm.bitcast %[[BASE_EXCEPTION]]
 // CHECK-NEXT: llvm.invoke @foo() to ^[[HAPPY:.*]] unwind ^[[UNWIND:[[:alnum:]]+]]
-// CHECK-NEXT: ^[[HAPPY]]:
-// CHECK-NEXT: llvm.return %[[TRUE_VALUE]]
 // CHECK-NEXT: ^[[UNWIND]]:
 // CHECK-NEXT: %[[LANDING_PAD:.*]] = llvm.landingpad
 // CHECK-SAME: catch %[[BIT_CAST]]
@@ -41,6 +35,9 @@ func @invoke_test(%trueValue : !py.unknown) -> !py.unknown {
 // CHECK-NEXT: %[[EXCEPTION_OBJECT:.*]] = llvm.inttoptr %[[GEP]]
 // CHECK-NEXT: llvm.br ^[[DEST:[[:alnum:]]+]]
 // CHECK-SAME: %[[EXCEPTION_OBJECT]]
+// CHECK-NEXT: ^[[HAPPY]]:
+// CHECK-NEXT: llvm.return %[[TRUE_VALUE]]
 // CHECK-NEXT: ^[[DEST]]
 // CHECK-SAME: %[[EXCEPTION_OBJECT:[[:alnum:]]+]]
 // CHECK-NEXT: llvm.return %[[EXCEPTION_OBJECT]]
+

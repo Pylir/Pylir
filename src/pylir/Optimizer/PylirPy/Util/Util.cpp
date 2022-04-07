@@ -21,11 +21,11 @@ void implementBlock(mlir::OpBuilder& builder, mlir::Block* block)
 }
 
 void raiseException(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value exception,
-                    mlir::Block* PYLIR_NULLABLE exceptionPath)
+                    mlir::Block* PYLIR_NULLABLE exceptionHandler)
 {
-    if (exceptionPath)
+    if (exceptionHandler)
     {
-        builder.create<pylir::Py::BranchOp>(loc, exceptionPath, exception);
+        builder.create<pylir::Py::BranchOp>(loc, exceptionHandler, exception);
     }
     else
     {
@@ -34,10 +34,10 @@ void raiseException(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value ex
 }
 
 mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value self, mlir::Value tuple,
-                      mlir::Value kwargs, mlir::Block* exceptionPath, mlir::Block* landingPadBlock)
+                      mlir::Value kwargs, mlir::Block* exceptionHandler)
 {
     mlir::Value result;
-    if (!landingPadBlock)
+    if (!exceptionHandler)
     {
         result = builder.create<pylir::Py::CallMethodOp>(loc, builder.getType<pylir::Py::UnknownType>(), self, tuple,
                                                          kwargs);
@@ -47,7 +47,7 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
         auto* happyPath = new mlir::Block;
         result = builder.create<pylir::Py::CallMethodExOp>(loc, builder.getType<pylir::Py::UnknownType>(), self, tuple,
                                                            kwargs, mlir::ValueRange{}, mlir::ValueRange{}, happyPath,
-                                                           landingPadBlock);
+                                                           exceptionHandler);
         implementBlock(builder, happyPath);
     }
     auto failure = builder.create<pylir::Py::IsUnboundValueOp>(loc, result);
@@ -56,8 +56,8 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
     builder.create<pylir::Py::CondBranchOp>(loc, failure, notBound, typeCall);
 
     implementBlock(builder, notBound);
-    auto typeError = pylir::Py::buildException(loc, builder, pylir::Py::Builtins::TypeError.name, {}, landingPadBlock);
-    raiseException(loc, builder, typeError, exceptionPath);
+    auto typeError = pylir::Py::buildException(loc, builder, pylir::Py::Builtins::TypeError.name, {}, exceptionHandler);
+    raiseException(loc, builder, typeError, exceptionHandler);
 
     implementBlock(builder, typeCall);
     return result;
@@ -66,7 +66,7 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
 } // namespace
 
 mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& builder, std::string_view kind,
-                                      std::vector<Py::IterArg> args, mlir::Block* landingPadBlock)
+                                      std::vector<Py::IterArg> args, mlir::Block* exceptionHandler)
 {
     auto typeObj = builder.create<Py::ConstantOp>(
         loc,
@@ -75,7 +75,7 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
         mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
     args.emplace(args.begin(), typeObj);
     mlir::Value tuple;
-    if (!landingPadBlock
+    if (!exceptionHandler
         || std::none_of(args.begin(), args.end(),
                         [](const Py::IterArg& arg) { return std::holds_alternative<Py::IterExpansion>(arg); }))
     {
@@ -85,7 +85,7 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
     {
         auto* happyPath = new mlir::Block;
         tuple = builder.create<Py::MakeTupleExOp>(loc, builder.getType<pylir::Py::UnknownType>(), args, happyPath,
-                                                  mlir::ValueRange{}, landingPadBlock, mlir::ValueRange{});
+                                                  mlir::ValueRange{}, exceptionHandler, mlir::ValueRange{});
         implementBlock(builder, happyPath);
     }
     auto dict = builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(builder.getContext(), {}));
@@ -113,7 +113,7 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
 
 mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder, llvm::Twine methodName,
                                                  mlir::Value tuple, mlir::Value kwargs, mlir::Block* notFoundPath,
-                                                 mlir::Block* exceptionPath, mlir::Block* landingPadBlock)
+                                                 mlir::Block* exceptionHandler)
 {
     auto emptyDict = builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(builder.getContext()));
     if (!kwargs)
@@ -144,7 +144,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
 
     implementBlock(builder, isFunctionBlock);
     mlir::Value result;
-    if (!landingPadBlock)
+    if (!exceptionHandler)
     {
         result = builder.create<Py::FunctionCallOp>(loc, builder.getType<pylir::Py::UnknownType>(), lookup.getResult(),
                                                     mlir::ValueRange{lookup.getResult(), tuple, kwargs});
@@ -155,7 +155,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
         result =
             builder.create<Py::FunctionInvokeOp>(loc, builder.getType<pylir::Py::UnknownType>(), lookup.getResult(),
                                                  mlir::ValueRange{lookup.getResult(), tuple, kwargs},
-                                                 mlir::ValueRange{}, mlir::ValueRange{}, happyPath, landingPadBlock);
+                                                 mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptionHandler);
         implementBlock(builder, happyPath);
     }
     auto* exitBlock = new mlir::Block;
@@ -177,12 +177,11 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     result = buildCall(loc, builder, getMethod.getResult(),
                        builder.create<Py::MakeTupleOp>(loc, builder.getType<pylir::Py::UnknownType>(),
                                                        std::vector<Py::IterArg>{popOp.getElement(), selfType}),
-                       emptyDict, exceptionPath, landingPadBlock);
+                       emptyDict, exceptionHandler);
     builder.create<Py::BranchOp>(loc, mergeBlock, result);
 
     implementBlock(builder, mergeBlock);
-    result =
-        buildCall(loc, builder, mergeBlock->getArgument(0), popOp.getResult(), kwargs, exceptionPath, landingPadBlock);
+    result = buildCall(loc, builder, mergeBlock->getArgument(0), popOp.getResult(), kwargs, exceptionHandler);
     builder.create<Py::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, exitBlock);
@@ -190,15 +189,13 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
 }
 
 mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilder& builder, llvm::Twine methodName,
-                                              mlir::Value tuple, mlir::Value kwargs, mlir::Block* exceptionPath,
-                                              mlir::Block* landingPadBlock)
+                                              mlir::Value tuple, mlir::Value kwargs, mlir::Block* exceptionHandler)
 {
     auto* notFound = new mlir::Block;
-    auto result =
-        buildTrySpecialMethodCall(loc, builder, methodName, tuple, kwargs, notFound, exceptionPath, landingPadBlock);
+    auto result = buildTrySpecialMethodCall(loc, builder, methodName, tuple, kwargs, notFound, exceptionHandler);
     mlir::OpBuilder::InsertionGuard guard{builder};
     implementBlock(builder, notFound);
-    auto exception = Py::buildException(loc, builder, Py::Builtins::TypeError.name, {}, landingPadBlock);
-    raiseException(loc, builder, exception, exceptionPath);
+    auto exception = Py::buildException(loc, builder, Py::Builtins::TypeError.name, {}, exceptionHandler);
+    raiseException(loc, builder, exception, exceptionHandler);
     return result;
 }
