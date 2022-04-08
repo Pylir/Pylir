@@ -84,16 +84,15 @@ void HandleLoadStoreEliminationPass::runOnOperation()
                     changed = true;
                     continue;
                 }
-                llvm::SmallVector<mlir::MutableOperandRange> blockArgOperands;
+                llvm::SmallVector<mlir::SuccessorOperands> blockArgOperands;
                 bool hasClobber = false;
                 for (auto pred = block->pred_begin(); pred != block->pred_end(); pred++)
                 {
                     auto terminator = mlir::dyn_cast<mlir::BranchOpInterface>((*pred)->getTerminator());
                     PYLIR_ASSERT(terminator);
-                    auto ops = terminator.getMutableSuccessorOperands(pred.getSuccessorIndex());
-                    PYLIR_ASSERT(ops);
-                    blockArgOperands.emplace_back(*ops);
-                    if (static_cast<mlir::OperandRange>(*ops)[blockArg.getArgNumber()] == clobberTracker->getResult(0))
+                    auto ops = terminator.getSuccessorOperands(pred.getSuccessorIndex());
+                    blockArgOperands.emplace_back(ops);
+                    if (ops[blockArg.getArgNumber()] == clobberTracker->getResult(0))
                     {
                         hasClobber = true;
                     }

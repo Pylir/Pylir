@@ -48,13 +48,13 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
             return objectTypesCompatible(lhs, rhs);
         }
 
-        mlir::Optional<mlir::MutableOperandRange> $cppClass::getMutableSuccessorOperands(unsigned int index)
+        mlir::SuccessorOperands $cppClass::getSuccessorOperands(unsigned int index)
         {
             if (index == 0)
             {
-                return getNormalDestOperandsMutable();
+                return mlir::SuccessorOperands(getNormalDestOperandsMutable());
             }
-            return llvm::None;
+            return mlir::SuccessorOperands(1, getUnwindDestOperandsMutable());
         }
 
         mlir::Operation* $cppClass::cloneWithoutExceptionHandling(::mlir::OpBuilder& builder)

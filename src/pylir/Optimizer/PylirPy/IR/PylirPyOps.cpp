@@ -51,7 +51,7 @@ mlir::Operation* cloneWithoutExceptionHandlingImpl(mlir::OpBuilder& builder, T e
         }
     }
     state.addAttributes(attributes);
-    return builder.createOperation(state);
+    return builder.create(state);
 }
 
 } // namespace
@@ -113,7 +113,7 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
         attributes.emplace_back(builder.getStringAttr(attrSizedSegmentName), builder.getI32VectorAttr(values));
     }
     state.addAttributes(attributes);
-    return builder.createOperation(state);
+    return builder.create(state);
 }
 } // namespace pylir::Py::details
 
@@ -124,7 +124,8 @@ bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
 
 namespace
 {
-bool parseIterArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& operands,
+bool parseIterArguments(mlir::OpAsmParser& parser,
+                        llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& operands,
                         mlir::ArrayAttr& iterExpansion)
 {
     llvm::SmallVector<std::int32_t> iters;
@@ -190,8 +191,8 @@ void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::Ope
     printer << ')';
 }
 
-bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& keys,
-                           llvm::SmallVectorImpl<mlir::OpAsmParser::OperandType>& values,
+bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& keys,
+                           llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& values,
                            mlir::ArrayAttr& mappingExpansion)
 {
     llvm::SmallVector<std::int32_t> mappings;
@@ -317,9 +318,9 @@ void printOptionalTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, Args..
 
 } // namespace
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::BranchOp::getMutableSuccessorOperands(unsigned int)
+mlir::SuccessorOperands pylir::Py::BranchOp::getSuccessorOperands(unsigned int)
 {
-    return getArgumentsMutable();
+    return mlir::SuccessorOperands(getArgumentsMutable());
 }
 
 bool pylir::Py::BranchOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
@@ -327,13 +328,13 @@ bool pylir::Py::BranchOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
     return objectTypesCompatible(lhs, rhs);
 }
 
-mlir::Optional<mlir::MutableOperandRange> pylir::Py::CondBranchOp::getMutableSuccessorOperands(unsigned int index)
+mlir::SuccessorOperands pylir::Py::CondBranchOp::getSuccessorOperands(unsigned int index)
 {
     if (index == 0)
     {
-        return getTrueArgsMutable();
+        return mlir::SuccessorOperands(getTrueArgsMutable());
     }
-    return getFalseArgsMutable();
+    return mlir::SuccessorOperands(getFalseArgsMutable());
 }
 
 mlir::Block* pylir::Py::CondBranchOp::getSuccessorForOperands(::mlir::ArrayRef<::mlir::Attribute> operands)

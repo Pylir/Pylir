@@ -280,8 +280,8 @@ class MonomorphFunctionImpl
             auto branchOp = mlir::dyn_cast<mlir::BranchOpInterface>((*pred)->getTerminator());
             PYLIR_ASSERT(branchOp);
             auto ops = branchOp.getSuccessorOperands(pred.getSuccessorIndex());
-            PYLIR_ASSERT(ops);
-            for (auto [blockArg, value] : llvm::zip(blockArgs, *ops))
+            for (auto [blockArg, value] :
+                 llvm::zip(llvm::drop_begin(blockArgs, ops.getProducedOperandCount()), ops.getForwardedOperands()))
             {
                 auto result = m_lattices.find(value);
                 if (result == m_lattices.end())
@@ -300,8 +300,7 @@ class MonomorphFunctionImpl
         {
             if (blockArg.getType().isa<pylir::Py::ObjectTypeInterface>())
             {
-                PYLIR_ASSERT(lattice);
-                addLattice(blockArg, *lattice);
+                addLattice(blockArg, lattice.getValueOr(Lattice{pylir::Py::UnknownType::get(blockArg.getContext())}));
             }
         }
     }

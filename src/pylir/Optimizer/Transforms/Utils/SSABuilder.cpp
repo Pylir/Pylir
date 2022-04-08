@@ -45,9 +45,7 @@ void pylir::SSABuilder::removeBlockArgumentOperands(mlir::BlockArgument argument
     for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
         auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
-        auto ops = terminator.getMutableSuccessorOperands(pred.getSuccessorIndex());
-        PYLIR_ASSERT(ops);
-        ops->erase(argument.getArgNumber());
+        terminator.getSuccessorOperands(pred.getSuccessorIndex()).erase(argument.getArgNumber());
     }
 }
 
@@ -59,8 +57,7 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
         mlir::Value blockOperand;
         auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
         auto ops = terminator.getSuccessorOperands(pred.getSuccessorIndex());
-        PYLIR_ASSERT(ops);
-        blockOperand = (*ops)[argument.getArgNumber()];
+        blockOperand = ops[argument.getArgNumber()];
 
         if (blockOperand == same || blockOperand == argument)
         {
@@ -111,9 +108,8 @@ mlir::Value pylir::SSABuilder::addBlockArguments(DefinitionsMap& map, mlir::Bloc
     for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
         auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
-        auto ops = terminator.getMutableSuccessorOperands(pred.getSuccessorIndex());
-        PYLIR_ASSERT(ops);
-        ops->append(readVariable(argument.getLoc(), argument.getType(), map, *pred));
+        terminator.getSuccessorOperands(pred.getSuccessorIndex())
+            .append(readVariable(argument.getLoc(), argument.getType(), map, *pred));
     }
     return tryRemoveTrivialBlockArgument(argument);
 }

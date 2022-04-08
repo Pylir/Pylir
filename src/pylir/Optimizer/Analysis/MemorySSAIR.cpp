@@ -24,9 +24,9 @@ void pylir::MemSSA::MemorySSADialect::initialize()
 
 #include "pylir/Optimizer/Analysis/MemorySSAIRDialect.cpp.inc"
 
-mlir::Optional<mlir::MutableOperandRange> pylir::MemSSA::MemoryBranchOp::getMutableSuccessorOperands(unsigned index)
+mlir::SuccessorOperands pylir::MemSSA::MemoryBranchOp::getSuccessorOperands(unsigned index)
 {
-    return getBranchArgsMutable()[index];
+    return mlir::SuccessorOperands(getBranchArgsMutable()[index]);
 }
 
 mlir::LogicalResult pylir::MemSSA::MemoryBranchOp::verify()
