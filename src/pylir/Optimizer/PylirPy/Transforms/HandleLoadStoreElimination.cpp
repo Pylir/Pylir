@@ -4,7 +4,7 @@
 #include <llvm/ADT/ScopeExit.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/Transforms/Utils/SSABuilder.hpp>
+#include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 
 #include "PassDetail.hpp"
 #include "Passes.hpp"

@@ -4,7 +4,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LoadForwarding : Pass<"load-forwarding"> {
+def LoadForwarding : Pass<"pylir-load-forwarding"> {
     let summary = "Forward results of stores to loads";
     let constructor = "::pylir::createLoadForwardingPass()";
     let dependentDialects = ["::pylir::MemSSA::MemorySSADialect"];

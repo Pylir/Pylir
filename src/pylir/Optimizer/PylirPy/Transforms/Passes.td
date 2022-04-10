@@ -4,16 +4,15 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ExpandPyDialect : Pass<"expand-py-dialect", "::mlir::ModuleOp"> {
+def ExpandPyDialect : Pass<"pylir-expand-py-dialect", "::mlir::ModuleOp"> {
     let summary = "Expands ops of the Py dialect to operations that can be lowered";
     let constructor = "::pylir::Py::createExpandPyDialectPass()";
     let dependentDialects = ["::pylir::Py::PylirPyDialect",
                              "::mlir::arith::ArithmeticDialect",
-                             "::mlir::cf::ControlFlowDialect",
                              "::mlir::func::FuncDialect"];
 }
 
-def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {
+def FoldHandles : Pass<"pylir-fold-handles", "::mlir::ModuleOp"> {
     let summary = "Fold py.globalHandle";
     let constructor = "::pylir::Py::createFoldHandlesPass()";
     let dependentDialects = ["::pylir::Py::PylirPyDialect"];
@@ -26,7 +25,7 @@ def FoldHandles : Pass<"fold-handles", "::mlir::ModuleOp"> {
     ];
 }
 
-def HandleLoadStoreElimination : Pass<"handle-load-store-elimination"> {
+def HandleLoadStoreElimination : Pass<"pylir-handle-load-store-elimination"> {
     let summary = "Eliminate loads and stores of handles";
     let constructor = "::pylir::Py::createHandleLoadStoreEliminationPass()";
 
@@ -38,7 +37,7 @@ def HandleLoadStoreElimination : Pass<"handle-load-store-elimination"> {
     ];
 }
 
-def Monomorph : Pass<"monomorph", "::mlir::ModuleOp"> {
+def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 	let summary = "Monomorph module";
 	let constructor = "::pylir::Py::createMonomorphPass()";
 	let dependentDialects = ["::pylir::Py::PylirPyDialect"];

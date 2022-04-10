@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s -expand-py-dialect --split-input-file | FileCheck %s
+// RUN: pylir-opt %s --pylir-expand-py-dialect --split-input-file | FileCheck %s
 
 // XFAIL: *
 

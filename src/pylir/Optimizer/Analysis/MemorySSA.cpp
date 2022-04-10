@@ -8,7 +8,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
-#include <pylir/Optimizer/Transforms/Utils/SSABuilder.hpp>
+#include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 
 mlir::Operation* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
 {

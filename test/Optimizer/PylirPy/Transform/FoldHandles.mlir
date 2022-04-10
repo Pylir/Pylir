@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s --fold-handles --split-input-file | FileCheck %s
+// RUN: pylir-opt %s --pylir-fold-handles --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type

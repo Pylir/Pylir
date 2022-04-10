@@ -12,7 +12,7 @@
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
-#include <pylir/Optimizer/Transforms/Utils/SSABuilder.hpp>
+#include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 #include <pylir/Parser/Syntax.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/ValueReset.hpp>

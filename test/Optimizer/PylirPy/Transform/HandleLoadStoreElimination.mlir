@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s -pass-pipeline='func.func(handle-load-store-elimination)' --split-input-file | FileCheck %s
+// RUN: pylir-opt %s -pass-pipeline='func.func(pylir-handle-load-store-elimination)' --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
