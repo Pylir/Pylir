@@ -15,6 +15,8 @@ std::unique_ptr<mlir::Pass> createHandleLoadStoreEliminationPass();
 
 std::unique_ptr<mlir::Pass> createMonomorphPass();
 
+std::unique_ptr<mlir::Pass> createInlinerPass();
+
 #define GEN_PASS_REGISTRATION
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 

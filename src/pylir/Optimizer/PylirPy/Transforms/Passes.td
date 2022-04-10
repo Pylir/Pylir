@@ -48,4 +48,16 @@ def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 	];
 }
 
+def Inliner : Pass<"pylir-inliner", "::mlir::ModuleOp"> {
+	let summary = "Inline functions";
+	let constructor = "::pylir::Py::createInlinerPass()";
+	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+	let statistics = [
+        Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
+	];
+
+	let options = [];
+}
+
 #endif
