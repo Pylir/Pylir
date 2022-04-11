@@ -414,23 +414,19 @@ llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* cont
                 result.insert(result.end(), rest.begin(), rest.end());
             })
         .Case(
-            [&](pylir::Py::TuplePopFrontOp op)
+            [&](pylir::Py::TupleDropFrontOp op)
             {
                 auto tuple = resolveTupleOperands(context, op.getTuple());
-                if (!tuple[0])
+                mlir::IntegerAttr attr;
+                if (!mlir::matchPattern(op.getCount(), mlir::m_Constant(&attr)))
                 {
-                    // We don't know the expansion/content of the very first element. If it were empty it might
-                    // remove the element right after.
-                    if (tuple.size() > 1)
-                    {
-                        tuple[1] = nullptr;
-                    }
-                    else
-                    {
-                        tuple.emplace_back(nullptr);
-                    }
+                    result.emplace_back(nullptr);
+                    return;
                 }
-                result.insert(result.end(), tuple.begin() + 1, tuple.end());
+                auto begin = tuple.begin();
+                for (std::size_t i = 0; attr.getValue().ugt(i) && begin != tuple.end() && *begin; i++, begin++)
+                    ;
+                result.insert(result.end(), begin, tuple.end());
             })
         .Default([&](auto) { result.emplace_back(nullptr); });
     return result;
@@ -525,54 +521,23 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
     return nullptr;
 }
 
-mlir::LogicalResult pylir::Py::TuplePopFrontOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                                     llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+::mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto constant = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>();
-    if (constant)
+    auto constant = resolveValue(*this, operands[1]).dyn_cast_or_null<Py::TupleAttr>();
+    if (constant && constant.getValue().empty())
     {
-        results.emplace_back(constant.getValue()[0]);
-        results.emplace_back(Py::TupleAttr::get(getContext(), constant.getValue().drop_front()));
-        return mlir::success();
+        return constant;
     }
-    if (auto prepend = getTuple().getDefiningOp<Py::TuplePrependOp>())
+    auto index = operands[0].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (index && index.getValue().isZero())
     {
-        results.emplace_back(prepend.getInput());
-        results.emplace_back(prepend.getTuple());
-        return mlir::success();
+        return getTuple();
     }
-    return mlir::failure();
-}
-
-mlir::LogicalResult pylir::Py::TuplePopFrontOp::canonicalize(TuplePopFrontOp op, mlir::PatternRewriter& rewriter)
-{
-    auto* definingOp = op.getTuple().getDefiningOp();
-    if (!definingOp)
+    if (!index || !constant)
     {
-        return mlir::failure();
+        return nullptr;
     }
-    return llvm::TypeSwitch<mlir::Operation*, mlir::LogicalResult>(definingOp)
-        .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(
-            [&](auto makeTuple)
-            {
-                if (!makeTuple.getArguments().empty()
-                    && (makeTuple.getIterExpansionAttr().empty()
-                        || makeTuple.getIterExpansionAttr().getValue()[0] != rewriter.getI32IntegerAttr(0)))
-                {
-                    llvm::SmallVector<std::int32_t> newArray;
-                    for (auto value : makeTuple.getIterExpansionAttr().template getAsValueRange<mlir::IntegerAttr>())
-                    {
-                        newArray.push_back(value.getZExtValue() - 1);
-                    }
-                    auto popped = rewriter.create<Py::MakeTupleOp>(
-                        op.getLoc(), rewriter.getType<pylir::Py::UnknownType>(), makeTuple.getArguments().drop_front(),
-                        rewriter.getI32ArrayAttr(newArray));
-                    rewriter.replaceOp(op, {makeTuple.getArguments()[0], popped});
-                    return mlir::success();
-                }
-                return mlir::failure();
-            })
-        .Default(mlir::failure());
+    return Py::TupleAttr::get(getContext(), constant.getValue().drop_front(index.getValue().getZExtValue()));
 }
 
 namespace
@@ -1077,28 +1042,35 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
-    pylir::Py::TuplePopFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
-                                            mlir::SymbolTable&)
+    pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+                                             mlir::SymbolTable&)
 {
     auto tupleType = argumentTypes[0].dyn_cast<Py::TupleType>();
     if (!tupleType)
     {
-        return {Py::UnknownType::get(getContext()),
-                Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
+        return {Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
                                    llvm::None)};
     }
-    llvm::SmallVector<pylir::Py::ObjectTypeInterface> res;
     if (tupleType.getElements().empty())
     {
-        res.push_back(Py::UnboundType::get(getContext()));
+        return {Py::UnboundType::get(getContext())};
     }
-    else
+    mlir::IntegerAttr index;
+    if (!mlir::matchPattern(getCount(), mlir::m_Constant(&index)))
     {
-        res.push_back(tupleType.getElements().front());
+        Py::ObjectTypeInterface sumType = tupleType.getElements().front();
+        for (auto iter : tupleType.getElements().drop_front())
+        {
+            sumType = joinTypes(sumType, iter);
+        }
+        return {sumType};
     }
-    res.push_back(Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
-                                     tupleType.getElements().drop_front()));
-    return res;
+    if (tupleType.getElements().size() >= index.getValue().getZExtValue())
+    {
+        return {Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), {})};
+    }
+    return {Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
+                               tupleType.getElements().drop_front(index.getValue().getZExtValue()))};
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
@@ -1125,19 +1097,6 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
 
 namespace
 {
-pylir::Py::MakeTupleOp prependTuple(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
-                                    mlir::OperandRange range, mlir::ArrayAttr attr)
-{
-    llvm::SmallVector<std::int32_t> newArray;
-    for (auto value : attr.getAsValueRange<mlir::IntegerAttr>())
-    {
-        newArray.push_back(value.getZExtValue() + 1);
-    }
-    llvm::SmallVector<mlir::Value> arguments{input};
-    arguments.append(range.begin(), range.end());
-    return builder.create<pylir::Py::MakeTupleOp>(loc, input.getType(), arguments, builder.getI32ArrayAttr(newArray));
-}
-
 pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
                                          mlir::Attribute attr)
 {

@@ -2820,19 +2820,18 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
     }
 };
 
-struct InitTuplePopFrontOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitTuplePopFrontOp>
+struct InitTupleDropFrontOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitTupleDropFrontOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitTuplePopFrontOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitTupleDropFrontOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitTuplePopFrontOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitTupleDropFrontOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto tuple = pyTupleModel(op.getLoc(), rewriter, adaptor.getMemory());
         auto prevTuple = pyTupleModel(op.getLoc(), rewriter, adaptor.getTuple());
 
         mlir::Value size = prevTuple.sizePtr(op.getLoc()).load(op.getLoc());
-        auto oneI = createIndexConstant(rewriter, op.getLoc(), 1);
-        size = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), size, oneI);
+        size = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), size, adaptor.getCount());
 
         tuple.sizePtr(op.getLoc()).store(op.getLoc(), size);
 
@@ -2840,7 +2839,7 @@ struct InitTuplePopFrontOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
 
         auto array = mlir::Value{tuple.trailingPtr(op.getLoc()).at(op.getLoc(), 0)};
-        auto prevArray = mlir::Value{prevTuple.trailingPtr(op.getLoc()).at(op.getLoc(), 1)};
+        auto prevArray = mlir::Value{prevTuple.trailingPtr(op.getLoc()).at(op.getLoc(), adaptor.getCount())};
         auto arrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
             op.getLoc(), derivePointer(rewriter.getI8Type(), array.getType()), array);
         auto prevArrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
@@ -3125,7 +3124,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<ReturnOpConversion>(converter);
     patternSet.insert<BoolToI1OpConversion>(converter);
     patternSet.insert<InitTuplePrependOpConversion>(converter);
-    patternSet.insert<InitTuplePopFrontOpConversion>(converter);
+    patternSet.insert<InitTupleDropFrontOpConversion>(converter);
     patternSet.insert<IntGetIntegerOpConversion>(converter);
     patternSet.insert<IntCmpOpConversion>(converter);
     patternSet.insert<InitIntAddOpConversion>(converter);

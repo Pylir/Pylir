@@ -15,19 +15,6 @@ func @test() -> !py.unknown {
 // CHECK: %[[C:.*]] = py.constant(#py.tuple<(@builtins.tuple)>)
 // CHECK: return %[[C]]
 
-func @test2(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (*%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(@builtins.tuple) : !py.unknown
-    %2 = py.tuple.prepend %1, %0 : (!py.unknown, !py.unknown) -> !py.unknown
-    return %2 : !py.unknown
-}
-
-// CHECK-LABEL: @test2
-// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[C:.*]] = py.constant(@builtins.tuple)
-// CHECK: %[[RESULT:.*]] = py.makeTuple (%[[C]], *%[[ARG0]])
-// CHECK: return %[[RESULT]]
-
 func @test3(%arg0 : !py.unknown) -> !py.unknown {
     %0 = py.constant(#py.tuple<(#py.str<"value">)>) : !py.unknown
     %2 = py.tuple.prepend %arg0, %0 : (!py.unknown, !py.unknown) -> !py.unknown

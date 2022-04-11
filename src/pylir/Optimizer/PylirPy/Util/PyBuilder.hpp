@@ -240,9 +240,9 @@ public:
         return create<Py::TuplePrependOp>(getUnknownType(), element, tuple);
     }
 
-    Py::TuplePopFrontOp createTuplePopFront(mlir::Value tuple)
+    Py::TupleDropFrontOp createTupleDropFront(mlir::Value count, mlir::Value tuple)
     {
-        return create<Py::TuplePopFrontOp>(getUnknownType(), tuple);
+        return create<Py::TupleDropFrontOp>(getUnknownType(), count, tuple);
     }
 
     Py::ListAppendOp createListAppend(mlir::Value list, mlir::Value item)

@@ -50,7 +50,7 @@ void ConvertPylirPyToPylirMem::runOnOperation()
         .addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
                       pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp, pylir::Py::BoolFromI1Op,
                       pylir::Py::IntFromIntegerOp, pylir::Py::StrConcatOp, pylir::Py::IntToStrOp, pylir::Py::StrCopyOp,
-                      pylir::Py::TuplePopFrontOp, pylir::Py::TuplePrependOp, pylir::Py::IntAddOp>();
+                      pylir::Py::TupleDropFrontOp, pylir::Py::TuplePrependOp, pylir::Py::IntAddOp>();
 
     mlir::RewritePatternSet patterns(&getContext());
     populateWithGenerated(patterns);

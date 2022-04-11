@@ -83,11 +83,11 @@ def PylirMem_InitTuplePrependOp : PylirMem_Op<"initTuplePrepend", [AlwaysBound]>
     let assemblyFormat = "$memory `to` ` ` `(` $element `,` $tuple `)` attr-dict `:` `(` type($element) `,` type($tuple) `)` `->` type($result)";
 }
 
-def PylirMem_InitTuplePopFrontOp : PylirMem_Op<"initTuplePopFront", [AlwaysBound]> {
-    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$tuple);
+def PylirMem_InitTupleDropFrontOp : PylirMem_Op<"initTupleDropFront", [AlwaysBound]> {
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Index:$count, DynamicType:$tuple);
     let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `(` $tuple `)` attr-dict `:` functional-type($tuple, $result)";
+    let assemblyFormat = "$memory `to` ` ` $count `(` $tuple `)` attr-dict `:` functional-type($tuple, $result)";
 }
 
 def PylirMem_InitTupleFromListOp : PylirMem_Op<"initTupleFromList"> {

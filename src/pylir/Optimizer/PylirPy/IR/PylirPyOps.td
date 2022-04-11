@@ -249,21 +249,16 @@ def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBo
     let hasFolder = 1;
 }
 
-def PylirPy_TuplePopFrontOp : PylirPy_Op<"tuple.popFront", [NoSideEffect, AlwaysBound,
+def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, AlwaysBound,
     DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
-    let arguments = (ins DynamicType:$tuple);
-    let results = (outs DynamicType:$element, DynamicType:$result);
+    let arguments = (ins Index:$count, DynamicType:$tuple);
+    let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
-        $tuple attr-dict `:` functional-type($tuple, results)
-    }];
-
-    let description = [{
-
+        $count `,` $tuple attr-dict `:` functional-type($tuple, $result)
     }];
 
     let hasFolder = 1;
-    let hasCanonicalizeMethod = 1;
 }
 
 def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect]> {

@@ -26,13 +26,12 @@ def : Pattern<(PylirPy_TuplePrependOp $input, $tuple), [
     (PylirMem_InitTuplePrependOp $memory, $input, $tuple)
 ]>;
 
-def : Pattern<(PylirPy_TuplePopFrontOp $tuple), [
+def : Pattern<(PylirPy_TupleDropFrontOp $count, $tuple), [
     (PylirPy_ConstantOp:$tupleType TupleRef, (returnType TypeClass)),
     (PylirPy_TupleLenOp:$prevSize $tuple),
-    (Arith_SubIOp:$newSize $prevSize, (Arith_ConstantOp ConstantAttr<IndexAttr, "1">)),
+    (Arith_SubIOp:$newSize $prevSize, $count),
     (PylirMem_GCAllocTupleOp:$memory $tupleType, $newSize),
-    (PylirPy_TupleGetItemOp:$element $tuple, (Arith_ConstantOp ConstantAttr<IndexAttr, "0">)),
-    (PylirMem_InitTuplePopFrontOp $memory, $tuple)
+    (PylirMem_InitTupleDropFrontOp $memory, $count, $tuple)
 ]>;
 
 def : Pat<(PylirPy_ListToTupleOp $list), (PylirMem_InitTupleFromListOp

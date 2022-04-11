@@ -6,8 +6,6 @@ include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Arithmetic/IR/ArithmeticOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
-def prependTuple : NativeCodeCall<"prependTuple($_builder, $_loc, $0, $1, $2)">;
-
 def prependTupleConst : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
 def IsTypeSlot : AttrConstraint<CPred<"::isTypeSlot($_self.cast<::mlir::StringAttr>().getValue())">, "is type slot">;
@@ -15,11 +13,31 @@ def IsTypeSlot : AttrConstraint<CPred<"::isTypeSlot($_self.cast<::mlir::StringAt
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
 defvar TypeClass = "$_builder.getType<::pylir::Py::ClassType>(" # !subst("$0", TypeRef.value, TypeRef.attr.constBuilderCall) # ", llvm::None)";
 
-def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, $expansion)),
-          (prependTuple $input, $args, $expansion)>;
+def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, ArrayCount<0>:$_)),
+          (PylirPy_MakeTupleOp
+            (NativeCodeCall<[{ [&]{ auto vector = llvm::to_vector($1);
+                                    vector.insert(vector.begin(), $0);
+                                    return vector; }() }]> $input, $args), ConstantAttr<I32ArrayAttr, "{}">)>;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (ConstantLikeMatcher PylirPy_TupleAttr:$args)),
           (prependTupleConst $input, $args)>;
+
+def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
+									(PylirPy_MakeTupleOp $args, ArrayCount<0>:$_)),
+          (PylirPy_MakeTupleOp
+            (NativeCodeCall<[{ [&]{
+                                    auto value = $0.cast<mlir::IntegerAttr>().getValue().getZExtValue();
+                                    auto vector = llvm::to_vector($1);
+                                    if (vector.size() <= value)
+                                    {
+                                        vector.clear();
+                                    }
+                                    else
+                                    {
+                                        vector.erase(vector.begin(), vector.begin() + value);
+                                    }
+                                    return vector;
+                                }() }]> $count, $args), ConstantAttr<I32ArrayAttr, "{}">)>;
 
 def : Pattern<(PylirPy_GetSlotOp:$loc $object,
                 (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_)), Confined<StrAttr, [IsTypeSlot]>:$slot),

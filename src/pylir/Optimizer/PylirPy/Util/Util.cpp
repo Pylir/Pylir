@@ -120,9 +120,11 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
     {
         kwargs = emptyDict;
     }
-    auto popOp = builder.create<Py::TuplePopFrontOp>(loc, builder.getType<pylir::Py::UnknownType>(),
-                                                     builder.getType<pylir::Py::UnknownType>(), tuple);
-    auto type = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), popOp.getElement());
+    auto element = builder.create<Py::TupleGetItemOp>(loc, builder.getType<pylir::Py::UnknownType>(), tuple,
+                                                      builder.create<mlir::arith::ConstantIndexOp>(loc, 0));
+    auto dropped = builder.create<Py::TupleDropFrontOp>(loc, builder.getType<pylir::Py::UnknownType>(),
+                                                        builder.create<mlir::arith::ConstantIndexOp>(loc, 1), tuple);
+    auto type = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), element);
     auto mroTuple = builder.create<Py::TypeMROOp>(loc, builder.getType<pylir::Py::UnknownType>(), type).getResult();
     auto lookup = builder.create<Py::MROLookupOp>(loc, builder.getType<pylir::Py::UnknownType>(), builder.getI1Type(),
                                                   mroTuple, methodName.str());
@@ -173,15 +175,15 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
                                      mlir::ValueRange{lookup.getResult()});
 
     implementBlock(builder, isDescriptor);
-    auto selfType = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), popOp.getElement());
+    auto selfType = builder.create<Py::TypeOfOp>(loc, builder.getType<pylir::Py::UnknownType>(), element);
     result = buildCall(loc, builder, getMethod.getResult(),
                        builder.create<Py::MakeTupleOp>(loc, builder.getType<pylir::Py::UnknownType>(),
-                                                       std::vector<Py::IterArg>{popOp.getElement(), selfType}),
+                                                       std::vector<Py::IterArg>{element, selfType}),
                        emptyDict, exceptionHandler);
     builder.create<Py::BranchOp>(loc, mergeBlock, result);
 
     implementBlock(builder, mergeBlock);
-    result = buildCall(loc, builder, mergeBlock->getArgument(0), popOp.getResult(), kwargs, exceptionHandler);
+    result = buildCall(loc, builder, mergeBlock->getArgument(0), dropped, kwargs, exceptionHandler);
     builder.create<Py::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, exitBlock);
