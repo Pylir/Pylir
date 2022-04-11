@@ -477,6 +477,15 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
     return result;
 }
 
+mlir::OpFoldResult pylir::Py::ReinterpretOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
+{
+    if (getType() != getObject().getType())
+    {
+        return nullptr;
+    }
+    return getObject();
+}
+
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     auto indexAttr = operands[1].dyn_cast_or_null<mlir::IntegerAttr>();
@@ -954,6 +963,16 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable& table)
 {
     return {typeOfConstant(getConstantAttr(), &table)};
+}
+
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::ReinterpretOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> types, mlir::SymbolTable&)
+{
+    if (isMoreSpecific(getType(), types[0]))
+    {
+        return {getType()};
+    }
+    return {types[0]};
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>

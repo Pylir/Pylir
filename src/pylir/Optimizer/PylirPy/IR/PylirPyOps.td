@@ -141,6 +141,16 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
     }];
 }
 
+def PylirPy_ReinterpretOp : PylirPy_Op<"reinterpret", [NoSideEffect,
+													   DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
+	let arguments = (ins DynamicType:$object);
+	let results = (outs DynamicType:$result);
+
+	let assemblyFormat = "$object attr-dict `:` type($object) `->` type($result)";
+
+	let hasFolder = 1;
+}
+
 // Dict ops
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [AlwaysBound, NoCapture,

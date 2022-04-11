@@ -18,4 +18,6 @@ inline mlir::FunctionType getUniversalCCType(mlir::MLIRContext* context)
 }
 
 pylir::Py::ObjectTypeInterface joinTypes(pylir::Py::ObjectTypeInterface lhs, pylir::Py::ObjectTypeInterface rhs);
+
+bool isMoreSpecific(pylir::Py::ObjectTypeInterface lhs, pylir::Py::ObjectTypeInterface rhs);
 } // namespace pylir::Py

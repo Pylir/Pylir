@@ -92,6 +92,12 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
             raise.erase();
         }
     }
+
+    mlir::Operation* materializeCallConversion(mlir::OpBuilder& builder, mlir::Value input, mlir::Type resultType,
+                                               mlir::Location conversionLoc) const override
+    {
+        return builder.create<pylir::Py::ReinterpretOp>(conversionLoc, resultType, input);
+    }
 };
 } // namespace
 
