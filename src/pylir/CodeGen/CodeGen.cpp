@@ -2345,38 +2345,14 @@ std::vector<pylir::CodeGen::UnpackResults>
             }
             case FunctionParameter::PosRest:
             {
-                // if posIndex is 0 then no other positional arguments existed. As a shortcut we can then simply assign
-                // the tuple to argValue instead of creating it from a list
-                if (posIndex == 0)
-                {
-                    argValue = tuple;
-                    break;
-                }
-                auto list = m_builder.createMakeList();
                 auto start = m_builder.create<mlir::arith::ConstantIndexOp>(posIndex);
-                auto conditionBlock = BlockPtr{};
-                conditionBlock->addArgument(m_builder.getIndexType(), m_builder.getCurrentLoc());
-                m_builder.create<Py::BranchOp>(conditionBlock, mlir::ValueRange{start});
-
-                implementBlock(conditionBlock);
-                auto isLess = m_builder.create<mlir::arith::CmpIOp>(mlir::arith::CmpIPredicate::ult,
-                                                                    conditionBlock->getArgument(0), tupleLen);
-                auto lessBlock = BlockPtr{};
-                auto endBlock = BlockPtr{};
-                m_builder.create<Py::CondBranchOp>(isLess, lessBlock, endBlock);
-
-                implementBlock(lessBlock);
-                auto fetched = m_builder.createTupleGetItem(tuple, conditionBlock->getArgument(0));
-                m_builder.createListAppend(list, fetched);
-                auto one = m_builder.create<mlir::arith::ConstantIndexOp>(1);
-                auto incremented = m_builder.create<mlir::arith::AddIOp>(conditionBlock->getArgument(0), one);
-                m_builder.create<Py::BranchOp>(conditionBlock, mlir::ValueRange{incremented});
-
-                implementBlock(endBlock);
-                argValue = m_builder.createListToTuple(list);
+                argValue = m_builder.createTupleDropFront(start, tuple);
                 break;
             }
-            case FunctionParameter::KeywordRest: argValue = dict; break;
+            case FunctionParameter::KeywordRest:
+                // TODO: make copy of dict
+                argValue = dict;
+                break;
         }
         switch (iter.kind)
         {

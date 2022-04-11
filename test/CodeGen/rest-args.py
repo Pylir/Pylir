@@ -8,8 +8,9 @@ def foo(*args, **kwd):
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
 # CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]
-
-# CHECK: call @"foo$impl[0]"(%[[SELF]], %[[TUPLE]], %[[DICT]])
+# CHECK: %[[ZERO:.*]] = arith.constant 0
+# CHECK: %[[ARGS:.*]] = py.tuple.dropFront %[[ZERO]], %[[TUPLE]]
+# CHECK: call @"foo$impl[0]"(%[[SELF]], %[[ARGS]], %[[DICT]])
 
 def bar(a, *args, k, **kwd):
     pass
@@ -23,29 +24,9 @@ def bar(a, *args, k, **kwd):
 
 # ... processing of a
 
-# list created first
-# CHECK: %[[LIST:.*]] = py.makeList ()
+# processing of *args
 # CHECK: %[[START:.*]] = arith.constant 1
-# CHECK: br ^[[CONDITION:[[:alnum:]]+]]
-# CHEK-SAME: %[[START]]
-
-# CHECK: ^[[CONDITION]]
-# CHECK-SAME: %[[ITERATOR:[[:alnum:]]+]]
-
-# CHECK: %[[CHECK:.*]] = arith.cmpi ult, %[[ITERATOR]], %[[TUPLE_LEN]]
-# CHECK: cond_br %[[CHECK]], ^[[BODY:[[:alnum:]]+]], ^[[END:[[:alnum:]]+]]
-
-# CHECK: ^[[BODY]]:
-# CHECK: %[[FETCHED:.*]] = py.tuple.getItem %[[TUPLE]][
-# CHECK-SAME: %[[ITERATOR]]
-# CHECK: py.list.append %[[LIST]], %[[FETCHED]]
-# CHECK: %[[ONE:.*]] = arith.constant 1
-# CHECK: %[[INCREMENTED:.*]] = arith.addi %[[ITERATOR]], %[[ONE]]
-# CHECK: br ^[[CONDITION]]
-# CHECK-SAME: %[[INCREMENTED]]
-
-# CHECK: ^[[END]]:
-# CHECK: %[[TUPLE_ARG:.*]] = py.list.toTuple %[[LIST]]
+# CHECK: %[[TUPLE_ARG:.*]] = py.tuple.dropFront %[[START]], %[[TUPLE]]
 
 # processing of k...
 # CHECK: %[[CONSTANT:.*]] = py.constant(#py.str<"k">)
