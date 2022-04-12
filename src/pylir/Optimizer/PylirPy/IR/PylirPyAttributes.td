@@ -42,7 +42,7 @@ def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [
 	DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>]> {
 	let mnemonic = "obj";
 
-	let assemblyFormat = "`<`(`,`struct($typeObject, $slots)^)? `>`";
+	let assemblyFormat = "`<` $typeObject (`,` $slots^)? `>`";
 }
 
 def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [

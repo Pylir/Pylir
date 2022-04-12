@@ -73,14 +73,11 @@ func @test_constant_dict() -> !py.unknown {
     return %0 : !py.unknown
 }
 
-py.globalValue @a = #py.type<>
+py.globalValue @a = #py.type
 
 // CHECK-LABEL: test_objects
 func @test_objects() -> !py.unknown {
     %0 = py.constant(#py.obj<@a>) : !py.unknown
-    %1 = py.constant(#py.obj<@a, builtinValue = #py.int<1>>) : !py.unknown
-    %2 = py.constant(#py.obj<@a, builtinValue = #py.int<1>, slots = {__dict__ = #py.dict<{}>}>) : !py.unknown
-    %3 = py.constant(#py.obj<@a, slots = {__dict__ = #py.dict<{}>}, builtinValue = #py.int<1>>) : !py.unknown
-    %4 = py.constant(#py.obj<@a, slots = {__dict__ = #py.dict<{}>}>) : !py.unknown
-    return %4 : !py.unknown
+    %1 = py.constant(#py.obj<@a, {__dict__ = #py.dict<{}>}>) : !py.unknown
+    return %1 : !py.unknown
 }

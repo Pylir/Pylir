@@ -57,7 +57,11 @@ def Inliner : Pass<"pylir-inliner", "::mlir::ModuleOp"> {
         Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
 	];
 
-	let options = [];
+	let options = [
+		Option<"m_maxFuncGrowth", "max-func-growth", "std::uint32_t", "150", "Percent a function is allowed to grow">,
+		Option<"m_maxModuleGrowth", "max-module-growth", "std::uint32_t", "200", "Percent the module is allowed to grow">,
+		Option<"m_maxRecursiveInlines", "max-recursive-inlines", "std::uint32_t", "4", "Amount of times a recursive function might be recursively inlined">,
+	];
 }
 
 #endif

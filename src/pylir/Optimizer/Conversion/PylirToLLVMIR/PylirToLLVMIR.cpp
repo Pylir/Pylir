@@ -3021,6 +3021,18 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
     }
 };
 
+struct ReinterpretOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ReinterpretOp>
+{
+    using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::ReinterpretOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOp(op, {adaptor.getObject()});
+        return mlir::success();
+    }
+};
+
 class ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 private:
@@ -3133,6 +3145,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<UnreachableOpConversion>(converter);
     patternSet.insert<TypeMROOpConversion>(converter);
     patternSet.insert<TupleContainsOpConversion>(converter);
+    patternSet.insert<ReinterpretOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
