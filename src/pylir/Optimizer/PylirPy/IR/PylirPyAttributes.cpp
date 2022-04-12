@@ -347,6 +347,7 @@ void pylir::Py::FunctionAttr::walkImmediateSubElements(llvm::function_ref<void(m
 {
     walkAttrsFn(getValue());
     walkAttrsFn(getQualName());
+    walkAttrsFn(getDefaults());
     walkAttrsFn(getKwDefaults());
     if (getDict())
     {
@@ -359,6 +360,7 @@ mlir::SubElementAttrInterface pylir::Py::FunctionAttr::replaceImmediateSubAttrib
 {
     auto value = getValue();
     auto qualName = getQualName();
+    auto defaults = getDefaults();
     auto kwDefaults = getKwDefaults();
     auto dict = getDict();
     for (auto [index, attr] : replacements)
@@ -368,10 +370,11 @@ mlir::SubElementAttrInterface pylir::Py::FunctionAttr::replaceImmediateSubAttrib
             case 0: value = attr.cast<mlir::FlatSymbolRefAttr>(); break;
             case 1: qualName = attr; break;
             case 2: kwDefaults = attr; break;
-            case 3: dict = attr; break;
+            case 3: defaults = attr; break;
+            case 4: dict = attr; break;
         }
     }
-    return get(getContext(), value, qualName, kwDefaults, dict);
+    return get(getContext(), value, qualName, defaults, kwDefaults, dict);
 }
 
 void pylir::Py::TypeAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
