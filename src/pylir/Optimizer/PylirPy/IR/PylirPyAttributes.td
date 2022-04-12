@@ -13,26 +13,6 @@ class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "
 
 defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr", "::mlir::DictionaryAttr::get($_ctx, {})">;
 
-def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [
-	DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>, ObjectAttrInterface]> {
-	let mnemonic = "obj";
-
-	let parameters = (ins "::mlir::FlatSymbolRefAttr":$typeObject,
-						  SlotsMap:$slots,
-						  OptionalParameter<"::mlir::Attribute">:$builtinValue);
-
-	let builders = [
-		AttrBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$typeObject,
-											CArg<"::mlir::DictionaryAttr", "{}">:$slots,
-											CArg<"::mlir::Attribute", "{}">:$builtinValue), [{
-			return Base::get(typeObject.getContext(), typeObject,
-						slots ? slots : mlir::DictionaryAttr::getWithSorted(typeObject.getContext(), {}), builtinValue);
-		}]>
-	];
-
-	let assemblyFormat = "`<`$typeObject (`,`struct($slots, $builtinValue)^)? `>`";
-}
-
 class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = [], string extraBuilderCode = "">
 	: PylirPy_Attr<name, traits> {
 
@@ -56,6 +36,14 @@ class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait>
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "typeObject">]),
     !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
 										["replaceImmediateSubAttribute"]>, ObjectAttrInterface])>;
+
+
+def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [
+	DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>]> {
+	let mnemonic = "obj";
+
+	let assemblyFormat = "`<`(`,`struct($typeObject, $slots)^)? `>`";
+}
 
 def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
 	ParamSpec<CustomPrint<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">,

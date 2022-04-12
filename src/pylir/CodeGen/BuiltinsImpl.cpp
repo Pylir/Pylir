@@ -407,16 +407,16 @@ void pylir::CodeGen::createBuiltinsImpl()
                     m_builder.create<Py::ReturnOp>(concat);
                 },
                 &objectReprFunc);
-            slots["__str__"] = createFunction(
-                "builtins.object.__str__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                [&](mlir::ValueRange functionArgs)
-                {
+            slots["__str__"] =
+                createFunction("builtins.object.__str__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+                               [&](mlir::ValueRange functionArgs)
+                               {
                                    auto self = functionArgs[0];
                                    auto result =
                                        Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__",
                                                                   m_builder.createMakeTuple({self}), {}, nullptr);
                                    m_builder.create<Py::ReturnOp>(result);
-                });
+                               });
         });
     auto baseException = createClass(
         m_builder.getBaseExceptionBuiltin(), {},
@@ -548,7 +548,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                [&](mlir::ValueRange)
                                { m_builder.create<Py::ReturnOp>(mlir::ValueRange{m_builder.createConstant(false)}); });
         });
-    m_builder.createGlobalValue(Py::Builtins::None.name, true, Py::ObjectAttr::get(m_builder.getNoneTypeBuiltin()),
+    m_builder.createGlobalValue(Py::Builtins::None.name, true, m_builder.getObjectAttr(m_builder.getNoneTypeBuiltin()),
                                 true);
     createClass(
         m_builder.getNotImplementedTypeBuiltin(), {},
@@ -564,7 +564,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                 { m_builder.create<Py::ReturnOp>(mlir::ValueRange{m_builder.createConstant("NotImplemented")}); });
         });
     m_builder.createGlobalValue(Py::Builtins::NotImplemented.name, true,
-                                Py::ObjectAttr::get(m_builder.getNotImplementedTypeBuiltin()), true);
+                                m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
     createClass(m_builder.getFunctionBuiltin(), {},
                 [&](SlotMapImpl& slots)
                 {

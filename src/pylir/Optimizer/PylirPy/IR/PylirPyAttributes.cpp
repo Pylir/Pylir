@@ -168,31 +168,13 @@ Op doTypeObjectSlotsReplace(Op op, ::llvm::ArrayRef<std::pair<size_t, ::mlir::At
 void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                      llvm::function_ref<void(mlir::Type)>) const
 {
-    walkAttrsFn(getTypeObject());
-    walkAttrsFn(getSlots());
-    if (getBuiltinValue())
-    {
-        walkAttrsFn(getBuiltinValue());
-    }
+    doTypeObjectSlotsWalk(*this, walkAttrsFn);
 }
 
 mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribute(
     ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
 {
-    auto type = getTypeObject();
-    auto slots = getSlots();
-    auto builtinValue = getBuiltinValue();
-    for (auto [index, attr] : replacements)
-    {
-        switch (index)
-        {
-            case 0: type = attr.cast<mlir::FlatSymbolRefAttr>(); break;
-            case 1: slots = attr.cast<mlir::DictionaryAttr>(); break;
-            case 2: builtinValue = attr; break;
-            default: PYLIR_UNREACHABLE;
-        }
-    }
-    return get(type, slots, builtinValue);
+    return doTypeObjectSlotsReplace(*this, replacements, 0);
 }
 
 void pylir::Py::IntAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,

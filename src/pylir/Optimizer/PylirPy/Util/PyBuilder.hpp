@@ -51,10 +51,9 @@ public:
         return Py::UnboundAttr::get(getContext());
     }
 
-    Py::ObjectAttr getObjectAttr(mlir::FlatSymbolRefAttr type, mlir::DictionaryAttr slots = {},
-                                 mlir::Attribute builtinValue = {})
+    Py::ObjectAttr getObjectAttr(mlir::FlatSymbolRefAttr type, mlir::DictionaryAttr slots = {})
     {
-        return Py::ObjectAttr::get(type, slots, builtinValue);
+        return Py::ObjectAttr::get(context, type, slots);
     }
 
     Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {}, mlir::DictionaryAttr slots = {})
