@@ -42,11 +42,11 @@ func @__init__() {
 // CHECK-LABEL: func @__init__
 // CHECK-DAG: %[[ONE:.*]] = py.constant(#py.int<1>) : !py.class<@builtins.int>
 // CHECK-DAG: %[[ZERO:.*]] = py.constant(#py.int<0>) : !py.class<@builtins.int>
+// CHECK-DAG: %[[INT_TYPE:.*]] = py.constant(@builtins.int)
 // CHECK: py.br ^[[LOOP:.*]](%[[ZERO]] : !py.class<@builtins.int>)
 // CHECK-NEXT: ^[[LOOP]]
 // CHECK-SAME: %[[ITER:[[:alnum:]]+]]: !py.class<@builtins.int>
-// CHECK-NEXT: %[[TYPE_OF:.*]] = py.typeOf %[[ITER]]
-// CHECK-NEXT: %[[MRO:.*]] = py.type.mro %[[TYPE_OF]]
+// CHECK-NEXT: %[[MRO:.*]] = py.type.mro %[[INT_TYPE]]
 // CHECK-NEXT: %[[LOOKUP:.*]], %{{.*}} = py.mroLookup "__add__" in %[[MRO]]
 // CHECK-NEXT: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]], %[[ONE]])
 // CHECK-NEXT: %[[DICT:.*]] = py.constant(#py.dict<{}>)

@@ -453,12 +453,12 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     {
         return strCopy.getTypeObject();
     }
-    auto inputType = getObject().getType().dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
-    if (!inputType)
-    {
-        return nullptr;
-    }
-    return inputType.getTypeObject();
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Py::TypeOfOp::typeFold(llvm::ArrayRef<Py::ObjectTypeInterface> operandTypes)
+{
+    return operandTypes[0].getTypeObject();
 }
 
 mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)

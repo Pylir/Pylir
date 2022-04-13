@@ -12,4 +12,5 @@ function(add_interface name)
 endfunction()
 
 add_interface(TypeRefineableInterface)
+add_interface(TypeFoldInterface)
 add_interface(ExceptionHandlingInterface)

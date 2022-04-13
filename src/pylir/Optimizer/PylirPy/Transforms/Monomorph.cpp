@@ -588,12 +588,14 @@ void Monomorph::runOnOperation()
 
     for (const auto& [key, value] : info.getCalculatedSpecializations())
     {
+        mlir::FunctionOpInterface funcOp = key.function;
         mlir::BlockAndValueMapping* mapping = nullptr;
         {
             auto result = functionClones.find(key);
             if (result != functionClones.end())
             {
                 mapping = &result->second.mapping;
+                funcOp = result->second.clone;
             }
         }
         for (const auto& [value, lattice] : value.lattices)
@@ -611,6 +613,37 @@ void Monomorph::runOnOperation()
             m_typesRefined++;
             changed = true;
         }
+
+        funcOp.walk(
+            [&, &value = value](pylir::Py::TypeFoldInterface foldable)
+            {
+                llvm::SmallVector<pylir::Py::ObjectTypeInterface> inputs(foldable->getNumOperands());
+                llvm::transform(foldable->getOperands(), inputs.begin(),
+                                [&value = value](mlir::Value val) { return value.lattices.lookup(val).type; });
+                auto result = foldable.typeFold(inputs);
+                if (!result)
+                {
+                    return;
+                }
+                if (auto val = result.dyn_cast<mlir::Value>())
+                {
+                    foldable->getResult(0).replaceAllUsesWith(val);
+                    if (mlir::isOpTriviallyDead(foldable))
+                    {
+                        foldable->erase();
+                    }
+                    return;
+                }
+                auto builder = mlir::OpBuilder::atBlockBegin(&funcOp.front());
+                auto c = foldable->getDialect()->materializeConstant(
+                    builder, result.get<mlir::Attribute>(), foldable->getResult(0).getType(), foldable->getLoc());
+                PYLIR_ASSERT(c);
+                foldable->replaceAllUsesWith(c);
+                if (mlir::isOpTriviallyDead(foldable))
+                {
+                    foldable->erase();
+                }
+            });
 
         auto setCallee = [](mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
         {

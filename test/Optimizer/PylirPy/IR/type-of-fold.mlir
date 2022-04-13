@@ -43,19 +43,6 @@ func @global_value() -> !py.unknown {
 // -----
 
 py.globalValue @builtins.type = #py.type
-
-func @typed(%arg0 : !py.class<@builtins.type>) -> !py.unknown {
-    %0 = py.typeOf %arg0 : (!py.class<@builtins.type>) -> !py.unknown
-    return %0 : !py.unknown
-}
-
-// CHECK-LABEL: @typed
-// CHECK: %[[CONST:.*]] = py.constant(@builtins.type)
-// CHECK: return %[[CONST]]
-
-// -----
-
-py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
 func @str_copy(%arg0 : !py.unknown, %arg1 : !py.unknown) -> !py.unknown {
