@@ -1064,7 +1064,7 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
                                              mlir::SymbolTable&)
 {
-    auto tupleType = argumentTypes[0].dyn_cast<Py::TupleType>();
+    auto tupleType = argumentTypes[1].dyn_cast<Py::TupleType>();
     if (!tupleType)
     {
         return {Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),

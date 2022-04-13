@@ -157,11 +157,7 @@ protected:
                 signalPassFailure();
                 return;
             }
-            mlir::Operation* containedIsolatedFromAbove =
-                containedCallable->hasTrait<mlir::OpTrait::IsIsolatedFromAbove>() ?
-                    containedCallable.getOperation() :
-                    containedCallable->getParentWithTrait<mlir::OpTrait::IsIsolatedFromAbove>();
-            if (mlir::failed(mlir::applyPatternsAndFoldGreedily(containedIsolatedFromAbove, patterns)))
+            if (mlir::failed(mlir::applyPatternsAndFoldGreedily(containedCallable, patterns)))
             {
                 signalPassFailure();
                 return;
