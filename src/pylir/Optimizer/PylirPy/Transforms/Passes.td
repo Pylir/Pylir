@@ -43,7 +43,8 @@ def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
 	let statistics = [
-		Statistic<"m_typesRefined", "Types refined", "Amount of types of operations which have been made more specific">,
+		Statistic<"m_operationsReplaced", "Operations replaced", "Amount of operations that have been replaced during folding">,
+		Statistic<"m_callsTurnedStatic", "Calls turned static", "Amount of call instructions that are now statically resolved">,
 		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specified types">,
 	];
 }

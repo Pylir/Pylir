@@ -8,6 +8,7 @@
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Support/Variant.hpp>
 
+#include "PylirPyDialect.hpp"
 #include "PylirPyOps.hpp"
 
 namespace
@@ -607,28 +608,21 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     {
         return nullptr;
     }
-    return llvm::TypeSwitch<mlir::Operation*, mlir::OpFoldResult>(op)
-        .Case(
-            [&](mlir::CallOpInterface callOpInterface) -> mlir::OpFoldResult
-            {
-                auto ref = callOpInterface.getCallableForCallee()
-                               .dyn_cast<mlir::SymbolRefAttr>()
-                               .dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-                if (!ref || ref.getValue() != llvm::StringRef{Py::pylirCallIntrinsic})
-                {
-                    return mlir::BoolAttr::get(getContext(), false);
-                }
-                return nullptr;
-            })
-        .Default(
-            [&](mlir::Operation* op) -> mlir::OpFoldResult
-            {
-                if (op->hasTrait<Py::AlwaysBound>())
-                {
-                    return mlir::BoolAttr::get(getContext(), false);
-                }
-                return nullptr;
-            });
+    if (op->hasTrait<Py::AlwaysBound>() || op->hasAttr(Py::alwaysBoundAttr))
+    {
+        return mlir::BoolAttr::get(getContext(), false);
+    }
+    auto callOpInterface = mlir::dyn_cast<mlir::CallOpInterface>(op);
+    if (!callOpInterface)
+    {
+        return nullptr;
+    }
+    auto func = mlir::dyn_cast_or_null<mlir::FunctionOpInterface>(callOpInterface.resolveCallable());
+    if (func && func.getResultAttr(getValue().cast<mlir::OpResult>().getResultNumber(), Py::alwaysBoundAttr))
+    {
+        return mlir::BoolAttr::get(getContext(), false);
+    }
+    return nullptr;
 }
 
 mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -744,7 +738,9 @@ mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, :
     {
         return mlir::failure();
     }
-    rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), functionAttr.getValue(), op.getCallOperands());
+    auto call =
+        rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), functionAttr.getValue(), op.getCallOperands());
+    call->setAttr(Py::alwaysBoundAttr, rewriter.getUnitAttr());
     return mlir::success();
 }
 
@@ -760,9 +756,10 @@ mlir::LogicalResult pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp o
     {
         return mlir::failure();
     }
-    rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, op.getType(), functionAttr.getValue(), op.getCallOperands(),
-                                              op.getNormalDestOperands(), op.getUnwindDestOperands(), op.getHappyPath(),
-                                              op.getExceptionPath());
+    auto call = rewriter.replaceOpWithNewOp<Py::InvokeOp>(
+        op, op.getType(), functionAttr.getValue(), op.getCallOperands(), op.getNormalDestOperands(),
+        op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
+    call->setAttr(Py::alwaysBoundAttr, rewriter.getUnitAttr());
     return mlir::success();
 }
 

@@ -1,7 +1,5 @@
 // RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
 
-// XFAIL: *
-
 py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__add__">)>}>
 py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.str = #py.type

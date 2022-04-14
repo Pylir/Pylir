@@ -33,12 +33,12 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
         return true;
     }
 
-    void handleTerminator(mlir::Operation* op, mlir::Block* newDest) const override
+    void handleTerminator(mlir::Operation*, mlir::Block*) const override
     {
         return;
     }
 
-    void handleTerminator(mlir::Operation* op, llvm::ArrayRef<mlir::Value> valuesToReplace) const override
+    void handleTerminator(mlir::Operation*, llvm::ArrayRef<mlir::Value>) const override
     {
         return;
     }
@@ -103,4 +103,34 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
         return builder.create<mlir::arith::ConstantOp>(loc, type, value);
     }
     return nullptr;
+}
+
+mlir::LogicalResult pylir::Py::PylirPyDialect::verifyOperationAttribute(mlir::Operation* op,
+                                                                        mlir::NamedAttribute attribute)
+{
+    if (attribute.getName() == alwaysBoundAttr)
+    {
+        if (!attribute.getValue().isa<mlir::UnitAttr>())
+        {
+            return op->emitOpError("Expected ") << alwaysBoundAttr << " to be a unit attr";
+        }
+        return mlir::success();
+    }
+    if (attribute.getName() == specializationOfAttr)
+    {
+        if (!attribute.getValue().isa<mlir::StringAttr>())
+        {
+            return op->emitOpError("Expected ") << specializationOfAttr << " to be a string attr";
+        }
+        return mlir::success();
+    }
+    if (attribute.getName() == specializationTypeAttr)
+    {
+        if (!attribute.getValue().isa<mlir::TypeAttr>())
+        {
+            return op->emitOpError("Expected ") << specializationTypeAttr << " to be a type attr";
+        }
+        return mlir::success();
+    }
+    return op->emitOpError("Unknown dialect attribute ") << attribute.getName();
 }

@@ -20,23 +20,23 @@ py.globalValue @builtins.int.__add__ = #py.function<@builtins.int.__add__$impl>
 py.globalValue const @builtins.int = #py.type<mroTuple = #py.tuple<(@builtins.int)>, slots = {__add__ = @builtins.int.__add__}>
 
 func @__init__() {
-  %0 = py.constant(@builtins.int)
-  %1 = py.constant(#py.int<1>)
-  %2 = py.constant(#py.int<0>)
-  cf.br ^bb1(%2 : !py.dynamic)
+	%one = py.constant(#py.int<1>)
+	%zero = py.constant(#py.int<0>)
+	cf.br ^loop(%zero : !py.dynamic)
 
-^bb1(%3: !py.dynamic):  // 2 preds: ^bb0, ^bb1
-  %4 = py.type.mro %0
-  %result, %success = py.mroLookup "__add__" in %4
-  %5 = py.makeTuple (%3, %1)
-  %6 = py.constant(#py.dict<{}>)
-  %7 = py.call @builtins.int.__add__$impl_0(%result, %5, %6) : (!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
-  %8 = test.random
-  cf.cond_br %8, ^bb1(%7 : !py.dynamic), ^bb2
+^loop(%iter : !py.dynamic):
+	%0 = py.typeOf %iter
+	%1 = py.type.mro %0
+	%2, %found = py.mroLookup "__add__" in %1
+	%3 = py.makeTuple (%iter, %one)
+	%4 = py.constant(#py.dict<{}>)
+	%5 = py.function.call %2(%2, %3, %4)
+	%6 = test.random
+	cf.cond_br %6, ^loop(%5 : !py.dynamic), ^exit
 
-^bb2:  // pred: ^bb1
-  test.use(%7) : !py.dynamic
-  py.unreachable
+^exit:
+	test.use(%5) : !py.dynamic
+	py.unreachable
 }
 
 func private @builtins.int.__add__$impl_0(%arg0: !py.dynamic {py.specialization_args = !py.unknown}, %arg1: !py.dynamic {py.specialization_args = !py.tuple<(!py.class<@builtins.int>, !py.class<@builtins.int>)>}, %arg2: !py.dynamic {py.specialization_args = !py.class<@builtins.dict>}) -> (!py.dynamic {py.specialization_args = !py.class<@builtins.int>}) attributes {py.specialization_of = "builtins.int.__add__$impl"} {
@@ -48,7 +48,21 @@ func private @builtins.int.__add__$impl_0(%arg0: !py.dynamic {py.specialization_
   return %2 : !py.dynamic
 }
 
-// CHECK-LABEL: func @builtins.int.__add__$impl
 // CHECK-LABEL: func @__init__
+// CHECK-DAG: %[[ONE:.*]] = py.constant(#py.int<1>)
+// CHECK-DAG: %[[ZERO:.*]] = py.constant(#py.int<0>)
+// CHECK-DAG: %[[INT_TYPE:.*]] = py.constant(@builtins.int)
+// CHECK: cf.br ^[[LOOP:.*]](%[[ZERO]] : {{.*}})
+// CHECK-NEXT: ^[[LOOP]]
+// CHECK-SAME: %[[ITER:[[:alnum:]]+]]
+// CHECK-NEXT: %[[MRO:.*]] = py.type.mro %[[INT_TYPE]]
+// CHECK-NEXT: %[[LOOKUP:.*]], %{{.*}} = py.mroLookup "__add__" in %[[MRO]]
+// CHECK-NEXT: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]], %[[ONE]])
+// CHECK-NEXT: %[[DICT:.*]] = py.constant(#py.dict<{}>)
+// CHECK-NEXT: %[[RESULT:.*]] = py.call @builtins.int.__add__$impl_0(%[[LOOKUP]], %[[TUPLE]], %[[DICT]])
+// CHECK: cf.cond_br %{{.*}}, ^[[LOOP]](%[[RESULT]] : {{.*}}), ^[[EXIT:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[EXIT]]:
+// CHECK-NEXT: test.use(%[[RESULT]])
+
 // CHECK-LABEL: func private @builtins.int.__add__$impl_0
 // CHECK-NOT: func {{.*}} @{{.*}}

@@ -165,18 +165,14 @@ class MonomorphFunctionImpl
     {
         mlir::FunctionOpInterface functionOpInterface;
         auto callee = callOp.getCallableForCallee();
-        std::vector<pylir::Py::ObjectTypeInterface> argTypes;
-        for (auto iter : callOp.getArgOperands())
+        std::vector<pylir::Py::ObjectTypeInterface> argTypes(callOp.getArgOperands().size());
+        for (auto iter : llvm::enumerate(callOp.getArgOperands()))
         {
-            auto lattice = m_lattices.find(iter);
+            auto lattice = m_lattices.find(iter.value());
             if (lattice != m_lattices.end())
             {
-                argTypes.push_back(lattice->second.type);
+                argTypes[iter.index()] = lattice->second.type;
                 continue;
-            }
-            if (auto objType = iter.getType().dyn_cast<pylir::Py::ObjectTypeInterface>())
-            {
-                argTypes.push_back(objType);
             }
         }
         if (auto ref = callee.dyn_cast<mlir::SymbolRefAttr>())
@@ -298,7 +294,7 @@ class MonomorphFunctionImpl
         }
         for (auto [blockArg, lattice] : llvm::zip(block->getArguments(), blockArgs))
         {
-            if (blockArg.getType().isa<pylir::Py::ObjectTypeInterface>())
+            if (blockArg.getType().isa<pylir::Py::DynamicType>())
             {
                 addLattice(blockArg, lattice.getValueOr(Lattice{pylir::Py::UnknownType::get(blockArg.getContext())}));
             }
@@ -388,8 +384,9 @@ public:
                 {
                     for (auto iter : m_currentOp->getResults())
                     {
-                        if (iter.getType().isa<pylir::Py::ObjectTypeInterface>()
-                            && m_lattices.try_emplace(iter, Lattice{iter.getType()}).second)
+                        if (iter.getType().isa<pylir::Py::DynamicType>()
+                            && m_lattices.try_emplace(iter, Lattice{pylir::Py::UnknownType::get(iter.getContext())})
+                                   .second)
                         {
                             m_inBlockChanged = true;
                         }
@@ -400,7 +397,7 @@ public:
                 llvm::SmallVector<pylir::Py::ObjectTypeInterface> operandTypes(m_currentOp->getNumOperands());
                 for (const auto& iter : llvm::enumerate(m_currentOp->getOperands()))
                 {
-                    if (iter.value().getType().isa<pylir::Py::ObjectTypeInterface>())
+                    if (iter.value().getType().isa<pylir::Py::DynamicType>())
                     {
                         operandTypes[iter.index()] = m_lattices.find(iter.value())->second.type;
                     }
@@ -495,13 +492,40 @@ void Monomorph::runOnOperation()
     llvm::SmallVector<mlir::FunctionOpInterface> roots;
     for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
     {
-        if (llvm::none_of(iter.getArgumentTypes(),
-                          [](mlir::Type type) { return type.isa<pylir::Py::ObjectTypeInterface>(); }))
+        if (llvm::none_of(iter.getArgumentTypes(), [](mlir::Type type) { return type.isa<pylir::Py::DynamicType>(); }))
         {
             roots.push_back(iter);
         }
     }
 
+    llvm::DenseMap<FunctionSpecialization, mlir::FunctionOpInterface> existingSpecializations;
+    for (auto func : getOperation().getOps<mlir::FunctionOpInterface>())
+    {
+        auto ref = func->getAttrOfType<mlir::StringAttr>(pylir::Py::specializationOfAttr);
+        if (!ref)
+        {
+            continue;
+        }
+        auto genericVersion = symbolTable.lookup(ref);
+        if (!genericVersion)
+        {
+            continue;
+        }
+        std::vector<pylir::Py::ObjectTypeInterface> argTypes(func.getNumArguments());
+        if (auto argAttr = func.getAllArgAttrs())
+        {
+            for (auto iter : llvm::enumerate(argAttr.getAsRange<mlir::DictionaryAttr>()))
+            {
+                auto spec = iter.value().getAs<mlir::TypeAttr>(pylir::Py::specializationTypeAttr);
+                if (!spec)
+                {
+                    continue;
+                }
+                argTypes[iter.index()] = spec.getValue().dyn_cast<pylir::Py::ObjectTypeInterface>();
+            }
+        }
+        existingSpecializations.insert({FunctionSpecialization{genericVersion, std::move(argTypes)}, func});
+    }
     MonomorphModuleInfo info;
     for (auto& iter : roots)
     {
@@ -519,6 +543,10 @@ void Monomorph::runOnOperation()
                 auto& funcSpecs = pylir::get<std::vector<FunctionSpecialization>>(continuation);
                 for (auto& funcSpec : funcSpecs)
                 {
+                    if (auto spec = existingSpecializations.lookup(funcSpec))
+                    {
+                        funcSpec.function = spec;
+                    }
                     if (const auto* result = info.lookup(funcSpec))
                     {
                         currentExecutionStack[parentFrame].addCallResult(result->returnType);
@@ -564,15 +592,34 @@ void Monomorph::runOnOperation()
     for (const auto& [key, value] : info.getCalculatedSpecializations())
     {
         auto funcOp = mlir::cast<mlir::FunctionOpInterface>(key.function);
-        if (llvm::equal(funcOp.getArgumentTypes(), key.argTypes))
         {
-            if (funcOp.getNumResults() == 1 && funcOp.getResultTypes()[0] != value.returnType)
+            llvm::SmallVector<pylir::Py::ObjectTypeInterface> argTypes(funcOp.getNumArguments());
+            if (auto argAttr = funcOp.getAllArgAttrs())
             {
-                m_typesRefined++;
-                funcOp.setType(mlir::FunctionType::get(&getContext(), funcOp.getArgumentTypes(), value.returnType));
-                changed = true;
+                for (auto iter : llvm::enumerate(argAttr.getAsRange<mlir::DictionaryAttr>()))
+                {
+                    auto spec = iter.value().getAs<mlir::TypeAttr>(pylir::Py::specializationTypeAttr);
+                    if (!spec)
+                    {
+                        continue;
+                    }
+                    argTypes[iter.index()] = spec.getValue().dyn_cast<pylir::Py::ObjectTypeInterface>();
+                }
             }
-            continue;
+            if (llvm::equal(argTypes, key.argTypes))
+            {
+                if (funcOp.getNumResults() != 1)
+                {
+                    continue;
+                }
+                auto resultAttr = funcOp.getResultAttrOfType<mlir::TypeAttr>(0, pylir::Py::specializationTypeAttr);
+                if (!resultAttr || resultAttr.getValue().dyn_cast<pylir::Py::ObjectTypeInterface>() != value.returnType)
+                {
+                    funcOp.setResultAttr(0, pylir::Py::specializationTypeAttr, mlir::TypeAttr::get(value.returnType));
+                    changed = true;
+                }
+                continue;
+            }
         }
 
         changed = true;
@@ -582,20 +629,29 @@ void Monomorph::runOnOperation()
         mlir::cast<mlir::SymbolOpInterface>(*clone).setPrivate();
         symbolTable.insert(clone);
         llvm::SmallVector<mlir::Type> argTypes(key.argTypes.begin(), key.argTypes.end());
-        clone.setType(mlir::FunctionType::get(&getContext(), argTypes, value.returnType));
-        // Changing the function type also requires changing the block arguments of the entry block, but this is done
-        // below through the lattices
+        clone.setResultAttr(0, pylir::Py::specializationTypeAttr, mlir::TypeAttr::get(value.returnType));
+        for (auto& iter : llvm::enumerate(argTypes))
+        {
+            if (!iter.value())
+            {
+                continue;
+            }
+            clone.setArgAttr(iter.index(), pylir::Py::specializationTypeAttr, mlir::TypeAttr::get(iter.value()));
+        }
+        clone->setAttr(pylir::Py::specializationOfAttr, mlir::cast<mlir::SymbolOpInterface>(*funcOp).getNameAttr());
         functionClones.insert({key, {clone, std::move(mapping)}});
     }
 
     for (const auto& [key, value] : info.getCalculatedSpecializations())
     {
         mlir::FunctionOpInterface funcOp = key.function;
+        mlir::BlockAndValueMapping* mapping = nullptr;
         {
             auto result = functionClones.find(key);
             if (result != functionClones.end())
             {
                 funcOp = result->second.clone;
+                mapping = &result->second.mapping;
             }
         }
 
@@ -610,6 +666,7 @@ void Monomorph::runOnOperation()
                 {
                     return;
                 }
+                m_operationsReplaced++;
                 if (auto val = result.dyn_cast<mlir::Value>())
                 {
                     foldable->getResult(0).replaceAllUsesWith(val);
@@ -630,42 +687,75 @@ void Monomorph::runOnOperation()
                 }
             });
 
-        auto setCallee = [](mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
+        auto setCallee = [this](mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
         {
-            llvm::TypeSwitch<mlir::Operation*>(op)
-                .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>([&](auto&& op) { op.setCalleeAttr(callee); })
+            return llvm::TypeSwitch<mlir::Operation*, bool>(op)
+                .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>(
+                    [&](auto&& op)
+                    {
+                        if (op.getCalleeAttr() == callee)
+                        {
+                            return false;
+                        }
+                        op.setCalleeAttr(callee);
+                        return true;
+                    })
                 .Case(
                     [&](pylir::Py::FunctionCallOp op)
                     {
+                        m_callsTurnedStatic++;
                         mlir::OpBuilder builder(op);
                         auto newCall = builder.create<pylir::Py::CallOp>(op.getLoc(), op->getResultTypes(), callee,
                                                                          op.getCallOperands());
                         op->replaceAllUsesWith(newCall);
                         op->erase();
+                        return true;
                     })
                 .Case(
                     [&](pylir::Py::FunctionInvokeOp op)
                     {
+                        m_callsTurnedStatic++;
                         mlir::OpBuilder builder(op);
                         auto newCall = builder.create<pylir::Py::InvokeOp>(
                             op.getLoc(), op->getResultTypes(), callee, op.getCallOperands(), op.getNormalDestOperands(),
                             op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
                         op->replaceAllUsesWith(newCall);
                         op->erase();
-                    });
+                        return true;
+                    })
+                .Default([](auto&&) -> bool { PYLIR_UNREACHABLE; });
         };
 
-        for (const auto& [call, specs] : value.callSites)
+        for (auto& iter : value.callSites)
         {
+            mlir::Operation* call = iter.first;
+            auto& specs = iter.second;
+            if (mapping)
+            {
+                // TODO: Map call properly (not like the following code) as soon as it is supported by
+                // BlockAndValueMapping
+                if (call->getNumResults() == 0)
+                {
+                    // TODO: Fix in MLIR
+                    PYLIR_UNREACHABLE;
+                }
+                call = mapping->lookupOrDefault(call->getResult(0)).getDefiningOp();
+            }
             if (specs.size() == 1)
             {
-                auto clone = functionClones.find(*specs.begin());
-                if (clone == functionClones.end())
+                mlir::FlatSymbolRefAttr fixedCall = mlir::FlatSymbolRefAttr::get(specs.begin()->function);
+                if (auto clone = functionClones.find(*specs.begin()); clone != functionClones.end())
                 {
-                    continue;
+                    fixedCall = mlir::FlatSymbolRefAttr::get(clone->second.clone);
                 }
-                changed = true;
-                setCallee(call, mlir::FlatSymbolRefAttr::get(clone->second.clone));
+                else if (auto spec = existingSpecializations.lookup(*specs.begin()))
+                {
+                    fixedCall = mlir::FlatSymbolRefAttr::get(spec);
+                }
+                if (setCallee(call, fixedCall))
+                {
+                    changed = true;
+                }
                 continue;
             }
             // TODO:

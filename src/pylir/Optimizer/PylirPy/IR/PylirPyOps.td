@@ -316,6 +316,7 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, DeclareOpIn
 // Function ops
 
 def PylirPy_FunctionCallOp : PylirPy_Op<"function.call", [DeclareOpInterfaceMethods<CallOpInterface>,
+														  AlwaysBound,
 														  AddableExceptionHandling<"FunctionInvokeOp, 1, -1">]> {
     let arguments = (ins DynamicType:$function, Variadic<DynamicType>:$call_operands);
     let results = (outs DynamicType:$result);
