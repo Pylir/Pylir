@@ -10,7 +10,6 @@
 #include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 #include <pylir/Support/Variant.hpp>
 
-#include <optional>
 #include <queue>
 #include <stack>
 #include <variant>
@@ -734,12 +733,16 @@ void Monomorph::runOnOperation()
             {
                 // TODO: Map call properly (not like the following code) as soon as it is supported by
                 // BlockAndValueMapping
-                if (call->getNumResults() == 0)
+                if (call->getNumResults() != 0)
                 {
-                    // TODO: Fix in MLIR
-                    PYLIR_UNREACHABLE;
+                    call = mapping->lookupOrDefault(call->getResult(0)).getDefiningOp();
                 }
-                call = mapping->lookupOrDefault(call->getResult(0)).getDefiningOp();
+                else
+                {
+                    auto* mappedBlock = mapping->lookupOrDefault(call->getBlock());
+                    auto distance = std::distance(call->getBlock()->begin(), mlir::Block::iterator{call});
+                    call = &*std::next(mappedBlock->begin(), distance);
+                }
             }
             if (specs.size() == 1)
             {
