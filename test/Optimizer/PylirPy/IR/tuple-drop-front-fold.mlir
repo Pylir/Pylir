@@ -3,22 +3,22 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @test() -> !py.unknown {
-    %0 = py.constant(#py.tuple<(@builtins.tuple)>) : !py.unknown
+func @test() -> !py.dynamic {
+    %0 = py.constant(#py.tuple<(@builtins.tuple)>)
     %1 = arith.constant 1 : index
-    %result = py.tuple.dropFront %1, %0 : (!py.unknown) -> !py.unknown
-    return %result : !py.unknown
+    %result = py.tuple.dropFront %1, %0
+    return %result : !py.dynamic
 }
 
 // CHECK-LABEL: @test
 // CHECK-DAG: %[[C2:.*]] = py.constant(#py.tuple<()>)
 // CHECK: return %[[C2]]
 
-func @test2(%arg0 : !py.unknown, %arg1 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0, %arg1) : (!py.unknown, !py.unknown) -> !py.unknown
+func @test2(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0, %arg1)
     %1 = arith.constant 1 : index
-    %result = py.tuple.dropFront %1, %0 : (!py.unknown) -> !py.unknown
-    return %result : !py.unknown
+    %result = py.tuple.dropFront %1, %0
+    return %result : !py.dynamic
 }
 
 // CHECK-LABEL: @test2

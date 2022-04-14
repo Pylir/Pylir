@@ -5,10 +5,10 @@ py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
 
-func @lookup(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.constant(#py.str<"key">) : !py.unknown
-    %1, %2 = py.dict.tryGetItem %arg0[%0] : (!py.unknown, !py.unknown) -> !py.unknown
-    return %1 : !py.unknown
+func @lookup(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant(#py.str<"key">)
+    %1, %2 = py.dict.tryGetItem %arg0[%0]
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: llvm.func @lookup
@@ -28,9 +28,9 @@ py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
 
-func @insert(%arg0 : !py.unknown, %value : !py.unknown) {
-    %0 = py.constant(#py.str<"key">) : !py.unknown
-    py.dict.setItem %arg0[%0] to %value : !py.unknown, !py.unknown, !py.unknown
+func @insert(%arg0 : !py.dynamic, %value : !py.dynamic) {
+    %0 = py.constant(#py.str<"key">)
+    py.dict.setItem %arg0[%0] to %value
     return
 }
 

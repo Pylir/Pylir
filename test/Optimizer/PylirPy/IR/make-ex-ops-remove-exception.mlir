@@ -4,17 +4,17 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
-func @make_tuple_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeTupleEx (*%0, %1) : (!py.unknown, !py.unknown) -> !py.unknown
+func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0)
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeTupleEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
-    return %2 : !py.unknown
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_tuple_ex_op_unique
@@ -28,17 +28,17 @@ func @make_tuple_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_tuple_ex_op(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeTupleEx (*%0, %1) : (!py.unknown, !py.unknown) -> !py.unknown
+func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0)
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeTupleEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
-    return %2 : !py.unknown
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_tuple_ex_op
@@ -52,17 +52,17 @@ func @make_tuple_ex_op(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_list_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeListEx (*%0, %1) : !py.unknown, !py.unknown
+func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0)
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeListEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
-    py.return %2 : !py.class<@builtins.list>
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_list_ex_op_unique
@@ -73,20 +73,20 @@ func @make_list_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.int = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
-func @make_list_ex_op(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeListEx (*%0, %1) : !py.unknown, !py.unknown
+func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0)
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeListEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
-    py.return %2 : !py.class<@builtins.list>
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_list_ex_op
@@ -97,20 +97,20 @@ func @make_list_ex_op(%arg0 : !py.unknown) -> !py.unknown {
 
 // -----
 
-py.globalValue @builtins.type = #py.type<>
-py.globalValue @builtins.int = #py.type<>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
 
-func @make_set_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeSetEx (*%0, %1) : !py.unknown, !py.unknown
+func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0)
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeSetEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
-    py.return %2 : !py.class<@builtins.set>
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_set_ex_op_unique
@@ -124,17 +124,17 @@ func @make_set_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_set_ex_op(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeSetEx (*%0, %1) : !py.unknown, !py.unknown
+func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0)
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeSetEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
-    py.return %2 : !py.class<@builtins.set>
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_set_ex_op
@@ -148,16 +148,16 @@ func @make_set_ex_op(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_dict_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeDictEx (%1 : %arg0) : (!py.unknown), (!py.unknown)
+func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeDictEx (%1 : %arg0)
         label ^happy unwind ^failure
 
 ^happy:
-    py.return %2 : !py.class<@builtins.dict>
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_dict_ex_op_unique
@@ -171,16 +171,16 @@ func @make_dict_ex_op_unique(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_dict_ex_op(%arg0 : !py.unknown) -> !py.unknown {
-    %1 = py.constant(#py.int<3>) : !py.unknown
-    %2 = py.makeDictEx (%1 : %arg0) : (!py.unknown), (!py.unknown)
+func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    %1 = py.constant(#py.int<3>)
+    %2 = py.makeDictEx (%1 : %arg0)
         label ^happy unwind ^failure
 
 ^happy:
-    py.return %2 : !py.class<@builtins.dict>
+    return %2 : !py.dynamic
 
-^failure(%e : !py.unknown):
-    return %e : !py.unknown
+^failure(%e : !py.dynamic):
+    return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @make_dict_ex_op

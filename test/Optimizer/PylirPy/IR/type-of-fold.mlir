@@ -1,9 +1,9 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-func @make_object(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeObject %arg0 : (!py.unknown) -> !py.unknown
-    %1 = py.typeOf %0 : (!py.unknown) -> !py.unknown
-    return %1 : !py.unknown
+func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeObject %arg0
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_object
@@ -15,10 +15,10 @@ func @make_object(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
-func @constant_obj() -> !py.unknown {
-    %0 = py.constant(#py.obj<@a>) : !py.unknown
-    %1 = py.typeOf %0 : (!py.unknown) -> !py.unknown
-    return %1 : !py.unknown
+func @constant_obj() -> !py.dynamic {
+    %0 = py.constant(#py.obj<@a>)
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @constant_obj
@@ -30,10 +30,10 @@ func @constant_obj() -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
-func @global_value() -> !py.unknown {
-    %0 = py.constant(@a) : !py.unknown
-    %1 = py.typeOf %0 : (!py.unknown) -> !py.unknown
-    return %1 : !py.unknown
+func @global_value() -> !py.dynamic {
+    %0 = py.constant(@a)
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @global_value
@@ -45,10 +45,10 @@ func @global_value() -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @str_copy(%arg0 : !py.unknown, %arg1 : !py.unknown) -> !py.unknown {
-    %0 = py.str.copy %arg0 : %arg1 : (!py.unknown, !py.unknown) -> !py.unknown
-    %1 = py.typeOf %0 : (!py.unknown) -> !py.unknown
-    return %1 : !py.unknown
+func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.str.copy %arg0 : %arg1
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @str_copy

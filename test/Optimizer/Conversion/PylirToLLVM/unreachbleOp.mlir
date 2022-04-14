@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @test(%arg : !py.unknown) -> !py.unknown {
+func @test(%arg : !py.dynamic) -> !py.dynamic {
     py.unreachable
 }
 

@@ -93,11 +93,11 @@ def PylirPy_VariantType : PylirPy_ObjectType<"Variant"> {
 	}];
 }
 
-class BuiltinType<string name> : TypeAlias<PylirPy_ClassType> {
-	let builderCall = "$_builder.getType<::pylir::Py::ClassType>(mlir::FlatSymbolRefAttr::get($_builder.getContext(), pylir::Py::Builtins::" # name # ".name), llvm::None)";
+def DynamicType : PylirPy_Type<"Dynamic"> {
+	let mnemonic = "dynamic";
+	let summary = "dynamic type";
 }
 
-defvar DynamicType = ObjectTypeInterfaceC;
 defvar IntegerLike = TypeConstraint<Or<[Index.predicate, AnySignlessInteger.predicate]>>;
 def PyFunctionType : Type<
     And<[

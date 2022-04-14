@@ -307,9 +307,11 @@ class MonomorphFunctionImpl
 
     void evalTerminator(mlir::Operation* terminator)
     {
-        if (auto retOp = mlir::dyn_cast<pylir::Py::ReturnOp>(terminator); retOp && retOp.operands().size() == 1)
+        if (terminator->hasTrait<mlir::OpTrait::ReturnLike>()
+            && mlir::isa<mlir::FunctionOpInterface>(terminator->getParentOp()) && terminator->getOperands().size() == 1)
         {
-            m_returnType = pylir::Py::joinTypes(m_returnType, m_lattices.find(retOp.operands()[0])->second.type);
+            m_returnType =
+                pylir::Py::joinTypes(m_returnType, m_lattices.find(terminator->getOperands()[0])->second.type);
         }
         if (!m_inBlockChanged)
         {
@@ -589,29 +591,12 @@ void Monomorph::runOnOperation()
     for (const auto& [key, value] : info.getCalculatedSpecializations())
     {
         mlir::FunctionOpInterface funcOp = key.function;
-        mlir::BlockAndValueMapping* mapping = nullptr;
         {
             auto result = functionClones.find(key);
             if (result != functionClones.end())
             {
-                mapping = &result->second.mapping;
                 funcOp = result->second.clone;
             }
-        }
-        for (const auto& [value, lattice] : value.lattices)
-        {
-            auto valueToUse = value;
-            if (mapping)
-            {
-                valueToUse = mapping->lookup(valueToUse);
-            }
-            if (valueToUse.getType() == lattice.type)
-            {
-                continue;
-            }
-            valueToUse.setType(lattice.type);
-            m_typesRefined++;
-            changed = true;
         }
 
         funcOp.walk(

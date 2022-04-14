@@ -1,7 +1,7 @@
 
 #include "PylirPyDialect.hpp"
 
-#include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Transforms/InliningUtils.h>
 
 #include <llvm/ADT/TypeSwitch.h>
@@ -35,27 +35,12 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
 
     void handleTerminator(mlir::Operation* op, mlir::Block* newDest) const override
     {
-        auto ret = mlir::dyn_cast<pylir::Py::ReturnOp>(op);
-        if (!ret)
-        {
-            return;
-        }
-        mlir::OpBuilder builder(op);
-        builder.create<pylir::Py::BranchOp>(op->getLoc(), newDest, ret.operands());
-        op->erase();
+        return;
     }
 
     void handleTerminator(mlir::Operation* op, llvm::ArrayRef<mlir::Value> valuesToReplace) const override
     {
-        auto ret = mlir::dyn_cast<pylir::Py::ReturnOp>(op);
-        if (!ret)
-        {
-            return;
-        }
-        for (auto [value, op] : llvm::zip(valuesToReplace, ret.operands()))
-        {
-            value.replaceAllUsesWith(op);
-        }
+        return;
     }
 
     void processInlinedCallBlocks(mlir::Operation* call,
@@ -88,15 +73,9 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
             mlir::OpBuilder builder(raise);
             auto ops = llvm::to_vector(invoke.getUnwindDestOperands());
             ops.insert(ops.begin(), raise.getException());
-            builder.create<pylir::Py::BranchOp>(raise.getLoc(), handler, ops);
+            builder.create<mlir::cf::BranchOp>(raise.getLoc(), handler, ops);
             raise.erase();
         }
-    }
-
-    mlir::Operation* materializeCallConversion(mlir::OpBuilder& builder, mlir::Value input, mlir::Type resultType,
-                                               mlir::Location conversionLoc) const override
-    {
-        return builder.create<pylir::Py::ReinterpretOp>(conversionLoc, resultType, input);
     }
 };
 } // namespace
@@ -115,18 +94,13 @@ void pylir::Py::PylirPyDialect::initialize()
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
                                                                 ::mlir::Type type, ::mlir::Location loc)
 {
-    if (type.isa<Py::ObjectTypeInterface>())
+    if (type.isa<Py::DynamicType>())
     {
         return builder.create<Py::ConstantOp>(loc, type, value);
     }
     if (mlir::arith::ConstantOp::isBuildableWith(value, type))
     {
         return builder.create<mlir::arith::ConstantOp>(loc, type, value);
-    }
-    if (auto ref = value.dyn_cast<mlir::FlatSymbolRefAttr>();
-        ref && mlir::func::ConstantOp::isBuildableWith(value, type))
-    {
-        return builder.create<mlir::func::ConstantOp>(loc, type, ref);
     }
     return nullptr;
 }

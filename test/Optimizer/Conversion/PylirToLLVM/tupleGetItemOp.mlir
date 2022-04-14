@@ -1,8 +1,8 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @test(%arg : !py.unknown, %index : index) -> !py.unknown {
-    %0 = py.tuple.getItem %arg[%index] : (!py.unknown) -> !py.unknown
-    return %0 : !py.unknown
+func @test(%arg : !py.dynamic, %index : index) -> !py.dynamic {
+    %0 = py.tuple.getItem %arg[%index]
+    return %0 : !py.dynamic
 }
 
 // CHECK: @test

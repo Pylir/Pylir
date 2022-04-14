@@ -5,11 +5,11 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.str = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func @foo(%arg0 : !py.unknown, %arg1 : !py.unknown) -> !py.unknown {
-    %0 = py.constant(@builtins.str) : !py.unknown
-    %1 = pyMem.gcAllocObject %0 : !py.unknown
-    %2 = pyMem.initStr %1 to %arg0, %arg1 : (!py.unknown, !py.unknown) -> !py.unknown
-    return %2 : !py.unknown
+func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant(@builtins.str)
+    %1 = pyMem.gcAllocObject %0
+    %2 = pyMem.initStr %1 to %arg0, %arg1
+    return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @foo

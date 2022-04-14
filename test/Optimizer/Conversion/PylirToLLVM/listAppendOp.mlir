@@ -4,8 +4,8 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.list = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func @foo(%list : !py.unknown, %item : !py.unknown) {
-    py.list.append %list, %item : !py.unknown, !py.unknown
+func @foo(%list : !py.dynamic, %item : !py.dynamic) {
+    py.list.append %list, %item
     return
 }
 

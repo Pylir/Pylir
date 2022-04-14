@@ -1,5 +1,6 @@
 #include "InlinerUtil.hpp"
 
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Transforms/InliningUtils.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -29,7 +30,7 @@ mlir::LogicalResult pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::Call
             destBlock = after->getPrevNode();
         }
         auto builder = mlir::OpBuilder::atBlockEnd(destBlock);
-        builder.create<pylir::Py::BranchOp>(invoke.getLoc(), invoke.getHappyPath(), invoke.getNormalDestOperands());
+        builder.create<mlir::cf::BranchOp>(invoke.getLoc(), invoke.getHappyPath(), invoke.getNormalDestOperands());
     }
     call.erase();
     return mlir::success();

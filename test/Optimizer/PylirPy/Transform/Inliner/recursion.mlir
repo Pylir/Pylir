@@ -5,7 +5,7 @@
 func @test(%arg0 : i32) -> i32 {
     %0 = arith.constant 0 : i32
     %1 = arith.cmpi eq, %arg0, %0 : i32
-    py.cond_br %1, ^exit, ^tail
+    cf.cond_br %1, ^exit, ^tail
 
 ^exit:
     return %0 : i32

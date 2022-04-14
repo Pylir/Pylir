@@ -1,6 +1,5 @@
 #include "PylirPyOps.hpp"
 
-#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OpImplementation.h>
@@ -16,10 +15,6 @@
 
 namespace
 {
-bool objectTypesCompatible(mlir::Type lhs, mlir::Type rhs)
-{
-    return (lhs == rhs) || (lhs.isa<pylir::Py::ObjectTypeInterface>() && rhs.isa<pylir::Py::ObjectTypeInterface>());
-}
 
 template <class T>
 mlir::Operation* cloneWithoutExceptionHandlingImpl(mlir::OpBuilder& builder, T exceptionOp,
@@ -265,92 +260,7 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
     printer << ')';
 }
 
-template <class... Args,
-          std::enable_if_t<(std::is_convertible_v<Args&, llvm::SmallVectorImpl<mlir::Type>&> && ...)>* = nullptr>
-bool parseOptionalTypeList(mlir::OpAsmParser& parser, Args&... types)
-{
-    if (parser.parseOptionalColon())
-    {
-        return false;
-    }
-    std::array<llvm::SmallVectorImpl<mlir::Type>*, sizeof...(Args)> array = {&types...};
-    if constexpr (sizeof...(Args) == 1)
-    {
-        return static_cast<bool>(parser.parseTypeList(*array[0]));
-    }
-    else
-    {
-        auto parseOnce = [&](llvm::SmallVectorImpl<mlir::Type>& list)
-        { return parser.parseLParen() || parser.parseTypeList(list) || parser.parseRParen(); };
-        if (parseOnce(*array[0]))
-        {
-            return true;
-        }
-        for (std::size_t i = 1; i < array.size(); i++)
-        {
-            if (parser.parseComma() || parseOnce(*array[i]))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-}
-
-template <class... Args, std::enable_if_t<(std::is_convertible_v<Args, mlir::TypeRange> && ...)>* = nullptr>
-void printOptionalTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, Args... types)
-{
-    if ((types.empty() && ...))
-    {
-        return;
-    }
-    std::array<mlir::TypeRange, sizeof...(Args)> array = {types...};
-    printer << " : ";
-    if constexpr (sizeof...(types) == 1)
-    {
-        printer << array[0];
-    }
-    else
-    {
-        llvm::interleaveComma(array, printer.getStream(), [&](mlir::TypeRange type) { printer << '(' << type << ')'; });
-    }
-}
-
 } // namespace
-
-mlir::SuccessorOperands pylir::Py::BranchOp::getSuccessorOperands(unsigned int)
-{
-    return mlir::SuccessorOperands(getArgumentsMutable());
-}
-
-bool pylir::Py::BranchOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
-}
-
-mlir::SuccessorOperands pylir::Py::CondBranchOp::getSuccessorOperands(unsigned int index)
-{
-    if (index == 0)
-    {
-        return mlir::SuccessorOperands(getTrueArgsMutable());
-    }
-    return mlir::SuccessorOperands(getFalseArgsMutable());
-}
-
-mlir::Block* pylir::Py::CondBranchOp::getSuccessorForOperands(::mlir::ArrayRef<::mlir::Attribute> operands)
-{
-    auto boolean = operands[0].dyn_cast_or_null<mlir::BoolAttr>();
-    if (!boolean)
-    {
-        return nullptr;
-    }
-    return boolean.getValue() ? getTrueBranch() : getFalseBranch();
-}
-
-bool pylir::Py::CondBranchOp::areTypesCompatible(::mlir::Type lhs, ::mlir::Type rhs)
-{
-    return objectTypesCompatible(lhs, rhs);
-}
 
 void pylir::Py::MakeTupleOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
@@ -377,9 +287,16 @@ template <class SymbolOp>
 mlir::LogicalResult verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
                                     mlir::SymbolTableCollection& symbolTable)
 {
-    if (!symbolTable.lookupNearestSymbolFrom<SymbolOp>(op, name))
+    if (auto symbol = symbolTable.lookupNearestSymbolFrom(op, name))
     {
-        return op->emitOpError("Failed to find ") << SymbolOp::getOperationName() << " named " << name;
+        if (!mlir::isa<SymbolOp>(symbol))
+        {
+            return op->emitOpError("Expected ") << name << " to be of different type, not " << symbol->getName();
+        }
+    }
+    else
+    {
+        return op->emitOpError("Failed to find symbol named ") << name;
     }
     return mlir::success();
 }
@@ -397,11 +314,11 @@ mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableColl
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::func::FuncOp>(*this, getFunctionAttr(), symbolTable);
+    return verifySymbolUse<mlir::FunctionOpInterface>(*this, getFunctionAttr(), symbolTable);
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                   Py::ObjectTypeInterface type, llvm::ArrayRef<::pylir::Py::IterArg> args)
+                                   llvm::ArrayRef<::pylir::Py::IterArg> args)
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
@@ -415,7 +332,7 @@ void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, type, values, odsBuilder.getI32ArrayAttr(iterExpansion));
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
 }
 
 void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -493,8 +410,7 @@ mlir::LogicalResult verifyCall(::mlir::SymbolTableCollection& symbolTable, mlir:
     {
         operandTypes.push_back(iter.getType());
     }
-    if (!std::equal(argumentTypes.begin(), argumentTypes.end(), operandTypes.begin(), operandTypes.end(),
-                    &objectTypesCompatible))
+    if (!std::equal(argumentTypes.begin(), argumentTypes.end(), operandTypes.begin(), operandTypes.end()))
     {
         return call->emitOpError("call operand types are not compatible with argument types of '") << callee << "'";
     }
@@ -553,9 +469,9 @@ mlir::Operation::operand_range pylir::Py::FunctionInvokeOp::getArgOperands()
 }
 
 void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                     Py::ObjectTypeInterface type, llvm::ArrayRef<::pylir::Py::IterArg> args,
-                                     mlir::Block* happyPath, mlir::ValueRange normalDestOperands,
-                                     mlir::Block* unwindPath, mlir::ValueRange unwindDestOperands)
+                                     llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
+                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
+                                     mlir::ValueRange unwindDestOperands)
 {
     std::vector<mlir::Value> values;
     std::vector<std::int32_t> iterExpansion;
@@ -569,7 +485,7 @@ void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, type, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
 }
 
@@ -767,7 +683,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     return op->emitOpError("Expected function attribute to contain a symbol reference\n");
                 }
                 auto table = mlir::SymbolTable(mlir::SymbolTable::getNearestSymbolTable(op));
-                if (!table.lookup<mlir::FuncOp>(functionAttr.getValue().getValue()))
+                if (!table.lookup<mlir::FunctionOpInterface>(functionAttr.getValue().getValue()))
                 {
                     return op->emitOpError("Expected function attribute to refer to a function\n");
                 }
@@ -853,14 +769,6 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
 
 mlir::LogicalResult pylir::Py::ConstantOp::verify()
 {
-    for (auto& uses : getOperation()->getUses())
-    {
-        if (auto interface = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(uses.getOwner());
-            interface && interface.getEffectOnValue<mlir::MemoryEffects::Write>(*this))
-        {
-            return uses.getOwner()->emitOpError("Write to a constant value is not allowed\n");
-        }
-    }
     return ::verify(*this, getConstantAttr());
 }
 
@@ -869,28 +777,6 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
     if (!isDeclaration())
     {
         return ::verify(*this, getInitializerAttr());
-    }
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::Py::ReturnOp::verify()
-{
-    auto parent = mlir::dyn_cast_or_null<mlir::FunctionOpInterface>((*this)->getParentOp());
-    if (!parent)
-    {
-        return (*this)->emitOpError("expected inside of a function op");
-    }
-    llvm::SmallVector<mlir::Type> operandTypes;
-    for (auto iter : operands())
-    {
-        operandTypes.push_back(iter.getType());
-    }
-    auto resultTypes = parent.getResultTypes();
-    if (!std::equal(resultTypes.begin(), resultTypes.end(), operandTypes.begin(), operandTypes.end(),
-                    &objectTypesCompatible))
-    {
-        return (*this)->emitOpError("operands are not compatible with enclosed function '")
-               << mlir::FlatSymbolRefAttr::get(parent) << "'s return types";
     }
     return mlir::success();
 }

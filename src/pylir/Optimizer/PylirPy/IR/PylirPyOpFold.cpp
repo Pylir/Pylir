@@ -1,5 +1,5 @@
 
-#include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/IR/Matchers.h>
 
 #include <llvm/ADT/StringSet.h>
@@ -80,7 +80,7 @@ protected:
                                                                      return constant->getDialect()
                                                                          ->materializeConstant(
                                                                              builder, attribute,
-                                                                             builder.getType<pylir::Py::UnknownType>(),
+                                                                             builder.getType<pylir::Py::DynamicType>(),
                                                                              op.getLoc())
                                                                          ->getResult(0);
                                                                  });
@@ -101,15 +101,7 @@ struct MakeOpTupleExpansionRemove : TupleExpansionRemover<T>
 
     void rewrite(T op, mlir::PatternRewriter& rewriter) const override
     {
-        auto newArgs = this->getNewExpansions(op, rewriter);
-        if constexpr (std::is_same_v<T, pylir::Py::MakeTupleOp>)
-        {
-            rewriter.replaceOpWithNewOp<T>(op, op.getType(), newArgs);
-        }
-        else
-        {
-            rewriter.replaceOpWithNewOp<T>(op, newArgs);
-        }
+        rewriter.replaceOpWithNewOp<T>(op, this->getNewExpansions(op, rewriter));
     }
 };
 
@@ -120,17 +112,8 @@ struct MakeExOpTupleExpansionRemove : TupleExpansionRemover<T>
 
     void rewrite(T op, mlir::PatternRewriter& rewriter) const override
     {
-        auto newArgs = this->getNewExpansions(op, rewriter);
-        if constexpr (std::is_same_v<T, pylir::Py::MakeTupleExOp>)
-        {
-            rewriter.replaceOpWithNewOp<T>(op, op.getType(), newArgs, op.getHappyPath(), op.getNormalDestOperands(),
-                                           op.getExceptionPath(), op.getUnwindDestOperands());
-        }
-        else
-        {
-            rewriter.replaceOpWithNewOp<T>(op, newArgs, op.getHappyPath(), op.getNormalDestOperands(),
-                                           op.getExceptionPath(), op.getUnwindDestOperands());
-        }
+        rewriter.replaceOpWithNewOp<T>(op, this->getNewExpansions(op, rewriter), op.getHappyPath(),
+                                       op.getNormalDestOperands(), op.getExceptionPath(), op.getUnwindDestOperands());
     }
 };
 
@@ -151,46 +134,12 @@ struct MakeExOpExceptionSimplifier : mlir::OpRewritePattern<ExOp>
             auto newOp = op.cloneWithoutExceptionHandling(rewriter);
             rewriter.replaceOp(op, newOp->getResults());
             rewriter.setInsertionPointAfter(newOp);
-            rewriter.create<pylir::Py::BranchOp>(newOp->getLoc(), happyPath);
+            rewriter.create<mlir::cf::BranchOp>(newOp->getLoc(), happyPath);
             return mlir::success();
         }
         rewriter.mergeBlocks(happyPath, op->getBlock(), op.getNormalDestOperands());
         auto newOp = op.cloneWithoutExceptionHandling(rewriter);
         rewriter.replaceOp(op, newOp->getResults());
-        return mlir::success();
-    }
-};
-
-struct NoopBranchRemove : mlir::OpRewritePattern<pylir::Py::BranchOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::BranchOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::BranchOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        if (op.getSuccessor()->getSinglePredecessor() != op->getBlock())
-        {
-            return mlir::failure();
-        }
-        rewriter.mergeBlocks(op.getSuccessor(), op->getBlock(), op.getArguments());
-        rewriter.eraseOp(op);
-        return mlir::success();
-    }
-};
-
-struct ConstantBranchRemove : mlir::OpRewritePattern<pylir::Py::CondBranchOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::CondBranchOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::CondBranchOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        mlir::BoolAttr condition;
-        if (!mlir::matchPattern(op.getCondition(), mlir::m_Constant(&condition)))
-        {
-            return mlir::failure();
-        }
-        rewriter.replaceOpWithNewOp<pylir::Py::BranchOp>(
-            op, condition.getValue() ? op.getTrueBranch() : op.getFalseBranch(),
-            condition.getValue() ? op.getTrueArgs() : op.getFalseArgs());
         return mlir::success();
     }
 };
@@ -250,7 +199,7 @@ struct PassthroughArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInte
             {
                 continue;
             }
-            auto brOp = mlir::dyn_cast_or_null<pylir::Py::BranchOp>(iter.value()->getTerminator());
+            auto brOp = mlir::dyn_cast_or_null<mlir::cf::BranchOp>(iter.value()->getTerminator());
             if (!brOp)
             {
                 continue;
@@ -259,7 +208,7 @@ struct PassthroughArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInte
             {
                 continue;
             }
-            if (llvm::any_of(brOp.getArguments(), [op](mlir::Value value) { return value.getDefiningOp() == op; }))
+            if (llvm::any_of(brOp.getDestOperands(), [op](mlir::Value value) { return value.getDefiningOp() == op; }))
             {
                 continue;
             }
@@ -268,7 +217,7 @@ struct PassthroughArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInte
                                        [&]
                                        {
                                            op->setSuccessor(brOp.getSuccessor(), iter.index());
-                                           op.getSuccessorOperands(iter.index()).append(brOp.getArguments());
+                                           op.getSuccessorOperands(iter.index()).append(brOp.getDestOperands());
                                        });
         }
         return mlir::success(changed);
@@ -319,17 +268,6 @@ void pylir::Py::MakeDictExOp::getCanonicalizationPatterns(::mlir::RewritePattern
                                                           ::mlir::MLIRContext* context)
 {
     results.add<MakeExOpExceptionSimplifier<MakeDictExOp, &MakeDictExOp::getMappingExpansion>>(context);
-}
-
-void pylir::Py::BranchOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results, ::mlir::MLIRContext* context)
-{
-    results.insert<NoopBranchRemove>(context);
-}
-
-void pylir::Py::CondBranchOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
-                                                          ::mlir::MLIRContext* context)
-{
-    results.insert<ConstantBranchRemove>(context);
 }
 
 mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
@@ -475,15 +413,6 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
         return Py::UnboundAttr::get(getContext());
     }
     return result;
-}
-
-mlir::OpFoldResult pylir::Py::ReinterpretOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
-{
-    if (getType() != getObject().getType())
-    {
-        return nullptr;
-    }
-    return getObject();
 }
 
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -664,7 +593,7 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     }
     if (auto blockArg = getValue().dyn_cast<mlir::BlockArgument>(); blockArg)
     {
-        if (mlir::isa_and_nonnull<mlir::FuncOp>(blockArg.getOwner()->getParentOp())
+        if (mlir::isa_and_nonnull<mlir::FunctionOpInterface>(blockArg.getOwner()->getParentOp())
             && blockArg.getOwner()->isEntryBlock())
         {
             return mlir::BoolAttr::get(getContext(), false);
@@ -915,19 +844,16 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
     return mlir::success();
 }
 
-pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table)
+pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attribute constant, mlir::SymbolTable& table)
 {
-    if (table)
+    if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
     {
-        if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
+        auto globalVal = table.lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
+        if (globalVal.isDeclaration())
         {
-            auto globalVal = table->lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
-            if (globalVal.isDeclaration())
-            {
-                return pylir::Py::UnknownType::get(constant.getContext());
-            }
-            return typeOfConstant(globalVal.getInitializerAttr(), table);
+            return pylir::Py::UnknownType::get(constant.getContext());
         }
+        return typeOfConstant(globalVal.getInitializerAttr(), table);
     }
     if (constant.isa<pylir::Py::UnboundAttr>())
     {
@@ -953,26 +879,10 @@ pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attri
     return pylir::Py::UnknownType::get(constant.getContext());
 }
 
-void pylir::Py::ConstantOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                  ::pylir::Py::UnboundAttr unboundAttr)
-{
-    build(odsBuilder, odsState, UnboundType::get(odsBuilder.getContext()), unboundAttr);
-}
-
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable& table)
 {
-    return {typeOfConstant(getConstantAttr(), &table)};
-}
-
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
-    pylir::Py::ReinterpretOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> types, mlir::SymbolTable&)
-{
-    if (isMoreSpecific(getType(), types[0]))
-    {
-        return {getType()};
-    }
-    return {types[0]};
+    return {typeOfConstant(getConstantAttr(), table)};
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
@@ -1128,8 +1038,7 @@ pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Locatio
         }
         else
         {
-            arguments.emplace_back(
-                builder.create<pylir::Py::ConstantOp>(loc, builder.getType<pylir::Py::UnknownType>(), iter));
+            arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
         }
     }
     return builder.create<pylir::Py::MakeTupleOp>(loc, input.getType(), arguments, builder.getI32ArrayAttr({}));

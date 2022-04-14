@@ -7,8 +7,8 @@ py.globalValue @builtins.float = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func @constant_tuple() -> index {
-    %0 = py.constant(#py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>) : !py.unknown
-    %1 = py.tuple.len %0 : !py.unknown
+    %0 = py.constant(#py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>)
+    %1 = py.tuple.len %0
     return %1 : index
 }
 
@@ -27,8 +27,8 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @foo = #py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>
 
 func @constant_tuple() -> index {
-    %0 = py.constant(@foo) : !py.unknown
-    %1 = py.tuple.len %0 : !py.unknown
+    %0 = py.constant(@foo)
+    %1 = py.tuple.len %0
     return %1 : index
 }
 
@@ -41,9 +41,9 @@ func @constant_tuple() -> index {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @make_tuple(%arg0 : !py.unknown, %arg1 : !py.unknown) -> index {
-    %0 = py.makeTuple (%arg0, %arg1) : (!py.unknown, !py.unknown) -> !py.unknown
-    %1 = py.tuple.len %0 : !py.unknown
+func @make_tuple(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> index {
+    %0 = py.makeTuple (%arg0, %arg1)
+    %1 = py.tuple.len %0
     return %1 : index
 }
 

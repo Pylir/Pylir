@@ -4,21 +4,21 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test() -> !py.unknown {
-    %0 = py.constant(#py.tuple<()>) : !py.unknown
-    %1 = py.constant(@builtins.tuple) : !py.unknown
-    %2 = py.tuple.prepend %1, %0 : (!py.unknown, !py.unknown) -> !py.unknown
-    return %2 : !py.unknown
+func @test() -> !py.dynamic {
+    %0 = py.constant(#py.tuple<()>)
+    %1 = py.constant(@builtins.tuple)
+    %2 = py.tuple.prepend %1, %0
+    return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test
 // CHECK: %[[C:.*]] = py.constant(#py.tuple<(@builtins.tuple)>)
 // CHECK: return %[[C]]
 
-func @test3(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.constant(#py.tuple<(#py.str<"value">)>) : !py.unknown
-    %2 = py.tuple.prepend %arg0, %0 : (!py.unknown, !py.unknown) -> !py.unknown
-    return %2 : !py.unknown
+func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant(#py.tuple<(#py.str<"value">)>)
+    %2 = py.tuple.prepend %arg0, %0
+    return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test3

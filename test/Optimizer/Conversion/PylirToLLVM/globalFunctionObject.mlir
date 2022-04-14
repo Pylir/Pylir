@@ -9,8 +9,8 @@ py.globalValue @builtins.tuple = #py.type
 
 py.globalValue @foo = #py.function<@bar>
 
-func @bar(%arg0 : !py.unknown, %arg1 : !py.unknown, %arg2 : !py.unknown) -> !py.unknown {
-    return %arg0 : !py.unknown
+func @bar(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
+    return %arg0 : !py.dynamic
 }
 
 // CHECK-LABEL: @foo

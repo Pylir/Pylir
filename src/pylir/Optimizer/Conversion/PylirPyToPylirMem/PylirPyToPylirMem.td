@@ -9,17 +9,16 @@ include "mlir/IR/PatternBase.td"
 
 defvar TupleRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.tuple">;
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
-defvar TypeClass = "$_builder.getType<::pylir::Py::ClassType>(" # !subst("$0", TypeRef.value, TypeRef.attr.constBuilderCall) # ", llvm::None)";
 
 def : Pattern<(PylirPy_MakeTupleOp $args, $_), [
-    (PylirPy_ConstantOp:$tupleType TupleRef, (returnType TypeClass)),
+    (PylirPy_ConstantOp:$tupleType TupleRef),
     (Arith_ConstantOp:$size (NativeCodeCall<"$_builder.getIndexAttr($0.size())"> $args)),
     (PylirMem_GCAllocTupleOp:$memory $tupleType, $size),
     (PylirMem_InitTupleOp $memory, $args)
 ]>;
 
 def : Pattern<(PylirPy_TuplePrependOp $input, $tuple), [
-    (PylirPy_ConstantOp:$tupleType TupleRef, (returnType TypeClass)),
+    (PylirPy_ConstantOp:$tupleType TupleRef),
     (PylirPy_TupleLenOp:$prevSize $tuple),
     (Arith_AddIOp:$newSize $prevSize, (Arith_ConstantOp ConstantAttr<IndexAttr, "1">)),
     (PylirMem_GCAllocTupleOp:$memory $tupleType, $newSize),
@@ -27,7 +26,7 @@ def : Pattern<(PylirPy_TuplePrependOp $input, $tuple), [
 ]>;
 
 def : Pattern<(PylirPy_TupleDropFrontOp $count, $tuple), [
-    (PylirPy_ConstantOp:$tupleType TupleRef, (returnType TypeClass)),
+    (PylirPy_ConstantOp:$tupleType TupleRef),
     (PylirPy_TupleLenOp:$prevSize $tuple),
     (Arith_SubIOp:$newSize $prevSize, $count),
     (PylirMem_GCAllocTupleOp:$memory $tupleType, $newSize),
@@ -35,47 +34,47 @@ def : Pattern<(PylirPy_TupleDropFrontOp $count, $tuple), [
 ]>;
 
 def : Pat<(PylirPy_ListToTupleOp $list), (PylirMem_InitTupleFromListOp
-    (PylirMem_GCAllocTupleOp (PylirPy_ConstantOp TupleRef, (returnType TypeClass)), (PylirPy_ListLenOp $list)), $list)>;
+    (PylirMem_GCAllocTupleOp (PylirPy_ConstantOp TupleRef), (PylirPy_ListLenOp $list)), $list)>;
 
 defvar ListRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.list">;
 
 def : Pat<(PylirPy_MakeListOp $args, $_),
-    (PylirMem_InitListOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp ListRef, (returnType TypeClass))), $args)>;
+    (PylirMem_InitListOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp ListRef)), $args)>;
 
 defvar SetRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.set">;
 
 def : Pat<(PylirPy_MakeSetOp $args, $_),
-    (PylirMem_InitSetOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp SetRef, (returnType TypeClass))), $args)>;
+    (PylirMem_InitSetOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp SetRef)), $args)>;
 
 defvar StrRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.str">;
 
 def : Pat<(PylirPy_StrConcatOp $args),
-    (PylirMem_InitStrOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp StrRef, (returnType TypeClass))), $args)>;
+    (PylirMem_InitStrOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp StrRef)), $args)>;
 
 def : Pat<(PylirPy_StrCopyOp $arg, $typeObj),
     (PylirMem_InitStrOp (PylirMem_GCAllocObjectOp $typeObj),
         (NativeCodeCall<"::llvm::SmallVector<::mlir::Value>{$0}"> $arg))>;
 
 def : Pat<(PylirPy_IntToStrOp $integer),
-    (PylirMem_InitStrFromIntOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp StrRef, (returnType TypeClass))), $integer)>;
+    (PylirMem_InitStrFromIntOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp StrRef)), $integer)>;
 
 defvar FunctionRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.function">;
 
 def : Pat<(PylirPy_MakeFuncOp $symbol),
-    (PylirMem_InitFuncOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp FunctionRef, (returnType TypeClass))), $symbol)>;
+    (PylirMem_InitFuncOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp FunctionRef)), $symbol)>;
 
 defvar BoolRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.bool">;
 
 def : Pat<(PylirPy_BoolFromI1Op $input), (PylirMem_InitIntOp
-    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp BoolRef, (returnType TypeClass))), $input)>;
+    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp BoolRef)), $input)>;
 
 defvar IntRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.int">;
 
 def : Pat<(PylirPy_IntFromIntegerOp $input), (PylirMem_InitIntOp
-    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef, (returnType TypeClass))), $input)>;
+    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef)), $input)>;
 
 def : Pat<(PylirPy_IntAddOp $lhs, $rhs), (PylirMem_InitIntAddOp
-    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef, (returnType TypeClass))), $lhs, $rhs)>;
+    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef)), $lhs, $rhs)>;
 
 def : Pat<(PylirPy_MakeObjectOp $typeObj), (PylirMem_InitObjectOp (PylirMem_GCAllocObjectOp $typeObj))>;
 

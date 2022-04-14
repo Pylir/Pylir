@@ -10,4 +10,8 @@ def NoCapture : NativeOpTrait<"NoCapture"> {
     let cppNamespace = "pylir::Py";
 }
 
+class RefinedType<string type> : NativeOpTrait<type # "RefinedType"> {
+	let cppNamespace = "pylir::Py";
+}
+
 #endif

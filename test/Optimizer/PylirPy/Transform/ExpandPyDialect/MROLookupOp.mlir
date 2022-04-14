@@ -4,9 +4,9 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.function = #py.type
 py.globalValue @builtins.dict = #py.type
 
-func @linear_search(%tuple : !py.unknown) -> !py.unknown {
-    %0, %1 = py.mroLookup "__call__" in %tuple : (!py.unknown) -> !py.unknown
-    return %0 : !py.unknown
+func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
+    %0, %1 = py.mroLookup "__call__" in %tuple
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @linear_search

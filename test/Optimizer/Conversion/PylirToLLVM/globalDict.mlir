@@ -6,9 +6,9 @@ py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test() -> !py.unknown {
-    %0 = py.constant(#py.dict<{#py.str<"Hello"> to #py.str<"World">}>) : !py.unknown
-    return %0 : !py.unknown
+func @test() -> !py.dynamic {
+    %0 = py.constant(#py.dict<{#py.str<"Hello"> to #py.str<"World">}>)
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: llvm.func internal @"$__GLOBAL_INIT__"

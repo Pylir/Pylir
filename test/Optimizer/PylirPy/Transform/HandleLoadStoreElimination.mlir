@@ -5,11 +5,11 @@ py.globalValue @builtins.str = #py.type
 
 py.globalHandle @foo
 
-func @test() -> !py.unknown {
-    %0 = py.constant(#py.str<"value">) : !py.unknown
-    py.store %0 into @foo : !py.unknown
-    %1 = py.load @foo : !py.unknown
-    return %1 : !py.unknown
+func @test() -> !py.dynamic {
+    %0 = py.constant(#py.str<"value">)
+    py.store %0 into @foo
+    %1 = py.load @foo
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL:  func @test
@@ -24,13 +24,13 @@ py.globalValue @builtins.str = #py.type
 
 py.globalHandle @foo
 
-func @test() -> !py.unknown {
-    %0 = py.constant(#py.str<"value">) : !py.unknown
-    %1 = py.constant(#py.str<"value">) : !py.unknown
-    py.store %0 into @foo : !py.unknown
-    py.store %1 into @foo : !py.unknown
-    %2 = py.load @foo : !py.unknown
-    return %2 : !py.unknown
+func @test() -> !py.dynamic {
+    %0 = py.constant(#py.str<"value">)
+    %1 = py.constant(#py.str<"value">)
+    py.store %0 into @foo
+    py.store %1 into @foo
+    %2 = py.load @foo
+    return %2 : !py.dynamic
 }
 
 // CHECK-LABEL:  func @test
@@ -48,12 +48,12 @@ func private @clobber()
 
 py.globalHandle @foo
 
-func @test() -> !py.unknown {
-    %0 = py.constant(#py.str<"value">) : !py.unknown
-    py.store %0 into @foo : !py.unknown
+func @test() -> !py.dynamic {
+    %0 = py.constant(#py.str<"value">)
+    py.store %0 into @foo
     call @clobber() : () -> ()
-    %1 = py.load @foo : !py.unknown
-    return %1 : !py.unknown
+    %1 = py.load @foo
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL:  func @test
@@ -70,23 +70,23 @@ py.globalValue @builtins.str = #py.type
 
 py.globalHandle @foo
 
-func @test() -> !py.unknown {
+func @test() -> !py.dynamic {
     %0 = test.random
     cf.cond_br %0, ^bb0, ^bb1
 
 ^bb0:
-    %1 = py.constant(#py.str<"text">) : !py.unknown
-    py.store %1 into @foo : !py.unknown
+    %1 = py.constant(#py.str<"text">)
+    py.store %1 into @foo
     cf.br ^merge
 
 ^bb1:
-    %2 = py.constant(#py.str<"value">) : !py.unknown
-    py.store %2 into @foo : !py.unknown
+    %2 = py.constant(#py.str<"value">)
+    py.store %2 into @foo
     cf.br ^merge
 
 ^merge:
-    %3 = py.load @foo : !py.unknown
-    return %3 : !py.unknown
+    %3 = py.load @foo
+    return %3 : !py.dynamic
 }
 
 // CHECK-LABEL: func @test
@@ -117,7 +117,7 @@ py.globalHandle @foo
 
 func private @clobber()
 
-func @test() -> !py.unknown {
+func @test() -> !py.dynamic {
     %0 = test.random
     cf.cond_br %0, ^bb0, ^bb1
 
@@ -126,13 +126,13 @@ func @test() -> !py.unknown {
     cf.br ^merge
 
 ^bb1:
-    %1 = py.constant(#py.str<"value">) : !py.unknown
-    py.store %1 into @foo : !py.unknown
+    %1 = py.constant(#py.str<"value">)
+    py.store %1 into @foo
     cf.br ^merge
 
 ^merge:
-    %2 = py.load @foo : !py.unknown
-    return %2 : !py.unknown
+    %2 = py.load @foo
+    return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: func @test

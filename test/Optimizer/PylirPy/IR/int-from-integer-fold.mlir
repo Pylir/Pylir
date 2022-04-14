@@ -3,10 +3,10 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @test() -> !py.class<@builtins.int> {
+func @test() -> !py.dynamic {
     %0 = arith.constant 5 : i64
     %1 = py.int.fromInteger %0 : i64
-    return %1 : !py.class<@builtins.int>
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @test

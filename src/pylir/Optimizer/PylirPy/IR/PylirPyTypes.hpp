@@ -13,8 +13,8 @@ namespace pylir::Py
 {
 inline mlir::FunctionType getUniversalCCType(mlir::MLIRContext* context)
 {
-    auto unknownType = Py::UnknownType::get(context);
-    return mlir::FunctionType::get(context, mlir::TypeRange{unknownType, unknownType, unknownType}, {unknownType});
+    auto dynamicType = Py::DynamicType::get(context);
+    return mlir::FunctionType::get(context, mlir::TypeRange{dynamicType, dynamicType, dynamicType}, {dynamicType});
 }
 
 pylir::Py::ObjectTypeInterface joinTypes(pylir::Py::ObjectTypeInterface lhs, pylir::Py::ObjectTypeInterface rhs);

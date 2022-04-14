@@ -3,9 +3,9 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @make_tuple(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeTuple (%arg0) : (!py.unknown) -> !py.unknown
-    return %0 : !py.unknown
+func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0)
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_tuple
@@ -21,9 +21,9 @@ func @make_tuple(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.list = #py.type
 
-func @make_list(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeList (%arg0) : !py.unknown
-    py.return %0 : !py.class<@builtins.list>
+func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeList (%arg0)
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_list
@@ -31,16 +31,16 @@ func @make_list(%arg0 : !py.unknown) -> !py.unknown {
 // CHECK-NEXT: %[[LIST:.*]] = py.constant(@builtins.list)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[LIST]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initList %[[MEM]] to [%[[ARG]]]
-// CHECK-NEXT: py.return %[[RESULT]]
+// CHECK-NEXT: return %[[RESULT]]
 
 // -----
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.set = #py.type
 
-func @make_set(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeSet (%arg0) : !py.unknown
-    py.return %0 : !py.class<@builtins.set>
+func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeSet (%arg0)
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_set
@@ -48,16 +48,16 @@ func @make_set(%arg0 : !py.unknown) -> !py.unknown {
 // CHECK-NEXT: %[[SET:.*]] = py.constant(@builtins.set)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[SET]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initSet %[[MEM]] to {%[[ARG]]}
-// CHECK-NEXT: py.return %[[RESULT]]
+// CHECK-NEXT: return %[[RESULT]]
 
 // -----
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.dict = #py.type
 
-func @make_dict(%arg0 : !py.unknown, %arg1 : !py.unknown) -> !py.unknown {
-    %0 = py.makeDict (%arg0 : %arg1) : (!py.unknown), (!py.unknown)
-    py.return %0 : !py.class<@builtins.dict>
+func @make_dict(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeDict (%arg0 : %arg1)
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_dict
@@ -67,7 +67,7 @@ func @make_dict(%arg0 : !py.unknown, %arg1 : !py.unknown) -> !py.unknown {
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[DICT]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initDict %[[MEM]]
 // CHECK-NEXT: py.dict.setItem %[[RESULT]][%[[ARG0]]] to %[[ARG1]]
-// CHECK-NEXT: py.return %[[RESULT]]
+// CHECK-NEXT: return %[[RESULT]]
 
 // -----
 
@@ -75,11 +75,11 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.function = #py.type
 
-func private @test(!py.unknown,!py.unknown,!py.unknown) -> !py.unknown
+func private @test(!py.dynamic,!py.dynamic,!py.dynamic) -> !py.dynamic
 
-func @make_function() -> !py.unknown {
+func @make_function() -> !py.dynamic {
     %0 = py.makeFunc @test
-    py.return %0 : !py.class<@builtins.function>
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_function
@@ -90,9 +90,9 @@ func @make_function() -> !py.unknown {
 
 // -----
 
-func @make_object(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.makeObject %arg0 : (!py.unknown) -> !py.unknown
-    return %0 : !py.unknown
+func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeObject %arg0
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_object
@@ -106,9 +106,9 @@ func @make_object(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @make_tuple_from_list(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.list.toTuple %arg0 : (!py.unknown) -> !py.unknown
-    return %0 : !py.unknown
+func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.list.toTuple %arg0
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_tuple_from_list
@@ -124,16 +124,16 @@ func @make_tuple_from_list(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.bool = #py.type
 
-func @make_bool_from_i1(%arg0 : i1) -> !py.unknown {
+func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
     %0 = py.bool.fromI1 %arg0
-    py.return %0 : !py.class<@builtins.bool>
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_bool_from_i1
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: %[[BOOL:.*]] = py.constant(@builtins.bool)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
-// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : (i1)
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : i1
 // CHECK-NEXT: return %[[RESULT]]
 
 // -----
@@ -141,16 +141,16 @@ func @make_bool_from_i1(%arg0 : i1) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_int_fromInteger(%arg0 : i32) -> !py.unknown {
+func @make_int_fromInteger(%arg0 : i32) -> !py.dynamic {
     %0 = py.int.fromInteger %arg0 : i32
-    py.return %0 : !py.class<@builtins.int>
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_int_fromInteger
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: %[[BOOL:.*]] = py.constant(@builtins.int)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
-// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : (i32)
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : i32
 // CHECK-NEXT: return %[[RESULT]]
 
 
@@ -160,9 +160,9 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @make_str_fromInt(%arg0 : !py.unknown) -> !py.unknown {
-    %0 = py.int.toStr %arg0 : !py.unknown
-    py.return %0 : !py.class<@builtins.str>
+func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.int.toStr %arg0
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_str_fromInt
@@ -177,9 +177,9 @@ func @make_str_fromInt(%arg0 : !py.unknown) -> !py.unknown {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_int_from_add(%arg0 : !py.unknown, %arg1 : !py.unknown) -> !py.unknown {
-    %0 = py.int.add %arg0, %arg1 : !py.unknown, !py.unknown
-    py.return %0 : !py.class<@builtins.int>
+func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.int.add %arg0, %arg1
+    return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_int_from_add

@@ -5,7 +5,7 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.list = #py.type
 
 func @test4() -> index {
-    %0 = py.constant(#py.str<"test">) : !py.unknown
+    %0 = py.constant(#py.str<"test">)
     %1 = py.makeList ()
     cf.br ^condition
 
@@ -18,15 +18,15 @@ func @test4() -> index {
     cf.cond_br %3, ^bb2, ^bb4
 
 ^bb2: // pred: ^bb1
-    %unused = py.list.len %1 : !py.class<@builtins.list>
+    %unused = py.list.len %1
     cf.br ^condition
 
 ^bb4: // pred: ^bb4
-    py.list.append %1, %0 : !py.class<@builtins.list>, !py.unknown
+    py.list.append %1, %0
     cf.br ^bb5
 
 ^bb5: // pred: ^condition, ^bb4
-    %5 = py.list.len %1 : !py.class<@builtins.list>
+    %5 = py.list.len %1
     return %5 : index
 }
 
@@ -43,7 +43,7 @@ func @test4() -> index {
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
 func @test5() -> index {
-    %0 = py.constant(#py.str<"test">) : !py.unknown
+    %0 = py.constant(#py.str<"test">)
     %1 = py.makeList ()
     cf.br ^back1
 
@@ -62,7 +62,7 @@ func @test5() -> index {
     cf.cond_br %3, ^back1, ^bb5
 
 ^bb5: // pred: ^condition, ^bb4
-    %5 = py.list.len %1 : !py.class<@builtins.list>
+    %5 = py.list.len %1
     return %5 : index
 }
 
@@ -74,7 +74,7 @@ func @test5() -> index {
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
 func @test6() {
-    %0 = py.constant(#py.str<"test">) : !py.unknown
+    %0 = py.constant(#py.str<"test">)
     %1 = py.makeList ()
     cf.br ^bb2
 

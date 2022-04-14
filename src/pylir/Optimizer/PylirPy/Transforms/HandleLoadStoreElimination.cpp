@@ -35,7 +35,7 @@ void HandleLoadStoreEliminationPass::runOnOperation()
     auto* topLevel = getOperation();
     getContext().allowUnregisteredDialects();
     mlir::OperationState state(mlir::UnknownLoc::get(&getContext()), "__clobber_tracker");
-    state.addTypes({pylir::Py::UnknownType::get(&getContext())});
+    state.addTypes({pylir::Py::DynamicType::get(&getContext())});
     mlir::Operation* clobberTracker = mlir::Operation::create(state);
     auto exit = llvm::make_scope_exit([&] { clobberTracker->erase(); });
     for (auto& region : topLevel->getRegions())

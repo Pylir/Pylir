@@ -3,41 +3,41 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
-func private @create_exception() -> !py.unknown
+func private @create_exception() -> !py.dynamic
 
-func @inline_foo(%arg0 : i1) -> !py.unknown {
-	%0 = py.call @create_exception() : () -> !py.unknown
-	py.cond_br %arg0, ^throw, ^normal_return
+func @inline_foo(%arg0 : i1) -> !py.dynamic {
+	%0 = py.call @create_exception() : () -> !py.dynamic
+	cf.cond_br %arg0, ^throw, ^normal_return
 
 ^throw:
-	py.raise %0 : !py.unknown
+	py.raise %0
 
 ^normal_return:
-	py.return %0 : !py.unknown
+	return %0 : !py.dynamic
 }
 
-func @__init__() -> !py.unknown {
+func @__init__() -> !py.dynamic {
 	%0 = test.random
-	%1 = py.call @inline_foo(%0) : (i1) -> !py.unknown
-	test.use(%1) : !py.unknown
-	%2 = py.invoke @inline_foo(%0) : (i1) -> !py.unknown
+	%1 = py.call @inline_foo(%0) : (i1) -> !py.dynamic
+	test.use(%1) : !py.dynamic
+	%2 = py.invoke @inline_foo(%0) : (i1) -> !py.dynamic
 		label ^continue unwind ^retException
 
 ^continue:
-	py.return %2 : !py.unknown
+	return %2 : !py.dynamic
 
-^retException(%e : !py.unknown):
-	py.return %e : !py.unknown
+^retException(%e : !py.dynamic):
+	return %e : !py.dynamic
 }
 
 // CHECK-LABEL: @__init__
 // CHECK-NEXT: %[[RANDOM:.*]] = test.random
-// CHECK-NEXT: %[[EX:.*]] = py.call @create_exception() : () -> !py.unknown
-// CHECK-NEXT: py.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
+// CHECK-NEXT: %[[EX:.*]] = py.call @create_exception()
+// CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
 // CHECK-NEXT: py.raise %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]:
-// CHECK-NEXT: py.br ^[[CONTINUE:.*]](
+// CHECK-NEXT: cf.br ^[[CONTINUE:.*]](
 // CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
@@ -45,17 +45,17 @@ func @__init__() -> !py.unknown {
 // CHECK-NEXT: %[[EX:.*]] = py.invoke @create_exception()
 // CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[HANDLER:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[SUCCESS]]
-// CHECK-NEXT: py.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
+// CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
-// CHECK-NEXT: py.br ^[[HANDLER:.*]](
+// CHECK-NEXT: cf.br ^[[HANDLER:.*]](
 // CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]
-// CHECK-NEXT: py.br ^[[CONTINUE:.*]](
+// CHECK-NEXT: cf.br ^[[CONTINUE:.*]](
 // CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
-// CHECK-NEXT: py.br ^[[CONTINUE:[[:alnum:]]+]]
+// CHECK-NEXT: cf.br ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[CONTINUE]]:
-// CHECK-NEXT: py.return %[[EX]]
+// CHECK-NEXT: return %[[EX]]
 // CHECK-NEXT: ^[[HANDLER]](%[[EX:[[:alnum:]]+]]: {{.*}}):
-// CHECK-NEXT: py.return %[[EX]]
+// CHECK-NEXT: return %[[EX]]

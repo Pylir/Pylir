@@ -4,11 +4,11 @@ py.globalValue @builtins.tuple = #py.tuple<()>
 
 py.globalHandle @handle
 
-func @test() -> !py.unknown {
-    %0 = py.constant(#py.tuple<()>) : !py.unknown
-    py.store %0 into @handle : !py.unknown
-    %1 = py.load @handle : !py.unknown
-    return %1 : !py.unknown
+func @test() -> !py.dynamic {
+    %0 = py.constant(#py.tuple<()>)
+    py.store %0 into @handle
+    %1 = py.load @handle
+    return %1 : !py.dynamic
 }
 
 // CHECK: llvm.mlir.global external @handle()

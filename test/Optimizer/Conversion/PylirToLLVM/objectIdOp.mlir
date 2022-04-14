@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @test(%arg0 : !py.unknown) -> index {
-    %0 = py.object.id %arg0 : !py.unknown
+func @test(%arg0 : !py.dynamic) -> index {
+    %0 = py.object.id %arg0
     return %0 : index
 }
 
