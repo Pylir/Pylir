@@ -35,9 +35,8 @@ func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @test3
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK-NEXT: %[[C:.*]] = arith.constant 0 : index
-// TODO: Fold to a py.tuple.copy once that is a thing
-// CHECK-NEXT: %[[TUPLE:.*]] = py.tuple.dropFront %[[C]], %[[ARG0]]
+// CHECK-NEXT: %[[C:.*]] = py.constant(@builtins.tuple)
+// CHECK-NEXT: %[[TUPLE:.*]] = py.tuple.copy %[[ARG0]] : %[[C]]
 // CHECK-NEXT: return %[[TUPLE]]
 
 func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
@@ -65,3 +64,17 @@ func @test5(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (*%[[ARG0]])
 // CHECK: %[[DROPPED:.*]] = py.tuple.dropFront %{{.*}}, %[[TUPLE]]
 // CHECK: return %[[DROPPED]]
+
+func @test6(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.tuple.prepend %arg0, %arg1
+    %1 = arith.constant 1 : index
+    %result = py.tuple.dropFront %1, %0
+    return %result : !py.dynamic
+}
+
+// CHECK-LABEL: @test6
+// CHECK-SAME: %{{[[:alnum:]]+}}
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK: %[[C:.*]] = py.constant(@builtins.tuple)
+// CHECK: %[[COPY:.*]] = py.tuple.copy %[[ARG1]] : %[[C]]
+// CHECK: return %[[COPY]]

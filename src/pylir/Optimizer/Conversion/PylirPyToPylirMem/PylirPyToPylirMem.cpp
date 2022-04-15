@@ -42,11 +42,11 @@ void ConvertPylirPyToPylirMem::runOnOperation()
     mlir::ConversionTarget target(getContext());
     target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
-    target
-        .addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
-                      pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp, pylir::Py::BoolFromI1Op,
-                      pylir::Py::IntFromIntegerOp, pylir::Py::StrConcatOp, pylir::Py::IntToStrOp, pylir::Py::StrCopyOp,
-                      pylir::Py::TupleDropFrontOp, pylir::Py::TuplePrependOp, pylir::Py::IntAddOp>();
+    target.addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
+                        pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp,
+                        pylir::Py::BoolFromI1Op, pylir::Py::IntFromIntegerOp, pylir::Py::StrConcatOp,
+                        pylir::Py::IntToStrOp, pylir::Py::StrCopyOp, pylir::Py::TupleDropFrontOp,
+                        pylir::Py::TuplePrependOp, pylir::Py::IntAddOp, pylir::Py::TupleCopyOp>();
 
     mlir::RewritePatternSet patterns(&getContext());
     populateWithGenerated(patterns);
