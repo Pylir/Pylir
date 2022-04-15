@@ -839,7 +839,9 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
     return mlir::success();
 }
 
-pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table)
+namespace
+{
+pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table)
 {
     if (table)
     {
@@ -876,6 +878,8 @@ pylir::Py::ObjectTypeInterface pylir::Py::ConstantOp::typeOfConstant(mlir::Attri
     }
     return pylir::Py::UnknownType::get(constant.getContext());
 }
+
+} // namespace
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable* table)

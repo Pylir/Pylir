@@ -79,15 +79,6 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect,
     }];
 
     let hasVerifier = 1;
-
-    let extraClassDeclaration = [{
-
-    private:
-
-        static pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table);
-
-	public:
-    }];
 }
 
 def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect, AlwaysBound, DeclareOpInterfaceMethods<TypeFoldInterface>]> {
