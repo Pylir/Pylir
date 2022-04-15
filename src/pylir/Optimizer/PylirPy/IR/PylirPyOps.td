@@ -84,7 +84,7 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect,
 
     private:
 
-        static pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTable& table);
+        static pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table);
 
 	public:
     }];
@@ -368,8 +368,7 @@ def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound,
 
 // Str ops
 
-def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [NoCapture, DeclareOpInterfaceMethods<TypeRefineableInterface>,
-												AlwaysBound]> {
+def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [NoCapture, RefinedObjectFromTypeObject, AlwaysBound]> {
     let arguments = (ins DynamicType:$string, DynamicType:$type_object);
     let results = (outs Arg<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
@@ -696,7 +695,7 @@ def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [DeclareOpInterfaceMethods<Symbo
     }];
 }
 
-def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
+def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, RefinedObjectFromTypeObject]> {
     let arguments = (ins DynamicType:$type_object);
 
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);

@@ -1,9 +1,11 @@
 #pragma once
 
+#include <mlir/IR/Matchers.h>
 #include <mlir/IR/OpDefinition.h>
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/ObjectFromTypeObjectInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
 #include "PylirPyTypes.hpp"
@@ -34,13 +36,13 @@ public:
     }
 };
 
-#define BUILTIN(x, ...)                                                                                               \
+#define BUILTIN_TYPE(x, ...)                                                                                          \
     template <class ConcreteType>                                                                                     \
     class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                        \
     {                                                                                                                 \
     public:                                                                                                           \
         llvm::SmallVector<pylir::Py::ObjectTypeInterface> refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, \
-                                                                      mlir::SymbolTable&)                             \
+                                                                      mlir::SymbolTable*)                             \
         {                                                                                                             \
             auto* context = this->getOperation()->getContext();                                                       \
             return {pylir::Py::ClassType::get(                                                                        \
@@ -49,5 +51,22 @@ public:
     };
 
 #include <pylir/Interfaces/Builtins.def>
+
+template <class ConcreteType>
+class RefinedObjectFromTypeObject : public TypeRefineableInterface::Trait<ConcreteType>
+{
+public:
+    llvm::SmallVector<pylir::Py::ObjectTypeInterface> refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+                                                                  mlir::SymbolTable*)
+    {
+        mlir::FlatSymbolRefAttr type;
+        if (!mlir::matchPattern(mlir::cast<ConcreteType>(this->getOperation()).getTypeObject(),
+                                mlir::m_Constant(&type)))
+        {
+            return {Py::UnknownType::get(this->getOperation()->getContext())};
+        }
+        return {Py::ClassType::get(this->getOperation()->getContext(), type, llvm::None)};
+    }
+};
 
 } // namespace pylir::Py

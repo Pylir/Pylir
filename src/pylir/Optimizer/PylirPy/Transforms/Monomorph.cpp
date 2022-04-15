@@ -401,7 +401,7 @@ public:
                         operandTypes[iter.index()] = m_lattices.find(iter.value())->second.type;
                     }
                 }
-                auto results = typeRefinement.refineTypes(operandTypes, *m_symbolTable);
+                auto results = typeRefinement.refineTypes(operandTypes, m_symbolTable);
                 PYLIR_ASSERT(results.size() == m_currentOp->getNumResults());
                 for (auto [res, type] : llvm::zip(m_currentOp->getResults(), results))
                 {

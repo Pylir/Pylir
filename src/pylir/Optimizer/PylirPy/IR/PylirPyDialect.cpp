@@ -89,7 +89,7 @@ struct PylirPyCostInterface : public pylir::DialectCostInterface
     std::size_t getCost(mlir::Operation* op) const override
     {
         return llvm::TypeSwitch<mlir::Operation*, std::size_t>(op)
-            .Case<pylir::Py::GetSlotOp, pylir::Py::SetSlotOp, pylir::Py::MakeObjectOp>(
+            .Case<pylir::Py::GetSlotOp, pylir::Py::SetSlotOp, pylir::Py::ObjectFromTypeObjectInterface>(
                 [](auto typeObjectUsers)
                 { return mlir::matchPattern(typeObjectUsers.getTypeObject(), mlir::m_Constant()) ? 1 : 10; })
             .Case([](pylir::Py::UnreachableOp) { return 0; })
