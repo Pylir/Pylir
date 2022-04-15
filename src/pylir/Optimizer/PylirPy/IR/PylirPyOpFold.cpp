@@ -416,6 +416,11 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
 
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
+    {
+        getTupleMutable().assign(tupleCopy.getTuple());
+        return mlir::Value{*this};
+    }
     auto indexAttr = operands[1].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!indexAttr)
     {
@@ -433,6 +438,11 @@ mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
+    if (auto tupleCopy = getInput().getDefiningOp<pylir::Py::TupleCopyOp>())
+    {
+        getInputMutable().assign(tupleCopy.getTuple());
+        return mlir::Value{*this};
+    }
     if (auto makeTuple = getInput().getDefiningOp<Py::MakeTupleOp>();
         makeTuple && makeTuple.getIterExpansionAttr().empty())
     {
@@ -447,6 +457,11 @@ mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> o
 
 mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
+    {
+        getTupleMutable().assign(tupleCopy.getTuple());
+        return mlir::Value{*this};
+    }
     auto element = operands[0];
     auto tuple = resolveValue(*this, operands[1]).dyn_cast_or_null<Py::TupleAttr>();
     if (tuple && element)
@@ -460,6 +475,11 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 ::mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
+    {
+        getTupleMutable().assign(tupleCopy.getTuple());
+        return mlir::Value{*this};
+    }
     auto constant = resolveValue(*this, operands[1]).dyn_cast_or_null<Py::TupleAttr>();
     if (constant && constant.getValue().empty())
     {
@@ -475,6 +495,28 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
         return Py::TupleAttr::get(getContext());
     }
     return Py::TupleAttr::get(getContext(), constant.getValue().drop_front(index.getValue().getZExtValue()));
+}
+
+::mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
+    {
+        getTupleMutable().assign(tupleCopy.getTuple());
+        return mlir::Value{*this};
+    }
+    auto type = operands[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+    if (type && type.getValue() == llvm::StringRef{Builtins::Tuple.name}
+        && mlir::isa_and_nonnull<Py::TupleDropFrontOp, Py::TuplePrependOp, Py::MakeTupleOp, Py::MakeTupleExOp>(
+            getTuple().getDefiningOp()))
+    {
+        return getTuple();
+    }
+    auto constant = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>();
+    if (!constant || !type)
+    {
+        return nullptr;
+    }
+    return Py::TupleAttr::get(getContext(), constant.getValue(), type);
 }
 
 namespace
@@ -688,6 +730,11 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
 
 mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
+    {
+        getTupleMutable().assign(tupleCopy.getTuple());
+        return mlir::Value{*this};
+    }
     auto tupleOperands = resolveTupleOperands(*this, getTuple());
     bool hadWildcard = false;
     for (auto& op : tupleOperands)
@@ -980,6 +1027,24 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     }
     return {Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
                                tupleType.getElements().drop_front(index.getValue().getZExtValue()))};
+}
+
+llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+    pylir::Py::TupleCopyOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+                                        mlir::SymbolTable*)
+{
+    auto tupleType = argumentTypes[0].dyn_cast<Py::TupleType>();
+    mlir::FlatSymbolRefAttr type;
+    if (!mlir::matchPattern(getTypeObject(), mlir::m_Constant(&type)))
+    {
+        // TODO: Should TupleType be able to not have a type object?
+        return {Py::UnknownType::get(getContext())};
+    }
+    if (!tupleType)
+    {
+        return {Py::ClassType::get(getContext(), type, llvm::None)};
+    }
+    return {Py::TupleType::get(getContext(), type, tupleType.getElements())};
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>

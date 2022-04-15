@@ -244,6 +244,18 @@ def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, Alwa
     let hasFolder = 1;
 }
 
+def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound,
+    DeclareOpInterfaceMethods<TypeRefineableInterface>, ObjectFromTypeObjectInterface]> {
+    let arguments = (ins DynamicType:$tuple, DynamicType:$type_object);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = [{
+        $tuple `:` $type_object attr-dict
+    }];
+
+    let hasFolder = 1;
+}
+
 def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect]> {
     let arguments = (ins DynamicType:$tuple, DynamicType:$element);
     let results = (outs I1:$success);

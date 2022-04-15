@@ -90,6 +90,13 @@ def PylirMem_InitTupleDropFrontOp : PylirMem_Op<"initTupleDropFront", [AlwaysBou
     let assemblyFormat = "$memory `to` ` ` $count `(` $tuple `)` attr-dict";
 }
 
+def PylirMem_InitTupleCopyOp : PylirMem_Op<"initTupleCopy"> {
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$initializer);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "$memory `to` ` ` `(` `*` $initializer `)` attr-dict";
+}
+
 def PylirMem_InitTupleFromListOp : PylirMem_Op<"initTupleFromList"> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$initializer);
     let results = (outs DynamicType:$result);

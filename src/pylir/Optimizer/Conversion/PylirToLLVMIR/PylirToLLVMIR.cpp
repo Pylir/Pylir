@@ -2773,6 +2773,37 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<pylir:
     }
 };
 
+struct InitTupleCopyOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitTupleCopyOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitTupleCopyOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitTupleCopyOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto destTuple = pyTupleModel(op.getLoc(), rewriter, adaptor.getMemory());
+        auto sourceTuple = pyTupleModel(op.getLoc(), rewriter, adaptor.getInitializer());
+
+        auto size = sourceTuple.sizePtr(op.getLoc()).load(op.getLoc());
+        destTuple.sizePtr(op.getLoc()).store(op.getLoc(), size);
+
+        auto sizeOf = createIndexConstant(rewriter, op.getLoc(), this->sizeOf(pointer(getPyObjectType())));
+        auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
+
+        auto array = mlir::Value{destTuple.trailingPtr(op.getLoc()).at(op.getLoc(), 0)};
+        auto listArray = mlir::Value{sourceTuple.trailingPtr(op.getLoc()).at(op.getLoc(), 0)};
+        auto arrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), derivePointer(rewriter.getI8Type(), array.getType()), array);
+        auto listArrayI8 = rewriter.create<mlir::LLVM::BitcastOp>(
+            op.getLoc(), derivePointer(rewriter.getI8Type(), listArray.getType()), listArray);
+        rewriter.create<mlir::LLVM::MemcpyOp>(
+            op.getLoc(), arrayI8, listArrayI8, inBytes,
+            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false)));
+
+        rewriter.replaceOp(op, adaptor.getMemory());
+        return mlir::success();
+    }
+};
+
 struct InitTupleDropFrontOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitTupleDropFrontOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Mem::InitTupleDropFrontOp>::ConvertPylirOpToLLVMPattern;
@@ -3102,6 +3133,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<TypeMROOpConversion>(converter);
     patternSet.insert<ArithmeticSelectOpConversion>(converter);
     patternSet.insert<TupleContainsOpConversion>(converter);
+    patternSet.insert<InitTupleCopyOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();

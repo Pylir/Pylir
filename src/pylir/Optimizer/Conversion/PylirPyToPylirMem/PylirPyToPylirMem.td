@@ -33,6 +33,12 @@ def : Pattern<(PylirPy_TupleDropFrontOp $count, $tuple), [
     (PylirMem_InitTupleDropFrontOp $memory, $count, $tuple)
 ]>;
 
+def : Pattern<(PylirPy_TupleCopyOp $tuple, $typeObj), [
+    (PylirPy_TupleLenOp:$size $tuple),
+    (PylirMem_GCAllocTupleOp:$memory $typeObj, $size),
+    (PylirMem_InitTupleCopyOp $memory, $tuple)
+]>;
+
 def : Pat<(PylirPy_ListToTupleOp $list), (PylirMem_InitTupleFromListOp
     (PylirMem_GCAllocTupleOp (PylirPy_ConstantOp TupleRef), (PylirPy_ListLenOp $list)), $list)>;
 
