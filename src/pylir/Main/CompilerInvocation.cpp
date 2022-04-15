@@ -563,19 +563,17 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         manager.addNestedPass<mlir::FuncOp>(pylir::Py::createHandleLoadStoreEliminationPass());
         manager.addPass(pylir::Py::createFoldHandlesPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-        manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
-        manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());
-        manager.addPass(mlir::createCanonicalizerPass());
         manager.addPass(pylir::Py::createInlinerPass());
-        manager.addPass(mlir::createSymbolDCEPass());
+        manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());
+        manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
     }
     manager.addPass(pylir::Py::createExpandPyDialectPass());
     if (level != "0")
     {
         manager.addPass(mlir::createCanonicalizerPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-        manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
         manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());
+        manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
     }
     manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
 }
