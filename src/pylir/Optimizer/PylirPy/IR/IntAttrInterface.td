@@ -10,6 +10,9 @@ def IntAttrInterface : UseableAttrInterface<"IntAttrInterface"> {
     let methods = [
         InterfaceMethod<"", "const ::pylir::BigInt&", "getIntegerValue", (ins)>
     ];
+
+    let returnType = "::pylir::BigInt";
+    let convertFromStorage = "$_self.getIntegerValue()";
 }
 
 #endif

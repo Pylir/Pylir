@@ -55,3 +55,18 @@ func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK: return %[[ARG1]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+
+func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeTuple (%arg0, %arg1)
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @type_refineable
+// CHECK: %[[CONST:.*]] = py.constant(@builtins.tuple)
+// CHECK: return %[[CONST]]

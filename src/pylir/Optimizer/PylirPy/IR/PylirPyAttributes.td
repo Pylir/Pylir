@@ -52,6 +52,8 @@ def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
 	let mnemonic = "int";
 
 	let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
+
+	let constBuilderCall = "::pylir::Py::IntAttr::get($_builder.getContext(), $0)";
 }
 
 def PylirPy_BoolAttr : TypeObjectSlotsAttr<"Bool", [ParamSpec<CustomPrint<AttrParameter<"bool", "">, [{

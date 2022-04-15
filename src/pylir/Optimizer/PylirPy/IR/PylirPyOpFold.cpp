@@ -371,11 +371,6 @@ llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* cont
     return result;
 }
 
-pylir::Py::IntAttr add(pylir::Py::IntAttrInterface lhs, pylir::Py::IntAttrInterface rhs)
-{
-    return pylir::Py::IntAttr::get(lhs.getContext(), lhs.getIntegerValue() + rhs.getIntegerValue());
-}
-
 } // namespace
 
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
@@ -468,16 +463,16 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
     auto constant = resolveValue(*this, operands[1]).dyn_cast_or_null<Py::TupleAttr>();
     if (constant && constant.getValue().empty())
     {
-        return constant;
+        return Py::TupleAttr::get(getContext());
     }
     auto index = operands[0].dyn_cast_or_null<mlir::IntegerAttr>();
-    if (index && index.getValue().isZero())
-    {
-        return getTuple();
-    }
     if (!index || !constant)
     {
         return nullptr;
+    }
+    if (index.getValue().getZExtValue() > constant.getValue().size())
+    {
+        return Py::TupleAttr::get(getContext());
     }
     return Py::TupleAttr::get(getContext(), constant.getValue().drop_front(index.getValue().getZExtValue()));
 }
@@ -963,7 +958,7 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     }
     if (tupleType.getElements().empty())
     {
-        return {Py::UnboundType::get(getContext())};
+        return {tupleType};
     }
     mlir::IntegerAttr index;
     if (!mlir::matchPattern(getCount(), mlir::m_Constant(&index)))
@@ -1013,14 +1008,7 @@ pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Locatio
     llvm::SmallVector<mlir::Value> arguments{input};
     for (const auto& iter : attr.cast<pylir::Py::TupleAttr>().getValue())
     {
-        if (auto attr = iter.dyn_cast<pylir::Py::ObjectAttrInterface>())
-        {
-            arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, attr));
-        }
-        else
-        {
-            arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
-        }
+        arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
     }
     return builder.create<pylir::Py::MakeTupleOp>(loc, input.getType(), arguments, builder.getI32ArrayAttr({}));
 }

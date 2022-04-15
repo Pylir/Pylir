@@ -38,6 +38,17 @@ def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
                                     return vector;
                                 }() }]> $count, $args), ConstantAttr<I32ArrayAttr, "{}">)>;
 
+class BinOpAttrs<string op, Attr attrType, Attr resultAttr = attrType>
+	: NativeCodeCall<!subst("$0",
+		!subst("$_self", "$0.cast<" # attrType.storageType # ">()", attrType.convertFromStorage)
+		# op # !subst("$_self", "$1.cast<" # attrType.storageType # ">()", attrType.convertFromStorage),
+		resultAttr.constBuilderCall)>;
+
+class PlusAttrs<Attr attrType, Attr resultAttr = attrType> : BinOpAttrs<"+", attrType, resultAttr>;
+
+def : Pat<(PylirPy_TupleDropFrontOp $count1, (PylirPy_TupleDropFrontOp $count2, $tuple)),
+          (PylirPy_TupleDropFrontOp (Arith_AddIOp $count1, $count2), $tuple)>;
+
 def : Pattern<(PylirPy_GetSlotOp:$loc $object,
                 (PylirPy_TypeOfOp (PylirPy_TypeOfOp $_)), Confined<StrAttr, [IsTypeSlot]>:$slot),
     [(PylirPy_ConstantOp:$constant TypeRef), (PylirPy_GetSlotOp $object, $constant, $slot, (location $loc))]
@@ -89,14 +100,12 @@ def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatch
 def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $op, (ConstantLikeMatcher IntAttrInterface:$first)),
             (ConstantLikeMatcher IntAttrInterface:$second)),
             [(PylirPy_ConstantOp:$constant
-            (NativeCodeCall<"add($0.cast<::pylir::Py::IntAttrInterface>(), $1.cast<::pylir::Py::IntAttrInterface>())">
-            $first, $second)), (PylirPy_IntAddOp $op, $constant)]>;
+            (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)), (PylirPy_IntAddOp $op, $constant)]>;
 
 def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $x, (ConstantLikeMatcher IntAttrInterface:$first)),
                                 (PylirPy_IntAddOp $y, (ConstantLikeMatcher IntAttrInterface:$second))),
             [(PylirPy_ConstantOp:$constant
-            (NativeCodeCall<"add($0.cast<::pylir::Py::IntAttrInterface>(), $1.cast<::pylir::Py::IntAttrInterface>())">
-             $first, $second)),
+            (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)),
              (PylirPy_IntAddOp (PylirPy_IntAddOp $x, $y), $constant)]>;
 
 #endif
