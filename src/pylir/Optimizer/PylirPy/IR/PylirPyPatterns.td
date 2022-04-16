@@ -6,23 +6,26 @@ include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Arithmetic/IR/ArithmeticOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
+class ResolvesTo<int constOnly = 1>
+	: NativeCodeCall<"::resolvesToPattern($_self, $0, " # !if(constOnly, "true", "false") # ")">;
+
 def prependTupleConst : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
 def IsTypeSlot : AttrConstraint<CPred<"::isTypeSlot($_self.cast<::mlir::StringAttr>().getValue())">, "is type slot">;
 
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
 
-def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, ArrayCount<0>:$_)),
+def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, ArrayCount<0>)),
           (PylirPy_MakeTupleOp
             (NativeCodeCall<[{ [&]{ auto vector = llvm::to_vector($1);
                                     vector.insert(vector.begin(), $0);
                                     return vector; }() }]> $input, $args), ConstantAttr<I32ArrayAttr, "{}">)>;
 
-def : Pat<(PylirPy_TuplePrependOp $input, (ConstantLikeMatcher PylirPy_TupleAttr:$args)),
+def : Pat<(PylirPy_TuplePrependOp $input, (ResolvesTo<0> PylirPy_TupleAttr:$args)),
           (prependTupleConst $input, $args)>;
 
 def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
-									(PylirPy_MakeTupleOp $args, ArrayCount<0>:$_)),
+									(PylirPy_MakeTupleOp $args, ArrayCount<0>)),
           (PylirPy_MakeTupleOp
             (NativeCodeCall<[{ [&]{
                                     auto value = $0.cast<mlir::IntegerAttr>().getValue().getZExtValue();
@@ -105,15 +108,14 @@ def : Pat<(PylirPy_IntCmpOp $kind, $lhs, $rhs),
 def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
           (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
 
-def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $op, (ConstantLikeMatcher IntAttrInterface:$first)),
-            (ConstantLikeMatcher IntAttrInterface:$second)),
-            [(PylirPy_ConstantOp:$constant
-            (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)), (PylirPy_IntAddOp $op, $constant)]>;
+def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $op, (ResolvesTo<0> IntAttrInterface:$first)),
+            (ResolvesTo<0> IntAttrInterface:$second)),
+            [(PylirPy_ConstantOp:$constant (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)),
+             (PylirPy_IntAddOp $op, $constant)]>;
 
-def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $x, (ConstantLikeMatcher IntAttrInterface:$first)),
-                                (PylirPy_IntAddOp $y, (ConstantLikeMatcher IntAttrInterface:$second))),
-            [(PylirPy_ConstantOp:$constant
-            (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)),
+def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $x, (ResolvesTo<0> IntAttrInterface:$first)),
+                                (PylirPy_IntAddOp $y, (ResolvesTo<0> IntAttrInterface:$second))),
+            [(PylirPy_ConstantOp:$constant (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)),
              (PylirPy_IntAddOp (PylirPy_IntAddOp $x, $y), $constant)]>;
 
 #endif

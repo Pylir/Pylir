@@ -41,6 +41,7 @@ class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait>
 def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [
 	DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>]> {
 	let mnemonic = "obj";
+	let summary = "python object";
 
 	let assemblyFormat = "`<` $typeObject (`,` $slots^)? `>`";
 }
@@ -50,6 +51,7 @@ def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
 											?, "$_printer << $_self.toString();">, "value">],
 	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
 	let mnemonic = "int";
+	let summary = "python integer";
 
 	let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
 
@@ -76,12 +78,14 @@ def PylirPy_BoolAttr : TypeObjectSlotsAttr<"Bool", [ParamSpec<CustomPrint<AttrPa
 }]>, "value">],
 	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
 	let mnemonic = "bool";
+	let summary = "python boolean";
 
 	let assemblyFormat = "`<`$value ( `,` struct($typeObject, $slots)^)?`>`";
 }
 
 def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter<"">, "value">]> {
 	let mnemonic = "float";
+	let summary = "python float";
 
     let extraClassDeclaration = [{
         double getDoubleValue() const
@@ -99,6 +103,7 @@ def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRe
 	$_printer << "\"";
 }]>, "value">]> {
 	let mnemonic = "str";
+	let summary = "python string";
 
 	let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
 }
@@ -106,6 +111,7 @@ def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRe
 def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
 	[ParamSpec<ListPrint<"::mlir::Attribute", "Paren">, "value", "{}">]> {
 	let mnemonic = "tuple";
+	let summary = "python tuple";
 
 	let extraClassDeclaration = [{
 		::mlir::DictionaryAttr getSlots() const
@@ -131,6 +137,7 @@ def PylirPy_SetAttr : TypeObjectSlotsAttr<"Set",
 		value = temp;
 	}]> {
 	let mnemonic = "set";
+	let summary = "python set";
 
 	let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
 }
@@ -154,6 +161,7 @@ def PylirPy_DictAttr : TypeObjectSlotsAttr<"Dict",
 		value = vector;
 	}]> {
     let mnemonic = "dict";
+    let summary = "python dictionary";
 
     let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
 }
@@ -168,6 +176,7 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	     DeclareAttrInterfaceMethods<ObjectAttrInterface>]>
 {
 	let mnemonic = "function";
+	let summary = "python function";
 
 	let assemblyFormat = "`<` $value ( `,` struct($qualName, $defaults, $kwDefaults, $dict)^)? `>`";
 }
@@ -175,6 +184,7 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
 	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctx, {})">, "mroTuple">]> {
 	let mnemonic = "type";
+	let summary = "python type";
 
 	let assemblyFormat = "(`<`struct(params)^`>`)?";
 }
