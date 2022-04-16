@@ -563,7 +563,9 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         manager.addNestedPass<mlir::FuncOp>(pylir::Py::createHandleLoadStoreEliminationPass());
         manager.addPass(pylir::Py::createFoldHandlesPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-        manager.addPass(pylir::Py::createInlinerPass());
+        manager.addPass(mlir::createCanonicalizerPass());
+        manager.addPass(pylir::Py::createTrialInlinerPass());
+        manager.addPass(mlir::createSymbolDCEPass());
         manager.addNestedPass<mlir::FuncOp>(pylir::createLoadForwardingPass());
         manager.addNestedPass<mlir::FuncOp>(mlir::createSCCPPass());
     }

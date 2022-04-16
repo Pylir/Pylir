@@ -65,4 +65,21 @@ def Inliner : Pass<"pylir-inliner", "::mlir::ModuleOp"> {
 	];
 }
 
+def TrialInliner : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
+	let summary = "Inline functions using trials";
+	let constructor = "::pylir::Py::createTrialInlinerPass()";
+	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+	let statistics = [
+		Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
+		Statistic<"m_cacheHits", "Cache hits", "Amount of times an inlining trial did not have to be performed due to a cache hit">,
+		Statistic<"m_cacheMisses", "Caches misses", "Amount of times an inlining trial had to be performed as it was not in cache">,
+	];
+
+	let options = [
+		Option<"m_minCalleeSizeReduction", "min-callee-size-reduction", "std::uint32_t", "50",
+			  "Percent the callee must have decreased in size after having been inlined in the caller to be deemed profitable">,
+	];
+}
+
 #endif
