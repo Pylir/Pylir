@@ -773,37 +773,54 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
 
 mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, ::mlir::PatternRewriter& rewriter)
 {
-    mlir::Attribute attribute;
-    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
+    mlir::FlatSymbolRefAttr callee;
+    if (auto makeFuncOp = op.getFunction().getDefiningOp<pylir::Py::MakeFuncOp>())
     {
-        return mlir::failure();
+        callee = makeFuncOp.getFunctionAttr();
     }
-    auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
-    if (!functionAttr)
+    else
     {
-        return mlir::failure();
+        mlir::Attribute attribute;
+        if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
+        {
+            return mlir::failure();
+        }
+        auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
+        if (!functionAttr)
+        {
+            return mlir::failure();
+        }
+        callee = functionAttr.getValue();
     }
-    auto call =
-        rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), functionAttr.getValue(), op.getCallOperands());
+    auto call = rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), callee, op.getCallOperands());
     call->setAttr(Py::alwaysBoundAttr, rewriter.getUnitAttr());
     return mlir::success();
 }
 
 mlir::LogicalResult pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp op, ::mlir::PatternRewriter& rewriter)
 {
-    mlir::Attribute attribute;
-    if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
+    mlir::FlatSymbolRefAttr callee;
+    if (auto makeFuncOp = op.getFunction().getDefiningOp<pylir::Py::MakeFuncOp>())
     {
-        return mlir::failure();
+        callee = makeFuncOp.getFunctionAttr();
     }
-    auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
-    if (!functionAttr)
+    else
     {
-        return mlir::failure();
+        mlir::Attribute attribute;
+        if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
+        {
+            return mlir::failure();
+        }
+        auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
+        if (!functionAttr)
+        {
+            return mlir::failure();
+        }
+        callee = functionAttr.getValue();
     }
-    auto call = rewriter.replaceOpWithNewOp<Py::InvokeOp>(
-        op, op.getType(), functionAttr.getValue(), op.getCallOperands(), op.getNormalDestOperands(),
-        op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
+    auto call = rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, op.getType(), callee, op.getCallOperands(),
+                                                          op.getNormalDestOperands(), op.getUnwindDestOperands(),
+                                                          op.getHappyPath(), op.getExceptionPath());
     call->setAttr(Py::alwaysBoundAttr, rewriter.getUnitAttr());
     return mlir::success();
 }
