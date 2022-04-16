@@ -653,13 +653,29 @@ void Monomorph::runOnOperation()
                 mapping = &result->second.mapping;
             }
         }
+        llvm::DenseMap<mlir::Value, mlir::Value> cloneToOrigMapping;
+        if (mapping)
+        {
+            for (auto [key2, value2] : mapping->getValueMap())
+            {
+                cloneToOrigMapping[value2] = key2;
+            }
+        }
 
         funcOp.walk(
             [&, &value = value](pylir::Py::TypeFoldInterface foldable)
             {
                 llvm::SmallVector<pylir::Py::ObjectTypeInterface> inputs(foldable->getNumOperands());
                 llvm::transform(foldable->getOperands(), inputs.begin(),
-                                [&value = value](mlir::Value val) { return value.lattices.lookup(val).type; });
+                                [&, &value = value](mlir::Value val)
+                                {
+                                    auto mapped = cloneToOrigMapping.lookup(val);
+                                    return value.lattices.lookup(mapped ? mapped : val).type;
+                                });
+                if (!llvm::all_of(inputs, llvm::identity<pylir::Py::ObjectTypeInterface>{}))
+                {
+                    return;
+                }
                 auto result = foldable.typeFold(inputs);
                 if (!result)
                 {
@@ -706,6 +722,7 @@ void Monomorph::runOnOperation()
                         mlir::OpBuilder builder(op);
                         auto newCall = builder.create<pylir::Py::CallOp>(op.getLoc(), op->getResultTypes(), callee,
                                                                          op.getCallOperands());
+                        newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                         op->replaceAllUsesWith(newCall);
                         op->erase();
                         return true;
@@ -718,6 +735,7 @@ void Monomorph::runOnOperation()
                         auto newCall = builder.create<pylir::Py::InvokeOp>(
                             op.getLoc(), op->getResultTypes(), callee, op.getCallOperands(), op.getNormalDestOperands(),
                             op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
+                        newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                         op->replaceAllUsesWith(newCall);
                         op->erase();
                         return true;
@@ -758,6 +776,7 @@ void Monomorph::runOnOperation()
                 if (setCallee(call, fixedCall))
                 {
                     changed = true;
+                    m_callsChanged++;
                 }
                 continue;
             }

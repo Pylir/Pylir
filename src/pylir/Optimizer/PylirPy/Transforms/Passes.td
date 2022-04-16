@@ -45,7 +45,8 @@ def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 	let statistics = [
 		Statistic<"m_operationsReplaced", "Operations replaced", "Amount of operations that have been replaced during folding">,
 		Statistic<"m_callsTurnedStatic", "Calls turned static", "Amount of call instructions that are now statically resolved">,
-		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specified types">,
+		Statistic<"m_callsChanged", "Calls changed", "Amount of call instructions that now point to clones">,
+		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specific types">,
 	];
 }
 
