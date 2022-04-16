@@ -2240,7 +2240,9 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::A
             }
         }
     }
-    return {makeTuple(iterArgs), makeDict(dictArgs)};
+    auto tuple = makeTuple(iterArgs);
+    auto dict = dictArgs.empty() ? m_builder.createConstant(m_builder.getDictAttr()) : makeDict(dictArgs);
+    return {tuple, dict};
 }
 
 std::string pylir::CodeGen::formImplName(std::string_view symbol)

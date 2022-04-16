@@ -140,6 +140,8 @@ def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [AlwaysBound, NoCap
         and `$found` will be 1. If not found, `$found` will be 0. Reading from `$result` when `$found` is 0 is undefined
         behaviour. If `$dict` is not really a dict (or a subclass of) the behaviour is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem"> {
@@ -178,6 +180,8 @@ def PylirPy_DictLenOp : PylirPy_Op<"dict.len", [DeclareOpInterfaceMethods<Memory
     let description = [{
         Returns the amount of key-value pairs stored in `$input`.
     }];
+
+    let hasFolder = 1;
 }
 
 // Tuple ops
