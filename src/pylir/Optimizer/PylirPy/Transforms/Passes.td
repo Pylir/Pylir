@@ -75,11 +75,14 @@ def TrialInliner : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
 		Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
 		Statistic<"m_cacheHits", "Cache hits", "Amount of times an inlining trial did not have to be performed due to a cache hit">,
 		Statistic<"m_cacheMisses", "Caches misses", "Amount of times an inlining trial had to be performed as it was not in cache">,
+		Statistic<"m_recursionLimitReached", "Recursion limits reached", "Amount of times a recursion chain was disabled in a caller">,
 	];
 
 	let options = [
 		Option<"m_minCalleeSizeReduction", "min-callee-size-reduction", "std::uint32_t", "50",
-			  "Percent the callee must have decreased in size after having been inlined in the caller to be deemed profitable">,
+			    "Percent the callee must have decreased in size after having been inlined in the caller to be deemed profitable">,
+		Option<"m_maxRecursionDepth", "max-recursion-depth", "std::size_t", "4",
+				"Maximum amount of times a recursive function deemed profitable may be inlined">,
 	];
 }
 

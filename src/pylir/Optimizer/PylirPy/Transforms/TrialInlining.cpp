@@ -99,6 +99,78 @@ public:
     }
 };
 
+class RecursionStateMachine
+{
+    std::vector<mlir::CallableOpInterface> m_pattern;
+    decltype(m_pattern)::const_iterator m_inPattern;
+    std::size_t m_count = 1;
+
+    enum class States
+    {
+        GatheringPattern,
+        Synchronizing,
+        CheckingPattern,
+    };
+
+    States m_state = States::GatheringPattern;
+
+public:
+    explicit RecursionStateMachine(mlir::CallableOpInterface firstOccurrence) : m_pattern{firstOccurrence} {}
+
+    RecursionStateMachine(const RecursionStateMachine&) = delete;
+    RecursionStateMachine& operator=(const RecursionStateMachine&) = delete;
+    RecursionStateMachine(RecursionStateMachine&&) noexcept = default;
+    RecursionStateMachine& operator=(RecursionStateMachine&&) noexcept = default;
+
+    std::size_t getCount() const
+    {
+        return m_count;
+    }
+
+    llvm::ArrayRef<mlir::CallableOpInterface> getPattern() const
+    {
+        return m_pattern;
+    }
+
+    void cycle(mlir::CallableOpInterface occurrence)
+    {
+        switch (m_state)
+        {
+            case States::Synchronizing:
+                if (occurrence != m_pattern.front())
+                {
+                    return;
+                }
+                m_state = States::GatheringPattern;
+                break;
+            case States::GatheringPattern:
+                if (occurrence != m_pattern.front())
+                {
+                    m_pattern.push_back(occurrence);
+                    return;
+                }
+                m_state = States::CheckingPattern;
+                m_inPattern = m_pattern.begin() + (m_pattern.size() == 1 ? 0 : 1);
+                m_count = 2;
+                break;
+            case States::CheckingPattern:
+                if (*m_inPattern == occurrence)
+                {
+                    if (++m_inPattern == m_pattern.end())
+                    {
+                        m_count++;
+                        m_inPattern = m_pattern.begin();
+                    }
+                    return;
+                }
+                m_state = occurrence == m_pattern.front() ? States::GatheringPattern : States::Synchronizing;
+                m_count = 0;
+                m_pattern.resize(1);
+                break;
+        }
+    }
+};
+
 class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
 {
     mlir::FrozenRewritePatternSet patterns;
@@ -158,6 +230,34 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                                                         TrialDataBase& dataBase,
                                                         const llvm::DenseMap<mlir::StringAttr, Inlineable>& symbolTable)
     {
+        llvm::MapVector<mlir::Operation*, RecursionStateMachine> recursionDetection;
+        llvm::DenseSet<mlir::Operation*> disabledCallables;
+        auto recursivePattern = [&](mlir::CallableOpInterface callable)
+        {
+            bool triggered = false;
+            for (auto iter = recursionDetection.begin(); iter != recursionDetection.end();)
+            {
+                auto& stateMachine = iter->second;
+                stateMachine.cycle(callable);
+                if (stateMachine.getCount() >= m_maxRecursionDepth)
+                {
+                    auto pattern = stateMachine.getPattern();
+                    disabledCallables.insert(pattern.begin(), pattern.end());
+                    iter = recursionDetection.erase(iter);
+                    triggered = true;
+                    m_recursionLimitReached++;
+                    continue;
+                }
+                iter++;
+            }
+            if (!triggered)
+            {
+                // If it was triggered, then this callable was the fist occurrence in a recursion pattern and now
+                // disabled and deleted. Don't reinsert it now
+                recursionDetection.insert({callable, RecursionStateMachine{callable}});
+            }
+        };
+
         bool failed = false;
         mlir::WalkResult walkResult(mlir::failure());
         do
@@ -172,14 +272,12 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                     {
                         return mlir::WalkResult::advance();
                     }
-                    if (ref.getAttr() == mlir::cast<mlir::SymbolOpInterface>(*functionOpInterface).getNameAttr())
+                    auto inlineable = symbolTable.find(ref.getAttr());
+                    if (inlineable == symbolTable.end())
                     {
-                        // TODO: MLIR does not support inlining direct recursion yet and we might have to handle this
-                        //  specially anyways
                         return mlir::WalkResult::advance();
                     }
-                    auto callable = symbolTable.find(ref.getAttr());
-                    if (callable == symbolTable.end())
+                    if (disabledCallables.contains(inlineable->second.getCallable()))
                     {
                         return mlir::WalkResult::advance();
                     }
@@ -191,8 +289,9 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                         {
                             return mlir::WalkResult::advance();
                         }
+                        recursivePattern(inlineable->second.getCallable());
                         m_callsInlined++;
-                        if (mlir::failed(pylir::Py::inlineCall(callOpInterface, callable->second.getCallable())))
+                        if (mlir::failed(pylir::Py::inlineCall(callOpInterface, inlineable->second.getCallable())))
                         {
                             failed = true;
                             return mlir::WalkResult::interrupt();
@@ -204,8 +303,9 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                         return mlir::WalkResult::interrupt();
                     }
                     m_cacheMisses++;
-                    auto trialResult = performTrial(functionOpInterface, callOpInterface,
-                                                    callable->second.getCallable(), callable->second.getCalleeSize());
+                    auto trialResult =
+                        performTrial(functionOpInterface, callOpInterface, inlineable->second.getCallable(),
+                                     inlineable->second.getCalleeSize());
                     if (mlir::failed(trialResult))
                     {
                         failed = true;
@@ -214,6 +314,14 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                         return mlir::WalkResult::interrupt();
                     }
                     pylir::get<std::promise<bool>>(result).set_value(*trialResult);
+                    if (*trialResult)
+                    {
+                        // Add it to patterns afterwards. This is only really to add a new state machine for the
+                        // callable. Any real patterns will be executed via cache hits. Since this was a cache miss
+                        // it can't really have been part of any pattern and it doesn't matter that it will reset
+                        // some of the existing state machines
+                        recursivePattern(inlineable->second.getCallable());
+                    }
                     // We have to interrupt regardless of whether it was rolled back or not as the specific blocks
                     // operations that make up the function body had all been copied and then moved, aka they are not
                     // the same anymore as in the walk operation. We might want to improve this situation in the future.
