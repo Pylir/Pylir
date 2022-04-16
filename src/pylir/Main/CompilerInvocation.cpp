@@ -449,7 +449,7 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::LLVM::LLVMDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();
     m_mlirContext.emplace(registry);
-    m_mlirContext->enableMultithreading(args.hasArg(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
+    m_mlirContext->enableMultithreading(args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
     m_mlirContext->getDiagEngine().registerHandler(
         [](mlir::Diagnostic& diagnostic)
         {
