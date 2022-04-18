@@ -89,8 +89,7 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
         builder.setInsertionPointToStart(&builder.getBlock()->getParent()->front());
         paramBegin = 1;
         auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
-        returnSlot = builder.create<mlir::LLVM::AllocaOp>(loc, func.getFunctionType().getParams().front(), one,
-                                                          mlir::IntegerAttr{});
+        returnSlot = builder.create<mlir::LLVM::AllocaOp>(loc, func.getFunctionType().getParams().front(), one, 1);
         arguments.push_back(returnSlot);
     }
 
@@ -111,8 +110,7 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
                 }
                 auto one =
                     builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
-                auto tempAlloca =
-                    builder.create<mlir::LLVM::AllocaOp>(loc, integerPointerType, one, mlir::IntegerAttr{});
+                auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(loc, integerPointerType, one, 1);
                 auto casted = builder.create<mlir::LLVM::BitcastOp>(
                     loc, mlir::LLVM::LLVMPointerType::get(operands[i].getType()), tempAlloca);
                 builder.create<mlir::LLVM::StoreOp>(loc, operands[i], casted);
@@ -124,7 +122,7 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
                 auto one =
                     builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
                 auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(
-                    loc, mlir::LLVM::LLVMPointerType::get(operands[i].getType()), one, mlir::IntegerAttr{});
+                    loc, mlir::LLVM::LLVMPointerType::get(operands[i].getType()), one, 1);
                 arguments.push_back(tempAlloca);
                 if (auto load = operands[i].getDefiningOp<mlir::LLVM::LoadOp>())
                 {
@@ -157,7 +155,7 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
         {
             auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
             auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(
-                loc, mlir::LLVM::LLVMPointerType::get(adjustments.originalRetType), one, mlir::IntegerAttr{});
+                loc, mlir::LLVM::LLVMPointerType::get(adjustments.originalRetType), one, 1);
             auto casted = builder.create<mlir::LLVM::BitcastOp>(
                 loc, mlir::LLVM::LLVMPointerType::get(call.getResult(0).getType()), tempAlloca);
             builder.create<mlir::LLVM::StoreOp>(loc, call.getResult(0), casted);

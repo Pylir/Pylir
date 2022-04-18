@@ -1,3 +1,4 @@
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Pass/Pass.h>

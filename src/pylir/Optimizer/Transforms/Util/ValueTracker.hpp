@@ -56,9 +56,7 @@ public:
         {
             return;
         }
-        auto* context = value.getContext();
-        context->allowUnregisteredDialects();
-        mlir::OperationState state(mlir::UnknownLoc::get(context), "__value_tracker");
+        mlir::OperationState state(mlir::UnknownLoc::get(value.getContext()), "__value_tracker");
         state.addOperands(value);
         m_tracker = mlir::Operation::create(state);
     }

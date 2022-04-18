@@ -22,6 +22,8 @@ struct HandleLoadStoreEliminationPass : pylir::Py::HandleLoadStoreEliminationBas
 protected:
     void runOnOperation() override;
 
+    mlir::LogicalResult initialize(mlir::MLIRContext* context) override;
+
 private:
     bool optimizeBlock(mlir::Block& block, mlir::Value clobberTracker,
                        llvm::DenseMap<mlir::Block*, BlockData>& blockArgUsages,
@@ -33,7 +35,6 @@ void HandleLoadStoreEliminationPass::runOnOperation()
 {
     bool changed = false;
     auto* topLevel = getOperation();
-    getContext().allowUnregisteredDialects();
     mlir::OperationState state(mlir::UnknownLoc::get(&getContext()), "__clobber_tracker");
     state.addTypes({pylir::Py::DynamicType::get(&getContext())});
     mlir::Operation* clobberTracker = mlir::Operation::create(state);
@@ -207,6 +208,12 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
         }
     }
     return changed;
+}
+
+mlir::LogicalResult HandleLoadStoreEliminationPass::initialize(mlir::MLIRContext* context)
+{
+    context->allowUnregisteredDialects();
+    return mlir::success();
 }
 } // namespace
 

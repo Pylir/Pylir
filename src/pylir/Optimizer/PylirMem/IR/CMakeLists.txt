@@ -8,8 +8,6 @@ mlir_tablegen(PylirMemOpsAttributes.h.inc -gen-attrdef-decls --attrdefs-dialect=
 mlir_tablegen(PylirMemOpsAttributes.cpp.inc -gen-attrdef-defs --attrdefs-dialect="pyMem")
 mlir_tablegen(PylirMemOpsDialect.h.inc -gen-dialect-decls -dialect="pyMem")
 mlir_tablegen(PylirMemOpsDialect.cpp.inc -gen-dialect-defs -dialect="pyMem")
-mlir_tablegen(PylirMemOpsEnums.h.inc -gen-enum-decls)
-mlir_tablegen(PylirMemOpsEnums.cpp.inc -gen-enum-defs)
 add_public_tablegen_target(PylirMemOpsIncGen)
 add_dependencies(mlir-headers PylirMemOpsIncGen)
 

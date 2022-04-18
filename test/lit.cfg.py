@@ -30,7 +30,9 @@ config.test_exec_root = os.path.join(config.pylir_obj_root, 'test')
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 
-llvm_config.with_system_environment(['HOME', 'INCLUDE', 'LIB', 'TMP', 'TEMP'])
+llvm_config.with_system_environment(
+    ['HOME', 'INCLUDE', 'LIB', 'TMP', 'TEMP', 'TSAN_OPTIONS', 'ASAN_OPTIONS',
+     'UBSAN_OPTIONS'])
 
 llvm_config.use_default_substitutions()
 

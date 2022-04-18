@@ -1,3 +1,4 @@
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
 
@@ -21,6 +22,12 @@ class TestMemorySSA : public TestMemorySSABase<TestMemorySSA>
 {
 protected:
     void runOnOperation() override;
+
+    mlir::LogicalResult initialize(mlir::MLIRContext* context) override
+    {
+        context->allowUnregisteredDialects();
+        return mlir::success();
+    }
 };
 
 void TestMemorySSA::runOnOperation()
