@@ -22,7 +22,7 @@ namespace such as `print` are already available. Some operators are already impl
 implemented. Exception handling is complete and a very basic Garbage Collector is already implemented. 
 
 A good way to check on current language conformance is to take a look at the testsuite for it 
-[here](https://github.com/zero9178/Pylir).
+[here](https://github.com/zero9178/Pylir/blob/master/test/Execution).
 
 Most time is currently spent working on the optimizer.
 
@@ -47,8 +47,8 @@ required revision tested to build a specific version of pylir is always document
 Pylir requires LLVM and MLIR to be built at this revision, and then be able to be found via cmake. Via the 
 `CMAKE_PREFIX_PATH` variable, one can point cmake at the LLVM and MLIR installation.
 
-Additionally, one may optionally also build and embed LLD. This is highly recommended and also enable LTO support in the 
-compiler. 
+Additionally, one may optionally also build and embed LLD. This is highly recommended and also enables LTO support in 
+the compiler. 
 
 ## Quick tour of the source code
 
