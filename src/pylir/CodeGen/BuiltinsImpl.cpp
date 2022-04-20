@@ -116,7 +116,7 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createClass(mlir::FlatSymbolRefAttr cla
 pylir::Py::GlobalValueOp pylir::CodeGen::createFunction(llvm::StringRef functionName,
                                                         const std::vector<FunctionParameter>& parameters,
                                                         llvm::function_ref<void(mlir::ValueRange)> implementation,
-                                                        mlir::FuncOp* implOut, Py::TupleAttr posArgs,
+                                                        mlir::func::FuncOp* implOut, Py::TupleAttr posArgs,
                                                         Py::DictAttr kwArgs)
 {
     return createFunction(
@@ -127,9 +127,9 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createFunction(llvm::StringRef function
 pylir::Py::GlobalValueOp
     pylir::CodeGen::createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
                                    llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation,
-                                   mlir::FuncOp* implOut, Py::TupleAttr posArgs, Py::DictAttr kwArgs)
+                                   mlir::func::FuncOp* implOut, Py::TupleAttr posArgs, Py::DictAttr kwArgs)
 {
-    auto function = mlir::FuncOp::create(
+    auto function = mlir::func::FuncOp::create(
         m_builder.getCurrentLoc(), (functionName + "$impl").str(),
         m_builder.getFunctionType(llvm::SmallVector<mlir::Type>(parameters.size() + 1, m_builder.getDynamicType()),
                                   m_builder.getDynamicType()));
@@ -389,7 +389,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                    auto result = m_builder.createIntFromInteger(hash);
                                    m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{result});
                                });
-            mlir::FuncOp objectReprFunc;
+            mlir::func::FuncOp objectReprFunc;
             Py::GlobalValueOp objectReprObj;
             slots["__repr__"] = objectReprObj = createFunction(
                 "builtins.object.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
@@ -611,7 +611,7 @@ void pylir::CodeGen::createBuiltinsImpl()
         m_builder.getStrBuiltin(), {},
         [&](SlotMapImpl& slots)
         {
-            mlir::FuncOp newFunction;
+            mlir::func::FuncOp newFunction;
             slots["__new__"] = createFunction(
                 "builtins.str.__new__",
                 {FunctionParameter{"", FunctionParameter::PosOnly, false},

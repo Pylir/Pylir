@@ -213,8 +213,8 @@ class CodeGen
                                                 llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
                                                 llvm::function_ref<mlir::Value(std::string_view)> kwDefault = {});
 
-    mlir::FuncOp buildFunctionCC(llvm::Twine name, mlir::FuncOp implementation,
-                                 const std::vector<FunctionParameter>& parameters);
+    mlir::func::FuncOp buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
+                                       const std::vector<FunctionParameter>& parameters);
 
     Py::GlobalValueOp createGlobalConstant(Py::ObjectAttrInterface value);
 
@@ -226,12 +226,12 @@ class CodeGen
 
     Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
                                      llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation = {},
-                                     mlir::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
+                                     mlir::func::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
                                      Py::DictAttr kwArgs = {});
 
     Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
                                      llvm::function_ref<void(mlir::ValueRange)> implementation,
-                                     mlir::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
+                                     mlir::func::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
                                      Py::DictAttr kwArgs = {});
 
     Py::GlobalValueOp createExternal(llvm::StringRef objectName);
@@ -282,7 +282,7 @@ class CodeGen
 
     void createBuiltinsImpl();
 
-    [[nodiscard]] auto implementFunction(mlir::FuncOp funcOp)
+    [[nodiscard]] auto implementFunction(mlir::func::FuncOp funcOp)
     {
         auto tuple =
             std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),

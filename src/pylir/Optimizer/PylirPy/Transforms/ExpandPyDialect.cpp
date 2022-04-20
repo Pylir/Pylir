@@ -225,7 +225,7 @@ void ExpandPyDialectPass::runOnOperation()
     {
         pylir::Py::PyBuilder builder(&getContext());
         builder.setInsertionPointToEnd(module.getBody());
-        auto func = builder.create<mlir::FuncOp>(
+        auto func = builder.create<mlir::func::FuncOp>(
             pylir::Py::pylirCallIntrinsic,
             builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
                                     {builder.getDynamicType()}));

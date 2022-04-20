@@ -57,7 +57,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     m_builder.setCurrentLoc(m_builder.getUnknownLoc());
 
     auto initFunc =
-        mlir::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__", m_builder.getFunctionType({}, {}));
+        mlir::func::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__", m_builder.getFunctionType({}, {}));
     auto reset = implementFunction(initFunc);
     // We aren't actually at function scope, even if wwe are implementing a function
     m_functionScope.reset();
@@ -1944,11 +1944,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     m_builder.setCurrentLoc(getLoc(funcDef.funcName, funcDef.funcName));
     auto qualifiedName = m_qualifiers + std::string(funcDef.funcName.getValue());
     std::vector<IdentifierToken> usedClosures;
-    mlir::FuncOp func;
+    mlir::func::FuncOp func;
     {
         pylir::ValueReset namespaceReset(m_classNamespace);
         m_classNamespace = {};
-        func = mlir::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
+        func = mlir::func::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
                                     m_builder.getFunctionType(std::vector<mlir::Type>(1 + functionParameters.size(),
                                                                                       m_builder.getDynamicType()),
                                                               {m_builder.getDynamicType()}));
@@ -2091,10 +2091,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     auto qualifiedName = m_qualifiers + std::string(classDef.className.getValue());
     auto name = m_builder.createConstant(qualifiedName);
 
-    mlir::FuncOp func;
+    mlir::func::FuncOp func;
     {
         func =
-            mlir::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
+            mlir::func::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
                                  m_builder.getFunctionType(std::vector<mlir::Type>(2 /* cell tuple + namespace dict */,
                                                                                    m_builder.getDynamicType()),
                                                            {m_builder.getDynamicType()}));
@@ -2418,11 +2418,11 @@ std::vector<pylir::CodeGen::UnpackResults>
     return args;
 }
 
-mlir::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::FuncOp implementation,
+mlir::func::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
                                              const std::vector<FunctionParameter>& parameters)
 {
     auto cc =
-        mlir::FuncOp::create(m_builder.getCurrentLoc(), name.str(), Py::getUniversalCCType(m_builder.getContext()));
+        mlir::func::FuncOp::create(m_builder.getCurrentLoc(), name.str(), Py::getUniversalCCType(m_builder.getContext()));
     cc.setPrivate();
     auto reset = implementFunction(cc);
 
