@@ -28,8 +28,6 @@ struct HandleLoadStoreEliminationPass : pylir::Py::HandleLoadStoreEliminationBas
 protected:
     void runOnOperation() override;
 
-    mlir::LogicalResult initialize(mlir::MLIRContext* context) override;
-
 private:
     bool optimizeBlock(mlir::Block& block, mlir::Value clobberTracker,
                        llvm::DenseMap<mlir::Block*, BlockData>& blockArgUsages,
@@ -41,15 +39,17 @@ void HandleLoadStoreEliminationPass::runOnOperation()
 {
     bool changed = false;
     auto* topLevel = getOperation();
-    mlir::OperationState state(mlir::UnknownLoc::get(&getContext()), "__clobber_tracker");
-    state.addTypes({pylir::Py::DynamicType::get(&getContext())});
-    mlir::Operation* clobberTracker = mlir::Operation::create(state);
-    auto exit = llvm::make_scope_exit([&] { clobberTracker->erase(); });
+    mlir::OwningOpRef<mlir::UnrealizedConversionCastOp> clobberTracker;
+    {
+        mlir::OpBuilder builder(&getContext());
+        clobberTracker = builder.create<mlir::UnrealizedConversionCastOp>(
+            builder.getUnknownLoc(), builder.getType<pylir::Py::DynamicType>(), mlir::ValueRange{});
+    }
     for (auto& region : topLevel->getRegions())
     {
         llvm::DenseMap<mlir::Block*, BlockData> blockArgUsages;
         llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap> definitions;
-        pylir::SSABuilder ssaBuilder([clobberTracker](mlir::BlockArgument) -> mlir::Value
+        pylir::SSABuilder ssaBuilder([&clobberTracker](mlir::BlockArgument) -> mlir::Value
                                      { return clobberTracker->getResult(0); });
         llvm::DenseSet<mlir::Block*> seen;
         for (auto& block : region)
@@ -216,11 +216,6 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
     return changed;
 }
 
-mlir::LogicalResult HandleLoadStoreEliminationPass::initialize(mlir::MLIRContext* context)
-{
-    context->allowUnregisteredDialects();
-    return mlir::success();
-}
 } // namespace
 
 std::unique_ptr<mlir::Pass> pylir::Py::createHandleLoadStoreEliminationPass()

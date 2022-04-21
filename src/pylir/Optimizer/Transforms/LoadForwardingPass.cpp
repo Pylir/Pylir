@@ -21,8 +21,6 @@ struct LoadForwardingPass : pylir::LoadForwardingBase<LoadForwardingPass>
 {
 protected:
     void runOnOperation() override;
-
-    mlir::LogicalResult initialize(mlir::MLIRContext* context) override;
 };
 
 void LoadForwardingPass::runOnOperation()
@@ -106,12 +104,6 @@ void LoadForwardingPass::runOnOperation()
         return;
     }
     markAnalysesPreserved<mlir::DominanceInfo, pylir::MemorySSA>();
-}
-
-mlir::LogicalResult LoadForwardingPass::initialize(mlir::MLIRContext* context)
-{
-    context->allowUnregisteredDialects();
-    return mlir::success();
 }
 
 } // namespace

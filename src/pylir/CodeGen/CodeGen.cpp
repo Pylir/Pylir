@@ -27,7 +27,6 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
         {
             context->loadDialect<pylir::Py::PylirPyDialect>();
             context->loadDialect<mlir::func::FuncDialect>();
-            context->allowUnregisteredDialects();
             return context;
         }()),
       m_module(mlir::ModuleOp::create(m_builder.getUnknownLoc())),

@@ -6,7 +6,8 @@
 
 #pragma once
 
-#include <mlir/IR/Operation.h>
+#include <mlir/IR/Builders.h>
+#include <mlir/IR/BuiltinOps.h>
 
 #include <utility>
 
@@ -14,20 +15,17 @@ namespace pylir
 {
 class ValueTracker
 {
-    mlir::Operation* m_tracker = nullptr;
+    mlir::OwningOpRef<mlir::UnrealizedConversionCastOp> m_tracker;
+
+    mlir::OwningOpRef<mlir::UnrealizedConversionCastOp>& tracker() const
+    {
+        return const_cast<std::remove_const_t<decltype(m_tracker)>&>(m_tracker);
+    }
 
 public:
     ValueTracker() = default;
 
-    ~ValueTracker()
-    {
-        if (m_tracker)
-        {
-            m_tracker->erase();
-        }
-    }
-
-    ValueTracker(const ValueTracker& rhs) : m_tracker(rhs.m_tracker ? rhs.m_tracker->clone() : nullptr) {}
+    ValueTracker(const ValueTracker& rhs) : m_tracker(rhs.m_tracker ? rhs.tracker()->clone() : nullptr) {}
 
     ValueTracker& operator=(const ValueTracker& rhs)
     {
@@ -39,21 +37,13 @@ public:
         {
             m_tracker->erase();
         }
-        m_tracker = rhs.m_tracker ? rhs.m_tracker->clone() : nullptr;
+        m_tracker = rhs.m_tracker ? rhs.tracker()->clone() : nullptr;
         return *this;
     }
 
-    ValueTracker(ValueTracker&& rhs) noexcept : m_tracker(std::exchange(rhs.m_tracker, nullptr)) {}
+    ValueTracker(ValueTracker&& rhs) noexcept = default;
 
-    ValueTracker& operator=(ValueTracker&& rhs) noexcept
-    {
-        if (m_tracker)
-        {
-            m_tracker->erase();
-        }
-        m_tracker = std::exchange(rhs.m_tracker, nullptr);
-        return *this;
-    }
+    ValueTracker& operator=(ValueTracker&& rhs) noexcept = default;
 
     // NOLINTNEXTLINE(google-explicit-constructor)
     ValueTracker(mlir::Value value)
@@ -62,9 +52,8 @@ public:
         {
             return;
         }
-        mlir::OperationState state(mlir::UnknownLoc::get(value.getContext()), "__value_tracker");
-        state.addOperands(value);
-        m_tracker = mlir::Operation::create(state);
+        mlir::OpBuilder builder(value.getContext());
+        m_tracker = builder.create<mlir::UnrealizedConversionCastOp>(builder.getUnknownLoc(), mlir::TypeRange{}, value);
     }
 
     ValueTracker& operator=(mlir::Value value)
@@ -73,7 +62,7 @@ public:
         {
             return *this = ValueTracker(value);
         }
-        m_tracker->setOperand(0, value);
+        m_tracker->getInputsMutable().assign(value);
         return *this;
     }
 
@@ -84,7 +73,7 @@ public:
         {
             return {};
         }
-        return m_tracker->getOperand(0);
+        return tracker()->getInputs()[0];
     }
 };
 } // namespace pylir

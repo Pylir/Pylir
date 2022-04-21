@@ -28,12 +28,6 @@ class TestMemorySSA : public TestMemorySSABase<TestMemorySSA>
 {
 protected:
     void runOnOperation() override;
-
-    mlir::LogicalResult initialize(mlir::MLIRContext* context) override
-    {
-        context->allowUnregisteredDialects();
-        return mlir::success();
-    }
 };
 
 void TestMemorySSA::runOnOperation()
