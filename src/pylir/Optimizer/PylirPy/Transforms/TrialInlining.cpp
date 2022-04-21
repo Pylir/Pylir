@@ -203,8 +203,6 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
             m_callsInlined++;
             return true;
         }
-        // TODO: why is this necessary? Fix in MLIR
-        functionOpInterface.getBody().dropAllReferences();
         functionOpInterface.getBody().takeBody(rollback->getBody());
         return false;
     }
