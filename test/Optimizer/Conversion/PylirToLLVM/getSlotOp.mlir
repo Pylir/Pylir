@@ -14,14 +14,10 @@ func @foo() -> !py.dynamic {
 
 // CHECK-LABEL: @foo
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.type
-// CHECK-NEXT: %[[TYPE_CAST:.*]] = llvm.bitcast %[[TYPE]]
 // CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
-// CHECK-NEXT: %[[TUPLE_CAST:.*]] = llvm.bitcast %[[TUPLE]]
-// CHECK-NEXT: %[[I8:.*]] = llvm.bitcast %[[TUPLE_CAST]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[I8]][{{[0-9]+}}]
-// CHECK-NEXT: %[[OBJECT_PTR:.*]] = llvm.bitcast %[[GEP]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[OBJECT_PTR]][0]
-// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][{{[0-9]+}}] : {{.*}}, i8
+// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP]][0]
+// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: llvm.return %[[LOAD]]
 
 // -----

@@ -7,8 +7,7 @@ func @test(%arg : !py.dynamic) -> index {
 
 // CHECK: @test
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[BITCAST:.*]] = llvm.bitcast %[[ARG]]
-// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[BITCAST]][0, 1]
+// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: llvm.return %[[RESULT]]

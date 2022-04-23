@@ -17,9 +17,8 @@ func @test() -> !py.dynamic {
 
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.addressof @{{const\$.*}}
-// CHECK-NEXT: %[[CAST:.*]] = llvm.bitcast %[[CONST]]
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CAST]], %[[HANDLE]]
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
 // CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
 // CHECK-NEXT: llvm.return %[[VALUE]]

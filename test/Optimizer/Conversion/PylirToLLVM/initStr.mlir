@@ -16,25 +16,20 @@ func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-NEXT: %[[STR:.*]] = llvm.mlir.addressof @builtins.str
-// CHECK-NEXT: %[[STR_CAST:.*]] = llvm.bitcast %[[STR]]
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.mlir.constant(32 : index)
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
-// CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][0, 0]
-// CHECK-NEXT: llvm.store %[[STR_CAST]], %[[GEP]]
-// CHECK-NEXT: %[[STR_OBJ:.*]] = llvm.bitcast %[[RESULT]]
-// CHECK-NEXT: %[[BUFFER:.*]] = llvm.getelementptr %[[STR_OBJ]][0, 1]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
+// CHECK-NEXT: llvm.store %[[STR]], %[[GEP]]
+// CHECK-NEXT: %[[BUFFER:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
 // CHECK-NEXT: %[[ZERO_I:.*]] = llvm.mlir.constant(0 : index)
-// CHECK-NEXT: %[[ARG0_STR:.*]] = llvm.bitcast %[[ARG0]]
-// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG0_STR]][0, 1]
+// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: %[[SIZE_SUM_0:.*]] = llvm.add %[[ZERO_I]], %[[SIZE_0]]
-// CHECK-NEXT: %[[ARG1_STR:.*]] = llvm.bitcast %[[ARG1]]
-// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1_STR]][0, 1]
+// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[SIZE_1:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.add %[[SIZE_SUM_0]], %[[SIZE_1]]
@@ -47,8 +42,7 @@ func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: llvm.store %[[ARRAY]], %[[GEP]]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant(0 : index)
 
-// CHECK-NEXT: %[[ARG0_STR:.*]] = llvm.bitcast %[[ARG0]]
-// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG0_STR]][0, 1]
+// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 2]
@@ -58,8 +52,7 @@ func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: "llvm.intr.memcpy"(%[[DEST]], %[[ARRAY_0]], %[[SIZE_0]], %[[FALSE]])
 // CHECK-NEXT: %[[SIZE_NEW:.*]] = llvm.add %[[SIZE]], %[[SIZE_0]]
 
-// CHECK-NEXT: %[[ARG1_STR:.*]] = llvm.bitcast %[[ARG1]]
-// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1_STR]][0, 1]
+// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[SIZE_1:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 2]
@@ -69,4 +62,4 @@ func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: "llvm.intr.memcpy"(%[[DEST]], %[[ARRAY_1]], %[[SIZE_1]], %[[FALSE]])
 // CHECK-NEXT: llvm.add %[[SIZE_NEW]], %[[SIZE_1]]
 
-// CHECK-NEXT: llvm.return %[[RESULT]]
+// CHECK-NEXT: llvm.return %[[MEMORY]]

@@ -23,12 +23,10 @@ func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: llvm.func @invoke_test
 // CHECK-SAME: %[[TRUE_VALUE:[[:alnum:]]+]]
 // CHECK-NEXT: %[[BASE_EXCEPTION:.*]] = llvm.mlir.addressof @builtins.BaseException
-// CHECK-NEXT: %[[BIT_CAST:.*]] = llvm.bitcast %[[BASE_EXCEPTION]]
-// CHECK-NEXT: %[[BIT_CAST:.*]] = llvm.bitcast %[[BASE_EXCEPTION]]
 // CHECK-NEXT: llvm.invoke @foo() to ^[[HAPPY:.*]] unwind ^[[UNWIND:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[UNWIND]]:
 // CHECK-NEXT: %[[LANDING_PAD:.*]] = llvm.landingpad
-// CHECK-SAME: catch %[[BIT_CAST]]
+// CHECK-SAME: catch %[[BASE_EXCEPTION]]
 // CHECK-NEXT: %[[EXCEPTION_HEADER_i8:.*]] = llvm.extractvalue %[[LANDING_PAD]][0 : i32]
 // CHECK-NEXT: %[[OFFSETOF:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[GEP:.*]] = llvm.sub %[[EXCEPTION_HEADER_i8]], %[[OFFSETOF]]

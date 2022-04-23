@@ -15,13 +15,9 @@ func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc
-// CHECK: %[[CASTED:.*]] = llvm.bitcast %[[MEMORY]]
-// CHECK: %[[RESULT:.*]] = llvm.bitcast %[[CASTED]]
-// CHECK-NEXT: %[[RESULT_INT:.*]] = llvm.getelementptr %[[RESULT]][0, 1]
-// CHECK-NEXT: %[[LHS:.*]] = llvm.bitcast %[[ARG0]]
-// CHECK-NEXT: %[[LHS_INT:.*]] = llvm.getelementptr %[[LHS]][0, 1]
-// CHECK-NEXT: %[[RHS:.*]] = llvm.bitcast %[[ARG1]]
-// CHECK-NEXT: %[[RHS_INT:.*]] = llvm.getelementptr %[[RHS]][0, 1]
+// CHECK: %[[RESULT_INT:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
+// CHECK-NEXT: %[[LHS_INT:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
+// CHECK-NEXT: %[[RHS_INT:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
 // CHECK-NEXT: llvm.call @mp_init(%[[RESULT_INT]])
 // CHECK-NEXT: llvm.call @mp_add(%[[LHS_INT]], %[[RHS_INT]], %[[RESULT_INT]])
-// CHECK-NEXT: llvm.return %[[CASTED]]
+// CHECK-NEXT: llvm.return %[[MEMORY]]

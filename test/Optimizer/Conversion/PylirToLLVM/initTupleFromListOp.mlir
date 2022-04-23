@@ -15,32 +15,25 @@ func @foo(%list : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: llvm.func @foo
 // CHECK-SAME: %[[LIST:[[:alnum:]]+]]
 // CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
-// CHECK-NEXT: %[[TUPLE_CAST:.*]] = llvm.bitcast %[[TUPLE]]
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
-// CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][0, 0]
-// CHECK-NEXT: llvm.store %[[TUPLE_CAST]], %[[GEP]]
-// CHECK-NEXT: %[[TUPLE_OBJ:.*]] = llvm.bitcast %[[RESULT]]
-// CHECK-NEXT: %[[LIST_CAST:.*]] = llvm.bitcast %[[LIST]]
-// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[LIST_CAST]][0, 1]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
+// CHECK-NEXT: llvm.store %[[TUPLE]], %[[GEP]]
+// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[LIST]][0, 1]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.load %[[SIZE_PTR]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_OBJ]][0, 1]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
 // CHECK-NEXT: llvm.store %[[SIZE]], %[[GEP]]
 // CHECK-NEXT: %[[TYPE_ELEMENT_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.mul %[[SIZE]], %[[TYPE_ELEMENT_SIZE]]
-// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_OBJ]][0, 2]
+// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[MEMORY]][0, 2]
 // CHECK-NEXT: %[[ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
-// CHECK-NEXT: %[[TUPLE_PTR_PTR:.*]] = llvm.getelementptr %[[LIST_CAST]][0, 2]
+// CHECK-NEXT: %[[TUPLE_PTR_PTR:.*]] = llvm.getelementptr %[[LIST]][0, 2]
 // CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[TUPLE_PTR_PTR]]
-// CHECK-NEXT: %[[TUPLE_PTR:.*]] = llvm.bitcast %[[LOAD]]
-// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_PTR]][0, 2]
+// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[LOAD]][0, 2]
 // CHECK-NEXT: %[[PREV_ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
-// CHECK-NEXT: %[[ARRAY_I8:.*]] = llvm.bitcast %[[ARRAY]]
-// CHECK-NEXT: %[[PREV_ARRAY_I8:.*]] = llvm.bitcast %[[PREV_ARRAY]]
 // CHECK-NEXT: %[[FALSE_C:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY_I8]], %[[PREV_ARRAY_I8]], %[[BYTES]], %[[FALSE_C]])
-// CHECK-NEXT: llvm.return %[[RESULT]]
+// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[PREV_ARRAY]], %[[BYTES]], %[[FALSE_C]])
+// CHECK-NEXT: llvm.return %[[MEMORY]]

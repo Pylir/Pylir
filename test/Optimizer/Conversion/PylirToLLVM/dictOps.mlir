@@ -14,9 +14,7 @@ func @lookup(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: llvm.func @lookup
 // CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 // CHECK-NEXT: %[[KEY:.*]] = llvm.mlir.addressof
-// CHECK-NEXT: %[[STR_CASTED:.*]] = llvm.bitcast %[[KEY]]
-// CHECK-NEXT: %[[DICT_CASTED:.*]] = llvm.bitcast %[[DICT]]
-// CHECK-NEXT: %[[RESULT:.*]] = llvm.call @pylir_dict_lookup(%[[DICT_CASTED]], %[[STR_CASTED]])
+// CHECK-NEXT: %[[RESULT:.*]] = llvm.call @pylir_dict_lookup(%[[DICT]], %[[KEY]])
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
 // CHECK-NEXT: %[[FOUND:.*]] = llvm.icmp "ne" %[[RESULT]], %[[NULL]]
 // CHECK-NEXT: llvm.return %[[RESULT]]
@@ -38,7 +36,5 @@ func @insert(%arg0 : !py.dynamic, %value : !py.dynamic) {
 // CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 // CHECK-SAME: %[[VALUE:[[:alnum:]]+]]
 // CHECK-NEXT: %[[KEY:.*]] = llvm.mlir.addressof
-// CHECK-NEXT: %[[STR_CASTED:.*]] = llvm.bitcast %[[KEY]]
-// CHECK-NEXT: %[[DICT_CASTED:.*]] = llvm.bitcast %[[DICT]]
-// CHECK-NEXT: llvm.call @pylir_dict_insert(%[[DICT_CASTED]], %[[STR_CASTED]], %[[VALUE]])
+// CHECK-NEXT: llvm.call @pylir_dict_insert(%[[DICT]], %[[KEY]], %[[VALUE]])
 // CHECK-NEXT: llvm.return

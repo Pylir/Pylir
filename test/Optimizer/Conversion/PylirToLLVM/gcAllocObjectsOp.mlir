@@ -14,16 +14,14 @@ func @foo() -> !pyMem.memory {
 
 // CHECK-LABEL: llvm.func @foo
 // CHECK-NEXT: %[[STR:.*]] = llvm.mlir.addressof @builtins.str
-// CHECK-NEXT: %[[STR_CAST:.*]] = llvm.bitcast %[[STR]]
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
-// CHECK-NEXT: %[[RESULT:.*]] = llvm.bitcast %[[MEMORY]]
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[RESULT]][0, 0]
-// CHECK-NEXT: llvm.store %[[STR_CAST]], %[[GEP]]
-// CHECK-NEXT: llvm.return %[[RESULT]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
+// CHECK-NEXT: llvm.store %[[STR]], %[[GEP]]
+// CHECK-NEXT: llvm.return %[[MEMORY]]
 
 // -----
 

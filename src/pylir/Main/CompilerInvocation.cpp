@@ -668,6 +668,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::I
         return mlir::success();
     }
     m_llvmContext = std::make_unique<llvm::LLVMContext>();
+    m_llvmContext->setOpaquePointers(true);
     std::vector<const char*> refs;
     refs.push_back("pylir (LLVM option parsing)");
 
