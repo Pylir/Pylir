@@ -6,7 +6,9 @@
 
 #pragma once
 
+#include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/IR/OpImplementation.h>
+#include <mlir/IR/SymbolTable.h>
 
 #include "pylir/Optimizer/PylirPy/Analysis/TypeFlowIRDialect.h.inc"
 

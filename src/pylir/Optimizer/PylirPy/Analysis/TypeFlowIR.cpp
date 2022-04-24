@@ -6,6 +6,8 @@
 
 #include "TypeFlowIR.hpp"
 
+#include <mlir/IR/FunctionImplementation.h>
+
 void pylir::TypeFlow::TypeFlowDialect::initialize()
 {
     addOperations<
@@ -23,6 +25,19 @@ void pylir::TypeFlow::TypeFlowDialect::initialize()
 }
 
 #include "pylir/Optimizer/PylirPy/Analysis/TypeFlowIRDialect.cpp.inc"
+
+mlir::ParseResult pylir::TypeFlow::FuncOp::parse(::mlir::OpAsmParser& parser, ::mlir::OperationState& result)
+{
+    return mlir::function_interface_impl::parseFunctionOp(
+        parser, result, false,
+        [](mlir::Builder& builder, llvm::ArrayRef<mlir::Type> argTypes, llvm::ArrayRef<mlir::Type> results, auto&&...)
+        { return builder.getFunctionType(argTypes, results); });
+}
+
+void pylir::TypeFlow::FuncOp::print(::mlir::OpAsmPrinter& p)
+{
+    mlir::function_interface_impl::printFunctionOp(p, *this, false);
+}
 
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/PylirPy/Analysis/TypeFlowIROps.cpp.inc"

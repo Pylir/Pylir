@@ -10,6 +10,8 @@
 include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/OpAsmInterface.td"
+include "mlir/IR/SymbolInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
@@ -28,5 +30,30 @@ class TypeFlow_Attr<string name, list<Trait> traits = [], string baseCppClass = 
 
 class TypeFlow_Op<string mnemonic, list<Trait> traits = []>
     : Op<TypeFlow_Dialect, mnemonic, traits>;
+
+def DictionaryArray : TypedArrayAttrBase<DictionaryAttr, "Dictionary array attribute">;
+
+def TypeFlow_FuncOp : TypeFlow_Op<"func", [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface]> {
+	let arguments = (ins TypeAttrOf<FunctionType>:$function_type,
+					 DictionaryArray:$arg_attrs,
+					 DictionaryArray:$res_attrs);
+
+	let regions = (region AnyRegion:$body);
+
+	let extraClassDeclaration = [{
+        /// Returns the argument types of this function.
+        llvm::ArrayRef<mlir::Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+
+        /// Returns the result types of this function.
+        llvm::ArrayRef<mlir::Type> getResultTypes() { return getFunctionType().getResults(); }
+
+        static llvm::StringRef getDefaultDialect()
+        {
+            return pylir::TypeFlow::TypeFlowDialect::getDialectNamespace();
+        }
+	}];
+
+	let hasCustomAssemblyFormat = 1;
+}
 
 #endif
