@@ -15,7 +15,5 @@
 
 #include "PylirMemAttributes.hpp"
 
-#include <pylir/Optimizer/PylirMem/IR/PylirMemOpsEnums.cpp.inc>
-
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.cpp.inc>

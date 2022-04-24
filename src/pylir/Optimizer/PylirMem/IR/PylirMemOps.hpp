@@ -15,7 +15,6 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
-#include <pylir/Optimizer/PylirMem/IR/PylirMemOpsEnums.h.inc>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTraits.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
