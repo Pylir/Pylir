@@ -6,6 +6,7 @@
 
 #include "Util.hpp"
 
+#include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 
 #include "Builtins.hpp"

@@ -11,6 +11,7 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Support/Functional.hpp>
 
 #include "PylirMemOps.hpp"
