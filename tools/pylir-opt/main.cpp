@@ -22,6 +22,8 @@ std::unique_ptr<mlir::Pass> createTestMemorySSA();
 
 std::unique_ptr<mlir::Pass> createTestInlinerInterface();
 
+std::unique_ptr<mlir::Pass> createTestTypeFlow();
+
 #define GEN_PASS_REGISTRATION
 #include "Passes.h.inc"
 

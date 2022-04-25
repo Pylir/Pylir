@@ -19,4 +19,9 @@ def TestInlinerInterface : Pass<"test-inliner-interface", "::mlir::ModuleOp"> {
 	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 }
 
+def TestTypeFlow : InterfacePass<"test-type-flow", "::mlir::FunctionOpInterface"> {
+    let constructor = "::createTestTypeFlow()";
+    let dependentDialects = ["::pylir::TypeFlow::TypeFlowDialect"];
+}
+
 #endif

@@ -14,15 +14,10 @@
 
 #include <memory>
 
-namespace pylir::Py
-{
-class PylirPyDialect;
-}
+#include "Passes.hpp"
 
 namespace
 {
-#define GEN_PASS_CLASSES
-#include "Passes.h.inc"
 
 class TestMemorySSA : public TestMemorySSABase<TestMemorySSA>
 {

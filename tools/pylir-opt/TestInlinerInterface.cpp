@@ -15,15 +15,10 @@
 
 #include <memory>
 
-namespace pylir::MemSSA
-{
-class MemorySSADialect;
-}
+#include "Passes.hpp"
 
 namespace
 {
-#define GEN_PASS_CLASSES
-#include "Passes.h.inc"
 
 class TestInlinerInterface : public TestInlinerInterfaceBase<TestInlinerInterface>
 {

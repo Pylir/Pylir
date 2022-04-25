@@ -16,6 +16,6 @@ mlir_tablegen(TypeFlowIRDialect.cpp.inc -gen-dialect-defs -dialect="typeFlow")
 add_public_tablegen_target(TypeFlowIRIncGen)
 add_dependencies(mlir-headers TypeFlowIRIncGen)
 
-add_library(PylirPyAnalysis TypeFlowIR.cpp)
+add_library(PylirPyAnalysis TypeFlowIR.cpp TypeFlow.cpp)
 target_link_libraries(PylirPyAnalysis PUBLIC MLIRIR PRIVATE PylirPyDialect)
 add_dependencies(PylirPyAnalysis TypeFlowIRIncGen)
