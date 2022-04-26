@@ -75,8 +75,11 @@ def : Pattern<(PylirPy_SetSlotOp:$loc $object, (PylirPy_TypeOfOp (PylirPy_TypeOf
 >;
 
 defvar Arith_CmpIEq = !head(!filter(x, Arith_CmpIPredicateAttr.enumerants, !eq(x.symbol, "eq")));
+defvar Arith_CmpINe = !head(!filter(x, Arith_CmpIPredicateAttr.enumerants, !eq(x.symbol, "ne")));
 
 def : Pat<(Arith_CmpIOp Arith_CmpIEq, (PylirPy_ObjectIdOp $lhs), (PylirPy_ObjectIdOp $rhs)), (PylirPy_IsOp $lhs, $rhs)>;
+def : Pat<(Arith_CmpIOp Arith_CmpINe, (PylirPy_ObjectIdOp $lhs), (PylirPy_ObjectIdOp $rhs)),
+			(Arith_XOrIOp (PylirPy_IsOp $lhs, $rhs), (Arith_ConstantOp ConstBoolAttrTrue))>;
 
 class IntegerWidthComp<string op> : Constraint<CPred<
     "$0.getType().getIntOrFloatBitWidth() " # op # " $1.getType().getIntOrFloatBitWidth()">,
