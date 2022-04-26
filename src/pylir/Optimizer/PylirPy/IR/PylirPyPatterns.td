@@ -49,7 +49,7 @@ def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
 class BinOpAttrs<string op, Attr attrType, Attr resultAttr = attrType>
 	: NativeCodeCall<!subst("$0",
 		!subst("$_self", "$0.cast<" # attrType.storageType # ">()", attrType.convertFromStorage)
-		# op # !subst("$_self", "$1.cast<" # attrType.storageType # ">()", attrType.convertFromStorage),
+		# " " # op # " " # !subst("$_self", "$1.cast<" # attrType.storageType # ">()", attrType.convertFromStorage),
 		resultAttr.constBuilderCall)>;
 
 class PlusAttrs<Attr attrType, Attr resultAttr = attrType> : BinOpAttrs<"+", attrType, resultAttr>;
@@ -113,14 +113,16 @@ def : Pat<(PylirPy_IntCmpOp $kind, $lhs, $rhs),
 def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
           (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
 
-def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $op, (ResolvesTo<0> IntAttrInterface:$first)),
-            (ResolvesTo<0> IntAttrInterface:$second)),
-            [(PylirPy_ConstantOp:$constant (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)),
-             (PylirPy_IntAddOp $op, $constant)]>;
+multiclass IntCommAndAssocPattern<Op op, string operator> {
+	def : Pat<(op (op $op, (ResolvesTo<0> IntAttrInterface:$first)), (ResolvesTo<0> IntAttrInterface:$second)),
+			(op $op,
+			(PylirPy_ConstantOp (BinOpAttrs<operator, IntAttrInterface, PylirPy_IntAttr> $first, $second)))>;
 
-def : Pattern<(PylirPy_IntAddOp (PylirPy_IntAddOp $x, (ResolvesTo<0> IntAttrInterface:$first)),
-                                (PylirPy_IntAddOp $y, (ResolvesTo<0> IntAttrInterface:$second))),
-            [(PylirPy_ConstantOp:$constant (PlusAttrs<IntAttrInterface, PylirPy_IntAttr> $first, $second)),
-             (PylirPy_IntAddOp (PylirPy_IntAddOp $x, $y), $constant)]>;
+	def : Pat<(op (op $x, (ResolvesTo<0> IntAttrInterface:$first)), (op $y, (ResolvesTo<0> IntAttrInterface:$second))),
+			(op (op $x, $y),
+			(PylirPy_ConstantOp (BinOpAttrs<operator, IntAttrInterface, PylirPy_IntAttr> $first, $second)))>;
+}
+
+defm : IntCommAndAssocPattern<PylirPy_IntAddOp, "+">;
 
 #endif
