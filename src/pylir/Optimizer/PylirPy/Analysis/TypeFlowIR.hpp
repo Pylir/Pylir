@@ -9,6 +9,11 @@
 #include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/IR/OpImplementation.h>
 #include <mlir/IR/SymbolTable.h>
+#include <mlir/Interfaces/ControlFlowInterfaces.h>
+#include <mlir/Interfaces/InferTypeOpInterface.h>
+#include <mlir/Interfaces/SideEffectInterfaces.h>
+
+#include <pylir/Optimizer/PylirPy/Interfaces/TypeFoldInterface.hpp>
 
 #include "pylir/Optimizer/PylirPy/Analysis/TypeFlowIRDialect.h.inc"
 
