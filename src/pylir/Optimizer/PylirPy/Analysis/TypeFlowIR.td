@@ -46,10 +46,14 @@ def TypeFlow_InstructionAttr : TypeFlow_Attr<"Instruction"> {
     let hasCustomAssemblyFormat = 1;
 }
 
+def TypeFlow_UndefAttr : TypeFlow_Attr<"Undef"> {
+	let mnemonic = "undef";
+}
+
 def DictionaryArray : TypedArrayAttrBase<DictionaryAttr, "Dictionary array attribute">;
 
 def TypeFlow_FuncOp : TypeFlow_Op<"func", [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface]> {
-	let arguments = (ins TypeAttrOf<FunctionType>:$function_type,
+	let arguments = (ins StrAttr:$sym_name, TypeAttrOf<FunctionType>:$function_type,
 					 DictionaryArray:$arg_attrs,
 					 DictionaryArray:$res_attrs);
 
@@ -71,6 +75,24 @@ def TypeFlow_FuncOp : TypeFlow_Op<"func", [Symbol, FunctionOpInterface, Isolated
 	let hasCustomAssemblyFormat = 1;
 }
 
+def TypeFlow_UndefOp : TypeFlow_Op<"undef", [NoSideEffect, ConstantLike]> {
+	let arguments = (ins);
+	let results = (outs TypeFlow_MetaType:$result);
+
+	let assemblyFormat = "attr-dict";
+
+	let hasFolder = 1;
+}
+
+def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoSideEffect, ConstantLike]> {
+	let arguments = (ins AnyAttr:$input);
+	let results = (outs TypeFlow_MetaType:$result);
+
+	let assemblyFormat = "$input attr-dict";
+
+	let hasFolder = 1;
+}
+
 def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect]> {
 	let arguments = (ins TypeFlow_MetaType:$input);
 	let results = (outs TypeFlow_MetaType:$result);
@@ -85,27 +107,36 @@ def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect]> {
 	let assemblyFormat = "$input attr-dict";
 }
 
-def TypeFlow_RefineableOp : TypeFlow_Op<"refineable", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect]> {
 	let arguments = (ins Variadic<TypeFlow_MetaType>:$input, TypeFlow_InstructionAttr:$instruction);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 
 	let assemblyFormat = "$input attr-dict $instruction";
 }
 
-def TypeFlow_FoldableOp : TypeFlow_Op<"foldable", [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-	let arguments = (ins Variadic<TypeFlow_MetaType>:$input, I32ArrayAttr:$indices, TypeFlow_InstructionAttr:$instruction);
-	let results = (outs Variadic<AnyType>:$results);
-
-	let assemblyFormat = "$input $indices attr-dict $instruction";
-}
-
-def TypeFlow_BranchOp : TypeFlow_Op<"branch", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {
+def TypeFlow_BranchOp : TypeFlow_Op<"branch", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, NoSideEffect]> {
 	let arguments = (ins VariadicOfVariadic<TypeFlow_MetaType, "arg_sizes">:$branch_args, I32ElementsAttr:$arg_sizes);
 	let results = (outs);
 
 	let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
 
 	let assemblyFormat = "$successors $branch_args attr-dict";
+}
+
+def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments]> {
+	let arguments = (ins TypeFlow_MetaType:$condition, Variadic<TypeFlow_MetaType>:$true_args, Variadic<TypeFlow_MetaType>:$false_args);
+	let results = (outs);
+
+	let successors = (successor AnySuccessor:$true_succ, AnySuccessor:$false_succ);
+
+	let assemblyFormat = "$condition `,` $true_succ (`(` $true_args^ `)`)? $false_succ (`(` $false_args^ `)`)? attr-dict";
+}
+
+def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEffect]> {
+	let arguments = (ins Variadic<TypeFlow_MetaType>:$values);
+	let results = (outs);
+
+    let assemblyFormat = "$values attr-dict";
 }
 
 #endif

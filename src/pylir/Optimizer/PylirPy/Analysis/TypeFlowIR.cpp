@@ -11,6 +11,8 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
+
 void pylir::TypeFlow::TypeFlowDialect::initialize()
 {
     addOperations<
@@ -59,30 +61,40 @@ void pylir::TypeFlow::FuncOp::print(::mlir::OpAsmPrinter& p)
     mlir::function_interface_impl::printFunctionOp(p, *this, false);
 }
 
+mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return operands[0];
+}
+
+mlir::OpFoldResult pylir::TypeFlow::UndefOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
+{
+    return UndefAttr::get(getContext());
+}
+
 mlir::SuccessorOperands pylir::TypeFlow::BranchOp::getSuccessorOperands(unsigned int index)
 {
     return mlir::SuccessorOperands(getBranchArgsMutable()[index]);
 }
 
-mlir::LogicalResult
-    pylir::TypeFlow::RefineableOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
-                                                    ::mlir::ValueRange operands, ::mlir::DictionaryAttr attributes,
-                                                    ::mlir::RegionRange regions,
-                                                    ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+mlir::SuccessorOperands pylir::TypeFlow::CondBranchOp::getSuccessorOperands(unsigned int index)
 {
-    Adaptor adaptor(operands, attributes, regions);
-    inferredReturnTypes.resize(adaptor.getInstruction()->getNumResults(), TypeFlow::MetaType::get(context));
-    return mlir::success();
+    return mlir::SuccessorOperands(index == 0 ? getTrueArgsMutable() : getFalseArgsMutable());
 }
 
 mlir::LogicalResult
-    pylir::TypeFlow::FoldableOp::inferReturnTypes(::mlir::MLIRContext*, ::llvm::Optional<::mlir::Location>,
-                                                  ::mlir::ValueRange operands, ::mlir::DictionaryAttr attributes,
-                                                  ::mlir::RegionRange regions,
-                                                  ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+    pylir::TypeFlow::CalcOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
+                                              ::mlir::ValueRange operands, ::mlir::DictionaryAttr attributes,
+                                              ::mlir::RegionRange regions,
+                                              ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
 {
     Adaptor adaptor(operands, attributes, regions);
-    inferredReturnTypes.append(llvm::to_vector(adaptor.getInstruction()->getResultTypes()));
+    std::size_t count = adaptor.getInstruction()->getNumResults();
+    if (mlir::isa<pylir::Py::TypeRefineableInterface>(adaptor.getInstruction()))
+    {
+        count = llvm::count_if(adaptor.getInstruction()->getResultTypes(),
+                               std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>));
+    }
+    inferredReturnTypes.resize(count, TypeFlow::MetaType::get(context));
     return mlir::success();
 }
 

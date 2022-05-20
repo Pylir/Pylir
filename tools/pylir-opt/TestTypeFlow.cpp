@@ -21,7 +21,16 @@ protected:
 
 void TestTypeFlow::runOnOperation()
 {
-    llvm::outs() << getAnalysis<pylir::Py::TypeFlow>().getFunction();
+    for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
+    {
+        auto function = getChildAnalysis<pylir::Py::TypeFlow>(iter).getFunction();
+        if (mlir::failed(function.verify()))
+        {
+            signalPassFailure();
+            return;
+        }
+        function.print(llvm::outs(), mlir::OpPrintingFlags().assumeVerified());
+    }
 }
 } // namespace
 
