@@ -36,6 +36,16 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
 
     llvm::DenseMap<mlir::Value, mlir::Value> valueMapping;
     llvm::DenseMap<mlir::Block*, mlir::Block*> blockMapping;
+    auto entryBlock = m_function->addEntryBlock();
+    blockMapping.insert({&func.front(), entryBlock});
+    std::size_t i = 0;
+    for (auto iter : func.getArguments())
+    {
+        if (iter.getType().isa<pylir::Py::DynamicType>())
+        {
+            valueMapping.insert({iter, entryBlock->getArgument(i++)});
+        }
+    }
     llvm::DenseSet<mlir::Value> foldEdges;
     pylir::TypeFlow::UndefOp undef;
 
@@ -43,6 +53,14 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
     {
         auto lookup = valueMapping.lookup(input);
         return lookup ? lookup : undef;
+    };
+
+    auto mapDynamicOperands = [&](mlir::ValueRange range)
+    {
+        auto result = llvm::to_vector(range);
+        llvm::remove_if(result, [&](mlir::Value val) { return !val.getType().isa<pylir::Py::DynamicType>(); });
+        llvm::transform(result, result.begin(), getValueMapping);
+        return result;
     };
 
     auto getBlockMapping = [&](mlir::Block* input)
@@ -57,31 +75,24 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
 
     for (auto& block : func.getBody())
     {
-        auto [result, inserted] = blockMapping.insert({&block, nullptr});
-        if (inserted)
+        auto* mappedBlock = getBlockMapping(&block);
+        if (!mappedBlock->getParent())
         {
-            result->second = m_function->empty() ? m_function->addEntryBlock() : m_function->addBlock();
+            m_function->push_back(mappedBlock);
         }
-        else
-        {
-            m_function->push_back(result->second);
-        }
-        auto* mappedBlock = result->second;
         builder.setInsertionPointToStart(mappedBlock);
         if (m_function->back().isEntryBlock())
         {
             undef = builder.create<pylir::TypeFlow::UndefOp>();
         }
-        for (auto iter : block.getArguments())
+        else
         {
-            // Entry block values may only exist for type objects. If we were to do the abstract interpretation using
-            // all possible values that'd be quite insane. We only allow types (both as types of objects, and type
-            // objects) as inputs. So filter out anything that is not an ObjectTypeInterface
-            if (mappedBlock->isEntryBlock() && !iter.getType().isa<pylir::Py::ObjectTypeInterface>())
+            for (auto iter : block.getArguments())
             {
-                continue;
+                // TODO: Probably filter out all that are not DynamicType? Unless we can guarantee that any type
+                //  dependent computed constants can't cause issues with convergence.
+                valueMapping.insert({iter, mappedBlock->addArgument(type, builder.getLoc())});
             }
-            valueMapping.insert({iter, mappedBlock->addArgument(iter.getType(), builder.getLoc())});
         }
         blockMapping.insert({&block, mappedBlock});
         for (auto& op : block)
@@ -93,6 +104,35 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
                 valueMapping.insert({op.getResult(0), constant});
                 continue;
             }
+
+            auto handleBranchOpInterface = [&](mlir::BranchOpInterface branchOpInterface)
+            {
+                llvm::SmallVector<llvm::SmallVector<mlir::Value>> args(branchOpInterface->getNumSuccessors());
+                for (std::size_t i = 0; i < args.size(); i++)
+                {
+                    auto ops = branchOpInterface.getSuccessorOperands(i);
+                    for (std::size_t j = 0; j < ops.size(); j++)
+                    {
+                        args[i].push_back(getValueMapping(ops[j]));
+                    }
+                }
+
+                if (auto cond = mlir::dyn_cast<mlir::cf::CondBranchOp>(*branchOpInterface))
+                {
+                    if (foldEdges.contains(cond.getCondition()))
+                    {
+                        builder.create<pylir::TypeFlow::CondBranchOp>(valueMapping.lookup(cond.getCondition()), args[0],
+                                                                      args[1], getBlockMapping(cond.getTrueDest()),
+                                                                      getBlockMapping(cond.getFalseDest()));
+                        return;
+                    }
+                }
+
+                llvm::SmallVector<mlir::ValueRange> ranges(args.begin(), args.end());
+                builder.create<pylir::TypeFlow::BranchOp>(
+                    ranges, llvm::to_vector(llvm::map_range(branchOpInterface->getSuccessors(), getBlockMapping)));
+            };
+
             llvm::TypeSwitch<mlir::Operation*>(&op)
                 .Case(
                     [&](pylir::Py::TypeOfOp typeOf)
@@ -107,41 +147,53 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
                         foldEdges.insert(typeOf);
                     })
                 .Case(
-                    [&](mlir::BranchOpInterface branchOpInterface)
+                    [&](mlir::CallOpInterface callOp)
                     {
-                        llvm::SmallVector<llvm::SmallVector<mlir::Value>> args(branchOpInterface->getNumSuccessors());
-                        for (std::size_t i = 0; i < args.size(); i++)
+                        auto callable = callOp.getCallableForCallee();
+                        PYLIR_ASSERT(callable);
+                        mlir::Operation* newCall;
+                        if (auto ref = callable.dyn_cast<mlir::SymbolRefAttr>())
                         {
-                            auto ops = branchOpInterface.getSuccessorOperands(i);
-                            for (std::size_t j = 0; j < ops.size(); j++)
-                            {
-                                args[i].push_back(getValueMapping(ops[j]));
-                            }
+                            newCall = builder.create<pylir::TypeFlow::CallOp>(
+                                std::vector<mlir::Type>(
+                                    llvm::count_if(callOp->getResultTypes(),
+                                                   std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>)),
+                                    type),
+                                ref, mapDynamicOperands(callOp.getArgOperands()));
                         }
-
-                        if (auto cond = mlir::dyn_cast<mlir::cf::CondBranchOp>(*branchOpInterface))
+                        else
                         {
-                            if (foldEdges.contains(cond.getCondition()))
-                            {
-                                builder.create<pylir::TypeFlow::CondBranchOp>(
-                                    valueMapping.lookup(cond.getCondition()), args[0], args[1],
-                                    getBlockMapping(cond.getTrueDest()), getBlockMapping(cond.getFalseDest()));
-                                return;
-                            }
+                            newCall = builder.create<pylir::TypeFlow::CallIndirectOp>(
+                                std::vector<mlir::Type>(
+                                    llvm::count_if(callOp->getResultTypes(),
+                                                   std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>)),
+                                    type),
+                                getValueMapping(callable.get<mlir::Value>()),
+                                mapDynamicOperands(callOp.getArgOperands()));
                         }
-
-                        llvm::SmallVector<mlir::ValueRange> ranges(args.begin(), args.end());
-                        auto successors = llvm::to_vector(branchOpInterface->getSuccessors());
-                        llvm::for_each(successors, [&](mlir::Block*& block) { block = getBlockMapping(block); });
-                        builder.create<pylir::TypeFlow::BranchOp>(ranges, successors);
+                        std::size_t i = 0;
+                        for (auto iter : callOp->getResults())
+                        {
+                            if (!iter.getType().isa<pylir::Py::DynamicType>())
+                            {
+                                continue;
+                            }
+                            valueMapping.insert({iter, newCall->getResult(i++)});
+                        }
+                        auto branchOp = mlir::dyn_cast<mlir::BranchOpInterface>(*callOp);
+                        if (!branchOp)
+                        {
+                            return;
+                        }
+                        handleBranchOpInterface(branchOp);
                     })
+                .Case(handleBranchOpInterface)
                 .Default(
                     [&](mlir::Operation* op)
                     {
                         if (op->hasTrait<mlir::OpTrait::ReturnLike>())
                         {
-                            builder.create<pylir::TypeFlow::ReturnOp>(
-                                llvm::to_vector(llvm::map_range(op->getOperands(), getValueMapping)));
+                            builder.create<pylir::TypeFlow::ReturnOp>(mapDynamicOperands(op->getOperands()));
                             return;
                         }
                         if (op->hasTrait<mlir::OpTrait::IsTerminator>())
@@ -158,10 +210,9 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
                             return;
                         }
 
-                        auto isRefineable = mlir::isa<pylir::Py::TypeRefineableInterface>(op);
-                        if (!isRefineable
-                            && llvm::none_of(op->getOperands(),
-                                             [&](mlir::Value val) { return foldEdges.contains(val); }))
+                        auto typeDependentConstant =
+                            llvm::any_of(op->getOperands(), [&](mlir::Value val) { return foldEdges.contains(val); });
+                        if (!mlir::isa<pylir::Py::TypeRefineableInterface>(op) && !typeDependentConstant)
                         {
                             return;
                         }
@@ -171,12 +222,12 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
                         {
                             // If the reason this op is being added is because it might be fold by value depended
                             // on a type of, we add its results regardless of its type.
-                            if (!isRefineable && !prev.getType().isa<pylir::Py::DynamicType>())
+                            if (!typeDependentConstant && !prev.getType().isa<pylir::Py::DynamicType>())
                             {
                                 continue;
                             }
                             valueMapping.insert({prev, iter});
-                            if (!isRefineable)
+                            if (typeDependentConstant)
                             {
                                 foldEdges.insert(prev);
                             }

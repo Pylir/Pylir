@@ -12,6 +12,7 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -120,7 +121,7 @@ def TypeFlow_BranchOp : TypeFlow_Op<"branch", [Terminator, DeclareOpInterfaceMet
 
 	let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
 
-	let assemblyFormat = "$successors $branch_args attr-dict";
+	let assemblyFormat = "$successors (`,` $branch_args^)? attr-dict";
 }
 
 def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments]> {
@@ -137,6 +138,20 @@ def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEff
 	let results = (outs);
 
     let assemblyFormat = "$values attr-dict";
+}
+
+def TypeFlow_CallOp : TypeFlow_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
+	let arguments = (ins SymbolRefAttr:$callee, Variadic<TypeFlow_MetaType>:$arguments);
+	let results = (outs Variadic<TypeFlow_MetaType>:$results);
+
+	let assemblyFormat = "$callee `(`$arguments `)` `:` type($results) attr-dict";
+}
+
+def TypeFlow_CallIndirectOp : TypeFlow_Op<"call_indirect", [DeclareOpInterfaceMethods<CallOpInterface>]> {
+	let arguments = (ins TypeFlow_MetaType:$callee, Variadic<TypeFlow_MetaType>:$arguments);
+	let results = (outs Variadic<TypeFlow_MetaType>:$results);
+
+	let assemblyFormat = "$callee `(`$arguments `)` `:` type($results) attr-dict";
 }
 
 #endif

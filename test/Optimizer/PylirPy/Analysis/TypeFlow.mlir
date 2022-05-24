@@ -17,6 +17,15 @@ func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynamic, %d
 }
 
 // CHECK-LABEL: typeFlow.func @builtins.int.__add__$impl
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
+// CHECK: %[[C0:.*]] = constant 0
+// CHECK: %[[C1:.*]] = constant 1
+// CHECK: %[[FIRST:.*]] = calc %[[ARG1]], %[[C0]]
+// CHECK: %[[SECOND:.*]] = calc %[[ARG1]], %[[C1]]
+// CHECK: %[[RES:.*]] = calc %[[FIRST]], %[[SECOND]]
+// CHECK: return %[[RES]]
 
 py.globalValue @builtins.int.__add__ = #py.function<@builtins.int.__add__$impl>
 py.globalValue const @builtins.int = #py.type<slots = {__add__ = @builtins.int.__add__}, mroTuple = #py.tuple<(@builtins.int)>>
@@ -40,3 +49,22 @@ func @__init__() {
 	test.use(%5) : !py.dynamic
 	py.unreachable
 }
+
+// CHECK-LABEL: typeFlow.func @__init__
+// CHECK: %[[C0:.*]] = constant #py.int<1>
+// CHECK: %[[C1:.*]] = constant #py.int<0>
+// CHECK: branch ^[[BODY:[[:alnum:]]+]], (%[[C1]])
+// CHECK: ^[[BODY]]
+// CHECK-SAME: %[[ITER:[[:alnum:]]+]]
+// CHECK-NEXT: %[[TYPE:.*]] = typeOf %[[ITER]]
+// CHECK-NEXT: %[[MRO:.*]] = calc %[[TYPE]]
+// CHECK-SAME: py.type.mro
+// CHECK-NEXT: %[[RESULT:.*]]:2 = calc %[[MRO]]
+// CHECK-SAME: py.mroLookup "__add__"
+// CHECK-NEXT: %[[TUPLE:.*]] = calc %[[ITER]], %[[C0]]
+// CHECK-SAME: py.makeTuple
+// CHECK-NEXT: %[[C2:.*]] = constant #py.dict<{}>
+// CHECK-NEXT: %[[RES:.*]] = call_indirect %[[RESULT]]#0(%[[RESULT]]#0, %[[TUPLE]], %[[C2]])
+// CHECK-NEXT: branch ^[[BODY]], ^[[EXIT:[[:alnum:]]+]], (%[[RES]])
+// CHECK-NEXT: ^[[EXIT]]:
+// CHECK-NEXT: branch

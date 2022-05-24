@@ -98,6 +98,26 @@ mlir::LogicalResult
     return mlir::success();
 }
 
+mlir::CallInterfaceCallable pylir::TypeFlow::CallOp::getCallableForCallee()
+{
+    return getCalleeAttr();
+}
+
+mlir::CallInterfaceCallable pylir::TypeFlow::CallIndirectOp::getCallableForCallee()
+{
+    return getCallee();
+}
+
+mlir::Operation::operand_range pylir::TypeFlow::CallOp::getArgOperands()
+{
+    return getArguments();
+}
+
+mlir::Operation::operand_range pylir::TypeFlow::CallIndirectOp::getArgOperands()
+{
+    return getArguments();
+}
+
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/PylirPy/Analysis/TypeFlowIROps.cpp.inc"
 
