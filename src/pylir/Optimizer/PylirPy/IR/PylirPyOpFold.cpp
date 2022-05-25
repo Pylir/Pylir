@@ -951,52 +951,10 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
     return mlir::success();
 }
 
-namespace
-{
-pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table)
-{
-    if (table)
-    {
-        if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
-        {
-            auto globalVal = table->lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
-            if (globalVal.isDeclaration())
-            {
-                return pylir::Py::UnknownType::get(constant.getContext());
-            }
-            return typeOfConstant(globalVal.getInitializerAttr(), table);
-        }
-    }
-    if (constant.isa<pylir::Py::UnboundAttr>())
-    {
-        return pylir::Py::UnboundType::get(constant.getContext());
-    }
-    if (auto tuple = constant.dyn_cast<pylir::Py::TupleAttr>())
-    {
-        llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
-        for (const auto& iter : tuple.getValue())
-        {
-            elementTypes.push_back(typeOfConstant(iter, table));
-        }
-        return pylir::Py::TupleType::get(constant.getContext(), tuple.getTypeObject(), elementTypes);
-    }
-    // TODO: Handle slots?
-    if (auto object = constant.dyn_cast<pylir::Py::ObjectAttrInterface>())
-    {
-        if (auto typeObject = object.getTypeObject())
-        {
-            return pylir::Py::ClassType::get(constant.getContext(), typeObject, llvm::None);
-        }
-    }
-    return pylir::Py::UnknownType::get(constant.getContext());
-}
-
-} // namespace
-
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable* table)
 {
-    return {typeOfConstant(getConstantAttr(), table)};
+    return {Py::typeOfConstant(getConstantAttr(), table)};
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>

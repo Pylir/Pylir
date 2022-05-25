@@ -168,8 +168,13 @@ public:
         auto pyFunction = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyFunction");
         if (!pyFunction.isInitialized())
         {
-            [[maybe_unused]] auto result = pyFunction.setBody(
-                {m_objectPtrType, convertType(pylir::Py::getUniversalCCType(&getContext())), getSlotEpilogue()}, false);
+            // TODO: Support opaque pointers in mlir::LLVM::CallOp if indirect. Until then, the below is the workaround
+            [[maybe_unused]] auto result =
+                pyFunction.setBody({m_objectPtrType,
+                                    mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMFunctionType::get(
+                                        m_objectPtrType, {m_objectPtrType, m_objectPtrType, m_objectPtrType})),
+                                    getSlotEpilogue()},
+                                   false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return pyFunction;
@@ -214,28 +219,6 @@ public:
     {
         return mlir::LLVM::LLVMStructType::getLiteral(
             &getContext(), {getIndexType(), getIndexType(), mlir::LLVM::LLVMPointerType::get(&getContext())});
-    }
-
-    mlir::LLVM::LLVMStructType getPairType()
-    {
-        auto pair = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "Pair");
-        if (!pair.isInitialized())
-        {
-            [[maybe_unused]] auto result = pair.setBody({m_objectPtrType, m_objectPtrType}, false);
-            PYLIR_ASSERT(mlir::succeeded(result));
-        }
-        return pair;
-    }
-
-    mlir::LLVM::LLVMStructType getBucketType()
-    {
-        auto bucket = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "Bucket");
-        if (!bucket.isInitialized())
-        {
-            [[maybe_unused]] auto result = bucket.setBody({getIndexType(), getIndexType()}, false);
-            PYLIR_ASSERT(mlir::succeeded(result));
-        }
-        return bucket;
     }
 
     mlir::LLVM::LLVMStructType getPyDictType(llvm::Optional<unsigned> slotSize = {})
@@ -1329,16 +1312,6 @@ protected:
         return getTypeConverter()->getPyListType();
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPairType() const
-    {
-        return getTypeConverter()->getPairType();
-    }
-
-    [[nodiscard]] mlir::LLVM::LLVMStructType getBucketType() const
-    {
-        return getTypeConverter()->getBucketType();
-    }
-
     [[nodiscard]] mlir::LLVM::LLVMStructType getPyDictType() const
     {
         return getTypeConverter()->getPyDictType();
@@ -1347,11 +1320,6 @@ protected:
     [[nodiscard]] mlir::LLVM::LLVMStructType getPyStringType() const
     {
         return getTypeConverter()->getPyStringType();
-    }
-
-    [[nodiscard]] mlir::LLVM::LLVMStructType getMPIntType() const
-    {
-        return getTypeConverter()->getMPIntType();
     }
 
     [[nodiscard]] mlir::LLVM::LLVMStructType getPyIntType() const

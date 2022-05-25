@@ -2427,8 +2427,11 @@ std::vector<pylir::CodeGen::UnpackResults>
 mlir::func::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
                                              const std::vector<FunctionParameter>& parameters)
 {
-    auto cc =
-        mlir::func::FuncOp::create(m_builder.getCurrentLoc(), name.str(), Py::getUniversalCCType(m_builder.getContext()));
+    auto cc = mlir::func::FuncOp::create(
+        m_builder.getCurrentLoc(), name.str(),
+        mlir::FunctionType::get(m_builder.getContext(),
+                                {m_builder.getDynamicType(), m_builder.getDynamicType(), m_builder.getDynamicType()},
+                                {m_builder.getDynamicType()}));
     cc.setPrivate();
     auto reset = implementFunction(cc);
 

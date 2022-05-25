@@ -13,7 +13,9 @@
 
 #include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
 
+#include "PylirPyAttributes.hpp"
 #include "PylirPyDialect.hpp"
+#include "PylirPyOps.hpp"
 
 void pylir::Py::PylirPyDialect::initializeTypes()
 {
@@ -85,17 +87,51 @@ bool pylir::Py::isMoreSpecific(pylir::Py::ObjectTypeInterface lhs, pylir::Py::Ob
             return false;
         }
         llvm::SmallDenseSet<mlir::Type> lhsSet(lhsVariant.getElements().begin(), lhsVariant.getElements().end());
-        if (llvm::all_of(rhsVariant.getElements(), [&](mlir::Type type) { return lhsSet.contains(type); }))
-        {
-            return false;
-        }
-        return true;
+        return !llvm::any_of(rhsVariant.getElements(), [&](mlir::Type type) { return !lhsSet.contains(type); });
     }
     if (auto lhsTuple = lhs.dyn_cast<Py::TupleType>())
     {
         return true;
     }
     return rhs.isa<Py::VariantType>();
+}
+
+pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table)
+{
+    if (table)
+    {
+        if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            auto globalVal = table->lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
+            if (globalVal.isDeclaration())
+            {
+                return pylir::Py::UnknownType::get(constant.getContext());
+            }
+            return typeOfConstant(globalVal.getInitializerAttr(), table);
+        }
+    }
+    if (constant.isa<pylir::Py::UnboundAttr>())
+    {
+        return pylir::Py::UnboundType::get(constant.getContext());
+    }
+    if (auto tuple = constant.dyn_cast<pylir::Py::TupleAttr>())
+    {
+        llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
+        for (const auto& iter : tuple.getValue())
+        {
+            elementTypes.push_back(typeOfConstant(iter, table));
+        }
+        return pylir::Py::TupleType::get(constant.getContext(), tuple.getTypeObject(), elementTypes);
+    }
+    // TODO: Handle slots?
+    if (auto object = constant.dyn_cast<pylir::Py::ObjectAttrInterface>())
+    {
+        if (auto typeObject = object.getTypeObject())
+        {
+            return pylir::Py::ClassType::get(constant.getContext(), typeObject, llvm::None);
+        }
+    }
+    return pylir::Py::UnknownType::get(constant.getContext());
 }
 
 namespace
