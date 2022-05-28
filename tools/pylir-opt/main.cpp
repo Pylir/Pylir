@@ -24,6 +24,8 @@ std::unique_ptr<mlir::Pass> createTestInlinerInterface();
 
 std::unique_ptr<mlir::Pass> createTestTypeFlow();
 
+std::unique_ptr<mlir::Pass> createTestAliasSetTracker();
+
 #define GEN_PASS_REGISTRATION
 #include "Passes.h.inc"
 

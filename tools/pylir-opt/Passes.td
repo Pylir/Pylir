@@ -24,4 +24,8 @@ def TestTypeFlow : Pass<"test-type-flow", "::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::TypeFlow::TypeFlowDialect"];
 }
 
+def TestAliasSetTracker : Pass<"test-alias-set-tracker", "::mlir::ModuleOp"> {
+    let constructor = "::createTestAliasSetTracker()";
+}
+
 #endif
