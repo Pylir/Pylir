@@ -68,7 +68,7 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
     }];
 }
 
-def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect,
+def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, ReturnsImmutable,
 												 DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
     let arguments = (ins AnyPylirAttr:$constant);
     let results = (outs DynamicType:$result);
@@ -226,7 +226,7 @@ def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
 }
 
 // TODO: I don't think this should exist but don't have better option until iterators work
-def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBound,
+def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBound, ReturnsImmutable,
 														  DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
     let arguments = (ins DynamicType:$input, DynamicType:$tuple);
     let results = (outs DynamicType:$result);
@@ -242,7 +242,7 @@ def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBo
     let hasFolder = 1;
 }
 
-def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, AlwaysBound,
+def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, AlwaysBound, ReturnsImmutable,
     DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
     let arguments = (ins Index:$count, DynamicType:$tuple);
     let results = (outs DynamicType:$result);
@@ -257,7 +257,7 @@ def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, Alwa
 def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound,
     DeclareOpInterfaceMethods<TypeRefineableInterface>, ObjectFromTypeObjectInterface]> {
     let arguments = (ins DynamicType:$tuple, DynamicType:$type_object);
-    let results = (outs DynamicType:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc]>:$result);
 
     let assemblyFormat = [{
         $tuple `:` $type_object attr-dict
@@ -312,7 +312,8 @@ def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<Memory
     }];
 }
 
-def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
+def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, DeclareOpInterfaceMethods<TypeRefineableInterface>,
+														ReturnsImmutable]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$list);
     let results = (outs DynamicType:$result);
 
@@ -369,7 +370,7 @@ def PylirPy_ObjectIdOp : PylirPy_Op<"object.id", [NoSideEffect]> {
 
 // Type ops
 
-def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound,
+def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound, ReturnsImmutable,
 												DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
 	let arguments = (ins DynamicType:$type_object);
 	let results = (outs DynamicType:$result);
@@ -393,7 +394,7 @@ def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [NoCapture, RefinedObjectFromType
     }];
 }
 
-def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoCapture, AlwaysBound, RefinedType<"Str">]> {
+def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoCapture, AlwaysBound, RefinedType<"Str">, ReturnsImmutable]> {
     let arguments = (ins Variadic<DynamicType>:$strings);
     let results = (outs DynamicType:$result);
 
@@ -431,7 +432,8 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
 
 // Int ops
 
-def PylirPy_IntFromIntegerOp : PylirPy_Op<"int.fromInteger", [NoCapture, AlwaysBound, RefinedType<"Int">]> {
+def PylirPy_IntFromIntegerOp : PylirPy_Op<"int.fromInteger", [NoCapture, AlwaysBound, RefinedType<"Int">,
+															  ReturnsImmutable, NoSideEffect]> {
     let arguments = (ins IntegerLike:$input);
     let results = (outs DynamicType:$result);
 
@@ -479,14 +481,16 @@ def PylirPy_IntCmpOp : PylirPy_Op<"int.cmp", [NoSideEffect]> {
     let assemblyFormat = "$pred $lhs `,` $rhs attr-dict";
 }
 
-def PylirPy_IntAddOp : PylirPy_Op<"int.add", [NoCapture, Commutative, AlwaysBound, NoSideEffect, RefinedType<"Int">]> {
+def PylirPy_IntAddOp : PylirPy_Op<"int.add", [NoCapture, Commutative, AlwaysBound, NoSideEffect, RefinedType<"Int">,
+											  ReturnsImmutable]> {
     let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$lhs `,` $rhs attr-dict";
 }
 
-def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCapture, AlwaysBound, NoSideEffect, RefinedType<"Str">]> {
+def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCapture, AlwaysBound, NoSideEffect, RefinedType<"Str">,
+												  ReturnsImmutable]> {
     let arguments = (ins DynamicType:$input);
     let results = (outs DynamicType:$result);
 
@@ -545,6 +549,7 @@ def PylirPy_CallMethodExOp : AddExceptionHandling<PylirPy_CallMethodOp>;
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [AlwaysBound, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
 													DeclareOpInterfaceMethods<TypeRefineableInterface>,
+													ReturnsImmutable,
 													AddableExceptionHandling<"MakeTupleExOp, -1">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          I32ArrayAttr:$iter_expansion
@@ -758,7 +763,7 @@ def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoSideEffect]> {
     }];
 }
 
-def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [AlwaysBound, RefinedType<"Bool">]> {
+def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [AlwaysBound, RefinedType<"Bool">, ReturnsImmutable, NoSideEffect]> {
     let arguments = (ins I1:$input);
     let results = (outs DynamicType:$result);
 

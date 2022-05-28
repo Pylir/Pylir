@@ -19,8 +19,6 @@
 namespace pylir::Py
 {
 
-class LandingPadOp;
-
 template <class ConcreteType>
 class AlwaysBound : public mlir::OpTrait::TraitBase<ConcreteType, AlwaysBound>
 {
@@ -28,6 +26,17 @@ class AlwaysBound : public mlir::OpTrait::TraitBase<ConcreteType, AlwaysBound>
     {
         static_assert(!ConcreteType::template hasTrait<mlir::OpTrait::ZeroOperands>(),
                       "'Always Bound' trait is ony applicable to ops with results");
+        return mlir::success();
+    }
+};
+
+template <class ConcreteType>
+class ReturnsImmutable : public mlir::OpTrait::TraitBase<ConcreteType, ReturnsImmutable>
+{
+    static mlir::LogicalResult verifyTrait(mlir::Operation*)
+    {
+        static_assert(!ConcreteType::template hasTrait<mlir::OpTrait::ZeroOperands>(),
+                      "'ReturnsImmutable' trait is ony applicable to ops with results");
         return mlir::success();
     }
 };

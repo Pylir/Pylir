@@ -13,6 +13,10 @@ def AlwaysBound : NativeOpTrait<"AlwaysBound"> {
     let cppNamespace = "pylir::Py";
 }
 
+def ReturnsImmutable : NativeOpTrait<"ReturnsImmutable"> {
+    let cppNamespace = "pylir::Py";
+}
+
 def NoCapture : NativeOpTrait<"NoCapture"> {
     let cppNamespace = "pylir::Py";
 }
