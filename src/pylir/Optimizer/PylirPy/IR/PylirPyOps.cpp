@@ -62,7 +62,7 @@ namespace pylir::Py::details
 mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::Operation* operation,
                                                 const mlir::OperationName& invokeVersion, ::mlir::Block* happyPath,
                                                 mlir::Block* exceptionPath, mlir::ValueRange unwindOperands,
-                                                llvm::StringRef attrSizedSegmentName, llvm::ArrayRef<int> shape)
+                                                llvm::StringRef attrSizedSegmentName, llvm::ArrayRef<OperandShape> shape)
 {
     mlir::OperationState state(operation->getLoc(), invokeVersion);
     state.addTypes(operation->getResultTypes());
@@ -91,17 +91,17 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
     {
         auto numOperands = operation->getNumOperands();
         llvm::SmallVector<std::int32_t> values;
-        while (!shape.empty() && shape.front() > 0)
+        while (!shape.empty() && shape.front() != OperandShape::Variadic)
         {
-            numOperands -= shape.front();
-            values.push_back(shape.front());
+            numOperands--;
+            values.push_back(1);
             shape = shape.drop_front();
         }
         auto index = values.size();
-        while (!shape.empty() && shape.back() > 0)
+        while (!shape.empty() && shape.back() != OperandShape::Variadic)
         {
-            numOperands -= shape.back();
-            values.insert(values.begin() + index, shape.back());
+            numOperands--;
+            values.insert(values.begin() + index, 1);
             shape = shape.drop_back();
         }
         PYLIR_ASSERT(shape.size() <= 1);
