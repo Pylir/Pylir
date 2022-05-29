@@ -115,14 +115,14 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
             }
             memBlock = lookup->second;
         }
-        ssa.getMemoryRegion().push_back(memBlock);
-        builder.setInsertionPointToStart(memBlock);
         // If any of the predecessors have not yet been inserted
         // mark the block as open
         if (hasUnresolvedPredecessors(&block))
         {
             ssaBuilder.markOpenBlock(memBlock);
         }
+        ssa.getMemoryRegion().push_back(memBlock);
+        builder.setInsertionPointToStart(memBlock);
 
         mlir::Value lastDef;
         if (memBlock->isEntryBlock())

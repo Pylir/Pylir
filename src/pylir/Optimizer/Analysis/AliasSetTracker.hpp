@@ -89,6 +89,11 @@ public:
         return m_sets[m_map.find(value)->second];
     }
 
+    bool contains(mlir::Value value) const
+    {
+        return m_map.count(value) != 0;
+    }
+
     auto begin() const
     {
         return m_sets.begin();

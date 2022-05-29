@@ -692,6 +692,13 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
             return mlir::BoolAttr::get(getContext(), false);
         }
     }
+    if (auto* lhsDef = getLhs().getDefiningOp(); lhsDef && lhsDef->hasTrait<Py::ReturnsImmutable>())
+    {
+        if (auto* rhsDef = getRhs().getDefiningOp(); rhsDef && rhsDef->hasTrait<Py::ReturnsImmutable>())
+        {
+            return mlir::BoolAttr::get(getContext(), false);
+        }
+    }
     return nullptr;
 }
 

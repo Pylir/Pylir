@@ -271,7 +271,6 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
 void pylir::Py::MakeTupleOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    effects.emplace_back(mlir::MemoryEffects::Allocate::get(), getResult());
     if (!getIterExpansionAttr().empty())
     {
         effects.emplace_back(mlir::MemoryEffects::Read::get());
@@ -282,7 +281,6 @@ void pylir::Py::MakeTupleOp::getEffects(
 void pylir::Py::MakeTupleExOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    effects.emplace_back(mlir::MemoryEffects::Allocate::get(), getResult());
     effects.emplace_back(mlir::MemoryEffects::Read::get());
     effects.emplace_back(mlir::MemoryEffects::Write::get());
 }

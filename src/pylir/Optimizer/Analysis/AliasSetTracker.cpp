@@ -75,7 +75,7 @@ mlir::AliasResult pylir::AliasSet::isCorrespondingPartition(mlir::Value value, m
         case Kind::MustAlias: return aliasAnalysis.alias(m_set[0], value);
         case Kind::MayAlias:
         {
-            for (auto& iter : m_set)
+            for (const auto& iter : m_set)
             {
                 auto result = aliasAnalysis.alias(iter, value);
                 if (!result.isNo())
@@ -83,7 +83,7 @@ mlir::AliasResult pylir::AliasSet::isCorrespondingPartition(mlir::Value value, m
                     return result;
                 }
             }
-            return mlir::AliasResult(mlir::AliasResult::NoAlias);
+            return {mlir::AliasResult::NoAlias};
         }
     }
     PYLIR_UNREACHABLE;

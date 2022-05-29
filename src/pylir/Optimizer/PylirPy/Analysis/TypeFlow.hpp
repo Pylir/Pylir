@@ -7,6 +7,7 @@
 #pragma once
 
 #include <mlir/IR/OwningOpRef.h>
+#include <mlir/Pass/AnalysisManager.h>
 
 #include "TypeFlowIR.hpp"
 

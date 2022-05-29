@@ -109,13 +109,16 @@ def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect]> {
 }
 
 def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect]> {
-	let arguments = (ins Variadic<TypeFlow_MetaType>:$input, TypeFlow_InstructionAttr:$instruction);
+	let arguments = (ins Variadic<TypeFlow_MetaType>:$input,
+	                     TypeFlow_InstructionAttr:$instruction,
+	                     UnitAttr:$value_calc);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 
-	let assemblyFormat = "$input attr-dict $instruction";
+	let assemblyFormat = "(`value` $value_calc^)? $input attr-dict $instruction";
 }
 
-def TypeFlow_BranchOp : TypeFlow_Op<"branch", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, NoSideEffect]> {
+def TypeFlow_BranchOp : TypeFlow_Op<"branch",
+	[Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, NoSideEffect]> {
 	let arguments = (ins VariadicOfVariadic<TypeFlow_MetaType, "arg_sizes">:$branch_args, I32ElementsAttr:$arg_sizes);
 	let results = (outs);
 
@@ -124,13 +127,18 @@ def TypeFlow_BranchOp : TypeFlow_Op<"branch", [Terminator, DeclareOpInterfaceMet
 	let assemblyFormat = "$successors (`,` $branch_args^)? attr-dict";
 }
 
-def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments]> {
-	let arguments = (ins TypeFlow_MetaType:$condition, Variadic<TypeFlow_MetaType>:$true_args, Variadic<TypeFlow_MetaType>:$false_args);
+def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
+	DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments]> {
+	let arguments = (ins TypeFlow_MetaType:$condition,
+						 Variadic<TypeFlow_MetaType>:$true_args,
+						 Variadic<TypeFlow_MetaType>:$false_args);
 	let results = (outs);
 
 	let successors = (successor AnySuccessor:$true_succ, AnySuccessor:$false_succ);
 
-	let assemblyFormat = "$condition `,` $true_succ (`(` $true_args^ `)`)? $false_succ (`(` $false_args^ `)`)? attr-dict";
+	let assemblyFormat = [{
+		$condition `,` $true_succ (`(` $true_args^ `)`)? $false_succ (`(` $false_args^ `)`)? attr-dict
+	}];
 }
 
 def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEffect]> {
@@ -140,18 +148,16 @@ def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEff
     let assemblyFormat = "$values attr-dict";
 }
 
-def TypeFlow_CallOp : TypeFlow_Op<"call", [DeclareOpInterfaceMethods<CallOpInterface>]> {
-	let arguments = (ins SymbolRefAttr:$callee, Variadic<TypeFlow_MetaType>:$arguments);
+
+class TypeFlow_CallBase<string name, Constraint calleeType> : TypeFlow_Op<name,
+	[DeclareOpInterfaceMethods<CallOpInterface>]> {
+	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 
-	let assemblyFormat = "$callee `(`$arguments `)` `:` type($results) attr-dict";
+	let assemblyFormat = "$callee `(`$arguments `)` `:` type(results) attr-dict";
 }
 
-def TypeFlow_CallIndirectOp : TypeFlow_Op<"call_indirect", [DeclareOpInterfaceMethods<CallOpInterface>]> {
-	let arguments = (ins TypeFlow_MetaType:$callee, Variadic<TypeFlow_MetaType>:$arguments);
-	let results = (outs Variadic<TypeFlow_MetaType>:$results);
-
-	let assemblyFormat = "$callee `(`$arguments `)` `:` type($results) attr-dict";
-}
+def TypeFlow_CallOp : TypeFlow_CallBase<"call", SymbolRefAttr>;
+def TypeFlow_CallIndirectOp : TypeFlow_CallBase<"call_indirect", TypeFlow_MetaType>;
 
 #endif

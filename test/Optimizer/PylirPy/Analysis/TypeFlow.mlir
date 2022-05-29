@@ -57,9 +57,9 @@ func @__init__() {
 // CHECK: ^[[BODY]]
 // CHECK-SAME: %[[ITER:[[:alnum:]]+]]
 // CHECK-NEXT: %[[TYPE:.*]] = typeOf %[[ITER]]
-// CHECK-NEXT: %[[MRO:.*]] = calc %[[TYPE]]
+// CHECK-NEXT: %[[MRO:.*]] = calc value %[[TYPE]]
 // CHECK-SAME: py.type.mro
-// CHECK-NEXT: %[[RESULT:.*]]:2 = calc %[[MRO]]
+// CHECK-NEXT: %[[RESULT:.*]]:2 = calc value %[[MRO]]
 // CHECK-SAME: py.mroLookup "__add__"
 // CHECK-NEXT: %[[TUPLE:.*]] = calc %[[ITER]], %[[C0]]
 // CHECK-SAME: py.makeTuple
