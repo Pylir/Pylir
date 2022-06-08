@@ -967,15 +967,13 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::ListToTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable*)
 {
-    return {
-        Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), llvm::None)};
+    return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable*)
 {
-    return {
-        Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), llvm::None)};
+    return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
 }
 
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
@@ -984,8 +982,7 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
 {
     if (!getIterExpansionAttr().empty())
     {
-        return {Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
-                                   llvm::None)};
+        return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
     for (auto iter : argumentTypes)
@@ -1034,8 +1031,7 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     auto tupleType = argumentTypes[1].dyn_cast<Py::TupleType>();
     if (!tupleType)
     {
-        return {Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
-                                   llvm::None)};
+        return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
     }
     if (tupleType.getElements().empty())
     {
@@ -1072,7 +1068,7 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     }
     if (!tupleType)
     {
-        return {Py::ClassType::get(getContext(), type, llvm::None)};
+        return {Py::ClassType::get(type)};
     }
     return {Py::TupleType::get(getContext(), type, tupleType.getElements())};
 }
@@ -1095,8 +1091,7 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
 llvm::SmallVector<pylir::Py::ObjectTypeInterface>
     pylir::Py::TypeMROOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable*)
 {
-    return {
-        Py::ClassType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), llvm::None)};
+    return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
 }
 
 namespace

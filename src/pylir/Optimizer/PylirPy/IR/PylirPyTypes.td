@@ -25,11 +25,6 @@ def PylirPy_UnknownType : PylirPy_ObjectType<"Unknown"> {
         {
             return {};
         }
-
-        ::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
-        {
-            return {};
-        }
     }];
 }
 
@@ -42,11 +37,6 @@ def PylirPy_UnboundType : PylirPy_ObjectType<"Unbound"> {
         {
             return {};
         }
-
-        ::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
-        {
-            return {};
-        }
     }];
 }
 
@@ -54,10 +44,13 @@ def PylirPy_ClassType : PylirPy_ObjectType<"Class"> {
 	let mnemonic = "class";
 	let summary = "class type";
 
-	let parameters = (ins "::mlir::FlatSymbolRefAttr":$typeObject,
-						  ArrayRefParameter<"std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>">:$slots);
+	let parameters = (ins "::mlir::FlatSymbolRefAttr":$typeObject);
 
-	let assemblyFormat = "`<` $typeObject custom<SlotSuffix>($slots) `>`";
+	let builders = [TypeBuilderWithInferredContext<parameters, [{
+		return get(typeObject.getContext(), typeObject);
+	}]>];
+
+	let assemblyFormat = "`<` $typeObject `>`";
 }
 
 def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
@@ -66,14 +59,12 @@ def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
 
 	let parameters = (ins DefaultType<"Tuple">:$typeObject, ListPrint<"pylir::Py::ObjectTypeInterface", "Paren">:$elements);
 
-	let assemblyFormat = "`<` $elements (`,` $typeObject^)? `>`";
+	let builders = [TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$typeObject,
+													"::llvm::ArrayRef<::pylir::Py::ObjectTypeInterface>":$elements), [{
+    	return get(typeObject.getContext(), typeObject, elements);
+	}]>];
 
-	let extraClassDeclaration = [{
-		::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
-		{
-            return {};
-        }
-	}];
+	let assemblyFormat = "`<` $elements (`,` $typeObject^)? `>`";
 }
 
 def PylirPy_VariantType : PylirPy_ObjectType<"Variant"> {
@@ -90,11 +81,6 @@ def PylirPy_VariantType : PylirPy_ObjectType<"Variant"> {
         {
             return {};
 		}
-
-		::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> getSlots() const
-		{
-            return {};
-        }
 	}];
 }
 

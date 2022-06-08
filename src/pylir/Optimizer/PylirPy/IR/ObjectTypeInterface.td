@@ -14,12 +14,7 @@ def ObjectTypeInterface : TypeInterface<"ObjectTypeInterface"> {
 
     let methods = [
         InterfaceMethod<[{}], "::mlir::FlatSymbolRefAttr", "getTypeObject", (ins)>,
-        InterfaceMethod<[{}], "::llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>>",
-                                                                                            "getSlots", (ins)>,
     ];
 }
-
-def ObjectTypeInterfaceC : Type<CPred<"$_self.isa<::pylir::Py::ObjectTypeInterface>()">, "ObjectTypeInterface instance",
-	"::pylir::Py::ObjectTypeInterface">;
 
 #endif

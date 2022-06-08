@@ -123,59 +123,15 @@ pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constan
         }
         return pylir::Py::TupleType::get(constant.getContext(), tuple.getTypeObject(), elementTypes);
     }
-    // TODO: Handle slots?
     if (auto object = constant.dyn_cast<pylir::Py::ObjectAttrInterface>())
     {
         if (auto typeObject = object.getTypeObject())
         {
-            return pylir::Py::ClassType::get(constant.getContext(), typeObject, llvm::None);
+            return pylir::Py::ClassType::get(typeObject);
         }
     }
     return pylir::Py::UnknownType::get(constant.getContext());
 }
-
-namespace
-{
-mlir::LogicalResult parseSlotSuffix(
-    mlir::AsmParser& parser,
-    mlir::FailureOr<llvm::SmallVector<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>>>& result)
-{
-    result = llvm::SmallVector<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>>{};
-    if (parser.parseOptionalComma())
-    {
-        return mlir::success();
-    }
-    if (parser.parseCommaSeparatedList(::mlir::AsmParser::Delimiter::Braces,
-                                       [&]() -> mlir::ParseResult
-                                       {
-                                           auto temp = std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>{};
-                                           if (parser.parseAttribute(temp.first) || parser.parseEqual()
-                                               || parser.parseType(temp.second))
-                                           {
-                                               return mlir::failure();
-                                           }
-                                           result->push_back(std::move(temp));
-                                           return mlir::success();
-                                       }))
-    {
-        return ::mlir::failure();
-    }
-    return mlir::success();
-}
-
-void printSlotSuffix(mlir::AsmPrinter& parser,
-                     llvm::ArrayRef<std::pair<mlir::StringAttr, pylir::Py::ObjectTypeInterface>> result)
-{
-    if (result.empty())
-    {
-        return;
-    }
-    parser << ", {";
-    llvm::interleaveComma(result, parser.getStream(),
-                          [&](const auto& pair) { parser << pair.first << " = " << pair.second; });
-    parser << "}";
-}
-} // namespace
 
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"

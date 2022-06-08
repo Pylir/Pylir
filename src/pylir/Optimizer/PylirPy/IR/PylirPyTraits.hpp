@@ -61,15 +61,14 @@ public:
                                                                       mlir::SymbolTable*)                             \
         {                                                                                                             \
             auto* context = this->getOperation()->getContext();                                                       \
-            return {pylir::Py::ClassType::get(                                                                        \
-                context, mlir::FlatSymbolRefAttr::get(context, pylir::Py::Builtins::x.name), llvm::None)};            \
+            return {pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, pylir::Py::Builtins::x.name))};   \
         }                                                                                                             \
     };
 
 #include <pylir/Interfaces/Builtins.def>
 
 template <class ConcreteType>
-class RefinedObjectFromTypeObject : public TypeRefineableInterface::Trait<ConcreteType>
+class RefinedObjectFromTypeObjectImpl : public TypeRefineableInterface::Trait<ConcreteType>
 {
 public:
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
@@ -81,7 +80,7 @@ public:
         {
             return {Py::UnknownType::get(this->getOperation()->getContext())};
         }
-        return {Py::ClassType::get(this->getOperation()->getContext(), type, llvm::None)};
+        return {Py::ClassType::get(type)};
     }
 };
 
