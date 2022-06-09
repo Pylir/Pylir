@@ -68,3 +68,29 @@ func @__init__() {
 // CHECK-NEXT: branch ^[[BODY]], ^[[EXIT:[[:alnum:]]+]], (%[[RES]])
 // CHECK-NEXT: ^[[EXIT]]:
 // CHECK-NEXT: branch
+
+// -----
+
+func @create1(%0 : !py.dynamic) -> !py.dynamic {
+	%1 = py.makeObject %0
+	return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: typeFlow.func @create1
+// CHECK-SAME: %[[ARG:[[:alnum:]]+]]
+// CHECK: %[[OBJ:.*]] = makeObject %[[ARG]]
+// CHECK-NEXT: return %[[OBJ]]
+
+py.globalValue const @builtins.type = #py.type
+py.globalValue const @builtins.tuple = #py.type
+
+func @create2(%0 : !py.dynamic) -> !py.dynamic {
+	%2 = py.constant(#py.tuple<()>)
+	%1 = py.tuple.copy %2 : %0
+	return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: typeFlow.func @create2
+// CHECK-SAME: %[[ARG:[[:alnum:]]+]]
+// CHECK: %[[OBJ:.*]] = makeObject %[[ARG]]
+// CHECK-NEXT: return %[[OBJ]]

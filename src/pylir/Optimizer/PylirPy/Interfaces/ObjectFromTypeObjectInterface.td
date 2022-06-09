@@ -15,6 +15,11 @@ def ObjectFromTypeObjectInterface : OpInterface<"ObjectFromTypeObjectInterface">
     let methods = [
         InterfaceMethod<[{}], "::mlir::Value", "getTypeObject", (ins)>,
     ];
+
+    let verify = [{
+        static_assert(ConcreteOp::template hasTrait<::mlir::OpTrait::OneResult>());
+        return mlir::success();
+    }];
 }
 
 #endif
