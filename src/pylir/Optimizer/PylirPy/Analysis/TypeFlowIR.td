@@ -150,7 +150,7 @@ def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEff
 
 
 class TypeFlow_CallBase<string name, Constraint calleeType> : TypeFlow_Op<name,
-	[DeclareOpInterfaceMethods<CallOpInterface>]> {
+	[DeclareOpInterfaceMethods<CallOpInterface>, NoSideEffect]> {
 	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 
