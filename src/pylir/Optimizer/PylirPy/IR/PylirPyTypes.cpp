@@ -96,19 +96,18 @@ bool pylir::Py::isMoreSpecific(pylir::Py::ObjectTypeInterface lhs, pylir::Py::Ob
     return rhs.isa<Py::VariantType>();
 }
 
-pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table)
+pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constant,
+                                                         mlir::SymbolTableCollection& collection,
+                                                         mlir::Operation* context)
 {
-    if (table)
+    if (auto ref = constant.dyn_cast<mlir::SymbolRefAttr>())
     {
-        if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
+        auto globalVal = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context, ref);
+        if (globalVal.isDeclaration())
         {
-            auto globalVal = table->lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
-            if (globalVal.isDeclaration())
-            {
-                return pylir::Py::UnknownType::get(constant.getContext());
-            }
-            return typeOfConstant(globalVal.getInitializerAttr(), table);
+            return pylir::Py::UnknownType::get(constant.getContext());
         }
+        return typeOfConstant(globalVal.getInitializerAttr(), collection, context);
     }
     if (constant.isa<pylir::Py::UnboundAttr>())
     {
@@ -119,18 +118,12 @@ pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constan
         llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
         for (const auto& iter : tuple.getValue())
         {
-            elementTypes.push_back(typeOfConstant(iter, table));
+            elementTypes.push_back(typeOfConstant(iter, collection, context));
         }
-        return pylir::Py::TupleType::get(constant.getContext(), tuple.getTypeObject(), elementTypes);
+        return pylir::Py::TupleType::get(tuple.getTypeObject(), elementTypes);
     }
-    if (auto object = constant.dyn_cast<pylir::Py::ObjectAttrInterface>())
-    {
-        if (auto typeObject = object.getTypeObject())
-        {
-            return pylir::Py::ClassType::get(typeObject);
-        }
-    }
-    return pylir::Py::UnknownType::get(constant.getContext());
+    auto object = constant.cast<pylir::Py::ObjectAttrInterface>();
+    return pylir::Py::ClassType::get(object.getTypeObject());
 }
 
 #define GET_TYPEDEF_CLASSES

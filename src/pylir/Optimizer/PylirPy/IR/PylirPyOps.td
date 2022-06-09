@@ -255,8 +255,7 @@ def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, Alwa
     let hasFolder = 1;
 }
 
-def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound,
-    DeclareOpInterfaceMethods<TypeRefineableInterface>, ObjectFromTypeObjectInterface]> {
+def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound, RefinedObjectFromTypeObject]> {
     let arguments = (ins DynamicType:$tuple, DynamicType:$type_object);
     let results = (outs Res<DynamicType, "", [MemAlloc]>:$result);
 
@@ -313,8 +312,7 @@ def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<Memory
     }];
 }
 
-def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, DeclareOpInterfaceMethods<TypeRefineableInterface>,
-														ReturnsImmutable]> {
+def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, RefinedTypeTupleApproximate, ReturnsImmutable]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$list);
     let results = (outs DynamicType:$result);
 
@@ -371,7 +369,7 @@ def PylirPy_ObjectIdOp : PylirPy_Op<"object.id", [NoSideEffect]> {
 // Type ops
 
 def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound, ReturnsImmutable,
-												DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
+												RefinedTypeTupleApproximate]> {
 	let arguments = (ins DynamicType:$type_object);
 	let results = (outs DynamicType:$result);
 

@@ -127,7 +127,7 @@ enum class RunStage
 
 class MonomorphFunctionImpl
 {
-    mlir::SymbolTable* m_symbolTable;
+    mlir::SymbolTableCollection* m_symbolTableCollection;
     mlir::FunctionOpInterface m_functionOp;
     std::vector<pylir::Py::ObjectTypeInterface> m_argTypes;
     std::queue<mlir::Block*> m_workList;
@@ -182,7 +182,8 @@ class MonomorphFunctionImpl
         }
         if (auto ref = callee.dyn_cast<mlir::SymbolRefAttr>())
         {
-            functionOpInterface = m_symbolTable->lookup<mlir::FunctionOpInterface>(ref.getLeafReference());
+            functionOpInterface = m_symbolTableCollection->lookupNearestSymbolFrom<mlir::FunctionOpInterface>(
+                callOp, ref.getLeafReference());
             return {FunctionSpecialization{functionOpInterface, std::move(argTypes)}};
         }
 
@@ -221,7 +222,8 @@ class MonomorphFunctionImpl
         std::vector<FunctionSpecialization> results;
         auto calcFunc = [&](mlir::FlatSymbolRefAttr type) -> mlir::FunctionOpInterface
         {
-            auto typeObject = m_symbolTable->lookup<pylir::Py::GlobalValueOp>(type.getAttr());
+            auto typeObject =
+                m_symbolTableCollection->lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(callOp, type.getAttr());
             if (typeObject.isDeclaration())
             {
                 return {};
@@ -230,14 +232,16 @@ class MonomorphFunctionImpl
             auto slot = slots.get(mroLookup.getSlotAttr());
             if (auto ref = slot.dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
             {
-                slot = m_symbolTable->lookup<pylir::Py::GlobalValueOp>(ref.getAttr()).getInitializerAttr();
+                slot = m_symbolTableCollection->lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(callOp, ref.getAttr())
+                           .getInitializerAttr();
             }
             auto func = slot.dyn_cast_or_null<pylir::Py::FunctionAttr>();
             if (!func)
             {
                 return {};
             }
-            return m_symbolTable->lookup<mlir::FunctionOpInterface>(func.getValue().getAttr());
+            return m_symbolTableCollection->lookupNearestSymbolFrom<mlir::FunctionOpInterface>(
+                callOp, func.getValue().getAttr());
         };
         auto type = result->second.type;
         if (auto var = type.dyn_cast<pylir::Py::VariantType>())
@@ -329,9 +333,10 @@ class MonomorphFunctionImpl
     }
 
 public:
-    explicit MonomorphFunctionImpl(mlir::SymbolTable& symbolTable, mlir::FunctionOpInterface interface,
+    explicit MonomorphFunctionImpl(mlir::SymbolTableCollection& symbolTableCollection,
+                                   mlir::FunctionOpInterface interface,
                                    std::vector<pylir::Py::ObjectTypeInterface>&& argTypes = {})
-        : m_symbolTable(&symbolTable),
+        : m_symbolTableCollection(&symbolTableCollection),
           m_functionOp(interface),
           m_argTypes(std::move(argTypes)),
           m_returnType(pylir::Py::UnboundType::get(interface->getContext()))
@@ -407,7 +412,16 @@ public:
                         operandTypes[iter.index()] = m_lattices.find(iter.value())->second.type;
                     }
                 }
-                auto results = typeRefinement.refineTypes(operandTypes, m_symbolTable);
+                llvm::SmallVector<pylir::Py::ObjectTypeInterface> results;
+                if (typeRefinement.refineTypes(operandTypes, results, *m_symbolTableCollection)
+                    == pylir::Py::TypeRefineResult::Failure)
+                {
+                    for (auto res : m_currentOp->getResults())
+                    {
+                        addLattice(res, {pylir::Py::UnknownType::get(res.getContext())});
+                    }
+                    continue;
+                }
                 PYLIR_ASSERT(results.size() == m_currentOp->getNumResults());
                 for (auto [res, type] : llvm::zip(m_currentOp->getResults(), results))
                 {
@@ -493,7 +507,7 @@ public:
 
 void Monomorph::runOnOperation()
 {
-    mlir::SymbolTable symbolTable(getOperation());
+    mlir::SymbolTableCollection symbolTableCollection;
     llvm::SmallVector<mlir::FunctionOpInterface> roots;
     for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
     {
@@ -511,7 +525,7 @@ void Monomorph::runOnOperation()
         {
             continue;
         }
-        auto genericVersion = symbolTable.lookup(ref);
+        auto* genericVersion = symbolTableCollection.lookupSymbolIn(getOperation(), ref);
         if (!genericVersion)
         {
             continue;
@@ -536,7 +550,7 @@ void Monomorph::runOnOperation()
     {
         llvm::DenseSet<FunctionSpecialization> currentlyExecuting;
         std::vector<ExecutionFrame> currentExecutionStack;
-        currentExecutionStack.emplace_back(MonomorphFunctionImpl{symbolTable, iter});
+        currentExecutionStack.emplace_back(MonomorphFunctionImpl{symbolTableCollection, iter});
         currentlyExecuting.insert({iter, {}});
         while (!currentExecutionStack.empty())
         {
@@ -564,7 +578,8 @@ void Monomorph::runOnOperation()
                         continue;
                     }
                     currentExecutionStack.emplace_back(
-                        MonomorphFunctionImpl{symbolTable, mlir::cast<mlir::FunctionOpInterface>(funcSpec.function),
+                        MonomorphFunctionImpl{symbolTableCollection,
+                                              mlir::cast<mlir::FunctionOpInterface>(funcSpec.function),
                                               std::move(funcSpec.argTypes)},
                         parentFrame);
                 }
@@ -632,10 +647,10 @@ void Monomorph::runOnOperation()
         mlir::BlockAndValueMapping mapping;
         auto clone = mlir::cast<mlir::FunctionOpInterface>(funcOp->clone(mapping));
         mlir::cast<mlir::SymbolOpInterface>(*clone).setPrivate();
-        symbolTable.insert(clone);
+        symbolTableCollection.getSymbolTable(getOperation()).insert(clone);
         llvm::SmallVector<mlir::Type> argTypes(key.argTypes.begin(), key.argTypes.end());
         clone.setResultAttr(0, pylir::Py::specializationTypeAttr, mlir::TypeAttr::get(value.returnType));
-        for (auto& iter : llvm::enumerate(argTypes))
+        for (const auto& iter : llvm::enumerate(argTypes))
         {
             if (!iter.value())
             {

@@ -11,4 +11,15 @@
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
 
+namespace pylir::Py
+{
+/// Possible return values of `TypeRefineableInterface::refineTypes`
+enum class TypeRefineResult
+{
+    Failure, /// Failed to compute all the resulting types.
+    Approximate, /// Only managed to compute an approximate result. The runtime type may be more precise.
+    Success, /// Successfully computed the resulting types.
+};
+}
+
 #include "pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.h.inc"

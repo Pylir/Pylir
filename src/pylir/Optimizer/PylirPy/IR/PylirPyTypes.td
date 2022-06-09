@@ -59,9 +59,15 @@ def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
 
 	let parameters = (ins DefaultType<"Tuple">:$typeObject, ListPrint<"pylir::Py::ObjectTypeInterface", "Paren">:$elements);
 
+	let skipDefaultBuilders = 1;
+
 	let builders = [TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$typeObject,
-													"::llvm::ArrayRef<::pylir::Py::ObjectTypeInterface>":$elements), [{
-    	return get(typeObject.getContext(), typeObject, elements);
+										CArg<"::llvm::ArrayRef<::pylir::Py::ObjectTypeInterface>", "{}">:$elements), [{
+    	return Base::get(typeObject.getContext(), typeObject, elements);
+	}]>, TypeBuilder<(ins CArg<"::mlir::FlatSymbolRefAttr", "{}">:$typeObject,
+						  CArg<"::llvm::ArrayRef<::pylir::Py::ObjectTypeInterface>", "{}">:$elements), [{
+		typeObject = typeObject ? typeObject : }] # !subst("$_ctx", "$_ctxt", DefaultType<"Tuple">.defaultValue) # [{;
+		return get(typeObject, elements);
 	}]>];
 
 	let assemblyFormat = "`<` $elements (`,` $typeObject^)? `>`";

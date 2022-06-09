@@ -25,6 +25,10 @@ class RefinedType<string type> : NativeOpTrait<type # "RefinedType"> {
 	let cppNamespace = "pylir::Py";
 }
 
+def RefinedTypeTupleApproximate : NativeOpTrait<"RefinedTypeTupleApproximate"> {
+	let cppNamespace = "pylir::Py";
+}
+
 def RefinedObjectFromTypeObjectImpl : NativeOpTrait<"RefinedObjectFromTypeObjectImpl"> {
 	let cppNamespace = "pylir::Py";
 }

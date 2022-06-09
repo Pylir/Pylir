@@ -52,35 +52,53 @@ public:
     }
 };
 
-#define BUILTIN_TYPE(x, ...)                                                                                          \
-    template <class ConcreteType>                                                                                     \
-    class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                        \
-    {                                                                                                                 \
-    public:                                                                                                           \
-        llvm::SmallVector<pylir::Py::ObjectTypeInterface> refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, \
-                                                                      mlir::SymbolTable*)                             \
-        {                                                                                                             \
-            auto* context = this->getOperation()->getContext();                                                       \
-            return {pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, pylir::Py::Builtins::x.name))};   \
-        }                                                                                                             \
+#define BUILTIN_TYPE(x, ...)                                                                                    \
+    template <class ConcreteType>                                                                               \
+    class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                  \
+    {                                                                                                           \
+    public:                                                                                                     \
+        pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,                 \
+                                                llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,  \
+                                                mlir::SymbolTableCollection&)                                   \
+        {                                                                                                       \
+            auto* context = this->getOperation()->getContext();                                                 \
+            result.emplace_back(                                                                                \
+                pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, pylir::Py::Builtins::x.name))); \
+            return TypeRefineResult::Success;                                                                   \
+        }                                                                                                       \
     };
-
 #include <pylir/Interfaces/Builtins.def>
+
+template <class ConcreteType>
+class RefinedTypeTupleApproximate : public TypeRefineableInterface::Trait<ConcreteType>
+{
+public:
+    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                            mlir::SymbolTableCollection&)
+    {
+        result.emplace_back(
+            Py::ClassType::get(mlir::FlatSymbolRefAttr::get(this->getOperation()->getContext(), Builtins::Tuple.name)));
+        return TypeRefineResult::Approximate;
+    }
+};
 
 template <class ConcreteType>
 class RefinedObjectFromTypeObjectImpl : public TypeRefineableInterface::Trait<ConcreteType>
 {
 public:
-    llvm::SmallVector<pylir::Py::ObjectTypeInterface> refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
-                                                                  mlir::SymbolTable*)
+    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                            mlir::SymbolTableCollection&)
     {
         mlir::FlatSymbolRefAttr type;
         if (!mlir::matchPattern(mlir::cast<ConcreteType>(this->getOperation()).getTypeObject(),
                                 mlir::m_Constant(&type)))
         {
-            return {Py::UnknownType::get(this->getOperation()->getContext())};
+            return TypeRefineResult::Failure;
         }
-        return {Py::ClassType::get(type)};
+        result.emplace_back(Py::ClassType::get(type));
+        return TypeRefineResult::Success;
     }
 };
 

@@ -22,5 +22,10 @@ pylir::Py::ObjectTypeInterface joinTypes(pylir::Py::ObjectTypeInterface lhs, pyl
 
 bool isMoreSpecific(pylir::Py::ObjectTypeInterface lhs, pylir::Py::ObjectTypeInterface rhs);
 
-pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTable* table = nullptr);
+/// Given a constant attribute, returns the type of the constant. This operation cannot fail and never returns null.
+/// Constant has to be either a SymbolReference or a `py` dialect attribute.
+/// The collection is used for symbol lookup in the case of a symbol reference while the context has to be provided
+/// to find the nearest symbol table.
+pylir::Py::ObjectTypeInterface typeOfConstant(mlir::Attribute constant, mlir::SymbolTableCollection& collection,
+                                              mlir::Operation* context);
 } // namespace pylir::Py

@@ -391,9 +391,13 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     }
     if (auto refineable = getObject().getDefiningOp<Py::TypeRefineableInterface>())
     {
-        llvm::SmallVector<Py::ObjectTypeInterface> operandTypes(refineable->getNumOperands(),
-                                                                Py::UnknownType::get(getContext()));
-        auto res = refineable.refineTypes(operandTypes, nullptr);
+        llvm::SmallVector<Py::ObjectTypeInterface> operandTypes(refineable->getNumOperands(), nullptr);
+        mlir::SymbolTableCollection collection;
+        llvm::SmallVector<Py::ObjectTypeInterface> res;
+        if (refineable.refineTypes(operandTypes, res, collection) == TypeRefineResult::Failure)
+        {
+            return nullptr;
+        }
         return res[getObject().cast<mlir::OpResult>().getResultNumber()].getTypeObject();
     }
     return nullptr;
@@ -958,53 +962,63 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
     return mlir::success();
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
-    pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable* table)
+pylir::Py::TypeRefineResult
+    pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+                                       llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                       mlir::SymbolTableCollection& table)
 {
-    return {Py::typeOfConstant(getConstantAttr(), table)};
+    result.push_back(typeOfConstant(getConstantAttr(), table, *this));
+    return TypeRefineResult::Success;
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
-    pylir::Py::ListToTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable*)
+pylir::Py::TypeRefineResult
+    pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+                                          llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                          mlir::SymbolTableCollection&)
 {
-    return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
+    result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+    return TypeRefineResult::Approximate;
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
-    pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable*)
-{
-    return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
-}
-
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+pylir::Py::TypeRefineResult
     pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
-                                        mlir::SymbolTable*)
+                                        llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                        mlir::SymbolTableCollection&)
 {
     if (!getIterExpansionAttr().empty())
     {
-        return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
+        result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+        return TypeRefineResult::Approximate;
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
     for (auto iter : argumentTypes)
     {
+        if (!iter)
+        {
+            result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+            return TypeRefineResult::Approximate;
+        }
         elementTypes.push_back(iter);
     }
-    return {Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
-                               elementTypes)};
+    result.emplace_back(Py::TupleType::get(
+        getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elementTypes));
+    return TypeRefineResult::Success;
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+pylir::Py::TypeRefineResult
     pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
-                                           mlir::SymbolTable*)
+                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                           mlir::SymbolTableCollection&)
 {
-    auto tupleType = argumentTypes[0].dyn_cast<pylir::Py::TupleType>();
+    auto tupleType = argumentTypes[0].dyn_cast_or_null<pylir::Py::TupleType>();
     if (!tupleType)
     {
-        return {Py::UnknownType::get(getContext())};
+        return TypeRefineResult::Failure;
     }
     if (tupleType.getElements().empty())
     {
-        return {Py::UnboundType::get(getContext())};
+        result.emplace_back(UnboundType::get(getContext()));
+        return TypeRefineResult::Success;
     }
     mlir::IntegerAttr index;
     if (!mlir::matchPattern(getIndex(), mlir::m_Constant(&index)))
@@ -1014,28 +1028,34 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
         {
             sumType = joinTypes(sumType, iter);
         }
-        return {sumType};
+        result.emplace_back(sumType);
+        return TypeRefineResult::Success;
     }
     auto zExtValue = index.getValue().getZExtValue();
     if (zExtValue >= tupleType.getElements().size())
     {
-        return {Py::UnboundType::get(getContext())};
+        result.emplace_back(UnboundType::get(getContext()));
+        return TypeRefineResult::Success;
     }
-    return {tupleType.getElements()[zExtValue]};
+    result.emplace_back(tupleType.getElements()[zExtValue]);
+    return TypeRefineResult::Success;
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+pylir::Py::TypeRefineResult
     pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
-                                             mlir::SymbolTable*)
+                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                             mlir::SymbolTableCollection&)
 {
-    auto tupleType = argumentTypes[1].dyn_cast<Py::TupleType>();
+    auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
     if (!tupleType)
     {
-        return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
+        result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+        return TypeRefineResult::Approximate;
     }
     if (tupleType.getElements().empty())
     {
-        return {tupleType};
+        result.emplace_back(tupleType);
+        return TypeRefineResult::Success;
     }
     mlir::IntegerAttr index;
     if (!mlir::matchPattern(getCount(), mlir::m_Constant(&index)))
@@ -1045,53 +1065,34 @@ llvm::SmallVector<pylir::Py::ObjectTypeInterface>
         {
             sumType = joinTypes(sumType, iter);
         }
-        return {sumType};
+        result.emplace_back(sumType);
+        return TypeRefineResult::Success;
     }
     if (tupleType.getElements().size() >= index.getValue().getZExtValue())
     {
-        return {Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), {})};
+        result.emplace_back(Py::TupleType::get(getContext()));
+        return TypeRefineResult::Success;
     }
-    return {Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
-                               tupleType.getElements().drop_front(index.getValue().getZExtValue()))};
+    result.emplace_back(Py::TupleType::get(getContext(),
+                                           mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
+                                           tupleType.getElements().drop_front(index.getValue().getZExtValue())));
+    return TypeRefineResult::Success;
 }
 
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
-    pylir::Py::TupleCopyOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
-                                        mlir::SymbolTable*)
-{
-    auto tupleType = argumentTypes[0].dyn_cast<Py::TupleType>();
-    mlir::FlatSymbolRefAttr type;
-    if (!mlir::matchPattern(getTypeObject(), mlir::m_Constant(&type)))
-    {
-        // TODO: Should TupleType be able to not have a type object?
-        return {Py::UnknownType::get(getContext())};
-    }
-    if (!tupleType)
-    {
-        return {Py::ClassType::get(type)};
-    }
-    return {Py::TupleType::get(getContext(), type, tupleType.getElements())};
-}
-
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
+pylir::Py::TypeRefineResult
     pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
-                                           mlir::SymbolTable*)
+                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                           mlir::SymbolTableCollection&)
 {
-    auto tupleType = argumentTypes[1].dyn_cast<Py::TupleType>();
+    auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
     if (!tupleType)
     {
-        return {Py::UnknownType::get(getContext())};
+        return TypeRefineResult::Failure;
     }
     llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());
     elements.insert(elements.begin(), argumentTypes[0]);
-    return {
-        Py::TupleType::get(getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elements)};
-}
-
-llvm::SmallVector<pylir::Py::ObjectTypeInterface>
-    pylir::Py::TypeMROOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>, mlir::SymbolTable*)
-{
-    return {Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name))};
+    result.emplace_back(Py::TupleType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elements));
+    return TypeRefineResult::Success;
 }
 
 namespace
