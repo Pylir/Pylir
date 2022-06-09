@@ -141,6 +141,54 @@ def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
 	}];
 }
 
+def TypeFlow_LoopRegionOp : TypeFlow_Op<"loop", [Terminator, RecursiveSideEffects]> {
+	let arguments = (ins Variadic<TypeFlow_MetaType>:$region_init);
+	let results = (outs);
+
+	let description = [{
+		Region representing a natural loop. Evaluation of the loop has to converge before any successors of the loop
+		region may be evaluated. The loop may only do another iteration if during evaluation, a `yield` op was reached.
+		In the case that a `yield` op is continuously reached, the loop will automatically exit if the block arguments
+		of either the body reached a fixpoint.
+
+		The loops `region_init` argument will be passed to the bodys block arguments at first execution. Following
+		executions will get the arguments passed from the `yield` op.
+
+		The loop region has multiple successor blocks. During evaluation of the loop header and body, `exit` ops may
+		mark a successor as reachable, via their index. After the loop has exited, any reachable successors will be
+		evaluated.
+	}];
+
+	let regions = (region MinSizedRegion<1>:$body);
+	let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
+
+	let assemblyFormat = "$region_init $body `successors` $successors attr-dict";
+}
+
+def TypeFlow_YieldOp : TypeFlow_Op<"yield", [Terminator, ReturnLike, NoSideEffect, HasParent<"LoopRegionOp">]> {
+	let arguments = (ins Variadic<TypeFlow_MetaType>:$args);
+
+	let description = [{
+		This op may only appear in the body region of a `loop` op. It causes the possible start of the next loop
+		iteration if the conditions documented in `loop` op are met.
+		If the loop has a header region, `args` are forwarded to the block arguments of that region. Otherise, they are
+		forwarded to the block arguments of the body region.
+	}];
+
+	let assemblyFormat = "$args attr-dict";
+}
+
+def TypeFlow_ExitOp : TypeFlow_Op<"exit", [Terminator, ReturnLike, NoSideEffect, HasParent<"LoopRegionOp">]> {
+	let arguments = (ins I32Attr:$exit_succ, Variadic<TypeFlow_MetaType>:$args);
+
+	let description = [{
+		This op represents an exit out of the loop. `exit_succ` is an index into the loop ops successor, which is
+		marked as reachable with the specified `args` as block arguments by the `exit` op.
+	}];
+
+	let assemblyFormat = "$exit_succ (`(` $args^ `)`)? attr-dict";
+}
+
 def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEffect]> {
 	let arguments = (ins Variadic<TypeFlow_MetaType>:$values);
 	let results = (outs);
