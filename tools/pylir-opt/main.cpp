@@ -26,6 +26,8 @@ std::unique_ptr<mlir::Pass> createTestTypeFlow();
 
 std::unique_ptr<mlir::Pass> createTestAliasSetTracker();
 
+std::unique_ptr<mlir::Pass> createTestLoopInfo();
+
 #define GEN_PASS_REGISTRATION
 #include "Passes.h.inc"
 

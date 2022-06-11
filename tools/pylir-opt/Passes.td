@@ -28,4 +28,8 @@ def TestAliasSetTracker : Pass<"test-alias-set-tracker", "::mlir::ModuleOp"> {
     let constructor = "::createTestAliasSetTracker()";
 }
 
+def TestLoopInfo : Pass<"test-loop-info", "::mlir::ModuleOp"> {
+    let constructor = "::createTestLoopInfo()";
+}
+
 #endif

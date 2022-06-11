@@ -8,6 +8,7 @@
 
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Pass/Pass.h>
 
 namespace pylir::MemSSA
 {
