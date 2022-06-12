@@ -16,10 +16,6 @@ mlir_tablegen(TypeFlowIRDialect.cpp.inc -gen-dialect-defs -dialect="typeFlow")
 add_public_tablegen_target(TypeFlowIRIncGen)
 add_dependencies(mlir-headers TypeFlowIRIncGen)
 
-set(LLVM_TARGET_DEFINITIONS TypeFlowPasses.td)
-mlir_tablegen(TypeFlowPasses.h.inc -gen-pass-decls)
-add_public_tablegen_target(TypeFlowPassesIncGen)
-
 add_library(PylirPyAnalysis TypeFlowIR.cpp TypeFlow.cpp)
-target_link_libraries(PylirPyAnalysis PUBLIC MLIRIR PRIVATE PylirPyDialect PylirAnalysis MLIRPass)
-add_dependencies(PylirPyAnalysis TypeFlowIRIncGen TypeFlowPassesIncGen)
+target_link_libraries(PylirPyAnalysis PUBLIC MLIRIR PRIVATE PylirPyDialect)
+add_dependencies(PylirPyAnalysis TypeFlowIRIncGen)

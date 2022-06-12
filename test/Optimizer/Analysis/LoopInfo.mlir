@@ -60,29 +60,3 @@ func @__init__() {
 // CHECK: ^[[HEADER_ONE]]:
 // CHECK: ^[[HEADER_TWO]]:
 // CHECK: ^[[BB3]]:
-
-// -----
-
-func @__init__() {
-	cf.br ^headerOne
-
-^headerOne:
-	%0 = test.random
-	cf.cond_br %0, ^headerTwo, ^exit
-
-^headerTwo:
-	%1 = test.random
-	cf.cond_br %1, ^headerTwo, ^headerOne
-
-^exit:
-	return
-}
-
-// CHECK: Loop at depth 0 containing: ^[[HEADER_ONE:.*]]<header>, ^[[HEADER_TWO:.*]]
-// CHECK-NEXT: Loop at depth 1 containing: ^[[HEADER_TWO]]<header>
-
-// Verify the blocks above match how they appear in the IR as well
-// CHECK-LABEL: func @__init__()
-// CHECK: ^[[HEADER_ONE]]:
-// CHECK: ^[[HEADER_TWO]]:
-// CHECK: ^[[BB3]]:

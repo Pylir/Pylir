@@ -141,7 +141,7 @@ def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
 	}];
 }
 
-def TypeFlow_LoopRegionOp : TypeFlow_Op<"loop", [Terminator, RecursiveSideEffects, OpAsmOpInterface]> {
+def TypeFlow_LoopRegionOp : TypeFlow_Op<"loop", [Terminator, RecursiveSideEffects]> {
 	let arguments = (ins Variadic<TypeFlow_MetaType>:$region_init);
 	let results = (outs);
 
@@ -162,16 +162,7 @@ def TypeFlow_LoopRegionOp : TypeFlow_Op<"loop", [Terminator, RecursiveSideEffect
 	let regions = (region MinSizedRegion<1>:$body);
 	let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);
 
-	let hasCustomAssemblyFormat = 1;
-
-	let extraClassDeclaration = [{
-            static llvm::StringRef getDefaultDialect()
-            {
-                return pylir::TypeFlow::TypeFlowDialect::getDialectNamespace();
-            }
-	}];
-
-	let hasVerifier = 1;
+	let assemblyFormat = "$region_init $body `successors` $successors attr-dict";
 }
 
 def TypeFlow_YieldOp : TypeFlow_Op<"yield", [Terminator, ReturnLike, NoSideEffect, HasParent<"LoopRegionOp">]> {
@@ -184,9 +175,7 @@ def TypeFlow_YieldOp : TypeFlow_Op<"yield", [Terminator, ReturnLike, NoSideEffec
 		forwarded to the block arguments of the body region.
 	}];
 
-	let assemblyFormat = "(`(`$args^ `)`)? attr-dict";
-
-	let hasVerifier = 1;
+	let assemblyFormat = "$args attr-dict";
 }
 
 def TypeFlow_ExitOp : TypeFlow_Op<"exit", [Terminator, ReturnLike, NoSideEffect, HasParent<"LoopRegionOp">]> {
@@ -198,7 +187,6 @@ def TypeFlow_ExitOp : TypeFlow_Op<"exit", [Terminator, ReturnLike, NoSideEffect,
 	}];
 
 	let assemblyFormat = "$exit_succ (`(` $args^ `)`)? attr-dict";
-	let hasVerifier = 1;
 }
 
 def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEffect]> {

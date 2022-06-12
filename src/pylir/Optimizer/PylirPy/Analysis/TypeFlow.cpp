@@ -9,13 +9,9 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/IR/ImplicitLocOpBuilder.h>
 #include <mlir/IR/Matchers.h>
-#include <mlir/Pass/Pass.h>
-#include <mlir/Pass/PassManager.h>
 
-#include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/Analysis/LoopInfo.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
@@ -236,15 +232,6 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
             });
 }
 
-#define GEN_PASS_CLASSES
-#include "pylir/Optimizer/PylirPy/Analysis/TypeFlowPasses.h.inc"
-
-class TypeFlowLoopLift : public TypeFlowLoopLiftBase<TypeFlowLoopLift>
-{
-protected:
-    void runOnOperation() override;
-};
-
 } // namespace
 
 pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
@@ -318,121 +305,5 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
         {
             dispatchOperations(&op, builder, valueTracking, getBlockMapping, foldEdges);
         }
-    }
-
-    mlir::PassManager passManager(m_function->getContext(), m_function->getOperationName());
-    passManager.addPass(std::make_unique<TypeFlowLoopLift>());
-    auto result = passManager.run(*m_function);
-    PYLIR_ASSERT(mlir::succeeded(result));
-}
-
-void pylir::Py::TypeFlow::dump()
-{
-    m_function->dump();
-}
-
-void TypeFlowLoopLift::runOnOperation()
-{
-    auto& loopInfo = getAnalysis<pylir::LoopInfo>();
-    for (auto* topLevelLoop : loopInfo.getTopLevelLoops())
-    {
-        // Perform a preorder walk via a worklist
-        llvm::SmallVector<pylir::Loop*> worklist{topLevelLoop};
-        while (!worklist.empty())
-        {
-            auto* loop = worklist.pop_back_val();
-            worklist.append(loop->begin(), loop->end());
-            auto* loopHeader = loop->getHeader();
-
-            auto loopEntries = llvm::to_vector(llvm::make_filter_range(
-                loop->getHeader()->getPredecessors(), [loop](mlir::Block* pred) { return !loop->contains(pred); }));
-            mlir::Block* preHeader = llvm::hasSingleElement(loopEntries) ? loopEntries.front() : nullptr;
-            llvm::SmallVector<mlir::Value> regionInit;
-            if (!preHeader || preHeader->getNumSuccessors() != 1
-                || !mlir::isa<pylir::TypeFlow::BranchOp>(preHeader->getTerminator()))
-            {
-                // If there is no single pre-header that dominates the header or the pre-headers terminator is not a
-                // noop branch we need to create one that will be the successor of all the loop header predecessors and
-                // will contain the loop region
-                preHeader = new mlir::Block;
-                preHeader->insertBefore(loopHeader);
-                for (auto& iter : loopHeader->getArguments())
-                {
-                    preHeader->addArgument(iter.getType(), iter.getLoc());
-                }
-                for (auto& iter : loopHeader->getUses())
-                {
-                    if (loop->contains(iter.getOwner()->getBlock()))
-                    {
-                        continue;
-                    }
-                    iter.set(preHeader);
-                }
-                regionInit.append(preHeader->args_begin(), preHeader->args_end());
-            }
-            else
-            {
-                auto terminator = mlir::cast<pylir::TypeFlow::BranchOp>(preHeader->getTerminator());
-                auto branchArgs = terminator.getBranchArgs()[0];
-                regionInit.append(branchArgs.begin(), branchArgs.end());
-                terminator->erase();
-            }
-
-            llvm::MapVector<mlir::Block*, std::uint32_t> successors;
-            mlir::Region loopRegion;
-            for (auto* block : loop->getBlocks())
-            {
-                block->getParent()->getBlocks().remove(block);
-                loopRegion.push_back(block);
-                auto terminator = mlir::cast<mlir::BranchOpInterface>(block->getTerminator());
-                // If this is dummy back edge
-                if (terminator && terminator->getSuccessors() == llvm::ArrayRef<mlir::Block*>{loopHeader})
-                {
-                    auto builder = mlir::OpBuilder(terminator);
-                    builder.create<pylir::TypeFlow::YieldOp>(terminator->getLoc(),
-                                                             terminator.getSuccessorOperands(0).getForwardedOperands());
-                    terminator.erase();
-                    continue;
-                }
-
-                for (auto& iter : llvm::enumerate(terminator->getSuccessors()))
-                {
-                    if (iter.value() != loopHeader && loop->contains(iter.value()))
-                    {
-                        continue;
-                    }
-                    auto* trampoline = new mlir::Block;
-                    loopRegion.push_back(trampoline);
-                    mlir::OpBuilder builder(&getContext());
-                    builder.setInsertionPointToStart(trampoline);
-                    auto successorOperands = terminator.getSuccessorOperands(iter.index());
-                    PYLIR_ASSERT(successorOperands.getProducedOperandCount() == 0);
-                    auto args = successorOperands.getForwardedOperands();
-                    if (iter.value() == loopHeader)
-                    {
-                        builder.create<pylir::TypeFlow::YieldOp>(terminator->getLoc(), args);
-                    }
-                    else
-                    {
-                        builder.create<pylir::TypeFlow::ExitOp>(
-                            terminator->getLoc(), successors.insert({iter.value(), successors.size()}).first->second,
-                            args);
-                    }
-                    terminator->setSuccessor(trampoline, iter.index());
-                    successorOperands.erase(0, args.size());
-                }
-            }
-
-            mlir::OpBuilder builder(&getContext());
-            builder.setInsertionPointToEnd(preHeader);
-            auto loopOp = builder.create<pylir::TypeFlow::LoopRegionOp>(
-                builder.getUnknownLoc(), regionInit, llvm::to_vector(llvm::make_first_range(successors)));
-            loopOp.getBody().takeBody(loopRegion);
-        }
-    }
-
-    if (loopInfo.getTopLevelLoops().empty())
-    {
-        markAllAnalysesPreserved();
     }
 }

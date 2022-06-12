@@ -13,8 +13,6 @@
 
 #include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
-#include <numeric>
-
 void pylir::TypeFlow::TypeFlowDialect::initialize()
 {
     addOperations<
@@ -61,114 +59,6 @@ mlir::ParseResult pylir::TypeFlow::FuncOp::parse(::mlir::OpAsmParser& parser, ::
 void pylir::TypeFlow::FuncOp::print(::mlir::OpAsmPrinter& p)
 {
     mlir::function_interface_impl::printFunctionOp(p, *this, false);
-}
-
-mlir::ParseResult pylir::TypeFlow::LoopRegionOp::parse(::mlir::OpAsmParser& parser, ::mlir::OperationState& result)
-{
-    llvm::SmallVector<mlir::OpAsmParser::UnresolvedOperand> regionInit;
-    llvm::SmallVector<mlir::OpAsmParser::UnresolvedOperand> blockArgs;
-    auto opt = parser.parseOptionalAssignmentList(blockArgs, regionInit);
-    if (opt.hasValue())
-    {
-        if (mlir::failed(*opt) || parser.parseArrow())
-        {
-            return mlir::failure();
-        }
-    }
-    llvm::SmallVector<mlir::Value> regionInitValues;
-    llvm::SmallVector<mlir::Type> types(regionInitValues.size(), pylir::TypeFlow::MetaType::get(parser.getContext()));
-    if (parser.resolveOperands(regionInit, types, parser.getCurrentLocation(), regionInitValues))
-    {
-        return mlir::failure();
-    }
-    result.addOperands(regionInitValues);
-
-    auto* region = result.addRegion();
-    if (parser.parseRegion(*region, blockArgs, types))
-    {
-        return mlir::failure();
-    }
-    if (!parser.parseOptionalKeyword("successors"))
-    {
-        llvm::SmallVector<mlir::Block*> blocks;
-        if (mlir::failed(parser.parseSuccessor(blocks.emplace_back())))
-        {
-            return mlir::failure();
-        }
-        while (!parser.parseOptionalComma())
-        {
-            if (mlir::failed(parser.parseSuccessor(blocks.emplace_back())))
-            {
-                return mlir::failure();
-            }
-        }
-        result.addSuccessors(blocks);
-    }
-    mlir::NamedAttrList attrList;
-    if (parser.parseOptionalAttrDict(attrList))
-    {
-        return mlir::failure();
-    }
-    result.addAttributes(attrList);
-    return mlir::success();
-}
-
-void pylir::TypeFlow::LoopRegionOp::print(::mlir::OpAsmPrinter& p)
-{
-    if (!getRegionInit().empty())
-    {
-        p << "(";
-        llvm::interleave(
-            llvm::zip(getBody().getArguments(), getRegionInit()), p.getStream(),
-            [&](auto&& pair)
-            {
-                p << std::get<0>(pair) << " = " << std::get<1>(pair);
-            },
-            ", ");
-        p << ") -> ";
-    }
-    p.printRegion(getBody(), false);
-    if (!getSuccessors().empty())
-    {
-        p << " successors ";
-        llvm::interleave(
-            getSuccessors(), p.getStream(), [&](mlir::Block* b) { p.printSuccessor(b); }, ", ");
-    }
-    p.printOptionalAttrDict((*this)->getAttrs());
-}
-
-mlir::LogicalResult pylir::TypeFlow::LoopRegionOp::verify()
-{
-    if (getRegionInit().size() != getBody().getNumArguments())
-    {
-        return emitOpError("Expected as many region init arguments as arguments of the body");
-    }
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::TypeFlow::ExitOp::verify()
-{
-    auto parent = (*this)->getParentOfType<pylir::TypeFlow::LoopRegionOp>();
-    if (getExitSucc() >= parent->getNumSuccessors())
-    {
-        return emitOpError("Index does not refer to a successor of the surrounding loop op");
-    }
-    auto* succ = parent->getSuccessor(getExitSucc());
-    if (getArgs().size() != succ->getNumArguments())
-    {
-        return emitOpError("Expected as many arguments to op as block arguments in the successor");
-    }
-    return mlir::success();
-}
-
-mlir::LogicalResult pylir::TypeFlow::YieldOp::verify()
-{
-    auto parent = (*this)->getParentOfType<pylir::TypeFlow::LoopRegionOp>();
-    if (getArgs().size() != parent.getRegionInit().size())
-    {
-        return emitOpError("Expected as many arguments to op as block arguments in the loop body");
-    }
-    return mlir::success();
 }
 
 mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
