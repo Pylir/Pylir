@@ -95,10 +95,12 @@ def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoSideEffect, ConstantLike]> 
 }
 
 def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect]> {
-	let arguments = (ins TypeFlow_MetaType:$input);
+	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$instruction);
 	let results = (outs TypeFlow_MetaType:$result);
 
-	let assemblyFormat = "$input attr-dict";
+	let assemblyFormat = "$input attr-dict $instruction";
+
+	let hasFolder = 1;
 }
 
 def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect]> {
@@ -106,6 +108,8 @@ def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect]> {
 	let results = (outs TypeFlow_MetaType:$result);
 
 	let assemblyFormat = "$input attr-dict";
+
+	let hasFolder = 1;
 }
 
 def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect]> {

@@ -132,7 +132,8 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
         .Case(
             [&](pylir::Py::TypeOfOp typeOf)
             {
-                auto newTypeOf = builder.create<pylir::TypeFlow::TypeOfOp>(valueTracking.use(typeOf.getObject()));
+                auto newTypeOf =
+                    builder.create<pylir::TypeFlow::TypeOfOp>(valueTracking.use(typeOf.getObject()), typeOf);
                 valueTracking.def(typeOf, newTypeOf);
                 foldEdges.insert(typeOf);
             })

@@ -11,6 +11,7 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
 void pylir::TypeFlow::TypeFlowDialect::initialize()
@@ -69,6 +70,37 @@ mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::At
 mlir::OpFoldResult pylir::TypeFlow::UndefOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
 {
     return UndefAttr::get(getContext());
+}
+
+mlir::OpFoldResult pylir::TypeFlow::TypeOfOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (auto typeAttr = operands[0].dyn_cast_or_null<mlir::TypeAttr>())
+    {
+        return typeAttr.getValue().cast<Py::ObjectTypeInterface>().getTypeObject();
+    }
+    else if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    {
+        mlir::SymbolTableCollection collection;
+        return Py::typeOfConstant(operands[0], collection, getInstruction()).getTypeObject();
+    }
+    if (auto makeObject = getInput().getDefiningOp<MakeObjectOp>())
+    {
+        return makeObject.getInput();
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::TypeFlow::MakeObjectOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (auto ref = operands[0].dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
+    {
+        return mlir::TypeAttr::get(Py::ClassType::get(ref));
+    }
+    if (auto typeOf = getInput().getDefiningOp<TypeOfOp>())
+    {
+        return typeOf.getInput();
+    }
+    return nullptr;
 }
 
 mlir::SuccessorOperands pylir::TypeFlow::BranchOp::getSuccessorOperands(unsigned int index)
