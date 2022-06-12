@@ -73,6 +73,11 @@ public:
         return m_blocks;
     }
 
+    bool contains(mlir::Block* block) const
+    {
+        return m_blockSet.contains(block);
+    }
+
     Loop* getParentLoop() const
     {
         return m_parentLoop;

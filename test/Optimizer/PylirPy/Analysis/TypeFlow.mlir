@@ -51,11 +51,9 @@ func @__init__() {
 }
 
 // CHECK-LABEL: typeFlow.func @__init__
-// CHECK: %[[C0:.*]] = constant #py.int<1>
-// CHECK: %[[C1:.*]] = constant #py.int<0>
-// CHECK: branch ^[[BODY:[[:alnum:]]+]], (%[[C1]])
-// CHECK: ^[[BODY]]
-// CHECK-SAME: %[[ITER:[[:alnum:]]+]]
+// CHECK-DAG: %[[C0:.*]] = constant #py.int<1>
+// CHECK-DAG: %[[C1:.*]] = constant #py.int<0>
+// CHECK: loop(%[[ITER:.*]] = %[[C1]]) -> {
 // CHECK-NEXT: %[[TYPE:.*]] = typeOf %[[ITER]]
 // CHECK-NEXT: %[[MRO:.*]] = calc value %[[TYPE]]
 // CHECK-SAME: py.type.mro
@@ -65,7 +63,12 @@ func @__init__() {
 // CHECK-SAME: py.makeTuple
 // CHECK-NEXT: %[[C2:.*]] = constant #py.dict<{}>
 // CHECK-NEXT: %[[RES:.*]] = call_indirect %[[RESULT]]#0(%[[RESULT]]#0, %[[TUPLE]], %[[C2]])
-// CHECK-NEXT: branch ^[[BODY]], ^[[EXIT:[[:alnum:]]+]], (%[[RES]])
+// CHECK-NEXT: branch ^[[YIELD:.*]], ^[[EXIT:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[YIELD]]:
+// CHECK-NEXT: yield(%[[RES]])
+// CHECK-NEXT: ^[[EXIT]]:
+// CHECK-NEXT: exit 0
+// CHECK-NEXT: } successors ^[[EXIT:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[EXIT]]:
 // CHECK-NEXT: branch
 
