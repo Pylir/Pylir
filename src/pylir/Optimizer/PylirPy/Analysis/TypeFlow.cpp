@@ -307,3 +307,8 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
         }
     }
 }
+
+void pylir::Py::TypeFlow::dump()
+{
+    m_function->dump();
+}

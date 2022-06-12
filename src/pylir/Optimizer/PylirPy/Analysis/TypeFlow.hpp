@@ -25,6 +25,8 @@ public:
     {
         return *m_function;
     }
+
+    void dump();
 };
 
 } // namespace pylir::Py
