@@ -137,7 +137,7 @@ def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
 	let successors = (successor AnySuccessor:$true_succ, AnySuccessor:$false_succ);
 
 	let assemblyFormat = [{
-		$condition `,` $true_succ (`(` $true_args^ `)`)? `,` $false_succ (`(` $false_args^ `)`)? attr-dict
+		$condition `,` $true_succ (`(` $true_args^ `)`)? $false_succ (`(` $false_args^ `)`)? attr-dict
 	}];
 }
 

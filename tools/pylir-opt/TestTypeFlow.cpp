@@ -23,10 +23,6 @@ void TestTypeFlow::runOnOperation()
 {
     for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
     {
-        if (iter.isExternal())
-        {
-            continue;
-        }
         auto function = getChildAnalysis<pylir::Py::TypeFlow>(iter).getFunction();
         if (mlir::failed(function.verify()))
         {
