@@ -360,7 +360,7 @@ void TypeFlowLoopLift::runOnOperation()
                 {
                     preHeader->addArgument(iter.getType(), iter.getLoc());
                 }
-                for (auto& iter : loopHeader->getUses())
+                for (auto& iter : llvm::make_early_inc_range(loopHeader->getUses()))
                 {
                     if (loop->contains(iter.getOwner()->getBlock()))
                     {

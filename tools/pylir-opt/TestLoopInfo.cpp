@@ -20,6 +20,10 @@ protected:
     {
         for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
         {
+            if (iter.isExternal())
+            {
+                continue;
+            }
             getChildAnalysis<pylir::LoopInfo>(iter).print(llvm::outs());
         }
     }
