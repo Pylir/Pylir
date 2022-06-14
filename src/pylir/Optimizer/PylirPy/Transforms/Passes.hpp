@@ -21,6 +21,8 @@ std::unique_ptr<mlir::Pass> createHandleLoadStoreEliminationPass();
 
 std::unique_ptr<mlir::Pass> createMonomorphPass();
 
+std::unique_ptr<mlir::Pass> createTypeFlowMonomorphPass();
+
 std::unique_ptr<mlir::Pass> createInlinerPass();
 
 std::unique_ptr<mlir::Pass> createTrialInlinerPass();
