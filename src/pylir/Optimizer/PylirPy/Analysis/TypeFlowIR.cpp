@@ -9,6 +9,7 @@
 #include <mlir/IR/DialectImplementation.h>
 #include <mlir/IR/FunctionImplementation.h>
 
+#include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.hpp>
@@ -67,40 +68,102 @@ mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::At
     return operands[0];
 }
 
-mlir::OpFoldResult pylir::TypeFlow::UndefOp::fold(::llvm::ArrayRef<::mlir::Attribute>)
-{
-    return UndefAttr::get(getContext());
-}
-
-mlir::OpFoldResult pylir::TypeFlow::TypeOfOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results,
+                                                    ::mlir::SymbolTableCollection& collection)
 {
     if (auto typeAttr = operands[0].dyn_cast_or_null<mlir::TypeAttr>())
     {
-        return typeAttr.getValue().cast<Py::ObjectTypeInterface>().getTypeObject();
+        results.emplace_back(typeAttr.getValue().cast<Py::ObjectTypeInterface>().getTypeObject());
+        return mlir::success();
     }
-    else if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
     {
-        mlir::SymbolTableCollection collection;
-        return Py::typeOfConstant(operands[0], collection, getInstruction()).getTypeObject();
+        results.emplace_back(Py::typeOfConstant(operands[0], collection, getContext()).getTypeObject());
+        return mlir::success();
     }
     if (auto makeObject = getInput().getDefiningOp<MakeObjectOp>())
     {
-        return makeObject.getInput();
+        results.emplace_back(makeObject.getInput());
+        return mlir::success();
     }
-    return nullptr;
+    return mlir::failure();
 }
 
-mlir::OpFoldResult pylir::TypeFlow::MakeObjectOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::LogicalResult pylir::TypeFlow::MakeObjectOp::exec(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                        ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results,
+                                                        ::mlir::SymbolTableCollection&)
 {
     if (auto ref = operands[0].dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
     {
-        return mlir::TypeAttr::get(Py::ClassType::get(ref));
+        results.emplace_back(mlir::TypeAttr::get(Py::ClassType::get(ref)));
+        return mlir::success();
     }
     if (auto typeOf = getInput().getDefiningOp<TypeOfOp>())
     {
-        return typeOf.getInput();
+        results.emplace_back(typeOf.getInput());
+        return mlir::success();
     }
-    return nullptr;
+    return mlir::failure();
+}
+
+mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                  ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results,
+                                                  ::mlir::SymbolTableCollection& collection)
+{
+    {
+        auto savedAttrs = getInstruction()->getAttrDictionary();
+        auto savedOps = getInstruction()->getOperands();
+        auto save = llvm::make_scope_exit(
+            [&]
+            {
+                getInstruction()->setAttrs(savedAttrs);
+                getInstruction()->setOperands(savedOps);
+            });
+        if (mlir::succeeded(getInstruction()->fold(operands, results)) && !results.empty())
+        {
+            return mlir::success();
+        }
+        if (getValueCalc())
+        {
+            return mlir::failure();
+        }
+    }
+    auto refinable = mlir::dyn_cast<pylir::Py::TypeRefineableInterface>(getInstruction());
+    if (!refinable)
+    {
+        return mlir::failure();
+    }
+    llvm::SmallVector<pylir::Py::ObjectTypeInterface> inputTypes(operands.size());
+    for (auto [type, operand] : llvm::zip(inputTypes, operands))
+    {
+        if (auto typeAttr = operand.dyn_cast_or_null<mlir::TypeAttr>())
+        {
+            type = typeAttr.getValue().dyn_cast<pylir::Py::ObjectTypeInterface>();
+        }
+        else if (operand.isa_and_nonnull<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+        {
+            type = pylir::Py::typeOfConstant(operand, collection, getInstruction());
+        }
+    }
+    llvm::SmallVector<pylir::Py::ObjectTypeInterface> resultTypes;
+    if (refinable.refineTypes(inputTypes, resultTypes, collection) != Py::TypeRefineResult::Success)
+    {
+        return mlir::failure();
+    }
+    results.resize(resultTypes.size());
+    for (auto [foldRes, resType] : llvm::zip(results, resultTypes))
+    {
+        foldRes = mlir::TypeAttr::get(resType);
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+                                                  ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    mlir::SymbolTableCollection collection;
+    return exec(operands, results, collection);
 }
 
 mlir::SuccessorOperands pylir::TypeFlow::BranchOp::getSuccessorOperands(unsigned int index)

@@ -16,6 +16,7 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.td"
 
 def TypeFlow_Dialect : Dialect {
     let name = "typeFlow";
@@ -47,10 +48,6 @@ def TypeFlow_InstructionAttr : TypeFlow_Attr<"Instruction"> {
     let hasCustomAssemblyFormat = 1;
 }
 
-def TypeFlow_UndefAttr : TypeFlow_Attr<"Undef"> {
-	let mnemonic = "undef";
-}
-
 def DictionaryArray : TypedArrayAttrBase<DictionaryAttr, "Dictionary array attribute">;
 
 def TypeFlow_FuncOp : TypeFlow_Op<"func", [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface]> {
@@ -76,13 +73,11 @@ def TypeFlow_FuncOp : TypeFlow_Op<"func", [Symbol, FunctionOpInterface, Isolated
 	let hasCustomAssemblyFormat = 1;
 }
 
-def TypeFlow_UndefOp : TypeFlow_Op<"undef", [NoSideEffect, ConstantLike]> {
+def TypeFlow_UndefOp : TypeFlow_Op<"undef", [NoSideEffect]> {
 	let arguments = (ins);
 	let results = (outs TypeFlow_MetaType:$result);
 
 	let assemblyFormat = "attr-dict";
-
-	let hasFolder = 1;
 }
 
 def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoSideEffect, ConstantLike]> {
@@ -94,31 +89,52 @@ def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoSideEffect, ConstantLike]> 
 	let hasFolder = 1;
 }
 
-def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect]> {
-	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$instruction);
+defvar foldAsExec = [{
+mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    llvm::SmallVector<mlir::OpFoldResult> res;
+    mlir::SymbolTableCollection collection;
+    if (mlir::failed(exec(operands, res, collection)))
+    {
+        return nullptr;
+    }
+    return res.front();
+}
+}];
+
+def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>]> {
+	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$context);
 	let results = (outs TypeFlow_MetaType:$result);
 
-	let assemblyFormat = "$input attr-dict $instruction";
+	let assemblyFormat = "$input attr-dict $context";
 
 	let hasFolder = 1;
+
+	let extraClassDefinition = foldAsExec;
 }
 
-def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect]> {
+def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect,
+	DeclareOpInterfaceMethods<TypeFlowExecInterface>]> {
 	let arguments = (ins TypeFlow_MetaType:$input);
 	let results = (outs TypeFlow_MetaType:$result);
 
 	let assemblyFormat = "$input attr-dict";
 
 	let hasFolder = 1;
+
+	let extraClassDefinition = foldAsExec;
 }
 
-def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect]> {
+def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect,
+	DeclareOpInterfaceMethods<TypeFlowExecInterface>]> {
 	let arguments = (ins Variadic<TypeFlow_MetaType>:$input,
 	                     TypeFlow_InstructionAttr:$instruction,
 	                     UnitAttr:$value_calc);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 
 	let assemblyFormat = "(`value` $value_calc^)? $input attr-dict $instruction";
+
+	let hasFolder = 1;
 }
 
 def TypeFlow_BranchOp : TypeFlow_Op<"branch",
@@ -155,10 +171,10 @@ def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEff
 
 class TypeFlow_CallBase<string name, Constraint calleeType> : TypeFlow_Op<name,
 	[DeclareOpInterfaceMethods<CallOpInterface>, NoSideEffect]> {
-	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments);
+	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments, TypeFlow_InstructionAttr:$context);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 
-	let assemblyFormat = "$callee `(`$arguments `)` `:` type(results) attr-dict";
+	let assemblyFormat = "$callee `(`$arguments `)` `:` type(results) attr-dict $context";
 }
 
 def TypeFlow_CallOp : TypeFlow_CallBase<"call", SymbolRefAttr>;

@@ -716,9 +716,30 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
     return object.getMroTuple();
 }
 
-mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute>,
+mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> constantOperands,
                                                  ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
+    if (auto tuple = resolveValue(*this, constantOperands[0]).dyn_cast_or_null<pylir::Py::TupleAttr>())
+    {
+        for (auto iter : tuple.getValue())
+        {
+            auto object = resolveValue(*this, iter);
+            if (!object)
+            {
+                return mlir::failure();
+            }
+            const auto& map = object.getSlots();
+            if (auto result = map.get(getSlotAttr()))
+            {
+                results.emplace_back(result);
+                results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+                return mlir::success();
+            }
+        }
+        results.emplace_back(Py::UnboundAttr::get(getContext()));
+        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+        return mlir::success();
+    }
     auto operands = resolveTupleOperands(*this, getMroTuple());
     for (auto& iter : operands)
     {

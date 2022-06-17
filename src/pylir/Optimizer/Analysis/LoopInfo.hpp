@@ -90,6 +90,11 @@ public:
         return m_subLoops.begin();
     }
 
+    bool contains(mlir::Block* block) const
+    {
+        return m_blockSet.count(block);
+    }
+
     void print(llvm::raw_ostream& os, unsigned depth = 0) const;
 };
 

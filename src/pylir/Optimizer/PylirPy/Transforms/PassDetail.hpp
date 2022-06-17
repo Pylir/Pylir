@@ -12,6 +12,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/Pass/Pass.h>
 
+#include <pylir/Optimizer/PylirPy/Analysis/TypeFlowIR.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 
 namespace pylir::Py

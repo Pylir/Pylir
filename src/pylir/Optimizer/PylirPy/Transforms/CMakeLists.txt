@@ -15,6 +15,7 @@ target_link_libraries(PylirPyTransforms
         MLIRPass
         PRIVATE
         PylirAnalysis
+        PylirPyAnalysis
         PylirPyDialect
         PylirPyUtil
         PylirTransformsUtils

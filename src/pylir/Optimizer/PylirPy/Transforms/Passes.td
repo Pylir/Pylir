@@ -58,7 +58,7 @@ def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 def TypeFlowMonomorph : Pass<"pylir-typeflow-monomorph", "::mlir::ModuleOp"> {
 	let summary = "Monomorph module";
 	let constructor = "::pylir::Py::createTypeFlowMonomorphPass()";
-	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+	let dependentDialects = ["::pylir::Py::PylirPyDialect", "::pylir::TypeFlow::TypeFlowDialect"];
 
 	let statistics = [
 		Statistic<"m_operationsReplaced", "Operations replaced", "Amount of operations that have been replaced during folding">,

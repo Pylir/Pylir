@@ -167,7 +167,7 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
                         std::vector<mlir::Type>(llvm::count_if(callOp->getResultTypes(),
                                                                std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>)),
                                                 builder.getType<pylir::TypeFlow::MetaType>()),
-                        ref, mapOperands(callOp.getArgOperands()));
+                        ref, mapOperands(callOp.getArgOperands()), callOp);
                     mapOutputs(newCall);
                 }
                 else
@@ -176,7 +176,7 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
                         std::vector<mlir::Type>(llvm::count_if(callOp->getResultTypes(),
                                                                std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>)),
                                                 builder.getType<pylir::TypeFlow::MetaType>()),
-                        valueTracking.use(callable.get<mlir::Value>()), mapOperands(callOp.getArgOperands()));
+                        valueTracking.use(callable.get<mlir::Value>()), mapOperands(callOp.getArgOperands()), callOp);
                     mapOutputs(newCall);
                 }
                 auto branchOp = mlir::dyn_cast<mlir::BranchOpInterface>(*callOp);
