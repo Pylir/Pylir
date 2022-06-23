@@ -45,19 +45,6 @@ def HandleLoadStoreElimination : Pass<"pylir-handle-load-store-elimination"> {
 def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 	let summary = "Monomorph module";
 	let constructor = "::pylir::Py::createMonomorphPass()";
-	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
-
-	let statistics = [
-		Statistic<"m_operationsReplaced", "Operations replaced", "Amount of operations that have been replaced during folding">,
-		Statistic<"m_callsTurnedStatic", "Calls turned static", "Amount of call instructions that are now statically resolved">,
-		Statistic<"m_callsChanged", "Calls changed", "Amount of call instructions that now point to clones">,
-		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specific types">,
-	];
-}
-
-def TypeFlowMonomorph : Pass<"pylir-typeflow-monomorph", "::mlir::ModuleOp"> {
-	let summary = "Monomorph module";
-	let constructor = "::pylir::Py::createTypeFlowMonomorphPass()";
 	let dependentDialects = ["::pylir::Py::PylirPyDialect", "::pylir::TypeFlow::TypeFlowDialect"];
 
 	let statistics = [

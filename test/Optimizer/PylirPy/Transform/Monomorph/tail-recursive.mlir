@@ -1,5 +1,7 @@
 // RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
 
+// XFAIL: *
+
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 

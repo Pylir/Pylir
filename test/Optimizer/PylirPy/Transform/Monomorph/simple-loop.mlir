@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
+// RUN: pylir-opt %s --pylir-monomorph --canonicalize --split-input-file | FileCheck %s
 
 py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__add__">)>}>
 py.globalValue const @builtins.tuple = #py.type
@@ -42,26 +42,13 @@ func @__init__() {
 // CHECK-LABEL: func @__init__
 // CHECK-DAG: %[[ONE:.*]] = py.constant(#py.int<1>)
 // CHECK-DAG: %[[ZERO:.*]] = py.constant(#py.int<0>)
-// CHECK-DAG: %[[INT_TYPE:.*]] = py.constant(@builtins.int)
+// CHECK-DAG: %[[DICT:.*]] = py.constant(#py.dict<{}>)
+// CHECK-DAG: %[[FUNC:.*]] = py.constant(@builtins.int.__add__)
 // CHECK: cf.br ^[[LOOP:.*]](%[[ZERO]] : {{.*}})
 // CHECK-NEXT: ^[[LOOP]]
 // CHECK-SAME: %[[ITER:[[:alnum:]]+]]
-// CHECK-NEXT: %[[MRO:.*]] = py.type.mro %[[INT_TYPE]]
-// CHECK-NEXT: %[[LOOKUP:.*]], %{{.*}} = py.mroLookup "__add__" in %[[MRO]]
 // CHECK-NEXT: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]], %[[ONE]])
-// CHECK-NEXT: %[[DICT:.*]] = py.constant(#py.dict<{}>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.call @[[CLONED:.*]](%[[LOOKUP]], %[[TUPLE]], %[[DICT]])
+// CHECK-NEXT: %[[RESULT:.*]] = py.call @builtins.int.__add__$impl(%[[FUNC]], %[[TUPLE]], %[[DICT]])
 // CHECK: cf.cond_br %{{.*}}, ^[[LOOP]](%[[RESULT]] : {{.*}}), ^[[EXIT:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[EXIT]]:
 // CHECK-NEXT: test.use(%[[RESULT]])
-
-// CHECK: func private @[[CLONED]]
-// CHECK-SAME: %{{[[:alnum:]]+}}
-// CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
-// CHECK-SAME: %{{[[:alnum:]]+}}
-// CHECK-NEXT: %[[ZERO:.*]] = arith.constant 0
-// CHECK-NEXT: %[[ONE:.*]] = arith.constant 1
-// CHECK-NEXT: %[[FIRST:.*]] = py.tuple.getItem %[[TUPLE]][%[[ZERO]]]
-// CHECK-NEXT: %[[SECOND:.*]] = py.tuple.getItem %[[TUPLE]][%[[ONE]]]
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.add %[[FIRST]], %[[SECOND]]
-// CHECK-NEXT: return %[[RESULT]]
