@@ -61,8 +61,7 @@ def TypeFlowMonomorph : Pass<"pylir-typeflow-monomorph", "::mlir::ModuleOp"> {
 	let dependentDialects = ["::pylir::Py::PylirPyDialect", "::pylir::TypeFlow::TypeFlowDialect"];
 
 	let statistics = [
-		Statistic<"m_operationsReplaced", "Operations replaced", "Amount of operations that have been replaced during folding">,
-		Statistic<"m_callsTurnedStatic", "Calls turned static", "Amount of call instructions that are now statically resolved">,
+		Statistic<"m_valuesReplaced", "Values replaced", "Amount of values that have been replaced with constants">,
 		Statistic<"m_callsChanged", "Calls changed", "Amount of call instructions that now point to clones">,
 		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specific types">,
 	];

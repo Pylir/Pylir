@@ -4,10 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#pragma once
+#include "TypeFlowInterfaces.hpp"
 
-#include <mlir/IR/OpDefinition.h>
-
-#include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
-
-#include "pylir/Optimizer/PylirPy/Interfaces/TypeFoldInterface.h.inc"
+#include "pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.cpp.inc"

@@ -3,6 +3,7 @@
 //
 
 #include <mlir/Analysis/Liveness.h>
+#include <mlir/IR/BlockAndValueMapping.h>
 #include <mlir/IR/Dominance.h>
 
 #include <llvm/ADT/DepthFirstIterator.h>
@@ -11,7 +12,7 @@
 
 #include <pylir/Optimizer/Analysis/LoopInfo.hpp>
 #include <pylir/Optimizer/PylirPy/Analysis/TypeFlow.hpp>
-#include <pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Analysis/TypeFlowInterfaces.hpp>
 #include <pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
@@ -188,7 +189,7 @@ class ExecutionFrame
 
 public:
     explicit ExecutionFrame(mlir::Operation* nextExecutedOp,
-                            llvm::DenseMap<mlir::Value, TypeFlowValue> valuesInit = {{}})
+                            llvm::DenseMap<mlir::Value, TypeFlowValue> valuesInit = decltype(m_values)(0))
         : m_nextExecutedOp(nextExecutedOp), m_values(std::move(valuesInit))
     {
     }
@@ -517,6 +518,11 @@ public:
         return m_returnTypes;
     }
 
+    const llvm::DenseMap<mlir::Value, TypeFlowValue>& getValues() const
+    {
+        return m_values;
+    }
+
     explicit Orchestrator(TypeFlowInstance& instance)
         : m_typeFLowIR(instance.typeFLowIR),
           m_loopInfo(instance.loopInfo),
@@ -628,7 +634,7 @@ public:
         {
             auto temp = handleNoAndIntoLoopSuccessors(successorBlocks.successors);
             frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
-            return temp;
+            return frames;
         }
 
         auto& loopOrch = m_loops[loop];
@@ -646,7 +652,7 @@ public:
 
         auto temp = buildSuccessorFrames(successors);
         frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
-        return temp;
+        return frames;
     }
 };
 
@@ -832,21 +838,78 @@ public:
             [] {}();
         }
     }
+
+    llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>>& getResults()
+    {
+        return m_orchestrators;
+    }
 };
 
 void TypeFlowMonomorph::runOnOperation()
 {
-    mlir::SymbolTableCollection symbolTableCollection;
+    // TODO: Use SetVector once interfaces properly function in DenseMapInfo
     llvm::SmallVector<mlir::FunctionOpInterface> roots;
+    llvm::SmallPtrSet<mlir::Operation*, 8> rootSet;
     for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
     {
         if (llvm::none_of(iter.getArgumentTypes(), std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>)))
         {
             roots.push_back(iter);
+            rootSet.insert(iter);
         }
     }
-    Scheduler scheduler(getContext().getThreadPool());
-    scheduler.run(roots, getAnalysisManager());
+
+    llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>> results;
+    {
+        Scheduler scheduler(getContext().getThreadPool());
+        scheduler.run(roots, getAnalysisManager());
+        results = std::move(scheduler.getResults());
+    }
+
+    struct Clone
+    {
+        mlir::FunctionOpInterface function;
+        mlir::BlockAndValueMapping mapping;
+    };
+
+    mlir::SymbolTable table(getOperation());
+    llvm::DenseMap<FunctionSpecialization, Clone> clones;
+    for (auto& [func, orchestrator] : results)
+    {
+        auto& clone = clones[func];
+        clone.function = func.getFunction();
+        bool isRoot = rootSet.contains(func.getFunction());
+        for (const auto& [key, value] : orchestrator->getValues())
+        {
+            if (!value || value.isa<mlir::TypeAttr>())
+            {
+                continue;
+            }
+            auto mapping = key.getDefiningOp<pylir::TypeFlow::TypeFlowValueMappingInterface>();
+            if (!mapping)
+            {
+                continue;
+            }
+
+            // Cloning of a function body is done lazily for the case where no value has changed.
+            // Roots are not cloned but updated in place.
+            if (clone.function == func.getFunction() && !isRoot)
+            {
+                clone.function = clone.function->clone(clone.mapping);
+                table.insert(clone.function);
+                m_functionsCloned++;
+            }
+
+            auto instrValue = mapping.mapValue(key);
+            auto cloneValue = clone.mapping.lookupOrDefault(instrValue);
+            mlir::OpBuilder builder(cloneValue.getDefiningOp());
+            auto* constant = cloneValue.getDefiningOp()->getDialect()->materializeConstant(
+                builder, value, cloneValue.getType(), cloneValue.getLoc());
+            PYLIR_ASSERT(constant);
+            cloneValue.replaceAllUsesWith(constant->getResult(0));
+            m_valuesReplaced++;
+        }
+    }
 }
 } // namespace
 

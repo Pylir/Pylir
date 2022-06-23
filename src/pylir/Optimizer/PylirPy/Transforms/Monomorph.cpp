@@ -683,45 +683,45 @@ void Monomorph::runOnOperation()
             }
         }
 
-        funcOp.walk(
-            [&, &value = value](pylir::Py::TypeFoldInterface foldable)
-            {
-                llvm::SmallVector<pylir::Py::ObjectTypeInterface> inputs(foldable->getNumOperands());
-                llvm::transform(foldable->getOperands(), inputs.begin(),
-                                [&, &value = value](mlir::Value val)
-                                {
-                                    auto mapped = cloneToOrigMapping.lookup(val);
-                                    return value.lattices.lookup(mapped ? mapped : val).type;
-                                });
-                if (!llvm::all_of(inputs, llvm::identity<pylir::Py::ObjectTypeInterface>{}))
-                {
-                    return;
-                }
-                auto result = foldable.typeFold(inputs);
-                if (!result)
-                {
-                    return;
-                }
-                m_operationsReplaced++;
-                if (auto val = result.dyn_cast<mlir::Value>())
-                {
-                    foldable->getResult(0).replaceAllUsesWith(val);
-                    if (mlir::isOpTriviallyDead(foldable))
-                    {
-                        foldable->erase();
-                    }
-                    return;
-                }
-                auto builder = mlir::OpBuilder::atBlockBegin(&funcOp.front());
-                auto c = foldable->getDialect()->materializeConstant(
-                    builder, result.get<mlir::Attribute>(), foldable->getResult(0).getType(), foldable->getLoc());
-                PYLIR_ASSERT(c);
-                foldable->replaceAllUsesWith(c);
-                if (mlir::isOpTriviallyDead(foldable))
-                {
-                    foldable->erase();
-                }
-            });
+//        funcOp.walk(
+//            [&, &value = value](pylir::Py::TypeFoldInterface foldable)
+//            {
+//                llvm::SmallVector<pylir::Py::ObjectTypeInterface> inputs(foldable->getNumOperands());
+//                llvm::transform(foldable->getOperands(), inputs.begin(),
+//                                [&, &value = value](mlir::Value val)
+//                                {
+//                                    auto mapped = cloneToOrigMapping.lookup(val);
+//                                    return value.lattices.lookup(mapped ? mapped : val).type;
+//                                });
+//                if (!llvm::all_of(inputs, llvm::identity<pylir::Py::ObjectTypeInterface>{}))
+//                {
+//                    return;
+//                }
+//                auto result = foldable.typeFold(inputs);
+//                if (!result)
+//                {
+//                    return;
+//                }
+//                m_operationsReplaced++;
+//                if (auto val = result.dyn_cast<mlir::Value>())
+//                {
+//                    foldable->getResult(0).replaceAllUsesWith(val);
+//                    if (mlir::isOpTriviallyDead(foldable))
+//                    {
+//                        foldable->erase();
+//                    }
+//                    return;
+//                }
+//                auto builder = mlir::OpBuilder::atBlockBegin(&funcOp.front());
+//                auto c = foldable->getDialect()->materializeConstant(
+//                    builder, result.get<mlir::Attribute>(), foldable->getResult(0).getType(), foldable->getLoc());
+//                PYLIR_ASSERT(c);
+//                foldable->replaceAllUsesWith(c);
+//                if (mlir::isOpTriviallyDead(foldable))
+//                {
+//                    foldable->erase();
+//                }
+//            });
 
         auto setCallee = [this](mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
         {

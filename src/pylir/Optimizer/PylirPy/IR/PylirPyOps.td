@@ -12,7 +12,6 @@ include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.td"
-include "pylir/Optimizer/PylirPy/Interfaces/TypeFoldInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 include "pylir/Optimizer/Interfaces/MemoryFoldInterface.td"
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
@@ -88,7 +87,7 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, Ret
     let hasVerifier = 1;
 }
 
-def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect, AlwaysBound, DeclareOpInterfaceMethods<TypeFoldInterface>]> {
+def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect, AlwaysBound]> {
     let arguments = (ins DynamicType:$object);
     let results = (outs DynamicType:$result);
 

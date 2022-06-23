@@ -16,7 +16,7 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-include "pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.td"
+include "pylir/Optimizer/PylirPy/Analysis/TypeFlowInterfaces.td"
 
 def TypeFlow_Dialect : Dialect {
     let name = "typeFlow";
@@ -102,7 +102,8 @@ mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 }
 }];
 
-def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>]> {
+def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
+	DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$context);
 	let results = (outs TypeFlow_MetaType:$result);
 
@@ -126,7 +127,7 @@ def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect,
 }
 
 def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect,
-	DeclareOpInterfaceMethods<TypeFlowExecInterface>]> {
+	DeclareOpInterfaceMethods<TypeFlowExecInterface>, DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins Variadic<TypeFlow_MetaType>:$input,
 	                     TypeFlow_InstructionAttr:$instruction,
 	                     UnitAttr:$value_calc);
@@ -170,7 +171,8 @@ def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEff
 
 
 class TypeFlow_CallBase<string name, Constraint calleeType> : TypeFlow_Op<name,
-	[DeclareOpInterfaceMethods<CallOpInterface>, NoSideEffect]> {
+	[DeclareOpInterfaceMethods<CallOpInterface>, NoSideEffect,
+	 DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments, TypeFlow_InstructionAttr:$context);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 

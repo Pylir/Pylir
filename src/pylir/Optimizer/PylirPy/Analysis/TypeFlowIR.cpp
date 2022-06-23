@@ -111,24 +111,25 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<::mlir::Attri
                                                   ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results,
                                                   ::mlir::SymbolTableCollection& collection)
 {
+    if (mlir::succeeded(getInstruction()->fold(operands, results)) && !results.empty())
     {
-        auto savedAttrs = getInstruction()->getAttrDictionary();
-        auto savedOps = getInstruction()->getOperands();
-        auto save = llvm::make_scope_exit(
-            [&]
+        if (!getValueCalc())
+        {
+            for (auto& iter : results)
             {
-                getInstruction()->setAttrs(savedAttrs);
-                getInstruction()->setOperands(savedOps);
-            });
-        if (mlir::succeeded(getInstruction()->fold(operands, results)) && !results.empty())
-        {
-            return mlir::success();
+                if (auto attr = iter.dyn_cast<mlir::Attribute>())
+                {
+                    iter = mlir::TypeAttr::get(pylir::Py::typeOfConstant(attr, collection, getInstruction()));
+                }
+            }
         }
-        if (getValueCalc())
-        {
-            return mlir::failure();
-        }
+        return mlir::success();
     }
+    if (getValueCalc())
+    {
+        return mlir::failure();
+    }
+
     auto refinable = mlir::dyn_cast<pylir::Py::TypeRefineableInterface>(getInstruction());
     if (!refinable)
     {
@@ -211,6 +212,26 @@ mlir::Operation::operand_range pylir::TypeFlow::CallOp::getArgOperands()
 mlir::Operation::operand_range pylir::TypeFlow::CallIndirectOp::getArgOperands()
 {
     return getArguments();
+}
+
+mlir::Value pylir::TypeFlow::TypeOfOp::mapValue(::mlir::Value resultValue)
+{
+    return getContext()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
+}
+
+mlir::Value pylir::TypeFlow::CalcOp::mapValue(::mlir::Value resultValue)
+{
+    return getInstruction()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
+}
+
+mlir::Value pylir::TypeFlow::CallOp::mapValue(::mlir::Value resultValue)
+{
+    return getContext()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
+}
+
+mlir::Value pylir::TypeFlow::CallIndirectOp::mapValue(::mlir::Value resultValue)
+{
+    return getContext()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
 }
 
 #define GET_OP_CLASSES

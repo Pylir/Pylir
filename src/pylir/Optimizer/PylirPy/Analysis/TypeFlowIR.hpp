@@ -14,8 +14,7 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
-#include <pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.hpp>
-#include <pylir/Optimizer/PylirPy/Interfaces/TypeFoldInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Analysis/TypeFlowInterfaces.hpp>
 
 #include "pylir/Optimizer/PylirPy/Analysis/TypeFlowIRDialect.h.inc"
 
