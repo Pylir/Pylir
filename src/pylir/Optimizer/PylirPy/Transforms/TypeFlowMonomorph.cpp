@@ -22,7 +22,6 @@
 
 #include <mutex>
 #include <queue>
-#include <shared_mutex>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -170,6 +169,7 @@ struct FunctionCall
 {
     FunctionSpecialization functionSpecialization;
     mlir::ValueRange resultValues;
+    mlir::Operation* callOp;
 };
 
 struct SuccessorBlocks
@@ -357,7 +357,7 @@ public:
                                 }
                             }
                             return FunctionCall{FunctionSpecialization{function, std::move(arguments)},
-                                                callOp.getResults()};
+                                                callOp.getResults(), callOp.getContext()};
                         });
             if (optional)
             {
@@ -393,7 +393,7 @@ class Orchestrator
     mlir::DominanceInfo& m_dominanceInfo;
     mlir::Liveness& m_liveness;
 
-    std::shared_mutex m_orchestratorLock;
+    std::mutex m_orchestratorLock;
     std::vector<pylir::Py::ObjectTypeInterface> m_returnTypes; // protected by m_orchestratorLock
     llvm::DenseMap<mlir::Block*, bool> m_finishedBlocks;       // protected by m_orchestratorLock
     llvm::DenseMap<mlir::Value, TypeFlowValue> m_values;       // protected by m_orchestratorLock
@@ -406,6 +406,8 @@ class Orchestrator
         Loop() : exitBlocks({}) {}
     };
     llvm::DenseMap<pylir::Loop*, Loop> m_loops; // protected by m_orchestratorLock
+    std::mutex m_callSiteLock;
+    llvm::DenseMap<mlir::Operation*, FunctionSpecialization> m_callSites; // protected by m_callSiteLock
 
     std::atomic_size_t m_inQueueCount = 0;
 
@@ -523,6 +525,11 @@ public:
         return m_values;
     }
 
+    const llvm::DenseMap<mlir::Operation*, FunctionSpecialization>& getCallSites() const
+    {
+        return m_callSites;
+    }
+
     explicit Orchestrator(TypeFlowInstance& instance)
         : m_typeFLowIR(instance.typeFLowIR),
           m_loopInfo(instance.loopInfo),
@@ -550,11 +557,17 @@ public:
         auto result = executionFrame.execute(symbolTableCollection);
         if (auto* call = std::get_if<FunctionCall>(&result))
         {
+            std::scoped_lock lock(m_callSiteLock);
+            auto [existing, inserted] = m_callSites.insert({call->callOp, call->functionSpecialization});
+            if (!inserted && existing->second != call->functionSpecialization)
+            {
+                existing->second = FunctionSpecialization{nullptr, {}};
+            }
             return {std::move(*call)};
         }
 
         // Save this blocks result first of all.
-        std::unique_lock lock(m_orchestratorLock);
+        std::scoped_lock lock(m_orchestratorLock);
         m_finishedBlocks[block] = true;
         {
             auto& newValues = executionFrame.getValues();
@@ -854,6 +867,54 @@ public:
     }
 };
 
+bool setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
+{
+    return llvm::TypeSwitch<mlir::Operation*, bool>(op)
+        .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>(
+            [&](auto&& op)
+            {
+                if (op.getCalleeAttr() == callee)
+                {
+                    return false;
+                }
+                op.setCalleeAttr(callee);
+                return true;
+            })
+        .Case(
+            [&](pylir::Py::FunctionCallOp op)
+            {
+                // If it hasn't been turned into a constant than redirecting it to a clone of the given constant
+                // is not valid either.
+                if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant()))
+                {
+                    return false;
+                }
+                mlir::OpBuilder builder(op);
+                auto newCall =
+                    builder.create<pylir::Py::CallOp>(op.getLoc(), op->getResultTypes(), callee, op.getCallOperands());
+                newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
+                op->replaceAllUsesWith(newCall);
+                op->erase();
+                return true;
+            })
+        .Case(
+            [&](pylir::Py::FunctionInvokeOp op)
+            {
+                if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant()))
+                {
+                    return false;
+                }
+                mlir::OpBuilder builder(op);
+                auto newCall = builder.create<pylir::Py::InvokeOp>(
+                    op.getLoc(), op->getResultTypes(), callee, op.getCallOperands(), op.getNormalDestOperands(),
+                    op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
+                newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
+                op->replaceAllUsesWith(newCall);
+                op->erase();
+                return true;
+            });
+}
+
 void TypeFlowMonomorph::runOnOperation()
 {
     // TODO: Use SetVector once interfaces properly function in DenseMapInfo
@@ -881,6 +942,7 @@ void TypeFlowMonomorph::runOnOperation()
         mlir::BlockAndValueMapping mapping;
     };
 
+    bool changed = false;
     mlir::SymbolTable table(getOperation());
     llvm::DenseMap<FunctionSpecialization, Clone> clones;
     for (auto& [func, orchestrator] : results)
@@ -917,7 +979,45 @@ void TypeFlowMonomorph::runOnOperation()
             PYLIR_ASSERT(constant);
             cloneValue.replaceAllUsesWith(constant->getResult(0));
             m_valuesReplaced++;
+            changed = true;
         }
+    }
+
+    for (auto& orchestrator : llvm::make_second_range(results))
+    {
+        for (const auto& [origCall, func] : orchestrator->getCallSites())
+        {
+            if (!func.getFunction())
+            {
+                continue;
+            }
+
+            auto& mapping = clones[func].mapping;
+            // TODO: Map call properly (not like the following code) as soon as it is supported by
+            // BlockAndValueMapping
+            mlir::Operation* call;
+            if (origCall->getNumResults() != 0)
+            {
+                call = mapping.lookupOrDefault(origCall->getResult(0)).getDefiningOp();
+            }
+            else
+            {
+                auto* mappedBlock = mapping.lookupOrDefault(origCall->getBlock());
+                auto distance = std::distance(origCall->getBlock()->begin(), mlir::Block::iterator{origCall});
+                call = &*std::next(mappedBlock->begin(), distance);
+            }
+
+            if (setCallee(call, mlir::FlatSymbolRefAttr::get(clones[func].function)))
+            {
+                m_callsChanged++;
+                changed = true;
+            }
+        }
+    }
+
+    if (!changed)
+    {
+        return markAllAnalysesPreserved();
     }
 }
 } // namespace

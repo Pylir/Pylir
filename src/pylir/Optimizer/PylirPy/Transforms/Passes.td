@@ -62,7 +62,7 @@ def TypeFlowMonomorph : Pass<"pylir-typeflow-monomorph", "::mlir::ModuleOp"> {
 
 	let statistics = [
 		Statistic<"m_valuesReplaced", "Values replaced", "Amount of values that have been replaced with constants">,
-		Statistic<"m_callsChanged", "Calls changed", "Amount of call instructions that now point to clones">,
+		Statistic<"m_callsChanged", "Calls changed", "Amount of call instructions that were changed">,
 		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specific types">,
 	];
 }
