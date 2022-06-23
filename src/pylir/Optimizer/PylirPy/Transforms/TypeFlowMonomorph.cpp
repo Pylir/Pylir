@@ -828,10 +828,19 @@ public:
                         { return mlir::TypeAttr::get(type); },
                         [](mlir::FlatSymbolRefAttr attr) -> mlir::Attribute { return attr; });
                 }
+                // No need to wait for the call if it has no results for us.
+                if (call.resultValues.empty())
+                {
+                    queue.push(std::move(front));
+                }
+                else
+                {
+                    m_callDependents[existing->second.get()].push_back(
+                        {std::move(front.first), std::move(front.second), call.resultValues});
+                }
                 queue.emplace(ExecutionFrame(&existing->second->getEntryBlock()->front(), std::move(entryValues)),
                               existing->second.get());
-                m_callDependents[existing->second.get()].push_back(
-                    {std::move(front.first), std::move(front.second), call.resultValues});
+
                 continue;
             }
             // TODO: Recursion/not yet ready case
