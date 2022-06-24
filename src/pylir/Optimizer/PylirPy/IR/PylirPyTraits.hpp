@@ -57,7 +57,7 @@ public:
     class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                  \
     {                                                                                                           \
     public:                                                                                                     \
-        pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,                 \
+        pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,                       \
                                                 llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,  \
                                                 mlir::SymbolTableCollection&)                                   \
         {                                                                                                       \
@@ -73,7 +73,7 @@ template <class ConcreteType>
 class RefinedTypeTupleApproximate : public TypeRefineableInterface::Trait<ConcreteType>
 {
 public:
-    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                             mlir::SymbolTableCollection&)
     {
@@ -87,7 +87,7 @@ template <class ConcreteType>
 class RefinedObjectFromTypeObjectImpl : public TypeRefineableInterface::Trait<ConcreteType>
 {
 public:
-    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                             mlir::SymbolTableCollection&)
     {

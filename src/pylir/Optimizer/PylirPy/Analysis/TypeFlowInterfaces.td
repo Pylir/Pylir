@@ -14,8 +14,8 @@ def TypeFlowExecInterface : OpInterface<"TypeFlowExecInterface"> {
 
     let methods = [
         InterfaceMethod<[{}], "::mlir::LogicalResult", "exec",
-            (ins "::llvm::ArrayRef<::mlir::Attribute>":$operands,
-                 "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$results,
+            (ins "::llvm::ArrayRef<::pylir::Py::TypeAttrUnion>":$operands,
+                 "::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>&":$results,
                  "::mlir::SymbolTableCollection&":$collection)>,
     ];
 }

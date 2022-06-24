@@ -68,18 +68,19 @@ mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::At
     return operands[0];
 }
 
-mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results,
+mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
+                                                    ::llvm::SmallVectorImpl<OpFoldResult>& results,
                                                     ::mlir::SymbolTableCollection& collection)
 {
-    if (auto typeAttr = operands[0].dyn_cast_or_null<mlir::TypeAttr>())
+    if (auto type = operands[0].dyn_cast_or_null<Py::ObjectTypeInterface>())
     {
-        results.emplace_back(typeAttr.getValue().cast<Py::ObjectTypeInterface>().getTypeObject());
+        results.emplace_back(type.getTypeObject());
         return mlir::success();
     }
     if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
     {
-        results.emplace_back(Py::typeOfConstant(operands[0], collection, getContext()).getTypeObject());
+        results.emplace_back(
+            Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getContext()).getTypeObject());
         return mlir::success();
     }
     if (auto makeObject = getInput().getDefiningOp<MakeObjectOp>())
@@ -90,8 +91,8 @@ mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<::mlir::Att
     return mlir::failure();
 }
 
-mlir::LogicalResult pylir::TypeFlow::MakeObjectOp::exec(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                                        ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results,
+mlir::LogicalResult pylir::TypeFlow::MakeObjectOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
+                                                        ::llvm::SmallVectorImpl<OpFoldResult>& results,
                                                         ::mlir::SymbolTableCollection&)
 {
     if (auto ref = operands[0].dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
@@ -107,20 +108,35 @@ mlir::LogicalResult pylir::TypeFlow::MakeObjectOp::exec(::llvm::ArrayRef<::mlir:
     return mlir::failure();
 }
 
-mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                                  ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results,
+mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
+                                                  ::llvm::SmallVectorImpl<OpFoldResult>& results,
                                                   ::mlir::SymbolTableCollection& collection)
 {
-    if (mlir::succeeded(getInstruction()->fold(operands, results)) && !results.empty())
+    llvm::SmallVector<mlir::OpFoldResult> mlirFoldResults;
+    if (mlir::succeeded(getInstruction()->fold(
+            llvm::to_vector(llvm::map_range(operands, [](Py::TypeAttrUnion value)
+                                            { return value.dyn_cast_or_null<mlir::Attribute>(); })),
+            mlirFoldResults))
+        && !mlirFoldResults.empty())
     {
-        if (!getValueCalc())
+        for (auto& iter : mlirFoldResults)
         {
-            for (auto& iter : results)
+            if (auto attr = iter.dyn_cast<mlir::Attribute>())
             {
-                if (auto attr = iter.dyn_cast<mlir::Attribute>())
+                if (!getValueCalc())
                 {
-                    iter = mlir::TypeAttr::get(pylir::Py::typeOfConstant(attr, collection, getInstruction()));
+                    // TODO: This is problematic if we can't get a type out of attr. This is currently UB in
+                    //       typeOfConstant. I should change that.
+                    results.emplace_back(pylir::Py::typeOfConstant(attr, collection, getInstruction()));
                 }
+                else
+                {
+                    results.emplace_back(attr);
+                }
+            }
+            else
+            {
+                results.emplace_back(iter.get<mlir::Value>());
             }
         }
         return mlir::success();
@@ -135,36 +151,65 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<::mlir::Attri
     {
         return mlir::failure();
     }
-    llvm::SmallVector<pylir::Py::ObjectTypeInterface> inputTypes(operands.size());
-    for (auto [type, operand] : llvm::zip(inputTypes, operands))
+    auto inputs = llvm::to_vector(operands);
+    for (auto& iter : inputs)
     {
-        if (auto typeAttr = operand.dyn_cast_or_null<mlir::TypeAttr>())
+        if (iter.isa_and_nonnull<pylir::Py::ObjectTypeInterface>())
         {
-            type = typeAttr.getValue().dyn_cast<pylir::Py::ObjectTypeInterface>();
         }
-        else if (operand.isa_and_nonnull<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+        else if (iter.isa_and_nonnull<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
         {
-            type = pylir::Py::typeOfConstant(operand, collection, getInstruction());
+            // TODO: This is wrong if the SymbolRefAttr does not refer to a `py.globalValue`
+            iter = pylir::Py::typeOfConstant(iter.cast<mlir::Attribute>(), collection, getInstruction());
         }
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> resultTypes;
-    if (refinable.refineTypes(inputTypes, resultTypes, collection) != Py::TypeRefineResult::Success)
+    if (refinable.refineTypes(inputs, resultTypes, collection) != Py::TypeRefineResult::Success)
     {
         return mlir::failure();
     }
     results.resize(resultTypes.size());
-    for (auto [foldRes, resType] : llvm::zip(results, resultTypes))
-    {
-        foldRes = mlir::TypeAttr::get(resType);
-    }
+    std::copy(resultTypes.begin(), resultTypes.end(), results.begin());
     return mlir::success();
 }
 
 mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
                                                   ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
+    llvm::SmallVector<::pylir::TypeFlow::OpFoldResult> res;
     mlir::SymbolTableCollection collection;
-    return exec(operands, results, collection);
+    if (mlir::failed(exec(
+            llvm::to_vector(llvm::map_range(operands,
+                                            [](mlir::Attribute attr) -> Py::TypeAttrUnion
+                                            {
+                                                if (auto typeAttr = attr.dyn_cast_or_null<mlir::TypeAttr>())
+                                                {
+                                                    return typeAttr.getValue().cast<pylir::Py::ObjectTypeInterface>();
+                                                }
+                                                else
+                                                {
+                                                    return attr;
+                                                }
+                                            })),
+            res, collection)))
+    {
+        return mlir::failure();
+    }
+    for (auto& iter : res)
+    {
+        if (auto typeFlowValue = iter.dyn_cast<::pylir::Py::TypeAttrUnion>())
+        {
+            if (auto type = typeFlowValue.dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
+            {
+                results.emplace_back(mlir::TypeAttr::get(type));
+                continue;
+            }
+            results.emplace_back(typeFlowValue.dyn_cast<mlir::Attribute>());
+            continue;
+        }
+        results.emplace_back(iter.get<mlir::Value>());
+    }
+    return mlir::success();
 }
 
 mlir::SuccessorOperands pylir::TypeFlow::BranchOp::getSuccessorOperands(unsigned int index)
@@ -185,7 +230,7 @@ mlir::LogicalResult
 {
     Adaptor adaptor(operands, attributes, regions);
     std::size_t count = adaptor.getInstruction()->getNumResults();
-    if (mlir::isa<pylir::Py::TypeRefineableInterface>(adaptor.getInstruction()))
+    if (!adaptor.getValueCalc())
     {
         count = llvm::count_if(adaptor.getInstruction()->getResultTypes(),
                                std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>));

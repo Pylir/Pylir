@@ -92,13 +92,31 @@ def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoSideEffect, ConstantLike]> 
 defvar foldAsExec = [{
 mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    llvm::SmallVector<mlir::OpFoldResult> res;
+    llvm::SmallVector<::pylir::TypeFlow::OpFoldResult> res;
     mlir::SymbolTableCollection collection;
-    if (mlir::failed(exec(operands, res, collection)))
+    if (mlir::failed(exec(llvm::to_vector(llvm::map_range(operands, [](mlir::Attribute attr) -> ::pylir::Py::TypeAttrUnion {
+        if (auto typeAttr = attr.dyn_cast_or_null<mlir::TypeAttr>())
+        {
+            return typeAttr.getValue().cast<pylir::Py::ObjectTypeInterface>();
+        }
+        else
+        {
+            return attr;
+        }
+    })), res, collection)))
     {
         return nullptr;
     }
-    return res.front();
+    auto first = res.front();
+    if (auto typeFlowValue = first.dyn_cast<::pylir::Py::TypeAttrUnion>())
+    {
+        if (auto type = typeFlowValue.dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
+        {
+            return mlir::TypeAttr::get(type);
+        }
+        return typeFlowValue.dyn_cast<mlir::Attribute>();
+    }
+    return first.get<mlir::Value>();
 }
 }];
 

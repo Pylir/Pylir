@@ -19,6 +19,7 @@
 #include <pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
 
@@ -39,39 +40,7 @@ protected:
     void runOnOperation() override;
 };
 
-/// The Lattice of the Dataflow analysis. It's top value is the NULL value. The bottom value is not directly represented
-/// in the lattice, but is indicated by the absence of a mapped TypeFlowValue in the respective maps.
-class TypeFlowValue : public mlir::Attribute
-{
-public:
-    TypeFlowValue() = default;
-
-    /*implicit*/ TypeFlowValue(pylir::Py::ObjectTypeInterface type) : mlir::Attribute(mlir::TypeAttr::get(type)) {}
-
-    /*implicit*/ TypeFlowValue(mlir::Attribute attr) : mlir::Attribute(attr) {}
-
-    TypeFlowValue join(TypeFlowValue rhs)
-    {
-        if (!rhs || !*this)
-        {
-            return {};
-        }
-        if (*this == rhs)
-        {
-            return *this;
-        }
-        if (auto thisType = dyn_cast<mlir::TypeAttr>())
-        {
-            if (auto rhsType = rhs.dyn_cast<mlir::TypeAttr>())
-            {
-                return pylir::Py::joinTypes(thisType.getValue(), rhsType.getValue());
-            }
-        }
-        return {};
-    }
-};
-
-using TypeFlowArgValue = std::variant<mlir::FlatSymbolRefAttr, pylir::Py::ObjectTypeInterface>;
+using TypeFlowArgValue = llvm::PointerUnion<mlir::SymbolRefAttr, pylir::Py::ObjectTypeInterface>;
 
 class FunctionSpecialization
 {
@@ -126,8 +95,7 @@ struct llvm::DenseMapInfo<FunctionSpecialization>
 
     static inline unsigned getHashValue(const FunctionSpecialization& value)
     {
-        auto f = [](auto unionVal)
-        { return (std::uintptr_t)pylir::match(unionVal, [](auto&& arg) { return arg.getAsOpaquePointer(); }); };
+        auto f = [](TypeFlowArgValue unionVal) { return (std::uintptr_t)unionVal.getOpaqueValue(); };
         auto argTypes = value.getArgTypes();
         return llvm::hash_combine(&*value.getFunction(),
                                   llvm::hash_combine_range(llvm::mapped_iterator(argTypes.begin(), f),
@@ -141,24 +109,25 @@ struct llvm::DenseMapInfo<FunctionSpecialization>
 };
 
 template <>
-struct llvm::DenseMapInfo<std::vector<TypeFlowValue>>
+struct llvm::DenseMapInfo<std::vector<pylir::Py::TypeAttrUnion>>
 {
-    static inline std::vector<TypeFlowValue> getEmptyKey()
+    static inline std::vector<pylir::Py::TypeAttrUnion> getEmptyKey()
     {
-        return {llvm::DenseMapInfo<TypeFlowValue>::getEmptyKey()};
+        return {llvm::DenseMapInfo<pylir::Py::TypeAttrUnion>::getEmptyKey()};
     }
 
-    static inline std::vector<TypeFlowValue> getTombstoneKey()
+    static inline std::vector<pylir::Py::TypeAttrUnion> getTombstoneKey()
     {
-        return {llvm::DenseMapInfo<TypeFlowValue>::getTombstoneKey()};
+        return {llvm::DenseMapInfo<pylir::Py::TypeAttrUnion>::getTombstoneKey()};
     }
 
-    static inline unsigned getHashValue(const std::vector<TypeFlowValue>& value)
+    static inline unsigned getHashValue(const std::vector<pylir::Py::TypeAttrUnion>& value)
     {
         return llvm::hash_combine_range(value.begin(), value.end());
     }
 
-    static inline bool isEqual(const std::vector<TypeFlowValue>& lhs, const std::vector<TypeFlowValue>& rhs)
+    static inline bool isEqual(const std::vector<pylir::Py::TypeAttrUnion>& lhs,
+                               const std::vector<pylir::Py::TypeAttrUnion>& rhs)
     {
         return lhs == rhs;
     }
@@ -187,11 +156,11 @@ class ExecutionFrame
     /// Op that is about to be executed.
     mlir::Operation* m_nextExecutedOp;
     /// Mapping of TypeFlowIR meta values and their actual current values.
-    llvm::DenseMap<mlir::Value, TypeFlowValue> m_values;
+    llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> m_values;
 
 public:
     explicit ExecutionFrame(mlir::Operation* nextExecutedOp,
-                            llvm::DenseMap<mlir::Value, TypeFlowValue> valuesInit = decltype(m_values)(0))
+                            llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> valuesInit = decltype(m_values)(0))
         : m_nextExecutedOp(nextExecutedOp), m_values(std::move(valuesInit))
     {
     }
@@ -201,7 +170,7 @@ public:
         return *m_nextExecutedOp;
     }
 
-    [[nodiscard]] llvm::DenseMap<mlir::Value, TypeFlowValue>& getValues()
+    [[nodiscard]] llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion>& getValues()
     {
         return m_values;
     }
@@ -239,11 +208,10 @@ public:
                     .Case(
                         [&](pylir::TypeFlow::TypeFlowExecInterface interface)
                         {
-                            llvm::SmallVector<mlir::OpFoldResult> result;
+                            llvm::SmallVector<pylir::TypeFlow::OpFoldResult> result;
                             if (mlir::failed(interface.exec(
                                     llvm::to_vector(llvm::map_range(interface->getOperands(),
-                                                                    [&](mlir::Value val) -> mlir::Attribute
-                                                                    { return m_values[val]; })),
+                                                                    [&](mlir::Value val) { return m_values[val]; })),
                                     result, collection)))
                             {
                                 for (auto iter : interface->getOpResults())
@@ -256,7 +224,7 @@ public:
                                 PYLIR_ASSERT(interface->getNumResults() == result.size());
                                 for (auto [res, value] : llvm::zip(interface->getOpResults(), result))
                                 {
-                                    if (auto attr = value.dyn_cast<mlir::Attribute>())
+                                    if (auto attr = value.dyn_cast<pylir::Py::TypeAttrUnion>())
                                     {
                                         m_values[res] = attr;
                                     }
@@ -292,9 +260,9 @@ public:
                                 returnOp.getValues().size());
                             for (auto [returnValue, value] : llvm::zip(returnedValues, returnOp.getValues()))
                             {
-                                if (auto typeAttr = m_values[value].dyn_cast_or_null<mlir::TypeAttr>())
+                                if (auto type = m_values[value].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
                                 {
-                                    returnValue = typeAttr.getValue();
+                                    returnValue = type;
                                 }
                             }
                             return returnedValues;
@@ -348,14 +316,15 @@ public:
                                 {
                                     argValue = ref;
                                 }
-                                else if (auto type = value.template dyn_cast_or_null<mlir::TypeAttr>())
+                                else if (auto type = value.template dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
                                 {
-                                    argValue = type.getValue();
+                                    argValue = type;
                                 }
                                 else if (value.template isa_and_nonnull<pylir::Py::ObjectAttrInterface,
                                                                         mlir::SymbolRefAttr>())
                                 {
-                                    argValue = pylir::Py::typeOfConstant(value, collection, callOp.getContext());
+                                    argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>(),
+                                                                         collection, callOp.getContext());
                                 }
                             }
                             return FunctionCall{FunctionSpecialization{function, std::move(arguments)},
@@ -396,14 +365,14 @@ class Orchestrator
     mlir::Liveness& m_liveness;
 
     std::mutex m_orchestratorLock;
-    std::vector<pylir::Py::ObjectTypeInterface> m_returnTypes; // protected by m_orchestratorLock
-    llvm::DenseMap<mlir::Block*, bool> m_finishedBlocks;       // protected by m_orchestratorLock
-    llvm::DenseMap<mlir::Value, TypeFlowValue> m_values;       // protected by m_orchestratorLock
+    std::vector<pylir::Py::ObjectTypeInterface> m_returnTypes;      // protected by m_orchestratorLock
+    llvm::DenseMap<mlir::Block*, bool> m_finishedBlocks;            // protected by m_orchestratorLock
+    llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> m_values; // protected by m_orchestratorLock
 
     struct Loop
     {
         llvm::SetVector<mlir::Block*> exitBlocks;
-        llvm::DenseSet<std::vector<TypeFlowValue>> headerArgs;
+        llvm::DenseSet<std::vector<pylir::Py::TypeAttrUnion>> headerArgs;
 
         Loop() : exitBlocks({}) {}
     };
@@ -418,8 +387,8 @@ class Orchestrator
         std::vector<ExecutionFrame> results;
         for (auto [iter, loop] : blocks)
         {
-            std::vector<TypeFlowValue> blockArgs(iter->getNumArguments());
-            llvm::DenseMap<mlir::Value, TypeFlowValue> values;
+            std::vector<pylir::Py::TypeAttrUnion> blockArgs(iter->getNumArguments());
+            llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> values;
             for (auto dominatingDef : m_liveness.getLiveIn(iter))
             {
                 values[dominatingDef] = m_values[dominatingDef];
@@ -522,7 +491,7 @@ public:
         return m_returnTypes;
     }
 
-    const llvm::DenseMap<mlir::Value, TypeFlowValue>& getValues() const
+    const llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion>& getValues() const
     {
         return m_values;
     }
@@ -833,15 +802,18 @@ public:
             if (inserted)
             {
                 existing->second = createOrchestrator(existing->first.getFunction(), moduleManager);
-                llvm::DenseMap<mlir::Value, TypeFlowValue> entryValues;
+                llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> entryValues;
                 for (auto [arg, value] :
                      llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.getArgTypes()))
                 {
-                    entryValues[arg] = pylir::match(
-                        value,
-                        [](pylir::Py::ObjectTypeInterface type) -> mlir::Attribute
-                        { return mlir::TypeAttr::get(type); },
-                        [](mlir::FlatSymbolRefAttr attr) -> mlir::Attribute { return attr; });
+                    if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                    {
+                        entryValues[arg] = ref;
+                    }
+                    else
+                    {
+                        entryValues[arg] = value.get<pylir::Py::ObjectTypeInterface>();
+                    }
                 }
                 // No need to wait for the call if it has no results for us.
                 if (call.resultValues.empty())
@@ -954,7 +926,8 @@ void Monomorph::runOnOperation()
         bool isRoot = rootSet.contains(func.getFunction());
         for (const auto& [key, value] : orchestrator->getValues())
         {
-            if (!value || value.isa<mlir::TypeAttr>())
+            auto attr = value.dyn_cast_or_null<mlir::Attribute>();
+            if (!attr)
             {
                 continue;
             }
@@ -977,7 +950,7 @@ void Monomorph::runOnOperation()
             auto cloneValue = clone.mapping.lookupOrDefault(instrValue);
             mlir::OpBuilder builder(cloneValue.getDefiningOp());
             auto* constant = cloneValue.getDefiningOp()->getDialect()->materializeConstant(
-                builder, value, cloneValue.getType(), cloneValue.getLoc());
+                builder, attr, cloneValue.getType(), cloneValue.getLoc());
             PYLIR_ASSERT(constant);
             cloneValue.replaceAllUsesWith(constant->getResult(0));
             m_valuesReplaced++;

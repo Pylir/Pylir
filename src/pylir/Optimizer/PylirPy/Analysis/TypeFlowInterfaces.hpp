@@ -12,4 +12,12 @@
 
 #include <llvm/ADT/ArrayRef.h>
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
+
+namespace pylir::TypeFlow
+{
+using OpFoldResult = llvm::PointerUnion<Py::TypeAttrUnion, mlir::Value>;
+} // namespace pylir::TypeFlow
+
 #include "pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.h.inc"

@@ -391,7 +391,7 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     }
     if (auto refineable = getObject().getDefiningOp<Py::TypeRefineableInterface>())
     {
-        llvm::SmallVector<Py::ObjectTypeInterface> operandTypes(refineable->getNumOperands(), nullptr);
+        llvm::SmallVector<Py::TypeAttrUnion> operandTypes(refineable->getNumOperands(), nullptr);
         mlir::SymbolTableCollection collection;
         llvm::SmallVector<Py::ObjectTypeInterface> res;
         if (refineable.refineTypes(operandTypes, res, collection) == TypeRefineResult::Failure)
@@ -979,7 +979,7 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+    pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion>,
                                        llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                        mlir::SymbolTableCollection& table)
 {
@@ -988,7 +988,7 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface>,
+    pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                           mlir::SymbolTableCollection&)
 {
@@ -997,7 +997,7 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+    pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
                                         llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                         mlir::SymbolTableCollection&)
 {
@@ -1014,7 +1014,7 @@ pylir::Py::TypeRefineResult
             result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
             return TypeRefineResult::Approximate;
         }
-        elementTypes.push_back(iter);
+        elementTypes.push_back(iter.cast<Py::ObjectTypeInterface>());
     }
     result.emplace_back(Py::TupleType::get(
         getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elementTypes));
@@ -1022,7 +1022,7 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+    pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion> argumentTypes,
                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                            mlir::SymbolTableCollection&)
 {
@@ -1058,7 +1058,7 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+    pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
                                              llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                              mlir::SymbolTableCollection&)
 {
@@ -1096,7 +1096,7 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::ObjectTypeInterface> argumentTypes,
+    pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                            mlir::SymbolTableCollection&)
 {
@@ -1106,7 +1106,7 @@ pylir::Py::TypeRefineResult
         return TypeRefineResult::Failure;
     }
     llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());
-    elements.insert(elements.begin(), argumentTypes[0]);
+    elements.insert(elements.begin(), argumentTypes[0].cast<Py::ObjectTypeInterface>());
     result.emplace_back(Py::TupleType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elements));
     return TypeRefineResult::Success;
 }
