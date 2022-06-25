@@ -16,18 +16,6 @@ class PylirPy_Type<string name, list<Trait> traits = []> : TypeDef<PylirPy_Diale
 class PylirPy_ObjectType<string name, list<Trait> traits = []>
 	: PylirPy_Type<name, !listconcat(traits, [ObjectTypeInterface])>;
 
-def PylirPy_UnknownType : PylirPy_ObjectType<"Unknown"> {
-    let mnemonic = "unknown";
-    let summary = "unknown type";
-
-    let extraClassDeclaration = [{
-        mlir::FlatSymbolRefAttr getTypeObject() const
-        {
-            return {};
-        }
-    }];
-}
-
 def PylirPy_UnboundType : PylirPy_ObjectType<"Unbound"> {
     let mnemonic = "unbound";
     let summary = "unbound type";

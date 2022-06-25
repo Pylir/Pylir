@@ -1036,8 +1036,8 @@ pylir::Py::TypeRefineResult
         result.emplace_back(UnboundType::get(getContext()));
         return TypeRefineResult::Success;
     }
-    mlir::IntegerAttr index;
-    if (!mlir::matchPattern(getIndex(), mlir::m_Constant(&index)))
+    mlir::IntegerAttr index = argumentTypes[1].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!index)
     {
         Py::ObjectTypeInterface sumType = tupleType.getElements().front();
         for (auto iter : tupleType.getElements().drop_front())
@@ -1073,8 +1073,8 @@ pylir::Py::TypeRefineResult
         result.emplace_back(tupleType);
         return TypeRefineResult::Success;
     }
-    mlir::IntegerAttr index;
-    if (!mlir::matchPattern(getCount(), mlir::m_Constant(&index)))
+    mlir::IntegerAttr index = argumentTypes[0].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!index)
     {
         Py::ObjectTypeInterface sumType = tupleType.getElements().front();
         for (auto iter : tupleType.getElements().drop_front())
