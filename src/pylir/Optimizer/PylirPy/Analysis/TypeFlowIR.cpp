@@ -98,7 +98,7 @@ mlir::LogicalResult pylir::TypeFlow::MakeObjectOp::exec(::llvm::ArrayRef<Py::Typ
 {
     if (auto ref = operands[0].dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
     {
-        results.emplace_back(mlir::TypeAttr::get(Py::ClassType::get(ref)));
+        results.emplace_back(Py::TypeAttrUnion(Py::ClassType::get(ref)));
         return mlir::success();
     }
     if (auto typeOf = getInput().getDefiningOp<TypeOfOp>())
