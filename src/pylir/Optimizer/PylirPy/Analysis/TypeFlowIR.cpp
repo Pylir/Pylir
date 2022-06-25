@@ -13,6 +13,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
 void pylir::TypeFlow::TypeFlowDialect::initialize()
@@ -77,7 +78,7 @@ mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAtt
         results.emplace_back(type.getTypeObject());
         return mlir::success();
     }
-    if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
     {
         results.emplace_back(
             Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getContext()).getTypeObject());
@@ -119,14 +120,17 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
             mlirFoldResults))
         && !mlirFoldResults.empty())
     {
-        for (auto& iter : mlirFoldResults)
+        for (auto [iter, type] : llvm::zip(mlirFoldResults, getInstruction()->getResultTypes()))
         {
+            // If this is a calc then all types that aren't `!py.dynamic` are ignored.
+            if (!getValueCalc() && !type.isa<Py::DynamicType>())
+            {
+                continue;
+            }
             if (auto attr = iter.dyn_cast<mlir::Attribute>())
             {
                 if (!getValueCalc())
                 {
-                    // TODO: This is problematic if we can't get a type out of attr. This is currently UB in
-                    //       typeOfConstant. I should change that.
                     results.emplace_back(pylir::Py::typeOfConstant(attr, collection, getInstruction()));
                 }
                 else
@@ -152,14 +156,14 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
         return mlir::failure();
     }
     auto inputs = llvm::to_vector(operands);
-    for (auto& iter : inputs)
+    for (auto [iter, type] : llvm::zip(inputs, getInstruction()->getOperandTypes()))
     {
-        if (iter.isa_and_nonnull<pylir::Py::ObjectTypeInterface>())
+        if (!type.isa<pylir::Py::DynamicType>())
         {
+            continue;
         }
-        else if (iter.isa_and_nonnull<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+        if (iter.isa_and_nonnull<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
         {
-            // TODO: This is wrong if the SymbolRefAttr does not refer to a `py.globalValue`
             iter = pylir::Py::typeOfConstant(iter.cast<mlir::Attribute>(), collection, getInstruction());
         }
     }

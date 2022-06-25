@@ -311,17 +311,26 @@ public:
                             for (auto [argValue, inValue] : llvm::zip(arguments, callOp.getArguments()))
                             {
                                 auto value = m_values[inValue];
-                                // TODO: Restrict below that ref may only refer to a type
-                                if (auto ref = value.template dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
+                                // We only allow references referring to type object to be passed as objects across
+                                // function boundaries. Everything else has to be a type.
+                                if (auto ref = value.template dyn_cast_or_null<mlir::SymbolRefAttr>())
                                 {
-                                    argValue = ref;
+                                    auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(
+                                        callOp.getContext(), ref);
+                                    if (lookup
+                                        && lookup.getInitializerAttr().template isa_and_nonnull<pylir::Py::TypeAttr>())
+                                    {
+                                        argValue = ref;
+                                        continue;
+                                    }
                                 }
-                                else if (auto type = value.template dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
+
+                                if (auto type = value.template dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
                                 {
                                     argValue = type;
                                 }
                                 else if (value.template isa_and_nonnull<pylir::Py::ObjectAttrInterface,
-                                                                        mlir::SymbolRefAttr>())
+                                                                        mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
                                 {
                                     argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>(),
                                                                          collection, callOp.getContext());
