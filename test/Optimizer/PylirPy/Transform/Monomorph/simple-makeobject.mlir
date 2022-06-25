@@ -5,6 +5,7 @@ py.globalValue @aType = #py.type
 
 func @createObject(%typeObject : !py.dynamic) -> !py.dynamic {
 	%0 = py.makeObject %typeObject
+	test.use(%0) : !py.dynamic // a kind of side effect
 	return %0 : !py.dynamic
 }
 
@@ -16,5 +17,12 @@ func @test() -> !py.dynamic {
 }
 
 // CHECK-LABEL: func @test
-// CHECK-DAG: %[[INT:.*]] = py.constant(@aType)
-// CHECK-DAG: return %[[INT]]
+// CHECK-NEXT: %[[INT:.*]] = py.constant(@aType)
+// CHECK-NEXT: py.call @[[SPECIALIZATION:[[:alnum:]]+]]
+// CHECK: return %[[INT]]
+
+// CHECK: func private @[[SPECIALIZATION]]
+// CHECK-NEXT: %[[C:.*]] = py.constant(@aType)
+// CHECK-NEXT: %[[O:.*]] = py.makeObject %[[C]]
+// CHECK-NEXT: test.use(%[[O]])
+// CHECK-NEXT: return %[[O]]

@@ -940,10 +940,27 @@ void Monomorph::runOnOperation()
             {
                 continue;
             }
-            auto mapping = key.getDefiningOp<pylir::TypeFlow::TypeFlowValueMappingInterface>();
-            if (!mapping)
+
+            mlir::Value instrValue;
+            if (auto blockArg = key.dyn_cast<mlir::BlockArgument>())
             {
-                continue;
+                if (!blockArg.getOwner()->isEntryBlock())
+                {
+                    continue;
+                }
+                auto dynamicArgIndex = blockArg.getArgNumber();
+                auto filter = llvm::make_filter_range(func.getFunction().getArguments(), [](mlir::Value val)
+                                                      { return val.getType().isa<pylir::Py::DynamicType>(); });
+                instrValue = *std::next(filter.begin(), dynamicArgIndex);
+            }
+            else
+            {
+                auto mapping = key.getDefiningOp<pylir::TypeFlow::TypeFlowValueMappingInterface>();
+                if (!mapping)
+                {
+                    continue;
+                }
+                instrValue = mapping.mapValue(key);
             }
 
             // Cloning of a function body is done lazily for the case where no value has changed.
@@ -951,15 +968,34 @@ void Monomorph::runOnOperation()
             if (clone.function == func.getFunction() && !isRoot)
             {
                 clone.function = clone.function->clone(clone.mapping);
+                mlir::cast<mlir::SymbolOpInterface>(*clone.function).setPrivate();
                 table.insert(clone.function);
                 m_functionsCloned++;
             }
 
-            auto instrValue = mapping.mapValue(key);
             auto cloneValue = clone.mapping.lookupOrDefault(instrValue);
-            mlir::OpBuilder builder(cloneValue.getDefiningOp());
-            auto* constant = cloneValue.getDefiningOp()->getDialect()->materializeConstant(
-                builder, attr, cloneValue.getType(), cloneValue.getLoc());
+            mlir::OpBuilder builder = [=]
+            {
+                if (auto op = cloneValue.getDefiningOp())
+                {
+                    return mlir::OpBuilder(op);
+                }
+                else
+                {
+                    return mlir::OpBuilder::atBlockBegin(cloneValue.cast<mlir::BlockArgument>().getParentBlock());
+                }
+            }();
+            mlir::Dialect* dialect;
+            if (cloneValue.isa<mlir::BlockArgument>())
+            {
+                // Due to the lack of a better way in the case of a block argument we just use PylirPyDialect for now.
+                dialect = getContext().getLoadedDialect<pylir::Py::PylirPyDialect>();
+            }
+            else
+            {
+                dialect = cloneValue.getDefiningOp()->getDialect();
+            }
+            auto* constant = dialect->materializeConstant(builder, attr, cloneValue.getType(), cloneValue.getLoc());
             PYLIR_ASSERT(constant);
             cloneValue.replaceAllUsesWith(constant->getResult(0));
             m_valuesReplaced++;
