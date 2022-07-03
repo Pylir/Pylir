@@ -181,10 +181,10 @@ def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
 }
 
 def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEffect]> {
-	let arguments = (ins Variadic<TypeFlow_MetaType>:$values);
+	let arguments = (ins Variadic<TypeFlow_MetaType>:$values, TypeFlow_InstructionAttr:$context);
 	let results = (outs);
 
-    let assemblyFormat = "$values attr-dict";
+    let assemblyFormat = "$values $context attr-dict";
 }
 
 

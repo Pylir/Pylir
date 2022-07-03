@@ -193,7 +193,7 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
             {
                 if (op->hasTrait<mlir::OpTrait::ReturnLike>())
                 {
-                    builder.create<pylir::TypeFlow::ReturnOp>(mapOperands(op->getOperands()));
+                    builder.create<pylir::TypeFlow::ReturnOp>(mapOperands(op->getOperands()), op);
                     return;
                 }
                 if (op->hasTrait<mlir::OpTrait::IsTerminator>())

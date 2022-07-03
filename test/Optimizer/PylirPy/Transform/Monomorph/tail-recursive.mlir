@@ -1,7 +1,5 @@
 // RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
 
-// XFAIL: *
-
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
@@ -20,14 +18,13 @@ func @foo(%arg0: !py.dynamic) -> !py.dynamic {
 	return %4 : !py.dynamic
 }
 
-func @__init__() {
+func @__init__() -> !py.dynamic {
 	%0 = py.constant(#py.int<10>)
 	%1 = py.call @foo(%0) : (!py.dynamic) -> !py.dynamic
-	test.use(%1) : !py.dynamic
-	return
+	%2 = py.typeOf %1
+	return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: func @__init__()
-// CHECK: py.call @[[FOO_CLONE:.*]](%{{.*}})
-
-// CHECK: func private @[[FOO_CLONE]]
+// CHECK: %[[TYPE:.*]] = py.constant(@builtins.int)
+// CHECK: return %[[TYPE]]

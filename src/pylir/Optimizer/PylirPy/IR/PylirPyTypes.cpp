@@ -65,6 +65,37 @@ pylir::Py::ObjectTypeInterface pylir::Py::joinTypes(pylir::Py::ObjectTypeInterfa
     return pylir::Py::VariantType::get(lhs.getContext(), temp);
 }
 
+bool pylir::Py::isMoreSpecific(pylir::Py::ObjectTypeInterface lhs, pylir::Py::ObjectTypeInterface rhs)
+{
+    if (lhs == rhs)
+    {
+        return false;
+    }
+    if (rhs.isa<Py::UnboundType>())
+    {
+        return true;
+    }
+    if (lhs.isa<Py::UnboundType>())
+    {
+        return false;
+    }
+    if (auto lhsVariant = lhs.dyn_cast<Py::VariantType>())
+    {
+        auto rhsVariant = rhs.dyn_cast<Py::VariantType>();
+        if (!rhsVariant)
+        {
+            return false;
+        }
+        llvm::SmallDenseSet<mlir::Type> lhsSet(lhsVariant.getElements().begin(), lhsVariant.getElements().end());
+        return !llvm::any_of(rhsVariant.getElements(), [&](mlir::Type type) { return !lhsSet.contains(type); });
+    }
+    if (auto lhsTuple = lhs.dyn_cast<Py::TupleType>())
+    {
+        return rhs.isa<Py::TupleType>();
+    }
+    return rhs.isa<Py::TupleType>();
+}
+
 pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constant,
                                                          mlir::SymbolTableCollection& collection,
                                                          mlir::Operation* context)

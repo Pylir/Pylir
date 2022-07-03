@@ -146,7 +146,7 @@ struct FunctionCall
 struct SuccessorBlocks
 {
     mlir::SuccessorRange successors{};
-    mlir::Block* skipped = nullptr;
+    mlir::Block* skippedBlock = nullptr;
 };
 
 using ExecutionResult = std::variant<SuccessorBlocks, FunctionCall, llvm::SmallVector<pylir::Py::ObjectTypeInterface>>;
@@ -228,9 +228,13 @@ public:
                                     {
                                         m_values[res] = attr;
                                     }
+                                    else if (auto val = value.dyn_cast<mlir::Value>())
+                                    {
+                                        m_values[res] = m_values[val];
+                                    }
                                     else
                                     {
-                                        m_values[res] = m_values[value.get<mlir::Value>()];
+                                        m_values[res] = {};
                                     }
                                 }
                             }
@@ -260,9 +264,16 @@ public:
                                 returnOp.getValues().size());
                             for (auto [returnValue, value] : llvm::zip(returnedValues, returnOp.getValues()))
                             {
-                                if (auto type = m_values[value].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
+                                auto& lookup = m_values[value];
+                                if (auto type = lookup.dyn_cast_or_null<pylir::Py::ObjectTypeInterface>())
                                 {
                                     returnValue = type;
+                                }
+                                else if (lookup.isa<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr,
+                                                    pylir::Py::UnboundAttr>())
+                                {
+                                    returnValue = pylir::Py::typeOfConstant(lookup.cast<mlir::Attribute>(), collection,
+                                                                            returnOp.getContext());
                                 }
                             }
                             return returnedValues;
@@ -364,11 +375,44 @@ struct TypeFlowInstance
     }
 };
 
+class Orchestrator;
+
+struct CallWaiting
+{
+    ExecutionFrame frame;
+    Orchestrator* orchestrator;
+    mlir::ValueRange resultValues;
+
+    CallWaiting(ExecutionFrame&& frame, Orchestrator* orchestrator, mlir::ValueRange resultValues)
+        : frame(std::move(frame)), orchestrator(orchestrator), resultValues(resultValues)
+    {
+    }
+};
+
+struct RecursionInfo
+{
+    enum class Phase
+    {
+        Expansion,
+        Breaking
+    };
+
+    Phase phase = Phase::Expansion;
+    llvm::DenseMap<Orchestrator*, std::vector<CallWaiting>> containedOrchsToCycleCalls;
+    Orchestrator* broken = nullptr;
+    llvm::DenseSet<std::vector<pylir::Py::TypeAttrUnion>> seen;
+
+    explicit RecursionInfo(llvm::DenseMap<Orchestrator*, std::vector<CallWaiting>>&& containedOrchsToCycleCalls)
+        : containedOrchsToCycleCalls(std::move(containedOrchsToCycleCalls))
+    {
+    }
+};
+
 /// Handles scheduling on the basic block level of a specific function call. It executes ExecutionFrames, which usually
 /// execute a basic block, and then handles scheduling which basic blocks should be executed next.
 class Orchestrator
 {
-    pylir::Py::TypeFlow& m_typeFLowIR;
+    pylir::Py::TypeFlow& m_typeFlowIR;
     pylir::LoopInfo& m_loopInfo;
     mlir::DominanceInfo& m_dominanceInfo;
     mlir::Liveness& m_liveness;
@@ -389,8 +433,17 @@ class Orchestrator
     std::mutex m_callSiteLock;
     llvm::DenseMap<mlir::Operation*, FunctionSpecialization> m_callSites; // protected by m_callSiteLock
 
-    std::atomic_size_t m_inQueueCount = 0;
+    std::size_t m_inQueueCount = 0;
+    std::vector<CallWaiting> m_waitingCallers;
+    llvm::SetVector<Orchestrator*> m_activeCalls;
 
+    std::vector<std::shared_ptr<RecursionInfo>> m_recursionInfos;
+
+    friend struct llvm::GraphTraits<Orchestrator*>;
+    friend struct llvm::GraphTraits<llvm::Inverse<Orchestrator*>>;
+
+    /// Creates successor frames for the given blocks. If the block is a loop header, its loop is not NULL and also
+    /// passed.
     std::vector<ExecutionFrame> buildSuccessorFrames(llvm::ArrayRef<std::pair<mlir::Block*, pylir::Loop*>> blocks)
     {
         std::vector<ExecutionFrame> results;
@@ -487,12 +540,53 @@ class Orchestrator
         return buildSuccessorFrames(successor);
     }
 
-    friend class OrchestratorRefCount;
+    friend class InQueueCount;
 
 public:
-    bool finishedExecution() const
+    [[nodiscard]] bool finishedExecution() const
     {
-        return m_inQueueCount.load(std::memory_order_relaxed);
+        return m_inQueueCount == 0 && m_activeCalls.empty();
+    }
+
+    [[nodiscard]] bool inCalls() const
+    {
+        return !m_activeCalls.empty();
+    }
+
+    [[nodiscard]] bool inQueue() const
+    {
+        return m_inQueueCount;
+    }
+
+    void addWaitingCall(ExecutionFrame&& frame, Orchestrator* orch, mlir::ValueRange results)
+    {
+        m_waitingCallers.emplace_back(std::move(frame), orch, results);
+        orch->m_activeCalls.insert(this);
+    }
+
+    std::vector<CallWaiting>& getWaitingCallers()
+    {
+        return m_waitingCallers;
+    }
+
+    [[nodiscard]] const auto& getActiveCalls() const
+    {
+        return m_activeCalls;
+    }
+
+    [[nodiscard]] bool inRecursions() const
+    {
+        return !m_recursionInfos.empty();
+    }
+
+    void addRecursionInfo(std::shared_ptr<RecursionInfo> info)
+    {
+        m_recursionInfos.push_back(std::move(info));
+    }
+
+    llvm::ArrayRef<std::shared_ptr<RecursionInfo>> getRecursionInfos()
+    {
+        return m_recursionInfos;
     }
 
     llvm::ArrayRef<pylir::Py::ObjectTypeInterface> getReturnTypes() const
@@ -500,29 +594,29 @@ public:
         return m_returnTypes;
     }
 
-    const llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion>& getValues() const
+    [[nodiscard]] const llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion>& getValues() const
     {
         return m_values;
     }
 
-    const llvm::DenseMap<mlir::Operation*, FunctionSpecialization>& getCallSites() const
+    [[nodiscard]] const llvm::DenseMap<mlir::Operation*, FunctionSpecialization>& getCallSites() const
     {
         return m_callSites;
     }
 
     explicit Orchestrator(TypeFlowInstance& instance)
-        : m_typeFLowIR(instance.typeFLowIR),
+        : m_typeFlowIR(instance.typeFLowIR),
           m_loopInfo(instance.loopInfo),
           m_dominanceInfo(instance.dominanceInfo),
           m_liveness(instance.liveness),
-          m_returnTypes(m_typeFLowIR.getFunction().getNumResults(),
-                        pylir::Py::UnboundType::get(m_typeFLowIR.getFunction()->getContext()))
+          m_returnTypes(m_typeFlowIR.getFunction().getNumResults(),
+                        pylir::Py::UnboundType::get(m_typeFlowIR.getFunction()->getContext()))
     {
     }
 
     [[nodiscard]] mlir::Block* getEntryBlock() const
     {
-        return &m_typeFLowIR.getFunction().front();
+        return &m_typeFlowIR.getFunction().front();
     }
 
     /// Executes an ExecutionFrame. This may return either a vector of new Execution frames that should be executed
@@ -564,62 +658,9 @@ public:
 
         std::vector<ExecutionFrame> frames;
         auto& successorBlocks = pylir::get<SuccessorBlocks>(result);
-        if (successorBlocks.skipped)
+        if (successorBlocks.skippedBlock)
         {
-            std::vector<mlir::DominanceInfoNode*> skippedSubTrees = {m_dominanceInfo.getNode(successorBlocks.skipped)};
-            llvm::df_iterator_default_set<mlir::DominanceInfoNode*> visitedSet;
-            while (!skippedSubTrees.empty())
-            {
-                auto* back = skippedSubTrees.back();
-                skippedSubTrees.pop_back();
-                for (auto* iter : llvm::depth_first_ext(back, visitedSet))
-                {
-                    m_finishedBlocks[block] = false;
-                    // If we reached a leaf we need to check whether it's successor have to either be skipped as well
-                    // or maybe even executed.
-                    if (!iter->isLeaf())
-                    {
-                        continue;
-                    }
-                    llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successors;
-                    for (auto* succ : iter->getBlock()->getSuccessors())
-                    {
-                        if (m_finishedBlocks.count(succ))
-                        {
-                            continue;
-                        }
-                        auto* succLoop = m_loopInfo.getLoopFor(succ);
-                        bool skipping = true;
-                        bool ready = true;
-                        for (auto* pred : succ->getPredecessors())
-                        {
-                            auto res = m_finishedBlocks.find(pred);
-                            if (res != m_finishedBlocks.end())
-                            {
-                                skipping = skipping && !res->second;
-                                continue;
-                            }
-                            if (succLoop && succLoop->contains(pred))
-                            {
-                                continue;
-                            }
-                            ready = false;
-                            break;
-                        }
-                        if (!ready)
-                        {
-                            continue;
-                        }
-                        if (skipping)
-                        {
-                            skippedSubTrees.push_back(m_dominanceInfo.getNode(succ));
-                            continue;
-                        }
-                        successors.emplace_back(succ, succLoop);
-                    }
-                    frames = buildSuccessorFrames(successors);
-                }
-            }
+            frames = skipDominating(successorBlocks.skippedBlock);
         }
 
         auto* loop = m_loopInfo.getLoopFor(block);
@@ -647,50 +688,211 @@ public:
         frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
         return frames;
     }
+
+    std::vector<ExecutionFrame> skipDominating(mlir::Block* root)
+    {
+        if (root->getParent()->hasOneBlock())
+        {
+            m_finishedBlocks[root] = false;
+            return {};
+        }
+        std::vector<ExecutionFrame> frames;
+
+        std::vector<mlir::DominanceInfoNode*> skippedSubTrees = {m_dominanceInfo.getNode(root)};
+        llvm::df_iterator_default_set<mlir::DominanceInfoNode*> visitedSet;
+        while (!skippedSubTrees.empty())
+        {
+            auto* back = skippedSubTrees.back();
+            skippedSubTrees.pop_back();
+            for (auto* iter : llvm::depth_first_ext(back, visitedSet))
+            {
+                m_finishedBlocks[iter->getBlock()] = false;
+                // If we reached a leaf we need to check whether it's successor have to either be skipped as well
+                // or maybe even executed.
+                if (!iter->isLeaf())
+                {
+                    continue;
+                }
+                llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successors;
+                for (auto* succ : iter->getBlock()->getSuccessors())
+                {
+                    if (m_finishedBlocks.count(succ))
+                    {
+                        continue;
+                    }
+                    auto* succLoop = m_loopInfo.getLoopFor(succ);
+                    bool skipping = true;
+                    bool readyToSchedule = true;
+                    for (auto* pred : succ->getPredecessors())
+                    {
+                        auto res = m_finishedBlocks.find(pred);
+                        if (res != m_finishedBlocks.end())
+                        {
+                            skipping = skipping && !res->second;
+                            continue;
+                        }
+                        // If this a loop header then a predecessor within the loop doesn't have to have finished.
+                        if (succLoop && succLoop->contains(pred))
+                        {
+                            continue;
+                        }
+                        readyToSchedule = false;
+                        break;
+                    }
+                    if (!readyToSchedule)
+                    {
+                        continue;
+                    }
+                    // If all predecessors were skipped we shall continue skipping.
+                    if (skipping)
+                    {
+                        skippedSubTrees.push_back(m_dominanceInfo.getNode(succ));
+                        continue;
+                    }
+                    // Otherwise all predecessors are either ready or skipped and we can schedule.
+                    successors.emplace_back(succ, succLoop);
+                }
+                auto temp = buildSuccessorFrames(successors);
+                frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
+            }
+        }
+        return frames;
+    }
+
+    void removeActiveCaller(Orchestrator* orch)
+    {
+        m_activeCalls.remove(orch);
+    }
+
+    void retire()
+    {
+        for (auto& iter : m_waitingCallers)
+        {
+            iter.orchestrator->removeActiveCaller(this);
+        }
+        m_waitingCallers.clear();
+        m_waitingCallers.shrink_to_fit();
+        m_finishedBlocks.shrink_and_clear();
+        m_loops.shrink_and_clear();
+        m_activeCalls.clear();
+        m_recursionInfos.clear();
+        m_recursionInfos.shrink_to_fit();
+    }
 };
 
-class OrchestratorRefCount
+} // namespace
+
+template <>
+struct llvm::GraphTraits<Orchestrator*>
+{
+    using NodeRef = Orchestrator*;
+    using ChildIteratorType = decltype(std::declval<Orchestrator&>().m_activeCalls)::iterator;
+
+    static NodeRef getEntryNode(Orchestrator* orch)
+    {
+        return orch;
+    }
+
+    static ChildIteratorType child_begin(Orchestrator* orch)
+    {
+        return orch->m_activeCalls.begin();
+    }
+
+    static ChildIteratorType child_end(Orchestrator* orch)
+    {
+        return orch->m_activeCalls.end();
+    }
+};
+
+template <>
+struct llvm::GraphTraits<llvm::Inverse<Orchestrator*>>
+{
+    using NodeRef = Orchestrator*;
+
+    static Orchestrator* map(const CallWaiting& call)
+    {
+        return call.orchestrator;
+    }
+
+    using ChildIteratorType = llvm::mapped_iterator<std::vector<CallWaiting>::iterator, decltype(&map)>;
+
+    static NodeRef getEntryNode(Inverse<Orchestrator*> g)
+    {
+        return g.Graph;
+    }
+
+    static ChildIteratorType child_begin(Orchestrator* orch)
+    {
+        return {orch->m_waitingCallers.begin(), map};
+    }
+
+    static ChildIteratorType child_end(Orchestrator* orch)
+    {
+        return {orch->m_waitingCallers.end(), map};
+    }
+};
+
+namespace
+{
+
+class InQueueCount
 {
     Orchestrator* m_orchestrator = nullptr;
 
 public:
-    OrchestratorRefCount() = default;
-    OrchestratorRefCount(std::nullptr_t) = delete;
+    InQueueCount() = default;
+    InQueueCount(std::nullptr_t) = delete;
 
-    explicit OrchestratorRefCount(Orchestrator* orchestrator) : m_orchestrator(orchestrator)
+    explicit InQueueCount(Orchestrator* orchestrator) : m_orchestrator(orchestrator)
     {
-        m_orchestrator->m_inQueueCount.fetch_add(1, std::memory_order::memory_order_relaxed);
-    }
-
-    ~OrchestratorRefCount()
-    {
-        if (m_orchestrator)
-        {
-            m_orchestrator->m_inQueueCount.fetch_sub(1, std::memory_order::memory_order_relaxed);
-        }
+        m_orchestrator->m_inQueueCount++;
     }
 
     std::size_t release()
     {
         PYLIR_ASSERT(m_orchestrator);
-        return std::exchange(m_orchestrator, nullptr)
-                   ->m_inQueueCount.fetch_sub(1, std::memory_order::memory_order_relaxed)
-               - 1;
+        return --std::exchange(m_orchestrator, nullptr)->m_inQueueCount;
     }
 
-    OrchestratorRefCount(const OrchestratorRefCount&) = delete;
-    OrchestratorRefCount& operator=(const OrchestratorRefCount&) = delete;
-
-    OrchestratorRefCount(OrchestratorRefCount&& rhs) noexcept
-        : m_orchestrator(std::exchange(rhs.m_orchestrator, nullptr))
-    {
-    }
-
-    OrchestratorRefCount& operator=(OrchestratorRefCount&& rhs) noexcept
+    ~InQueueCount()
     {
         if (m_orchestrator)
         {
-            m_orchestrator->m_inQueueCount.fetch_sub(std::memory_order::memory_order_relaxed);
+            m_orchestrator->m_inQueueCount--;
+        }
+    }
+
+    InQueueCount(const InQueueCount& rhs) : m_orchestrator(rhs.m_orchestrator)
+    {
+        m_orchestrator->m_inQueueCount++;
+    }
+
+    InQueueCount& operator=(const InQueueCount& rhs)
+    {
+        if (this == &rhs)
+        {
+            return *this;
+        }
+        if (m_orchestrator)
+        {
+            m_orchestrator->m_inQueueCount--;
+        }
+        m_orchestrator = rhs.m_orchestrator;
+        m_orchestrator->m_inQueueCount++;
+        return *this;
+    }
+
+    InQueueCount(InQueueCount&& rhs) noexcept : m_orchestrator(std::exchange(rhs.m_orchestrator, nullptr)) {}
+
+    InQueueCount& operator=(InQueueCount&& rhs) noexcept
+    {
+        if (this == &rhs)
+        {
+            return *this;
+        }
+        if (m_orchestrator)
+        {
+            m_orchestrator->m_inQueueCount--;
         }
         m_orchestrator = std::exchange(rhs.m_orchestrator, nullptr);
         return *this;
@@ -712,6 +914,78 @@ public:
     }
 };
 
+template <class F>
+class ActionIterator
+{
+    F* f;
+
+public:
+    using iterator_category = std::output_iterator_tag;
+    using value_type = void;
+    using pointer = void;
+    using reference = void;
+    using difference_type = std::ptrdiff_t;
+
+    explicit ActionIterator(F&& f) : f(&f) {}
+
+    explicit ActionIterator(F& f) : f(&f) {}
+
+    template <class T, std::enable_if_t<std::is_invocable_v<F, T>>* = nullptr>
+    ActionIterator& operator=(T&& t)
+    {
+        (*f)(std::forward<T>(t));
+        return *this;
+    }
+
+    ActionIterator& operator*()
+    {
+        return *this;
+    }
+
+    ActionIterator& operator++()
+    {
+        return *this;
+    }
+
+    ActionIterator operator++(int)
+    {
+        return *this;
+    }
+};
+
+template <class NodeRef, class F>
+class FilteredDFIteratorSet : public llvm::df_iterator_default_set<NodeRef>
+{
+    F m_f;
+
+    using BaseSet = llvm::df_iterator_default_set<NodeRef>;
+    using iterator = typename BaseSet::iterator;
+
+public:
+    explicit FilteredDFIteratorSet(F f) : m_f(std::move(f)) {}
+
+    std::pair<iterator, bool> insert(NodeRef N)
+    {
+        auto [iter, inserted] = BaseSet::insert(N);
+        if (!m_f(N))
+        {
+            return {iter, false};
+        }
+        return {iter, inserted};
+    }
+
+    template <typename IterT>
+    void insert(IterT Begin, IterT End)
+    {
+        BaseSet::insert(Begin, End);
+    }
+
+    void completed(NodeRef) {}
+};
+
+template <class F>
+FilteredDFIteratorSet(F) -> FilteredDFIteratorSet<typename llvm::function_traits<F>::template arg_t<0>, F>;
+
 /// Responsible for managing Orchestrators and their execution.
 class Scheduler
 {
@@ -719,29 +993,232 @@ class Scheduler
     llvm::DenseMap<mlir::Operation*, std::unique_ptr<TypeFlowInstance>> m_typeFlowInstances;
     llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>> m_orchestrators;
 
-    struct CallWaiting
-    {
-        ExecutionFrame frame;
-        OrchestratorRefCount orchestrator;
-        mlir::ValueRange resultValues;
-    };
-
-    llvm::DenseMap<Orchestrator*, std::vector<CallWaiting>> m_callDependents;
+    using Queue = std::queue<std::pair<ExecutionFrame, InQueueCount>>;
 
     std::unique_ptr<Orchestrator> createOrchestrator(mlir::FunctionOpInterface function,
                                                      mlir::AnalysisManager moduleManager)
     {
-        auto& typeFlowIR = moduleManager.getChildAnalysis<pylir::Py::TypeFlow>(function);
-        mlir::ModuleAnalysisManager typeFlowModuleAnalysis(typeFlowIR.getFunction(), nullptr);
-        mlir::AnalysisManager typeFlowAnalysisManager = typeFlowModuleAnalysis;
-        auto& instance =
-            m_typeFlowInstances
-                .insert({function, std::make_unique<TypeFlowInstance>(
-                                       typeFlowIR, std::move(typeFlowAnalysisManager.getAnalysis<pylir::LoopInfo>()),
-                                       std::move(typeFlowAnalysisManager.getAnalysis<mlir::DominanceInfo>()),
-                                       std::move(typeFlowAnalysisManager.getAnalysis<mlir::Liveness>()))})
-                .first->second;
-        return std::make_unique<Orchestrator>(*instance);
+        auto [iter, inserted] = m_typeFlowInstances.insert({function, nullptr});
+        if (inserted)
+        {
+            auto& typeFlowIR = moduleManager.getChildAnalysis<pylir::Py::TypeFlow>(function);
+            mlir::ModuleAnalysisManager typeFlowModuleAnalysis(typeFlowIR.getFunction(), nullptr);
+            mlir::AnalysisManager typeFlowAnalysisManager = typeFlowModuleAnalysis;
+            iter->second = std::make_unique<TypeFlowInstance>(
+                typeFlowIR, std::move(typeFlowAnalysisManager.getAnalysis<pylir::LoopInfo>()),
+                std::move(typeFlowAnalysisManager.getAnalysis<mlir::DominanceInfo>()),
+                std::move(typeFlowAnalysisManager.getAnalysis<mlir::Liveness>()));
+        }
+        return std::make_unique<Orchestrator>(*iter->second);
+    }
+
+    void handleRecursion(const llvm::SmallPtrSetImpl<Orchestrator*>& cycle, Queue& queue)
+    {
+        llvm::DenseMap<Orchestrator*, std::vector<CallWaiting>> containedOrchs;
+
+        for (auto* thisOrch : cycle)
+        {
+            for (const auto& predOrch : thisOrch->getWaitingCallers())
+            {
+                if (cycle.contains(predOrch.orchestrator))
+                {
+                    containedOrchs[thisOrch].push_back(predOrch);
+                    auto frames = predOrch.orchestrator->skipDominating(predOrch.frame.getNextExecutedOp().getBlock());
+                    for (auto& frame : frames)
+                    {
+                        queue.emplace(std::move(frame), predOrch.orchestrator);
+                    }
+                    break;
+                }
+            }
+        }
+        auto info = std::make_shared<RecursionInfo>(std::move(containedOrchs));
+        for (auto* orch : cycle)
+        {
+            orch->addRecursionInfo(info);
+        }
+    }
+
+    // A dynamic topological sort algorithm for directed acyclic graphs
+    // David J. Pearce, Paul H. J. Kelly
+    // Journal of Experimental Algorithmics (JEA) JEA Homepage archive
+    // Volume 11, 2006, Article No. 1.7
+    std::vector<Orchestrator*> m_indexToOrch;
+    llvm::DenseMap<Orchestrator*, std::size_t> m_orchToIndex;
+
+    std::size_t getIndex(Orchestrator* orch)
+    {
+        auto [iter, inserted] = m_orchToIndex.insert({orch, 0});
+        if (!inserted)
+        {
+            return iter->second;
+        }
+        m_indexToOrch.push_back(orch);
+        return iter->second = m_indexToOrch.size() - 1;
+    }
+
+    llvm::SmallPtrSet<Orchestrator*, 4> addEdge(Orchestrator* from, Orchestrator* to)
+    {
+        auto lb = getIndex(to);
+        auto ub = getIndex(from);
+        if (lb >= ub)
+        {
+            return {};
+        }
+
+        std::vector<std::size_t> rf;
+        std::vector<std::size_t> rb;
+        bool forward = true;
+        FilteredDFIteratorSet set([&forward, ub, lb, this](Orchestrator* orch)
+                                  { return forward ? getIndex(orch) <= ub : getIndex(orch) > lb; });
+        if (auto cycle = dfsForward(to, rf, ub, set); !cycle.empty())
+        {
+            return cycle;
+        }
+        forward = false;
+        dfsBackward(from, rb, set);
+
+        std::vector<Orchestrator*> reorder;
+
+        auto pushReorder = [&](std::vector<std::size_t>& vec)
+        {
+            std::sort(vec.begin(), vec.end());
+            std::transform(vec.begin(), vec.end(), std::back_inserter(reorder),
+                           [&](std::size_t iter) { return m_indexToOrch[iter]; });
+        };
+
+        pushReorder(rb);
+        pushReorder(rf);
+
+        std::merge(rb.begin(), rb.end(), rf.begin(), rf.end(),
+                   ActionIterator(
+                       [&, i = 0](std::size_t index) mutable
+                       {
+                           m_orchToIndex[reorder[i]] = index;
+                           m_indexToOrch[index] = reorder[i];
+                           i++;
+                       }));
+        return {};
+    }
+
+    template <class F>
+    llvm::SmallPtrSet<Orchestrator*, 4> dfsForward(Orchestrator* curr, std::vector<std::size_t>& r, std::size_t bound,
+                                                   FilteredDFIteratorSet<Orchestrator*, F>& set)
+    {
+        auto range = llvm::depth_first_ext(curr, set);
+        for (auto iter = range.begin(); iter != range.end(); iter++)
+        {
+            auto* orch = *iter;
+            if (getIndex(orch) == bound)
+            {
+                llvm::SmallPtrSet<Orchestrator*, 4> res;
+                llvm::transform(llvm::seq<std::size_t>(0, iter.getPathLength()), std::inserter(res, res.begin()),
+                                [&](std::size_t index) { return iter.getPath(index); });
+                return res;
+            }
+            r.push_back(getIndex(orch));
+        }
+        return {};
+    }
+
+    template <class F>
+    void dfsBackward(Orchestrator* curr, std::vector<std::size_t>& r, FilteredDFIteratorSet<Orchestrator*, F>& set)
+    {
+        for (auto* orch : llvm::inverse_depth_first_ext(curr, set))
+        {
+            r.push_back(getIndex(orch));
+        }
+    }
+
+    void scheduleWaitingCallsInRecursion(Queue& queue, RecursionInfo* info, Orchestrator* orch)
+    {
+        auto iter = llvm::remove_if(orch->getWaitingCallers(), [&](const CallWaiting& callWaiting)
+                                    { return info->containedOrchsToCycleCalls.count(callWaiting.orchestrator); });
+        std::for_each(iter, orch->getWaitingCallers().end(),
+                      [&](CallWaiting& iter)
+                      {
+                          for (auto [dest, value] : llvm::zip(iter.resultValues, orch->getReturnTypes()))
+                          {
+                              iter.frame.getValues()[dest] = value;
+                          }
+                          queue.emplace(std::move(iter.frame), iter.orchestrator);
+                          iter.orchestrator->removeActiveCaller(orch);
+                      });
+        orch->getWaitingCallers().erase(iter, orch->getWaitingCallers().end());
+    }
+
+    void checkLastInRecursion(Orchestrator* orch, Queue& queue)
+    {
+        for (const auto& info : llvm::reverse(orch->getRecursionInfos()))
+        {
+            if (info->phase != RecursionInfo::Phase::Expansion)
+            {
+                continue;
+            }
+
+            for (auto* iter : llvm::make_first_range(info->containedOrchsToCycleCalls))
+            {
+                if (iter->inQueue()
+                    || llvm::any_of(iter->getActiveCalls(), [&](Orchestrator* callee)
+                                    { return !info->containedOrchsToCycleCalls.count(callee); }))
+                {
+                    return;
+                }
+            }
+
+            // We try to find the most specific return type by all orchestrators. For that purpose we rank them
+            // by checking each pair of return types, how specific each is. One candidate may have less return types
+            // than the other in which case the remaining ones are not considered. If the new candidate had more
+            // more-specific return types than the existing best candidate, it becomes the new best candidate.
+            // It doesn't actually matter which we select for correctness, just for speed of convergence.
+            Orchestrator* bestCandidate = nullptr;
+            for (auto& iter : llvm::make_first_range(info->containedOrchsToCycleCalls))
+            {
+                if (!bestCandidate)
+                {
+                    bestCandidate = iter;
+                    continue;
+                }
+
+                std::ptrdiff_t sum = 0;
+                for (auto [cand, existing] : llvm::zip(iter->getReturnTypes(), bestCandidate->getReturnTypes()))
+                {
+                    if (!cand)
+                    {
+                        if (existing)
+                        {
+                            sum += 1;
+                        }
+                        continue;
+                    }
+                    if (!existing)
+                    {
+                        sum -= 1;
+                        continue;
+                    }
+                    if (pylir::Py::isMoreSpecific(cand, existing))
+                    {
+                        sum += 1;
+                    }
+                    else if (pylir::Py::isMoreSpecific(existing, cand))
+                    {
+                        sum -= 1;
+                    }
+                }
+                if (sum <= 0)
+                {
+                    continue;
+                }
+                bestCandidate = iter;
+            }
+            PYLIR_ASSERT(bestCandidate);
+
+            info->phase = RecursionInfo::Phase::Breaking;
+            info->broken = bestCandidate;
+            info->seen.insert({bestCandidate->getReturnTypes().begin(), bestCandidate->getReturnTypes().end()});
+            scheduleWaitingCallsInRecursion(queue, info.get(), bestCandidate);
+            return;
+        }
     }
 
 public:
@@ -751,7 +1228,7 @@ public:
     /// arguments.
     void run(llvm::ArrayRef<mlir::FunctionOpInterface> roots, mlir::AnalysisManager moduleManager)
     {
-        std::queue<std::pair<ExecutionFrame, OrchestratorRefCount>> queue;
+        Queue queue;
 
         (void)m_threadPool;
         for (auto iter : roots)
@@ -775,7 +1252,7 @@ public:
                     // Successor blocks and this execution round was definitely not the last one from the orchestrator.
                     for (auto& iter : *vec)
                     {
-                        queue.emplace(std::move(iter), std::move(front.second));
+                        queue.emplace(std::move(iter), front.second);
                     }
                     continue;
                 }
@@ -788,59 +1265,136 @@ public:
                     continue;
                 }
 
-                auto res = m_callDependents.find(orch);
-                if (res == m_callDependents.end())
+                if (orch->inCalls())
                 {
+                    // Not part of a recursion, actually just waiting for some calls to finish.
+                    if (orch->inRecursions())
+                    {
+                        checkLastInRecursion(orch, queue);
+                    }
                     continue;
                 }
 
-                for (auto& iter : res->second)
+                // Truly finished case.
+                // If not part of a recursion just schedule all waiting calls.
+                if (!orch->inRecursions())
                 {
-                    for (auto [dest, value] : llvm::zip(iter.resultValues, orch->getReturnTypes()))
+                    for (auto& iter : std::move(*orch).getWaitingCallers())
                     {
-                        iter.frame.getValues()[dest] = value;
+                        for (auto [dest, value] : llvm::zip(iter.resultValues, orch->getReturnTypes()))
+                        {
+                            iter.frame.getValues()[dest] = value;
+                        }
+                        queue.emplace(std::move(iter.frame), iter.orchestrator);
                     }
-                    queue.emplace(std::move(iter.frame), std::move(iter.orchestrator));
+                    orch->retire();
+                    continue;
                 }
 
+                const auto& info = orch->getRecursionInfos().back();
+                if (info->broken != orch)
+                {
+                    scheduleWaitingCallsInRecursion(queue, info.get(), orch);
+                    continue;
+                }
+
+                // The return type has not changed and the recursion was properly resolved. Time to retire the whole
+                // recursion.
+                if (!info->seen.insert({orch->getReturnTypes().begin(), orch->getReturnTypes().end()}).second)
+                {
+                    auto infoKeepAlive = info;
+                    for (auto* retiringOrch : llvm::make_first_range(infoKeepAlive->containedOrchsToCycleCalls))
+                    {
+                        if (retiringOrch->getRecursionInfos().back() != infoKeepAlive)
+                        {
+                            continue;
+                        }
+                        for (auto& iter : std::move(*retiringOrch).getWaitingCallers())
+                        {
+                            for (auto [dest, value] : llvm::zip(iter.resultValues, retiringOrch->getReturnTypes()))
+                            {
+                                iter.frame.getValues()[dest] = value;
+                            }
+                            queue.emplace(std::move(iter.frame), iter.orchestrator);
+                        }
+                        retiringOrch->retire();
+                    }
+                    continue;
+                }
+
+                // TODO: trigger recalc
+                [] {}();
                 continue;
             }
             auto& call = pylir::get<FunctionCall>(result);
-            // Easy case of first time calling a function and no recursion
             auto [existing, inserted] = m_orchestrators.insert({std::move(call.functionSpecialization), nullptr});
             if (inserted)
             {
                 existing->second = createOrchestrator(existing->first.getFunction(), moduleManager);
-                llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> entryValues;
-                for (auto [arg, value] :
-                     llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.getArgTypes()))
+            }
+            else if (existing->second->finishedExecution())
+            {
+                // This orchestrator has already finished execution and there is no need to wait.
+                for (auto [dest, value] : llvm::zip(call.resultValues, existing->second->getReturnTypes()))
                 {
-                    if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
-                    {
-                        entryValues[arg] = ref;
-                    }
-                    else
-                    {
-                        entryValues[arg] = value.get<pylir::Py::ObjectTypeInterface>();
-                    }
+                    front.first.getValues()[dest] = value;
                 }
-                // No need to wait for the call if it has no results for us.
-                if (call.resultValues.empty())
+                queue.emplace(std::move(front));
+                continue;
+            }
+
+            auto* orch = front.second.get();
+            if (!call.resultValues.empty())
+            {
+                existing->second->addWaitingCall(std::move(front.first), orch, call.resultValues);
+                if (orch != existing->second.get())
                 {
-                    queue.push(std::move(front));
+                    if (auto cycle = addEdge(orch, existing->second.get()); !cycle.empty())
+                    {
+                        handleRecursion(cycle, queue);
+                    }
                 }
                 else
                 {
-                    m_callDependents[existing->second.get()].push_back(
-                        {std::move(front.first), std::move(front.second), call.resultValues});
+                    handleRecursion(llvm::SmallPtrSet<Orchestrator*, 1>{orch}, queue);
                 }
-                queue.emplace(ExecutionFrame(&existing->second->getEntryBlock()->front(), std::move(entryValues)),
-                              existing->second.get());
+            }
+            else
+            {
+                // No need to wait for the call if it has no results for us.
+                queue.emplace(std::move(front.first), front.second);
+            }
 
+            // This is not the first call to that function, it has not yet finished execution, and we have already
+            // registered ourselves as dependent. There is nothing more to do but wait for its.
+            if (!inserted)
+            {
+                // If this isn't the last queue item, or we are not part of a recursion there is nothing to do but wait
+                // for the calls to finish.
+                if (front.second.release() != 0 || !orch->inRecursions())
+                {
+                    continue;
+                }
+
+                checkLastInRecursion(orch, queue);
                 continue;
             }
-            // TODO: Recursion/not yet ready case
-            [] {}();
+
+            llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> entryValues;
+            for (auto [arg, value] :
+                 llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.getArgTypes()))
+            {
+                if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                {
+                    entryValues[arg] = ref;
+                }
+                else
+                {
+                    entryValues[arg] = value.get<pylir::Py::ObjectTypeInterface>();
+                }
+            }
+            queue.emplace(ExecutionFrame(&existing->second->getEntryBlock()->front(), std::move(entryValues)),
+                          existing->second.get());
         }
     }
 
@@ -976,14 +1530,12 @@ void Monomorph::runOnOperation()
             auto cloneValue = clone.mapping.lookupOrDefault(instrValue);
             mlir::OpBuilder builder = [=]
             {
-                if (auto op = cloneValue.getDefiningOp())
+                if (auto* op = cloneValue.getDefiningOp())
                 {
                     return mlir::OpBuilder(op);
                 }
-                else
-                {
-                    return mlir::OpBuilder::atBlockBegin(cloneValue.cast<mlir::BlockArgument>().getParentBlock());
-                }
+
+                return mlir::OpBuilder::atBlockBegin(cloneValue.cast<mlir::BlockArgument>().getParentBlock());
             }();
             mlir::Dialect* dialect;
             if (cloneValue.isa<mlir::BlockArgument>())
