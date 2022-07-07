@@ -838,7 +838,7 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
         Py::Builtins::Float.name, Py::Builtins::Int.name,   Py::Builtins::Bool.name,
         Py::Builtins::Str.name,   Py::Builtins::Tuple.name,
     };
-    if (!getConstant() && immutableTypes.contains(getInitializer()->getTypeObject().getValue()))
+    if (!getConstant() && getInitializer() && immutableTypes.contains(getInitializer()->getTypeObject().getValue()))
     {
         setConstantAttr(mlir::UnitAttr::get(getContext()));
         return mlir::success();

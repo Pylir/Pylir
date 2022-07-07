@@ -564,6 +564,12 @@ public:
         orch->m_activeCalls.insert(this);
     }
 
+    void addWaitingCall(const CallWaiting& callWaiting)
+    {
+        m_waitingCallers.push_back(callWaiting);
+        callWaiting.orchestrator->m_activeCalls.insert(this);
+    }
+
     std::vector<CallWaiting>& getWaitingCallers()
     {
         return m_waitingCallers;
@@ -592,6 +598,11 @@ public:
     llvm::ArrayRef<pylir::Py::ObjectTypeInterface> getReturnTypes() const
     {
         return m_returnTypes;
+    }
+
+    bool hasPreliminaryReturnTypes() const
+    {
+        return !m_recursionInfos.empty() && m_recursionInfos.back()->broken == this;
     }
 
     [[nodiscard]] const llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion>& getValues() const
@@ -1325,8 +1336,14 @@ public:
                     continue;
                 }
 
-                // TODO: trigger recalc
-                [] {}();
+                for (auto& [cycleOrch, calls] : info->containedOrchsToCycleCalls)
+                {
+                    for (auto& call : calls)
+                    {
+                        cycleOrch->addWaitingCall(call);
+                    }
+                }
+                scheduleWaitingCallsInRecursion(queue, info.get(), info->broken);
                 continue;
             }
             auto& call = pylir::get<FunctionCall>(result);

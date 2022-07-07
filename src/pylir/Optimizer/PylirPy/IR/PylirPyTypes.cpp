@@ -32,6 +32,10 @@ pylir::Py::ObjectTypeInterface pylir::Py::joinTypes(pylir::Py::ObjectTypeInterfa
     {
         return lhs;
     }
+    if (!lhs || !rhs)
+    {
+        return {};
+    }
     if (lhs.isa<pylir::Py::UnboundType>())
     {
         return rhs;
@@ -39,10 +43,6 @@ pylir::Py::ObjectTypeInterface pylir::Py::joinTypes(pylir::Py::ObjectTypeInterfa
     if (rhs.isa<pylir::Py::UnboundType>())
     {
         return lhs;
-    }
-    if (!lhs || !rhs)
-    {
-        return {};
     }
     llvm::SmallSetVector<mlir::Type, 4> elementTypes;
     if (auto variant = lhs.dyn_cast<Py::VariantType>())
