@@ -1267,7 +1267,7 @@ public:
 
                 if (orch->inCalls())
                 {
-                    // Not part of a recursion, actually just waiting for some calls to finish.
+                    // May not be queued up anymore but there are still calls we are waiting for.
                     if (orch->inRecursions())
                     {
                         checkLastInRecursion(orch, queue);
@@ -1291,6 +1291,8 @@ public:
                     continue;
                 }
 
+                // Otherwise we schedule all the other calls part of the recursive cycle until we processed the whole
+                // cycle.
                 const auto& info = orch->getRecursionInfos().back();
                 if (info->broken != orch)
                 {
@@ -1302,13 +1304,14 @@ public:
                 // recursion.
                 if (!info->seen.insert({orch->getReturnTypes().begin(), orch->getReturnTypes().end()}).second)
                 {
-                    auto infoKeepAlive = info;
+                    std::shared_ptr<RecursionInfo> infoKeepAlive = info;
                     for (auto* retiringOrch : llvm::make_first_range(infoKeepAlive->containedOrchsToCycleCalls))
                     {
                         if (retiringOrch->getRecursionInfos().back() != infoKeepAlive)
                         {
                             continue;
                         }
+
                         for (auto& iter : std::move(*retiringOrch).getWaitingCallers())
                         {
                             for (auto [dest, value] : llvm::zip(iter.resultValues, retiringOrch->getReturnTypes()))
@@ -1366,7 +1369,7 @@ public:
             }
 
             // This is not the first call to that function, it has not yet finished execution, and we have already
-            // registered ourselves as dependent. There is nothing more to do but wait for its.
+            // registered ourselves as dependent. There is nothing more to do but wait for its completion.
             if (!inserted)
             {
                 // If this isn't the last queue item, or we are not part of a recursion there is nothing to do but wait
@@ -1380,6 +1383,7 @@ public:
                 continue;
             }
 
+            // First call, set up the function arguments.
             llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> entryValues;
             for (auto [arg, value] :
                  llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.getArgTypes()))
