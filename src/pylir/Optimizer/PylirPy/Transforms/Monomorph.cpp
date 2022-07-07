@@ -1352,7 +1352,7 @@ public:
             {
                 existing->second = createOrchestrator(existing->first.getFunction(), moduleManager);
             }
-            else if (existing->second->finishedExecution())
+            else if (existing->second->finishedExecution() || existing->second->hasPreliminaryReturnTypes())
             {
                 // This orchestrator has already finished execution and there is no need to wait.
                 for (auto [dest, value] : llvm::zip(call.resultValues, existing->second->getReturnTypes()))
