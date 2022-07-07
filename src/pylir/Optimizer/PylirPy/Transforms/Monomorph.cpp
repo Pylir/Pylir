@@ -23,7 +23,6 @@
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
 
-#include <mutex>
 #include <queue>
 #include <unordered_map>
 #include <utility>
@@ -417,10 +416,9 @@ class Orchestrator
     mlir::DominanceInfo& m_dominanceInfo;
     mlir::Liveness& m_liveness;
 
-    std::mutex m_orchestratorLock;
-    std::vector<pylir::Py::ObjectTypeInterface> m_returnTypes;      // protected by m_orchestratorLock
-    llvm::DenseMap<mlir::Block*, bool> m_finishedBlocks;            // protected by m_orchestratorLock
-    llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> m_values; // protected by m_orchestratorLock
+    std::vector<pylir::Py::ObjectTypeInterface> m_returnTypes;
+    llvm::DenseMap<mlir::Block*, bool> m_finishedBlocks;
+    llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> m_values;
 
     struct Loop
     {
@@ -429,9 +427,8 @@ class Orchestrator
 
         Loop() : exitBlocks({}) {}
     };
-    llvm::DenseMap<pylir::Loop*, Loop> m_loops; // protected by m_orchestratorLock
-    std::mutex m_callSiteLock;
-    llvm::DenseMap<mlir::Operation*, FunctionSpecialization> m_callSites; // protected by m_callSiteLock
+    llvm::DenseMap<pylir::Loop*, Loop> m_loops;
+    llvm::DenseMap<mlir::Operation*, FunctionSpecialization> m_callSites;
 
     std::size_t m_inQueueCount = 0;
     std::vector<CallWaiting> m_waitingCallers;
@@ -642,7 +639,6 @@ public:
         auto result = executionFrame.execute(symbolTableCollection);
         if (auto* call = std::get_if<FunctionCall>(&result))
         {
-            std::scoped_lock lock(m_callSiteLock);
             auto [existing, inserted] = m_callSites.insert({call->callOp, call->functionSpecialization});
             if (!inserted && existing->second != call->functionSpecialization)
             {
@@ -652,7 +648,6 @@ public:
         }
 
         // Save this blocks result first of all.
-        std::scoped_lock lock(m_orchestratorLock);
         m_finishedBlocks[block] = true;
         {
             auto& newValues = executionFrame.getValues();
