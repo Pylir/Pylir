@@ -128,7 +128,7 @@ struct FunctionCall
 
 struct SuccessorBlocks
 {
-    mlir::SuccessorRange successors{};
+    llvm::SmallVector<mlir::Block*, 2> successors{};
     mlir::Block* skippedBlock = nullptr;
 };
 
@@ -234,7 +234,7 @@ public:
                             if (auto boolean = cond.dyn_cast_or_null<mlir::BoolAttr>())
                             {
                                 return SuccessorBlocks{
-                                    boolean.getValue() ? condBranchOp.getTrueSucc() : condBranchOp.getFalseSucc(),
+                                    {boolean.getValue() ? condBranchOp.getTrueSucc() : condBranchOp.getFalseSucc()},
                                     boolean.getValue() ? condBranchOp.getFalseSucc() : condBranchOp.getTrueSucc(),
                                 };
                             }
@@ -657,7 +657,9 @@ public:
         auto& successorBlocks = pylir::get<SuccessorBlocks>(result);
         if (successorBlocks.skippedBlock)
         {
-            frames = skipDominating(successorBlocks.skippedBlock);
+            llvm::SmallPtrSet<mlir::Block*, 2> set(successorBlocks.successors.begin(),
+                                                   successorBlocks.successors.end());
+            frames = skipDominating(successorBlocks.skippedBlock, set);
         }
 
         auto* loop = m_loopInfo.getLoopFor(block);
@@ -686,7 +688,9 @@ public:
         return frames;
     }
 
-    std::vector<ExecutionFrame> skipDominating(mlir::Block* root)
+    std::vector<ExecutionFrame> skipDominating(
+        mlir::Block* root,
+        const llvm::SmallPtrSetImpl<mlir::Block*>& alreadyBeingScheduled = llvm::SmallPtrSet<mlir::Block*, 1>{})
     {
         if (root->getParent()->hasOneBlock())
         {
@@ -713,7 +717,7 @@ public:
                 llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successors;
                 for (auto* succ : iter->getBlock()->getSuccessors())
                 {
-                    if (m_finishedBlocks.count(succ))
+                    if (m_finishedBlocks.count(succ) || alreadyBeingScheduled.contains(succ))
                     {
                         continue;
                     }
@@ -1423,9 +1427,9 @@ public:
                 {
                     entryValues[arg] = ref;
                 }
-                else
+                else if (auto type = value.dyn_cast<pylir::Py::ObjectTypeInterface>())
                 {
-                    entryValues[arg] = value.get<pylir::Py::ObjectTypeInterface>();
+                    entryValues[arg] = type;
                 }
             }
             queue.emplace(ExecutionFrame(&existing->second->getEntryBlock()->front(), std::move(entryValues)),
