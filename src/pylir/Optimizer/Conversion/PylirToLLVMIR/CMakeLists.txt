@@ -15,7 +15,7 @@ add_mlir_conversion_library(PylirToLLVMIR
 
         LINK_LIBS PUBLIC
         PylirMemDialect
-        MLIRLLVMIR
+        MLIRLLVMDialect
         MLIRPass
         MLIRTransforms
         MLIRFuncToLLVM

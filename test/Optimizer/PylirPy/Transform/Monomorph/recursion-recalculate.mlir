@@ -5,7 +5,7 @@ py.globalValue @builtins.int = #py.type
 
 py.globalValue "private" @test
 
-func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = test.random
 	cf.cond_br %0, ^call, ^exit(%arg0 : !py.dynamic)
 
@@ -22,7 +22,7 @@ func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 	return %7 : !py.dynamic
 }
 
-func @__init__() -> !py.dynamic {
+func.func @__init__() -> !py.dynamic {
 	%1 = py.constant(#py.int<0>)
 	%2 = py.call @foo(%1) : (!py.dynamic) -> !py.dynamic
 	%3 = py.typeOf %2

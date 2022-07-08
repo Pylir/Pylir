@@ -54,7 +54,7 @@ def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
     	return Base::get(typeObject.getContext(), typeObject, elements);
 	}]>, TypeBuilder<(ins CArg<"::mlir::FlatSymbolRefAttr", "{}">:$typeObject,
 						  CArg<"::llvm::ArrayRef<::pylir::Py::ObjectTypeInterface>", "{}">:$elements), [{
-		typeObject = typeObject ? typeObject : }] # !subst("$_ctx", "$_ctxt", DefaultType<"Tuple">.defaultValue) # [{;
+		typeObject = typeObject ? typeObject : }] # DefaultType<"Tuple">.defaultValue # [{;
 		return get(typeObject, elements);
 	}]>];
 

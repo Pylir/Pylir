@@ -1,19 +1,19 @@
 // RUN: pylir-opt %s --pylir-trial-inliner='min-callee-size-reduction=0' --split-input-file | FileCheck %s
 
-func private @complex(i32) -> i32
+func.func private @complex(i32) -> i32
 
-func @bar() -> i32 {
+func.func @bar() -> i32 {
 	%0 = arith.constant 6 : i32
 	%1 = call @complex(%0) : (i32) -> i32
 	return %1 : i32
 }
 
-func @foo() -> i1 {
+func.func @foo() -> i1 {
 	%0 = arith.constant true
 	return %0 : i1
 }
 
-func @test() -> i32 {
+func.func @test() -> i32 {
     %0 = call @foo() : () -> i1
     cf.cond_br %0, ^bb0, ^bb1
 

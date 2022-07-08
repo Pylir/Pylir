@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s --test-alias-set-tracker --split-input-file | FileCheck %s
 
-func @basic(%x : !py.dynamic, %y : !py.dynamic, %i : index) {
+func.func @basic(%x : !py.dynamic, %y : !py.dynamic, %i : index) {
 	%l1 = py.makeList ()
 	%l2 = py.makeList ()
 	%b = test.random

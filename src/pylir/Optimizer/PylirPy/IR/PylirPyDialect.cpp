@@ -44,14 +44,10 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
     }
 
     void handleTerminator(mlir::Operation*, mlir::Block*) const override
-    {
-        return;
-    }
+    {}
 
     void handleTerminator(mlir::Operation*, llvm::ArrayRef<mlir::Value>) const override
-    {
-        return;
-    }
+    {}
 
     void processInlinedCallBlocks(mlir::Operation* call,
                                   llvm::iterator_range<mlir::Region::iterator> inlinedBlocks) const override

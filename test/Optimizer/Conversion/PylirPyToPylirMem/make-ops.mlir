@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     return %0 : !py.dynamic
 }
@@ -21,7 +21,7 @@ func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.list = #py.type
 
-func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeList (%arg0)
     return %0 : !py.dynamic
 }
@@ -38,7 +38,7 @@ func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.set = #py.type
 
-func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeSet (%arg0)
     return %0 : !py.dynamic
 }
@@ -55,7 +55,7 @@ func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.dict = #py.type
 
-func @make_dict(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+func.func @make_dict(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeDict (%arg0 : %arg1)
     return %0 : !py.dynamic
 }
@@ -75,9 +75,9 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.function = #py.type
 
-func private @test(!py.dynamic,!py.dynamic,!py.dynamic) -> !py.dynamic
+func.func private @test(!py.dynamic,!py.dynamic,!py.dynamic) -> !py.dynamic
 
-func @make_function() -> !py.dynamic {
+func.func @make_function() -> !py.dynamic {
     %0 = py.makeFunc @test
     return %0 : !py.dynamic
 }
@@ -90,7 +90,7 @@ func @make_function() -> !py.dynamic {
 
 // -----
 
-func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeObject %arg0
     return %0 : !py.dynamic
 }
@@ -106,7 +106,7 @@ func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.list.toTuple %arg0
     return %0 : !py.dynamic
 }
@@ -124,7 +124,7 @@ func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.bool = #py.type
 
-func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
+func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
     %0 = py.bool.fromI1 %arg0
     return %0 : !py.dynamic
 }
@@ -141,7 +141,7 @@ func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_int_fromInteger(%arg0 : i32) -> !py.dynamic {
+func.func @make_int_fromInteger(%arg0 : i32) -> !py.dynamic {
     %0 = py.int.fromInteger %arg0 : i32
     return %0 : !py.dynamic
 }
@@ -160,7 +160,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.int.toStr %arg0
     return %0 : !py.dynamic
 }
@@ -177,7 +177,7 @@ func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+func.func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.int.add %arg0, %arg1
     return %0 : !py.dynamic
 }

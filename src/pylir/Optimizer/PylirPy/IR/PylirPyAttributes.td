@@ -16,7 +16,7 @@ include "mlir/IR/SubElementInterfaces.td"
 class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
     AttrDef<PylirPy_Dialect, name, traits, baseCppClass>;
 
-defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr", "::mlir::DictionaryAttr::get($_ctx, {})">;
+defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr", "::mlir::DictionaryAttr::get($_ctxt, {})">;
 
 class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = [], string extraBuilderCode = "">
 	: PylirPy_Attr<name, traits> {
@@ -173,9 +173,9 @@ def PylirPy_DictAttr : TypeObjectSlotsAttr<"Dict",
 
 def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	[ParamSpec<AttrParameter<"mlir::FlatSymbolRefAttr", "">, "value">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::StrAttr::get($_ctx, \"\")">, "qualName">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctx, pylir::Py::Builtins::None.name)">, "defaults">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctx, pylir::Py::Builtins::None.name)">, "kwDefaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::StrAttr::get($_ctxt, \"\")">, "qualName">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Py::Builtins::None.name)">, "defaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Py::Builtins::None.name)">, "kwDefaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
 	 ], [DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>,
 	     DeclareAttrInterfaceMethods<ObjectAttrInterface>]>
@@ -187,7 +187,7 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 }
 
 def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
-	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctx, {})">, "mroTuple">]> {
+	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctxt, {})">, "mroTuple">]> {
 	let mnemonic = "type";
 	let summary = "python type";
 

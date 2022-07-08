@@ -2,7 +2,7 @@
 
 py.globalValue @builtins.tuple = #py.tuple<()>
 
-func @constants() -> !py.dynamic {
+func.func @constants() -> !py.dynamic {
     %0 = py.constant(#py.tuple<()>)
     return %0 : !py.dynamic
 }

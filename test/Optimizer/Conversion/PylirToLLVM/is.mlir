@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @is(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @is(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.is %lhs, %rhs
     return %0 : i1
 }

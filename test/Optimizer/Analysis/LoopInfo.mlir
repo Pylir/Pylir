@@ -6,7 +6,7 @@ py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.int = #py.type
 
-func @__init__() {
+func.func @__init__() {
 	%one = py.constant(#py.int<1>)
 	%zero = py.constant(#py.int<0>)
 	cf.br ^loop(%zero : !py.dynamic)
@@ -34,7 +34,7 @@ func @__init__() {
 
 // -----
 
-func @__init__() {
+func.func @__init__() {
 	cf.br ^headerOne
 
 ^headerOne:
@@ -63,7 +63,7 @@ func @__init__() {
 
 // -----
 
-func @__init__() {
+func.func @__init__() {
 	cf.br ^headerOne
 
 ^headerOne:

@@ -5,7 +5,7 @@ py.globalValue @builtins.str = #py.type
 
 py.globalHandle @foo
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     py.store %0 into @foo
     %1 = py.load @foo
@@ -24,7 +24,7 @@ py.globalValue @builtins.str = #py.type
 
 py.globalHandle @foo
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     %1 = py.constant(#py.str<"value">)
     py.store %0 into @foo
@@ -44,11 +44,11 @@ func @test() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func private @clobber()
+func.func private @clobber()
 
 py.globalHandle @foo
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     py.store %0 into @foo
     call @clobber() : () -> ()
@@ -70,7 +70,7 @@ py.globalValue @builtins.str = #py.type
 
 py.globalHandle @foo
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = test.random
     cf.cond_br %0, ^bb0, ^bb1
 
@@ -115,9 +115,9 @@ py.globalValue @builtins.str = #py.type
 
 py.globalHandle @foo
 
-func private @clobber()
+func.func private @clobber()
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = test.random
     cf.cond_br %0, ^bb0, ^bb1
 

@@ -3,13 +3,13 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @aType = #py.type
 
-func @createObject(%typeObject : !py.dynamic) -> !py.dynamic {
+func.func @createObject(%typeObject : !py.dynamic) -> !py.dynamic {
 	%0 = py.makeObject %typeObject
 	test.use(%0) : !py.dynamic // a kind of side effect
 	return %0 : !py.dynamic
 }
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
 	%0 = py.constant(@aType)
 	%1 = py.call @createObject(%0) : (!py.dynamic) -> !py.dynamic
 	%2 = py.typeOf %1

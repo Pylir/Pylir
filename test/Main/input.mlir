@@ -7,7 +7,7 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.function = #py.type
 py.globalValue @builtins.dict = #py.type
 
-func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.typeOf %arg0
     %1 = py.typeOf %0
     %2 = py.getSlot "__slots__" from %0 : %1

@@ -5,7 +5,7 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func @foo() -> !py.dynamic {
+func.func @foo() -> !py.dynamic {
     %0 = py.constant(@builtins.dict)
     %1 = pyMem.gcAllocObject %0
     %2 = pyMem.initDict %1
@@ -19,6 +19,7 @@ func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][%[[ZERO]], 0]
 // CHECK-NEXT: llvm.store %[[DICT]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[MEMORY]]

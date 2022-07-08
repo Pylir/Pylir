@@ -23,6 +23,8 @@ def TypeFlow_Dialect : Dialect {
     let cppNamespace = "::pylir::TypeFlow";
 
     let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
+    let useDefaultAttributePrinterParser = 1;
+    let useDefaultTypePrinterParser = 1;
 }
 
 class TypeFlow_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type">

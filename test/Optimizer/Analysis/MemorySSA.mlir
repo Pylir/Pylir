@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test() -> index {
+func.func @test() -> index {
     %0 = py.constant(#py.str<"test">)
     %1 = py.makeList ()
     py.list.append %1, %0
@@ -20,7 +20,7 @@ func @test() -> index {
 // CHECK-NEXT: use(%[[APPEND]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
-func @test2(%arg0 : i1) -> index {
+func.func @test2(%arg0 : i1) -> index {
     %0 = py.constant(#py.str<"test">)
     %1 = py.makeList ()
     cf.cond_br %arg0, ^bb1, ^bb2
@@ -48,7 +48,7 @@ func @test2(%arg0 : i1) -> index {
 // CHECK-NEXT: use(%[[MERGE]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
-func @test3() -> index {
+func.func @test3() -> index {
     %0 = py.constant(#py.str<"test">)
     %1 = py.makeList ()
     cf.br ^condition
@@ -87,9 +87,9 @@ func @test3() -> index {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func private @bar()
+func.func private @bar()
 
-func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     %1 = py.typeOf %arg0
     py.setSlot "test" of %arg0 : %1 to %0

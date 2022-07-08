@@ -4,7 +4,7 @@ py.globalValue @builtins.tuple = #py.tuple<()>
 
 py.globalHandle @handle
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.tuple<()>)
     py.store %0 into @handle
     %1 = py.load @handle

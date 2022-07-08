@@ -5,4 +5,4 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_library(CodeGen CodeGen.cpp CodeGen.hpp BuiltinsImpl.cpp)
-target_link_libraries(CodeGen PUBLIC PylirPyDialect Parser PRIVATE PylirPyUtil PRIVATE PylirTransformsUtils MLIRFunc)
+target_link_libraries(CodeGen PUBLIC PylirPyDialect Parser PRIVATE PylirPyUtil PRIVATE PylirTransformsUtils MLIRFuncDialect)

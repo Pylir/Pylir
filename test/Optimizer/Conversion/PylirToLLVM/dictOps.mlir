@@ -5,7 +5,7 @@ py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
 
-func @lookup(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @lookup(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"key">)
     %1, %2 = py.dict.tryGetItem %arg0[%0]
     return %1 : !py.dynamic
@@ -26,7 +26,7 @@ py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
 
-func @insert(%arg0 : !py.dynamic, %value : !py.dynamic) {
+func.func @insert(%arg0 : !py.dynamic, %value : !py.dynamic) {
     %0 = py.constant(#py.str<"key">)
     py.dict.setItem %arg0[%0] to %value
     return

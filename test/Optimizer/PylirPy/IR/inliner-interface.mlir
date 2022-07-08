@@ -3,9 +3,9 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
-func private @create_exception() -> !py.dynamic
+func.func private @create_exception() -> !py.dynamic
 
-func @inline_foo(%arg0 : i1) -> !py.dynamic {
+func.func @inline_foo(%arg0 : i1) -> !py.dynamic {
 	%0 = py.call @create_exception() : () -> !py.dynamic
 	cf.cond_br %arg0, ^throw, ^normal_return
 
@@ -16,7 +16,7 @@ func @inline_foo(%arg0 : i1) -> !py.dynamic {
 	return %0 : !py.dynamic
 }
 
-func @__init__() -> !py.dynamic {
+func.func @__init__() -> !py.dynamic {
 	%0 = test.random
 	%1 = py.call @inline_foo(%0) : (i1) -> !py.dynamic
 	test.use(%1) : !py.dynamic

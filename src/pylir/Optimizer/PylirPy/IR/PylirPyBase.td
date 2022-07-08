@@ -7,7 +7,7 @@
 #ifndef PYLIR_PY_BASE_TABLEGEN
 #define PYLIR_PY_BASE_TABLEGEN
 
-include "mlir/IR/OpBase.td"
+include "mlir/IR/DialectBase.td"
 
 def PylirPy_Dialect : Dialect {
     let name = "py";
@@ -21,6 +21,8 @@ def PylirPy_Dialect : Dialect {
 
     let hasConstantMaterializer = 1;
     let hasCanonicalizer = 1;
+    let useDefaultAttributePrinterParser = 1;
+    let useDefaultTypePrinterParser = 1;
 
     let hasOperationAttrVerify = 1;
 

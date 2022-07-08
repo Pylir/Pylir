@@ -4,7 +4,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
-func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant(#py.int<3>)
     %2 = py.makeTupleEx (*%0, %1)
@@ -28,7 +28,7 @@ func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant(#py.int<3>)
     %2 = py.makeTupleEx (*%0, %1)
@@ -52,7 +52,7 @@ func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant(#py.int<3>)
     %2 = py.makeListEx (*%0, %1)
@@ -76,7 +76,7 @@ func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant(#py.int<3>)
     %2 = py.makeListEx (*%0, %1)
@@ -100,7 +100,7 @@ func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant(#py.int<3>)
     %2 = py.makeSetEx (*%0, %1)
@@ -124,7 +124,7 @@ func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0)
     %1 = py.constant(#py.int<3>)
     %2 = py.makeSetEx (*%0, %1)
@@ -148,7 +148,7 @@ func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.constant(#py.int<3>)
     %2 = py.makeDictEx (%1 : %arg0)
         label ^happy unwind ^failure
@@ -171,7 +171,7 @@ func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.constant(#py.int<3>)
     %2 = py.makeDictEx (%1 : %arg0)
         label ^happy unwind ^failure

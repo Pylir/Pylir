@@ -41,34 +41,19 @@ protected:
 
 using TypeFlowArgValue = llvm::PointerUnion<mlir::SymbolRefAttr, pylir::Py::ObjectTypeInterface>;
 
-class FunctionSpecialization
+struct FunctionSpecialization
 {
-    mlir::Operation* m_function;
-    std::vector<TypeFlowArgValue> m_argTypes;
+    mlir::FunctionOpInterface function;
+    std::vector<TypeFlowArgValue> argTypes;
 
-    friend struct llvm::DenseMapInfo<FunctionSpecialization>;
-
-    FunctionSpecialization(mlir::Operation* function) : m_function(function) {}
-
-public:
     FunctionSpecialization(mlir::FunctionOpInterface function, std::vector<TypeFlowArgValue> argTypes)
-        : m_function(function), m_argTypes(std::move(argTypes))
+        : function(function), argTypes(std::move(argTypes))
     {
-    }
-
-    [[nodiscard]] mlir::FunctionOpInterface getFunction() const
-    {
-        return m_function;
-    }
-
-    llvm::ArrayRef<TypeFlowArgValue> getArgTypes() const
-    {
-        return m_argTypes;
     }
 
     bool operator==(const FunctionSpecialization& rhs) const
     {
-        return std::tie(m_function, m_argTypes) == std::tie(rhs.m_function, rhs.m_argTypes);
+        return std::tie(function, argTypes) == std::tie(rhs.function, rhs.argTypes);
     }
 
     bool operator!=(const FunctionSpecialization& rhs) const
@@ -84,21 +69,20 @@ struct llvm::DenseMapInfo<FunctionSpecialization>
 {
     static inline FunctionSpecialization getEmptyKey()
     {
-        return {llvm::DenseMapInfo<mlir::Operation*>::getEmptyKey()};
+        return {llvm::DenseMapInfo<mlir::FunctionOpInterface>::getEmptyKey(), {}};
     }
 
     static inline FunctionSpecialization getTombstoneKey()
     {
-        return {llvm::DenseMapInfo<mlir::Operation*>::getTombstoneKey()};
+        return {llvm::DenseMapInfo<mlir::FunctionOpInterface>::getTombstoneKey(), {}};
     }
 
     static inline unsigned getHashValue(const FunctionSpecialization& value)
     {
         auto f = [](TypeFlowArgValue unionVal) { return (std::uintptr_t)unionVal.getOpaqueValue(); };
-        auto argTypes = value.getArgTypes();
-        return llvm::hash_combine(&*value.getFunction(),
-                                  llvm::hash_combine_range(llvm::mapped_iterator(argTypes.begin(), f),
-                                                           llvm::mapped_iterator(argTypes.end(), f)));
+        auto argTypes = value.argTypes;
+        return llvm::hash_combine(&*value.function, llvm::hash_combine_range(llvm::mapped_iterator(argTypes.begin(), f),
+                                                                             llvm::mapped_iterator(argTypes.end(), f)));
     }
 
     static inline bool isEqual(const FunctionSpecialization& lhs, const FunctionSpecialization& rhs)
@@ -996,7 +980,7 @@ FilteredDFIteratorSet(F) -> FilteredDFIteratorSet<typename llvm::function_traits
 class Scheduler
 {
     llvm::ThreadPool& m_threadPool;
-    llvm::DenseMap<mlir::Operation*, std::unique_ptr<TypeFlowInstance>> m_typeFlowInstances;
+    llvm::DenseMap<mlir::FunctionOpInterface, std::unique_ptr<TypeFlowInstance>> m_typeFlowInstances;
     llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>> m_orchestrators;
 
     using Queue = std::queue<std::pair<ExecutionFrame, InQueueCount>>;
@@ -1240,7 +1224,7 @@ public:
         for (auto iter : roots)
         {
             auto spec = FunctionSpecialization(iter, {});
-            auto function = spec.getFunction();
+            auto function = spec.function;
             auto& orchestrator = m_orchestrators[std::move(spec)] = createOrchestrator(function, moduleManager);
             queue.emplace(ExecutionFrame(&orchestrator->getEntryBlock()->front()), orchestrator.get());
         }
@@ -1345,7 +1329,7 @@ public:
             auto [existing, inserted] = m_orchestrators.insert({std::move(call.functionSpecialization), nullptr});
             if (inserted)
             {
-                existing->second = createOrchestrator(existing->first.getFunction(), moduleManager);
+                existing->second = createOrchestrator(existing->first.function, moduleManager);
             }
             else if (existing->second->finishedExecution() || existing->second->hasPreliminaryReturnTypes())
             {
@@ -1398,7 +1382,7 @@ public:
             // First call, set up the function arguments.
             llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> entryValues;
             for (auto [arg, value] :
-                 llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.getArgTypes()))
+                 llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.argTypes))
             {
                 if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
                 {
@@ -1470,22 +1454,19 @@ bool setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
 
 void Monomorph::runOnOperation()
 {
-    // TODO: Use SetVector once interfaces properly function in DenseMapInfo
-    llvm::SmallVector<mlir::FunctionOpInterface> roots;
-    llvm::SmallPtrSet<mlir::Operation*, 8> rootSet;
+    llvm::SetVector<mlir::FunctionOpInterface> roots;
     for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
     {
         if (llvm::none_of(iter.getArgumentTypes(), std::mem_fn(&mlir::Type::isa<pylir::Py::DynamicType>)))
         {
-            roots.push_back(iter);
-            rootSet.insert(iter);
+            roots.insert(iter);
         }
     }
 
     llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>> results;
     {
         Scheduler scheduler(getContext().getThreadPool());
-        scheduler.run(roots, getAnalysisManager());
+        scheduler.run(roots.getArrayRef(), getAnalysisManager());
         results = std::move(scheduler.getResults());
     }
 
@@ -1501,8 +1482,8 @@ void Monomorph::runOnOperation()
     for (auto& [func, orchestrator] : results)
     {
         auto& clone = clones[func];
-        clone.function = func.getFunction();
-        bool isRoot = rootSet.contains(func.getFunction());
+        clone.function = func.function;
+        bool isRoot = roots.contains(func.function);
         for (const auto& [key, value] : orchestrator->getValues())
         {
             auto attr = value.dyn_cast_or_null<mlir::Attribute>();
@@ -1519,7 +1500,7 @@ void Monomorph::runOnOperation()
                     continue;
                 }
                 auto dynamicArgIndex = blockArg.getArgNumber();
-                auto filter = llvm::make_filter_range(func.getFunction().getArguments(), [](mlir::Value val)
+                auto filter = llvm::make_filter_range(func.function.getArguments(), [](mlir::Value val)
                                                       { return val.getType().isa<pylir::Py::DynamicType>(); });
                 instrValue = *std::next(filter.begin(), dynamicArgIndex);
             }
@@ -1535,7 +1516,7 @@ void Monomorph::runOnOperation()
 
             // Cloning of a function body is done lazily for the case where no value has changed.
             // Roots are not cloned but updated in place.
-            if (clone.function == func.getFunction() && !isRoot)
+            if (clone.function == func.function && !isRoot)
             {
                 clone.function = clone.function->clone(clone.mapping);
                 mlir::cast<mlir::SymbolOpInterface>(*clone.function).setPrivate();
@@ -1575,7 +1556,7 @@ void Monomorph::runOnOperation()
     {
         for (const auto& [origCall, func] : orchestrator->getCallSites())
         {
-            if (!func.getFunction())
+            if (!func.function)
             {
                 continue;
             }

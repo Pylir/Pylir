@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
+func.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
     %2 = py.tuple.copy %arg0 : %arg1
     %3 = py.tuple.copy %2 : %arg2
     return %3 : !py.dynamic
@@ -16,7 +16,7 @@ func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py
 // CHECK-NEXT: %[[COPY:.*]] = py.tuple.copy %[[ARG0]] : %[[ARG2]]
 // CHECK-NEXT: return %[[COPY]]
 
-func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = py.makeTuple (%arg0)
 	%1 = py.constant (@builtins.tuple)
 	%2 = py.tuple.copy %0 : %1

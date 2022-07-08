@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-func @test(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.object.id %lhs
     %1 = py.object.id %rhs
     %2 = arith.cmpi "eq", %0, %1 : index
@@ -13,7 +13,7 @@ func @test(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[RESULT:.*]] = py.is %[[LHS]], %[[RHS]]
 // CHECK-NEXT: return %[[RESULT]]
 
-func @test2(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test2(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.object.id %lhs
     %1 = py.object.id %rhs
     %2 = arith.cmpi "ne", %0, %1 : index

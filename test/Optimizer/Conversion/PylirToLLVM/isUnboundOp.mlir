@@ -2,7 +2,7 @@
 
 py.globalHandle @handle
 
-func @test() -> i1 {
+func.func @test() -> i1 {
     %0 = py.load @handle
     %1 = py.isUnboundValue %0
     return %1 : i1

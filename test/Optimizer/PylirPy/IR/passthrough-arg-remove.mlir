@@ -1,8 +1,8 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-func private @foo() -> i32
+func.func private @foo() -> i32
 
-func @test(%arg1 : i32) -> i32 {
+func.func @test(%arg1 : i32) -> i32 {
 	%0 = py.invoke @foo() : () -> i32
 		label ^bb1 unwind ^bb2
 

@@ -19,6 +19,8 @@ def MemorySSA_Dialect : Dialect {
     let cppNamespace = "::pylir::MemSSA";
 
     let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
+    let useDefaultAttributePrinterParser = 1;
+    let useDefaultTypePrinterParser = 1;
 }
 
 class MemorySSA_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type">

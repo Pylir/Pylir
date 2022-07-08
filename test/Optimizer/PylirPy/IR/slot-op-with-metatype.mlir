@@ -5,7 +5,7 @@ py.globalValue @builtins.type = #py.type<slots = {__slots__ = @const$}>
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.typeOf %arg0
     %1 = py.typeOf %0
     %2 = py.getSlot "__slots__" from %0 : %1
@@ -26,7 +26,7 @@ py.globalValue @builtins.type = #py.type<slots = {__slots__ = @const$}>
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) {
+func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) {
     %0 = py.typeOf %arg0
     %1 = py.typeOf %0
     py.setSlot "__slots__" of %0 : %1 to %arg1

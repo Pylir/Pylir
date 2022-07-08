@@ -3,17 +3,17 @@
 py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.int = #py.type
 
-func @plusOne(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @plusOne(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = py.call @header(%arg0) : (!py.dynamic) -> !py.dynamic
 	return %0 : !py.dynamic
 }
 
-func @plusTwo(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @plusTwo(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = py.call @plusOne(%arg0) : (!py.dynamic) -> !py.dynamic
     return %0 : !py.dynamic
 }
 
-func @header(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @header(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = test.random
 	cf.cond_br %0, ^bb1, ^bb2
 
@@ -26,7 +26,7 @@ func @header(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
-func @root() -> !py.dynamic {
+func.func @root() -> !py.dynamic {
 	%0 = py.constant(#py.int<1>)
 	%1 = py.call @header(%0) : (!py.dynamic) -> !py.dynamic
 	%2 = py.typeOf %1

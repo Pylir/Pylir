@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @test1(%arg0 : !py.dynamic) -> i1 {
+func.func @test1(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = py.int.cmp eq %0, %arg0
     return %1 : i1
@@ -15,7 +15,7 @@ func @test1(%arg0 : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp eq %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
-func @test2(%arg0 : !py.dynamic) -> i1 {
+func.func @test2(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = py.int.cmp ne %0, %arg0
     return %1 : i1
@@ -27,7 +27,7 @@ func @test2(%arg0 : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp ne %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
-func @test3(%arg0 : !py.dynamic) -> i1 {
+func.func @test3(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = arith.constant 1 : i1
     %2 = py.int.cmp ne %0, %arg0
@@ -41,7 +41,7 @@ func @test3(%arg0 : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp eq %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
-func @test4(%arg0 : !py.dynamic) -> i1 {
+func.func @test4(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = arith.constant 1 : i1
     %2 = py.int.cmp eq %0, %arg0
@@ -55,7 +55,7 @@ func @test4(%arg0 : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp ne %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
-func @test5(%arg0 : !py.dynamic) -> i1 {
+func.func @test5(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = arith.constant 1 : i1
     %2 = py.int.cmp lt %0, %arg0
@@ -70,7 +70,7 @@ func @test5(%arg0 : !py.dynamic) -> i1 {
 // CHECK-NEXT: return %[[RESULT]]
 
 
-func @test6(%arg0 : !py.dynamic) -> i1 {
+func.func @test6(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = arith.constant 1 : i1
     %2 = py.int.cmp le %0, %arg0
@@ -84,7 +84,7 @@ func @test6(%arg0 : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp lt %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
-func @test7(%arg0 : !py.dynamic) -> i1 {
+func.func @test7(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = arith.constant 1 : i1
     %2 = py.int.cmp gt %0, %arg0
@@ -99,7 +99,7 @@ func @test7(%arg0 : !py.dynamic) -> i1 {
 // CHECK-NEXT: return %[[RESULT]]
 
 
-func @test8(%arg0 : !py.dynamic) -> i1 {
+func.func @test8(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.int<5>)
     %1 = arith.constant 1 : i1
     %2 = py.int.cmp ge %0, %arg0

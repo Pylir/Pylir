@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp eq %lhs, %rhs
     return %0 : i1
 }
@@ -8,14 +8,16 @@ func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test_eq
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][0, 1]
-// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][0, 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(0 : i{{.*}})
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp ne %lhs, %rhs
     return %0 : i1
 }
@@ -23,14 +25,16 @@ func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test_ne
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][0, 1]
-// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][0, 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(0 : i{{.*}})
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp lt %lhs, %rhs
     return %0 : i1
 }
@@ -38,14 +42,16 @@ func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test_lt
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][0, 1]
-// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][0, 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(-1 : i{{.*}})
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp le %lhs, %rhs
     return %0 : i1
 }
@@ -53,14 +59,16 @@ func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test_le
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][0, 1]
-// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][0, 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(1 : i{{.*}})
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp gt %lhs, %rhs 
     return %0 : i1
 }
@@ -68,14 +76,16 @@ func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test_gt
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][0, 1]
-// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][0, 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(1 : i{{.*}})
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+func.func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp ge %lhs, %rhs 
     return %0 : i1
 }
@@ -83,8 +93,10 @@ func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test_ge
 // CHECK-SAME: %[[LHS:[[:alnum:]]+]]
 // CHECK-SAME: %[[RHS:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][0, 1]
-// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][0, 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[LHS_MPINT:.*]] = llvm.getelementptr %[[LHS]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[RHS_MPINT:.*]] = llvm.getelementptr %[[RHS]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @mp_cmp(%[[LHS_MPINT]], %[[RHS_MPINT]])
 // CHECK-NEXT: %[[C:.*]] = llvm.mlir.constant(-1 : i{{.*}})
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[RESULT]], %[[C]]

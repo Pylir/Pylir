@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func @test1(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test1(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.int<5>)
     %1 = py.constant(#py.int<3>)
     %2 = py.int.add %arg0, %0
@@ -17,7 +17,7 @@ func @test1(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[RESULT:.*]] = py.int.add %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
-func @test2(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+func.func @test2(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.int<5>)
     %1 = py.constant(#py.int<3>)
     %2 = py.int.add %arg0, %0

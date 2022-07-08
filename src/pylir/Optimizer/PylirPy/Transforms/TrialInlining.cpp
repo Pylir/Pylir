@@ -233,8 +233,8 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                                                         TrialDataBase& dataBase,
                                                         const llvm::DenseMap<mlir::StringAttr, Inlineable>& symbolTable)
     {
-        llvm::MapVector<mlir::Operation*, RecursionStateMachine> recursionDetection;
-        llvm::DenseSet<mlir::Operation*> disabledCallables;
+        llvm::MapVector<mlir::CallableOpInterface, RecursionStateMachine> recursionDetection;
+        llvm::DenseSet<mlir::CallableOpInterface> disabledCallables;
         auto recursivePattern = [&](mlir::CallableOpInterface callable)
         {
             bool triggered = false;
@@ -368,7 +368,7 @@ protected:
         {
             dialect->getCanonicalizationPatterns(set);
         }
-        for (auto& op : context->getRegisteredOperations())
+        for (const auto& op : context->getRegisteredOperations())
         {
             op.getCanonicalizationPatterns(set, context);
         }

@@ -7,7 +7,7 @@ py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.function = #py.type
 py.globalValue const @builtins.None = #py.type
 
-func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynamic, %dict : !py.dynamic) -> !py.dynamic {
+func.func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynamic, %dict : !py.dynamic) -> !py.dynamic {
 	%zero = arith.constant 0 : index
 	%one = arith.constant 1 : index
 	%first = py.tuple.getItem %tuple[%zero]
@@ -19,7 +19,7 @@ func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynamic, %d
 py.globalValue @builtins.int.__add__ = #py.function<@builtins.int.__add__$impl>
 py.globalValue const @builtins.int = #py.type<slots = {__add__ = @builtins.int.__add__}, mroTuple = #py.tuple<(@builtins.int)>>
 
-func @__init__() {
+func.func @__init__() {
 	%one = py.constant(#py.int<1>)
 	%zero = py.constant(#py.int<0>)
 	cf.br ^loop(%zero : !py.dynamic)

@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(@builtins.str)
     %1 = py.str.copy %arg0 : %0
     return %1 : !py.dynamic

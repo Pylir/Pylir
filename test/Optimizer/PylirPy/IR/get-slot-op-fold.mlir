@@ -5,7 +5,7 @@ py.globalValue const @builtins.type = #py.type<slots = {__slots__ = @tuple}>
 py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.str = #py.type
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(@builtins.type)
     %1 = py.getSlot "__slots__" from %0 : %0
     return %1 : !py.dynamic

@@ -6,6 +6,7 @@
 
 #include "PylirPyAttributes.hpp"
 
+#include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
 
 #include <llvm/ADT/SmallString.h>

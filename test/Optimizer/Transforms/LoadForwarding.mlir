@@ -5,7 +5,7 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @foo = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"test">)>}>
 
-func @test_get_slot() -> !py.dynamic {
+func.func @test_get_slot() -> !py.dynamic {
     %0 = py.constant(@foo)
     %1 = py.makeObject %0
     %2 = py.constant(#py.str<"value">)
@@ -23,9 +23,9 @@ func @test_get_slot() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func private @bar()
+func.func private @bar()
 
-func @test_get_slot_clobbered(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test_get_slot_clobbered(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     %1 = py.typeOf %arg0
     py.setSlot "test" of %arg0 : %1 to %0
@@ -41,7 +41,7 @@ func @test_get_slot_clobbered(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-func @test_get_slot_new_object(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test_get_slot_new_object(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeObject %arg0
     %1 = py.getSlot "test" from %0 : %arg0
     return %1 : !py.dynamic
@@ -53,7 +53,7 @@ func @test_get_slot_new_object(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-func @test_dict_len() -> index {
+func.func @test_dict_len() -> index {
     %0 = py.makeDict ()
     %1 = py.dict.len %0
     return %1 : index
@@ -68,7 +68,7 @@ func @test_dict_len() -> index {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test_dict_lookup_setitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
+func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
     %0 = py.constant(#py.str<"value">)
     py.dict.setItem %arg0[%0] to %0
     %result, %found = py.dict.tryGetItem %arg0[%0]
@@ -85,7 +85,7 @@ func @test_dict_lookup_setitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
+func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
     %0 = py.constant(#py.str<"value">)
     py.dict.delItem %0 from %arg0
     %result, %found = py.dict.tryGetItem %arg0[%0]
@@ -102,7 +102,7 @@ func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test_dict_lookup_makeDict() -> (!py.dynamic, i1) {
+func.func @test_dict_lookup_makeDict() -> (!py.dynamic, i1) {
     %0 = py.constant(#py.str<"value">)
     %1 = py.makeDict ()
     %result, %found = py.dict.tryGetItem %1[%0]
@@ -119,7 +119,7 @@ func @test_dict_lookup_makeDict() -> (!py.dynamic, i1) {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test_list_len() -> index {
+func.func @test_list_len() -> index {
     %0 = py.constant(#py.str<"value">)
     %1 = py.makeDict ()
     %2 = py.makeList (%0, %1)

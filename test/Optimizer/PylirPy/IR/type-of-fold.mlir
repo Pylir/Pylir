@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeObject %arg0
     %1 = py.typeOf %0
     return %1 : !py.dynamic
@@ -15,7 +15,7 @@ func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
-func @constant_obj() -> !py.dynamic {
+func.func @constant_obj() -> !py.dynamic {
     %0 = py.constant(#py.obj<@a>)
     %1 = py.typeOf %0
     return %1 : !py.dynamic
@@ -30,7 +30,7 @@ func @constant_obj() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
-func @global_value() -> !py.dynamic {
+func.func @global_value() -> !py.dynamic {
     %0 = py.constant(@a)
     %1 = py.typeOf %0
     return %1 : !py.dynamic
@@ -45,7 +45,7 @@ func @global_value() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+func.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.str.copy %arg0 : %arg1
     %1 = py.typeOf %0
     return %1 : !py.dynamic
@@ -61,7 +61,7 @@ func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+func.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeTuple (%arg0, %arg1)
     %1 = py.typeOf %0
     return %1 : !py.dynamic

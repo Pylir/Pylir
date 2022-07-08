@@ -52,7 +52,7 @@ mlir::LLVM::LLVMPointerType derivePointer(mlir::Type basePointerType)
 class PylirTypeConverter : public mlir::LLVMTypeConverter
 {
     mlir::LLVM::LLVMPointerType m_objectPtrType;
-    llvm::DenseMap<mlir::Attribute, mlir::LLVM::GlobalOp> m_globalConstants;
+    llvm::DenseMap<pylir::Py::ObjectAttrInterface, mlir::LLVM::GlobalOp> m_globalConstants;
     llvm::DenseMap<mlir::Attribute, mlir::LLVM::GlobalOp> m_globalBuffers;
     mlir::SymbolTable m_symbolTable;
     std::unique_ptr<pylir::PlatformABI> m_cabi;
@@ -763,9 +763,11 @@ public:
                             {
                                 auto toInit = builder.create<mlir::LLVM::AddressOfOp>(
                                     global.getLoc(), m_objectPtrType, mlir::FlatSymbolRefAttr::get(global));
+                                mlir::Value zero = builder.create<mlir::LLVM::ConstantOp>(
+                                    global.getLoc(), builder.getI32Type(), builder.getI32IntegerAttr(0));
                                 mpIntPtr = builder.create<mlir::LLVM::GEPOp>(
-                                    global.getLoc(), derivePointer(toInit.getType()), global.getType(), toInit,
-                                    mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, 1});
+                                    global.getLoc(), derivePointer(toInit.getType()), global.getType(), toInit, zero,
+                                    llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex, 1});
                             }
 
                             createRuntimeCall(global.getLoc(), builder, Runtime::mp_init, {mpIntPtr});
@@ -984,10 +986,12 @@ protected:
     template <class ResultModel>
     ResultModel field(mlir::Location loc, std::size_t index)
     {
+        mlir::Value zero =
+            m_builder.create<mlir::LLVM::ConstantOp>(loc, m_builder.getI32Type(), m_builder.getI32IntegerAttr(0));
         return {loc, m_builder,
-                m_builder.create<mlir::LLVM::GEPOp>(loc, derivePointer(m_pointer.getType()), m_elementType, m_pointer,
-                                                    mlir::ValueRange{},
-                                                    llvm::ArrayRef<std::int32_t>{0, static_cast<std::int32_t>(index)}),
+                m_builder.create<mlir::LLVM::GEPOp>(
+                    loc, derivePointer(m_pointer.getType()), m_elementType, m_pointer, zero,
+                    llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex, static_cast<std::int32_t>(index)}),
                 ResultModel::getElementType(m_typeConverter, m_elementType.getBody()[index]), m_typeConverter};
     }
 
@@ -1037,15 +1041,17 @@ struct Pointer : Model<mlir::LLVM::LLVMPointerType>
     {
         return {loc, m_builder,
                 m_builder.create<mlir::LLVM::GEPOp>(loc, m_pointer.getType(), m_elementType, m_pointer, index,
-                                                    llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex}),
+                                                    mlir::LLVM::GEPOp::kDynamicIndex),
                 m_elementType, m_typeConverter};
     }
 
     Pointer<ElementModel> offset(mlir::Location loc, std::int32_t index)
     {
+        auto value =
+            m_builder.create<mlir::LLVM::ConstantOp>(loc, m_builder.getI32Type(), m_builder.getI32IntegerAttr(index));
         return {loc, m_builder,
-                m_builder.create<mlir::LLVM::GEPOp>(loc, m_pointer.getType(), m_elementType, m_pointer,
-                                                    mlir::ValueRange{}, index),
+                m_builder.create<mlir::LLVM::GEPOp>(loc, m_pointer.getType(), m_elementType, m_pointer, value,
+                                                    mlir::LLVM::GEPOp::kDynamicIndex),
                 m_elementType, m_typeConverter};
     }
 };
@@ -1083,21 +1089,28 @@ struct Array : Model<mlir::LLVM::LLVMArrayType>
 
     Pointer<ElementModel> at(mlir::Location loc, mlir::Value index)
     {
+        mlir::Value zero =
+            m_builder.create<mlir::LLVM::ConstantOp>(loc, m_builder.getI32Type(), m_builder.getI32IntegerAttr(0));
         return {loc, m_builder,
-                m_builder.create<mlir::LLVM::GEPOp>(loc, derivePointer(m_pointer.getType()), m_elementType, m_pointer,
-                                                    index,
-                                                    llvm::ArrayRef<std::int32_t>{0, mlir::LLVM::GEPOp::kDynamicIndex}),
+                m_builder.create<mlir::LLVM::GEPOp>(
+                    loc, derivePointer(m_pointer.getType()), m_elementType, m_pointer, mlir::ValueRange{zero, index},
+                    llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex, mlir::LLVM::GEPOp::kDynamicIndex}),
                 Pointer<ElementModel>::getElementType(m_typeConverter, m_elementType.getElementType()),
                 m_typeConverter};
     }
 
     Pointer<ElementModel> at(mlir::Location loc, std::int32_t index)
     {
-        return {loc, m_builder,
-                m_builder.create<mlir::LLVM::GEPOp>(loc, derivePointer(m_pointer.getType()), m_elementType, m_pointer,
-                                                    mlir::ValueRange{}, llvm::ArrayRef<std::int32_t>{0, index}),
-                Pointer<ElementModel>::getElementType(m_typeConverter, m_elementType.getElementType()),
-                m_typeConverter};
+        mlir::Value zero =
+            m_builder.create<mlir::LLVM::ConstantOp>(loc, m_builder.getI32Type(), m_builder.getI32IntegerAttr(0));
+        mlir::Value indexValue =
+            m_builder.create<mlir::LLVM::ConstantOp>(loc, m_builder.getI32Type(), m_builder.getI32IntegerAttr(index));
+        return {
+            loc, m_builder,
+            m_builder.create<mlir::LLVM::GEPOp>(
+                loc, derivePointer(m_pointer.getType()), m_elementType, m_pointer, mlir::ValueRange{zero, indexValue},
+                llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex, mlir::LLVM::GEPOp::kDynamicIndex}),
+            Pointer<ElementModel>::getElementType(m_typeConverter, m_elementType.getElementType()), m_typeConverter};
     }
 };
 
@@ -2140,12 +2153,16 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         {
             instanceType = getBuiltinsInstanceType(getLayoutType(typeObject));
         }
-        mlir::Value objectPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), adaptor.getObject().getType(), rewriter.getI8Type(), adaptor.getObject(), mlir::ValueRange{},
-            llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(sizeOf(instanceType))});
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE), objectPtrPtr, mlir::ValueRange{},
-            llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(result - tupleAttr.getValue().begin())});
+        mlir::Value sizeOfInstance = rewriter.create<mlir::LLVM::ConstantOp>(
+            op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(sizeOf(instanceType)));
+        mlir::Value objectPtrPtr =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), adaptor.getObject().getType(), rewriter.getI8Type(),
+                                               adaptor.getObject(), sizeOfInstance, mlir::LLVM::GEPOp::kDynamicIndex);
+
+        mlir::Value offset = rewriter.create<mlir::LLVM::ConstantOp>(
+            op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(result - tupleAttr.getValue().begin()));
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE),
+                                                      objectPtrPtr, offset, mlir::LLVM::GEPOp::kDynamicIndex);
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep.getSourceElementType(), gep);
         return mlir::success();
     }
@@ -2206,12 +2223,16 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         {
             instanceType = getBuiltinsInstanceType(getLayoutType(typeObject));
         }
-        mlir::Value objectPtrPtr = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), adaptor.getObject().getType(), rewriter.getI8Type(), adaptor.getObject(), mlir::ValueRange{},
-            llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(sizeOf(instanceType))});
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE), objectPtrPtr, mlir::ValueRange{},
-            llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(result - tupleAttr.getValue().begin())});
+        mlir::Value sizeOfInstance = rewriter.create<mlir::LLVM::ConstantOp>(
+            op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(sizeOf(instanceType)));
+        mlir::Value objectPtrPtr =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), adaptor.getObject().getType(), rewriter.getI8Type(),
+                                               adaptor.getObject(), sizeOfInstance, mlir::LLVM::GEPOp::kDynamicIndex);
+
+        mlir::Value offset = rewriter.create<mlir::LLVM::ConstantOp>(
+            op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(result - tupleAttr.getValue().begin()));
+        auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE),
+                                                      objectPtrPtr, offset, mlir::LLVM::GEPOp::kDynamicIndex);
         rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.getValue(), gep);
         return mlir::success();
     }
@@ -2271,12 +2292,12 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         rewriter.setInsertionPointToStart(foundIndex);
         auto typeObj = pyTypeModel(op.getLoc(), rewriter, adaptor.getTypeObject());
         auto offset = typeObj.offsetPtr(op.getLoc()).load(op.getLoc());
-        auto index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), pointer(REF_ADDRESS_SPACE), pointer(REF_ADDRESS_SPACE), adaptor.getObject(),
-            mlir::ValueRange{index}, llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex});
-        auto slot = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep.getSourceElementType(), gep);
-        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{slot}, endBlock);
+        mlir::Value index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
+        auto gep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), pointer(REF_ADDRESS_SPACE), pointer(REF_ADDRESS_SPACE),
+                                               adaptor.getObject(), index, mlir::LLVM::GEPOp::kDynamicIndex);
+        mlir::Value slot = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep.getSourceElementType(), gep);
+        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), slot, endBlock);
 
         rewriter.setInsertionPointToStart(endBlock);
         rewriter.replaceOp(op, endBlock->getArgument(0));
@@ -2336,10 +2357,10 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         rewriter.setInsertionPointToStart(foundIndex);
         auto typeObj = pyTypeModel(op.getLoc(), rewriter, adaptor.getTypeObject());
         auto offset = typeObj.offsetPtr(op.getLoc()).load(op.getLoc());
-        auto index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
-        auto gep = rewriter.create<mlir::LLVM::GEPOp>(
-            op.getLoc(), pointer(REF_ADDRESS_SPACE), pointer(REF_ADDRESS_SPACE), adaptor.getObject(),
-            mlir::ValueRange{index}, llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex});
+        mlir::Value index = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, condition->getArgument(0));
+        auto gep =
+            rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), pointer(REF_ADDRESS_SPACE), pointer(REF_ADDRESS_SPACE),
+                                               adaptor.getObject(), index, mlir::LLVM::GEPOp::kDynamicIndex);
         rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.getValue(), gep);
         rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, endBlock);
 
@@ -2819,9 +2840,8 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
             auto iterString = pyStringModel(op.getLoc(), rewriter, iter).bufferPtr(op.getLoc());
             auto sizeLoaded = iterString.sizePtr(op.getLoc()).load(op.getLoc());
             auto sourceLoaded = mlir::Value{iterString.elementPtr(op.getLoc()).load(op.getLoc())};
-            auto dest =
-                rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), array.getType(), rewriter.getI8Type(), array, size,
-                                                   llvm::ArrayRef<std::int32_t>{mlir::LLVM::GEPOp::kDynamicIndex});
+            auto dest = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), array.getType(), rewriter.getI8Type(), array,
+                                                           size, mlir::LLVM::GEPOp::kDynamicIndex);
             auto falseC =
                 rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
             rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), dest, sourceLoaded, sizeLoaded, falseC);

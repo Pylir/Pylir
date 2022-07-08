@@ -7,7 +7,7 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @same_value
 // CHECK: %[[RES:.*]] = arith.constant true
 // CHECK: return %[[RES]]
-func @same_value() -> i1 {
+func.func @same_value() -> i1 {
     %0 = py.makeTuple ()
     %1 = py.is %0, %0
     return %1 : i1
@@ -22,7 +22,7 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @two_allocs
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
-func @two_allocs(%arg0 : !py.dynamic) -> i1 {
+func.func @two_allocs(%arg0 : !py.dynamic) -> i1 {
     %0 = py.makeTuple (%arg0)
     %1 = py.makeTuple (%arg0)
     %2 = py.is %0, %1
@@ -38,7 +38,7 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @singletons
 // CHECK: %[[RES:.*]] = arith.constant true
 // CHECK: return %[[RES]]
-func @singletons() -> i1 {
+func.func @singletons() -> i1 {
     %0 = py.constant(@builtins.bool)
     %1 = py.constant(@builtins.bool)
     %2 = py.is %0, %1
@@ -54,7 +54,7 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @alloca_symbol
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
-func @alloca_symbol(%arg0 : !py.dynamic) -> i1 {
+func.func @alloca_symbol(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(@builtins.bool)
     %1 = py.makeTuple (%arg0)
     %2 = py.is %0, %1

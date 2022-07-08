@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func @foo() -> !py.dynamic {
+func.func @foo() -> !py.dynamic {
     %0 = py.constant(#py.unbound)
     return %0 : !py.dynamic
 }
@@ -9,7 +9,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
-func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
+func.func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
     %result = py.invoke @foo() : () -> !py.dynamic
         label ^success unwind ^failure
 

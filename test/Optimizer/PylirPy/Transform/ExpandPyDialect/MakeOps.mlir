@@ -10,7 +10,7 @@ py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.function =  #py.type
 py.globalValue @builtins.StopIteration = #py.type
 
-func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant #py.int<3>
     %1 = py.constant #py.int<4>
     %2 = py.makeList (%0, *%arg0, %1)
@@ -45,7 +45,7 @@ py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.function =  #py.type
 py.globalValue @builtins.StopIteration = #py.type
 
-func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant #py.int<3>
     %1 = py.constant #py.int<4>
     %2 = py.makeTuple (%0, *%arg0, %1)

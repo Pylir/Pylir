@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.tuple<(@builtins.tuple)>)
     %1 = arith.constant 0 : index
     %2 = py.tuple.getItem %0[%1]
@@ -14,7 +14,7 @@ func @test() -> !py.dynamic {
 // CHECK-DAG: %[[C1:.*]] = py.constant(@builtins.tuple)
 // CHECK: return %[[C1]]
 
-func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(@builtins.tuple)
     %1 = py.makeTuple (%0, * %arg0)
     %2 = arith.constant 0 : index
@@ -26,7 +26,7 @@ func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-DAG: %[[C1:.*]] = py.constant(@builtins.tuple)
 // CHECK: return %[[C1]]
 
-func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(@builtins.tuple)
     %1 = py.tuple.prepend %0, %arg0
     %2 = arith.constant 0 : index

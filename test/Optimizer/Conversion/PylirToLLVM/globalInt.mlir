@@ -5,7 +5,7 @@ py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.int<5>)
     return %0 : !py.dynamic
 }

@@ -3,7 +3,7 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.bool = #py.type
 
-func @entry_block(%arg0 : !py.dynamic) -> i1 {
+func.func @entry_block(%arg0 : !py.dynamic) -> i1 {
     %0 = py.isUnboundValue %arg0
     return %0 : i1
 }
@@ -17,7 +17,7 @@ func @entry_block(%arg0 : !py.dynamic) -> i1 {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.bool = #py.type
 
-func @block_argument(%arg0 : i1) -> i1 {
+func.func @block_argument(%arg0 : i1) -> i1 {
     %c = py.constant(#py.bool<False>)
     cf.cond_br %arg0, ^true, ^false(%c : !py.dynamic)
 
@@ -42,7 +42,7 @@ py.globalValue @builtins.bool = #py.type
 
 py.globalHandle @a
 
-func @load_op(%arg0 : !py.dynamic) -> i1 {
+func.func @load_op(%arg0 : !py.dynamic) -> i1 {
     py.store %arg0 into @a
     %0 = py.load @a
     %1 = py.isUnboundValue %0

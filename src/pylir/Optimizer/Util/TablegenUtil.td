@@ -19,21 +19,12 @@ class ParamSpecBuilder<list<ParamSpec> spec, code extraCode = ""> : AttrBuilder<
 											!foreach(x, spec, CArg<x.type.cppType, !if(x.type.isOptional, "{}", x.defaultArg)>),
 															!foreach(x, spec, x.name)),
 	!interleave(!foreach(x, !filter(x, spec, x.type.isOptional),
-					x.name # " = " # x.name # " ? " # x.name # " : " # !subst("$_ctx", "$_ctxt", x.type.defaultValue) # ";\n"),
-							"") # extraCode #
+					x.name # " = " # x.name # " ? " # x.name # " : " # x.type.defaultValue # ";\n"), "") # extraCode #
 	"return Base::get($_ctxt, " # !interleave(!foreach(x, spec, x.name), ", ") # ");"
 >;
 
-class UseableAttrInterface<string name> : AttrInterface<name>,
-	Attr<CPred<"$_self.isa<" # cppNamespace # "::" # name # ">()">, name # " instance">
-{
-	let storageType = cppNamespace # "::" # cppClassName;
-    let returnType = storageType;
-    let convertFromStorage = "$_self";
-}
-
 class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::mlir::FlatSymbolRefAttr",
-	"::mlir::FlatSymbolRefAttr::get($_ctx, ::pylir::Py::Builtins::" # name # ".name)", description>;
+	"::mlir::FlatSymbolRefAttr::get($_ctxt, ::pylir::Py::Builtins::" # name # ".name)", description>;
 
 class CustomPrint<AttrOrTypeParameter x, string elementParse = ?, string elementPrint = ?>
 	: AttrOrTypeParameter<x.cppType, x.summary, x.cppAccessorType>

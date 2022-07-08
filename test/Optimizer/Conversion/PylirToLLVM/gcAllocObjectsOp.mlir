@@ -6,7 +6,7 @@ py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#
 py.globalValue const @builtins.tuple = #py.type // stub
 py.globalValue const @builtins.str = #py.type // stub
 
-func @foo() -> !pyMem.memory {
+func.func @foo() -> !pyMem.memory {
     %0 = py.constant(@builtins.str)
     %1 = pyMem.gcAllocObject %0
     return %1 : !pyMem.memory
@@ -19,7 +19,8 @@ func @foo() -> !pyMem.memory {
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][%[[ZERO]], 0]
 // CHECK-NEXT: llvm.store %[[STR]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[MEMORY]]
 
@@ -30,7 +31,7 @@ py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#
 py.globalValue const @builtins.tuple = #py.type // stub
 py.globalValue const @builtins.str = #py.type // stub
 
-func @foo(%arg0 : !py.dynamic) -> !pyMem.memory {
+func.func @foo(%arg0 : !py.dynamic) -> !pyMem.memory {
     %0 = pyMem.gcAllocObject %arg0
     return %0 : !pyMem.memory
 }

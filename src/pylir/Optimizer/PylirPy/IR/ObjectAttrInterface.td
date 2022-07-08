@@ -8,9 +8,8 @@
 #define PYLIRPY_INTERFACES_OBJECT_ATTR_INTERFACE
 
 include "mlir/IR/OpBase.td"
-include "pylir/Optimizer/Util/TablegenUtil.td"
 
-def ObjectAttrInterface : UseableAttrInterface<"ObjectAttrInterface"> {
+def ObjectAttrInterface : AttrInterface<"ObjectAttrInterface"> {
     let cppNamespace = "::pylir::Py";
 
     let methods = [

@@ -12,7 +12,7 @@ py.globalValue @builtins.tuple = #py.type
 // CHECK-SAME: #py.int<2>
 // CHECK-SAME: #py.float<3.000000e+00>
 // CHECK: return %[[RES]]
-func @maketuple_simple() -> !py.dynamic {
+func.func @maketuple_simple() -> !py.dynamic {
     %0 = py.constant(#py.str<"text">)
     %1 = py.constant(#py.int<2>)
     %2 = py.constant(#py.float<3.0>)
@@ -35,7 +35,7 @@ py.globalValue @builtins.list = #py.type
 // CHECK-SAME: #py.int<2>
 // CHECK-SAME: #py.float<3.000000e+00>
 // CHECK: return %[[RES]]
-func @maketuple_expansion() -> !py.dynamic {
+func.func @maketuple_expansion() -> !py.dynamic {
     %0 = py.constant(#py.str<"text">)
     %1 = py.constant(#py.list<[#py.int<2>, #py.float<3.0>]>)
     %2 = py.makeTuple ( %0, *%1 )

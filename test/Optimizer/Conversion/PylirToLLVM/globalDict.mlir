@@ -6,7 +6,7 @@ py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 
-func @test() -> !py.dynamic {
+func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.dict<{#py.str<"Hello"> to #py.str<"World">}>)
     return %0 : !py.dynamic
 }
