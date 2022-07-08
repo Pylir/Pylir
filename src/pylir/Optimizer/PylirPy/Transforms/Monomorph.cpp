@@ -372,6 +372,14 @@ struct CallWaiting
     }
 };
 
+struct Loop
+{
+    llvm::SetVector<mlir::Block*> exitBlocks;
+    llvm::DenseSet<std::vector<pylir::Py::TypeAttrUnion>> headerArgs;
+
+    Loop() : exitBlocks({}) {}
+};
+
 struct RecursionInfo
 {
     enum class Phase
@@ -380,12 +388,18 @@ struct RecursionInfo
         Breaking
     };
 
+    struct SavePoint
+    {
+        CallWaiting callWaiting;
+        std::vector<Loop> loopState;
+    };
+
     Phase phase = Phase::Expansion;
-    llvm::DenseMap<Orchestrator*, std::vector<CallWaiting>> containedOrchsToCycleCalls;
+    llvm::DenseMap<Orchestrator*, std::vector<SavePoint>> containedOrchsToCycleCalls;
     Orchestrator* broken = nullptr;
     llvm::DenseSet<std::vector<pylir::Py::TypeAttrUnion>> seen;
 
-    explicit RecursionInfo(llvm::DenseMap<Orchestrator*, std::vector<CallWaiting>>&& containedOrchsToCycleCalls)
+    explicit RecursionInfo(llvm::DenseMap<Orchestrator*, std::vector<SavePoint>>&& containedOrchsToCycleCalls)
         : containedOrchsToCycleCalls(std::move(containedOrchsToCycleCalls))
     {
     }
@@ -404,13 +418,6 @@ class Orchestrator
     llvm::DenseMap<mlir::Block*, bool> m_finishedBlocks;
     llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> m_values;
 
-    struct Loop
-    {
-        llvm::SetVector<mlir::Block*> exitBlocks;
-        llvm::DenseSet<std::vector<pylir::Py::TypeAttrUnion>> headerArgs;
-
-        Loop() : exitBlocks({}) {}
-    };
     llvm::DenseMap<pylir::Loop*, Loop> m_loops;
     llvm::DenseMap<mlir::Operation*, FunctionSpecialization> m_callSites;
 
@@ -768,6 +775,31 @@ public:
         m_recursionInfos.clear();
         m_recursionInfos.shrink_to_fit();
     }
+
+    std::vector<Loop> getLoopState(mlir::Block* block)
+    {
+        std::vector<Loop> state;
+        for (auto* loop = m_loopInfo.getLoopFor(block); loop; loop = loop->getParentLoop())
+        {
+            auto res = m_loops.find(loop);
+            if (res == m_loops.end())
+            {
+                break;
+            }
+            state.push_back(res->second);
+        }
+        return state;
+    }
+
+    void installLoopState(mlir::Block* block, const std::vector<Loop>& vec)
+    {
+        std::size_t index = 0;
+        for (auto* loop = m_loopInfo.getLoopFor(block); loop; loop = loop->getParentLoop())
+        {
+            PYLIR_ASSERT(index < vec.size());
+            m_loops[loop] = vec[index++];
+        }
+    }
 };
 
 } // namespace
@@ -1004,7 +1036,7 @@ class Scheduler
 
     void handleRecursion(const llvm::SmallPtrSetImpl<Orchestrator*>& cycle, Queue& queue)
     {
-        llvm::DenseMap<Orchestrator*, std::vector<CallWaiting>> containedOrchs;
+        llvm::DenseMap<Orchestrator*, std::vector<RecursionInfo::SavePoint>> containedOrchs;
 
         for (auto* thisOrch : cycle)
         {
@@ -1012,8 +1044,9 @@ class Scheduler
             {
                 if (cycle.contains(predOrch.orchestrator))
                 {
-                    containedOrchs[thisOrch].push_back(predOrch);
-                    auto frames = predOrch.orchestrator->skipDominating(predOrch.frame.getNextExecutedOp().getBlock());
+                    auto* block = predOrch.frame.getNextExecutedOp().getBlock();
+                    containedOrchs[thisOrch].push_back({predOrch, predOrch.orchestrator->getLoopState(block)});
+                    auto frames = predOrch.orchestrator->skipDominating(block);
                     for (auto& frame : frames)
                     {
                         queue.emplace(std::move(frame), predOrch.orchestrator);
@@ -1319,7 +1352,9 @@ public:
                 {
                     for (auto& call : calls)
                     {
-                        cycleOrch->addWaitingCall(call);
+                        cycleOrch->addWaitingCall(call.callWaiting);
+                        call.callWaiting.orchestrator->installLoopState(
+                            call.callWaiting.frame.getNextExecutedOp().getBlock(), call.loopState);
                     }
                 }
                 scheduleWaitingCallsInRecursion(queue, info.get(), info->broken);
