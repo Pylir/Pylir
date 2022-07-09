@@ -13,7 +13,7 @@
 #include <llvm/ADT/ArrayRef.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
-#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
+#include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 
 namespace pylir::TypeFlow
 {

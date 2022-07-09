@@ -18,8 +18,8 @@
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
+#include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.hpp>
-#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
 
 #include <optional>
 #include <variant>

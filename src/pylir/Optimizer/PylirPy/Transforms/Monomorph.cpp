@@ -19,7 +19,7 @@
 #include <pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
+#include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
 
@@ -167,7 +167,7 @@ public:
     /// Execution may be resumed at the operation after the call by simply calling execute again.
     /// If a return instruction was the cause of returning, a SmallVector containing the return values is returned.
     /// The Frame may not be executed again.
-    ExecutionResult execute(mlir::SymbolTableCollection& collection)
+    ExecutionResult execute(mlir::Operation* context, mlir::SymbolTableCollection& collection)
     {
         PYLIR_ASSERT(m_nextExecutedOp);
         while (true)
@@ -255,8 +255,8 @@ public:
                                 else if (lookup.isa<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr,
                                                     pylir::Py::UnboundAttr>())
                                 {
-                                    returnValue = pylir::Py::typeOfConstant(lookup.cast<mlir::Attribute>(), collection,
-                                                                            returnOp.getContext());
+                                    returnValue =
+                                        pylir::Py::typeOfConstant(lookup.cast<mlir::Attribute>(), collection, context);
                                 }
                             }
                             return returnedValues;
@@ -268,7 +268,7 @@ public:
                             if constexpr (std::is_same_v<std::decay_t<decltype(callOp)>, pylir::TypeFlow::CallOp>)
                             {
                                 function = collection.lookupNearestSymbolFrom<mlir::FunctionOpInterface>(
-                                    callOp.getContext(), callOp.getCallee());
+                                    context, callOp.getCallee());
                             }
                             else
                             {
@@ -279,8 +279,8 @@ public:
                                     if (auto callee = calleeValue.template dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
                                     {
                                         auto functionObject =
-                                            collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(
-                                                callOp.getContext(), callee);
+                                            collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context,
+                                                                                                         callee);
                                         if (functionObject)
                                         {
                                             funcAttr = functionObject.getInitializerAttr()
@@ -298,7 +298,7 @@ public:
                                     return std::nullopt;
                                 }
                                 function = collection.lookupNearestSymbolFrom<mlir::FunctionOpInterface>(
-                                    callOp.getContext(), funcAttr.getValue());
+                                    context, funcAttr.getValue());
                             }
 
                             std::vector<TypeFlowArgValue> arguments(callOp.getArguments().size());
@@ -309,8 +309,8 @@ public:
                                 // function boundaries. Everything else has to be a type.
                                 if (auto ref = value.template dyn_cast_or_null<mlir::SymbolRefAttr>())
                                 {
-                                    auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(
-                                        callOp.getContext(), ref);
+                                    auto lookup =
+                                        collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context, ref);
                                     if (lookup
                                         && lookup.getInitializerAttr().template isa_and_nonnull<pylir::Py::TypeAttr>())
                                     {
@@ -327,11 +327,11 @@ public:
                                                                         mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
                                 {
                                     argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>(),
-                                                                         collection, callOp.getContext());
+                                                                         collection, context);
                                 }
                             }
                             return FunctionCall{FunctionSpecialization{function, std::move(arguments)},
-                                                callOp.getResults(), callOp.getContext()};
+                                                callOp.getResults(), callOp.getInstruction()};
                         });
             if (optional)
             {
@@ -409,6 +409,7 @@ struct RecursionInfo
 /// execute a basic block, and then handles scheduling which basic blocks should be executed next.
 class Orchestrator
 {
+    mlir::Operation* m_context;
     pylir::Py::TypeFlow& m_typeFlowIR;
     pylir::LoopInfo& m_loopInfo;
     mlir::DominanceInfo& m_dominanceInfo;
@@ -432,7 +433,8 @@ class Orchestrator
 
     /// Creates successor frames for the given blocks. If the block is a loop header, its loop is not NULL and also
     /// passed.
-    std::vector<ExecutionFrame> buildSuccessorFrames(llvm::ArrayRef<std::pair<mlir::Block*, pylir::Loop*>> blocks)
+    std::vector<ExecutionFrame> buildSuccessorFrames(llvm::ArrayRef<std::pair<mlir::Block*, pylir::Loop*>> blocks,
+                                                     mlir::SymbolTableCollection& collection)
     {
         std::vector<ExecutionFrame> results;
         for (auto [iter, loop] : blocks)
@@ -476,7 +478,7 @@ class Orchestrator
                     auto [existing, inserted] = values.insert({arg, succValue});
                     if (!inserted)
                     {
-                        existing->second = existing->second.join(succValue);
+                        existing->second = existing->second.join(succValue, collection, m_context);
                     }
                     blockArgs[arg.getArgNumber()] = existing->second;
                 }
@@ -502,14 +504,15 @@ class Orchestrator
             }
             // We have previously encountered this loop with these block args and hence reached a fixpoint.
             // Unleash the exits!
-            auto temp = handleNoAndIntoLoopSuccessors(loopOrch.exitBlocks.getArrayRef());
+            auto temp = handleNoAndIntoLoopSuccessors(loopOrch.exitBlocks.getArrayRef(), collection);
             results.insert(results.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
             m_loops.erase(loop);
         }
         return results;
     }
 
-    std::vector<ExecutionFrame> handleNoAndIntoLoopSuccessors(mlir::BlockRange successors)
+    std::vector<ExecutionFrame> handleNoAndIntoLoopSuccessors(mlir::BlockRange successors,
+                                                              mlir::SymbolTableCollection& collection)
     {
         llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successor;
         for (auto* iter : successors)
@@ -525,7 +528,7 @@ class Orchestrator
                 successor.emplace_back(iter, succLoop);
             }
         }
-        return buildSuccessorFrames(successor);
+        return buildSuccessorFrames(successor, collection);
     }
 
     friend class InQueueCount;
@@ -588,7 +591,7 @@ public:
         return m_returnTypes;
     }
 
-    bool hasPreliminaryReturnTypes() const
+    [[nodiscard]] bool hasPreliminaryReturnTypes() const
     {
         return !m_recursionInfos.empty() && m_recursionInfos.back()->broken == this;
     }
@@ -603,8 +606,9 @@ public:
         return m_callSites;
     }
 
-    explicit Orchestrator(TypeFlowInstance& instance)
-        : m_typeFlowIR(instance.typeFLowIR),
+    explicit Orchestrator(mlir::Operation* context, TypeFlowInstance& instance)
+        : m_context(context),
+          m_typeFlowIR(instance.typeFLowIR),
           m_loopInfo(instance.loopInfo),
           m_dominanceInfo(instance.dominanceInfo),
           m_liveness(instance.liveness),
@@ -627,7 +631,7 @@ public:
                                                                     mlir::SymbolTableCollection& symbolTableCollection)
     {
         mlir::Block* block = executionFrame.getNextExecutedOp().getBlock();
-        auto result = executionFrame.execute(symbolTableCollection);
+        auto result = executionFrame.execute(m_context, symbolTableCollection);
         if (auto* call = std::get_if<FunctionCall>(&result))
         {
             auto [existing, inserted] = m_callSites.insert({call->callOp, call->functionSpecialization});
@@ -659,13 +663,13 @@ public:
         {
             llvm::SmallPtrSet<mlir::Block*, 2> set(successorBlocks.successors.begin(),
                                                    successorBlocks.successors.end());
-            frames = skipDominating(successorBlocks.skippedBlock, set);
+            frames = skipDominating(successorBlocks.skippedBlock, symbolTableCollection, set);
         }
 
         auto* loop = m_loopInfo.getLoopFor(block);
         if (!loop)
         {
-            auto temp = handleNoAndIntoLoopSuccessors(successorBlocks.successors);
+            auto temp = handleNoAndIntoLoopSuccessors(successorBlocks.successors, symbolTableCollection);
             frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
             return frames;
         }
@@ -683,15 +687,18 @@ public:
             loopOrch.exitBlocks.insert(succ);
         }
 
-        auto temp = buildSuccessorFrames(successors);
+        auto temp = buildSuccessorFrames(successors, symbolTableCollection);
         frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
         return frames;
     }
 
     std::vector<ExecutionFrame> skipDominating(
-        mlir::Block* root,
+        mlir::Block* root, mlir::SymbolTableCollection& collection,
         const llvm::SmallPtrSetImpl<mlir::Block*>& alreadyBeingScheduled = llvm::SmallPtrSet<mlir::Block*, 1>{})
     {
+        // TODO: This is not correct, it will currently always mark `root` as finished/skipped even though it should
+        //       only do that if all of its predecessors have marked it as such. More importantly, this function is
+        //       currently being used naively to skip a block, when in reality it's a call edge getting skipped.
         if (root->getParent()->hasOneBlock())
         {
             m_finishedBlocks[root] = false;
@@ -753,7 +760,7 @@ public:
                     // Otherwise all predecessors are either ready or skipped and we can schedule.
                     successors.emplace_back(succ, succLoop);
                 }
-                auto temp = buildSuccessorFrames(successors);
+                auto temp = buildSuccessorFrames(successors, collection);
                 frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
             }
         }
@@ -1035,10 +1042,11 @@ class Scheduler
                 std::move(typeFlowAnalysisManager.getAnalysis<mlir::DominanceInfo>()),
                 std::move(typeFlowAnalysisManager.getAnalysis<mlir::Liveness>()));
         }
-        return std::make_unique<Orchestrator>(*iter->second);
+        return std::make_unique<Orchestrator>(function, *iter->second);
     }
 
-    void handleRecursion(const llvm::SmallPtrSetImpl<Orchestrator*>& cycle, Queue& queue)
+    void handleRecursion(const llvm::SmallPtrSetImpl<Orchestrator*>& cycle, Queue& queue,
+                         mlir::SymbolTableCollection& collection)
     {
         llvm::DenseMap<Orchestrator*, std::vector<RecursionInfo::SavePoint>> containedOrchs;
 
@@ -1050,7 +1058,7 @@ class Scheduler
                 {
                     auto* block = predOrch.frame.getNextExecutedOp().getBlock();
                     containedOrchs[thisOrch].push_back({predOrch, predOrch.orchestrator->getLoopState(block)});
-                    auto frames = predOrch.orchestrator->skipDominating(block);
+                    auto frames = predOrch.orchestrator->skipDominating(block, collection);
                     for (auto& frame : frames)
                     {
                         queue.emplace(std::move(frame), predOrch.orchestrator);
@@ -1389,12 +1397,12 @@ public:
                 {
                     if (auto cycle = addEdge(orch, existing->second.get()); !cycle.empty())
                     {
-                        handleRecursion(cycle, queue);
+                        handleRecursion(cycle, queue, collection);
                     }
                 }
                 else
                 {
-                    handleRecursion(llvm::SmallPtrSet<Orchestrator*, 1>{orch}, queue);
+                    handleRecursion(llvm::SmallPtrSet<Orchestrator*, 1>{orch}, queue, collection);
                 }
             }
             else

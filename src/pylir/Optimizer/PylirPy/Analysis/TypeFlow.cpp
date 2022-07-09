@@ -13,7 +13,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
+#include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 
 namespace
 {
@@ -193,7 +193,7 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
             {
                 if (op->hasTrait<mlir::OpTrait::ReturnLike>())
                 {
-                    builder.create<pylir::TypeFlow::ReturnOp>(mapOperands(op->getOperands()), op);
+                    builder.create<pylir::TypeFlow::ReturnOp>(mapOperands(op->getOperands()));
                     return;
                 }
                 if (op->hasTrait<mlir::OpTrait::IsTerminator>())

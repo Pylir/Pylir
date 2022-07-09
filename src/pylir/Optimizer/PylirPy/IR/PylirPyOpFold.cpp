@@ -763,6 +763,13 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
 
 mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (auto tuple = operands[0].dyn_cast_or_null<pylir::Py::TupleAttr>())
+    {
+        if (auto element = operands[1])
+        {
+            return mlir::BoolAttr::get(getContext(), llvm::is_contained(tuple.getValue(), element));
+        }
+    }
     if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
     {
         getTupleMutable().assign(tupleCopy.getTuple());
@@ -1036,7 +1043,7 @@ pylir::Py::TypeRefineResult
         result.emplace_back(UnboundType::get(getContext()));
         return TypeRefineResult::Success;
     }
-    mlir::IntegerAttr index = argumentTypes[1].dyn_cast_or_null<mlir::IntegerAttr>();
+    auto index = argumentTypes[1].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!index)
     {
         Py::ObjectTypeInterface sumType = tupleType.getElements().front();

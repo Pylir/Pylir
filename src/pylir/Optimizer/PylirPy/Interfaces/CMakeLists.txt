@@ -16,6 +16,5 @@ function(add_interface name)
     target_link_libraries(PylirPy${name} PUBLIC MLIRIR)
 endfunction()
 
-add_interface(TypeRefineableInterface)
 add_interface(ExceptionHandlingInterface)
 add_interface(ObjectFromTypeObjectInterface)

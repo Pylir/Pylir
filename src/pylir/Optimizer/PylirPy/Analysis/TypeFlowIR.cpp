@@ -14,7 +14,7 @@
 
 #include <pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
-#include <pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.hpp>
+#include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 
 void pylir::TypeFlow::TypeFlowDialect::initialize()
 {
@@ -81,7 +81,7 @@ mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAtt
     if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
     {
         results.emplace_back(
-            Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getContext()).getTypeObject());
+            Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getInstruction()).getTypeObject());
         return mlir::success();
     }
     if (auto makeObject = getInput().getDefiningOp<MakeObjectOp>())
@@ -261,26 +261,6 @@ mlir::Operation::operand_range pylir::TypeFlow::CallOp::getArgOperands()
 mlir::Operation::operand_range pylir::TypeFlow::CallIndirectOp::getArgOperands()
 {
     return getArguments();
-}
-
-mlir::Value pylir::TypeFlow::TypeOfOp::mapValue(::mlir::Value resultValue)
-{
-    return getContext()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
-}
-
-mlir::Value pylir::TypeFlow::CalcOp::mapValue(::mlir::Value resultValue)
-{
-    return getInstruction()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
-}
-
-mlir::Value pylir::TypeFlow::CallOp::mapValue(::mlir::Value resultValue)
-{
-    return getContext()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
-}
-
-mlir::Value pylir::TypeFlow::CallIndirectOp::mapValue(::mlir::Value resultValue)
-{
-    return getContext()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
 }
 
 #define GET_OP_CLASSES

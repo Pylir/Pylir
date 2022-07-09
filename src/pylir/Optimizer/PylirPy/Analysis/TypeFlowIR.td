@@ -124,10 +124,10 @@ mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 
 def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
 	DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
-	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$context);
+	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$instruction);
 	let results = (outs TypeFlow_MetaType:$result);
 
-	let assemblyFormat = "$input attr-dict $context";
+	let assemblyFormat = "$input attr-dict $instruction";
 
 	let hasFolder = 1;
 
@@ -183,20 +183,21 @@ def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
 }
 
 def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEffect]> {
-	let arguments = (ins Variadic<TypeFlow_MetaType>:$values, TypeFlow_InstructionAttr:$context);
+	let arguments = (ins Variadic<TypeFlow_MetaType>:$values);
 	let results = (outs);
 
-    let assemblyFormat = "$values $context attr-dict";
+    let assemblyFormat = "$values attr-dict";
 }
 
 
 class TypeFlow_CallBase<string name, Constraint calleeType> : TypeFlow_Op<name,
 	[DeclareOpInterfaceMethods<CallOpInterface>, NoSideEffect,
 	 DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
-	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments, TypeFlow_InstructionAttr:$context);
+	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments,
+	                     TypeFlow_InstructionAttr:$instruction);
 	let results = (outs Variadic<TypeFlow_MetaType>:$results);
 
-	let assemblyFormat = "$callee `(`$arguments `)` `:` type(results) attr-dict $context";
+	let assemblyFormat = "$callee `(`$arguments `)` `:` type(results) attr-dict $instruction";
 }
 
 def TypeFlow_CallOp : TypeFlow_CallBase<"call", SymbolRefAttr>;

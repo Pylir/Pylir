@@ -37,13 +37,17 @@ set(LLVM_TARGET_DEFINITIONS PylirPyPatterns.td)
 mlir_tablegen(PylirPyPatterns.cpp.inc -gen-rewriters)
 add_public_tablegen_target(PylirPyPatternsIncGen)
 
+set(LLVM_TARGET_DEFINITIONS TypeRefineableInterface.td)
+mlir_tablegen(TypeRefineableInterface.h.inc -gen-op-interface-decls)
+mlir_tablegen(TypeRefineableInterface.cpp.inc -gen-op-interface-defs)
+add_public_tablegen_target(TypeRefineableInterfaceIncGen)
+
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
-        ObjectAttrInterface.cpp IntAttrInterface.cpp ObjectTypeInterface.cpp)
+        ObjectAttrInterface.cpp IntAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp)
 add_dependencies(PylirPyDialect PylirPyOpsIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen IntAttrInterfaceIncGen
-        ObjectTypeInterfaceIncGen)
+        ObjectTypeInterfaceIncGen TypeRefineableInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
-        PylirCaptureInterface PylirPyTypeRefineableInterface PylirPyExceptionHandlingInterface
-        PylirPyObjectFromTypeObjectInterface
+        PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyObjectFromTypeObjectInterface
         PRIVATE MLIRArithmeticDialect MLIRControlFlowDialect)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)

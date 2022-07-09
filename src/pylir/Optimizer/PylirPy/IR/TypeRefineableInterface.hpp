@@ -13,7 +13,7 @@
 
 #include <llvm/ADT/ArrayRef.h>
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyTypes.hpp>
+#include "PylirPyTypes.hpp"
 
 namespace pylir::Py
 {
@@ -106,25 +106,7 @@ public:
         return isa_and_nonnull<T>() ? cast<T>() : nullptr;
     }
 
-    TypeAttrUnion join(TypeAttrUnion rhs)
-    {
-        if (!rhs || !*this)
-        {
-            return {};
-        }
-        if (*this == rhs)
-        {
-            return *this;
-        }
-        if (auto thisType = dyn_cast<ObjectTypeInterface>())
-        {
-            if (auto rhsType = rhs.dyn_cast<ObjectTypeInterface>())
-            {
-                return joinTypes(thisType, rhsType);
-            }
-        }
-        return {};
-    }
+    TypeAttrUnion join(TypeAttrUnion rhs, mlir::SymbolTableCollection& collection, mlir::Operation* context);
 
     using Base::operator bool;
 
