@@ -1022,7 +1022,6 @@ FilteredDFIteratorSet(F) -> FilteredDFIteratorSet<typename llvm::function_traits
 /// Responsible for managing Orchestrators and their execution.
 class Scheduler
 {
-    llvm::ThreadPool& m_threadPool;
     llvm::DenseMap<mlir::FunctionOpInterface, std::unique_ptr<TypeFlowInstance>> m_typeFlowInstances;
     llvm::MapVector<FunctionSpecialization, std::unique_ptr<Orchestrator>> m_orchestrators;
 
@@ -1257,7 +1256,6 @@ class Scheduler
     }
 
 public:
-    explicit Scheduler(llvm::ThreadPool& threadPool) : m_threadPool(threadPool) {}
 
     /// Run the typeflow analysis starting from the given root functions. These may not take any DynamicType function
     /// arguments.
@@ -1265,7 +1263,6 @@ public:
     {
         Queue queue;
 
-        (void)m_threadPool;
         for (auto iter : roots)
         {
             auto spec = FunctionSpecialization(iter, {});
@@ -1504,7 +1501,7 @@ void Monomorph::runOnOperation()
 
     llvm::MapVector<FunctionSpecialization, std::unique_ptr<Orchestrator>> results;
     {
-        Scheduler scheduler(getContext().getThreadPool());
+        Scheduler scheduler;
         scheduler.run(roots.getArrayRef(), getAnalysisManager());
         results = std::move(scheduler.getResults());
     }
