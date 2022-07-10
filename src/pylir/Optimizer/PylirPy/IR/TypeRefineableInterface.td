@@ -19,10 +19,14 @@ def TypeRefineableInterface : OpInterface<"TypeRefineableInterface"> {
             operation. For each operand of type `py.dynamic`, the input type is passed in, for all other operands of
             different types, constant values may be passed in.
             If the type or value of an operand is unknown, its corresponding array slot is a nullptr.
-            This operation may not succeed in which case `TypeRefineResult::Failure` is returned.
-            If only parts of the type can be deduced `TypeRefineResult::Approximate` is returned. This currently implies
-            that a `ClassType` is returned instead of more concrete ObjectTypeInterface.
-            All other cases should return `TypeRefineResult::Success`.
+
+            An operation may return one of three results:
+            `TypeRefineResult::Failure` signals that no proper results could be calculated from the given inputs.
+            `TypeRefineResult::Success` signals that an exact result was returned that is suitable for constant folding.
+            `TypeRefineResult::Approximate` signals that only a conservative result could be returned. It is unsuitable
+            for constant folding in `typeFlow` as a more accurate result may still be achieved during interpretation.
+            The value returned has to be a conceptual supertype of all possible exact results. This makes it suitable
+            for constant folding of `py.typeOf` eg, as a returned type object HAS to be equal to all exact results.
 
             If there is no failure, the types of the results of this op are expected to be pushed into `resultTypes`,
             which must be equal to the amount of results of the operation at the end of the call.

@@ -1164,10 +1164,13 @@ struct ArithSelectTypeRefinable
         auto boolean = inputs[0].dyn_cast_or_null<mlir::BoolAttr>();
         if (!boolean)
         {
-            // TODO: Having issues with the interface definition here again. I want to be able to return a
-            //  variant/joined type of lhs and rhs, but calling this a success is sort of lying, while calling it an
-            //  approximate makes it be ignored for Monomorph.
-            return pylir::Py::TypeRefineResult::Failure;
+            auto joined = pylir::Py::joinTypes(lhsType, rhsType);
+            if (!joined)
+            {
+                return pylir::Py::TypeRefineResult::Failure;
+            }
+            resultTypes.emplace_back(joined);
+            return pylir::Py::TypeRefineResult::Approximate;
         }
         if (boolean.getValue() ? !lhsType : !rhsType)
         {

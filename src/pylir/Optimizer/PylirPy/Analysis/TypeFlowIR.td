@@ -168,6 +168,13 @@ def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOp
 	let assemblyFormat = "(`value` $value_calc^)? $input attr-dict $instruction";
 
 	let hasFolder = 1;
+
+	let extraClassDeclaration = [{
+        mlir::LogicalResult exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
+                                 ::llvm::SmallVectorImpl<OpFoldResult>& results,
+                                 ::mlir::SymbolTableCollection& collection,
+                                 bool forFolding);
+	}];
 }
 
 def TypeFlow_BranchOp : TypeFlow_Op<"branch",

@@ -165,7 +165,7 @@ mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::Ty
 
 mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
                                                   ::llvm::SmallVectorImpl<OpFoldResult>& results,
-                                                  ::mlir::SymbolTableCollection& collection)
+                                                  ::mlir::SymbolTableCollection& collection, bool forFolding)
 {
     llvm::SmallVector<mlir::OpFoldResult> mlirFoldResults;
     if (mlir::succeeded(getInstruction()->fold(
@@ -225,13 +225,25 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
         }
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> resultTypes;
-    if (refinable.refineTypes(inputs, resultTypes, collection) != Py::TypeRefineResult::Success)
+    auto result = refinable.refineTypes(inputs, resultTypes, collection);
+    if (forFolding && result != Py::TypeRefineResult::Success)
+    {
+        return mlir::failure();
+    }
+    if (!forFolding && result == Py::TypeRefineResult::Failure)
     {
         return mlir::failure();
     }
     results.resize(resultTypes.size());
     std::copy(resultTypes.begin(), resultTypes.end(), results.begin());
     return mlir::success();
+}
+
+mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
+                                                  ::llvm::SmallVectorImpl<OpFoldResult>& results,
+                                                  ::mlir::SymbolTableCollection& collection)
+{
+    return exec(operands, results, collection, false);
 }
 
 mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
@@ -249,7 +261,7 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attri
                                                 }
                                                 return attr;
                                             })),
-            res, collection)))
+            res, collection, true)))
     {
         return mlir::failure();
     }
