@@ -1024,7 +1024,7 @@ class Scheduler
 {
     llvm::ThreadPool& m_threadPool;
     llvm::DenseMap<mlir::FunctionOpInterface, std::unique_ptr<TypeFlowInstance>> m_typeFlowInstances;
-    llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>> m_orchestrators;
+    llvm::MapVector<FunctionSpecialization, std::unique_ptr<Orchestrator>> m_orchestrators;
 
     using Queue = std::queue<std::pair<ExecutionFrame, InQueueCount>>;
 
@@ -1445,49 +1445,42 @@ public:
         }
     }
 
-    llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>>& getResults()
+    llvm::MapVector<FunctionSpecialization, std::unique_ptr<Orchestrator>>& getResults()
     {
         return m_orchestrators;
     }
 };
 
-bool setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
+bool calleeDiffers(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
 {
     return llvm::TypeSwitch<mlir::Operation*, bool>(op)
-        .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>(
-            [&](auto&& op)
-            {
-                if (op.getCalleeAttr() == callee)
-                {
-                    return false;
-                }
-                op.setCalleeAttr(callee);
-                return true;
-            })
-        .Case(
-            [&](pylir::Py::FunctionCallOp op)
+        .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>([&](auto op) { return op.getCalleeAttr() != callee; })
+        .Case<pylir::Py::FunctionCallOp, pylir::Py::FunctionInvokeOp>(
+            [&](auto op)
             {
                 // If it hasn't been turned into a constant than redirecting it to a clone of the given constant
                 // is not valid either.
-                if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant()))
-                {
-                    return false;
-                }
+                return mlir::matchPattern(op.getFunction(), mlir::m_Constant());
+            });
+}
+
+void setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
+{
+    llvm::TypeSwitch<mlir::Operation*>(op)
+        .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>([&](auto&& op) { op.setCalleeAttr(callee); })
+        .Case(
+            [&](pylir::Py::FunctionCallOp op)
+            {
                 mlir::OpBuilder builder(op);
                 auto newCall =
                     builder.create<pylir::Py::CallOp>(op.getLoc(), op->getResultTypes(), callee, op.getCallOperands());
                 newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                 op->replaceAllUsesWith(newCall);
                 op->erase();
-                return true;
             })
         .Case(
             [&](pylir::Py::FunctionInvokeOp op)
             {
-                if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant()))
-                {
-                    return false;
-                }
                 mlir::OpBuilder builder(op);
                 auto newCall = builder.create<pylir::Py::InvokeOp>(
                     op.getLoc(), op->getResultTypes(), callee, op.getCallOperands(), op.getNormalDestOperands(),
@@ -1495,7 +1488,6 @@ bool setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
                 newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                 op->replaceAllUsesWith(newCall);
                 op->erase();
-                return true;
             });
 }
 
@@ -1510,7 +1502,7 @@ void Monomorph::runOnOperation()
         }
     }
 
-    llvm::DenseMap<FunctionSpecialization, std::unique_ptr<Orchestrator>> results;
+    llvm::MapVector<FunctionSpecialization, std::unique_ptr<Orchestrator>> results;
     {
         Scheduler scheduler(getContext().getThreadPool());
         scheduler.run(roots.getArrayRef(), getAnalysisManager());
@@ -1599,37 +1591,66 @@ void Monomorph::runOnOperation()
         }
     }
 
-    for (auto& orchestrator : llvm::make_second_range(results))
+    // Redirect all call-sites to the specializations. This is not done naively but only if the target function is a
+    // result of cloning. That is because it has only been cloned if it itself had to have changed. Since cloning itself
+    // can also be caused by redirecting a call-site to a clone, we iterate through this until a fixpoint is reached.
+    // This implementation could be improved via a topological sort or similar, but this will do for now.
+    bool cloneOccurred;
+    do
     {
-        for (const auto& [origCall, func] : orchestrator->getCallSites())
+        cloneOccurred = false;
+        for (auto& [thisFunc, orchestrator] : results)
         {
-            if (!func.function)
+            bool isRoot = roots.contains(thisFunc.function);
+            auto& thisClone = clones[thisFunc];
+            for (const auto& [origCall, func] : orchestrator->getCallSites())
             {
-                continue;
-            }
+                auto calcCall = [&, &origCall = origCall, &thisFunc = thisFunc]
+                {
+                    if (thisClone.function == thisFunc.function)
+                    {
+                        return origCall;
+                    }
+                    auto& mapping = thisClone.mapping;
+                    // TODO: Map call properly (not like the following code) as soon as it is supported by
+                    // BlockAndValueMapping
+                    if (origCall->getNumResults() != 0)
+                    {
+                        return mapping.lookupOrDefault(origCall->getResult(0)).getDefiningOp();
+                    }
 
-            auto& mapping = clones[func].mapping;
-            // TODO: Map call properly (not like the following code) as soon as it is supported by
-            // BlockAndValueMapping
-            mlir::Operation* call;
-            if (origCall->getNumResults() != 0)
-            {
-                call = mapping.lookupOrDefault(origCall->getResult(0)).getDefiningOp();
-            }
-            else
-            {
-                auto* mappedBlock = mapping.lookupOrDefault(origCall->getBlock());
-                auto distance = std::distance(origCall->getBlock()->begin(), mlir::Block::iterator{origCall});
-                call = &*std::next(mappedBlock->begin(), distance);
-            }
+                    auto* mappedBlock = mapping.lookupOrDefault(origCall->getBlock());
+                    auto distance = std::distance(origCall->getBlock()->begin(), mlir::Block::iterator{origCall});
+                    return &*std::next(mappedBlock->begin(), distance);
+                };
 
-            if (setCallee(call, mlir::FlatSymbolRefAttr::get(clones[func].function)))
-            {
+                auto& calleeClone = clones[func];
+                auto* call = calcCall();
+                // We only change the call-site if the callee had to be cloned, since cloned implies IR was changed
+                // based on prior analysis.
+                if (!func.function || calleeClone.function == func.function
+                    || !calleeDiffers(call, mlir::FlatSymbolRefAttr::get(calleeClone.function)))
+                {
+                    continue;
+                }
+
+                // Lazy cloning of this function if it has not yet occurred. Just like in the constant setting loop.
+                if (thisClone.function == thisFunc.function && !isRoot)
+                {
+                    thisClone.function = thisClone.function->clone(thisClone.mapping);
+                    mlir::cast<mlir::SymbolOpInterface>(*thisClone.function).setPrivate();
+                    table.insert(thisClone.function);
+                    m_functionsCloned++;
+                    cloneOccurred = true;
+                    call = calcCall();
+                }
+
+                setCallee(call, mlir::FlatSymbolRefAttr::get(calleeClone.function));
                 m_callsChanged++;
                 changed = true;
             }
         }
-    }
+    } while (cloneOccurred);
 
     if (!changed)
     {
