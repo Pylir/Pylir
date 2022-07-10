@@ -1462,10 +1462,16 @@ bool calleeDiffers(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
             });
 }
 
-void setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
+// Returns the new call op if one had to be created to replace op.
+mlir::Operation* setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
 {
-    llvm::TypeSwitch<mlir::Operation*>(op)
-        .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>([&](auto&& op) { op.setCalleeAttr(callee); })
+    return llvm::TypeSwitch<mlir::Operation*, mlir::Operation*>(op)
+        .Case<pylir::Py::CallOp, pylir::Py::InvokeOp>(
+            [&](auto&& op)
+            {
+                op.setCalleeAttr(callee);
+                return nullptr;
+            })
         .Case(
             [&](pylir::Py::FunctionCallOp op)
             {
@@ -1475,6 +1481,7 @@ void setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
                 newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                 op->replaceAllUsesWith(newCall);
                 op->erase();
+                return newCall;
             })
         .Case(
             [&](pylir::Py::FunctionInvokeOp op)
@@ -1486,6 +1493,7 @@ void setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
                 newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                 op->replaceAllUsesWith(newCall);
                 op->erase();
+                return newCall;
             });
 }
 
@@ -1643,7 +1651,12 @@ void Monomorph::runOnOperation()
                     call = calcCall();
                 }
 
-                setCallee(call, mlir::FlatSymbolRefAttr::get(calleeClone.function));
+                auto* newCall = setCallee(call, mlir::FlatSymbolRefAttr::get(calleeClone.function));
+                if (newCall)
+                {
+                    // call is now invalid, but it's still contained within the mapping. Have to update it.
+                    thisClone.mapping.map(origCall->getResults(), newCall->getResults());
+                }
                 m_callsChanged++;
                 changed = true;
             }
