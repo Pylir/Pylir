@@ -574,6 +574,10 @@ mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribu
 
 mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
+    if (auto op = getInput().getDefiningOp<Py::BoolFromI1Op>())
+    {
+        return op.getInput();
+    }
     auto boolean = operands[0].dyn_cast_or_null<Py::BoolAttr>();
     if (!boolean)
     {
@@ -584,6 +588,10 @@ mlir::OpFoldResult pylir::Py::BoolToI1Op::fold(::llvm::ArrayRef<mlir::Attribute>
 
 mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
+    if (auto op = getInput().getDefiningOp<Py::BoolToI1Op>())
+    {
+        return op.getInput();
+    }
     auto boolean = operands[0].dyn_cast_or_null<mlir::BoolAttr>();
     if (!boolean)
     {
