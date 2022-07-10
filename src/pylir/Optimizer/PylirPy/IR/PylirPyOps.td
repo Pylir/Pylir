@@ -254,7 +254,8 @@ def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, Alwa
     let hasFolder = 1;
 }
 
-def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound, RefinedObjectFromTypeObject]> {
+def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound, ObjectFromTypeObjectInterface,
+    DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
     let arguments = (ins DynamicType:$tuple, DynamicType:$type_object);
     let results = (outs Res<DynamicType, "", [MemAlloc]>:$result);
 

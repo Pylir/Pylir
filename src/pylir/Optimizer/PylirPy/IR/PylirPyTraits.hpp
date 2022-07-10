@@ -87,13 +87,13 @@ template <class ConcreteType>
 class RefinedObjectFromTypeObjectImpl : public TypeRefineableInterface::Trait<ConcreteType>
 {
 public:
-    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
+    pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> operands,
                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                             mlir::SymbolTableCollection&)
     {
-        mlir::FlatSymbolRefAttr type;
-        if (!mlir::matchPattern(mlir::cast<ConcreteType>(this->getOperation()).getTypeObject(),
-                                mlir::m_Constant(&type)))
+        mlir::FlatSymbolRefAttr type = operands[mlir::cast<ConcreteType>(this->getOperation()).getTypeObjectIndex()]
+                                           .template dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+        if (!type)
         {
             return TypeRefineResult::Failure;
         }

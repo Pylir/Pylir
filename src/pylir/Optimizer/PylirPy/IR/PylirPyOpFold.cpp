@@ -1031,8 +1031,27 @@ pylir::Py::TypeRefineResult
         }
         elementTypes.push_back(iter.cast<Py::ObjectTypeInterface>());
     }
-    result.emplace_back(Py::TupleType::get(
-        getContext(), mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elementTypes));
+    result.emplace_back(Py::TupleType::get(getContext(), {}, elementTypes));
+    return TypeRefineResult::Success;
+}
+
+pylir::Py::TypeRefineResult
+    pylir::Py::TupleCopyOp::refineTypes(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
+                                        ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes,
+                                        ::mlir::SymbolTableCollection&)
+{
+    auto typeObject = inputs[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+    if (!typeObject)
+    {
+        return TypeRefineResult::Failure;
+    }
+    auto tuple = inputs[0].dyn_cast_or_null<pylir::Py::TupleType>();
+    if (!tuple)
+    {
+        resultTypes.emplace_back(Py::ClassType::get(getContext(), typeObject));
+        return TypeRefineResult::Approximate;
+    }
+    resultTypes.emplace_back(Py::TupleType::get(getContext(), typeObject, tuple.getElements()));
     return TypeRefineResult::Success;
 }
 
@@ -1088,7 +1107,7 @@ pylir::Py::TypeRefineResult
         result.emplace_back(tupleType);
         return TypeRefineResult::Success;
     }
-    mlir::IntegerAttr index = argumentTypes[0].dyn_cast_or_null<mlir::IntegerAttr>();
+    auto index = argumentTypes[0].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!index)
     {
         Py::ObjectTypeInterface sumType = tupleType.getElements().front();
@@ -1104,9 +1123,8 @@ pylir::Py::TypeRefineResult
         result.emplace_back(Py::TupleType::get(getContext()));
         return TypeRefineResult::Success;
     }
-    result.emplace_back(Py::TupleType::get(getContext(),
-                                           mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name),
-                                           tupleType.getElements().drop_front(index.getValue().getZExtValue())));
+    result.emplace_back(
+        Py::TupleType::get(getContext(), {}, tupleType.getElements().drop_front(index.getValue().getZExtValue())));
     return TypeRefineResult::Success;
 }
 
@@ -1122,7 +1140,7 @@ pylir::Py::TypeRefineResult
     }
     llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());
     elements.insert(elements.begin(), argumentTypes[0].cast<Py::ObjectTypeInterface>());
-    result.emplace_back(Py::TupleType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name), elements));
+    result.emplace_back(Py::TupleType::get({}, elements));
     return TypeRefineResult::Success;
 }
 

@@ -78,7 +78,8 @@ func.func @create1(%0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: typeFlow.func @create1
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK: %[[OBJ:.*]] = makeObject %[[ARG]]
+// CHECK: %[[OBJ:.*]] = calc %[[ARG]]
+// CHECK-SAME: py.makeObject
 // CHECK-NEXT: return %[[OBJ]]
 
 py.globalValue const @builtins.type = #py.type
@@ -92,5 +93,7 @@ func.func @create2(%0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: typeFlow.func @create2
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK: %[[OBJ:.*]] = makeObject %[[ARG]]
+// CHECK: %[[C:.*]] = constant #py.tuple<()>
+// CHECK: %[[OBJ:.*]] = calc %[[C]], %[[ARG]]
+// CHECK-SAME: py.tuple.copy
 // CHECK-NEXT: return %[[OBJ]]

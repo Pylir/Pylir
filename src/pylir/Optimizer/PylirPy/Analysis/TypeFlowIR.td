@@ -134,7 +134,7 @@ def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect, DeclareOpInterfaceM
 	let extraClassDefinition = foldAsExec;
 }
 
-def TypeFlow_TupleLenOp : TypeFlow_Op<"tuple.len", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
+def TypeFlow_TupleLenOp : TypeFlow_Op<"tupleLen", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
 	DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$instruction);
 	let results = (outs TypeFlow_MetaType:$result);
@@ -152,18 +152,6 @@ def TypeFlow_IsOp : TypeFlow_Op<"is", [NoSideEffect, DeclareOpInterfaceMethods<T
 	let results = (outs TypeFlow_MetaType:$result);
 
 	let assemblyFormat = "$lhs `,` $rhs attr-dict $instruction";
-
-	let hasFolder = 1;
-
-	let extraClassDefinition = foldAsExec;
-}
-
-def TypeFlow_MakeObjectOp : TypeFlow_Op<"makeObject", [NoSideEffect,
-	DeclareOpInterfaceMethods<TypeFlowExecInterface>]> {
-	let arguments = (ins TypeFlow_MetaType:$input);
-	let results = (outs TypeFlow_MetaType:$result);
-
-	let assemblyFormat = "$input attr-dict";
 
 	let hasFolder = 1;
 

@@ -138,13 +138,6 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
                 foldEdges.insert(typeOf);
             })
         .Case(
-            [&](pylir::Py::ObjectFromTypeObjectInterface fromTypeObjectInterface)
-            {
-                auto newMakeObject = builder.create<pylir::TypeFlow::MakeObjectOp>(
-                    valueTracking.use(fromTypeObjectInterface.getTypeObject()));
-                valueTracking.def(fromTypeObjectInterface->getResult(0), newMakeObject);
-            })
-        .Case(
             [&](pylir::Py::TupleLenOp op)
             {
                 auto tupleLen = builder.create<pylir::TypeFlow::TupleLenOp>(valueTracking.use(op.getInput()), op);

@@ -13,7 +13,12 @@ def ObjectFromTypeObjectInterface : OpInterface<"ObjectFromTypeObjectInterface">
     let cppNamespace = "::pylir::Py";
 
     let methods = [
-        InterfaceMethod<[{}], "::mlir::Value", "getTypeObject", (ins)>,
+        InterfaceMethod<[{}], "unsigned", "getTypeObjectIndex", (ins), "", [{
+            return static_cast<mlir::OperandRange>($_op.getTypeObjectMutable()).getBeginOperandIndex();
+        }]>,
+        InterfaceMethod<[{}], "::mlir::Value", "getTypeObject", (ins), "", [{
+            return $_op->getOperand($_op->getTypeObjectIndex());
+        }]>,
     ];
 
     let verify = [{
