@@ -92,6 +92,81 @@ mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAtt
     return mlir::failure();
 }
 
+mlir::LogicalResult pylir::TypeFlow::TupleLenOp::exec(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> operands,
+                                                      ::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>& results,
+                                                      ::mlir::SymbolTableCollection&)
+{
+    llvm::SmallVector<mlir::OpFoldResult> mlirFoldResults;
+    if (mlir::succeeded(getInstruction()->fold(
+            llvm::to_vector(llvm::map_range(operands, [](Py::TypeAttrUnion value)
+                                            { return value.dyn_cast_or_null<mlir::Attribute>(); })),
+            mlirFoldResults))
+        && !mlirFoldResults.empty())
+    {
+        for (auto [iter, type] : llvm::zip(mlirFoldResults, getInstruction()->getResultTypes()))
+        {
+            if (auto attr = iter.dyn_cast<mlir::Attribute>())
+            {
+                results.emplace_back(attr);
+            }
+            else
+            {
+                results.emplace_back(iter.get<mlir::Value>());
+            }
+        }
+        return mlir::success();
+    }
+    if (auto type = operands[0].dyn_cast_or_null<pylir::Py::TupleType>())
+    {
+        results.emplace_back(mlir::IntegerAttr::get(getInstruction()->getResultTypes()[0], type.getElements().size()));
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
+mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> operands,
+                                                ::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>& results,
+                                                ::mlir::SymbolTableCollection& collection)
+{
+    if (auto lhsAttr = operands[0].dyn_cast_or_null<mlir::Attribute>())
+    {
+        if (auto rhsAttr = operands[0].dyn_cast_or_null<mlir::Attribute>())
+        {
+            if (lhsAttr != rhsAttr)
+            {
+                results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+                return mlir::success();
+            }
+            if (lhsAttr.isa<mlir::SymbolRefAttr>() && rhsAttr.isa<mlir::SymbolRefAttr>())
+            {
+                results.emplace_back(mlir::BoolAttr::get(getContext(), true));
+                return mlir::success();
+            }
+            return mlir::failure();
+        }
+    }
+    auto lhsType = operands[0].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
+    auto rhsType = operands[1].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
+    if (!lhsType && operands[0].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    {
+        lhsType = Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getInstruction());
+    }
+    if (!rhsType && operands[1].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    {
+        rhsType = Py::typeOfConstant(operands[1].cast<mlir::Attribute>(), collection, getInstruction());
+    }
+    if (!lhsType || !rhsType)
+    {
+        return mlir::failure();
+    }
+    if (rhsType != lhsType)
+    {
+        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
+        return mlir::success();
+    }
+    return mlir::failure();
+}
+
 mlir::LogicalResult pylir::TypeFlow::MakeObjectOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
                                                         ::llvm::SmallVectorImpl<OpFoldResult>& results,
                                                         ::mlir::SymbolTableCollection&)
@@ -190,10 +265,7 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attri
                                                 {
                                                     return typeAttr.getValue().cast<pylir::Py::ObjectTypeInterface>();
                                                 }
-                                                else
-                                                {
-                                                    return attr;
-                                                }
+                                                return attr;
                                             })),
             res, collection)))
     {

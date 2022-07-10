@@ -145,6 +145,21 @@ void dispatchOperations(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder
                 valueTracking.def(fromTypeObjectInterface->getResult(0), newMakeObject);
             })
         .Case(
+            [&](pylir::Py::TupleLenOp op)
+            {
+                auto tupleLen = builder.create<pylir::TypeFlow::TupleLenOp>(valueTracking.use(op.getInput()), op);
+                valueTracking.def(op, tupleLen);
+                foldEdges.insert(op);
+            })
+        .Case(
+            [&](pylir::Py::IsOp op)
+            {
+                auto isOp = builder.create<pylir::TypeFlow::IsOp>(valueTracking.use(op.getLhs()),
+                                                                  valueTracking.use(op.getRhs()), op);
+                valueTracking.def(op, isOp);
+                foldEdges.insert(op);
+            })
+        .Case(
             [&](mlir::CallOpInterface callOp)
             {
                 auto callable = callOp.getCallableForCallee();

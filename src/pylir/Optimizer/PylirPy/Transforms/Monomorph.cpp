@@ -1267,7 +1267,8 @@ public:
         {
             auto spec = FunctionSpecialization(iter, {});
             auto function = spec.function;
-            auto& orchestrator = m_orchestrators[std::move(spec)] = createOrchestrator(function, moduleManager);
+            auto& orchestrator =
+                m_orchestrators.insert({spec, createOrchestrator(function, moduleManager)}).first->second;
             queue.emplace(ExecutionFrame(&orchestrator->getEntryBlock()->front()), orchestrator.get());
         }
 
