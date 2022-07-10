@@ -714,7 +714,7 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
 mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> constantOperands,
                                                  ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
-    if (auto tuple = resolveValue(*this, constantOperands[0]).dyn_cast_or_null<pylir::Py::TupleAttr>())
+    if (auto tuple = resolveValue(*this, constantOperands[0], false).dyn_cast_or_null<pylir::Py::TupleAttr>())
     {
         for (auto iter : tuple.getValue())
         {
@@ -763,7 +763,7 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
 
 mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tuple = operands[0].dyn_cast_or_null<pylir::Py::TupleAttr>())
+    if (auto tuple = resolveValue(*this, operands[0], false).dyn_cast_or_null<pylir::Py::TupleAttr>())
     {
         if (auto element = operands[1])
         {
