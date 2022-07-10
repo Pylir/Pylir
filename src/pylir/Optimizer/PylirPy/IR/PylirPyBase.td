@@ -30,6 +30,8 @@ def PylirPy_Dialect : Dialect {
         void initializeAttributes();
 
         void initializeTypes();
+
+        void initializeExternalModels();
     }];
 
     let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;

@@ -21,6 +21,7 @@
 #include "PylirPyAttributes.hpp"
 #include "PylirPyOps.hpp"
 #include "PylirPyTypes.hpp"
+#include "TypeRefineableInterface.hpp"
 
 namespace
 {
@@ -117,6 +118,7 @@ void pylir::Py::PylirPyDialect::initialize()
         >();
     initializeTypes();
     initializeAttributes();
+    initializeExternalModels();
     addInterfaces<PylirPyInlinerInterface, PylirPyCostInterface>();
 }
 

@@ -1146,6 +1146,38 @@ pylir::Py::TypeRefineResult
 
 namespace
 {
+
+struct ArithSelectTypeRefinable
+    : public pylir::Py::TypeRefineableInterface::ExternalModel<ArithSelectTypeRefinable, mlir::arith::SelectOp>
+{
+    pylir::Py::TypeRefineResult refineTypes(mlir::Operation*, ::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
+                                            ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes,
+                                            ::mlir::SymbolTableCollection&) const
+    {
+        auto lhsType = inputs[1].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
+        auto rhsType = inputs[2].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
+        if (lhsType && rhsType && lhsType == rhsType)
+        {
+            resultTypes.emplace_back(lhsType);
+            return pylir::Py::TypeRefineResult::Success;
+        }
+        auto boolean = inputs[0].dyn_cast_or_null<mlir::BoolAttr>();
+        if (!boolean)
+        {
+            // TODO: Having issues with the interface definition here again. I want to be able to return a
+            //  variant/joined type of lhs and rhs, but calling this a success is sort of lying, while calling it an
+            //  approximate makes it be ignored for Monomorph.
+            return pylir::Py::TypeRefineResult::Failure;
+        }
+        if (boolean.getValue() ? !lhsType : !rhsType)
+        {
+            return pylir::Py::TypeRefineResult::Failure;
+        }
+        resultTypes.emplace_back(boolean.getValue() ? lhsType : rhsType);
+        return pylir::Py::TypeRefineResult::Success;
+    }
+};
+
 pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
                                          mlir::Attribute attr)
 {
@@ -1226,4 +1258,9 @@ void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(::mlir::RewritePatte
     populateWithGenerated(results);
     results.insert<NoopBlockArgRemove>(getContext());
     results.insert<PassthroughArgRemove>(getContext());
+}
+
+void pylir::Py::PylirPyDialect::initializeExternalModels()
+{
+    mlir::arith::SelectOp::attachInterface<ArithSelectTypeRefinable>(*getContext());
 }
