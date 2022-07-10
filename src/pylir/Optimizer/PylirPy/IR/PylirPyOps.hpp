@@ -69,9 +69,9 @@ struct AddableExceptionHandling
         {
             if constexpr (n == 1)
             {
-                return {};
+                return std::nullopt;
             }
-            else if constexpr (ConcreteType::template hasTrait<mlir::OpTrait::NOperands<n>::Impl>())
+            else if constexpr (ConcreteType::template hasTrait<mlir::OpTrait::NOperands<n>::template Impl>())
             {
                 return n;
             }
@@ -87,7 +87,7 @@ struct AddableExceptionHandling
             {
                 return {};
             }
-            else if constexpr (ConcreteType::template hasTrait<mlir::OpTrait::OneResult>())
+            else if constexpr (ConcreteType::template hasTrait<mlir::OpTrait::OneOperand>())
             {
                 return 1;
             }

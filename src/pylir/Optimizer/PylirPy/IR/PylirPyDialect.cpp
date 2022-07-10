@@ -64,13 +64,13 @@ struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
         {
             for (auto op : llvm::make_early_inc_range(iter.getOps<pylir::Py::AddableExceptionHandlingInterface>()))
             {
-                auto* block = op->getBlock();
-                auto* successBlock = block->splitBlock(mlir::Block::iterator{op});
-                auto builder = mlir::OpBuilder::atBlockEnd(block);
+                auto* successBlock = iter.splitBlock(mlir::Block::iterator{op});
+                auto builder = mlir::OpBuilder::atBlockEnd(&iter);
                 auto* newOp = op.cloneWithExceptionHandling(builder, successBlock, invoke.getExceptionPath(),
                                                             invoke.getUnwindDestOperands());
                 op->replaceAllUsesWith(newOp);
                 op.erase();
+                break;
             }
             auto raise = mlir::dyn_cast<pylir::Py::RaiseOp>(iter.getTerminator());
             if (!raise)
