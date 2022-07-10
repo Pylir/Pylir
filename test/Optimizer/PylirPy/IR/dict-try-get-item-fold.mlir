@@ -5,10 +5,11 @@ py.globalValue @builtins.dict = #py.type
 
 func.func @test(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.dict<{}>)
-    %2, %3 = py.dict.tryGetItem %0[%arg0]
+    %2 = py.dict.tryGetItem %0[%arg0]
+    %3 = py.isUnboundValue %2
     return %3 : i1
 }
 
 // CHECK-LABEL: @test
-// CHECK-DAG: %[[C1:.*]] = arith.constant false
+// CHECK-DAG: %[[C1:.*]] = arith.constant true
 // CHECK: return %[[C1]]

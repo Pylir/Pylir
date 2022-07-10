@@ -68,51 +68,48 @@ func.func @test_dict_len() -> index {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
+func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     py.dict.setItem %arg0[%0] to %0
-    %result, %found = py.dict.tryGetItem %arg0[%0]
-    return %result, %found : !py.dynamic, i1
+    %result = py.dict.tryGetItem %arg0[%0]
+    return %result : !py.dynamic
 }
 
 // CHECK-LABEL: @test_dict_lookup_setitem
 // CHECK-DAG: %[[C:.*]] = py.constant(#py.str<"value">)
-// CHECK-DAG: %[[TRUE:.*]] = arith.constant true
-// CHECK: return %[[C]], %[[TRUE]]
+// CHECK: return %[[C]]
 
 // -----
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
+func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     py.dict.delItem %0 from %arg0
-    %result, %found = py.dict.tryGetItem %arg0[%0]
-    return %result, %found : !py.dynamic, i1
+    %result = py.dict.tryGetItem %arg0[%0]
+    return %result : !py.dynamic
 }
 
 // CHECK-LABEL: @test_dict_lookup_delitem
 // CHECK-DAG: %[[C:.*]] = py.constant(#py.unbound)
-// CHECK-DAG: %[[FALSE:.*]] = arith.constant false
-// CHECK: return %[[C]], %[[FALSE]]
+// CHECK: return %[[C]]
 
 // -----
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test_dict_lookup_makeDict() -> (!py.dynamic, i1) {
+func.func @test_dict_lookup_makeDict() -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
     %1 = py.makeDict ()
-    %result, %found = py.dict.tryGetItem %1[%0]
-    return %result, %found : !py.dynamic, i1
+    %result = py.dict.tryGetItem %1[%0]
+    return %result : !py.dynamic
 }
 
 // CHECK-LABEL: @test_dict_lookup_makeDict
 // CHECK-DAG: %[[C:.*]] = py.constant(#py.unbound)
-// CHECK-DAG: %[[FALSE:.*]] = arith.constant false
-// CHECK: return %[[C]], %[[FALSE]]
+// CHECK: return %[[C]]
 
 // -----
 

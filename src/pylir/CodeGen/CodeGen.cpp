@@ -1028,9 +1028,9 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
         classNamespaceFound->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
         auto str = m_builder.createConstant(identifierToken.getValue());
         auto tryGet = m_builder.createDictTryGetItem(m_classNamespace, str);
+        auto isUnbound = m_builder.createIsUnboundValue(tryGet);
         auto elseBlock = BlockPtr{};
-        m_builder.create<mlir::cf::CondBranchOp>(tryGet.getFound(), classNamespaceFound, tryGet.getResult(), elseBlock,
-                                                 mlir::ValueRange{});
+        m_builder.create<mlir::cf::CondBranchOp>(isUnbound, elseBlock, classNamespaceFound, tryGet.getResult());
         implementBlock(elseBlock);
 
         // if not found in locals, it does not import free variables but rather goes straight to the global scope
@@ -2322,9 +2322,10 @@ std::vector<pylir::CodeGen::UnpackResults>
             {
                 auto constant = m_builder.createConstant(iter.name);
                 auto lookup = m_builder.createDictTryGetItem(dict, constant);
+                auto lookupIsUnbound = m_builder.createIsUnboundValue(lookup);
                 auto foundBlock = BlockPtr{};
                 auto notFoundBlock = BlockPtr{};
-                m_builder.create<mlir::cf::CondBranchOp>(lookup.getFound(), foundBlock, notFoundBlock);
+                m_builder.create<mlir::cf::CondBranchOp>(lookupIsUnbound, notFoundBlock, foundBlock);
 
                 auto resultBlock = BlockPtr{};
                 resultBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());

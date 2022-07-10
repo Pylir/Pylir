@@ -7,7 +7,7 @@ py.globalValue const @builtins.str = #py.type
 
 func.func @lookup(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"key">)
-    %1, %2 = py.dict.tryGetItem %arg0[%0]
+    %1 = py.dict.tryGetItem %arg0[%0]
     return %1 : !py.dynamic
 }
 
@@ -15,8 +15,6 @@ func.func @lookup(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 // CHECK-NEXT: %[[KEY:.*]] = llvm.mlir.addressof
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.call @pylir_dict_lookup(%[[DICT]], %[[KEY]])
-// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[FOUND:.*]] = llvm.icmp "ne" %[[RESULT]], %[[NULL]]
 // CHECK-NEXT: llvm.return %[[RESULT]]
 
 // -----

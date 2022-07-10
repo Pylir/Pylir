@@ -1826,9 +1826,7 @@ struct DictTryGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py
         auto dict = pyDictModel(op.getLoc(), rewriter, adaptor.getDict());
         auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_lookup,
                                         {mlir::Value{dict}, adaptor.getKey()});
-        auto null = rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), result.getType());
-        auto wasFound = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::ne, result, null);
-        rewriter.replaceOp(op, {result, wasFound});
+        rewriter.replaceOp(op, result);
         return mlir::success();
     }
 };

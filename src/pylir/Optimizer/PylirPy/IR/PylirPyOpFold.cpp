@@ -804,36 +804,31 @@ mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Att
     return mlir::BoolAttr::get(getContext(), false);
 }
 
-mlir::LogicalResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attribute> operands,
-                                                      llvm::SmallVectorImpl<mlir::OpFoldResult>& results)
+mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
     auto constantDict = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::DictAttr>();
     if (constantDict && constantDict.getValue().empty())
     {
-        results.emplace_back(Py::UnboundAttr::get(getContext()));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
+        return Py::UnboundAttr::get(getContext());
     }
     if (!constantDict)
     {
-        return mlir::failure();
+        return nullptr;
     }
     auto resolvedKey = resolveValue(*this, operands[1]);
     if (!constantDict || !operands[1])
     {
-        return mlir::failure();
+        return nullptr;
     }
     // TODO: Make this work in the general case for builtin types (that have a known __eq__ impl)
-    for (auto& [key, value] : constantDict.getValue())
+    for (const auto& [key, value] : constantDict.getValue())
     {
         if (key == operands[1] || resolveValue(*this, key) == resolvedKey)
         {
-            results.emplace_back(value);
-            results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-            return mlir::success();
+            return value;
         }
     }
-    return mlir::failure();
+    return nullptr;
 }
 
 mlir::OpFoldResult pylir::Py::DictLenOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)
@@ -957,7 +952,6 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
         if (setItemOp.getKey() == getKey())
         {
             results.emplace_back(setItemOp.getValue());
-            results.emplace_back(mlir::BoolAttr::get(getContext(), true));
             return mlir::success();
         }
         return mlir::failure();
@@ -967,7 +961,6 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
         if (delItemOp.getKey() == getKey())
         {
             results.emplace_back(Py::UnboundAttr::get(getContext()));
-            results.emplace_back(mlir::BoolAttr::get(getContext(), false));
             return mlir::success();
         }
         return mlir::failure();
@@ -975,7 +968,6 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
     if (auto makeDictOp = mlir::dyn_cast<Py::MakeDictOp>(lastClobber); makeDictOp && makeDictOp.getKeys().empty())
     {
         results.emplace_back(Py::UnboundAttr::get(getContext()));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
         return mlir::success();
     }
     return mlir::failure();

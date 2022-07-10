@@ -718,10 +718,11 @@ void pylir::CodeGen::createBuiltinsImpl()
                             auto dict = functionArguments[0];
                             auto key = functionArguments[1];
                             // TODO: check dict is dict or subclass
-                            auto lookup = m_builder.createDictTryGetItem(dict, key);
+                            mlir::Value lookup = m_builder.createDictTryGetItem(dict, key);
+                            auto isUnbound = m_builder.createIsUnboundValue(lookup);
                             auto* exception = new mlir::Block;
                             auto* success = new mlir::Block;
-                            m_builder.create<mlir::cf::CondBranchOp>(lookup.getFound(), success, exception);
+                            m_builder.create<mlir::cf::CondBranchOp>(isUnbound, exception, success);
 
                             implementBlock(exception);
                             auto object = Py::buildException(m_builder.getCurrentLoc(), m_builder,
@@ -729,7 +730,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                             m_builder.createRaise(object);
 
                             implementBlock(success);
-                            m_builder.create<mlir::func::ReturnOp>(lookup.getResult());
+                            m_builder.create<mlir::func::ReturnOp>(lookup);
                         });
 
                     slots["__setitem__"] = createFunction("builtins.dict.__setitem__",

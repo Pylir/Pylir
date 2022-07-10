@@ -132,19 +132,19 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
 
 // Dict ops
 
-def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [AlwaysBound, NoCapture,
+def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [NoCapture,
                                                               DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$dict, DynamicType:$key);
-    let results = (outs DynamicType:$result, I1:$found);
+    let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
         $dict `[` $key `]` attr-dict
     }];
 
     let description = [{
-        This op looks up the value of `$key` in the dictionary `$dict`. If found it'll be returned in `$result`
-        and `$found` will be 1. If not found, `$found` will be 0. Reading from `$result` when `$found` is 0 is undefined
-        behaviour. If `$dict` is not really a dict (or a subclass of) the behaviour is undefined.
+        This op looks up the value of `$key` in the dictionary `$dict`. If found it'll be returned in `$result`.
+        If not found, `$result` is an `unbound` value.
+        If `$dict` is not really a dict (or a subclass of) the behaviour is undefined.
     }];
 
     let hasFolder = 1;
