@@ -288,43 +288,43 @@ public:
 
     template <class T, class U>
     auto addLabel(const T& start, const U& end, std::optional<std::string>&& labelText = std::nullopt,
-                  std::optional<colour>&& colour = std::nullopt,
-                  std::optional<emphasis>&& emphasis =
+                  std::optional<colour> colour = std::nullopt,
+                  std::optional<emphasis> emphasis =
                       std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>,
                                                           DiagnosticsBuilder&>
     {
-        m_messages.back().labels.push_back({range(start, m_context).first, range(end, m_context).second,
-                                            std::move(labelText), std::move(colour), std::move(emphasis)});
+        m_messages.back().labels.push_back(
+            {range(start, m_context).first, range(end, m_context).second, std::move(labelText), colour, emphasis});
         return *this;
     }
 
     template <class T, class U>
     [[nodiscard]] auto addLabel(const T& start, const U& end, std::optional<std::string>&& labelText = std::nullopt,
-                                std::optional<colour>&& colour = std::nullopt,
-                                std::optional<emphasis>&& emphasis = std::nullopt) && -> std::
+                                std::optional<colour> colour = std::nullopt,
+                                std::optional<emphasis> emphasis = std::nullopt) && -> std::
         enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>, DiagnosticsBuilder&&>
     {
-        return std::move(addLabel(start, end, std::move(labelText), std::move(colour), std::move(emphasis)));
+        return std::move(addLabel(start, end, std::move(labelText), colour, emphasis));
     }
 
     template <class T>
     auto addLabel(const T& pos, std::optional<std::string>&& labelText = std::nullopt,
-                  std::optional<colour>&& colour = std::nullopt,
-                  std::optional<emphasis>&& emphasis =
+                  std::optional<colour> colour = std::nullopt,
+                  std::optional<emphasis> emphasis =
                       std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
         auto [start, end] = range(pos, m_context);
-        m_messages.back().labels.push_back({start, end, std::move(labelText), std::move(colour), std::move(emphasis)});
+        m_messages.back().labels.push_back({start, end, std::move(labelText), colour, emphasis});
         return *this;
     }
 
     template <class T>
     [[nodiscard]] auto addLabel(const T& start, std::optional<std::string>&& labelText = std::nullopt,
-                                std::optional<colour>&& colour = std::nullopt,
-                                std::optional<emphasis>&& emphasis =
+                                std::optional<colour> colour = std::nullopt,
+                                std::optional<emphasis> emphasis =
                                     std::nullopt) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
     {
-        return std::move(addLabel(start, std::move(labelText), std::move(colour), std::move(emphasis)));
+        return std::move(addLabel(start, std::move(labelText), colour, emphasis));
     }
 
     template <class T, class S, class... Args>

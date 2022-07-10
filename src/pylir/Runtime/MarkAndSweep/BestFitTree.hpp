@@ -146,6 +146,10 @@ public:
     }
 
     ~BestFitTree();
+    BestFitTree(BestFitTree&&) noexcept = default;
+    BestFitTree& operator=(BestFitTree&&) noexcept = default;
+    BestFitTree(const BestFitTree&) = delete;
+    BestFitTree& operator=(const BestFitTree&) = delete;
 
     PyObject* alloc(std::size_t size);
 

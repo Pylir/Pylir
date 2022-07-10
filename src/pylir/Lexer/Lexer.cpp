@@ -317,7 +317,7 @@ bool pylir::Lexer::parseNext()
     }
     do
     {
-        auto start = m_current;
+        const auto *start = m_current;
         switch (*m_current)
         {
             case U'#':
@@ -536,8 +536,8 @@ bool pylir::Lexer::parseNext()
                 //            }
             case U'.':
             {
-                if (std::next(m_current) == m_document->end()
-                    || !(*std::next(m_current) >= U'0' && *std::next(m_current) <= U'9'))
+                if (std::next(m_current) == m_document->end() || *std::next(m_current) < U'0'
+                   || *std::next(m_current) > U'9')
                 {
                     m_current++;
                     m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::Dot);
@@ -758,7 +758,7 @@ void pylir::Lexer::parseIdentifier()
         return;
     }
     static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-    auto start = m_current;
+    const auto *start = m_current;
     m_current = std::find_if_not(m_current, m_document->end(),
                                  [&](char32_t value) { return legalIdentifierSet.contains(value); });
     auto utf32 = std::u32string_view{start, static_cast<std::size_t>(m_current - start)};
@@ -1145,13 +1145,13 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                                 createDiagnosticsBuilder(m_current - m_document->begin(),
                                                          Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N)
                                     .addLabel(m_current - m_document->begin(), "{", Diag::INSERT_COLOUR,
-                                              std::move(emphasis))
+                                              emphasis)
                                     .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin() - 1,
                                               std::nullopt, Diag::ERROR_COMPLY);
                             return tl::unexpected{builder.emitError()};
                         }
                         m_current++;
-                        auto closing = std::find(m_current, m_document->end(), U'}');
+                        const auto *closing = std::find(m_current, m_document->end(), U'}');
                         auto utf8Name = Text::toUTF8String(
                             std::u32string_view{m_current, static_cast<std::size_t>(closing - m_current)});
                         auto codepoint = Text::fromName(utf8Name);
@@ -1231,7 +1231,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
 
 void pylir::Lexer::parseNumber()
 {
-    auto start = m_current;
+    const auto *start = m_current;
     PYLIR_ASSERT(m_current != m_document->end());
     bool (*allowedDigits)(char32_t) = +[](char32_t value) { return value >= U'0' && value <= U'9'; };
     unsigned radix = 10;
@@ -1283,8 +1283,8 @@ void pylir::Lexer::parseNumber()
             default: break;
         }
     }
-    auto numberStart = m_current;
-    auto end = std::find_if_not(m_current, m_document->end(),
+    const auto *numberStart = m_current;
+    const auto *end = std::find_if_not(m_current, m_document->end(),
                                 [allowedDigits, previous = U'\0', &isFloat, radix](char32_t value) mutable
                                 {
                                     if (value == U'.' && radix == 10)
@@ -1330,7 +1330,7 @@ void pylir::Lexer::parseNumber()
     auto checkSuffix = [&]
     {
         static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-        auto suffixEnd = std::find_if_not(m_current, m_document->end(),
+        const auto *suffixEnd = std::find_if_not(m_current, m_document->end(),
                                           [&](char32_t value) { return legalIdentifierSet.contains(value); });
         if (suffixEnd != m_current)
         {
@@ -1361,7 +1361,7 @@ void pylir::Lexer::parseNumber()
         }
         if (radix == 10 && !integer.isZero() && text.front() == '0')
         {
-            auto leadingEnd =
+            const auto *leadingEnd =
                 std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
             auto builder =
                 createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
@@ -1395,7 +1395,7 @@ void pylir::Lexer::parseNumber()
             text += *end;
             end++;
         }
-        auto newEnd = std::find_if_not(end, m_document->end(),
+        const auto *newEnd = std::find_if_not(end, m_document->end(),
                                        [previous = U'\0', allowedDigits](char32_t value) mutable
                                        {
                                            if (value == U'_')
@@ -1471,7 +1471,7 @@ void pylir::Lexer::parseNumber()
 
 void pylir::Lexer::parseIndent()
 {
-    auto start = m_current;
+    const auto *start = m_current;
     std::size_t indent = 0;
     for (; m_current != m_document->end() && Text::isWhitespace(*m_current); m_current++)
     {

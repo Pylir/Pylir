@@ -240,7 +240,7 @@ struct fmt::formatter<pylir::TokenType> : formatter<std::string_view>
 
     constexpr auto parse(fmt::format_parse_context& ctx)
     {
-        auto iter = ctx.begin();
+        const auto *iter = ctx.begin();
         if (iter != ctx.end() && (*iter == 'q' || *iter == 'l'))
         {
             quote = *iter++ == 'q';

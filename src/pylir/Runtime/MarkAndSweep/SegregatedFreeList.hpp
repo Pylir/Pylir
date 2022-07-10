@@ -21,12 +21,16 @@ class SegregatedFreeList
     std::byte* m_head = nullptr;
     std::vector<PagePtr> m_pages;
 
-    PagePtr newPage() const;
+    [[nodiscard]] PagePtr newPage() const;
 
 public:
     explicit SegregatedFreeList(std::size_t sizeClass) : m_sizeClass(sizeClass) {}
 
     ~SegregatedFreeList();
+    SegregatedFreeList(SegregatedFreeList&&) noexcept = default;
+    SegregatedFreeList& operator=(SegregatedFreeList&&) noexcept = default;
+    SegregatedFreeList(const SegregatedFreeList&) = delete;
+    SegregatedFreeList& operator=(const SegregatedFreeList&) = delete;
 
     PyObject* nextCell();
 

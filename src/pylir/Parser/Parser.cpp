@@ -67,17 +67,15 @@ tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType t
     {
         return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
     }
-    else if (m_current->getTokenType() != tokenType)
+    if (m_current->getTokenType() != tokenType)
     {
         return tl::unexpected{
             createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, tokenType, m_current->getTokenType())
                 .addLabel(*m_current, fmt::format("{}", tokenType), Diag::ERROR_COLOUR, Diag::emphasis::strikethrough)
                 .emitError()};
     }
-    else
-    {
-        return *m_current++;
-    }
+
+    return *m_current++;
 }
 
 bool pylir::Parser::lookaheadEquals(tcb::span<const TokenType> tokens)

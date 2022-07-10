@@ -20,7 +20,7 @@ pylir::BodySize::BodySize(mlir::Operation* operation) : m_size(0)
             {
                 return;
             }
-            auto* interface = collection.getInterfaceFor(op);
+            const auto* interface = collection.getInterfaceFor(op);
             if (!interface)
             {
                 m_size++;

@@ -122,17 +122,18 @@ class RecursionStateMachine
 public:
     explicit RecursionStateMachine(mlir::CallableOpInterface firstOccurrence) : m_pattern{firstOccurrence} {}
 
+    ~RecursionStateMachine() = default;
     RecursionStateMachine(const RecursionStateMachine&) = delete;
     RecursionStateMachine& operator=(const RecursionStateMachine&) = delete;
     RecursionStateMachine(RecursionStateMachine&&) noexcept = default;
     RecursionStateMachine& operator=(RecursionStateMachine&&) noexcept = default;
 
-    std::size_t getCount() const
+    [[nodiscard]] std::size_t getCount() const
     {
         return m_count;
     }
 
-    llvm::ArrayRef<mlir::CallableOpInterface> getPattern() const
+    [[nodiscard]] llvm::ArrayRef<mlir::CallableOpInterface> getPattern() const
     {
         return m_pattern;
     }
@@ -218,12 +219,12 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
         {
         }
 
-        mlir::CallableOpInterface getCallable() const
+        [[nodiscard]] mlir::CallableOpInterface getCallable() const
         {
             return mlir::cast<mlir::CallableOpInterface>(**m_functionOp);
         }
 
-        std::size_t getCalleeSize() const
+        [[nodiscard]] std::size_t getCalleeSize() const
         {
             return m_calleeSize;
         }
