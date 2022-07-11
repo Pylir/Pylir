@@ -345,15 +345,10 @@ struct TypeFlowInstance
 {
     pylir::Py::TypeFlow& typeFLowIR;
     pylir::LoopInfo loopInfo;
-    mlir::DominanceInfo dominanceInfo;
     mlir::Liveness liveness;
 
-    TypeFlowInstance(pylir::Py::TypeFlow& typeFLowIr, pylir::LoopInfo&& loopInfo, mlir::DominanceInfo&& dominanceInfo,
-                     mlir::Liveness&& liveness)
-        : typeFLowIR(typeFLowIr),
-          loopInfo(std::move(loopInfo)),
-          dominanceInfo(std::move(dominanceInfo)),
-          liveness(std::move(liveness))
+    TypeFlowInstance(pylir::Py::TypeFlow& typeFLowIr, pylir::LoopInfo&& loopInfo, mlir::Liveness&& liveness)
+        : typeFLowIR(typeFLowIr), loopInfo(std::move(loopInfo)), liveness(std::move(liveness))
     {
     }
 };
@@ -374,10 +369,10 @@ struct CallWaiting
 
 struct Loop
 {
-    llvm::SetVector<mlir::Block*> exitBlocks;
+    llvm::SetVector<std::pair<mlir::Block*, mlir::Block*>> exitEdges;
     llvm::DenseSet<std::vector<pylir::Py::TypeAttrUnion>> headerArgs;
 
-    Loop() : exitBlocks({}) {}
+    Loop() : exitEdges({}) {}
 };
 
 struct RecursionInfo
@@ -412,11 +407,10 @@ class Orchestrator
     mlir::Operation* m_context;
     pylir::Py::TypeFlow& m_typeFlowIR;
     pylir::LoopInfo& m_loopInfo;
-    mlir::DominanceInfo& m_dominanceInfo;
     mlir::Liveness& m_liveness;
 
     std::vector<pylir::Py::ObjectTypeInterface> m_returnTypes;
-    llvm::DenseMap<mlir::Block*, bool> m_finishedBlocks;
+    llvm::DenseMap<std::pair<mlir::Block*, mlir::Block*>, bool> m_finishedEdges;
     llvm::DenseMap<mlir::Value, pylir::Py::TypeAttrUnion> m_values;
 
     llvm::DenseMap<pylir::Loop*, Loop> m_loops;
@@ -449,7 +443,7 @@ class Orchestrator
             // Creating block args values from predecessor branch arguments
             for (auto pred = iter->pred_begin(); pred != iter->pred_end(); pred++)
             {
-                if (!m_finishedBlocks.lookup(*pred))
+                if (!m_finishedEdges.lookup({*pred, iter}))
                 {
                     continue;
                 }
@@ -494,36 +488,70 @@ class Orchestrator
             //       changes.
             if (loopOrch.headerArgs.insert(std::move(blockArgs)).second)
             {
-                // New loop iteration. Remove all loop blocks from finishedBlocks to make them reevaluated properly.
+                // New loop iteration. Remove all outgoing edges from loop blocks to make them reevaluated properly.
                 for (auto* block : loop->getBlocks())
                 {
-                    m_finishedBlocks.erase(block);
+                    for (auto* succ : block->getSuccessors())
+                    {
+                        m_finishedEdges.erase({block, succ});
+                    }
                 }
                 results.emplace_back(&iter->front(), std::move(values));
                 continue;
             }
             // We have previously encountered this loop with these block args and hence reached a fixpoint.
             // Unleash the exits!
-            auto temp = handleNoAndIntoLoopSuccessors(loopOrch.exitBlocks.getArrayRef(), collection);
+            for (auto& pair : loopOrch.exitEdges)
+            {
+                m_finishedEdges.insert({pair, true});
+            }
+            auto temp = findSuccessors(llvm::make_second_range(loopOrch.exitEdges), collection);
             results.insert(results.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
             m_loops.erase(loop);
         }
         return results;
     }
 
-    std::vector<ExecutionFrame> handleNoAndIntoLoopSuccessors(mlir::BlockRange successors,
-                                                              mlir::SymbolTableCollection& collection)
+    template <class Range>
+    std::vector<ExecutionFrame> findSuccessors(Range&& successors, mlir::SymbolTableCollection& collection)
     {
         llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successor;
-        for (auto* iter : successors)
+        for (mlir::Block* iter : successors)
         {
-            // If all predecessors results are ready then, schedule this successor to be executed.
-            // Special case if the successor is a loop header. In that case, back edges are ignored.
-            // Since every loop entry of a natural loop is the loop header, if we are currently not in a loop,
-            // but a successor block is, it is the loop header.
             auto* succLoop = m_loopInfo.getLoopFor(iter);
-            if (llvm::all_of(iter->getPredecessors(), [this, succLoop](mlir::Block* pred)
-                             { return m_finishedBlocks.count(pred) || (succLoop && succLoop->contains(pred)); }))
+            if (!succLoop || succLoop->getHeader() != iter)
+            {
+                if (llvm::all_of(iter->getPredecessors(),
+                                 [=](mlir::Block* pred) {
+                                     return m_finishedEdges.count({pred, iter});
+                                 }))
+                {
+                    successor.emplace_back(iter, nullptr);
+                }
+                continue;
+            }
+
+            // Loop headers are treated specially. To be able to enter the loop header for the very first iteration we
+            // enter it if all entry edges are ready but exactly no back edges are. As soon as at least one backedge
+            // is ready however, that means it's not the loops first iteration and therefore ALL incoming edges have
+            // to be ready.
+            bool anyBackEdgeReady = false;
+            bool allReady = true;
+            bool allEntriesReady = true;
+            for (auto* pred : iter->getPredecessors())
+            {
+                bool edgeReady = m_finishedEdges.count({pred, iter});
+                allReady = allReady && edgeReady;
+                if (succLoop->contains(pred))
+                {
+                    anyBackEdgeReady = anyBackEdgeReady || edgeReady;
+                }
+                else
+                {
+                    allEntriesReady = allEntriesReady && edgeReady;
+                }
+            }
+            if (allReady || (!anyBackEdgeReady && allEntriesReady))
             {
                 successor.emplace_back(iter, succLoop);
             }
@@ -610,7 +638,6 @@ public:
         : m_context(context),
           m_typeFlowIR(instance.typeFLowIR),
           m_loopInfo(instance.loopInfo),
-          m_dominanceInfo(instance.dominanceInfo),
           m_liveness(instance.liveness),
           m_returnTypes(m_typeFlowIR.getFunction().getNumResults(),
                         pylir::Py::UnboundType::get(m_typeFlowIR.getFunction()->getContext()))
@@ -643,7 +670,6 @@ public:
         }
 
         // Save this blocks result first of all.
-        m_finishedBlocks[block] = true;
         {
             auto& newValues = executionFrame.getValues();
             m_values.insert(newValues.begin(), newValues.end());
@@ -661,107 +687,75 @@ public:
         auto& successorBlocks = pylir::get<SuccessorBlocks>(result);
         if (successorBlocks.skippedBlock)
         {
-            llvm::SmallPtrSet<mlir::Block*, 2> set(successorBlocks.successors.begin(),
-                                                   successorBlocks.successors.end());
-            frames = skipDominating(successorBlocks.skippedBlock, symbolTableCollection, set);
+            frames = skipDominating({block, successorBlocks.skippedBlock}, symbolTableCollection);
         }
 
         auto* loop = m_loopInfo.getLoopFor(block);
         if (!loop)
         {
-            auto temp = handleNoAndIntoLoopSuccessors(successorBlocks.successors, symbolTableCollection);
-            frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
-            return frames;
-        }
-
-        auto& loopOrch = m_loops[loop];
-        llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successors;
-        for (auto* succ : successorBlocks.successors)
-        {
-            if (loop->contains(succ))
+            for (auto* succ : successorBlocks.successors)
             {
-                auto* succLoop = m_loopInfo.getLoopFor(succ);
-                successors.emplace_back(succ, succLoop->getHeader() == succ ? succLoop : nullptr);
-                continue;
+                m_finishedEdges[{block, succ}] = true;
             }
-            loopOrch.exitBlocks.insert(succ);
+        }
+        else
+        {
+            auto& loopOrch = m_loops[loop];
+            llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successors;
+            for (auto* succ : successorBlocks.successors)
+            {
+                if (loop->contains(succ))
+                {
+                    m_finishedEdges[{block, succ}] = true;
+                    continue;
+                }
+                loopOrch.exitEdges.insert({block, succ});
+            }
         }
 
-        auto temp = buildSuccessorFrames(successors, symbolTableCollection);
+        auto temp = findSuccessors(successorBlocks.successors, symbolTableCollection);
         frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
         return frames;
     }
 
-    std::vector<ExecutionFrame> skipDominating(
-        mlir::Block* root, mlir::SymbolTableCollection& collection,
-        const llvm::SmallPtrSetImpl<mlir::Block*>& alreadyBeingScheduled = llvm::SmallPtrSet<mlir::Block*, 1>{})
+    std::vector<ExecutionFrame> skipDominating(std::pair<mlir::Block*, mlir::Block*> edge,
+                                               mlir::SymbolTableCollection& collection)
     {
-        // TODO: This is not correct, it will currently always mark `root` as finished/skipped even though it should
-        //       only do that if all of its predecessors have marked it as such. More importantly, this function is
-        //       currently being used naively to skip a block, when in reality it's a call edge getting skipped.
-        if (root->getParent()->hasOneBlock())
-        {
-            m_finishedBlocks[root] = false;
-            return {};
-        }
-        std::vector<ExecutionFrame> frames;
+        m_finishedEdges[edge] = false;
 
-        std::vector<mlir::DominanceInfoNode*> skippedSubTrees = {m_dominanceInfo.getNode(root)};
-        llvm::df_iterator_default_set<mlir::DominanceInfoNode*> visitedSet;
-        while (!skippedSubTrees.empty())
+        std::vector<ExecutionFrame> frames;
+        std::queue<mlir::Block*> skippedWorklist;
+
+        auto add = [&](mlir::Block* toBlock)
         {
-            auto* back = skippedSubTrees.back();
-            skippedSubTrees.pop_back();
-            for (auto* iter : llvm::depth_first_ext(back, visitedSet))
+            bool completelySkipped = true;
+            for (auto* pred : toBlock->getPredecessors())
             {
-                m_finishedBlocks[iter->getBlock()] = false;
-                // If we reached a leaf we need to check whether it's successor have to either be skipped as well
-                // or maybe even executed.
-                if (!iter->isLeaf())
+                auto res = m_finishedEdges.find({pred, toBlock});
+                if (res == m_finishedEdges.end())
                 {
-                    continue;
+                    return;
                 }
-                llvm::SmallVector<std::pair<mlir::Block*, pylir::Loop*>> successors;
-                for (auto* succ : iter->getBlock()->getSuccessors())
-                {
-                    if (m_finishedBlocks.count(succ) || alreadyBeingScheduled.contains(succ))
-                    {
-                        continue;
-                    }
-                    auto* succLoop = m_loopInfo.getLoopFor(succ);
-                    bool skipping = true;
-                    bool readyToSchedule = true;
-                    for (auto* pred : succ->getPredecessors())
-                    {
-                        auto res = m_finishedBlocks.find(pred);
-                        if (res != m_finishedBlocks.end())
-                        {
-                            skipping = skipping && !res->second;
-                            continue;
-                        }
-                        // If this a loop header then a predecessor within the loop doesn't have to have finished.
-                        if (succLoop && succLoop->contains(pred))
-                        {
-                            continue;
-                        }
-                        readyToSchedule = false;
-                        break;
-                    }
-                    if (!readyToSchedule)
-                    {
-                        continue;
-                    }
-                    // If all predecessors were skipped we shall continue skipping.
-                    if (skipping)
-                    {
-                        skippedSubTrees.push_back(m_dominanceInfo.getNode(succ));
-                        continue;
-                    }
-                    // Otherwise all predecessors are either ready or skipped and we can schedule.
-                    successors.emplace_back(succ, succLoop);
-                }
-                auto temp = buildSuccessorFrames(successors, collection);
-                frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
+                completelySkipped = completelySkipped && !res->second;
+            }
+            if (completelySkipped)
+            {
+                skippedWorklist.push(toBlock);
+                return;
+            }
+            auto temp = findSuccessors(llvm::ArrayRef{toBlock}, collection);
+            frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
+        };
+
+        add(edge.second);
+        while (!skippedWorklist.empty())
+        {
+            auto* back = skippedWorklist.back();
+            skippedWorklist.pop();
+            for (auto* succ : back->getSuccessors())
+            {
+                m_finishedEdges[{back, succ}] = false;
+                add(succ);
             }
         }
         return frames;
@@ -780,7 +774,7 @@ public:
         }
         m_waitingCallers.clear();
         m_waitingCallers.shrink_to_fit();
-        m_finishedBlocks.shrink_and_clear();
+        m_finishedEdges.shrink_and_clear();
         m_loops.shrink_and_clear();
         m_activeCalls.clear();
         m_recursionInfos.clear();
@@ -1038,7 +1032,6 @@ class Scheduler
             mlir::AnalysisManager typeFlowAnalysisManager = typeFlowModuleAnalysis;
             iter->second = std::make_unique<TypeFlowInstance>(
                 typeFlowIR, std::move(typeFlowAnalysisManager.getAnalysis<pylir::LoopInfo>()),
-                std::move(typeFlowAnalysisManager.getAnalysis<mlir::DominanceInfo>()),
                 std::move(typeFlowAnalysisManager.getAnalysis<mlir::Liveness>()));
         }
         return std::make_unique<Orchestrator>(function, *iter->second);
@@ -1057,7 +1050,12 @@ class Scheduler
                 {
                     auto* block = predOrch.frame.getNextExecutedOp().getBlock();
                     containedOrchs[thisOrch].push_back({predOrch, predOrch.orchestrator->getLoopState(block)});
-                    auto frames = predOrch.orchestrator->skipDominating(block, collection);
+                    std::vector<ExecutionFrame> frames;
+                    for (auto* succ : block->getSuccessors())
+                    {
+                        auto temp = predOrch.orchestrator->skipDominating({block, succ}, collection);
+                        frames.insert(frames.end(), std::move_iterator(temp.begin()), std::move_iterator(temp.end()));
+                    }
                     for (auto& frame : frames)
                     {
                         queue.emplace(std::move(frame), predOrch.orchestrator);
@@ -1256,7 +1254,6 @@ class Scheduler
     }
 
 public:
-
     /// Run the typeflow analysis starting from the given root functions. These may not take any DynamicType function
     /// arguments.
     void run(llvm::ArrayRef<mlir::FunctionOpInterface> roots, mlir::AnalysisManager moduleManager)

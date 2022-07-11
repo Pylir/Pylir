@@ -114,6 +114,8 @@ public:
     {
         return static_cast<const Base&>(*this) == static_cast<const Base&>(rhs);
     }
+
+    void dump();
 };
 } // namespace pylir::Py
 

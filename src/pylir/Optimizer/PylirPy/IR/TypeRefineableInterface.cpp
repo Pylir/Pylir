@@ -53,3 +53,20 @@ pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion
     }
     return {};
 }
+
+void pylir::Py::TypeAttrUnion::dump()
+{
+    if (!*this)
+    {
+        llvm::errs() << "null";
+        return;
+    }
+    if (auto attr = dyn_cast<mlir::Attribute>())
+    {
+        return attr.dump();
+    }
+    else if (auto type = dyn_cast<Py::ObjectTypeInterface>())
+    {
+        return type.dump();
+    }
+}
