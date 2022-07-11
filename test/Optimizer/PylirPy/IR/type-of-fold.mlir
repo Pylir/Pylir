@@ -70,3 +70,18 @@ func.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dyna
 // CHECK-LABEL: @type_refineable
 // CHECK: %[[CONST:.*]] = py.constant(@builtins.tuple)
 // CHECK: return %[[CONST]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+
+func.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = py.tuple.prepend %arg0, %arg1
+    %1 = py.typeOf %0
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @tuple_prepend
+// CHECK: %[[CONST:.*]] = py.constant(@builtins.tuple)
+// CHECK: return %[[CONST]]

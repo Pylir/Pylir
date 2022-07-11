@@ -1126,13 +1126,15 @@ pylir::Py::TypeRefineResult
                                            mlir::SymbolTableCollection&)
 {
     auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
-    if (!tupleType)
+    // TODO: Once/if tuple type accepts nullptr elements (for unknown), the below or should not be necessary
+    if (!tupleType || !argumentTypes[0].isa_and_nonnull<Py::ObjectTypeInterface>())
     {
-        return TypeRefineResult::Failure;
+        result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+        return TypeRefineResult::Approximate;
     }
     llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());
     elements.insert(elements.begin(), argumentTypes[0].cast<Py::ObjectTypeInterface>());
-    result.emplace_back(Py::TupleType::get({}, elements));
+    result.emplace_back(Py::TupleType::get(getContext(), {}, elements));
     return TypeRefineResult::Success;
 }
 
