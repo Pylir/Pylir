@@ -10,7 +10,6 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/IR/Matchers.h>
-#include <mlir/Transforms/InliningUtils.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
@@ -25,66 +24,6 @@
 
 namespace
 {
-struct PylirPyInlinerInterface : public mlir::DialectInlinerInterface
-{
-    using mlir::DialectInlinerInterface::DialectInlinerInterface;
-
-    bool isLegalToInline(mlir::Operation*, mlir::Operation*, bool) const override
-    {
-        return true;
-    }
-
-    bool isLegalToInline(mlir::Region*, mlir::Region*, bool, mlir::BlockAndValueMapping&) const override
-    {
-        return true;
-    }
-
-    bool isLegalToInline(mlir::Operation*, mlir::Region*, bool, mlir::BlockAndValueMapping&) const override
-    {
-        return true;
-    }
-
-    void handleTerminator(mlir::Operation*, mlir::Block*) const override
-    {}
-
-    void handleTerminator(mlir::Operation*, llvm::ArrayRef<mlir::Value>) const override
-    {}
-
-    void processInlinedCallBlocks(mlir::Operation* call,
-                                  llvm::iterator_range<mlir::Region::iterator> inlinedBlocks) const override
-    {
-        auto invoke = mlir::dyn_cast<pylir::Py::InvokeOp>(call);
-        if (!invoke)
-        {
-            return;
-        }
-        auto* handler = invoke.getExceptionPath();
-
-        for (auto& iter : inlinedBlocks)
-        {
-            for (auto op : llvm::make_early_inc_range(iter.getOps<pylir::Py::AddableExceptionHandlingInterface>()))
-            {
-                auto* successBlock = iter.splitBlock(mlir::Block::iterator{op});
-                auto builder = mlir::OpBuilder::atBlockEnd(&iter);
-                auto* newOp = op.cloneWithExceptionHandling(builder, successBlock, invoke.getExceptionPath(),
-                                                            invoke.getUnwindDestOperands());
-                op->replaceAllUsesWith(newOp);
-                op.erase();
-                break;
-            }
-            auto raise = mlir::dyn_cast<pylir::Py::RaiseOp>(iter.getTerminator());
-            if (!raise)
-            {
-                continue;
-            }
-            mlir::OpBuilder builder(raise);
-            auto ops = llvm::to_vector(invoke.getUnwindDestOperands());
-            ops.insert(ops.begin(), raise.getException());
-            builder.create<mlir::cf::BranchOp>(raise.getLoc(), handler, ops);
-            raise.erase();
-        }
-    }
-};
 
 struct PylirPyCostInterface : public pylir::DialectCostInterface
 {
@@ -119,7 +58,7 @@ void pylir::Py::PylirPyDialect::initialize()
     initializeTypes();
     initializeAttributes();
     initializeExternalModels();
-    addInterfaces<PylirPyInlinerInterface, PylirPyCostInterface>();
+    addInterfaces<PylirPyCostInterface>();
 }
 
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,

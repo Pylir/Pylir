@@ -187,10 +187,7 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
     {
         mlir::OwningOpRef<mlir::FunctionOpInterface> rollback = functionOpInterface.clone();
         auto callerSize = pylir::BodySize(functionOpInterface).getSize();
-        if (mlir::failed(pylir::Py::inlineCall(callOpInterface, callableOpInterface)))
-        {
-            return mlir::failure();
-        }
+        pylir::Py::inlineCall(callOpInterface, callableOpInterface);
         if (mlir::failed(mlir::applyPatternsAndFoldGreedily(functionOpInterface, patterns)))
         {
             return mlir::failure();
@@ -295,11 +292,7 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                         }
                         recursivePattern(inlineable->second.getCallable());
                         m_callsInlined++;
-                        if (mlir::failed(pylir::Py::inlineCall(callOpInterface, inlineable->second.getCallable())))
-                        {
-                            failed = true;
-                            return mlir::WalkResult::interrupt();
-                        }
+                        pylir::Py::inlineCall(callOpInterface, inlineable->second.getCallable());
                         if (mlir::failed(mlir::applyPatternsAndFoldGreedily(functionOpInterface, patterns)))
                         {
                             failed = true;

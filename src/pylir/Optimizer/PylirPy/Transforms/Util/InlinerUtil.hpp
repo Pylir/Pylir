@@ -10,5 +10,5 @@
 
 namespace pylir::Py
 {
-mlir::LogicalResult inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable);
+void inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable);
 }

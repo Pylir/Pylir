@@ -7,37 +7,80 @@
 #include "InlinerUtil.hpp"
 
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/Transforms/InliningUtils.h>
+#include <mlir/IR/BlockAndValueMapping.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
-mlir::LogicalResult pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable)
+void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable)
 {
-    auto invoke = mlir::dyn_cast<pylir::Py::InvokeOp>(*call);
-    mlir::Block* after = nullptr;
-    if (invoke)
+    auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*call);
+
+    auto* preBlock = call->getBlock();
+    auto* postBlock = preBlock->splitBlock(call);
+    postBlock->addArguments(
+        callable.getCallableResults(),
+        llvm::to_vector(llvm::map_range(call->getResults(), [](mlir::Value arg) { return arg.getLoc(); })));
+
+    mlir::BlockAndValueMapping mapping;
+    mapping.map(callable.getCallableRegion()->getArguments(), call.getArgOperands());
+    callable.getCallableRegion()->cloneInto(preBlock->getParent(), postBlock->getIterator(), mapping);
+
+    auto* firstInlinedBlock = preBlock->getNextNode();
+    for (auto& iter : llvm::make_range(firstInlinedBlock->getIterator(), postBlock->getIterator()))
     {
-        after = invoke->getBlock()->getNextNode();
-    }
-    mlir::InlinerInterface interface(call.getContext());
-    if (mlir::failed(mlir::inlineCall(interface, call, callable, callable.getCallableRegion())))
-    {
-        return mlir::failure();
-    }
-    if (invoke)
-    {
-        mlir::Block* destBlock;
-        if (!after)
+        if (exceptionHandler)
         {
-            destBlock = &invoke->getParentRegion()->back();
+            for (auto op : llvm::make_early_inc_range(iter.getOps<pylir::Py::AddableExceptionHandlingInterface>()))
+            {
+                auto* successBlock = iter.splitBlock(mlir::Block::iterator{op});
+                auto builder = mlir::OpBuilder::atBlockEnd(&iter);
+                auto* newOp = op.cloneWithExceptionHandling(
+                    builder, successBlock, exceptionHandler.getExceptionPath(),
+                    static_cast<mlir::OperandRange>(exceptionHandler.getUnwindDestOperandsMutable()));
+                op->replaceAllUsesWith(newOp);
+                op.erase();
+                break;
+            }
         }
-        else
+        auto* terminator = iter.getTerminator();
+        if (auto raise = mlir::dyn_cast<pylir::Py::RaiseOp>(terminator); raise && exceptionHandler)
         {
-            destBlock = after->getPrevNode();
+            mlir::OpBuilder builder(raise);
+            auto ops =
+                llvm::to_vector(static_cast<mlir::OperandRange>(exceptionHandler.getUnwindDestOperandsMutable()));
+            ops.insert(ops.begin(), raise.getException());
+            builder.create<mlir::cf::BranchOp>(raise.getLoc(), exceptionHandler.getExceptionPath(), ops);
+            raise.erase();
+            continue;
         }
-        auto builder = mlir::OpBuilder::atBlockEnd(destBlock);
-        builder.create<mlir::cf::BranchOp>(invoke.getLoc(), invoke.getHappyPath(), invoke.getNormalDestOperands());
+        if (terminator->hasTrait<mlir::OpTrait::ReturnLike>())
+        {
+            mlir::OpBuilder builder(terminator);
+            builder.create<mlir::cf::BranchOp>(terminator->getLoc(), postBlock, terminator->getOperands());
+            terminator->erase();
+            continue;
+        }
     }
-    call.erase();
-    return mlir::success();
+
+    preBlock->getOperations().splice(preBlock->end(), firstInlinedBlock->getOperations());
+    firstInlinedBlock->erase();
+    if (postBlock->hasNoPredecessors())
+    {
+        postBlock->erase();
+    }
+    else
+    {
+        for (auto [res, arg] : llvm::zip(call->getResults(), postBlock->getArguments()))
+        {
+            res.replaceAllUsesWith(arg);
+        }
+        if (exceptionHandler)
+        {
+            mlir::OpBuilder builder(call);
+            builder.create<mlir::cf::BranchOp>(
+                call->getLoc(), exceptionHandler.getHappyPath(),
+                static_cast<mlir::OperandRange>(exceptionHandler.getNormalDestOperandsMutable()));
+        }
+        call.erase();
+    }
 }

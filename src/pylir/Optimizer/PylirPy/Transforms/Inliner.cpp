@@ -158,11 +158,7 @@ protected:
 
             callableInlinedCallables[containedCallable][callSite.callableOp]++;
 
-            if (mlir::failed(pylir::Py::inlineCall(callSite.callOp, callSite.callableOp)))
-            {
-                signalPassFailure();
-                return;
-            }
+            pylir::Py::inlineCall(callSite.callOp, callSite.callableOp);
             if (mlir::failed(mlir::applyPatternsAndFoldGreedily(containedCallable, patterns)))
             {
                 signalPassFailure();

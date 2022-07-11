@@ -43,12 +43,7 @@ protected:
                 signalPassFailure();
                 return;
             }
-            if (mlir::failed(pylir::Py::inlineCall(iter, func)))
-            {
-                iter->emitError("Inlining ") << ref << " failed";
-                signalPassFailure();
-                return;
-            }
+            pylir::Py::inlineCall(iter, func);
         }
     }
 };
