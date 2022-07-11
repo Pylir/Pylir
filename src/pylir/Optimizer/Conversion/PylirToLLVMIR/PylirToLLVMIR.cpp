@@ -2940,10 +2940,6 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
 
 class ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
-private:
-    llvm::Triple m_triple;
-    llvm::DataLayout m_dataLayout{""};
-
 protected:
     void runOnOperation() override;
 
@@ -2951,19 +2947,9 @@ public:
     ConvertPylirToLLVMPass() = default;
 
     ConvertPylirToLLVMPass(llvm::Triple triple, const llvm::DataLayout& dataLayout)
-        : m_triple(std::move(triple)), m_dataLayout(dataLayout)
     {
-    }
-
-    mlir::LogicalResult initializeOptions(llvm::StringRef options) override
-    {
-        if (mlir::failed(Pass::initializeOptions(options)))
-        {
-            return mlir::failure();
-        }
-        m_triple = llvm::Triple(m_targetTripleCLI.getValue());
-        m_dataLayout = llvm::DataLayout(m_dataLayoutCLI.getValue());
-        return mlir::success();
+        m_targetTripleCLI = triple.str();
+        m_dataLayoutCLI = dataLayout.getStringRepresentation();
     }
 };
 
@@ -2982,7 +2968,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
                       mlir::LLVM::LinkageAttr::get(&getContext(), mlir::LLVM::linkage::Linkage::Internal));
     }
 
-    PylirTypeConverter converter(&getContext(), m_triple, m_dataLayout, module);
+    PylirTypeConverter converter(&getContext(), llvm::Triple(m_targetTripleCLI), llvm::DataLayout(m_dataLayoutCLI),
+                                 module);
     converter.addConversion([&](pylir::Py::DynamicType)
                             { return mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE); });
     converter.addConversion([&](pylir::Mem::MemoryType)
@@ -3065,9 +3052,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
         iter.setPersonalityAttr(mlir::FlatSymbolRefAttr::get(&getContext(), "pylir_personality_function"));
     }
     module->setAttr(mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
-                    mlir::StringAttr::get(&getContext(), m_dataLayout.getStringRepresentation()));
+                    mlir::StringAttr::get(&getContext(), m_dataLayoutCLI));
     module->setAttr(mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
-                    mlir::StringAttr::get(&getContext(), m_triple.str()));
+                    mlir::StringAttr::get(&getContext(), m_targetTripleCLI));
     if (auto globalInit = converter.getGlobalInit())
     {
         builder.setInsertionPointToEnd(&globalInit.back());

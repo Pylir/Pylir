@@ -80,4 +80,5 @@ def Xsingle_threaded : F<"Xsingle-threaded", "Run in single threaded mode">, Gro
 def Xmulti_threaded : F<"Xmulti-threaded", "Run in multi threaded mode (Default)">, Group<grp_internal>;
 def Xprint_before : Joined<["-"], "Xprint-before=">, Group<grp_internal>;
 def Xprint_after : Joined<["-"], "Xprint-after=">, Group<grp_internal>;
-def Xprint_after_all : F<"Xprint-after-all", "Print after every pass">, Group<grp_internal>;
+def Xprint_after_all : F<"Xprint-after-all", "Print IR to stderr after every pass">, Group<grp_internal>;
+def Xprint_pipeline : F<"Xprint-pipeline", "Print the pass pipeline to stderr">, Group<grp_internal>;

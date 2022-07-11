@@ -284,6 +284,10 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                                                                 m_targetMachine->createDataLayout()));
             manager.nestAny().addPass(mlir::createReconcileUnrealizedCastsPass());
             manager.nestAny().addPass(mlir::LLVM::createLegalizeForExportPass());
+            if (args.hasArg(OPT_Xprint_pipeline))
+            {
+                manager.printAsTextualPipeline(llvm::errs());
+            }
             if (mlir::failed(manager.run(*mlirModule)))
             {
                 return mlir::failure();
