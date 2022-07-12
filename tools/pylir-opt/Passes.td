@@ -32,4 +32,8 @@ def TestLoopInfo : Pass<"test-loop-info", "::mlir::ModuleOp"> {
     let constructor = "::createTestLoopInfo()";
 }
 
+def TestHelloWorld : Pass<"test-hello-world"> {
+    let constructor = "::createTestHelloWorld()";
+}
+
 #endif

@@ -6,12 +6,16 @@
 
 #include "PylirMain.hpp"
 
+#include <mlir/Transforms/Passes.h>
+
 #include <llvm/Option/Arg.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Main/Opts.inc>
+#include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
+#include <pylir/Optimizer/Transforms/Passes.hpp>
 
 #include "CommandLine.hpp"
 #include "CompilerInvocation.hpp"
@@ -62,6 +66,12 @@ int pylir::main(int argc, char** argv)
     llvm::InitializeAllTargetMCs();
     llvm::InitializeAllAsmPrinters();
     llvm::InitializeAllAsmParsers();
+    mlir::registerCSEPass();
+    mlir::registerCanonicalizerPass();
+    mlir::registerSCCPPass();
+    mlir::registerSymbolDCEPass();
+    pylir::registerTransformPasses();
+    pylir::Py::registerTransformPasses();
 
     pylir::cli::CommandLine commandLine(llvm::sys::fs::getMainExecutable(argv[0], reinterpret_cast<void*>(&main)), argc,
                                         argv);

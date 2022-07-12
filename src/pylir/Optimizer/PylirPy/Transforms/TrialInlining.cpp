@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/IR/Threading.h>
-#include <mlir/Transforms/GreedyPatternRewriteDriver.h>
+#include <mlir/Pass/PassManager.h>
 
 #include <llvm/ADT/DenseMap.h>
 
@@ -15,7 +15,7 @@
 #include <pylir/Support/Variant.hpp>
 
 #include <future>
-#include <shared_mutex>
+#include <mutex>
 #include <variant>
 
 #include "PassDetail.hpp"
@@ -179,19 +179,22 @@ public:
 
 class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
 {
-    mlir::FrozenRewritePatternSet patterns;
+    mlir::OpPassManager m_passManager;
 
     mlir::FailureOr<bool> performTrial(mlir::FunctionOpInterface functionOpInterface,
                                        mlir::CallOpInterface callOpInterface,
-                                       mlir::CallableOpInterface callableOpInterface, std::size_t calleeSize)
+                                       mlir::CallableOpInterface callableOpInterface, std::size_t calleeSize,
+                                       mlir::OpPassManager& passManager)
     {
         mlir::OwningOpRef<mlir::FunctionOpInterface> rollback = functionOpInterface.clone();
         auto callerSize = pylir::BodySize(functionOpInterface).getSize();
         pylir::Py::inlineCall(callOpInterface, callableOpInterface);
-        if (mlir::failed(mlir::applyPatternsAndFoldGreedily(functionOpInterface, patterns)))
+
+        if (mlir::failed(runPipeline(passManager, functionOpInterface)))
         {
             return mlir::failure();
         }
+
         auto newCombinedSize = pylir::BodySize(functionOpInterface).getSize();
         auto delta =
             static_cast<std::ptrdiff_t>(callerSize + calleeSize) - static_cast<std::ptrdiff_t>(newCombinedSize);
@@ -229,7 +232,8 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
 
     mlir::FailureOr<mlir::FunctionOpInterface> optimize(mlir::FunctionOpInterface functionOpInterface,
                                                         TrialDataBase& dataBase,
-                                                        const llvm::DenseMap<mlir::StringAttr, Inlineable>& symbolTable)
+                                                        const llvm::DenseMap<mlir::StringAttr, Inlineable>& symbolTable,
+                                                        mlir::OpPassManager& passManager)
     {
         llvm::MapVector<mlir::CallableOpInterface, RecursionStateMachine> recursionDetection;
         llvm::DenseSet<mlir::CallableOpInterface> disabledCallables;
@@ -293,7 +297,7 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                         recursivePattern(inlineable->second.getCallable());
                         m_callsInlined++;
                         pylir::Py::inlineCall(callOpInterface, inlineable->second.getCallable());
-                        if (mlir::failed(mlir::applyPatternsAndFoldGreedily(functionOpInterface, patterns)))
+                        if (mlir::failed(runPipeline(passManager, functionOpInterface)))
                         {
                             failed = true;
                         }
@@ -302,7 +306,7 @@ class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
                     m_cacheMisses++;
                     auto trialResult =
                         performTrial(functionOpInterface, callOpInterface, inlineable->second.getCallable(),
-                                     inlineable->second.getCalleeSize());
+                                     inlineable->second.getCalleeSize(), passManager);
                     if (mlir::failed(trialResult))
                     {
                         failed = true;
@@ -346,28 +350,22 @@ protected:
         }
 
         TrialDataBase dataBase;
-        if (mlir::failed(mlir::failableParallelForEach(
-                &getContext(), llvm::enumerate(functions),
-                [&](const auto& iter) { return optimize(iter.value(), dataBase, originalCallables); })))
+        if (mlir::failed(mlir::failableParallelForEach(&getContext(), llvm::enumerate(functions),
+                                                       [&](const auto& iter)
+                                                       {
+                                                           mlir::OpPassManager copy = m_passManager;
+                                                           return optimize(iter.value(), dataBase, originalCallables,
+                                                                           copy);
+                                                       })))
         {
             signalPassFailure();
             return;
         }
     }
 
-    mlir::LogicalResult initialize(mlir::MLIRContext* context) override
+    mlir::LogicalResult initialize(mlir::MLIRContext*) override
     {
-        mlir::RewritePatternSet set(context);
-        for (auto* dialect : context->getLoadedDialects())
-        {
-            dialect->getCanonicalizationPatterns(set);
-        }
-        for (const auto& op : context->getRegisteredOperations())
-        {
-            op.getCanonicalizationPatterns(set, context);
-        }
-        patterns = mlir::FrozenRewritePatternSet(std::move(set));
-        return mlir::success();
+        return mlir::parsePassPipeline(m_optimizationPipeline, m_passManager);
     }
 };
 } // namespace

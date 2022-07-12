@@ -289,6 +289,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             if (args.hasArg(OPT_Xprint_pipeline))
             {
                 manager.printAsTextualPipeline(llvm::errs());
+                llvm::errs() << '\n';
             }
             if (mlir::failed(manager.run(*mlirModule)))
             {
