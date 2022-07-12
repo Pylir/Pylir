@@ -278,12 +278,14 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 return mlir::failure();
             }
-            manager.nestAny().addPass(mlir::arith::createArithmeticExpandOpsPass());
-            manager.nestAny().addPass(mlir::arith::createConvertArithmeticToLLVMPass());
+            auto* nested = &manager.nestAny();
+            nested->addPass(mlir::arith::createArithmeticExpandOpsPass());
+            nested->addPass(mlir::arith::createConvertArithmeticToLLVMPass());
             manager.addPass(pylir::createConvertPylirToLLVMPass(m_targetMachine->getTargetTriple(),
                                                                 m_targetMachine->createDataLayout()));
-            manager.nestAny().addPass(mlir::createReconcileUnrealizedCastsPass());
-            manager.nestAny().addPass(mlir::LLVM::createLegalizeForExportPass());
+            nested = &manager.nestAny();
+            nested->addPass(mlir::createReconcileUnrealizedCastsPass());
+            nested->addPass(mlir::LLVM::createLegalizeForExportPass());
             if (args.hasArg(OPT_Xprint_pipeline))
             {
                 manager.printAsTextualPipeline(llvm::errs());
@@ -567,6 +569,7 @@ mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::Logica
 
 void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mlir::OpPassManager& manager)
 {
+    mlir::OpPassManager* nested;
     manager.addPass(mlir::createCanonicalizerPass());
     if (level != "0")
     {
@@ -576,8 +579,9 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         manager.addPass(mlir::createCanonicalizerPass());
         manager.addPass(pylir::Py::createTrialInlinerPass());
         manager.addPass(mlir::createSymbolDCEPass());
-        manager.nestAny().addPass(pylir::createLoadForwardingPass());
-        manager.nestAny().addPass(mlir::createSCCPPass());
+        nested = &manager.nestAny();
+        nested->addPass(pylir::createLoadForwardingPass());
+        nested->addPass(mlir::createSCCPPass());
         manager.addPass(pylir::Py::createMonomorphPass());
         manager.nestAny().addPass(mlir::createCanonicalizerPass());
         manager.addPass(pylir::Py::createTrialInlinerPass());
@@ -586,10 +590,11 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
     manager.addPass(pylir::Py::createExpandPyDialectPass());
     if (level != "0")
     {
-        manager.nestAny().addPass(mlir::createCanonicalizerPass());
-        manager.nestAny().addPass(mlir::createCSEPass());
-        manager.nestAny().addPass(pylir::createLoadForwardingPass());
-        manager.nestAny().addPass(mlir::createSCCPPass());
+        nested = &manager.nestAny();
+        nested->addPass(mlir::createCanonicalizerPass());
+        nested->addPass(mlir::createCSEPass());
+        nested->addPass(pylir::createLoadForwardingPass());
+        nested->addPass(mlir::createSCCPPass());
     }
     manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
 }
