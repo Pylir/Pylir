@@ -227,6 +227,7 @@ struct ExpandPyDialectPass : public pylir::Py::ExpandPyDialectBase<ExpandPyDiale
 void ExpandPyDialectPass::runOnOperation()
 {
     auto module = getOperation();
+    if (!module.lookupSymbol(pylir::Py::pylirCallIntrinsic))
     {
         pylir::Py::PyBuilder builder(&getContext());
         builder.setInsertionPointToEnd(module.getBody());
