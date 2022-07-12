@@ -1,4 +1,4 @@
-# RUN: pylir %s -o %t
+# RUN: pylir %s -o %t -O3
 # RUN: %t | FileCheck %s --match-full-lines
 
 try:
