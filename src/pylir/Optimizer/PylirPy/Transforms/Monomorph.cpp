@@ -501,7 +501,7 @@ class Orchestrator
             }
             // We have previously encountered this loop with these block args and hence reached a fixpoint.
             // Unleash the exits!
-            for (auto& pair : loopOrch.exitEdges)
+            for (const auto& pair : loopOrch.exitEdges)
             {
                 m_finishedEdges.insert({pair, true});
             }
@@ -672,7 +672,14 @@ public:
         // Save this blocks result first of all.
         {
             auto& newValues = executionFrame.getValues();
-            m_values.insert(newValues.begin(), newValues.end());
+            for (auto& pair : newValues)
+            {
+                auto [existing, inserted] = m_values.insert(pair);
+                if (!inserted)
+                {
+                    existing->second = pair.second;
+                }
+            }
         }
         if (auto* vec = std::get_if<llvm::SmallVector<pylir::Py::ObjectTypeInterface>>(&result))
         {
