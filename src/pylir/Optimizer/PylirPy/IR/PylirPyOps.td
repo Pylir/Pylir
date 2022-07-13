@@ -685,6 +685,17 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     let assemblyFormat = [{
             custom<MappingArguments>($keys, $values, $mapping_expansion) attr-dict
     }];
+
+    let extraClassDeclaration = [{
+        llvm::iterator_range<::pylir::Py::DictArgsIterator> getDictArgs()
+        {
+            auto expansion = getMappingExpansion().getValue();
+            return llvm::make_range(
+                DictArgsIterator(getKeys().begin(), getValues().begin(), expansion.begin(), expansion, 0),
+                DictArgsIterator(getKeys().end(), getValues().end(), expansion.end(), expansion, getKeys().size())
+            );
+        }
+    }];
 }
 
 def PylirPy_MakeDictExOp : AddExceptionHandling<PylirPy_MakeDictOp> {

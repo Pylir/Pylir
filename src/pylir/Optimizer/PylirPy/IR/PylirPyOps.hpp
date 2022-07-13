@@ -133,6 +133,61 @@ struct AddableExceptionHandling
     };
 };
 
+class DictArgsIterator
+{
+    mlir::OperandRange::iterator m_keys;
+    mlir::OperandRange::iterator m_values;
+    llvm::ArrayRef<mlir::Attribute> m_expansions;
+    llvm::ArrayRef<mlir::Attribute>::iterator m_currExp;
+    std::size_t m_index = 0;
+
+    bool isCurrentlyExpansion();
+
+public:
+    using value_type = DictArg;
+    using reference = DictArg;
+    using pointer = DictArg*;
+    using difference_type = std::ptrdiff_t;
+    using iterator_category = std::bidirectional_iterator_tag;
+
+    DictArgsIterator(mlir::OperandRange::iterator keys, mlir::OperandRange::iterator values,
+                     llvm::ArrayRef<mlir::Attribute>::iterator expIterator, llvm::ArrayRef<mlir::Attribute> expansions,
+                     std::size_t index)
+        : m_keys(keys), m_values(values), m_expansions(expansions), m_currExp(expIterator), m_index(index)
+    {
+    }
+
+    DictArg operator*();
+
+    bool operator==(const DictArgsIterator& rhs) const
+    {
+        return m_keys == rhs.m_keys;
+    }
+
+    bool operator!=(const DictArgsIterator& rhs) const
+    {
+        return !(rhs == *this);
+    }
+
+    DictArgsIterator& operator++();
+
+    DictArgsIterator operator++(int)
+    {
+        auto copy = *this;
+        ++(*this);
+        return copy;
+    }
+
+    DictArgsIterator& operator--();
+
+    DictArgsIterator operator--(int)
+    {
+        auto copy = *this;
+        --(*this);
+        return copy;
+    }
+};
+
 } // namespace pylir::Py
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.h.inc>

@@ -118,6 +118,54 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
 }
 } // namespace pylir::Py::details
 
+bool pylir::Py::DictArgsIterator::isCurrentlyExpansion()
+{
+    return m_currExp != m_expansions.end() && m_currExp->cast<mlir::IntegerAttr>().getValue() == m_index;
+}
+
+pylir::Py::DictArg pylir::Py::DictArgsIterator::operator*()
+{
+    if (isCurrentlyExpansion())
+    {
+        return MappingExpansion{*m_keys};
+    }
+    return std::pair{*m_keys, *m_values};
+}
+
+pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator++()
+{
+    m_keys++;
+    m_index++;
+    while (m_currExp != m_expansions.end() && m_currExp->cast<mlir::IntegerAttr>().getValue().ule(m_index))
+    {
+        m_currExp++;
+    }
+    if (!isCurrentlyExpansion())
+    {
+        m_values++;
+    }
+    return *this;
+}
+
+pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator--()
+{
+    m_keys--;
+    if (m_currExp == m_expansions.end() && !m_expansions.empty())
+    {
+        m_currExp--;
+    }
+    m_index--;
+    while (m_currExp != m_expansions.begin() && m_currExp->cast<mlir::IntegerAttr>().getValue().ugt(m_index))
+    {
+        m_currExp--;
+    }
+    if (!isCurrentlyExpansion())
+    {
+        m_values--;
+    }
+    return *this;
+}
+
 bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
 {
     return static_cast<mlir::OperandRange>(getTypeObjectMutable()).getBeginOperandIndex() != index;

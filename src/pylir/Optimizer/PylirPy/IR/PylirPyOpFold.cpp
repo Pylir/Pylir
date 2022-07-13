@@ -947,30 +947,61 @@ mlir::LogicalResult pylir::Py::DictLenOp::foldUsage(mlir::Operation* lastClobber
 mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* lastClobber,
                                                            ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
-    if (auto setItemOp = mlir::dyn_cast<Py::DictSetItemOp>(lastClobber))
-    {
-        if (setItemOp.getKey() == getKey())
-        {
-            results.emplace_back(setItemOp.getValue());
-            return mlir::success();
-        }
-        return mlir::failure();
-    }
-    if (auto delItemOp = mlir::dyn_cast<Py::DictDelItemOp>(lastClobber))
-    {
-        if (delItemOp.getKey() == getKey())
-        {
-            results.emplace_back(Py::UnboundAttr::get(getContext()));
-            return mlir::success();
-        }
-        return mlir::failure();
-    }
-    if (auto makeDictOp = mlir::dyn_cast<Py::MakeDictOp>(lastClobber); makeDictOp && makeDictOp.getKeys().empty())
-    {
-        results.emplace_back(Py::UnboundAttr::get(getContext()));
-        return mlir::success();
-    }
-    return mlir::failure();
+    return llvm::TypeSwitch<mlir::Operation*, mlir::LogicalResult>(lastClobber)
+        .Case(
+            [&](Py::DictSetItemOp op)
+            {
+                if (op.getKey() == getKey())
+                {
+                    results.emplace_back(op.getValue());
+                    return mlir::success();
+                }
+                return mlir::failure();
+            })
+        .Case(
+            [&](Py::DictDelItemOp op)
+            {
+                if (op.getKey() == getKey())
+                {
+                    results.emplace_back(Py::UnboundAttr::get(getContext()));
+                    return mlir::success();
+                }
+                return mlir::failure();
+            })
+        .Case<Py::MakeDictExOp, Py::MakeDictOp>(
+            [&](auto op)
+            {
+                // We have to reverse through the map as the last key appearing in the list is the one appearing in the
+                // map. Additionally, if there are any unknown values inbetween that could be equal to our key, we have
+                // to abort as we can't be sure it would not be equal to our key at runtime.
+                for (auto&& variant : llvm::reverse(op.getDictArgs()))
+                {
+                    if (std::holds_alternative<MappingExpansion>(variant))
+                    {
+                        return mlir::failure();
+                    }
+                    auto [key, value] = pylir::get<std::pair<mlir::Value, mlir::Value>>(variant);
+                    if (key == getKey())
+                    {
+                        results.emplace_back(value);
+                        return mlir::success();
+                    }
+                    // TODO:
+                    //  some more generic mechanism to not automatically fail if we know they are definitely NOT
+                    //  equal (trivial for constants at least, except for references as they need to be resolved).
+                    mlir::Attribute attr1, attr2;
+                    if (mlir::matchPattern(key, mlir::m_Constant(&attr1))
+                        && mlir::matchPattern(getKey(), mlir::m_Constant(&attr2)) && attr1 != attr2
+                        && !attr1.isa<mlir::SymbolRefAttr>())
+                    {
+                        continue;
+                    }
+                    return mlir::failure();
+                }
+                results.emplace_back(Py::UnboundAttr::get(getContext()));
+                return mlir::success();
+            })
+        .Default(mlir::failure());
 }
 
 mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber,

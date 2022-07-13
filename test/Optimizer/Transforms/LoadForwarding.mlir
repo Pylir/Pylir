@@ -100,16 +100,19 @@ func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test_dict_lookup_makeDict() -> !py.dynamic {
+func.func @test_dict_lookup_makeDict() -> (!py.dynamic, !py.dynamic) {
     %0 = py.constant(#py.str<"value">)
     %1 = py.makeDict ()
     %result = py.dict.tryGetItem %1[%0]
-    return %result : !py.dynamic
+    %2 = py.makeDict (%0 : %0)
+    %res2 = py.dict.tryGetItem %2[%0]
+    return %result, %res2 : !py.dynamic, !py.dynamic
 }
 
 // CHECK-LABEL: @test_dict_lookup_makeDict
-// CHECK-DAG: %[[C:.*]] = py.constant(#py.unbound)
-// CHECK: return %[[C]]
+// CHECK-DAG: %[[U:.*]] = py.constant(#py.unbound)
+// CHECK-DAG: %[[C:.*]] = py.constant(#py.str<"value">)
+// CHECK: return %[[U]], %[[C]]
 
 // -----
 
