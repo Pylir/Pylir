@@ -367,6 +367,20 @@ protected:
     {
         return mlir::parsePassPipeline(m_optimizationPipeline, m_passManager);
     }
+
+public:
+    void getDependentDialects(mlir::DialectRegistry& registry) const override
+    {
+        TrialInlinerBase::getDependentDialects(registry);
+        // Above initialize will signal the error properly. This also gets called before `initialize`, hence we can't
+        // use m_passManager here.
+        mlir::OpPassManager temp;
+        if (mlir::failed(mlir::parsePassPipeline(m_optimizationPipeline, temp, llvm::nulls())))
+        {
+            return;
+        }
+        temp.getDependentDialects(registry);
+    }
 };
 } // namespace
 
