@@ -11,7 +11,6 @@
 #include <pylir/Support/Macros.hpp>
 
 #include <functional>
-#include <variant>
 
 #include "ValueTracker.hpp"
 

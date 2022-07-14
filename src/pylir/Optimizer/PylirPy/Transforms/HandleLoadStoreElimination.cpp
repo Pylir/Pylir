@@ -11,6 +11,7 @@
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
+#include <pylir/Optimizer/Transforms/Util/SSAUpdater.hpp>
 
 #include "PassDetail.hpp"
 #include "Passes.hpp"
@@ -51,26 +52,12 @@ void HandleLoadStoreEliminationPass::runOnOperation()
         llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap> definitions;
         pylir::SSABuilder ssaBuilder([&clobberTracker](mlir::BlockArgument) -> mlir::Value
                                      { return clobberTracker->getResult(0); });
-        llvm::DenseSet<mlir::Block*> seen;
-        for (auto& block : region)
-        {
-            if (!llvm::all_of(block.getPredecessors(), [&](mlir::Block* pred) { return seen.contains(pred); }))
-            {
-                ssaBuilder.markOpenBlock(&block);
-            }
-            changed |= optimizeBlock(block, clobberTracker->getResult(0), blockArgUsages, definitions, ssaBuilder);
-            seen.insert(&block);
-            for (auto* succ : block.getSuccessors())
-            {
-                if (ssaBuilder.isOpenBlock(succ))
-                {
-                    if (llvm::all_of(succ->getPredecessors(), [&](mlir::Block* pred) { return seen.contains(pred); }))
-                    {
-                        ssaBuilder.sealBlock(succ);
-                    }
-                }
-            }
-        }
+
+        pylir::updateSSAinRegion(ssaBuilder, region,
+                                 [&](mlir::Block* block) {
+                                     changed |= optimizeBlock(*block, clobberTracker->getResult(0), blockArgUsages,
+                                                              definitions, ssaBuilder);
+                                 });
 
         for (auto& [block, blockData] : blockArgUsages)
         {
