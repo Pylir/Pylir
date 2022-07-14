@@ -10,7 +10,7 @@
 
 #include <pylir/Optimizer/Analysis/MemorySSAIR.hpp>
 
-namespace pylir
+namespace
 {
 #define GEN_PASS_CLASSES
 #include <pylir/Optimizer/Transforms/Passes.h.inc>

@@ -17,7 +17,7 @@
 
 namespace
 {
-struct FoldHandlesPass : public pylir::Py::FoldHandlesBase<FoldHandlesPass>
+struct FoldHandlesPass : public FoldHandlesBase<FoldHandlesPass>
 {
     void runOnOperation() override;
 };

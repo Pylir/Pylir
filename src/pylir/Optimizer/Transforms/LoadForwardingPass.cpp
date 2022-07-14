@@ -17,7 +17,7 @@
 namespace
 {
 
-struct LoadForwardingPass : pylir::LoadForwardingBase<LoadForwardingPass>
+struct LoadForwardingPass : LoadForwardingBase<LoadForwardingPass>
 {
 protected:
     void runOnOperation() override;

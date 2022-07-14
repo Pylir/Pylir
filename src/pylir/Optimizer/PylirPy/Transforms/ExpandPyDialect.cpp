@@ -226,7 +226,7 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
     }
 };
 
-struct ExpandPyDialectPass : public pylir::Py::ExpandPyDialectBase<ExpandPyDialectPass>
+struct ExpandPyDialectPass : public ExpandPyDialectBase<ExpandPyDialectPass>
 {
     void runOnOperation() override;
 };

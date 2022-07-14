@@ -30,7 +30,7 @@ namespace mlir::arith
 class ArithmeticDialect;
 }
 
-namespace pylir
+namespace
 {
 #define GEN_PASS_CLASSES
 #include <pylir/Optimizer/Conversion/Passes.h.inc>

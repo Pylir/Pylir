@@ -23,7 +23,7 @@ struct BlockData
     std::vector<std::pair<pylir::Py::LoadOp, pylir::ValueTracker>> candidates;
 };
 
-struct HandleLoadStoreEliminationPass : pylir::Py::HandleLoadStoreEliminationBase<HandleLoadStoreEliminationPass>
+struct HandleLoadStoreEliminationPass : HandleLoadStoreEliminationBase<HandleLoadStoreEliminationPass>
 {
 protected:
     void runOnOperation() override;

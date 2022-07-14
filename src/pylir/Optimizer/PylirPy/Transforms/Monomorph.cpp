@@ -33,7 +33,7 @@
 
 namespace
 {
-class Monomorph : public pylir::Py::MonomorphBase<Monomorph>
+class Monomorph : public MonomorphBase<Monomorph>
 {
 protected:
     void runOnOperation() override;

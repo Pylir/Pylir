@@ -36,7 +36,7 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
     }
 };
 
-struct ConvertPylirPyToPylirMem : pylir::ConvertPylirPyToPylirMemBase<ConvertPylirPyToPylirMem>
+struct ConvertPylirPyToPylirMem : ConvertPylirPyToPylirMemBase<ConvertPylirPyToPylirMem>
 {
 protected:
     void runOnOperation() override;

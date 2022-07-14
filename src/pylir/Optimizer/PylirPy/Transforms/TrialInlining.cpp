@@ -177,7 +177,7 @@ public:
     }
 };
 
-class TrialInliner : public pylir::Py::TrialInlinerBase<TrialInliner>
+class TrialInliner : public TrialInlinerBase<TrialInliner>
 {
     mlir::OpPassManager m_passManager;
 

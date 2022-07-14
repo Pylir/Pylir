@@ -21,7 +21,7 @@
 
 namespace
 {
-class Inliner : public pylir::Py::InlinerBase<Inliner>
+class Inliner : public InlinerBase<Inliner>
 {
     mlir::FrozenRewritePatternSet patterns;
 

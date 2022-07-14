@@ -2948,7 +2948,7 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
     }
 };
 
-class ConvertPylirToLLVMPass : public pylir::ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
+class ConvertPylirToLLVMPass : public ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
 {
 protected:
     void runOnOperation() override;
