@@ -132,8 +132,8 @@ struct TupleExUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>
     }
 };
 
-template <class TargetOp, class InsertOp, class NormalMakeOp = TargetOp>
-struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
+template <class TargetOp>
+struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
 {
     using mlir::OpRewritePattern<TargetOp>::OpRewritePattern;
 
@@ -153,12 +153,16 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
         PYLIR_ASSERT(!range.empty());
         auto begin = range.begin();
         auto prefix = op.getOperands().take_front((*begin).getValue().getZExtValue());
-        auto list = rewriter.create<NormalMakeOp>(loc, prefix, rewriter.getI32ArrayAttr({}));
+        auto one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+        auto list = rewriter.create<pylir::Py::MakeListOp>(loc, prefix, rewriter.getI32ArrayAttr({}));
         for (const auto& iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), (*begin).getValue().getZExtValue()))
         {
             if (begin == range.end() || (*begin).getValue() != iter.index())
             {
-                rewriter.create<InsertOp>(loc, list, iter.value());
+                auto len = rewriter.create<pylir::Py::ListLenOp>(loc, list);
+                auto newLen = rewriter.create<mlir::arith::AddIOp>(loc, len, one);
+                rewriter.create<pylir::Py::ListResizeOp>(loc, list, newLen);
+                rewriter.create<pylir::Py::ListSetItemOp>(loc, list, len, iter.value());
                 continue;
             }
             begin++;
@@ -174,7 +178,10 @@ struct SequenceUnrollPattern : mlir::OpRewritePattern<TargetOp>
             auto next =
                 pylir::Py::buildSpecialMethodCall(loc, rewriter, "__next__", iterObject, {}, stopIterationHandler);
 
-            rewriter.create<InsertOp>(loc, list, next);
+            auto len = rewriter.create<pylir::Py::ListLenOp>(loc, list);
+            auto newLen = rewriter.create<mlir::arith::AddIOp>(loc, len, one);
+            rewriter.create<pylir::Py::ListResizeOp>(loc, list, newLen);
+            rewriter.create<pylir::Py::ListSetItemOp>(loc, list, len, next);
             rewriter.create<mlir::cf::BranchOp>(loc, condition);
 
             stopIterationHandler->insertBefore(dest);
@@ -316,9 +323,8 @@ void ExpandPyDialectPass::runOnOperation()
     patterns.add<CallMethodExPattern>(&getContext());
     patterns.add<TupleUnrollPattern>(&getContext());
     patterns.add<TupleExUnrollPattern>(&getContext());
-    patterns.add<SequenceUnrollPattern<pylir::Py::MakeListOp, pylir::Py::ListAppendOp>>(&getContext());
-    patterns.add<SequenceUnrollPattern<pylir::Py::MakeListExOp, pylir::Py::ListAppendOp, pylir::Py::MakeListOp>>(
-        &getContext());
+    patterns.add<ListUnrollPattern<pylir::Py::MakeListOp>>(&getContext());
+    patterns.add<ListUnrollPattern<pylir::Py::MakeListExOp>>(&getContext());
     if (mlir::failed(mlir::applyPartialConversion(module, target, std::move(patterns))))
     {
         signalPassFailure();

@@ -249,9 +249,14 @@ public:
         return create<Py::TupleDropFrontOp>(count, tuple);
     }
 
-    Py::ListAppendOp createListAppend(mlir::Value list, mlir::Value item)
+    Py::ListResizeOp createListResize(mlir::Value list, mlir::Value length)
     {
-        return create<Py::ListAppendOp>(list, item);
+        return create<Py::ListResizeOp>(list, length);
+    }
+
+    Py::ListSetItemOp createListSetItem(mlir::Value list, mlir::Value index, mlir::Value element)
+    {
+        return create<Py::ListSetItemOp>(list, index, element);
     }
 
     Py::ListLenOp createListLen(mlir::Value list)

@@ -261,8 +261,6 @@ class CodeGen
 
     void assignTarget(const Syntax::Target& target, mlir::Value value);
 
-    mlir::Value typeSensitiveRegion(mlir::Value typeObject, llvm::function_ref<void()> region);
-
     mlir::Value binOp(llvm::StringRef method, mlir::Value lhs, mlir::Value rhs);
 
     mlir::Value binOp(llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs, mlir::Value rhs);
@@ -270,14 +268,13 @@ class CodeGen
     template <mlir::Value (CodeGen::*op)(const std::vector<Py::IterArg>&)>
     mlir::Value visit(const Syntax::StarredList& starredList);
 
-    template <class InsertOp>
-    void visit(mlir::Value container, const Syntax::AssignmentExpression& iteration, const Syntax::CompFor& compFor);
+    void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::AssignmentExpression& iteration,
+               const Syntax::CompFor& compFor);
 
-    template <class InsertOp>
-    void visit(mlir::Value container, const Syntax::AssignmentExpression& iteration, const Syntax::CompIf& compIf);
+    void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::AssignmentExpression& iteration,
+               const Syntax::CompIf& compIf);
 
-    template <class InsertOp>
-    void visit(mlir::Value container, const Syntax::Comprehension& comprehension);
+    void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Comprehension& comprehension);
 
     bool needsTerminator()
     {

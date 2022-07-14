@@ -4,8 +4,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.list = #py.type
 
-func.func @test4() -> index {
-    %0 = py.constant(#py.str<"test">)
+func.func @test4(%length : index) -> index {
     %1 = py.makeList ()
     cf.br ^condition
 
@@ -22,7 +21,7 @@ func.func @test4() -> index {
     cf.br ^condition
 
 ^bb4: // pred: ^bb4
-    py.list.append %1, %0
+    py.list.resize %1 to %length
     cf.br ^bb5
 
 ^bb5: // pred: ^condition, ^bb4
@@ -37,13 +36,12 @@ func.func @test4() -> index {
 // CHECK: use(%[[DEF1]])
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 // CHECK: %[[DEF2:.*]] = def(%[[DEF1]])
-// CHECK-NEXT: py.list.append %[[LIST_DEF]]
+// CHECK-NEXT: py.list.resize %[[LIST_DEF]]
 // CHECK: ^{{.*}}(%[[MEM_MERGE:.*]]: !def)
 // CHECK-NEXT: use(%[[MEM_MERGE]])
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
 func.func @test5() -> index {
-    %0 = py.constant(#py.str<"test">)
     %1 = py.makeList ()
     cf.br ^back1
 

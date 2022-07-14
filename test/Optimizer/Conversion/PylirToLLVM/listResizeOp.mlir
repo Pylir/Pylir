@@ -4,14 +4,14 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.list = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func.func @foo(%list : !py.dynamic, %item : !py.dynamic) {
-    py.list.append %list, %item
+func.func @foo(%list : !py.dynamic, %length : index) {
+    py.list.resize %list to %length
     return
 }
 
 // CHECK-LABEL: llvm.func @foo
 // CHECK-SAME: %[[LIST:[[:alnum:]]+]]
-// CHECK-SAME: %[[ITEM:[[:alnum:]]+]]
+// CHECK-SAME: %[[NEW_LENGTH:[[:alnum:]]+]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
 // CHECK-NEXT: %[[TUPLE_PTR_PTR:.*]] = llvm.getelementptr %[[LIST]][%[[ZERO]], 2]
 // CHECK-NEXT: %[[TUPLE_PTR:.*]] = llvm.load %[[TUPLE_PTR_PTR]]
@@ -19,24 +19,15 @@ func.func @foo(%list : !py.dynamic, %item : !py.dynamic) {
 // CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[LIST]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.load %[[SIZE_PTR]]
 // CHECK-NEXT: %[[ONE_INDEX:.*]] = llvm.mlir.constant(1 : index)
-// CHECK-NEXT: %[[INCREMENTED:.*]] = llvm.add %[[LEN]], %[[ONE_INDEX]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_PTR]][%[[ZERO]], 1]
 // CHECK-NEXT: %[[CAPACITY:.*]] = llvm.load %[[GEP]]
-// CHECK-NEXT: %[[GROW:.*]] = llvm.icmp "ult" %[[CAPACITY]], %[[INCREMENTED]]
-// CHECK-NEXT: llvm.cond_br %[[GROW]], ^[[GROW_BLOCK:.*]], ^[[DONT_GROW_BLOCK:[[:alnum:]]+]]
-
-// CHECK-NEXT: ^[[DONT_GROW_BLOCK]]:
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_PTR]][%[[ZERO]], 2]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TRAILING]][%[[ZERO]], %[[LEN]]]
-// CHECK-NEXT: llvm.store %[[ITEM]], %[[GEP]]
-// CHECK-NEXT: llvm.br ^[[END_BLOCK:[[:alnum:]]+]]
+// CHECK-NEXT: %[[GROW:.*]] = llvm.icmp "ult" %[[CAPACITY]], %[[NEW_LENGTH]]
+// CHECK-NEXT: llvm.cond_br %[[GROW]], ^[[GROW_BLOCK:.*]], ^[[END_BLOCK:[[:alnum:]]+]]
 
 // CHECK-NEXT: ^[[GROW_BLOCK]]:
 // CHECK-NEXT: %[[SHL:.*]] = llvm.shl %[[CAPACITY]], %[[ONE_INDEX]]
-// CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.umax"(%[[SHL]], %[[INCREMENTED]])
+// CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.umax"(%[[SHL]], %[[NEW_LENGTH]])
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_PTR]][%[[ZERO]], 0]
 // CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.load %[[GEP]]
@@ -57,9 +48,6 @@ func.func @foo(%list : !py.dynamic, %item : !py.dynamic) {
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
 // CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][%[[ZERO]], 2]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TRAILING]][%[[ZERO]], %[[LEN]]]
-// CHECK-NEXT: llvm.store %[[ITEM]], %[[GEP]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
 // CHECK-NEXT: %[[ZERO2:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
 // CHECK-NEXT: %[[ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][%[[ZERO]], %[[ZERO2]]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
@@ -77,5 +65,5 @@ func.func @foo(%list : !py.dynamic, %item : !py.dynamic) {
 // CHECK-NEXT: llvm.br ^[[END_BLOCK]]
 
 // CHECK-NEXT: ^[[END_BLOCK]]:
-// CHECK-NEXT: llvm.store %[[INCREMENTED]], %[[SIZE_PTR]]
+// CHECK-NEXT: llvm.store %[[NEW_LENGTH]], %[[SIZE_PTR]]
 // CHECK-NEXT: llvm.return

@@ -168,7 +168,12 @@ pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator--()
 
 bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
 {
-    return static_cast<mlir::OperandRange>(getTypeObjectMutable()).getBeginOperandIndex() != index;
+    return static_cast<mlir::OperandRange>(getValueMutable()).getBeginOperandIndex() == index;
+}
+
+bool pylir::Py::ListSetItemOp::capturesOperand(unsigned int index)
+{
+    return static_cast<mlir::OperandRange>(getElementMutable()).getBeginOperandIndex() == index;
 }
 
 namespace

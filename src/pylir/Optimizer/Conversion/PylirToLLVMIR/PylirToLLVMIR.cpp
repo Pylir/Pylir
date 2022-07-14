@@ -1753,11 +1753,29 @@ struct ListLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListL
     }
 };
 
-struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListAppendOp>
+struct ListSetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListSetItemOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::ListAppendOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::ListSetItemOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::ListAppendOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::ListSetItemOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        pyListModel(op.getLoc(), rewriter, adaptor.getList())
+            .tuplePtr(op.getLoc())
+            .load(op.getLoc())
+            .trailingPtr(op.getLoc())
+            .at(op.getLoc(), adaptor.getIndex())
+            .store(op.getLoc(), adaptor.getElement());
+        rewriter.eraseOp(op);
+        return mlir::success();
+    }
+};
+
+struct ListResizeOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListResizeOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::ListResizeOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::ListResizeOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto* block = op->getBlock();
@@ -1769,26 +1787,19 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
         auto sizePtr = list.sizePtr(op.getLoc());
         auto size = sizePtr.load(op.getLoc());
         auto oneIndex = createIndexConstant(rewriter, op.getLoc(), 1);
-        auto incremented = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), size, oneIndex);
 
         auto capacityPtr = tuplePtr.sizePtr(op.getLoc());
         auto capacity = capacityPtr.load(op.getLoc());
-        auto notEnoughCapacity =
-            rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::ult, capacity, incremented);
+        auto notEnoughCapacity = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::ult,
+                                                                     capacity, adaptor.getLength());
         auto* growBlock = new mlir::Block;
-        auto* notGrowBlock = new mlir::Block;
-        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), notEnoughCapacity, growBlock, notGrowBlock);
-
-        notGrowBlock->insertBefore(endBlock);
-        rewriter.setInsertionPointToStart(notGrowBlock);
-        tuplePtr.trailingPtr(op.getLoc()).at(op.getLoc(), size).store(op.getLoc(), adaptor.getItem());
-        rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, endBlock);
+        rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), notEnoughCapacity, growBlock, endBlock);
 
         growBlock->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(growBlock);
         {
             mlir::Value newCapacity = rewriter.create<mlir::LLVM::ShlOp>(op.getLoc(), capacity, oneIndex);
-            newCapacity = rewriter.create<mlir::LLVM::UMaxOp>(op.getLoc(), newCapacity, incremented);
+            newCapacity = rewriter.create<mlir::LLVM::UMaxOp>(op.getLoc(), newCapacity, adaptor.getLength());
 
             mlir::Value tupleMemory = rewriter.create<pylir::Mem::GCAllocTupleOp>(
                 op.getLoc(), mlir::Value{tuplePtr.typePtr(op.getLoc()).load(op.getLoc())}, newCapacity);
@@ -1797,7 +1808,6 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
             auto newTupleModel = pyTupleModel(op.getLoc(), rewriter, tupleMemory);
             newTupleModel.sizePtr(op.getLoc()).store(op.getLoc(), newCapacity);
             auto trailingPtr = newTupleModel.trailingPtr(op.getLoc());
-            trailingPtr.at(op.getLoc(), size).store(op.getLoc(), adaptor.getItem());
             auto array = mlir::Value{trailingPtr.at(op.getLoc(), 0)};
             auto prevArray = mlir::Value{tuplePtr.trailingPtr(op.getLoc()).at(op.getLoc(), 0)};
             auto elementTypeSize = createIndexConstant(rewriter, op.getLoc(), sizeOf(pointer()));
@@ -1810,7 +1820,7 @@ struct ListAppendOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Li
         rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, endBlock);
 
         rewriter.setInsertionPointToStart(endBlock);
-        sizePtr.store(op.getLoc(), incremented);
+        sizePtr.store(op.getLoc(), adaptor.getLength());
         rewriter.eraseOp(op);
         return mlir::success();
     }
@@ -3004,8 +3014,9 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitListOpConversion>(converter);
     patternSet.insert<InitTupleOpConversion>(converter);
     patternSet.insert<InitTupleFromListOpConversion>(converter);
-    patternSet.insert<ListAppendOpConversion>(converter);
     patternSet.insert<ListLenOpConversion>(converter);
+    patternSet.insert<ListSetItemOpConversion>(converter);
+    patternSet.insert<ListResizeOpConversion>(converter);
     patternSet.insert<RaiseOpConversion>(converter);
     patternSet.insert<InitIntOpConversion>(converter);
     patternSet.insert<ObjectHashOpConversion>(converter);

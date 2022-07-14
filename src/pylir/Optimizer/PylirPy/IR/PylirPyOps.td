@@ -284,17 +284,34 @@ def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect]> {
 
 // List ops
 
-def PylirPy_ListAppendOp : PylirPy_Op<"list.append"> {
-    let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list, DynamicType:$item);
+def PylirPy_ListResizeOp : PylirPy_Op<"list.resize", [NoCapture]> {
+    let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list, Index:$length);
     let results = (outs);
 
     let assemblyFormat = [{
-        $list `,` $item attr-dict
+        $list `to` $length attr-dict
     }];
 
     let description = [{
-        This op appends the `$item` to the very end of `$list`. If `$list` is not really a list (or subclass of)
-        the behaviour is undefined.
+        This op resizes the `$list` to `$length` amount of elements, allowing both growing and shrinking.
+        If this op caused the `$list` to grow then the newly added accessible elements are initially undefined and
+        reading them prior to setting them is undefined behaviour.
+        If `$list` is not really a list (or subclass of) the behaviour is undefined.
+    }];
+}
+
+def PylirPy_ListSetItemOp : PylirPy_Op<"list.setItem", [DeclareOpInterfaceMethods<CaptureInterface>]> {
+    let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list, Index:$index, DynamicType:$element);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $list `[` $index `]` `to` $element attr-dict
+    }];
+
+    let description = [{
+        This op sets the item referred to by the `$index` inside of the  `$list` to `$element`.
+        If `$list` is not really a list (or subclass of) the behaviour is undefined. If `$index` is greater or equal to
+        the length of the list the behaviour is undefined.
     }];
 }
 
@@ -307,8 +324,8 @@ def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<Memory
     }];
 
     let description = [{
-        This op returns the length of `$input` as the given integer type. If `$input` is not really a list (or a
-        subclass of) then the behaviour of is undefined.
+        This op returns the length of `$input`. If `$input` is not really a list (or a subclass of) then the behaviour
+        is undefined.
     }];
 }
 
