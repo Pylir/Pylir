@@ -1744,11 +1744,28 @@ struct ListLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListL
     mlir::LogicalResult matchAndRewrite(pylir::Py::ListLenOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        rewriter.replaceOp(op, pyListModel(op.getLoc(), rewriter, adaptor.getInput())
+        rewriter.replaceOp(op, pyListModel(op.getLoc(), rewriter, adaptor.getList())
                                    .tuplePtr(op.getLoc())
                                    .load(op.getLoc())
                                    .sizePtr(op.getLoc())
                                    .load(op.getLoc()));
+        return mlir::success();
+    }
+};
+
+struct ListGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListGetItemOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::ListGetItemOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::ListGetItemOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOp(op, mlir::Value{pyListModel(op.getLoc(), rewriter, adaptor.getList())
+                                               .tuplePtr(op.getLoc())
+                                               .load(op.getLoc())
+                                               .trailingPtr(op.getLoc())
+                                               .at(op.getLoc(), adaptor.getIndex())
+                                               .load(op.getLoc())});
         return mlir::success();
     }
 };
@@ -3015,6 +3032,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<InitTupleOpConversion>(converter);
     patternSet.insert<InitTupleFromListOpConversion>(converter);
     patternSet.insert<ListLenOpConversion>(converter);
+    patternSet.insert<ListGetItemOpConversion>(converter);
     patternSet.insert<ListSetItemOpConversion>(converter);
     patternSet.insert<ListResizeOpConversion>(converter);
     patternSet.insert<RaiseOpConversion>(converter);

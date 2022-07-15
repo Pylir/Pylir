@@ -315,12 +315,27 @@ def PylirPy_ListSetItemOp : PylirPy_Op<"list.setItem", [DeclareOpInterfaceMethod
     }];
 }
 
+def PylirPy_ListGetItemOp : PylirPy_Op<"list.getItem", [NoCapture, AlwaysBound]> {
+    let arguments = (ins Arg<DynamicType, "",[MemRead]>:$list, Index:$index);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = [{
+        $list `[` $index `]` attr-dict
+    }];
+
+    let description = [{
+        This op gets the item referred to by the `$index` inside of the `$list`.
+        If `$list` is not really a list (or subclass of) the behaviour is undefined. If `$index` is greater or equal to
+        the length of the list the behaviour is undefined.
+    }];
+}
+
 def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$input);
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$list);
     let results = (outs Index:$result);
 
     let assemblyFormat = [{
-        $input attr-dict
+        $list attr-dict
     }];
 
     let description = [{
