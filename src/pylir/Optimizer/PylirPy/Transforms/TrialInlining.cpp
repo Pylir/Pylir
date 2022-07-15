@@ -342,6 +342,16 @@ protected:
         auto functions =
             llvm::to_vector(llvm::make_filter_range(getOperation().getOps<mlir::FunctionOpInterface>(),
                                                     [](mlir::FunctionOpInterface op) { return !op.isExternal(); }));
+        // Run the optimization pipeline once beforehand to get a correct measurement on what improvements the inlining
+        // would bring.
+        mlir::OpPassManager passManager(getOperation()->getName());
+        passManager.nestAny() = m_passManager;
+        if (mlir::failed(runPipeline(passManager, getOperation())))
+        {
+            signalPassFailure();
+            return;
+        }
+
         llvm::DenseMap<mlir::StringAttr, Inlineable> originalCallables;
         for (auto iter : functions)
         {
@@ -350,12 +360,11 @@ protected:
         }
 
         TrialDataBase dataBase;
-        if (mlir::failed(mlir::failableParallelForEach(&getContext(), llvm::enumerate(functions),
+        if (mlir::failed(mlir::failableParallelForEach(&getContext(), functions,
                                                        [&](const auto& iter)
                                                        {
                                                            mlir::OpPassManager copy = m_passManager;
-                                                           return optimize(iter.value(), dataBase, originalCallables,
-                                                                           copy);
+                                                           return optimize(iter, dataBase, originalCallables, copy);
                                                        })))
         {
             signalPassFailure();

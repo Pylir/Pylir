@@ -1,5 +1,7 @@
 #include "Passes.hpp"
 
+#include <iostream>
+
 namespace
 {
 class TestHelloWorld : public TestHelloWorldBase<TestHelloWorld>
@@ -7,7 +9,8 @@ class TestHelloWorld : public TestHelloWorldBase<TestHelloWorld>
 protected:
     void runOnOperation() override
     {
-        llvm::outs() << "Hello World!\n";
+        // Using cout here as it has an atomicity guarantee for single invocations of operator<<
+        std::cout << "Hello World!\n";
     }
 };
 } // namespace

@@ -577,17 +577,12 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         manager.nestAny().addPass(pylir::Py::createHandleLoadStoreEliminationPass());
         manager.addPass(pylir::Py::createFoldHandlesPass());
         manager.nestAny().addPass(mlir::createCSEPass());
-        nested = &manager.nestAny();
-        nested->addPass(mlir::createCanonicalizerPass());
-        nested->addPass(pylir::Py::createSROAPass());
-        nested->addPass(mlir::createCanonicalizerPass());
         manager.addPass(pylir::Py::createTrialInlinerPass());
         manager.addPass(mlir::createSymbolDCEPass());
         nested = &manager.nestAny();
         nested->addPass(pylir::createLoadForwardingPass());
         nested->addPass(mlir::createSCCPPass());
         manager.addPass(pylir::Py::createMonomorphPass());
-        manager.nestAny().addPass(mlir::createCanonicalizerPass());
         manager.addPass(pylir::Py::createTrialInlinerPass());
         manager.addPass(mlir::createSymbolDCEPass());
     }
