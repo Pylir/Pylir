@@ -58,7 +58,7 @@ llvm::DenseSet<mlir::Value> SROA::collectAggregates()
                                                            && effect.getResource()
                                                                   == mlir::SideEffects::DefaultResource::get();
                                                 })
-                                   || llvm::any_of(
+                                   && llvm::any_of(
                                        effects, [](const auto& effect)
                                        { return mlir::isa<mlir::MemoryEffects::Allocate>(effect.getEffect()); });
                         })
@@ -338,6 +338,7 @@ void SROA::runOnOperation()
         if (!aggregates.empty())
         {
             changedThisIteration = true;
+            changed = true;
         }
         else
         {

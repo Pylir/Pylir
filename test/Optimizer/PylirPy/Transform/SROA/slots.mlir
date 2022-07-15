@@ -29,3 +29,24 @@ func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-DAG: %[[W:.*]] = py.constant(#py.str<"World">)
 // CHECK: %[[R:.*]] = py.str.concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
 // CHECK: return %[[R]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.int = #py.type
+
+func.func @test_neg(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = py.typeOf %arg0
+    %1 = py.typeOf %0
+    %2 = py.getSlot "zero" from %0 : %1
+    return %2 : !py.dynamic
+}
+
+
+// CHECK-LABEL: func.func @test_neg
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-NEXT: %[[TYPE:.*]] = py.typeOf %[[ARG0]]
+// CHECK-NEXT: %[[METATYPE:.*]] = py.typeOf %[[TYPE]]
+// CHECK-NEXT: %[[SLOT:.*]] = py.getSlot "zero" from %[[TYPE]] : %[[METATYPE]]
+// CHECK-NEXT: return %[[SLOT]]
