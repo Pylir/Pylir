@@ -92,4 +92,16 @@ def TrialInliner : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
 	];
 }
 
+def SROA  : Pass<"pylir-sroa"> {
+    let summary = "Scalar Replacement Of Aggregates";
+    let constructor = "::pylir::Py::createSROAPass()";
+    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+    let statistics = [
+        Statistic<"m_aggregatesRemoved", "Aggregates removed", "Amount of aggregates that were removed">,
+        Statistic<"m_readOpsRemoved", "Aggregate reads removed", "Amount of reads from aggregates that were removed">,
+        Statistic<"m_writeOpsRemoved", "Aggregate writes removed", "Amount of writes to aggregates that were removed">,
+    ];
+}
+
 #endif

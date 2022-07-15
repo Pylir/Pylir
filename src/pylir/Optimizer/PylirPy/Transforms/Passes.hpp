@@ -27,6 +27,8 @@ std::unique_ptr<mlir::Pass> createInlinerPass();
 
 std::unique_ptr<mlir::Pass> createTrialInlinerPass();
 
+std::unique_ptr<mlir::Pass> createSROAPass();
+
 #define GEN_PASS_REGISTRATION
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 

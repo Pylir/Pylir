@@ -107,10 +107,9 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryF
     let assemblyFormat = "$slot `from` $object `:` $type_object attr-dict";
 
     let description = [{
-        Retrieves the value stored in the slot named `$slot` inside of `$object`. The `$slot` has to be one of the slots
-        that were defined in `$type_object`. If `$object` is not of type `$type_object` the result is undefined.
-        `$result` will contain the value in the slot, or unbound value if it was never assigned to or not part of the
-        type.
+        Retrieves the value stored in the slot named `$slot` inside of `$object`. If `$slot` is not one of the slots
+        defined in `$type_object` the result is undefined. If `$object` is not of type `$type_object` the result is
+        undefined. `$result` will contain the value in the slot, or unbound value if it was never assigned to.
     }];
 
     let hasFolder = 1;
@@ -125,8 +124,9 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
     let assemblyFormat = "$slot `of` $object `:` $type_object `to` $value attr-dict";
 
     let description = [{
-        Sets the value of the slot named `$slot` inside of `$object` to `$value`. The `$slot` has to be one of the slots
-        that were defined in `$type_object`. If `$object` is not of type `$type_object` the result is undefined.
+        Sets the value of the slot named `$slot` inside of `$object` to `$value`. If `$slot` is not one of the slots
+        defined in `$type_object` the operation is undefined. If `$object` is not of type `$type_object` the
+        operation is undefined.
     }];
 }
 
