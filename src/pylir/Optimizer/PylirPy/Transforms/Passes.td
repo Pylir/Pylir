@@ -87,8 +87,9 @@ def TrialInliner : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
 			    "Percent the callee must have decreased in size after having been inlined in the caller to be deemed profitable">,
 		Option<"m_maxRecursionDepth", "max-recursion-depth", "std::size_t", "4",
 				"Maximum amount of times a recursive function deemed profitable may be inlined">,
-        Option<"m_optimizationPipeline", "optimization-pipeline", "std::string", [{"canonicalize"}],
-                "Optimization pipeline used to perform the inlining trials">,
+        Option<"m_optimizationPipeline", "optimization-pipeline", "std::string",
+               [{"canonicalize,pylir-sroa,canonicalize"}],
+               "Optimization pipeline used to perform the inlining trials">,
 	];
 }
 
