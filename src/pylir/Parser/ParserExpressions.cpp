@@ -25,8 +25,7 @@ tl::expected<pylir::Syntax::YieldExpression, std::string> pylir::Parser::parseYi
     }
 
     if (m_current == m_lexer.end()
-        || (m_current->getTokenType() != TokenType::FromKeyword
-            && !Syntax::firstInExpression(m_current->getTokenType())))
+        || (m_current->getTokenType() != TokenType::FromKeyword && !firstInExpression(m_current->getTokenType())))
     {
         return Syntax::YieldExpression{std::move(*yield), std::monostate{}};
     }
@@ -145,8 +144,8 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
                                                                       std::move(*closeParentheses)}};
             }
 
-            if (Syntax::firstInStarredItem(m_current->getTokenType())
-                && (!Syntax::firstInExpression(m_current->getTokenType())
+            if (firstInStarredItem(m_current->getTokenType())
+                && (!firstInExpression(m_current->getTokenType())
                     || lookaheadEquals(std::array{TokenType::Identifier, TokenType::Walrus})))
             {
                 auto starredExpression = parseStarredExpression();
@@ -168,7 +167,7 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
             {
                 return tl::unexpected{std::move(expression).error()};
             }
-            if (m_current == m_lexer.end() || !Syntax::firstInCompFor(m_current->getTokenType()))
+            if (m_current == m_lexer.end() || !firstInCompFor(m_current->getTokenType()))
             {
                 auto starredExpression = parseStarredExpression(Syntax::AssignmentExpression{
                     std::nullopt, std::make_unique<Syntax::Expression>(std::move(*expression))});
@@ -240,7 +239,7 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
                 if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Colon)
                 {
                     // We are 100% in a Set.
-                    if (m_current != m_lexer.end() && Syntax::firstInCompFor(m_current->getTokenType()))
+                    if (m_current != m_lexer.end() && firstInCompFor(m_current->getTokenType()))
                     {
                         auto comprehension = parseComprehension(
                             {std::nullopt, std::make_unique<Syntax::Expression>(std::move(*expression))});
@@ -276,7 +275,7 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
                 {
                     return tl::unexpected{std::move(secondExpression).error()};
                 }
-                if (m_current != m_lexer.end() && Syntax::firstInCompFor(m_current->getTokenType()))
+                if (m_current != m_lexer.end() && firstInCompFor(m_current->getTokenType()))
                 {
                     auto compFor = parseCompFor();
                     if (!compFor)
@@ -331,7 +330,7 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
                     return Syntax::Enclosure::DictDisplay::KeyDatum{Syntax::Enclosure::DictDisplay::KeyDatum::Key{
                         std::move(*first), std::move(*colon), std::move(*second)}};
                 },
-                [&](TokenType type) { return Syntax::firstInExpression(type) || type == TokenType::PowerOf; },
+                [&](TokenType type) { return firstInExpression(type) || type == TokenType::PowerOf; },
                 std::move(keyDatum));
             if (!keyDatumList)
             {
@@ -358,8 +357,7 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
                 return Syntax::Enclosure{Syntax::Enclosure::ListDisplay{std::move(openSquareBracket), std::monostate{},
                                                                         std::move(*closeSquare)}};
             }
-            if (Syntax::firstInStarredItem(m_current->getTokenType())
-                && !Syntax::firstInComprehension(m_current->getTokenType()))
+            if (firstInStarredItem(m_current->getTokenType()) && !firstInComprehension(m_current->getTokenType()))
             {
                 auto starredList = parseStarredList();
                 if (!starredList)
@@ -380,7 +378,7 @@ tl::expected<pylir::Syntax::Enclosure, std::string> pylir::Parser::parseEnclosur
             {
                 return tl::unexpected{std::move(assignment).error()};
             }
-            if (m_current == m_lexer.end() || !Syntax::firstInCompFor(m_current->getTokenType()))
+            if (m_current == m_lexer.end() || !firstInCompFor(m_current->getTokenType()))
             {
                 auto starredList = parseStarredList(Syntax::StarredItem{std::move(*assignment)});
                 if (!starredList)
@@ -464,7 +462,7 @@ tl::expected<pylir::Syntax::Slicing, std::string>
             }
             auto firstColon = *m_current++;
             std::unique_ptr<Syntax::Expression> upperBound;
-            if (m_current != m_lexer.end() && Syntax::firstInExpression(m_current->getTokenType()))
+            if (m_current != m_lexer.end() && firstInExpression(m_current->getTokenType()))
             {
                 auto temp = parseExpression();
                 if (!temp)
@@ -479,7 +477,7 @@ tl::expected<pylir::Syntax::Slicing, std::string>
                 return tl::unexpected{std::move(secondColumn).error()};
             }
             std::unique_ptr<Syntax::Expression> stride;
-            if (m_current != m_lexer.end() && Syntax::firstInExpression(m_current->getTokenType()))
+            if (m_current != m_lexer.end() && firstInExpression(m_current->getTokenType()))
             {
                 auto temp = parseExpression();
                 if (!temp)
@@ -491,7 +489,7 @@ tl::expected<pylir::Syntax::Slicing, std::string>
             return Syntax::Slicing::ProperSlice{std::move(lowerBound), std::move(firstColon), std::move(upperBound),
                                                 std::move(*secondColumn), std::move(stride)};
         },
-        &Syntax::firstInExpression);
+        &firstInExpression);
     if (!list)
     {
         return tl::unexpected{std::move(list).error()};
@@ -564,7 +562,7 @@ tl::expected<pylir::Syntax::ArgumentList, std::string>
                 continue;
             }
 
-            if (!Syntax::firstInAssignmentExpression(next->getTokenType()))
+            if (!firstInAssignmentExpression(next->getTokenType()))
             {
                 break;
             }
@@ -749,7 +747,7 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(std::uni
         {
             return tl::unexpected{std::move(assignment).error()};
         }
-        if (m_current != m_lexer.end() && Syntax::firstInCompFor(m_current->getTokenType()))
+        if (m_current != m_lexer.end() && firstInCompFor(m_current->getTokenType()))
         {
             // We are in a comprehension!
             auto comprehension = parseComprehension(std::move(*assignment));
@@ -846,7 +844,7 @@ tl::expected<pylir::Syntax::Primary, std::string> pylir::Parser::parsePrimary()
 
 tl::expected<pylir::Syntax::CommaList<pylir::Syntax::Expression>, std::string> pylir::Parser::parseExpressionList()
 {
-    return parseCommaList(pylir::bind_front(&Parser::parseExpression, this), &Syntax::firstInExpression);
+    return parseCommaList(pylir::bind_front(&Parser::parseExpression, this), &firstInExpression);
 }
 
 tl::expected<pylir::Syntax::AssignmentExpression, std::string> pylir::Parser::parseAssignmentExpression()
@@ -1282,8 +1280,7 @@ tl::expected<pylir::Syntax::StarredExpression, std::string>
     pylir::Parser::parseStarredExpression(std::optional<Syntax::AssignmentExpression>&& firstItem)
 {
     if ((m_current == m_lexer.end()
-         || (m_current->getTokenType() != TokenType::Star
-             && !Syntax::firstInAssignmentExpression(m_current->getTokenType())))
+         || (m_current->getTokenType() != TokenType::Star && !firstInAssignmentExpression(m_current->getTokenType())))
         && !firstItem)
     {
         return Syntax::StarredExpression{Syntax::StarredExpression::Items{{}, nullptr}};
@@ -1317,7 +1314,7 @@ tl::expected<pylir::Syntax::StarredExpression, std::string>
         leading.emplace_back(Syntax::StarredItem{std::move(*firstItem)}, *m_current++);
     }
     std::unique_ptr<Syntax::StarredItem> last;
-    while (m_current != m_lexer.end() && Syntax::firstInStarredItem(m_current->getTokenType()))
+    while (m_current != m_lexer.end() && firstInStarredItem(m_current->getTokenType()))
     {
         auto item = parseStarredItem();
         if (!item)
@@ -1364,7 +1361,7 @@ tl::expected<pylir::Syntax::StarredItem, std::string> pylir::Parser::parseStarre
 tl::expected<pylir::Syntax::StarredList, std::string>
     pylir::Parser::parseStarredList(std::optional<Syntax::StarredItem>&& firstItem)
 {
-    return parseCommaList(pylir::bind_front(&Parser::parseStarredItem, this), &Syntax::firstInStarredItem,
+    return parseCommaList(pylir::bind_front(&Parser::parseStarredItem, this), &firstInStarredItem,
                           std::move(firstItem));
 }
 

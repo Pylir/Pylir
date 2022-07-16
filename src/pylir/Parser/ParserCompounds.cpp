@@ -39,7 +39,7 @@ tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInpu
 
 tl::expected<pylir::Syntax::Statement, std::string> pylir::Parser::parseStatement()
 {
-    if (m_current != m_lexer.end() && Syntax::firstInCompoundStmt(m_current->getTokenType()))
+    if (m_current != m_lexer.end() && firstInCompoundStmt(m_current->getTokenType()))
     {
         auto compound = parseCompoundStmt();
         if (!compound)
@@ -64,7 +64,7 @@ tl::expected<pylir::Syntax::Statement, std::string> pylir::Parser::parseStatemen
 
 tl::expected<pylir::Syntax::StmtList, std::string> pylir::Parser::parseStmtList()
 {
-    return parseCommaList(pylir::bind_front(&Parser::parseSimpleStmt, this), Syntax::firstInSimpleStmt, std::nullopt,
+    return parseCommaList(pylir::bind_front(&Parser::parseSimpleStmt, this), firstInSimpleStmt, std::nullopt,
                           TokenType::SemiColon);
 }
 

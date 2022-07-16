@@ -10,6 +10,89 @@
 
 #include "Visitor.hpp"
 
+bool pylir::Parser::firstInExpression(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::LambdaKeyword:
+        case TokenType::Minus:
+        case TokenType::Plus:
+        case TokenType::BitNegate:
+        case TokenType::AwaitKeyword:
+        case TokenType::StringLiteral:
+        case TokenType::ByteLiteral:
+        case TokenType::IntegerLiteral:
+        case TokenType::FloatingPointLiteral:
+        case TokenType::ComplexLiteral:
+        case TokenType::Identifier:
+        case TokenType::TrueKeyword:
+        case TokenType::FalseKeyword:
+        case TokenType::NoneKeyword:
+        case TokenType::NotKeyword:
+        case TokenType::OpenParentheses:
+        case TokenType::OpenSquareBracket:
+        case TokenType::OpenBrace: return true;
+        default: break;
+    }
+    return false;
+}
+
+bool pylir::Parser::firstInTarget(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::OpenParentheses:
+        case TokenType::OpenSquareBracket:
+        case TokenType::OpenBrace:
+        case TokenType::Identifier:
+        case TokenType::Star:
+        case TokenType::StringLiteral:
+        case TokenType::ByteLiteral:
+        case TokenType::IntegerLiteral:
+        case TokenType::FloatingPointLiteral:
+        case TokenType::ComplexLiteral: return true;
+        default: return false;
+    }
+}
+
+bool pylir::Parser::firstInSimpleStmt(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::AssertKeyword:
+        case TokenType::PassKeyword:
+        case TokenType::DelKeyword:
+        case TokenType::ReturnKeyword:
+        case TokenType::YieldKeyword:
+        case TokenType::RaiseKeyword:
+        case TokenType::BreakKeyword:
+        case TokenType::ContinueKeyword:
+        case TokenType::ImportKeyword:
+        case TokenType::FromKeyword:
+        case TokenType::GlobalKeyword:
+        case TokenType::NonlocalKeyword:
+        case TokenType::Star: return true;
+        default: return firstInAssignmentExpression(tokenType);
+    }
+}
+
+bool pylir::Parser::firstInCompoundStmt(TokenType tokenType)
+{
+    switch (tokenType)
+    {
+        case TokenType::IfKeyword:
+        case TokenType::WhileKeyword:
+        case TokenType::ForKeyword:
+        case TokenType::TryKeyword:
+        case TokenType::WithKeyword:
+        case TokenType::AtSign:
+        case TokenType::AsyncKeyword:
+        case TokenType::DefKeyword:
+        case TokenType::ClassKeyword: return true;
+        default: return false;
+    }
+}
+
 void pylir::Parser::addToNamespace(const pylir::Token& token)
 {
     PYLIR_ASSERT(token.getTokenType() == TokenType::Identifier);

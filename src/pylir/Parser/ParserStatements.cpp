@@ -106,7 +106,7 @@ tl::expected<pylir::Syntax::Target, std::string> pylir::Parser::parseTarget()
 tl::expected<pylir::Syntax::TargetList, std::string>
     pylir::Parser::parseTargetList(std::optional<Syntax::Target>&& firstItem)
 {
-    return parseCommaList(pylir::bind_front(&Parser::parseTarget, this), Syntax::firstInTarget, std::move(firstItem));
+    return parseCommaList(pylir::bind_front(&Parser::parseTarget, this), firstInTarget, std::move(firstItem));
 }
 
 tl::expected<pylir::Syntax::AssignmentStmt, std::string>
@@ -126,7 +126,7 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
     std::optional<Syntax::StarredExpression> leftOverStarredExpression;
     do
     {
-        if (hadFirst && (m_current == m_lexer.end() || !Syntax::firstInTarget(m_current->getTokenType())))
+        if (hadFirst && (m_current == m_lexer.end() || !firstInTarget(m_current->getTokenType())))
         {
             break;
         }
@@ -148,7 +148,7 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
         }
         addToNamespace(*targetList);
         targets.emplace_back(std::move(*targetList), assignment);
-    } while (m_current != m_lexer.end() && Syntax::firstInTarget(m_current->getTokenType()));
+    } while (m_current != m_lexer.end() && firstInTarget(m_current->getTokenType()));
     if (leftOverStarredExpression)
     {
         return Syntax::AssignmentStmt{std::move(targets), std::move(*leftOverStarredExpression)};
@@ -280,7 +280,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                         .emitError()};
             }
             auto returnKeyword = *m_current++;
-            if (m_current == m_lexer.end() || !Syntax::firstInExpression(m_current->getTokenType()))
+            if (m_current == m_lexer.end() || !firstInExpression(m_current->getTokenType()))
             {
                 return Syntax::SimpleStmt{Syntax::ReturnStmt{returnKeyword, std::nullopt}};
             }
@@ -303,7 +303,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
         case TokenType::RaiseKeyword:
         {
             auto raise = *m_current++;
-            if (m_current == m_lexer.end() || !Syntax::firstInExpression(m_current->getTokenType()))
+            if (m_current == m_lexer.end() || !firstInExpression(m_current->getTokenType()))
             {
                 return Syntax::SimpleStmt{Syntax::RaiseStmt{raise, std::nullopt}};
             }
