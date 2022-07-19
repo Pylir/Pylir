@@ -54,7 +54,13 @@ class Parser
 
     void addToNamespace(const IdentifierToken& token);
 
-    void addToNamespace(const Syntax::TargetList& targetList);
+    void addToNamespace(const Syntax::Target& target);
+
+    template <class T, class... Args>
+    static std::unique_ptr<T> make_node(Args&&... args)
+    {
+        return std::unique_ptr<T>(new T{{}, std::forward<Args>(args)...});
+    }
 
     tl::expected<IdentifierSet, std::string> finishNamespace(pylir::Syntax::Suite& suite,
                                                              const IdentifierSet& nonLocals,
@@ -67,7 +73,7 @@ class Parser
         ParseFunc parseFunc, CheckFunc checkFunc,
         std::optional<typename std::invoke_result_t<ParseFunc>::value_type>&& optionalFirst = std::nullopt,
         TokenType tokenType = TokenType::Comma)
-        -> tl::expected<Syntax::CommaList<typename std::invoke_result_t<ParseFunc>::value_type>, std::string>
+        -> tl::expected<std::vector<typename std::invoke_result_t<ParseFunc>::value_type>, std::string>
     {
         using T = typename std::invoke_result_t<ParseFunc>::value_type;
         if (!optionalFirst)
@@ -79,14 +85,13 @@ class Parser
             }
             optionalFirst = std::move(*first);
         }
-        std::vector<std::pair<BaseToken, std::unique_ptr<T>>> rest;
-        std::optional<BaseToken> last;
+        std::vector<T> rest;
+        rest.push_back(std::move(*optionalFirst));
         while (m_current != m_lexer.end() && m_current->getTokenType() == tokenType)
         {
-            auto comma = m_current++;
+            m_current++;
             if (!checkFunc(m_current->getTokenType()))
             {
-                last = *comma;
                 break;
             }
             auto other = parseFunc();
@@ -94,20 +99,20 @@ class Parser
             {
                 return tl::unexpected{std::move(other).error()};
             }
-            rest.emplace_back(*comma, std::make_unique<T>(*std::move(other)));
+            rest.emplace_back(std::move(*other));
         }
-        return Syntax::CommaList<T>{std::make_unique<T>(std::move(*optionalFirst)), std::move(rest), last};
+        return rest;
     }
 
-    template <class T, auto parseLesser, TokenType... allowed>
-    tl::expected<T, std::string> parseGenericBinOp()
+    template <auto parseLesser, TokenType... allowed>
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseGenericBinOp()
     {
         auto first = (this->*parseLesser)();
         if (!first)
         {
             return tl::unexpected{std::move(first).error()};
         }
-        T current{std::move(*first)};
+        IntrVarPtr<Syntax::Expression> current{std::move(*first)};
         while (m_current != m_lexer.end() && ((m_current->getTokenType() == allowed) || ...))
         {
             auto op = *m_current++;
@@ -116,17 +121,14 @@ class Parser
             {
                 return tl::unexpected{std::move(rhs).error()};
             }
-            current.variant = std::make_unique<typename T::BinOp>(
-                typename T::BinOp{std::make_unique<T>(std::move(current)), std::move(op), std::move(*rhs)});
+            current = make_node<Syntax::BinOp>(std::move(current), std::move(op), std::move(*rhs));
         }
-        return {std::move(current)};
+        return std::move(current);
     }
 
-    tl::expected<Syntax::AugTarget, std::string> convertToAug(Syntax::StarredExpression&& starredExpression,
-                                                              const BaseToken& assignOp);
+    tl::expected<void, std::string> checkAug(const Syntax::Expression& expression, const Token& assignOp);
 
-    tl::expected<Syntax::TargetList, std::string> convertToTargetList(Syntax::StarredExpression&& starredExpression,
-                                                                      const BaseToken& assignOp);
+    tl::expected<void, std::string> checkTarget(const Syntax::Expression& expression, const Token& assignOp);
 
     static bool firstInAssignmentExpression(TokenType tokenType)
     {
@@ -184,30 +186,19 @@ public:
     /**
      * yield_expression ::=  "yield" [expression_list | "from" expression]
      */
-    tl::expected<Syntax::YieldExpression, std::string> parseYieldExpression();
+    tl::expected<Syntax::Yield, std::string> parseYieldExpression();
 
     /**
      * atom ::=  identifier | literal | enclosure
      *
      * literal ::=  stringliteral | bytesliteral | integer | floatnumber | imagnumber | None | True | False
      */
-    tl::expected<Syntax::Atom, std::string> parseAtom();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAtom();
 
     /**
      * attributeref ::=  primary "." identifier
      */
-    tl::expected<Syntax::AttributeRef, std::string> parseAttributeRef(std::unique_ptr<Syntax::Primary>&& primary);
-
-    /**
-     * slicing      ::=  primary "[" slice_list "]"
-     * slice_list   ::=  slice_item { "," slice_item } [","]
-     * slice_item   ::=  expression | proper_slice
-     * proper_slice ::=  [lower_bound] ":" [upper_bound] [ ":" [stride] ]
-     * lower_bound  ::=  expression
-     * upper_bound  ::=  expression
-     * stride       ::=  expression
-     */
-    tl::expected<Syntax::Slicing, std::string> parseSlicing(std::unique_ptr<Syntax::Primary>&& primary);
+    tl::expected<Syntax::AttributeRef, std::string> parseAttributeRef(IntrVarPtr<Syntax::Expression>&& expression);
 
     /**
      * argument_list        ::=  positional_arguments ["," starred_and_keywords] ["," keywords_arguments]
@@ -219,33 +210,41 @@ public:
      * keywords_arguments   ::=  (keyword_item | "**" expression) { "," keyword_item | "," "**" expression }
      * keyword_item         ::=  identifier "=" expression
      */
-    tl::expected<Syntax::ArgumentList, std::string>
-        parseArgumentList(std::optional<Syntax::AssignmentExpression>&& firstAssignment = std::nullopt);
+    tl::expected<std::vector<Syntax::Argument>, std::string>
+        parseArgumentList(IntrVarPtr<Syntax::Expression>&& firstAssignment = nullptr);
 
     /**
      * call ::=  primary "(" [argument_list [","] | comprehension] ")"
      */
-    tl::expected<Syntax::Call, std::string> parseCall(std::unique_ptr<Syntax::Primary>&& primary);
+    tl::expected<Syntax::Call, std::string> parseCall(IntrVarPtr<Syntax::Expression>&& expression);
 
     /**
      * primary ::=  atom | attributeref | subscription | slicing | call
      */
-    tl::expected<Syntax::Primary, std::string> parsePrimary();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parsePrimary();
 
     /**
      * subscription ::=  primary "[" expression_list "]"
+     * slicing      ::=  primary "[" slice_list "]"
+     * slice_list   ::=  slice_item { "," slice_item } [","]
+     * slice_item   ::=  expression | proper_slice
+     * proper_slice ::=  [lower_bound] ":" [upper_bound] [ ":" [stride] ]
+     * lower_bound  ::=  expression
+     * upper_bound  ::=  expression
+     * stride       ::=  expression
      */
-    tl::expected<Syntax::Primary, std::string> parseSlicingOrSubscription(std::unique_ptr<Syntax::Primary>&& primary);
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string>
+        parseSlicingOrSubscription(IntrVarPtr<Syntax::Expression>&& expression);
 
     /**
      * await_expr ::=  "await" primary
      */
-    tl::expected<Syntax::AwaitExpr, std::string> parseAwaitExpr();
+    tl::expected<Syntax::UnaryOp, std::string> parseAwaitExpr();
 
     /**
      * power ::= (await_expr | primary) ["**" u_expr]
      */
-    tl::expected<Syntax::Power, std::string> parsePower();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parsePower();
 
     /**
      * u_expr ::=  power
@@ -253,7 +252,7 @@ public:
      *          |  "+" u_expr
      *          |  "~" u_expr
      */
-    tl::expected<Syntax::UExpr, std::string> parseUExpr();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseUExpr();
 
     /**
      * m_expr ::=  u_expr
@@ -263,92 +262,99 @@ public:
      *          |  m_expr "/" u_expr
      *          |  m_expr "%" u_expr
      */
-    tl::expected<Syntax::MExpr, std::string> parseMExpr();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseMExpr();
 
     /**
      * a_expr ::=  m_expr
      *          |  a_expr "+" m_expr
      *          |  a_expr "-" m_expr
      */
-    tl::expected<Syntax::AExpr, std::string> parseAExpr();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAExpr();
 
     /**
      * shift_expr ::=  a_expr
      *              |  shift_expr ("<<" | ">>") a_expr
      */
-    tl::expected<Syntax::ShiftExpr, std::string> parseShiftExpr();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseShiftExpr();
 
     /**
      * and_expr ::=  shift_expr
      *            |  and_expr "&" shift_expr
      */
-    tl::expected<Syntax::AndExpr, std::string> parseAndExpr();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAndExpr();
 
     /**
      * xor_expr ::=  and_expr
      *            |  xor_expr "^" and_expr
      */
-    tl::expected<Syntax::XorExpr, std::string> parseXorExpr();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseXorExpr();
 
     /**
      * or_expr  ::=  xor_expr
      *            | or_expr "|" xor_expr
      */
-    tl::expected<Syntax::OrExpr, std::string> parseOrExpr();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseOrExpr();
 
     /**
      * comparison    ::=  or_expr { comp_operator or_expr }
      * comp_operator ::=  "<" | ">" | "==" | ">=" | "<=" | "!=" | "is" ["not"] | ["not"] "in"
      */
-    tl::expected<Syntax::Comparison, std::string> parseComparison();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseComparison();
 
     /**
      * not_test ::=  comparison
      *            |  "not" not_test
      */
-    tl::expected<Syntax::NotTest, std::string> parseNotTest();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseNotTest();
 
     /**
      * and_test ::=  not_test
      *            |  and_test "and" not_test
      */
-    tl::expected<Syntax::AndTest, std::string> parseAndTest();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAndTest();
 
     /**
      * or_test  ::=  and_test
      *            |  or_test "or" and_test
      */
-    tl::expected<Syntax::OrTest, std::string> parseOrTest();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseOrTest();
 
     /**
      * assignment_expression ::=  [identifier ":="] expression
      */
-    tl::expected<Syntax::AssignmentExpression, std::string> parseAssignmentExpression();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAssignmentExpression();
 
     /**
      * conditional_expression ::=  or_test ["if" or_test "else" expression]
      */
-    tl::expected<Syntax::ConditionalExpression, std::string> parseConditionalExpression();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseConditionalExpression();
 
     /**
      * expression ::=  conditional_expression
      *              |  lambda_expr
      */
-    tl::expected<Syntax::Expression, std::string> parseExpression();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseExpression();
 
-    tl::expected<Syntax::CommaList<Syntax::Expression>, std::string> parseExpressionList();
+    /**
+     * expression_list ::=  expression { "," expression } [","]
+     */
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseExpressionList();
 
     /**
      * lambda_expr ::=  "lambda" [parameter_list] ":" expression
      */
-    tl::expected<Syntax::LambdaExpression, std::string> parseLambdaExpression();
+    tl::expected<Syntax::Lambda, std::string> parseLambdaExpression();
 
     /**
      * starred_expression ::=  expression
      *                      |  { starred_item "," } [starred_item]
+     *
+     * Note: While this is the formal syntax described in the python reference, we parse the second alternative with the
+     *       last item not being optional unless at least one comma has been parsed. Empty starred_expressions are
+     *       instead handled at it's uses grammar rules.
      */
-    tl::expected<Syntax::StarredExpression, std::string>
-        parseStarredExpression(std::optional<Syntax::AssignmentExpression>&& firstItem = std::nullopt);
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string>
+        parseStarredExpression(IntrVarPtr<Syntax::Expression>&& firstItem = nullptr);
 
     /**
      * starred_item ::=  assignment_expression
@@ -356,7 +362,7 @@ public:
      */
     tl::expected<Syntax::StarredItem, std::string> parseStarredItem();
 
-    tl::expected<Syntax::StarredList, std::string>
+    tl::expected<std::vector<Syntax::StarredItem>, std::string>
         parseStarredList(std::optional<Syntax::StarredItem>&& firstItem = std::nullopt);
 
     /**
@@ -373,7 +379,7 @@ public:
      * comprehension ::=  assignment_expression comp_for
      */
     tl::expected<Syntax::Comprehension, std::string>
-        parseComprehension(Syntax::AssignmentExpression&& assignmentExpression);
+        parseComprehension(IntrVarPtr<Syntax::Expression>&& assignmentExpression);
 
     /**
      * enclosure            ::=  parenth_form | list_display | dict_display | set_display
@@ -395,35 +401,31 @@ public:
      *
      * yield_atom           ::=  "(" yield_expression ")"
      */
-    tl::expected<Syntax::Enclosure, std::string> parseEnclosure();
+    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseEnclosure();
 
     /**
-     * target          ::=  identifier
-     *                   | "(" [target_list] ")"
-     *                   | "[" [target_list] "]"
-     *                   | attributeref
-     *                   | subscription
-     *                   | slicing
-     *                   | "*" target
+     * target      ::=  identifier
+     *               |  "(" [target_list] ")"
+     *               |  "[" [target_list] "]"
+     *               |  attributeref
+     *               |  subscription
+     *               |  slicing
+     *               |  "*" target
      *
-     * Undocumented, but CPython seems to only allows "*" target once. Any further stars as prefix are rejected.
+     * target_list ::= target { "," target } [","]
+     *
+     * Undocumented, but CPython seems to only allow "*" target once. Any further stars as prefix are rejected.
      * This makes target a strict subset of starred_expression.
      */
-    tl::expected<Syntax::Target, std::string> parseTarget();
+    tl::expected<IntrVarPtr<Syntax::Target>, std::string> parseTarget(const Token& assignmentLikeToken);
 
-    tl::expected<Syntax::TargetList, std::string>
-        parseTargetList(std::optional<Syntax::Target>&& firstItem = std::nullopt);
+    tl::expected<IntrVarPtr<Syntax::Target>, std::string> parseTargetList(const Token& assignmentLikeToken);
 
     /**
      * assignment_stmt ::=  target_list "=" { target_list "=" } (starred_expression | yield_expression)
      */
     tl::expected<Syntax::AssignmentStmt, std::string>
-        parseAssignmentStmt(std::optional<Syntax::TargetList>&& firstItem = std::nullopt);
-
-    /**
-     * augtarget ::=  identifier | attributeref | subscription | slicing
-     */
-    tl::expected<Syntax::AugTarget, std::string> parseAugTarget();
+        parseAssignmentStmt(IntrVarPtr<Syntax::Target>&& firstItem = nullptr);
 
     /**
      * assert_stmt ::=  "assert" expression ["," expression]
@@ -461,6 +463,8 @@ public:
      *                             |  global_stmt
      *                             |  nonlocal_stmt
      *
+     * expression_stmt           ::=  starred_expression
+     *
      * nonlocal_stmt             ::=  "nonlocal" identifier { "," identifier }
      *
      * global_stmt               ::=  "global" identifier { "," identifier }
@@ -490,23 +494,9 @@ public:
      * augmented_assignment_stmt ::=  augtarget augop (expression_list | yield_expression)
      * augop                     ::=  "+=" | "-=" | "*=" | "@=" | "/=" | "//=" | "%=" | "**="
      *                             |  ">>=" | "<<=" | "&=" | "^=" | "|="
+     * augtarget                 ::=  identifier | attributeref | subscription | slicing
      */
-    tl::expected<Syntax::SimpleStmt, std::string> parseSimpleStmt();
-
-    /**
-     * file_input ::=  { NEWLINE | statement }
-     */
-    tl::expected<Syntax::FileInput, std::string> parseFileInput();
-
-    /**
-     * statement ::=  stmt_list NEWLINE | compound_stmt
-     */
-    tl::expected<Syntax::Statement, std::string> parseStatement();
-
-    /**
-     * stmt_list ::=  simple_stmt (";" simple_stmt)* [";"]
-     */
-    tl::expected<Syntax::StmtList, std::string> parseStmtList();
+    tl::expected<IntrVarPtr<Syntax::SimpleStmt>, std::string> parseSimpleStmt();
 
     /**
      * compound_stmt ::=  if_stmt
@@ -524,12 +514,30 @@ public:
      *
      * async_for_stmt ::=  "async" for_stmt
      */
-    tl::expected<Syntax::CompoundStmt, std::string> parseCompoundStmt();
+    tl::expected<IntrVarPtr<Syntax::CompoundStmt>, std::string> parseCompoundStmt();
+
+    /**
+     * stmt_list ::=  simple_stmt { ";" simple_stmt } [";"]
+     *
+     *                Note: we parse this as [simple_stmt] { ";" [simple_stmt] } [";"].
+     *                      That way the expression statement inside of simple_stmt can never be empty.
+     */
+    tl::expected<std::vector<IntrVarPtr<Syntax::SimpleStmt>>, std::string> parseStmtList();
+
+    /**
+     * statement ::=  stmt_list NEWLINE | compound_stmt
+     */
+    tl::expected<decltype(Syntax::Suite::statements), std::string> parseStatement();
 
     /**
      * suite ::=  stmt_list NEWLINE | NEWLINE INDENT statement { statement } DEDENT
      */
     tl::expected<Syntax::Suite, std::string> parseSuite();
+
+    /**
+     * file_input ::=  { NEWLINE | statement }
+     */
+    tl::expected<Syntax::FileInput, std::string> parseFileInput();
 
     tl::expected<Syntax::IfStmt::Else, std::string> parseElse();
 
@@ -566,16 +574,16 @@ public:
     tl::expected<Syntax::WithStmt, std::string> parseWithStmt();
 
     /**
-     * parameter_list            ::=  defparameter ("," defparameter)* "," "/" ["," [parameter_list_no_posonly]]
+     * parameter_list            ::=  defparameter { "," defparameter } "," "/" ["," [parameter_list_no_posonly]]
      *                             |  parameter_list_no_posonly
      * parameter_list_no_posonly ::=  defparameter { "," defparameter } ["," [parameter_list_starargs]]
      *                             |  parameter_list_starargs
-     * parameter_list_starargs   ::=  "*" [parameter] ("," defparameter)* ["," ["**" parameter [","]]]
+     * parameter_list_starargs   ::=  "*" [parameter] {"," defparameter } ["," ["**" parameter [","]]]
      *                             |  "**" parameter [","]
      * parameter                 ::=  identifier [":" expression]
      * defparameter              ::=  parameter ["=" expression]
      */
-    tl::expected<Syntax::ParameterList, std::string> parseParameterList();
+    tl::expected<std::vector<Syntax::Parameter>, std::string> parseParameterList();
 
     /**
      * decorator     ::=  "@" assignment_expression NEWLINE

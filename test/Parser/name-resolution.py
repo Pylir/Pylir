@@ -14,13 +14,14 @@ def foo():
 
 
 # CHECK-LABEL: function foo
-# CHECK: locals: inner
+# CHECK-NEXT: locals: inner
 # CHECK-NOT: nonlocals:
-# CHECK: closures: a, c
+# CHECK-NEXT: closures: a, c
 
 # CHECK-LABEL: function inner
-# CHECK: locals: b
-# CHECK: nonlocals: a, c
+# CHECK-NEXT: parameter b
+# CHECK-NEXT: locals: b
+# CHECK-NEXT: nonlocals: a, c
 # CHECK-NOT: closures:
 
 def outer():
@@ -32,16 +33,16 @@ def outer():
 
 
 # CHECK-LABEL: function outer
-# CHECK: locals: inner
-# CHECK: closures: x
+# CHECK-NEXT: locals: inner
+# CHECK-NEXT: closures: x
 
 # CHECK-LABEL: function inner
-# CHECK: locals: inner2
-# CHECK: nonlocals: x
+# CHECK-NEXT: locals: inner2
+# CHECK-NEXT: nonlocals: x
 # CHECK-NOT: closures:
-# CHECk_LABEL: function inner2
+# CHECK-LABEL: function inner2
 # CHECK-NOT: locals:
-# CHECK: nonlocals: x
+# CHECK-NEXT: nonlocals: x
 # CHECK-NOT: closures:
 
 x = 0
@@ -55,13 +56,13 @@ def outer2():
 
 
 # CHECK-LABEL: function outer2
-# CHECK: locals: inner
+# CHECK-NEXT: locals: inner
 # CHECK-NOT: nonlocals
-# CHECK: closures: x
+# CHECK-NEXT: closures: x
 
 # CHECK-LABEL: function inner
 # CHECK-NOT: locals:
-# CHECK: nonlocals: x
+# CHECK-NEXT: nonlocals: x
 # CHECK-NOT: closures:
 
 def outer3():
@@ -76,16 +77,17 @@ def outer3():
 
 
 # CHECK-LABEL: function outer3
-# CHECK: locals: Foo
-# CHECK: closures: y
+# CHECK-NEXT: locals: Foo
+# CHECK-NEXT: closures: y
 # CHECK-NOT: closures:
 # CHECK-LABEL: class Foo
-# CHECK: locals: foo
-# CHECK: nonlocals: y
+# CHECK-NEXT: locals: foo
+# CHECK-NEXT: nonlocals: y
 # CHECK-NOT: closures:
 # CHECK-LABEL: function foo
-# CHECK: locals: self
-# CHECK: nonlocals: y
+# CHECK-NEXT: parameter
+# CHECK-NEXT: locals: self
+# CHECK-NEXT: nonlocals: y
 # CHECK-NOT: closures:
 
 def bar():
@@ -98,21 +100,22 @@ def bar():
                     nonlocal x
 
 # CHECK-LABEL: function bar
-# CHECK: locals: Bar
-# CHECK: closures: x
+# CHECK-NEXT: locals: Bar
+# CHECK-NEXT: closures: x
 # CHECK-LABEL: class Bar
-# CHECK: locals: outer
-# CHECK: nonlocals: x
+# CHECK-NEXT: locals: outer
+# CHECK-NEXT: nonlocals: x
 # CHECK-NOT: closures:
 # CHECK-LABEL: function outer
-# CHECK: locals: inner, self
-# CHECK: nonlocals: x
+# CHECK-NEXT: parameter
+# CHECK-NEXT: locals: inner, self
+# CHECK-NEXT: nonlocals: x
 # CHECK-NOT: closures:
 # CHECK-LABEL: function inner
-# CHECK: locals: inner2
-# CHECK: nonlocals: x
+# CHECK-NEXT: locals: inner2
+# CHECK-NEXT: nonlocals: x
 # CHECK-NOT: closures:
-# CHECk_LABEL: function inner2
+# CHECK-LABEL: function inner2
 # CHECK-NOT: locals:
-# CHECK: nonlocals: x
+# CHECK-NEXT: nonlocals: x
 # CHECK-NOT: closures:

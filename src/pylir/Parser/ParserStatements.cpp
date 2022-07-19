@@ -9,111 +9,11 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Support/Functional.hpp>
 
-tl::expected<pylir::Syntax::Target, std::string> pylir::Parser::parseTarget()
-{
-    if (m_current == m_lexer.end())
-    {
-        return tl::unexpected{
-            createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, TokenType::Identifier)
-                .addLabel(m_document->getText().size(), std::nullopt, Diag::ERROR_COLOUR)
-                .emitError()};
-    }
-    switch (m_current->getTokenType())
-    {
-        case TokenType::Identifier:
-        {
-            auto augTarget = parseAugTarget();
-            if (!augTarget)
-            {
-                return tl::unexpected{std::move(augTarget).error()};
-            }
-            return pylir::match(
-                std::move(augTarget->variant), [](const auto&) -> Syntax::Target { PYLIR_UNREACHABLE; },
-                [](Syntax::AttributeRef&& attributeRef) -> Syntax::Target { return {std::move(attributeRef)}; },
-                [](Syntax::Subscription&& subscription) -> Syntax::Target { return {std::move(subscription)}; },
-                [](Syntax::Slicing&& slicing) -> Syntax::Target { return {std::move(slicing)}; },
-                [](IdentifierToken&& identifier) -> Syntax::Target { return {std::move(identifier)}; });
-        }
-        case TokenType::Star:
-        {
-            auto star = *m_current++;
-            auto target = parseTarget();
-            if (!target)
-            {
-                return tl::unexpected{std::move(target).error()};
-            }
-            return Syntax::Target{std::pair{star, std::make_unique<Syntax::Target>(std::move(*target))}};
-        }
-        case TokenType::OpenParentheses:
-        {
-            auto open = *m_current++;
-            if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses)
-            {
-                auto close = expect(TokenType::CloseParentheses);
-                if (!close)
-                {
-                    return tl::unexpected{std::move(close).error()};
-                }
-                return Syntax::Target{Syntax::Target::Parenth{open, std::nullopt, *close}};
-            }
-            auto list = parseTargetList();
-            if (!list)
-            {
-                return tl::unexpected{std::move(list).error()};
-            }
-            auto close = expect(TokenType::CloseParentheses);
-            if (!close)
-            {
-                return tl::unexpected{std::move(close).error()};
-            }
-            return Syntax::Target{Syntax::Target::Parenth{open, std::move(*list), *close}};
-        }
-        case TokenType::OpenSquareBracket:
-        {
-            auto open = *m_current++;
-            if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseSquareBracket)
-            {
-                auto close = expect(TokenType::CloseSquareBracket);
-                if (!close)
-                {
-                    return tl::unexpected{std::move(close).error()};
-                }
-                return Syntax::Target{Syntax::Target::Square{open, std::nullopt, *close}};
-            }
-            auto list = parseTargetList();
-            if (!list)
-            {
-                return tl::unexpected{std::move(list).error()};
-            }
-            auto close = expect(TokenType::CloseSquareBracket);
-            if (!close)
-            {
-                return tl::unexpected{std::move(close).error()};
-            }
-            return Syntax::Target{Syntax::Target::Square{open, std::move(*list), *close}};
-        }
-        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
-        default:
-        {
-            return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                                           TokenType::Identifier, m_current->getTokenType())
-                                      .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
-                                      .emitError()};
-        }
-    }
-}
-
-tl::expected<pylir::Syntax::TargetList, std::string>
-    pylir::Parser::parseTargetList(std::optional<Syntax::Target>&& firstItem)
-{
-    return parseCommaList(pylir::bind_front(&Parser::parseTarget, this), firstInTarget, std::move(firstItem));
-}
-
 tl::expected<pylir::Syntax::AssignmentStmt, std::string>
-    pylir::Parser::parseAssignmentStmt(std::optional<Syntax::TargetList>&& firstItem)
+    pylir::Parser::parseAssignmentStmt(IntrVarPtr<Syntax::Target>&& firstItem)
 {
-    std::vector<std::pair<Syntax::TargetList, BaseToken>> targets;
-    bool hadFirst = firstItem.has_value();
+    std::vector<std::pair<IntrVarPtr<Syntax::Target>, Token>> targets;
+    bool hadFirst = firstItem != nullptr;
     if (firstItem)
     {
         auto assignment = expect(TokenType::Assignment);
@@ -121,9 +21,9 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
         {
             return tl::unexpected{std::move(assignment).error()};
         }
-        targets.emplace_back(std::move(*firstItem), std::move(*assignment));
+        targets.emplace_back(std::move(firstItem), std::move(*assignment));
     }
-    std::optional<Syntax::StarredExpression> leftOverStarredExpression;
+    IntrVarPtr<Syntax::Expression> leftOverStarredExpression;
     do
     {
         if (hadFirst && (m_current == m_lexer.end() || !firstInTarget(m_current->getTokenType())))
@@ -141,17 +41,17 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
             break;
         }
         auto assignment = *m_current++;
-        auto targetList = convertToTargetList(std::move(*starredExpression), assignment);
-        if (!targetList)
+        auto error = checkTarget(**starredExpression, assignment);
+        if (!error)
         {
-            return tl::unexpected{std::move(targetList).error()};
+            return tl::unexpected{std::move(error).error()};
         }
-        addToNamespace(*targetList);
-        targets.emplace_back(std::move(*targetList), assignment);
+        addToNamespace(**starredExpression);
+        targets.emplace_back(std::move(*starredExpression), assignment);
     } while (m_current != m_lexer.end() && firstInTarget(m_current->getTokenType()));
     if (leftOverStarredExpression)
     {
-        return Syntax::AssignmentStmt{std::move(targets), std::move(*leftOverStarredExpression)};
+        return Syntax::AssignmentStmt{{}, std::move(targets), nullptr, std::move(leftOverStarredExpression)};
     }
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
     {
@@ -160,7 +60,8 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
         {
             return tl::unexpected{std::move(yieldExpr).error()};
         }
-        return Syntax::AssignmentStmt{std::move(targets), std::move(*yieldExpr)};
+        return Syntax::AssignmentStmt{
+            {}, std::move(targets), nullptr, std::make_unique<Syntax::Yield>(std::move(*yieldExpr))};
     }
 
     auto starredExpression = parseStarredExpression();
@@ -168,66 +69,14 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
     {
         return tl::unexpected{std::move(starredExpression).error()};
     }
-    return Syntax::AssignmentStmt{std::move(targets), std::move(*starredExpression)};
+    return Syntax::AssignmentStmt{{}, std::move(targets), nullptr, std::move(*starredExpression)};
 }
 
-tl::expected<pylir::Syntax::AugTarget, std::string> pylir::Parser::parseAugTarget()
-{
-    auto identifier = expect(TokenType::Identifier);
-    if (!identifier)
-    {
-        return tl::unexpected{std::move(identifier).error()};
-    }
-    if (m_current == m_lexer.end()
-        || (m_current->getTokenType() != TokenType::Dot && m_current->getTokenType() != TokenType::OpenSquareBracket))
-    {
-        return Syntax::AugTarget{IdentifierToken{std::move(*identifier)}};
-    }
-    Syntax::Primary current{Syntax::Atom{IdentifierToken{std::move(*identifier)}}};
-    do
-    {
-        switch (m_current->getTokenType())
-        {
-            case TokenType::Dot:
-            {
-                auto attributeRef = parseAttributeRef(std::make_unique<Syntax::Primary>(std::move(current)));
-                if (!attributeRef)
-                {
-                    return tl::unexpected{std::move(attributeRef).error()};
-                }
-                current = Syntax::Primary{std::move(*attributeRef)};
-                break;
-            }
-            case TokenType::OpenSquareBracket:
-            {
-                auto newCurrent = parseSlicingOrSubscription(std::make_unique<Syntax::Primary>(std::move(current)));
-                if (!newCurrent)
-                {
-                    return tl::unexpected{std::move(newCurrent).error()};
-                }
-                current = std::move(*newCurrent);
-                break;
-            }
-            default: PYLIR_UNREACHABLE;
-        }
-    } while (
-        m_current != m_lexer.end()
-        && (m_current->getTokenType() == TokenType::Dot || m_current->getTokenType() == TokenType::OpenSquareBracket));
-    return pylir::match(
-        std::move(current.variant), [](const auto&) -> Syntax::AugTarget { PYLIR_UNREACHABLE; },
-        [](Syntax::AttributeRef&& attributeRef) -> Syntax::AugTarget { return {std::move(attributeRef)}; },
-        [](Syntax::Subscription&& subscription) -> Syntax::AugTarget { return {std::move(subscription)}; },
-        [](Syntax::Slicing&& slicing) -> Syntax::AugTarget { return {std::move(slicing)}; },
-        [](IdentifierToken&& identifier) -> Syntax::AugTarget { return {std::move(identifier)}; });
-}
-
-tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleStmt()
+tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::Parser::parseSimpleStmt()
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, "statement")
-                                  .addLabel(m_document->getText().size(), std::nullopt, Diag::ERROR_COLOUR)
-                                  .emitError()};
+        return make_node<Syntax::ExpressionStmt>(nullptr);
     }
     switch (m_current->getTokenType())
     {
@@ -238,18 +87,10 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 return tl::unexpected{std::move(assertStmt).error()};
             }
-            return Syntax::SimpleStmt{std::move(*assertStmt)};
+            return std::make_unique<Syntax::AssertStmt>(std::move(*assertStmt));
         }
-        case TokenType::PassKeyword: return Syntax::SimpleStmt{Syntax::PassStmt{*m_current++}};
+        case TokenType::PassKeyword: return make_node<Syntax::SingleTokenStmt>(*m_current++);
         case TokenType::BreakKeyword:
-            if (!m_inLoop)
-            {
-                return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP,
-                                                               m_current->getTokenType())
-                                          .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
-                                          .emitError()};
-            }
-            return Syntax::SimpleStmt{Syntax::BreakStmt{*m_current++}};
         case TokenType::ContinueKeyword:
             if (!m_inLoop)
             {
@@ -258,17 +99,17 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                                           .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
                                           .emitError()};
             }
-            return Syntax::SimpleStmt{Syntax::ContinueStmt{*m_current++}};
+            return make_node<Syntax::SingleTokenStmt>(*m_current++);
         case TokenType::DelKeyword:
         {
             auto delKeyword = *m_current++;
-            auto targetList = parseTargetList();
+            auto targetList = parseTargetList(delKeyword);
             if (!targetList)
             {
                 return tl::unexpected{std::move(targetList).error()};
             }
-            addToNamespace(*targetList);
-            return Syntax::SimpleStmt{Syntax::DelStmt{delKeyword, std::move(*targetList)}};
+            addToNamespace(**targetList);
+            return make_node<Syntax::DelStmt>(delKeyword, std::move(*targetList));
         }
         case TokenType::ReturnKeyword:
         {
@@ -282,14 +123,14 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             auto returnKeyword = *m_current++;
             if (m_current == m_lexer.end() || !firstInExpression(m_current->getTokenType()))
             {
-                return Syntax::SimpleStmt{Syntax::ReturnStmt{returnKeyword, std::nullopt}};
+                return make_node<Syntax::ReturnStmt>(returnKeyword, nullptr);
             }
             auto expressionList = parseExpressionList();
             if (!expressionList)
             {
                 return tl::unexpected{std::move(expressionList).error()};
             }
-            return Syntax::SimpleStmt{Syntax::ReturnStmt{returnKeyword, std::move(*expressionList)}};
+            return make_node<Syntax::ReturnStmt>(returnKeyword, std::move(*expressionList));
         }
         case TokenType::YieldKeyword:
         {
@@ -298,14 +139,14 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 return tl::unexpected{std::move(yieldExpr).error()};
             }
-            return Syntax::SimpleStmt{Syntax::YieldStmt{std::move(*yieldExpr)}};
+            return make_node<Syntax::ExpressionStmt>(std::make_unique<Syntax::Yield>(std::move(*yieldExpr)));
         }
         case TokenType::RaiseKeyword:
         {
             auto raise = *m_current++;
             if (m_current == m_lexer.end() || !firstInExpression(m_current->getTokenType()))
             {
-                return Syntax::SimpleStmt{Syntax::RaiseStmt{raise, std::nullopt}};
+                return make_node<Syntax::RaiseStmt>(raise, nullptr, nullptr);
             }
             auto expression = parseExpression();
             if (!expression)
@@ -314,7 +155,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             }
             if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::FromKeyword)
             {
-                return Syntax::SimpleStmt{Syntax::RaiseStmt{raise, std::pair{std::move(*expression), std::nullopt}}};
+                return make_node<Syntax::RaiseStmt>(raise, std::move(*expression), nullptr);
             }
             auto from = *m_current++;
             auto source = parseExpression();
@@ -322,8 +163,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 return tl::unexpected{std::move(source).error()};
             }
-            return Syntax::SimpleStmt{
-                Syntax::RaiseStmt{raise, std::pair{std::move(*expression), std::pair{from, std::move(*source)}}}};
+            return make_node<Syntax::RaiseStmt>(raise, std::move(*expression), std::move(*source));
         }
         case TokenType::GlobalKeyword:
         case TokenType::NonlocalKeyword:
@@ -334,16 +174,17 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 return tl::unexpected{std::move(identifier).error()};
             }
-            std::vector<std::pair<BaseToken, IdentifierToken>> rest;
+            std::vector<IdentifierToken> identifiers;
+            identifiers.emplace_back(std::move(*identifier));
             while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
             {
-                auto comma = *m_current++;
+                m_current++;
                 auto another = expect(TokenType::Identifier);
                 if (!another)
                 {
                     return tl::unexpected{std::move(another).error()};
                 }
-                rest.emplace_back(comma, std::move(*another));
+                identifiers.emplace_back(std::move(*another));
             }
             if (keyword.getTokenType() == TokenType::NonlocalKeyword)
             {
@@ -389,27 +230,19 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                     }
                     return {};
                 };
-                if (auto error = handleToken(IdentifierToken{*identifier}); !error)
+
+                for (auto& iter : identifiers)
                 {
-                    return tl::unexpected{error.error()};
-                }
-                if (!m_namespace.empty())
-                {
-                    m_namespace.back().identifiers.emplace(IdentifierToken{*identifier}, Scope::Kind::NonLocal);
-                }
-                for (auto& iter : rest)
-                {
-                    if (auto error = handleToken(iter.second); !error)
+                    if (auto error = handleToken(iter); !error)
                     {
                         return tl::unexpected{error.error()};
                     }
                     if (!m_namespace.empty())
                     {
-                        m_namespace.back().identifiers.emplace(iter.second, Scope::Kind::NonLocal);
+                        m_namespace.back().identifiers.emplace(iter, Scope::Kind::NonLocal);
                     }
                 }
-                return Syntax::SimpleStmt{
-                    Syntax::NonLocalStmt{keyword, IdentifierToken{std::move(*identifier)}, std::move(rest)}};
+                return make_node<Syntax::GlobalOrNonLocalStmt>(keyword, std::move(identifiers));
             }
 
             if (!m_namespace.empty())
@@ -452,32 +285,24 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                     }
                     return {};
                 };
-                if (auto error = handleToken(IdentifierToken{*identifier}); !error)
+                for (auto& iter : identifiers)
                 {
-                    return tl::unexpected{std::move(error).error()};
-                }
-                m_globals.insert(IdentifierToken{*identifier});
-                m_namespace.back().identifiers.emplace(IdentifierToken{*identifier}, Scope::Kind::Global);
-                for (auto& iter : rest)
-                {
-                    if (auto error = handleToken(iter.second); !error)
+                    if (auto error = handleToken(iter); !error)
                     {
                         return tl::unexpected{std::move(error).error()};
                     }
-                    m_globals.insert(iter.second);
-                    m_namespace.back().identifiers.emplace(iter.second, Scope::Kind::Global);
+                    m_globals.insert(iter);
+                    m_namespace.back().identifiers.emplace(iter, Scope::Kind::Global);
                 }
             }
             else
             {
-                m_globals.insert(IdentifierToken{*identifier});
-                for (auto& iter : rest)
+                for (auto& iter : identifiers)
                 {
-                    m_globals.insert(iter.second);
+                    m_globals.insert(iter);
                 }
             }
-            return Syntax::SimpleStmt{
-                Syntax::GlobalStmt{keyword, IdentifierToken{std::move(*identifier)}, std::move(rest)}};
+            return make_node<Syntax::GlobalOrNonLocalStmt>(keyword, std::move(identifiers));
         }
         case TokenType::FromKeyword:
         case TokenType::ImportKeyword:
@@ -487,10 +312,10 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
             {
                 return tl::unexpected{std::move(import).error()};
             }
-            if (auto* fromImportAs = std::get_if<Syntax::ImportStmt::FromImportList>(&import->variant);
+            if (auto* fromImportAs = std::get_if<Syntax::ImportStmt::FromImport>(&import->variant);
                 fromImportAs && fromImportAs->relativeModule.dots.empty() && fromImportAs->relativeModule.module
-                && fromImportAs->relativeModule.module->leading.empty()
-                && fromImportAs->relativeModule.module->lastIdentifier.getValue() == "__future__")
+                && fromImportAs->relativeModule.module->identifiers.size() == 1
+                && fromImportAs->relativeModule.module->identifiers.back().getValue() == "__future__")
             {
                 auto check = [&](const IdentifierToken& identifierToken) -> tl::expected<void, std::string>
                 {
@@ -511,30 +336,15 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                             .addLabel(identifierToken, std::nullopt, Diag::ERROR_COLOUR)
                             .emitError()};
                 };
-                if (auto result = check(fromImportAs->identifier); !result)
+                for (auto& iter : fromImportAs->imports)
                 {
-                    return tl::unexpected{std::move(result).error()};
-                }
-                for (auto& iter : fromImportAs->rest)
-                {
-                    if (auto result = check(iter.identifier); !result)
+                    if (auto result = check(iter.first); !result)
                     {
                         return tl::unexpected{std::move(result).error()};
                     }
                 }
-                return Syntax::SimpleStmt{Syntax::FutureStmt{
-                    fromImportAs->from,
-                    fromImportAs->relativeModule.module->lastIdentifier,
-                    fromImportAs->import,
-                    fromImportAs->openParenth,
-                    std::move(fromImportAs->identifier),
-                    std::move(fromImportAs->name),
-                    std::move(fromImportAs->rest),
-                    fromImportAs->comma,
-                    fromImportAs->closeParenth,
-                }};
             }
-            return Syntax::SimpleStmt{std::move(*import)};
+            return std::make_unique<Syntax::ImportStmt>(std::move(*import));
         }
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         default:
@@ -547,7 +357,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
 
             if (m_current == m_lexer.end())
             {
-                return Syntax::SimpleStmt{std::move(*starredExpression)};
+                return make_node<Syntax::ExpressionStmt>(std::move(*starredExpression));
             }
 
             switch (m_current->getTokenType())
@@ -555,18 +365,18 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                 case TokenType::Assignment:
                 {
                     // If an assignment follows, check whether the starred expression could be a target list
-                    auto targetList = convertToTargetList(std::move(*starredExpression), *m_current);
+                    auto targetList = checkTarget(**starredExpression, *m_current);
                     if (!targetList)
                     {
                         return tl::unexpected{std::move(targetList).error()};
                     }
-                    addToNamespace(*targetList);
-                    auto assignmentStmt = parseAssignmentStmt(std::move(*targetList));
+                    addToNamespace(**starredExpression);
+                    auto assignmentStmt = parseAssignmentStmt(std::move(*starredExpression));
                     if (!assignmentStmt)
                     {
                         return tl::unexpected{std::move(assignmentStmt).error()};
                     }
-                    return Syntax::SimpleStmt{std::move(*assignmentStmt)};
+                    return std::make_unique<Syntax::AssignmentStmt>(std::move(*assignmentStmt));
                 }
                 case TokenType::PlusAssignment:
                 case TokenType::Colon:
@@ -584,7 +394,7 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                 case TokenType::BitOrAssignment:
                 {
                     // needs to be an augtarget then
-                    auto augTarget = convertToAug(std::move(*starredExpression), *m_current);
+                    auto augTarget = checkAug(**starredExpression, *m_current);
                     if (!augTarget)
                     {
                         return tl::unexpected{std::move(augTarget).error()};
@@ -597,10 +407,12 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                         {
                             return tl::unexpected{std::move(expression).error()};
                         }
+                        std::vector<std::pair<IntrVarPtr<Syntax::Target>, Token>> vector;
+                        vector.emplace_back(std::move(*starredExpression), colon);
                         if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Assignment)
                         {
-                            return Syntax::SimpleStmt{Syntax::AnnotatedAssignmentSmt{
-                                std::move(*augTarget), colon, std::move(*expression), std::nullopt}};
+                            return make_node<Syntax::AssignmentStmt>(std::move(vector), std::move(*expression),
+                                                                     nullptr);
                         }
                         auto assignment = *m_current++;
                         if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
@@ -610,20 +422,21 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                             {
                                 return tl::unexpected{std::move(yield).error()};
                             }
-                            return Syntax::SimpleStmt{
-                                Syntax::AnnotatedAssignmentSmt{std::move(*augTarget), colon, std::move(*expression),
-                                                               std::pair{assignment, std::move(*yield)}}};
+                            return make_node<Syntax::AssignmentStmt>(
+                                std::move(vector), std::move(*expression),
+                                std::make_unique<Syntax::Yield>(std::move(*yield)));
                         }
                         auto starred = parseStarredExpression();
                         if (!starred)
                         {
                             return tl::unexpected{std::move(starred).error()};
                         }
-                        return Syntax::SimpleStmt{
-                            Syntax::AnnotatedAssignmentSmt{std::move(*augTarget), colon, std::move(*expression),
-                                                           std::pair{assignment, std::move(*starred)}}};
+                        return make_node<Syntax::AssignmentStmt>(std::move(vector), std::move(*expression),
+                                                                 std::move(*starred));
                     }
                     auto augOp = *m_current++;
+                    std::vector<std::pair<IntrVarPtr<Syntax::Target>, Token>> vector;
+                    vector.emplace_back(std::move(*starredExpression), augOp);
                     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
                     {
                         auto yield = parseYieldExpression();
@@ -631,18 +444,17 @@ tl::expected<pylir::Syntax::SimpleStmt, std::string> pylir::Parser::parseSimpleS
                         {
                             return tl::unexpected{std::move(yield).error()};
                         }
-                        return Syntax::SimpleStmt{
-                            Syntax::AugmentedAssignmentStmt{std::move(*augTarget), augOp, std::move(*yield)}};
+                        return make_node<Syntax::AssignmentStmt>(std::move(vector), nullptr,
+                                                                 std::make_unique<Syntax::Yield>(std::move(*yield)));
                     }
                     auto expressionList = parseExpressionList();
                     if (!expressionList)
                     {
                         return tl::unexpected{std::move(expressionList).error()};
                     }
-                    return Syntax::SimpleStmt{
-                        Syntax::AugmentedAssignmentStmt{std::move(*augTarget), augOp, std::move(*expressionList)}};
+                    return make_node<Syntax::AssignmentStmt>(std::move(vector), nullptr, std::move(*expressionList));
                 }
-                default: return Syntax::SimpleStmt{std::move(*starredExpression)};
+                default: return make_node<Syntax::ExpressionStmt>(std::move(*starredExpression));
             }
     }
 }
@@ -661,520 +473,334 @@ tl::expected<pylir::Syntax::AssertStmt, std::string> pylir::Parser::parseAssertS
     }
     if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
     {
-        return Syntax::AssertStmt{std::move(*assertKeyword), std::move(*expression), std::nullopt};
+        return Syntax::AssertStmt{{}, std::move(*assertKeyword), std::move(*expression), nullptr};
     }
-    auto comma = *m_current++;
+    m_current++;
     auto message = parseExpression();
     if (!message)
     {
         return tl::unexpected{std::move(message).error()};
     }
-    return Syntax::AssertStmt{std::move(*assertKeyword), std::move(*expression),
-                              std::pair{std::move(comma), std::move(*message)}};
+    return Syntax::AssertStmt{{}, std::move(*assertKeyword), std::move(*expression), std::move(*message)};
 }
 
 namespace
 {
 using namespace pylir;
 
-template <class T>
 struct Visitor
 {
     Parser& parser;
-    const BaseToken& assignOp;
+    const Token& assignOp;
+    bool augmented;
 
-    template <class... Args>
-    T construct(Args&&... args)
+    // Disallows implicit conversions
+    template <class T, std::enable_if_t<std::is_same_v<T, Syntax::Expression>>* = nullptr>
+    std::optional<std::string> visit(const T& expression)
     {
-        if constexpr (std::is_same_v<T, Syntax::AugTarget>)
+        return expression.match([&](const auto& sub) { return visit(sub); });
+    }
+
+    std::optional<std::string> visit(const Syntax::AttributeRef&)
+    {
+        return std::nullopt;
+    }
+
+    std::optional<std::string> visit(const Syntax::Subscription&)
+    {
+        return std::nullopt;
+    }
+
+    std::optional<std::string> visit(const Syntax::Slice&)
+    {
+        return std::nullopt;
+    }
+
+    std::optional<std::string> visit(const Syntax::TupleConstruct& tupleConstruct)
+    {
+        if (augmented)
         {
-            return T{std::forward<Args>(args)...};
-        }
-        else if constexpr (std::is_same_v<T, Syntax::TargetList>)
-        {
-            Syntax::Target target{std::forward<Args>(args)...};
-            return Syntax::TargetList{std::make_unique<Syntax::Target>(std::move(target)), {}, std::nullopt};
-        }
-    }
-
-    using Ret = tl::expected<T, std::string>;
-
-    template <class ThisClass, class Getter>
-    auto visitBinaryOp(ThisClass&& thisClass, Getter getter)
-        -> std::enable_if_t<!std::is_lvalue_reference_v<ThisClass>, Ret>
-    {
-        return pylir::match(
-            std::move(thisClass.variant),
-            [&](std::unique_ptr<typename ThisClass::BinOp>&& binOp) -> Ret
+            switch (tupleConstruct.items.size())
             {
-                auto& [lhs, token, rhs] = *binOp;
-                return tl::unexpected{parser
-                                          .createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
-                                                                    std::invoke(getter, token))
-                                          .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
-                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                          .emitError()};
-            },
-            [&](auto&& other) -> std::enable_if_t<!std::is_lvalue_reference_v<decltype(other)>, Ret> {
-                return visit(std::forward<decltype(other)>(other));
-            });
-    }
-
-    template <class Thing = T>
-    auto visit(Syntax::StarredItem&& expression) -> std::enable_if_t<std::is_same_v<Thing, Syntax::TargetList>, Ret>
-    {
-        return pylir::match(
-            std::move(expression.variant),
-            [&](Syntax::AssignmentExpression&& assignmentExpression) { return visit(std::move(assignmentExpression)); },
-            [&](std::pair<BaseToken, Syntax::OrExpr>&& pair) -> Ret
-            {
-                auto target = visit(std::move(pair.second));
-                if (!target)
-                {
-                    return target;
-                }
-                return construct(std::pair{pair.first, std::move(target->firstExpr)});
-            });
-    }
-
-    template <class Thing = T>
-    auto visit(Syntax::Enclosure&& expression) -> std::enable_if_t<std::is_same_v<T, Thing>, Ret>
-    {
-        return pylir::match(
-            std::move(expression.variant),
-            [&](Syntax::Enclosure::ParenthForm&& parenthForm) -> Ret
-            {
-                if (!parenthForm.expression)
-                {
-                    return construct(
-                        Syntax::Target::Parenth{parenthForm.openParenth, std::nullopt, parenthForm.closeParenth});
-                }
-                auto list = visit(std::move(*parenthForm.expression));
-                if (!list)
-                {
-                    return list;
-                }
-                return construct(
-                    Syntax::Target::Parenth{parenthForm.openParenth, std::move(*list), parenthForm.closeParenth});
-            },
-            [&](Syntax::Enclosure::DictDisplay&&) -> Ret
-            {
-                return tl::unexpected{
-                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
-                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                case 0:
+                    return parser
+                        .createDiagnosticsBuilder(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_EMPTY_TUPLE,
+                                                  assignOp.getTokenType())
+                        .addLabel(tupleConstruct, std::nullopt, Diag::ERROR_COLOUR)
                         .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            },
-            [&](Syntax::Enclosure::SetDisplay&&) -> Ret
-            {
-                return tl::unexpected{
-                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
-                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                        .emitError();
+                case 1:
+                    return parser
+                        .createDiagnosticsBuilder(tupleConstruct,
+                                                  Diag::OPERATOR_N_CANNOT_ASSIGN_TO_SINGLE_TUPLE_ELEMENT,
+                                                  assignOp.getTokenType())
+                        .addLabel(tupleConstruct, std::nullopt, Diag::ERROR_COLOUR)
                         .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            },
-            [&](Syntax::Enclosure::ListDisplay&& listDisplay) -> Ret
-            {
-                return pylir::match(
-                    std::move(listDisplay.variant),
-                    [&](std::monostate) -> Ret {
-                        return construct(
-                            Syntax::Target::Square{listDisplay.openSquare, std::nullopt, listDisplay.closeSquare});
-                    },
-                    [&](Syntax::Comprehension&&) -> Ret
-                    {
-                        return tl::unexpected{
-                            parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
-                                .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
-                                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                .emitError()};
-                    },
-                    [&](Syntax::StarredList&& starredList) -> Ret
-                    {
-                        Syntax::TargetList targetList{};
-                        auto first = visit(std::move(*starredList.firstExpr));
-                        if (!first)
-                        {
-                            return first;
-                        }
-                        targetList.firstExpr = std::move(first->firstExpr);
-                        for (auto& [comma, item] : starredList.remainingExpr)
-                        {
-                            auto other = visit(std::move(*item));
-                            if (!other)
-                            {
-                                return other;
-                            }
-                            targetList.remainingExpr.emplace_back(comma, std::move(other->firstExpr));
-                        }
-                        targetList.trailingComma = starredList.trailingComma;
-                        return construct(Syntax::Target::Square{listDisplay.openSquare, std::move(targetList),
-                                                                listDisplay.closeSquare});
-                    });
-            },
-            [&](Syntax::Enclosure::YieldAtom&&) -> Ret
-            {
-                return tl::unexpected{
-                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
-                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                        .emitError();
+                default:
+                    return parser
+                        .createDiagnosticsBuilder(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
+                                                  assignOp.getTokenType())
+                        .addLabel(tupleConstruct, std::nullopt, Diag::ERROR_COLOUR)
                         .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            },
-            [&](Syntax::Enclosure::GeneratorExpression&&) -> Ret
-            {
-                return tl::unexpected{
-                    parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
-                        .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            });
-    }
-
-    Ret visit(Syntax::Atom&& expression)
-    {
-        return pylir::match(
-            std::move(expression.variant),
-            [&](IdentifierToken&& identifierToken) -> Ret { return construct(std::move(identifierToken)); },
-            [&](Syntax::Atom::Literal&& literal) -> Ret
-            {
-                return tl::unexpected{
-                    parser.createDiagnosticsBuilder(literal.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
-                        .addLabel(literal.token, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            },
-            [&](std::unique_ptr<Syntax::Enclosure>&& enclosure) -> Ret
-            {
-                if constexpr (std::is_same_v<Syntax::AugTarget, T>)
-                {
-                    return tl::unexpected{
-                        parser.createDiagnosticsBuilder(*enclosure, Diag::CANNOT_ASSIGN_TO_N, "enclosure")
-                            .addLabel(*enclosure, std::nullopt, Diag::ERROR_COLOUR)
-                            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                            .emitError()};
-                }
-                else
-                {
-                    return visit(std::move(*enclosure));
-                }
-            });
-    }
-
-    Ret visit(Syntax::Primary&& expression)
-    {
-        return pylir::match(
-            std::move(expression.variant), [&](Syntax::Atom&& atom) { return visit(std::move(atom)); },
-            [&](Syntax::Call&& call) -> Ret
-            {
-                return tl::unexpected{
-                    parser.createDiagnosticsBuilder(call.openParentheses, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
-                        .addLabel(call.openParentheses, call, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            },
-            [&](auto&& value) -> std::enable_if_t<std::is_rvalue_reference_v<decltype(value)>, Ret> {
-                return construct(std::forward<decltype(value)>(value));
-            });
-    }
-
-    Ret visit(Syntax::AwaitExpr&& expression)
-    {
-        return tl::unexpected{
-            parser
-                .createDiagnosticsBuilder(expression.awaitToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "await expression")
-                .addLabel(expression.awaitToken, std::nullopt, Diag::ERROR_COLOUR)
-                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                .emitError()};
-    }
-
-    Ret visit(Syntax::Power&& expression)
-    {
-        if (expression.rightHand)
-        {
-            return tl::unexpected{parser
-                                      .createDiagnosticsBuilder(expression.rightHand->first,
-                                                                Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
-                                                                TokenType::PowerOf)
-                                      .addLabel(expression.rightHand->first, std::nullopt, Diag::ERROR_COLOUR)
-                                      .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                      .emitError()};
-        }
-        return pylir::match(std::move(expression.variant), [&](auto&& value) { return visit(std::forward<decltype(value)>(value)); });
-    }
-
-    Ret visit(Syntax::UExpr&& expression)
-    {
-        return pylir::match(
-            std::move(expression.variant), [&](Syntax::Power&& power) { return visit(std::move(power)); },
-            [&](std::pair<Token, std::unique_ptr<Syntax::UExpr>>&& pair) -> Ret
-            {
-                return tl::unexpected{
-                    parser
-                        .createDiagnosticsBuilder(pair.first, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
-                                                  fmt::format("unary operator {:q}", pair.first.getTokenType()))
-                        .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            });
-    }
-
-    Ret visit(Syntax::MExpr&& expression)
-    {
-        return pylir::match(
-            std::move(expression.variant),
-            [&](auto&& binOp) -> std::enable_if_t<std::is_rvalue_reference_v<decltype(binOp)>, Ret>
-            {
-                auto& [lhs, token, rhs] = *binOp;
-                TokenType tokenType;
-                if constexpr (std::is_same_v<Token, std::decay_t<decltype(token)>>)
-                {
-                    tokenType = token.getTokenType();
-                }
-                else
-                {
-                    tokenType = TokenType::AtSign;
-                }
-                return tl::unexpected{
-                    parser.createDiagnosticsBuilder(token, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, tokenType)
-                        .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError()};
-            },
-            [&](Syntax::UExpr&& other) { return visit(std::move(other)); });
-    }
-
-    Ret visit(Syntax::AExpr&& expression)
-    {
-        return visitBinaryOp(std::move(expression), &Token::getTokenType);
-    }
-
-    Ret visit(Syntax::ShiftExpr&& expression)
-    {
-        return visitBinaryOp(std::move(expression), &Token::getTokenType);
-    }
-
-    Ret visit(Syntax::AndExpr&& expression)
-    {
-        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::BitAnd; });
-    }
-
-    Ret visit(Syntax::XorExpr&& expression)
-    {
-        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::BitXor; });
-    }
-
-    Ret visit(Syntax::OrExpr&& expression)
-    {
-        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::BitOr; });
-    }
-
-    Ret visit(Syntax::Comparison&& expression)
-    {
-        if (!expression.rest.empty())
-        {
-            auto builder = parser.createDiagnosticsBuilder(expression.rest.front().first.firstToken,
-                                                           Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "comparison");
-            for (auto& [pair, other] : expression.rest)
-            {
-                if (pair.secondToken)
-                {
-                    builder.addLabel(pair.firstToken, *pair.secondToken, std::nullopt, Diag::ERROR_COLOUR);
-                }
-                else
-                {
-                    builder.addLabel(pair.firstToken, std::nullopt, Diag::ERROR_COLOUR);
-                }
+                        .emitError();
             }
-            return tl::unexpected{builder.addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY).emitError()};
         }
-        return visit(std::move(expression.left));
-    }
-
-    Ret visit(Syntax::NotTest&& expression)
-    {
-        return pylir::match(
-            std::move(expression.variant),
-            [&](Syntax::Comparison&& comparison) { return visit(std::move(comparison)); },
-            [&](std::pair<BaseToken, std::unique_ptr<Syntax::NotTest>>&& pair) -> Ret
-            {
-                return tl::unexpected{parser
-                                          .createDiagnosticsBuilder(pair.first,
-                                                                    Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
-                                                                    TokenType::NotKeyword)
-                                          .addLabel(pair.first, std::nullopt, Diag::ERROR_COLOUR)
-                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                          .emitError()};
-            });
-    }
-
-    Ret visit(Syntax::AndTest&& expression)
-    {
-        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType ::AndKeyword; });
-    }
-
-    Ret visit(Syntax::OrTest&& expression)
-    {
-        return visitBinaryOp(std::move(expression), [](auto&&) { return TokenType::OrKeyword; });
-    }
-
-    Ret visit(Syntax::ConditionalExpression&& expression)
-    {
-        if (expression.suffix)
+        for (const auto& iter : tupleConstruct.items)
         {
-            return tl::unexpected{parser
-                                      .createDiagnosticsBuilder(expression.suffix->ifToken,
-                                                                Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
-                                                                "conditional expression")
-                                      .addLabel(expression.suffix->ifToken, *expression.suffix->elseValue, std::nullopt,
-                                                Diag::ERROR_COLOUR)
-                                      .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                      .emitError()};
+            if (auto error = visit(*iter.expression))
+            {
+                return error;
+            }
         }
-        return visit(std::move(expression.value));
+        return std::nullopt;
     }
 
-    Ret visit(Syntax::Expression&& expression)
+    std::optional<std::string> visit(const Syntax::DictDisplay& expression)
     {
-        return pylir::match(
-            std::move(expression.variant),
-            [&](Syntax::ConditionalExpression&& conditionalExpression)
-            { return visit(std::move(conditionalExpression)); },
-            [&](std::unique_ptr<Syntax::LambdaExpression>&& lambdaExpression) -> Ret
-            {
-                return tl::unexpected{parser
-                                          .createDiagnosticsBuilder(*lambdaExpression,
-                                                                    Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
-                                                                    "lambda expression")
-                                          .addLabel(*lambdaExpression, std::nullopt, Diag::ERROR_COLOUR)
-                                          .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                          .emitError()};
-            });
+        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
+            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
     }
 
-    Ret visit(Syntax::AssignmentExpression&& assignmentExpression)
+    std::optional<std::string> visit(const Syntax::SetDisplay& expression)
     {
-        if (assignmentExpression.identifierAndWalrus)
+        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
+            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::ListDisplay& expression)
+    {
+        if (std::holds_alternative<Syntax::Comprehension>(expression.variant) || augmented)
         {
-            return tl::unexpected{
-                parser
-                    .createDiagnosticsBuilder(assignmentExpression.identifierAndWalrus->second,
-                                              Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
-                    .addLabel(assignmentExpression.identifierAndWalrus->second, std::nullopt, Diag::ERROR_COLOUR)
+            return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
+                .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                .emitError();
+        }
+        for (const auto& iter : pylir::get<std::vector<Syntax::StarredItem>>(expression.variant))
+        {
+            if (auto error = visit(*iter.expression))
+            {
+                return error;
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<std::string> visit(const Syntax::Yield& expression)
+    {
+        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
+            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::Generator& expression)
+    {
+        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
+            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::BinOp& binOp)
+    {
+        return parser
+            .createDiagnosticsBuilder(binOp.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
+                                      binOp.operation.getTokenType())
+            .addLabel(binOp.operation, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::Lambda& lambda)
+    {
+        return parser.createDiagnosticsBuilder(lambda, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression")
+            .addLabel(lambda, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::Atom& expression)
+    {
+        switch (expression.token.getTokenType())
+        {
+            case TokenType::StringLiteral:
+            case TokenType::IntegerLiteral:
+            case TokenType::FloatingPointLiteral:
+            case TokenType::NoneKeyword:
+            case TokenType::FalseKeyword:
+            case TokenType::TrueKeyword:
+            case TokenType::ByteLiteral:
+            case TokenType::ComplexLiteral:
+                return parser.createDiagnosticsBuilder(expression.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
+                    .addLabel(expression.token, std::nullopt, Diag::ERROR_COLOUR)
                     .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                    .emitError()};
+                    .emitError();
+            default: return std::nullopt;
         }
-        return visit(std::move(*assignmentExpression.expression));
     }
 
-    Ret visit(Syntax::StarredExpression&& starredExpression)
+    std::optional<std::string> visit(const Syntax::Call& call)
     {
-        return pylir::match(
-            std::move(starredExpression.variant),
-            [&](Syntax::Expression&& expression) { return visit(std::move(expression)); },
-            [&](Syntax::StarredExpression::Items&& items) -> Ret
-            {
-                if constexpr (std::is_same_v<Syntax::AugTarget, T>)
-                {
-                    if (!items.leading.empty())
-                    {
-                        auto& last = items.last ? *items.last : items.leading.back().first;
-                        return tl::unexpected{
-                            parser
-                                .createDiagnosticsBuilder(items.leading.front().first, Diag::CANNOT_ASSIGN_TO_N,
-                                                          "multiple values")
-                                .addLabel(items.leading.front().first, last, std::nullopt, Diag::ERROR_COLOUR)
-                                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                                .emitError()};
-                    }
-                    if (!items.last)
-                    {
-                        return tl::unexpected{parser
-                                                  .createDiagnosticsBuilder(assignOp, Diag::EXPECTED_N_BEFORE_N,
-                                                                            "identifier", "assignment")
-                                                  .addLabel(assignOp, std::nullopt, Diag::ERROR_COLOUR)
-                                                  .emitError()};
-                    }
-                    return pylir::match(
-                        std::move(items.last->variant),
-                        [&](Syntax::AssignmentExpression&& assignmentExpression)
-                        { return visit(std::move(assignmentExpression)); },
-                        [&](std::pair<BaseToken, Syntax::OrExpr>&&) -> Ret { PYLIR_UNREACHABLE; });
-                }
-                else
-                {
-                    if (items.leading.empty() && !items.last)
-                    {
-                        return tl::unexpected{parser
-                                                  .createDiagnosticsBuilder(assignOp, Diag::EXPECTED_N_BEFORE_N,
-                                                                            "identifier", "assignment")
-                                                  .addLabel(assignOp, std::nullopt, Diag::ERROR_COLOUR)
-                                                  .emitError()};
-                    }
-                    Syntax::TargetList targetList{};
-                    std::optional<BaseToken> comma;
-                    for (auto& iter : items.leading)
-                    {
-                        auto target = visit(std::move(iter.first));
-                        if (!target)
-                        {
-                            return target;
-                        }
-                        if (!targetList.firstExpr)
-                        {
-                            targetList.firstExpr = std::move(target->firstExpr);
-                        }
-                        else
-                        {
-                            targetList.remainingExpr.emplace_back(*comma, std::move(target->firstExpr));
-                        }
-                        comma = iter.second;
-                    }
-                    if (!items.last)
-                    {
-                        targetList.trailingComma = comma;
-                    }
-                    else
-                    {
-                        auto target = visit(std::move(*items.last));
-                        if (!target)
-                        {
-                            return target;
-                        }
-                        if (!targetList.firstExpr)
-                        {
-                            targetList.firstExpr = std::move(target->firstExpr);
-                        }
-                        else
-                        {
-                            targetList.remainingExpr.emplace_back(*comma, std::move(target->firstExpr));
-                        }
-                    }
-                    return targetList;
-                }
-            });
+        return parser.createDiagnosticsBuilder(call.openParenth, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
+            .addLabel(call.openParenth, call, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::UnaryOp& expression)
+    {
+        return parser
+            .createDiagnosticsBuilder(expression.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
+                                      expression.operation.getTokenType())
+            .addLabel(expression.operation, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::Comparison& comparison)
+    {
+        // It's better looking, but still a technically arbitrary decision, but we'll emit the diagnostic only once
+        // for the very last use of a comparison operator.
+        const auto& back = comparison.rest.back().first;
+        if (back.secondToken)
+        {
+            return parser
+                .createDiagnosticsBuilder(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
+                                          fmt::format(FMT_STRING("'{} {}'"), back.firstToken.getTokenType(),
+                                                      back.secondToken->getTokenType()))
+                .addLabel(back.firstToken, *back.secondToken, std::nullopt, Diag::ERROR_COLOUR)
+                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+                .emitError();
+        }
+
+        return parser
+            .createDiagnosticsBuilder(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
+                                      back.firstToken.getTokenType())
+            .addLabel(back.firstToken, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::Conditional& expression)
+    {
+        return parser
+            .createDiagnosticsBuilder(expression.ifToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression")
+            .addLabel(expression.ifToken, *expression.elseValue, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
+    }
+
+    std::optional<std::string> visit(const Syntax::Assignment& assignment)
+    {
+        return parser
+            .createDiagnosticsBuilder(assignment.walrus, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
+            .addLabel(assignment.walrus, std::nullopt, Diag::ERROR_COLOUR)
+            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
+            .emitError();
     }
 };
 } // namespace
 
-tl::expected<pylir::Syntax::AugTarget, std::string>
-    pylir::Parser::convertToAug(Syntax::StarredExpression&& starredExpression, const BaseToken& assignOp)
+tl::expected<pylir::IntrVarPtr<Syntax::Target>, std::string>
+    pylir::Parser::parseTarget(const pylir::Token& assignmentLikeToken)
 {
-    Visitor<Syntax::AugTarget> visitor{*this, assignOp};
-    return visitor.visit(std::move(starredExpression));
+    auto expression = parsePrimary();
+    if (!expression)
+    {
+        return tl::unexpected{std::move(expression).error()};
+    }
+    auto error = checkTarget(**expression, assignmentLikeToken);
+    if (!error)
+    {
+        return tl::unexpected{std::move(error).error()};
+    }
+    return expression;
 }
 
-tl::expected<pylir::Syntax::TargetList, std::string>
-    pylir::Parser::convertToTargetList(Syntax::StarredExpression&& starredExpression, const BaseToken& assignOp)
+tl::expected<pylir::IntrVarPtr<pylir::Syntax::Target>, std::string>
+    pylir::Parser::parseTargetList(const pylir::Token& assignmentLikeToken)
 {
-    Visitor<Syntax::TargetList> visitor{*this, assignOp};
-    return visitor.visit(std::move(starredExpression));
+    IntrVarPtr<Syntax::Target> target;
+    {
+        bool lastWasComma = false;
+        std::vector<IntrVarPtr<Syntax::Target>> subTargets;
+        while (subTargets.empty() || (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma))
+        {
+            if (!subTargets.empty())
+            {
+                m_current++;
+                if (!firstInTarget(m_current->getTokenType()))
+                {
+                    lastWasComma = true;
+                    break;
+                }
+            }
+            auto other = parsePrimary();
+            if (!other)
+            {
+                return tl::unexpected{std::move(other).error()};
+            }
+            subTargets.emplace_back(std::move(*other));
+        }
+        if (lastWasComma || subTargets.size() > 1)
+        {
+            std::vector<Syntax::StarredItem> starredItems(subTargets.size());
+            std::transform(std::move_iterator(subTargets.begin()), std::move_iterator(subTargets.end()),
+                           starredItems.begin(),
+                           [](IntrVarPtr<Syntax::Target>&& target) {
+                               return Syntax::StarredItem{std::nullopt, std::move(target)};
+                           });
+            target = make_node<Syntax::TupleConstruct>(std::nullopt, std::move(starredItems), std::nullopt);
+        }
+        else
+        {
+            target = std::move(subTargets[0]);
+        }
+    }
+
+    auto error = checkTarget(*target, assignmentLikeToken);
+    if (!error)
+    {
+        return tl::unexpected{std::move(error).error()};
+    }
+    return target;
+}
+
+tl::expected<void, std::string> pylir::Parser::checkAug(const Syntax::Expression& starredExpression,
+                                                        const Token& assignOp)
+{
+    Visitor visitor{*this, assignOp, true};
+    auto error = visitor.visit(starredExpression);
+    if (error)
+    {
+        return tl::unexpected{std::move(*error)};
+    }
+    return {};
+}
+
+tl::expected<void, std::string> pylir::Parser::checkTarget(const Syntax::Expression& starredExpression,
+                                                           const Token& assignOp)
+{
+    Visitor visitor{*this, assignOp, false};
+    auto error = visitor.visit(starredExpression);
+    if (error)
+    {
+        return tl::unexpected{std::move(*error)};
+    }
+    return {};
 }
 
 tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
 {
     auto parseModule = [&]() -> tl::expected<Syntax::ImportStmt::Module, std::string>
     {
-        std::vector<std::pair<IdentifierToken, BaseToken>> leading;
+        std::vector<IdentifierToken> identifiers;
         do
         {
             auto identifier = expect(TokenType::Identifier);
@@ -1182,11 +808,12 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
             {
                 return tl::unexpected{std::move(identifier).error()};
             }
+            identifiers.emplace_back(std::move(*identifier));
             if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Dot)
             {
-                return Syntax::ImportStmt::Module{std::move(leading), IdentifierToken{std::move(*identifier)}};
+                return Syntax::ImportStmt::Module{std::move(identifiers)};
             }
-            leading.emplace_back(IdentifierToken{std::move(*identifier)}, *m_current++);
+            m_current++;
         } while (true);
     };
 
@@ -1221,46 +848,38 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
         case TokenType::ImportKeyword:
         {
             auto import = *m_current++;
-            auto module = parseModule();
-            if (!module)
+
+            bool first = true;
+            std::vector<std::pair<Syntax::ImportStmt::Module, std::optional<IdentifierToken>>> modules;
+            while (first || (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma))
             {
-                return tl::unexpected{std::move(module).error()};
-            }
-            std::optional<std::pair<BaseToken, IdentifierToken>> name;
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
-            {
-                auto as = *m_current++;
-                auto identifier = expect(TokenType::Identifier);
-                if (!identifier)
+                if (first)
                 {
-                    return tl::unexpected{std::move(identifier).error()};
+                    first = false;
                 }
-                name.emplace(as, IdentifierToken{std::move(*identifier)});
-            }
-            std::vector<Syntax::ImportStmt::ImportAsAs::Further> rest;
-            while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-            {
-                auto comma = *m_current++;
+                else
+                {
+                    m_current++;
+                }
                 auto nextModule = parseModule();
                 if (!nextModule)
                 {
                     return tl::unexpected{std::move(nextModule).error()};
                 }
-                std::optional<std::pair<BaseToken, IdentifierToken>> nextName;
+                std::optional<IdentifierToken> nextName;
                 if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
                 {
-                    auto as = *m_current++;
+                    m_current++;
                     auto identifier = expect(TokenType::Identifier);
                     if (!identifier)
                     {
                         return tl::unexpected{std::move(identifier).error()};
                     }
-                    nextName.emplace(as, IdentifierToken{std::move(*identifier)});
+                    nextName.emplace(std::move(*identifier));
                 }
-                rest.push_back({comma, std::move(*nextModule), std::move(nextName)});
+                modules.emplace_back(std::move(*nextModule), std::move(nextName));
             }
-            return Syntax::ImportStmt{
-                Syntax::ImportStmt::ImportAsAs{import, std::move(*module), std::move(name), std::move(rest)}};
+            return Syntax::ImportStmt{{}, Syntax::ImportStmt::ImportAs{std::move(import), std::move(modules)}};
         }
         case TokenType::FromKeyword:
         {
@@ -1278,46 +897,37 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
             if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
             {
                 auto star = *m_current++;
-                return Syntax::ImportStmt{Syntax::ImportStmt::FromImportAll{from, std::move(*relative), *import, star}};
+                return Syntax::ImportStmt{{}, Syntax::ImportStmt::ImportAll{from, std::move(*relative), *import, star}};
             }
             std::optional<BaseToken> openParenth;
             if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::OpenParentheses)
             {
                 openParenth = *m_current++;
             }
-            auto identifier = expect(TokenType::Identifier);
-            if (!identifier)
+
+            bool first = true;
+            std::vector<std::pair<IdentifierToken, std::optional<IdentifierToken>>> imports;
+            while (first || (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma))
             {
-                return tl::unexpected{std::move(identifier).error()};
-            }
-            std::optional<std::pair<BaseToken, IdentifierToken>> name;
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
-            {
-                auto as = *m_current++;
-                auto identifier = expect(TokenType::Identifier);
-                if (!identifier)
+                if (first)
                 {
-                    return tl::unexpected{std::move(identifier).error()};
+                    first = false;
                 }
-                name.emplace(as, IdentifierToken{std::move(*identifier)});
-            }
-            std::vector<Syntax::ImportStmt::FromImportList::Further> rest;
-            std::optional<BaseToken> trailingComma;
-            while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-            {
-                auto comma = *m_current++;
-                if (openParenth
-                    && (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses))
+                else
                 {
-                    trailingComma = comma;
-                    break;
+                    m_current++;
+                    if (openParenth
+                        && (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses))
+                    {
+                        break;
+                    }
                 }
                 auto imported = expect(TokenType::Identifier);
                 if (!imported)
                 {
                     return tl::unexpected{std::move(imported).error()};
                 }
-                std::optional<std::pair<BaseToken, IdentifierToken>> nextName;
+                std::optional<IdentifierToken> nextName;
                 if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
                 {
                     auto as = *m_current++;
@@ -1326,11 +936,10 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
                     {
                         return tl::unexpected{std::move(identifier).error()};
                     }
-                    nextName.emplace(as, IdentifierToken{std::move(*identifier)});
+                    nextName.emplace(std::move(*identifier));
                 }
-                rest.push_back({comma, IdentifierToken{std::move(*imported)}, std::move(nextName)});
+                imports.emplace_back(std::move(*imported), std::move(nextName));
             }
-            std::optional<BaseToken> closeParentheses;
             if (openParenth)
             {
                 auto close = expect(TokenType::CloseParentheses);
@@ -1338,11 +947,9 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
                 {
                     return tl::unexpected{std::move(close).error()};
                 }
-                closeParentheses = *close;
             }
-            return Syntax::ImportStmt{Syntax::ImportStmt::FromImportList{
-                from, std::move(*relative), *import, openParenth, IdentifierToken{std::move(*identifier)},
-                std::move(name), std::move(rest), trailingComma, closeParentheses}};
+            return Syntax::ImportStmt{
+                {}, Syntax::ImportStmt::FromImport{from, std::move(*relative), *import, std::move(imports)}};
         }
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         default:

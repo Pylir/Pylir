@@ -16,12 +16,12 @@
 
 tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInput()
 {
-    std::vector<std::variant<BaseToken, Syntax::Statement>> statements;
+    decltype(Syntax::Suite::statements) vector;
     while (true)
     {
-        for (; m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Newline; m_current++)
+        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Newline)
         {
-            statements.emplace_back(*m_current);
+            m_current++;
         }
         if (m_current == m_lexer.end())
         {
@@ -32,13 +32,14 @@ tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInpu
         {
             return tl::unexpected{std::move(statement).error()};
         }
-        statements.emplace_back(std::move(*statement));
+        vector.insert(vector.end(), std::move_iterator(statement->begin()), std::move_iterator(statement->end()));
     }
-    return Syntax::FileInput{std::move(statements), {m_globals.begin(), m_globals.end()}};
+    return Syntax::FileInput{{std::move(vector)}, {m_globals.begin(), m_globals.end()}};
 }
 
-tl::expected<pylir::Syntax::Statement, std::string> pylir::Parser::parseStatement()
+tl::expected<decltype(pylir::Syntax::Suite::statements), std::string> pylir::Parser::parseStatement()
 {
+    decltype(pylir::Syntax::Suite::statements) result;
     if (m_current != m_lexer.end() && firstInCompoundStmt(m_current->getTokenType()))
     {
         auto compound = parseCompoundStmt();
@@ -46,7 +47,8 @@ tl::expected<pylir::Syntax::Statement, std::string> pylir::Parser::parseStatemen
         {
             return tl::unexpected{std::move(compound).error()};
         }
-        return Syntax::Statement{std::move(*compound)};
+        result.emplace_back(std::move(*compound));
+        return result;
     }
 
     auto stmtList = parseStmtList();
@@ -59,16 +61,40 @@ tl::expected<pylir::Syntax::Statement, std::string> pylir::Parser::parseStatemen
     {
         return tl::unexpected{std::move(newLine).error()};
     }
-    return Syntax::Statement{Syntax::Statement::SingleLine{std::move(*stmtList), *newLine}};
+    result.insert(result.end(), std::move_iterator(stmtList->begin()), std::move_iterator(stmtList->end()));
+    return result;
 }
 
-tl::expected<pylir::Syntax::StmtList, std::string> pylir::Parser::parseStmtList()
+tl::expected<std::vector<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>>, std::string> pylir::Parser::parseStmtList()
 {
-    return parseCommaList(pylir::bind_front(&Parser::parseSimpleStmt, this), firstInSimpleStmt, std::nullopt,
-                          TokenType::SemiColon);
+    std::vector<IntrVarPtr<Syntax::SimpleStmt>> statements;
+    while (m_current != m_lexer.end()
+           && (m_current->getTokenType() == TokenType::SemiColon || firstInSimpleStmt(m_current->getTokenType())))
+    {
+        while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::SemiColon)
+        {
+            m_current++;
+        }
+        if (m_current == m_lexer.end())
+        {
+            return statements;
+        }
+        auto simpleStmt = parseSimpleStmt();
+        if (!simpleStmt)
+        {
+            return tl::unexpected{std::move(simpleStmt).error()};
+        }
+        statements.push_back(std::move(*simpleStmt));
+        if (m_current == m_lexer.end()
+            || m_current->getTokenType() != TokenType::SemiColon)
+        {
+            return statements;
+        }
+    }
+    return statements;
 }
 
-tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompoundStmt()
+tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir::Parser::parseCompoundStmt()
 {
     if (m_current == m_lexer.end())
     {
@@ -85,7 +111,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             {
                 return tl::unexpected{std::move(ifStmt).error()};
             }
-            return Syntax::CompoundStmt{std::move(*ifStmt)};
+            return std::make_unique<Syntax::IfStmt>(std::move(*ifStmt));
         }
         case TokenType::ForKeyword:
         {
@@ -94,7 +120,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             {
                 return tl::unexpected{std::move(forStmt).error()};
             }
-            return Syntax::CompoundStmt{std::move(*forStmt)};
+            return std::make_unique<Syntax::ForStmt>(std::move(*forStmt));
         }
         case TokenType::TryKeyword:
         {
@@ -103,7 +129,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             {
                 return tl::unexpected{std::move(tryStmt).error()};
             }
-            return Syntax::CompoundStmt{std::move(*tryStmt)};
+            return std::make_unique<Syntax::TryStmt>(std::move(*tryStmt));
         }
         case TokenType::WithKeyword:
         {
@@ -112,7 +138,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             {
                 return tl::unexpected{std::move(withStmt).error()};
             }
-            return Syntax::CompoundStmt{std::move(*withStmt)};
+            return std::make_unique<Syntax::WithStmt>(std::move(*withStmt));
         }
         case TokenType::WhileKeyword:
         {
@@ -121,7 +147,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             {
                 return tl::unexpected{std::move(whileStmt).error()};
             }
-            return Syntax::CompoundStmt{std::move(*whileStmt)};
+            return std::make_unique<Syntax::WhileStmt>(std::move(*whileStmt));
         }
         case TokenType::DefKeyword:
         {
@@ -130,7 +156,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             {
                 return tl::unexpected{std::move(funcDef).error()};
             }
-            return Syntax::CompoundStmt{std::move(*funcDef)};
+            return std::make_unique<Syntax::FuncDef>(std::move(*funcDef));
         }
         case TokenType::ClassKeyword:
         {
@@ -139,7 +165,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
             {
                 return tl::unexpected{std::move(classDef).error()};
             }
-            return Syntax::CompoundStmt{std::move(*classDef)};
+            return std::make_unique<Syntax::ClassDef>(std::move(*classDef));
         }
         case TokenType::AtSign:
         {
@@ -167,7 +193,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
                 {
                     return tl::unexpected{std::move(func).error()};
                 }
-                return Syntax::CompoundStmt{std::move(*func)};
+                return std::make_unique<Syntax::FuncDef>(std::move(*func));
             }
             if (m_current == m_lexer.end())
             {
@@ -185,16 +211,16 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
                     {
                         return tl::unexpected{std::move(func).error()};
                     }
-                    return Syntax::CompoundStmt{std::move(*func)};
+                    return std::make_unique<Syntax::FuncDef>(std::move(*func));
                 }
                 case TokenType::ClassKeyword:
                 {
-                    auto func = parseClassDef(std::move(decorators));
-                    if (!func)
+                    auto clazz = parseClassDef(std::move(decorators));
+                    if (!clazz)
                     {
-                        return tl::unexpected{std::move(func).error()};
+                        return tl::unexpected{std::move(clazz).error()};
                     }
-                    return Syntax::CompoundStmt{std::move(*func)};
+                    return std::make_unique<Syntax::ClassDef>(std::move(*clazz));
                 }
                 case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
                 default:
@@ -225,7 +251,7 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
                     {
                         return tl::unexpected{std::move(func).error()};
                     }
-                    return Syntax::CompoundStmt{std::move(*func)};
+                    return std::make_unique<Syntax::FuncDef>(std::move(*func));
                 }
                 case TokenType::ForKeyword:
                 {
@@ -234,7 +260,8 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
                     {
                         return tl::unexpected{std::move(forStmt).error()};
                     }
-                    return Syntax::CompoundStmt{Syntax::AsyncForStmt{async, std::move(*forStmt)}};
+                    forStmt->maybeAsyncKeyword = async;
+                    return std::make_unique<Syntax::ForStmt>(std::move(*forStmt));
                 }
                 case TokenType::WithKeyword:
                 {
@@ -243,7 +270,8 @@ tl::expected<pylir::Syntax::CompoundStmt, std::string> pylir::Parser::parseCompo
                     {
                         return tl::unexpected{std::move(withStmt).error()};
                     }
-                    return Syntax::CompoundStmt{Syntax::AsyncWithStmt{async, std::move(*withStmt)}};
+                    withStmt->maybeAsyncKeyword = async;
+                    return std::make_unique<Syntax::WithStmt>(std::move(*withStmt));
                 }
                 case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
                 default:
@@ -337,9 +365,13 @@ tl::expected<pylir::Syntax::IfStmt, std::string> pylir::Parser::parseIfStmt()
         }
         elseSection = std::move(*parsedElse);
     }
-    return Syntax::IfStmt{*ifKeyword,       std::move(*assignment),
-                          *colon,           std::make_unique<Syntax::Suite>(std::move(*suite)),
-                          std::move(elifs), std::move(elseSection)};
+    return Syntax::IfStmt{{},
+                          *ifKeyword,
+                          std::move(*assignment),
+                          *colon,
+                          std::make_unique<Syntax::Suite>(std::move(*suite)),
+                          std::move(elifs),
+                          std::move(elseSection)};
 }
 
 tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStmt()
@@ -377,8 +409,12 @@ tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStm
         }
         elseSection = std::move(*parsedElse);
     }
-    return Syntax::WhileStmt{*whileKeyword, std::move(*condition), *colon,
-                             std::make_unique<Syntax::Suite>(std::move(*suite)), std::move(elseSection)};
+    return Syntax::WhileStmt{{},
+                             *whileKeyword,
+                             std::move(*condition),
+                             *colon,
+                             std::make_unique<Syntax::Suite>(std::move(*suite)),
+                             std::move(elseSection)};
 }
 
 tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
@@ -388,12 +424,12 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
     {
         return tl::unexpected{std::move(forKeyword).error()};
     }
-    auto targetList = parseTargetList();
+    auto targetList = parseTargetList(*forKeyword);
     if (!targetList)
     {
         return tl::unexpected{std::move(targetList).error()};
     }
-    addToNamespace(*targetList);
+    addToNamespace(**targetList);
     auto inKeyword = expect(TokenType::InKeyword);
     if (!inKeyword)
     {
@@ -427,7 +463,9 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
         }
         elseSection = std::move(*parsedElse);
     }
-    return Syntax::ForStmt{*forKeyword,
+    return Syntax::ForStmt{{},
+                           std::nullopt,
+                           *forKeyword,
                            std::move(*targetList),
                            *inKeyword,
                            std::move(*expressionList),
@@ -466,18 +504,19 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         {
             return tl::unexpected{std::move(finallySuite).error()};
         }
-        return Syntax::TryStmt{*tryKeyword,
+        return Syntax::TryStmt{{},
+                               *tryKeyword,
                                *colon,
                                std::make_unique<Syntax::Suite>(std::move(*suite)),
                                {},
+                               std::nullopt,
                                std::nullopt,
                                Syntax::TryStmt::Finally{finallyKeyword, *finallyColon,
                                                         std::make_unique<Syntax::Suite>(std::move(*finallySuite))}};
     }
 
-    std::optional<Token> catchAll;
-    bool catchAllIssuedAlready = false;
-    std::vector<Syntax::TryStmt::Except> exceptSections;
+    std::optional<Syntax::TryStmt::ExceptAll> catchAll;
+    std::vector<Syntax::TryStmt::ExceptArgs> exceptSections;
     do
     {
         auto exceptKeyword = expect(TokenType::ExceptKeyword);
@@ -485,13 +524,11 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         {
             return tl::unexpected{std::move(exceptKeyword).error()};
         }
-        if (catchAll && !catchAllIssuedAlready)
+        if (catchAll)
         {
-            // Don't issue this more than once
-            catchAllIssuedAlready = true;
             return tl::unexpected{
-                createDiagnosticsBuilder(*catchAll, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
-                    .addLabel(*catchAll, std::nullopt, Diag::ERROR_COLOUR, Diag::emphasis::bold)
+                createDiagnosticsBuilder(catchAll->exceptKeyword, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
+                    .addLabel(catchAll->exceptKeyword, std::nullopt, Diag::ERROR_COLOUR, Diag::emphasis::bold)
                     .emitError()};
         }
         if (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::Colon)
@@ -506,9 +543,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
             {
                 return tl::unexpected{std::move(exceptSuite).error()};
             }
-            exceptSections.push_back(
-                {*exceptKeyword, std::nullopt, *exceptColon, std::make_unique<Syntax::Suite>(std::move(*exceptSuite))});
-            catchAll = *exceptKeyword;
+            catchAll = {*exceptKeyword, *exceptColon, std::make_unique<Syntax::Suite>(std::move(*exceptSuite))};
             continue;
         }
         auto expression = parseExpression();
@@ -516,7 +551,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         {
             return tl::unexpected{std::move(expression).error()};
         }
-        std::optional<std::pair<BaseToken, IdentifierToken>> name;
+        std::optional<IdentifierToken> name;
         if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
         {
             auto asKeyword = *m_current++;
@@ -526,7 +561,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
                 return tl::unexpected{std::move(id).error()};
             }
             addToNamespace(*id);
-            name.emplace(asKeyword, IdentifierToken{*id});
+            name.emplace(std::move(*id));
         }
         auto exceptColon = expect(TokenType::Colon);
         if (!exceptColon)
@@ -538,7 +573,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         {
             return tl::unexpected{std::move(exceptSuite).error()};
         }
-        exceptSections.push_back({*exceptKeyword, std::pair{std::move(*expression), std::move(name)}, *exceptColon,
+        exceptSections.push_back({*exceptKeyword, std::move(*expression), std::move(name), *exceptColon,
                                   std::make_unique<Syntax::Suite>(std::move(*exceptSuite))});
     } while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::ExceptKeyword);
 
@@ -570,10 +605,12 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         finally = Syntax::TryStmt::Finally{finallyKeyword, *finallyColon,
                                            std::make_unique<Syntax::Suite>(std::move(*finallySuite))};
     }
-    return Syntax::TryStmt{*tryKeyword,
+    return Syntax::TryStmt{{},
+                           *tryKeyword,
                            *colon,
                            std::make_unique<Syntax::Suite>(std::move(*suite)),
                            std::move(exceptSections),
+                           std::move(catchAll),
                            std::move(elseSection),
                            std::move(finally)};
 }
@@ -585,48 +622,36 @@ tl::expected<pylir::Syntax::WithStmt, std::string> pylir::Parser::parseWithStmt(
     {
         return tl::unexpected{std::move(withKeyword).error()};
     }
-    std::optional<Syntax::WithStmt::WithItem> firstItem;
-    {
-        auto expression = parseExpression();
-        if (!expression)
-        {
-            return tl::unexpected{std::move(expression).error()};
-        }
-        std::optional<std::pair<BaseToken, Syntax::Target>> name;
-        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
-        {
-            auto asKeyword = *m_current++;
-            auto target = parseTarget();
-            if (!target)
-            {
-                return tl::unexpected{std::move(target).error()};
-            }
-            name.emplace(asKeyword, std::move(*target));
-        }
-        firstItem = Syntax::WithStmt::WithItem{std::move(*expression), std::move(name)};
-    }
 
-    std::vector<std::pair<BaseToken, Syntax::WithStmt::WithItem>> withItems;
-    while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+    bool first = true;
+    std::vector<Syntax::WithStmt::WithItem> withItems;
+    while (first || (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma))
     {
-        auto comma = *m_current++;
+        if (first)
+        {
+            first = false;
+        }
+        else
+        {
+            m_current++;
+        }
         auto expression = parseExpression();
         if (!expression)
         {
             return tl::unexpected{std::move(expression).error()};
         }
-        std::optional<std::pair<BaseToken, Syntax::Target>> name;
+        IntrVarPtr<Syntax::Target> name;
         if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
         {
             auto asKeyword = *m_current++;
-            auto target = parseTarget();
+            auto target = parseTarget(asKeyword);
             if (!target)
             {
                 return tl::unexpected{std::move(target).error()};
             }
-            name.emplace(asKeyword, std::move(*target));
+            name = std::move(*target);
         }
-        withItems.emplace_back(comma, Syntax::WithStmt::WithItem{std::move(*expression), std::move(name)});
+        withItems.push_back({std::move(*expression), std::move(name)});
     }
 
     auto colon = expect(TokenType::Colon);
@@ -639,21 +664,24 @@ tl::expected<pylir::Syntax::WithStmt, std::string> pylir::Parser::parseWithStmt(
     {
         return tl::unexpected{std::move(suite).error()};
     }
-    return Syntax::WithStmt{*withKeyword, std::move(*firstItem), std::move(withItems), *colon,
-                            std::make_unique<Syntax::Suite>(std::move(*suite))};
+    return Syntax::WithStmt{{},           std::nullopt,
+                            *withKeyword, std::move(withItems),
+                            *colon,       std::make_unique<Syntax::Suite>(std::move(*suite))};
 }
 
 tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
 {
+    decltype(Syntax::Suite::statements) statements;
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Newline)
     {
-        auto newline = *m_current++;
-        auto indent = expect(TokenType::Indent);
-        if (!indent)
+        m_current++;
+        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Indent)
         {
-            return tl::unexpected{std::move(indent).error()};
+            // stmt_list was empty, and hence a newline immediately followed with no indent after.
+            return Syntax::Suite{};
         }
-        std::vector<Syntax::Statement> statements;
+
+        m_current++;
         do
         {
             auto statement = parseStatement();
@@ -661,14 +689,15 @@ tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
             {
                 return tl::unexpected{std::move(statement).error()};
             }
-            statements.push_back(std::move(*statement));
+            statements.insert(statements.end(), std::move_iterator(statement->begin()),
+                              std::move_iterator(statement->end()));
         } while (m_current != m_lexer.end() && m_current->getTokenType() != TokenType::Dedent);
         auto dedent = expect(TokenType::Dedent);
         if (!dedent)
         {
             return tl::unexpected{std::move(dedent).error()};
         }
-        return Syntax::Suite{Syntax::Suite::MultiLine{newline, *indent, std::move(statements), *dedent}};
+        return Syntax::Suite{std::move(statements)};
     }
 
     auto statementList = parseStmtList();
@@ -681,275 +710,182 @@ tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
     {
         return tl::unexpected{std::move(newline).error()};
     }
-    return Syntax::Suite{Syntax::Suite::SingleLine{std::move(*statementList), *newline}};
+    statements.insert(statements.end(), std::move_iterator(statementList->begin()),
+                      std::move_iterator(statementList->end()));
+    return Syntax::Suite{std::move(statements)};
 }
 
-tl::expected<pylir::Syntax::ParameterList, std::string> pylir::Parser::parseParameterList()
+tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::parseParameterList()
 {
-    auto parseParameter = [&]() -> tl::expected<Syntax::ParameterList::Parameter, std::string>
+    std::vector<pylir::Syntax::Parameter> parameters;
+    Syntax::Parameter::Kind currentKind = Syntax::Parameter::Normal;
+
+    std::optional<BaseToken> seenPositionalOnly;
+    std::optional<std::size_t> seenDefaultParam;
+    std::variant<std::monostate, std::size_t, BaseToken> seenPosRest;
+    std::optional<std::size_t> seenKwRest;
+    while (parameters.empty() || (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma))
     {
+        if (!parameters.empty())
+        {
+            m_current++;
+            if (m_current == m_lexer.end())
+            {
+                return parameters;
+            }
+        }
+
+        std::optional<Token> stars;
+        switch (m_current->getTokenType())
+        {
+            case TokenType::Divide:
+            {
+                if (parameters.empty())
+                {
+                    return tl::unexpected{
+                        createDiagnosticsBuilder(*m_current,
+                                                 Diag::AT_LEAST_ONE_PARAMETER_REQUIRED_BEFORE_POSITIONAL_ONLY_INDICATOR)
+                            .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
+                            .emitError()};
+                }
+                if (!seenPositionalOnly)
+                {
+                    seenPositionalOnly = *m_current++;
+                    for (auto& iter : parameters)
+                    {
+                        iter.kind = Syntax::Parameter::PosOnly;
+                    }
+                    continue;
+                }
+                return tl::unexpected{
+                    createDiagnosticsBuilder(*m_current, Diag::POSITIONAL_ONLY_INDICATOR_MAY_ONLY_APPEAR_ONCE)
+                        .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
+                        .addNote(*seenPositionalOnly, Diag::PREVIOUS_OCCURRENCE_HERE)
+                        .addLabel(*seenPositionalOnly, std::nullopt, Diag::NOTE_COLOUR)
+                        .emitError()};
+            }
+            case TokenType::Star:
+                stars = *m_current++;
+                if (currentKind == Syntax::Parameter::Normal)
+                {
+                    currentKind = Syntax::Parameter::KeywordOnly;
+                    if (m_current == m_lexer.end())
+                    {
+                        return parameters;
+                    }
+                    if (m_current->getTokenType() != TokenType::Comma
+                        && m_current->getTokenType() != TokenType::Identifier)
+                    {
+                        return parameters;
+                    }
+                    if (m_current->getTokenType() == TokenType::Comma)
+                    {
+                        seenPosRest = *stars;
+                        continue;
+                    }
+                }
+                break;
+            case TokenType::PowerOf: currentKind = Syntax::Parameter::KeywordRest; stars = *m_current++;
+            case TokenType::Identifier: break;
+            default: return parameters;
+        }
+
         auto identifier = expect(TokenType::Identifier);
         if (!identifier)
         {
             return tl::unexpected{std::move(identifier).error()};
         }
-        std::optional<std::pair<BaseToken, Syntax::Expression>> annotation;
+
+        IntrVarPtr<Syntax::Expression> maybeType;
+        IntrVarPtr<Syntax::Expression> maybeDefault;
         if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Colon)
         {
-            auto colon = *m_current++;
-            auto expression = parseExpression();
-            if (!expression)
+            m_current++;
+            auto type = parseExpression();
+            if (!type)
             {
-                return tl::unexpected{std::move(expression).error()};
+                return tl::unexpected{std::move(type).error()};
             }
-            annotation = std::pair{colon, std::move(*expression)};
+            maybeType = std::move(*type);
         }
-        return Syntax::ParameterList::Parameter{IdentifierToken{*identifier}, std::move(annotation)};
-    };
-
-    auto parseDefParameter = [&]() -> tl::expected<Syntax::ParameterList::DefParameter, std::string>
-    {
-        auto parameter = parseParameter();
-        if (!parameter)
+        if (!stars && m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Assignment)
         {
-            return tl::unexpected{std::move(parameter).error()};
-        }
-        std::optional<std::pair<BaseToken, Syntax::Expression>> defaultArg;
-        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Assignment)
-        {
-            auto assignment = *m_current++;
-            auto expression = parseExpression();
-            if (!expression)
+            m_current++;
+            auto defaultVal = parseExpression();
+            if (!defaultVal)
             {
-                return tl::unexpected{std::move(expression).error()};
+                return tl::unexpected{std::move(defaultVal).error()};
             }
-            defaultArg = std::pair{assignment, std::move(*expression)};
+            maybeDefault = std::move(*defaultVal);
         }
-        return Syntax::ParameterList::DefParameter{std::move(*parameter), std::move(defaultArg)};
-    };
-
-    auto parseParameterListStarArgs = [&]() -> tl::expected<Syntax::ParameterList::StarArgs, std::string>
-    {
-        PYLIR_ASSERT(m_current != m_lexer.end());
-        if (m_current->getTokenType() == TokenType::PowerOf)
-        {
-            auto doubleStar = *m_current++;
-            auto parameter = parseParameter();
-            if (!parameter)
-            {
-                return tl::unexpected{std::move(parameter).error()};
-            }
-            std::optional<BaseToken> comma;
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-            {
-                comma = *m_current++;
-            }
-            return Syntax::ParameterList::StarArgs{
-                Syntax::ParameterList::StarArgs::DoubleStar{doubleStar, std::move(*parameter), comma}};
-        }
-        PYLIR_ASSERT(m_current->getTokenType() == TokenType::Star);
-        auto star = *m_current++;
-        std::optional<Syntax::ParameterList::Parameter> parameter;
-        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Identifier)
-        {
-            auto parsedParameter = parseParameter();
-            if (!parsedParameter)
-            {
-                return tl::unexpected{std::move(parsedParameter).error()};
-            }
-            parameter = std::move(*parsedParameter);
-        }
-        std::vector<std::pair<BaseToken, Syntax::ParameterList::DefParameter>> defParameters;
-        while (lookaheadEquals(std::array{TokenType::Comma, TokenType::Identifier}))
-        {
-            auto comma = *m_current++;
-            auto defParameter = parseDefParameter();
-            if (!defParameter)
-            {
-                return tl::unexpected{std::move(defParameter).error()};
-            }
-            defParameters.emplace_back(comma, std::move(*defParameter));
-        }
-        if (!lookaheadEquals(std::array{TokenType::Comma, TokenType::PowerOf}))
-        {
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-            {
-                return Syntax::ParameterList::StarArgs{Syntax::ParameterList::StarArgs::Star{
-                    star, std::move(parameter), std::move(defParameters),
-                    Syntax::ParameterList::StarArgs::Star::Further{*m_current++, std::nullopt}}};
-            }
-            return Syntax::ParameterList::StarArgs{Syntax::ParameterList::StarArgs::Star{
-                star, std::move(parameter), std::move(defParameters), std::nullopt}};
-        }
-        auto comma = *m_current++;
-        auto powerOf = *m_current++;
-        auto expandParameter = parseParameter();
-        if (!expandParameter)
-        {
-            return tl::unexpected{std::move(expandParameter).error()};
-        }
-        std::optional<BaseToken> trailingComma;
-        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
-        {
-            trailingComma = *m_current++;
-        }
-        return Syntax::ParameterList::StarArgs{Syntax::ParameterList::StarArgs::Star{
-            star, std::move(parameter), std::move(defParameters),
-            Syntax::ParameterList::StarArgs::Star::Further{
-                comma,
-                Syntax::ParameterList::StarArgs::DoubleStar{powerOf, std::move(*expandParameter), trailingComma}}}};
-    };
-
-    std::optional<IdentifierToken> firstDefaultParameter;
-
-    auto parseParameterListNoPosOnlyPrefix = [&]() -> tl::expected<Syntax::ParameterList::NoPosOnly, std::string>
-    {
-        if (m_current != m_lexer.end()
-            && (m_current->getTokenType() == TokenType::Star || m_current->getTokenType() == TokenType::PowerOf))
-        {
-            auto starArgs = parseParameterListStarArgs();
-            if (!starArgs)
-            {
-                return tl::unexpected{std::move(starArgs).error()};
-            }
-            return Syntax::ParameterList::NoPosOnly{std::move(*starArgs)};
-        }
-
-        auto first = parseDefParameter();
-        if (!first)
-        {
-            return tl::unexpected{std::move(first).error()};
-        }
-        if (!firstDefaultParameter && first->defaultArg)
-        {
-            firstDefaultParameter = first->parameter.identifier;
-        }
-        else if (firstDefaultParameter && !first->defaultArg.has_value())
+        if (!maybeDefault && seenDefaultParam)
         {
             return tl::unexpected{
                 createDiagnosticsBuilder(
-                    *first, Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
-                    first->parameter.identifier.getValue())
-                    .addLabel(first->parameter.identifier, std::nullopt, Diag::ERROR_COLOUR)
-                    .addNote(*firstDefaultParameter, Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
-                             firstDefaultParameter->getValue())
-                    .addLabel(*firstDefaultParameter, std::nullopt, Diag::NOTE_COLOUR)
+                    *identifier, Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
+                    pylir::get<std::string>(identifier->getValue()))
+                    .addLabel(*identifier, std::nullopt, Diag::ERROR_COLOUR)
+                    .addNote(parameters[*seenDefaultParam], Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
+                             parameters[*seenDefaultParam].name.getValue())
+                    .addLabel(parameters[*seenDefaultParam], std::nullopt, Diag::NOTE_COLOUR)
                     .emitError()};
         }
-        std::vector<std::pair<BaseToken, Syntax::ParameterList::DefParameter>> defParameters;
-        while (lookaheadEquals(std::array{TokenType::Comma, TokenType::Identifier}))
+        if (maybeDefault)
         {
-            auto comma = *m_current++;
-            auto defParameter = parseDefParameter();
-            if (!defParameter)
+            seenDefaultParam = parameters.size();
+        }
+        if (seenKwRest)
+        {
+            return tl::unexpected{
+                createDiagnosticsBuilder(*identifier, Diag::NO_MORE_PARAMETERS_ALLOWED_AFTER_EXCESS_KEYWORD_PARAMETER_N,
+                                         pylir::get<std::string>(identifier->getValue()),
+                                         parameters[*seenKwRest].name.getValue())
+                    .addLabel(*identifier, std::nullopt, Diag::ERROR_COLOUR)
+                    .addNote(parameters[*seenKwRest], Diag::EXCESS_KEYWORD_PARAMETER_N_HERE,
+                             parameters[*seenKwRest].name.getValue())
+                    .addLabel(parameters[*seenKwRest], std::nullopt, Diag::NOTE_COLOUR)
+                    .emitError()};
+        }
+
+        if (!stars)
+        {
+            parameters.push_back({currentKind, stars, IdentifierToken(std::move(*identifier)), std::move(maybeType),
+                                  std::move(maybeDefault)});
+            continue;
+        }
+
+        if (stars->getTokenType() == TokenType::Star)
+        {
+            if (auto* token = std::get_if<BaseToken>(&seenPosRest))
             {
-                return tl::unexpected{std::move(defParameter).error()};
+                return tl::unexpected{createDiagnosticsBuilder(
+                                          *identifier, Diag::STARRED_PARAMETER_NOT_ALLOWED_AFTER_KEYWORD_ONLY_INDICATOR)
+                                          .addLabel(*identifier, std::nullopt, Diag::ERROR_COLOUR)
+                                          .addNote(*token, Diag::KEYWORD_ONLY_INDICATOR_HERE)
+                                          .addLabel(*token, std::nullopt, Diag::NOTE_COLOUR)
+                                          .emitError()};
             }
-            if (!firstDefaultParameter && defParameter->defaultArg.has_value())
-            {
-                firstDefaultParameter = defParameter->parameter.identifier;
-            }
-            else if (firstDefaultParameter && !defParameter->defaultArg.has_value())
+            if (auto* index = std::get_if<std::size_t>(&seenPosRest))
             {
                 return tl::unexpected{
-                    createDiagnosticsBuilder(
-                        *defParameter,
-                        Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
-                        defParameter->parameter.identifier.getValue())
-                        .addLabel(defParameter->parameter.identifier, std::nullopt, Diag::ERROR_COLOUR)
-                        .addNote(*firstDefaultParameter, Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
-                                 firstDefaultParameter->getValue())
-                        .addLabel(*firstDefaultParameter, std::nullopt, Diag::NOTE_COLOUR)
+                    createDiagnosticsBuilder(*identifier, Diag::ONLY_ONE_STARRED_PARAMETER_ALLOWED)
+                        .addLabel(*identifier, std::nullopt, Diag::ERROR_COLOUR)
+                        .addNote(parameters[*index], Diag::STARRED_PARAMETER_N_HERE, parameters[*index].name.getValue())
+                        .addLabel(parameters[*index], std::nullopt, Diag::NOTE_COLOUR)
                         .emitError()};
             }
-            defParameters.emplace_back(comma, std::move(*defParameter));
+
+            seenPosRest = parameters.size();
+            parameters.push_back({Syntax::Parameter::PosRest, stars, IdentifierToken(std::move(*identifier)),
+                                  std::move(maybeType), std::move(maybeDefault)});
+            continue;
         }
-        return Syntax::ParameterList::NoPosOnly{
-            Syntax::ParameterList::NoPosOnly::DefParams{std::move(*first), std::move(defParameters), std::nullopt}};
-    };
 
-    auto prefix = parseParameterListNoPosOnlyPrefix();
-    if (!prefix)
-    {
-        return tl::unexpected{std::move(prefix).error()};
+        seenKwRest = parameters.size();
+        parameters.push_back({Syntax::Parameter::KeywordRest, stars, IdentifierToken(std::move(*identifier)),
+                              std::move(maybeType), std::move(maybeDefault)});
     }
-    if (std::holds_alternative<Syntax::ParameterList::StarArgs>(prefix->variant))
-    {
-        return Syntax::ParameterList{std::move(*prefix)};
-    }
-    auto& defParams = pylir::get<Syntax::ParameterList::NoPosOnly::DefParams>(prefix->variant);
-
-    if (!lookaheadEquals(std::array{TokenType::Comma, TokenType::Divide}))
-    {
-        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
-        {
-            return Syntax::ParameterList{std::move(*prefix)};
-        }
-        auto comma = *m_current++;
-        std::optional<Syntax::ParameterList::StarArgs> starArgs;
-        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
-        {
-            auto parsedStarArgs = parseParameterListStarArgs();
-            if (!parsedStarArgs)
-            {
-                return tl::unexpected{std::move(parsedStarArgs).error()};
-            }
-            starArgs = std::move(*parsedStarArgs);
-        }
-        defParams.suffix = std::pair{comma, std::move(starArgs)};
-        return Syntax::ParameterList{std::move(*prefix)};
-    }
-
-    auto comma = *m_current++;
-    auto slash = *m_current++;
-    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
-    {
-        return Syntax::ParameterList{Syntax::ParameterList::PosOnly{
-            std::move(defParams.first), std::move(defParams.rest), comma, slash, std::nullopt}};
-    }
-    auto suffixComma = *m_current++;
-    if (m_current == m_lexer.end()
-        || (m_current->getTokenType() != TokenType::Identifier && m_current->getTokenType() != TokenType::Star
-            && m_current->getTokenType() != TokenType::PowerOf))
-    {
-        return Syntax::ParameterList{Syntax::ParameterList::PosOnly{
-            std::move(defParams.first), std::move(defParams.rest), comma, slash, std::pair{suffixComma, std::nullopt}}};
-    }
-    auto secondNoPosOnly = parseParameterListNoPosOnlyPrefix();
-    if (!secondNoPosOnly)
-    {
-        return tl::unexpected{std::move(secondNoPosOnly).error()};
-    }
-    if (std::holds_alternative<Syntax::ParameterList::StarArgs>(secondNoPosOnly->variant))
-    {
-        return Syntax::ParameterList{
-            Syntax::ParameterList::PosOnly{std::move(defParams.first), std::move(defParams.rest), comma, slash,
-                                           std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
-    }
-
-    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
-    {
-        return Syntax::ParameterList{
-            Syntax::ParameterList::PosOnly{std::move(defParams.first), std::move(defParams.rest), comma, slash,
-                                           std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
-    }
-    auto& secondDefParams = pylir::get<Syntax::ParameterList::NoPosOnly::DefParams>(secondNoPosOnly->variant);
-
-    auto trailingComma = *m_current++;
-    std::optional<Syntax::ParameterList::StarArgs> starArgs;
-    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
-    {
-        auto parsedStarArgs = parseParameterListStarArgs();
-        if (!parsedStarArgs)
-        {
-            return tl::unexpected{std::move(parsedStarArgs).error()};
-        }
-        starArgs = std::move(*parsedStarArgs);
-    }
-    secondDefParams.suffix = std::pair{trailingComma, std::move(starArgs)};
-    return Syntax::ParameterList{Syntax::ParameterList::PosOnly{std::move(defParams.first), std::move(defParams.rest),
-                                                                comma, slash,
-                                                                std::pair{suffixComma, std::move(*secondNoPosOnly)}}};
+    return parameters;
 }
 
 namespace
@@ -1108,7 +1044,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     {
         return tl::unexpected{std::move(openParenth).error()};
     }
-    std::optional<Syntax::ParameterList> parameterList;
+    std::vector<Syntax::Parameter> parameterList;
     if (m_current != m_lexer.end() && m_current->getTokenType() != TokenType::CloseParentheses)
     {
         auto parsedParameterList = parseParameterList();
@@ -1123,16 +1059,16 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     {
         return tl::unexpected{std::move(closeParenth).error()};
     }
-    std::optional<std::pair<BaseToken, Syntax::Expression>> suffix;
+    IntrVarPtr<Syntax::Expression> suffix;
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Arrow)
     {
-        auto arrow = *m_current++;
+        m_current++;
         auto expression = parseExpression();
         if (!expression)
         {
             return tl::unexpected{std::move(expression).error()};
         }
-        suffix = std::pair{arrow, std::move(*expression)};
+        suffix = std::move(*expression);
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
@@ -1141,23 +1077,11 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     }
     m_namespace.emplace_back();
     std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
+
     // add parameters to local variables
-
-    if (parameterList)
+    for (auto& iter : parameterList)
     {
-        class ParamVisitor : public Syntax::Visitor<ParamVisitor>
-        {
-        public:
-            std::function<void(const IdentifierToken&)> callback;
-
-            using Visitor::visit;
-
-            void visit(const Syntax::ParameterList::Parameter& parameter)
-            {
-                callback(parameter.identifier);
-            }
-        } visitor{{}, [&](const IdentifierToken& token) { addToNamespace(token); }};
-        visitor.visit(*parameterList);
+        addToNamespace(iter.name);
     }
 
     pylir::ValueReset resetLoop(m_inLoop);
@@ -1208,7 +1132,8 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
         }
     }
 
-    return Syntax::FuncDef{std::move(decorators),
+    return Syntax::FuncDef{{},
+                           std::move(decorators),
                            asyncKeyword,
                            *defKeyword,
                            IdentifierToken{std::move(*funcName)},
@@ -1242,7 +1167,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::OpenParentheses)
     {
         auto open = *m_current++;
-        std::optional<Syntax::ArgumentList> argumentList;
+        std::vector<Syntax::Argument> argumentList;
         if (m_current != m_lexer.end() && m_current->getTokenType() != TokenType::CloseParentheses)
         {
             auto parsedArgumentList = parseArgumentList();
@@ -1301,7 +1226,8 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
             return tl::unexpected{std::move(error.error())};
         }
     }
-    return Syntax::ClassDef{std::move(decorators),
+    return Syntax::ClassDef{{},
+                            std::move(decorators),
                             *classKeyword,
                             IdentifierToken{std::move(*className)},
                             std::move(inheritance),

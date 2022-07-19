@@ -117,18 +117,20 @@ std::string pylir::Dumper::Builder::emit() const
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
 {
-    return pylir::match(
-        atom.variant,
-        [](const IdentifierToken& identifier) -> std::string { return fmt::format("atom {}", identifier.getValue()); },
-        [](const Syntax::Atom::Literal& literal) -> std::string
-        {
+    switch (atom.token.getTokenType())
+    {
+        case TokenType::Identifier: return fmt::format("atom {}", pylir::get<std::string>(atom.token.getValue()));
+        case TokenType::NoneKeyword: return "atom None";
+        case TokenType::TrueKeyword: return "atom True";
+        case TokenType::FalseKeyword: return "atom False";
+        default:
             return pylir::match(
-                literal.token.getValue(),
+                atom.token.getValue(),
                 [](double value) -> std::string { return fmt::format(FMT_STRING("atom {:#}"), value); },
                 [](const BigInt& bigInt) -> std::string { return fmt::format("atom {}", bigInt.toString()); },
                 [&](const std::string& string) -> std::string
                 {
-                    if (literal.token.getTokenType() == TokenType::StringLiteral)
+                    if (atom.token.getTokenType() == TokenType::StringLiteral)
                     {
                         std::string result;
                         result.reserve(string.size());
@@ -182,225 +184,69 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Atom& atom)
                     }
                     return fmt::format("atom b'{}'", result);
                 },
-                [&](std::monostate) -> std::string
-                {
-                    switch (literal.token.getTokenType())
-                    {
-                        case TokenType::NoneKeyword: return "atom None";
-                        case TokenType::TrueKeyword: return "atom True";
-                        case TokenType::FalseKeyword: return "atom False";
-                        default: PYLIR_UNREACHABLE;
-                    }
-                });
-        },
-        [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> std::string { return dump(*enclosure); });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::Enclosure& enclosure)
-{
-    return pylir::match(
-        enclosure.variant,
-        [&](const Syntax::Enclosure::DictDisplay& dictDisplay) -> std::string
-        {
-            if (std::holds_alternative<std::monostate>(dictDisplay.variant))
-            {
-                return "dict display empty";
-            }
-
-            return createBuilder("dict display")
-                .add(pylir::match(
-                    dictDisplay.variant, [](std::monostate) -> std::string { PYLIR_UNREACHABLE; },
-                    [&](const Syntax::Enclosure::DictDisplay::DictComprehension& comprehension) -> std::string
-                    {
-                        return createBuilder("dict comprehension")
-                            .add(comprehension.first)
-                            .add(comprehension.second)
-                            .add(comprehension.compFor)
-                            .emit();
-                    },
-                    [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& commaList) -> std::string
-                    {
-                        return dump(
-                            commaList,
-                            [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum) -> std::string
-                            {
-                                return pylir::match(
-                                    keyDatum.variant,
-                                    [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Key& key) -> std::string
-                                    { return createBuilder("key").add(key.first).add(key.second).emit(); },
-                                    [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Datum& datum) -> std::string
-                                    { return createBuilder("datum").add(datum.orExpr).emit(); });
-                            },
-                            "key datum list");
-                    }))
-                .emit();
-        },
-        [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> std::string
-        {
-            auto result = createBuilder("set display");
-            pylir::match(setDisplay.variant, [&](const auto& value) { result.add(value); });
-            return result.emit();
-        },
-        [&](const Syntax::Enclosure::ListDisplay& listDisplay) -> std::string
-        {
-            if (std::holds_alternative<std::monostate>(listDisplay.variant))
-            {
-                return "list display empty";
-            }
-            auto result = createBuilder("list display");
-            pylir::match(
-                listDisplay.variant, [](const std::monostate&) { PYLIR_UNREACHABLE; },
-                [&](const auto& value) { result.add(value); });
-            return result.emit();
-        },
-        [&](const Syntax::Enclosure::GeneratorExpression& generatorExpression) -> std::string
-        {
-            return createBuilder("generator expression")
-                .add(generatorExpression.expression)
-                .add(generatorExpression.compFor)
-                .emit();
-        },
-        [&](const Syntax::Enclosure::YieldAtom& yieldAtom) -> std::string
-        { return createBuilder("yieldatom").add(yieldAtom.yieldExpression).emit(); },
-        [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> std::string
-        {
-            if (!parenthForm.expression)
-            {
-                return "parenth empty";
-            }
-
-                            return createBuilder("parenth").add(*parenthForm.expression).emit();
-
-        });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::Primary& primary)
-{
-    return pylir::match(primary.variant, [&](const auto& value) -> std::string { return dump(value); });
+                [&](std::monostate) -> std::string { PYLIR_UNREACHABLE; });
+    }
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AttributeRef& attribute)
 {
-    return createBuilder("attribute {}", attribute.identifier.getValue()).add(*attribute.primary).emit();
+    return createBuilder("attribute {}", attribute.identifier.getValue()).add(*attribute.object).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Subscription& subscription)
 {
-    return createBuilder("subscription")
-        .add(*subscription.primary, "primary")
-        .add(subscription.expressionList, "index")
-        .emit();
+    return createBuilder("subscription").add(*subscription.object, "object").add(*subscription.index, "index").emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::Slicing& slicing)
+std::string pylir::Dumper::dump(const pylir::Syntax::Slice& slice)
 {
-    return createBuilder("slicing")
-        .add(*slicing.primary, "primary")
-        .add(dump(
-                 slicing.sliceList,
-                 [&](const auto& slice) -> std::string
-                 {
-                     return pylir::match(
-                         slice,
-                         [&](const Syntax::Slicing::ProperSlice& properSlice) -> std::string
-                         {
-                             auto builder = createBuilder("proper slice");
-                             if (properSlice.optionalLowerBound)
-                             {
-                                 builder.add(*properSlice.optionalLowerBound, "lowerBound");
-                             }
-                             if (properSlice.optionalUpperBound)
-                             {
-                                 builder.add(*properSlice.optionalUpperBound, "upperBound");
-                             }
-                             if (properSlice.optionalStride)
-                             {
-                                 builder.add(*properSlice.optionalStride, "stride");
-                             }
-                             return builder.emit();
-                         },
-                         [&](const Syntax::Expression& expression) { return dump(expression); });
-                 },
-                 "proper slice list"),
-             "index")
-        .emit();
+    auto builder = createBuilder("slice");
+    if (slice.maybeLowerBound)
+    {
+        builder.add(*slice.maybeLowerBound, "lowerBound");
+    }
+    if (slice.maybeUpperBound)
+    {
+        builder.add(*slice.maybeUpperBound, "upperBound");
+    }
+    if (slice.maybeStride)
+    {
+        builder.add(*slice.maybeStride, "stride");
+    }
+    return builder.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Comprehension& comprehension)
 {
-    return createBuilder("comprehension").add(comprehension.assignmentExpression).add(comprehension.compFor).emit();
+    return createBuilder("comprehension").add(*comprehension.expression).add(comprehension.compFor).emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentExpression& assignmentExpression)
+std::string pylir::Dumper::dump(const pylir::Syntax::Assignment& assignment)
 {
-    if (!assignmentExpression.identifierAndWalrus)
-    {
-        return dump(*assignmentExpression.expression);
-    }
-    return createBuilder("assignment expression to {}", assignmentExpression.identifierAndWalrus->first.getValue())
-        .add(*assignmentExpression.expression)
+    return createBuilder("assignment expression to {}", assignment.variable.getValue())
+        .add(*assignment.expression)
         .emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::ArgumentList& argument)
+std::string pylir::Dumper::dump(const pylir::Syntax::Argument& argument)
 {
-    auto builder = createBuilder("argument list");
-    if (argument.positionalArguments)
+    auto builder = createBuilder("argument");
+    if (argument.maybeName)
     {
-        auto positional =
-            createBuilder("positional arguments")
-                .add(pylir::match(
-                    argument.positionalArguments->firstItem.variant,
-                    [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                    [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                    { return createBuilder("starred").add(*star.expression).emit(); }));
-        for (const auto& [token, item] : argument.positionalArguments->rest)
-        {
-            positional.add(pylir::match(
-                item.variant, [&](const std::unique_ptr<Syntax::AssignmentExpression>& value) { return dump(*value); },
-                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                { return createBuilder("starred").add(*star.expression).emit(); }));
-        }
-        builder.add(positional);
+        builder.add(createBuilder("keyword item {}", argument.maybeName->getValue()).add(*argument.expression));
     }
-    if (argument.starredAndKeywords)
+    else if (argument.maybeExpansionsOrEqual)
     {
-        auto starred = createBuilder("starred keywords");
-        auto keyword = createBuilder("keyword item {}", argument.starredAndKeywords->first.identifier.getValue())
-                           .add(*argument.starredAndKeywords->first.expression);
-        starred.add(keyword);
-        for (const auto& [token, iter] : argument.starredAndKeywords->rest)
+        switch (argument.maybeExpansionsOrEqual->getTokenType())
         {
-            starred.add(pylir::match(
-                iter,
-                [&](const Syntax::ArgumentList::KeywordItem& keywordItem) {
-                    return createBuilder("keyword item {}", keywordItem.identifier.getValue())
-                        .add(*keywordItem.expression)
-                        .emit();
-                },
-                [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
-                { return createBuilder("starred expression").add(*expression.expression).emit(); }));
+            case TokenType::PowerOf: builder.add(createBuilder("mapped").add(*argument.expression)); break;
+            case TokenType::Star: builder.add(createBuilder("starred").add(*argument.expression)); break;
+            default: PYLIR_UNREACHABLE;
         }
-        builder.add(starred);
     }
-    if (argument.keywordArguments)
+    else
     {
-        auto starred = createBuilder("keyword arguments");
-        auto mapped = createBuilder("mapped expression").add(*argument.keywordArguments->first.expression);
-        starred.add(mapped);
-        for (const auto& [token, iter] : argument.keywordArguments->rest)
-        {
-            starred.add(pylir::match(
-                iter,
-                [&](const Syntax::ArgumentList::KeywordItem& keywordItem) {
-                    return createBuilder("keyword item {}", keywordItem.identifier.getValue())
-                        .add(*keywordItem.expression)
-                        .emit();
-                },
-                [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
-                { return createBuilder("mapped expression").add(*expression.expression).emit(); }));
-        }
-        builder.add(starred);
+        builder.add(*argument.expression);
     }
     return builder.emit();
 }
@@ -408,98 +254,28 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ArgumentList& argument)
 std::string pylir::Dumper::dump(const pylir::Syntax::Call& call)
 {
     auto builder = createBuilder("call");
-    builder.add(*call.primary);
-    if (std::holds_alternative<std::monostate>(call.variant))
-    {
-        return builder.emit();
-    }
-    if (const auto* comprehension = std::get_if<std::unique_ptr<Syntax::Comprehension>>(&call.variant))
-    {
-        return builder.add(**comprehension).emit();
-    }
-    const auto& [argument, comma] = pylir::get<std::pair<Syntax::ArgumentList, std::optional<BaseToken>>>(call.variant);
-    return builder.add(argument).emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::AwaitExpr& awaitExpr)
-{
-    return createBuilder("await expression").add(awaitExpr.primary).emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::UExpr& uExpr)
-{
-    if (const auto* power = std::get_if<Syntax::Power>(&uExpr.variant))
-    {
-        return dump(*power);
-    }
-    const auto& [token, rhs] = pylir::get<std::pair<Token, std::unique_ptr<Syntax::UExpr>>>(uExpr.variant);
-    return createBuilder(FMT_STRING("unary {:q}"), token.getTokenType()).add(*rhs).emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::Power& power)
-{
-    if (!power.rightHand)
-    {
-        return pylir::match(power.variant, [&](const auto& value) { return dump(value); });
-    }
-    return createBuilder("power")
-        .add(pylir::match(power.variant, [&](const auto& value) { return dump(value); }), "base")
-        .add(*power.rightHand->second, "exponent")
-        .emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::MExpr& mExpr)
-{
+    builder.add(*call.expression, "callable");
     return pylir::match(
-        mExpr.variant, [&](const Syntax::UExpr& uExpr) { return dump(uExpr); },
-        [&](const std::unique_ptr<Syntax::MExpr::BinOp>& binOp)
+        call.variant,
+        [&](const std::vector<Syntax::Argument>& argument)
         {
-            return createBuilder("mexpr {:q}", binOp->binToken.getTokenType())
-                .add(*binOp->lhs, "lhs")
-                .add(binOp->rhs, "rhs")
-                .emit();
+            for (const auto& iter : argument)
+            {
+                builder.add(iter);
+            }
+            return builder.emit();
         },
-        [&](const std::unique_ptr<Syntax::MExpr::AtBin>& binOp) {
-            return createBuilder("mexpr {:q}", TokenType::AtSign)
-                .add(*binOp->lhs, "lhs")
-                .add(*binOp->rhs, "rhs")
-                .emit();
+        [&](const Syntax::Comprehension& comprehension)
+        {
+            builder.add(comprehension);
+            return builder.emit();
         });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::AExpr& aExpr)
-{
-    return dumpBinOp(aExpr, "aexpr", &Token::getTokenType);
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::ShiftExpr& shiftExpr)
-{
-    return dumpBinOp(shiftExpr, "shiftExpr", &Token::getTokenType);
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::AndExpr& andExpr)
-{
-    return dumpBinOp(andExpr, "andExpr", [](auto&&) { return TokenType::BitAnd; });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::XorExpr& xorExpr)
-{
-    return dumpBinOp(xorExpr, "xorExpr", [](auto&&) { return TokenType::BitXor; });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::OrExpr& orExpr)
-{
-    return dumpBinOp(orExpr, "orExpr", [](auto&&) { return TokenType::BitOr; });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
 {
-    if (comparison.rest.empty())
-    {
-        return dump(comparison.left);
-    }
     auto result = createBuilder("comparison");
-    result.add(comparison.left, "lhs");
+    result.add(*comparison.first, "lhs");
     for (const auto& [token, rhs] : comparison.rest)
     {
         std::string name;
@@ -511,96 +287,52 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Comparison& comparison)
         {
             name = fmt::format("{:q}", token.firstToken.getTokenType());
         }
-        result.add(rhs, name);
+        result.add(*rhs, name);
     }
     return result.emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::NotTest& notTest)
+std::string pylir::Dumper::dump(const pylir::Syntax::Conditional& conditionalExpression)
 {
-    return pylir::match(
-        notTest.variant, [&](const Syntax::Comparison& comparison) { return dump(comparison); },
-        [&](const auto& pair) { return createBuilder("notTest").add(*pair.second).emit(); });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::AndTest& andTest)
-{
-    return dumpBinOp(andTest, "andTest", [](auto&&) { return TokenType::AndKeyword; });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::OrTest& orTest)
-{
-    return dumpBinOp(orTest, "orTest", [](auto&&) { return TokenType::OrKeyword; });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::ConditionalExpression& conditionalExpression)
-{
-    if (!conditionalExpression.suffix)
-    {
-        return dump(conditionalExpression.value);
-    }
     return createBuilder("conditional expression")
-        .add(conditionalExpression.value, "value")
-        .add(*conditionalExpression.suffix->test, "condition")
-        .add(*conditionalExpression.suffix->elseValue, "elseValue")
+        .add(*conditionalExpression.trueValue, "trueValue")
+        .add(*conditionalExpression.condition, "condition")
+        .add(*conditionalExpression.elseValue, "elseValue")
         .emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::LambdaExpression& lambdaExpression)
+std::string pylir::Dumper::dump(const pylir::Syntax::Lambda& lambda)
 {
     auto builder = createBuilder("lambda expression");
-    if (lambdaExpression.parameterList)
     {
-        builder.add(*lambdaExpression.parameterList);
+        auto subBuilder = createBuilder("parameters");
+        for (const auto& iter : lambda.parameters)
+        {
+            subBuilder.add(iter);
+        }
+        builder.add(subBuilder);
     }
-    return builder.add(lambdaExpression.expression).emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::Expression& expression)
-{
-    return pylir::match(
-        expression.variant, [&](const auto& value) { return dump(value); },
-        [&](const std::unique_ptr<Syntax::LambdaExpression>& lambdaExpression) { return dump(*lambdaExpression); });
+    return builder.add(*lambda.expression).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::StarredItem& starredItem)
 {
-    if (const auto* assignment = std::get_if<Syntax::AssignmentExpression>(&starredItem.variant))
+    if (!starredItem.maybeStar)
     {
-        return dump(*assignment);
+        return dump(*starredItem.expression);
     }
-    return createBuilder("starred item")
-        .add(pylir::get<std::pair<BaseToken, Syntax::OrExpr>>(starredItem.variant).second)
-        .emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::StarredExpression& starredExpression)
-{
-    if (const auto* expression = std::get_if<Syntax::Expression>(&starredExpression.variant))
-    {
-        return dump(*expression);
-    }
-    const auto& item = pylir::get<Syntax::StarredExpression::Items>(starredExpression.variant);
-    auto result = createBuilder("starred expression");
-    for (const auto& iter : item.leading)
-    {
-        result.add(iter.first);
-    }
-    if (item.last)
-    {
-        result.add(*item.last);
-    }
-    return result.emit();
+    return createBuilder("starred item").add(*starredItem.expression).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompIf& compIf)
 {
     auto result = createBuilder("comp if");
     return pylir::match(
-        compIf.compIter, [&](std::monostate) { return result.add(compIf.orTest, "condition").emit(); },
-        [&](const Syntax::CompFor& compFor) { return result.add(compIf.orTest, "condition").add(compFor).emit(); },
+        compIf.compIter, [&](std::monostate) { return result.add(*compIf.test, "condition").emit(); },
+        [&](const std::unique_ptr<Syntax::CompFor>& compFor)
+        { return result.add(*compIf.test, "condition").add(*compFor).emit(); },
         [&](const std::unique_ptr<Syntax::CompIf>& second)
-        { return result.add(compIf.orTest, "condition").add(*second).emit(); });
+        { return result.add(*compIf.test, "condition").add(*second).emit(); });
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::CompFor& compFor)
@@ -614,131 +346,85 @@ std::string pylir::Dumper::dump(const pylir::Syntax::CompFor& compFor)
     {
         title = "comp for";
     }
-    auto builder = createBuilder("{}", title).add(compFor.targets);
+    auto builder = createBuilder("{}", title).add(*compFor.targets, "target");
     if (std::holds_alternative<std::monostate>(compFor.compIter))
     {
-        return builder.add(compFor.orTest).emit();
+        return builder.add(*compFor.test).emit();
     }
-    builder.add(compFor.orTest);
+    builder.add(*compFor.test);
     builder.add(pylir::match(
         compFor.compIter, [&](const auto& ptr) { return dump(*ptr); },
         [](std::monostate) -> std::string { PYLIR_UNREACHABLE; }));
     return builder.emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::Target& target)
-{
-    return pylir::match(
-        target.variant,
-        [&](const IdentifierToken& identifierToken) { return fmt::format("target {}", identifierToken.getValue()); },
-        [&](const Syntax::Target::Parenth& parenth) -> std::string
-        {
-            if (!parenth.targetList)
-            {
-                return "target parenth empty";
-            }
-            return createBuilder("target parenth").add(*parenth.targetList).emit();
-        },
-        [&](const Syntax::Target::Square& square) -> std::string
-        {
-            if (!square.targetList)
-            {
-                return "target square empty";
-            }
-            return createBuilder("target square").add(*square.targetList).emit();
-        },
-        [&](const std::pair<BaseToken, std::unique_ptr<Syntax::Target>>& pair)
-        { return createBuilder("target starred").add(*pair.second).emit(); },
-        [&](const auto& value) { return dump(value); });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::SimpleStmt& simpleStmt)
-{
-    return pylir::match(simpleStmt.variant, [&](auto&& value) { return dump(value); });
-}
-
 std::string pylir::Dumper::dump(const pylir::Syntax::AssertStmt& assertStmt)
 {
-    auto result = createBuilder("assert statement").add(assertStmt.condition, "condition");
-    if (assertStmt.message)
+    auto result = createBuilder("assert statement").add(*assertStmt.condition, "condition");
+    if (assertStmt.maybeMessage)
     {
-        result.add(assertStmt.message->second, "message");
+        result.add(*assertStmt.maybeMessage, "message");
     }
     return result.emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::PassStmt&)
-{
-    return "pass statement";
-}
-
 std::string pylir::Dumper::dump(const pylir::Syntax::DelStmt& delStmt)
 {
-    return createBuilder("del statement").add(delStmt.targetList).emit();
+    return createBuilder("del statement").add(*delStmt.targetList).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ReturnStmt& returnStmt)
 {
-    if (!returnStmt.expressions)
+    if (!returnStmt.maybeExpression)
     {
         return "return statement";
     }
-    return createBuilder("return statement").add(*returnStmt.expressions).emit();
+    return createBuilder("return statement").add(*returnStmt.maybeExpression).emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::YieldStmt& yieldStmt)
+std::string pylir::Dumper::dump(const pylir::Syntax::Yield& yield)
 {
-    return dump(yieldStmt.yieldExpression);
+    if (!yield.maybeExpression)
+    {
+        return createBuilder("yield empty").emit();
+    }
+    if (yield.fromToken)
+    {
+        return createBuilder("yield from").add(*yield.maybeExpression).emit();
+    }
+    return createBuilder("yield").add(*yield.maybeExpression).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::RaiseStmt& raiseStmt)
 {
     auto builder = createBuilder("raise statement");
-    if (raiseStmt.expressions)
+    if (raiseStmt.maybeException)
     {
-        builder.add(raiseStmt.expressions->first, "exception");
-        if (raiseStmt.expressions->second)
+        builder.add(*raiseStmt.maybeException, "exception");
+        if (raiseStmt.maybeCause)
         {
-            builder.add(raiseStmt.expressions->second->second, "expression");
+            builder.add(*raiseStmt.maybeCause, "cause");
         }
     }
     return builder.emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::BreakStmt&)
+std::string pylir::Dumper::dump(const pylir::Syntax::GlobalOrNonLocalStmt& globalOrNonLocalStmt)
 {
-    return "break statement";
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::ContinueStmt&)
-{
-    return "continue statement";
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::GlobalStmt& globalStmt)
-{
-    std::vector<std::string_view> identifiers{globalStmt.identifier.getValue()};
-    std::transform(globalStmt.rest.begin(), globalStmt.rest.end(), std::back_inserter(identifiers),
-                   [](const auto& pair) { return pair.second.getValue(); });
-    return fmt::format(FMT_STRING("global {}"), fmt::join(identifiers, ", "));
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::NonLocalStmt& nonLocalStmt)
-{
-    std::vector<std::string_view> identifiers{nonLocalStmt.identifier.getValue()};
-    std::transform(nonLocalStmt.rest.begin(), nonLocalStmt.rest.end(), std::back_inserter(identifiers),
-                   [](const auto& pair) { return pair.second.getValue(); });
-    return fmt::format(FMT_STRING("nonlocal {}"), fmt::join(identifiers, ", "));
+    std::vector<std::string_view> identifiers{globalOrNonLocalStmt.identifiers.size()};
+    std::transform(globalOrNonLocalStmt.identifiers.begin(), globalOrNonLocalStmt.identifiers.end(),
+                   identifiers.begin(), [](const auto& pair) { return pair.getValue(); });
+    const auto* title = globalOrNonLocalStmt.token.getTokenType() == TokenType::GlobalKeyword ? "global" : "nonlocal";
+    return fmt::format(FMT_STRING("{} {}"), title, fmt::join(identifiers, ", "));
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
 {
     auto dumpModule = [&](const Syntax::ImportStmt::Module& module)
     {
-        std::vector<std::string_view> identifiers;
-        std::transform(module.leading.begin(), module.leading.end(), std::back_inserter(identifiers),
-                       [](const auto& pair) { return pair.first.getValue(); });
-        identifiers.push_back(module.lastIdentifier.getValue());
+        std::vector<std::string_view> identifiers(module.identifiers.size());
+        std::transform(module.identifiers.begin(), module.identifiers.end(), identifiers.begin(),
+                       [](const auto& token) { return token.getValue(); });
         return fmt::format(FMT_STRING("module {}"), fmt::join(identifiers, "."));
     };
 
@@ -755,130 +441,52 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
 
     return pylir::match(
         importStmt.variant,
-        [&](const Syntax::ImportStmt::ImportAsAs& importAsAs)
+        [&](const Syntax::ImportStmt::ImportAs& importAs)
         {
             auto result = createBuilder("import");
-            result.add(dumpModule(importAsAs.module));
-            if (importAsAs.name)
+            for (const auto& [module, name] : importAs.modules)
             {
-                result.add(fmt::format("as {}", importAsAs.name->second.getValue()));
-            }
-            for (const auto& further : importAsAs.rest)
-            {
-                result.add(dumpModule(further.module));
-                if (further.name)
-                {
-                    result.add(fmt::format("as {}", further.name->second.getValue()));
-                }
+                result.add(dumpModule(module),
+                           name ? std::optional<std::string_view>{fmt::format("as {}", name->getValue())} :
+                                  std::nullopt);
             }
             return result.emit();
         },
-        [&](const Syntax::ImportStmt::FromImportAll& importAll)
+        [&](const Syntax::ImportStmt::ImportAll& importAll)
         { return createBuilder("import all").add(dumpRelativeModule(importAll.relativeModule)).emit(); },
-        [&](const Syntax::ImportStmt::FromImportList& importList)
+        [&](const Syntax::ImportStmt::FromImport& importList)
         {
             auto result = createBuilder("import list");
             result.add(dumpRelativeModule(importList.relativeModule));
-            if (importList.name)
+            for (const auto& [object, name] : importList.imports)
             {
-                result.add(fmt::format("{} as {}", importList.identifier.getValue(), importList.identifier.getValue()));
-            }
-            else
-            {
-                result.add(importList.identifier.getValue());
-            }
-            for (const auto& further : importList.rest)
-            {
-                if (further.name)
+                if (name)
                 {
-                    result.add(fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
+                    result.add(fmt::format("{} as {}", object.getValue(), name->getValue()));
                 }
                 else
                 {
-                    result.add(further.identifier.getValue());
+                    result.add(object.getValue());
                 }
             }
             return result.emit();
         });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::FutureStmt& futureStmt)
-{
-    auto result = createBuilder("future list");
-    if (futureStmt.name)
-    {
-        result.add(fmt::format("{} as {}", futureStmt.identifier.getValue(), futureStmt.identifier.getValue()));
-    }
-    else
-    {
-        result.add(futureStmt.identifier.getValue());
-    }
-    for (const auto& further : futureStmt.rest)
-    {
-        if (further.name)
-        {
-            result.add(fmt::format("{} as {}", further.identifier.getValue(), further.name->second.getValue()));
-        }
-        else
-        {
-            result.add(further.identifier.getValue());
-        }
-    }
-    return result.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentStmt& assignmentStmt)
 {
     auto result = createBuilder("assignment statement");
-    for (const auto& iter : assignmentStmt.targets)
+    for (const auto& [target, operation] : assignmentStmt.targets)
     {
-        result.add(iter.first);
+        result.add(*target, fmt::format(FMT_STRING("Operator {:q}"), operation.getTokenType()));
     }
-    return result.add(pylir::match(assignmentStmt.variant, [&](auto&& value) { return dump(value); })).emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::YieldExpression& yieldExpression)
-{
-    return pylir::match(
-        yieldExpression.variant, [](std::monostate) -> std::string { return "yield empty"; },
-        [&](const std::pair<BaseToken, Syntax::Expression>& expression) -> std::string
-        { return createBuilder("yield from").add(expression.second).emit(); },
-        [&](const Syntax::ExpressionList& list) -> std::string
-        {
-            auto result = createBuilder("yield list").add(*list.firstExpr);
-            for (const auto& iter : list.remainingExpr)
-            {
-                result.add(*iter.second);
-            }
-            return result.emit();
-        });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::AugmentedAssignmentStmt& augmentedAssignmentStmt)
-{
-    return createBuilder("augmented assignment {:q}", augmentedAssignmentStmt.augOp.getTokenType())
-        .add(augmentedAssignmentStmt.augTarget)
-        .add(pylir::match(augmentedAssignmentStmt.variant, [&](const auto& value) { return dump(value); }))
-        .emit();
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::AugTarget& augTarget)
-{
-    return pylir::match(
-        augTarget.variant,
-        [&](const IdentifierToken& identifierToken) { return "augtarget " + std::string(identifierToken.getValue()); },
-        [&](const auto& value) { return dump(value); });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::AnnotatedAssignmentSmt& annotatedAssignmentSmt)
-{
-    auto result = createBuilder("annotated assignment")
-                      .add(annotatedAssignmentSmt.augTarget)
-                      .add(annotatedAssignmentSmt.expression);
-    if (annotatedAssignmentSmt.optionalAssignmentStmt)
+    if (assignmentStmt.maybeAnnotation)
     {
-        result.add(pylir::match(annotatedAssignmentSmt.optionalAssignmentStmt->second,
-                                [&](const auto& value) { return dump(value); }));
+        result.add(*assignmentStmt.maybeAnnotation, "annotation");
+    }
+    if (assignmentStmt.maybeExpression)
+    {
+        result.add(*assignmentStmt.maybeExpression, "expression");
     }
     return result.emit();
 }
@@ -890,56 +498,29 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FileInput& fileInput)
     {
         builder.add(dumpVariables(fileInput.globals), "globals");
     }
-    for (const auto& iter : fileInput.input)
+    for (const auto& iter : fileInput.input.statements)
     {
-        if (const auto* statement = std::get_if<Syntax::Statement>(&iter))
-        {
-            builder.add(*statement);
-        }
+        pylir::match(iter, [&](const auto& ptr) { builder.add(*ptr); });
     }
     return builder.emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::Statement& statement)
-{
-    return pylir::match(
-        statement.variant, [&](const Syntax::CompoundStmt& compoundStmt) { return dump(compoundStmt); },
-        [&](const Syntax::Statement::SingleLine& singleLine) { return dump(singleLine.stmtList); });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::CompoundStmt& compoundStmt)
-{
-    return pylir::match(compoundStmt.variant, [&](const auto& value) { return dump(value); });
-}
-
-std::string pylir::Dumper::dump(const pylir::Syntax::StmtList& stmtList)
-{
-    return dump(
-        stmtList, [&](const auto& value) { return dump(value); }, "stmt list");
-}
-
 std::string pylir::Dumper::dump(const pylir::Syntax::Suite& suite)
 {
-    return pylir::match(
-        suite.variant,
-        [&](const Syntax::Suite::MultiLine& multiLine)
-        {
-            auto builder = createBuilder("suite");
-            for (const auto& iter : multiLine.statements)
-            {
-                builder.add(iter);
-            }
-            return builder.emit();
-        },
-        [&](const Syntax::Suite::SingleLine& singleLine) { return dump(singleLine.stmtList); });
+    auto builder = createBuilder("suite");
+    for (const auto& iter : suite.statements)
+    {
+        pylir::match(iter, [&](const auto& ptr) { builder.add(*ptr); });
+    }
+    return builder.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::IfStmt& ifStmt)
 {
-    auto builder = createBuilder("if stmt").add(ifStmt.condition).add(*ifStmt.suite);
+    auto builder = createBuilder("if stmt").add(*ifStmt.condition).add(*ifStmt.suite);
     for (const auto& iter : ifStmt.elifs)
     {
-        builder.add(iter.condition).add(*iter.suite);
+        builder.add(*iter.condition).add(*iter.suite);
     }
     if (ifStmt.elseSection)
     {
@@ -950,7 +531,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::IfStmt& ifStmt)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::WhileStmt& whileStmt)
 {
-    auto builder = createBuilder("while stmt").add(whileStmt.condition).add(*whileStmt.suite);
+    auto builder = createBuilder("while stmt").add(*whileStmt.condition).add(*whileStmt.suite);
     if (whileStmt.elseSection)
     {
         builder.add(*whileStmt.elseSection->suite);
@@ -960,7 +541,8 @@ std::string pylir::Dumper::dump(const pylir::Syntax::WhileStmt& whileStmt)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::ForStmt& forStmt)
 {
-    auto builder = createBuilder("for stmt").add(forStmt.targetList).add(forStmt.expressionList).add(*forStmt.suite);
+    const auto* title = forStmt.maybeAsyncKeyword ? "async for stmt" : "for stmt";
+    auto builder = createBuilder(title).add(*forStmt.targetList).add(*forStmt.expression).add(*forStmt.suite);
     if (forStmt.elseSection)
     {
         builder.add(*forStmt.elseSection->suite);
@@ -974,15 +556,14 @@ std::string pylir::Dumper::dump(const pylir::Syntax::TryStmt& tryStmt)
     for (const auto& iter : tryStmt.excepts)
     {
         auto except = createBuilder("except");
-        if (iter.expression)
-        {
-            except.add(iter.expression->first);
-            if (iter.expression->second)
-            {
-                except.add(fmt::format("as {}", iter.expression->second->second.getValue()));
-            }
-        }
+        except.add(*iter.filter, iter.maybeName ?
+                                     std::optional<std::string_view>{fmt::format("as {}", iter.maybeName->getValue())} :
+                                     std::nullopt);
         builder.add(except.add(*iter.suite));
+    }
+    if (tryStmt.maybeExceptAll)
+    {
+        builder.add(*tryStmt.maybeExceptAll->suite, "except all");
     }
     if (tryStmt.elseSection)
     {
@@ -997,18 +578,17 @@ std::string pylir::Dumper::dump(const pylir::Syntax::TryStmt& tryStmt)
 
 std::string pylir::Dumper::dump(const pylir::Syntax::WithStmt& withStmt)
 {
-    auto builder = createBuilder("with stmt");
+    auto builder = createBuilder(withStmt.maybeAsyncKeyword ? "async with stmt" : "with stmt");
     auto dumpWithItem = [&](const Syntax::WithStmt::WithItem& item)
     {
-        auto builder = createBuilder("with item").add(item.expression);
-        if (item.target)
+        auto builder = createBuilder("with item").add(*item.expression);
+        if (item.maybeTarget)
         {
-            builder.add(item.target->second, "as");
+            builder.add(*item.maybeTarget, "as");
         }
         return builder.emit();
     };
-    builder.add(dumpWithItem(withStmt.first));
-    for (const auto& [token, item] : withStmt.rest)
+    for (const auto& item : withStmt.items)
     {
         builder.add(dumpWithItem(item));
     }
@@ -1016,124 +596,57 @@ std::string pylir::Dumper::dump(const pylir::Syntax::WithStmt& withStmt)
     return builder.emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::ParameterList& parameterList)
+std::string pylir::Dumper::dump(const pylir::Syntax::Parameter& parameter)
 {
-    auto builder = createBuilder("parameter list");
-
-    auto dumpParameter = [&](const Syntax::ParameterList::Parameter& parameter)
+    std::string_view kind;
+    switch (parameter.kind)
     {
-        auto builder = createBuilder("parameter {}", parameter.identifier.getValue());
-        if (parameter.type)
-        {
-            builder.add(parameter.type->second);
-        }
-        return builder.emit();
-    };
-
-    auto dumpDefParameter = [&](const Syntax::ParameterList::DefParameter& defParameter)
+        case Syntax::Parameter::Normal: kind = "normal"; break;
+        case Syntax::Parameter::PosOnly: kind = "positional-only"; break;
+        case Syntax::Parameter::KeywordOnly: kind = "keyword-only"; break;
+        case Syntax::Parameter::PosRest: kind = "positional-rest"; break;
+        case Syntax::Parameter::KeywordRest: kind = "keyword-rest"; break;
+    }
+    auto builder = createBuilder(FMT_STRING("parameter {} {}"), parameter.name.getValue(), kind);
+    if (parameter.maybeType)
     {
-        if (!defParameter.defaultArg)
-        {
-            return dumpParameter(defParameter.parameter);
-        }
-        return createBuilder("def parameter")
-            .add(dumpParameter(defParameter.parameter))
-            .add(defParameter.defaultArg->second)
-            .emit();
-    };
-
-    auto dumpParameterListStarArgs = [&](const Syntax::ParameterList::StarArgs& list)
+        builder.add(*parameter.maybeType, "type");
+    }
+    if (parameter.maybeDefault)
     {
-        auto builder = createBuilder("parameter list star args");
-        pylir::match(
-            list.variant,
-            [&](const Syntax::ParameterList::StarArgs::DoubleStar& doubleStar)
-            { builder.add(dumpParameter(doubleStar.parameter), "double starred"); },
-            [&](const Syntax::ParameterList::StarArgs::Star& star)
-            {
-                auto temp = createBuilder("starred");
-                if (star.parameter)
-                {
-                    temp.add(dumpParameter(*star.parameter), "starred");
-                }
-                for (const auto& [token, item] : star.defParameters)
-                {
-                    temp.add(dumpDefParameter(item));
-                }
-                if (star.further && star.further->doubleStar)
-                {
-                    temp.add(dumpParameter(star.further->doubleStar->parameter), "double starred");
-                }
-                builder.add(temp);
-            });
-        return builder.emit();
-    };
-    auto dumpParameterListNoPosOnly = [&](const Syntax::ParameterList::NoPosOnly& list)
-    {
-        return pylir::match(
-            list.variant,
-            [&](const Syntax::ParameterList::StarArgs& starArgs) { return dumpParameterListStarArgs(starArgs); },
-            [&](const Syntax::ParameterList::NoPosOnly::DefParams& defParams)
-            {
-                auto builder = createBuilder("no pos only").add(dumpDefParameter(defParams.first));
-                for (const auto& [token, item] : defParams.rest)
-                {
-                    builder.add(dumpDefParameter(item));
-                }
-                if (defParams.suffix && defParams.suffix->second)
-                {
-                    builder.add(dumpParameterListStarArgs(*defParams.suffix->second));
-                }
-                return builder.emit();
-            });
-    };
-
-    return pylir::match(
-        parameterList.variant,
-        [&](const Syntax::ParameterList::NoPosOnly& noPosOnly) { return dumpParameterListNoPosOnly(noPosOnly); },
-        [&](const Syntax::ParameterList::PosOnly& posOnly)
-        {
-            auto builder = createBuilder("pos only").add(dumpDefParameter(posOnly.first));
-            for (const auto& [token, iter] : posOnly.rest)
-            {
-                builder.add(dumpDefParameter(iter));
-            }
-            if (posOnly.suffix && posOnly.suffix->second)
-            {
-                builder.add(dumpParameterListNoPosOnly(*posOnly.suffix->second));
-            }
-            return builder.emit();
-        });
+        builder.add(*parameter.maybeDefault, "default");
+    }
+    return builder.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::Decorator& decorator)
 {
-    return createBuilder("decorator").add(decorator.assignmentExpression).emit();
+    return createBuilder("decorator").add(*decorator.expression).emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
 {
-    std::string title;
+    std::string_view title;
     if (funcDef.async)
     {
-        title = fmt::format("async function {}", funcDef.funcName.getValue());
+        title = "async function";
     }
     else
     {
-        title = fmt::format("function {}", funcDef.funcName.getValue());
+        title = "function";
     }
-    auto builder = createBuilder("{}", title);
+    auto builder = createBuilder("{} {}", title, funcDef.funcName.getValue());
     for (const auto& iter : funcDef.decorators)
     {
         builder.add(iter);
     }
-    if (funcDef.parameterList)
+    for (const auto& iter : funcDef.parameterList)
     {
-        builder.add(*funcDef.parameterList);
+        builder.add(iter);
     }
-    if (funcDef.suffix)
+    if (funcDef.maybeSuffix)
     {
-        builder.add(funcDef.suffix->second, "suffix");
+        builder.add(*funcDef.maybeSuffix, "suffix");
     }
     if (!funcDef.localVariables.empty())
     {
@@ -1157,9 +670,12 @@ std::string pylir::Dumper::dump(const Syntax::ClassDef& classDef)
     {
         builder.add(iter);
     }
-    if (classDef.inheritance && classDef.inheritance->argumentList)
+    if (classDef.inheritance)
     {
-        builder.add(*classDef.inheritance->argumentList);
+        for (const auto& iter : classDef.inheritance->argumentList)
+        {
+            builder.add(iter);
+        }
     }
     if (!classDef.localVariables.empty())
     {
@@ -1173,12 +689,96 @@ std::string pylir::Dumper::dump(const Syntax::ClassDef& classDef)
     return builder.emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::AsyncForStmt& asyncForStmt)
+std::string pylir::Dumper::dump(const Syntax::BinOp& binOp)
 {
-    return createBuilder("async for").add(asyncForStmt.forStmt).emit();
+    return createBuilder("binary op {:q}", binOp.operation.getTokenType()).add(*binOp.lhs).add(*binOp.rhs).emit();
 }
 
-std::string pylir::Dumper::dump(const pylir::Syntax::AsyncWithStmt& asyncWithStmt)
+std::string pylir::Dumper::dump(const Syntax::UnaryOp& unaryOp)
 {
-    return createBuilder("async with").add(asyncWithStmt.withStmt).emit();
+    return createBuilder("unary op {:q}", unaryOp.operation.getTokenType()).add(*unaryOp.expression).emit();
+}
+
+std::string pylir::Dumper::dump(const Syntax::Generator& generator)
+{
+    return createBuilder("generator").add(*generator.expression).add(generator.compFor).emit();
+}
+
+std::string pylir::Dumper::dump(const Syntax::ExpressionStmt& expressionStmt)
+{
+    return dump(*expressionStmt.expression);
+}
+
+std::string pylir::Dumper::dump(const Syntax::SingleTokenStmt& singleTokenStmt)
+{
+    return createBuilder("{:q} statement", singleTokenStmt.token.getTokenType()).emit();
+}
+
+std::string pylir::Dumper::dump(const Syntax::ListDisplay& listDisplay)
+{
+    auto builder = createBuilder("list display");
+    pylir::match(
+        listDisplay.variant, [&](const Syntax::Comprehension& comprehension) { builder.add(comprehension); },
+        [&](const std::vector<Syntax::StarredItem>& items)
+        {
+            for (const auto& iter : items)
+            {
+                builder.add(iter);
+            }
+        });
+    return builder.emit();
+}
+
+std::string pylir::Dumper::dump(const Syntax::SetDisplay& setDisplay)
+{
+    auto builder = createBuilder("set display");
+    pylir::match(
+        setDisplay.variant, [&](const Syntax::Comprehension& comprehension) { builder.add(comprehension); },
+        [&](const std::vector<Syntax::StarredItem>& items)
+        {
+            for (const auto& iter : items)
+            {
+                builder.add(iter);
+            }
+        });
+    return builder.emit();
+}
+
+std::string pylir::Dumper::dump(const Syntax::TupleConstruct& tupleConstruct)
+{
+    auto builder = createBuilder("tuple construct");
+    for (const auto& iter : tupleConstruct.items)
+    {
+        builder.add(iter);
+    }
+    return builder.emit();
+}
+
+std::string pylir::Dumper::dump(const Syntax::DictDisplay& dictDisplay)
+{
+    auto builder = createBuilder("dict display");
+    pylir::match(
+        dictDisplay.variant,
+        [&](const Syntax::DictDisplay::DictComprehension& comprehension)
+        {
+            builder.add(*comprehension.first, "key");
+            builder.add(*comprehension.second, "value");
+            builder.add(comprehension.compFor);
+        },
+        [&](const std::vector<Syntax::DictDisplay::KeyDatum>& items)
+        {
+            for (const auto& iter : items)
+            {
+                if (!iter.maybeValue)
+                {
+                    builder.add(*iter.key, "unpacked");
+                }
+                else
+                {
+                    builder.add(*iter.key, "key");
+                    builder.add(*iter.maybeValue, "value");
+                }
+            }
+        });
+    return builder.emit();
 }

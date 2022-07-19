@@ -25,7 +25,7 @@
             CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__))); \
             return;                                                       \
         }                                                                 \
-        FAIL("No error emitted");                                         \
+        FAIL_CHECK("No error emitted");                                   \
     }(source)
 
 using namespace Catch::Matchers;
@@ -95,17 +95,17 @@ TEST_CASE("Parse yield expression", "[Parser]")
 
 TEST_CASE("Parse assignment statement", "[Parser]")
 {
-    PARSER_EMITS("= 3", pylir::Diag::EXPECTED_N_BEFORE_N, "identifier", "assignment");
+    PARSER_EMITS("= 3", pylir::Diag::EXPECTED_N_INSTEAD_OF_N, "newline", "'='");
     PARSER_EMITS("(a := 3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::Walrus);
     PARSER_EMITS("(lambda: 3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression");
     PARSER_EMITS("(3 if True else 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression");
     PARSER_EMITS("(3 and 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::AndKeyword);
-    PARSER_EMITS("(not 3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::NotKeyword);
-    PARSER_EMITS("(3 != 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "comparison");
-    PARSER_EMITS("(-3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
-                 fmt::format("unary operator {:q}", pylir::TokenType::Minus));
+    PARSER_EMITS("(not 3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N, pylir::TokenType::NotKeyword);
+    PARSER_EMITS("(3 != 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::NotEqual);
+    PARSER_EMITS("(-3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N, pylir::TokenType::Minus);
     PARSER_EMITS("(2**8) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::PowerOf);
-    PARSER_EMITS("(await foo()) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "await expression");
+    PARSER_EMITS("(await foo()) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
+                 pylir::TokenType::AwaitKeyword);
     PARSER_EMITS("(foo()) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call");
     PARSER_EMITS("5 = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "literal");
     PARSER_EMITS("{} = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "dictionary display");
@@ -118,11 +118,12 @@ TEST_CASE("Parse assignment statement", "[Parser]")
 
 TEST_CASE("Parse augmented assignment statement", "[Parser]")
 {
-    PARSER_EMITS("+= 3", pylir::Diag::EXPECTED_N_BEFORE_N, "identifier", "assignment");
-    PARSER_EMITS("a,b += 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "multiple values");
+    PARSER_EMITS("+= 3", pylir::Diag::EXPECTED_N_INSTEAD_OF_N, pylir::TokenType::Newline,
+                 pylir::TokenType::PlusAssignment);
+    PARSER_EMITS("a,b += 3", pylir::Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
+                 pylir::TokenType::PlusAssignment);
     PARSER_EMITS("*b += 3", pylir::Diag::EXPECTED_N_INSTEAD_OF_N, pylir::TokenType::Comma,
                  pylir::TokenType::PlusAssignment);
-    PARSER_EMITS("(b) += 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "enclosure");
 }
 
 TEST_CASE("Parse namespaces", "[Parser]")

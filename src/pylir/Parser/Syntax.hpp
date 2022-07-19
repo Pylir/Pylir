@@ -6,339 +6,100 @@
 
 #pragma once
 
-#include <pylir/Lexer/Token.hpp>
+#include <llvm/ADT/STLExtras.h>
 
-#include <memory>
-#include <optional>
-#include <variant>
+#include <pylir/Lexer/Token.hpp>
+#include <pylir/Support/AbstractIntrusiveVariant.hpp>
 
 namespace pylir::Syntax
 {
-struct Expression;
 
-template <class T>
-struct CommaList
+struct Expression
+    : public AbstractIntrusiveVariant<Expression, struct BinOp, struct Atom, struct AttributeRef, struct Subscription,
+                                      struct Slice, struct Assignment, struct Conditional, struct Call, struct Lambda,
+                                      struct UnaryOp, struct Yield, struct Generator, struct TupleConstruct,
+                                      struct ListDisplay, struct SetDisplay, struct DictDisplay, struct Comparison>
 {
-    std::unique_ptr<T> firstExpr;
-    std::vector<std::pair<BaseToken, std::unique_ptr<T>>> remainingExpr;
-    std::optional<BaseToken> trailingComma;
+    using AbstractIntrusiveVariant::AbstractIntrusiveVariant;
 };
 
-using ExpressionList = CommaList<Expression>;
-
-struct Enclosure;
-
-struct Atom
+struct Atom : Expression::Base<Atom>
 {
-    struct Literal
-    {
-        Token token;
-    };
-
-    std::variant<Literal, IdentifierToken, std::unique_ptr<Enclosure>> variant;
+    Token token;
 };
 
-struct Primary;
-
-struct AttributeRef
+struct BinOp : Expression::Base<BinOp>
 {
-    std::unique_ptr<Primary> primary;
-    BaseToken dot;
-    IdentifierToken identifier;
+    IntrVarPtr<Expression> lhs;
+    Token operation;
+    IntrVarPtr<Expression> rhs;
 };
 
-struct Subscription
+struct UnaryOp : Expression::Base<UnaryOp>
 {
-    std::unique_ptr<Primary> primary;
-    BaseToken openSquareBracket;
-    ExpressionList expressionList;
-    BaseToken closeSquareBracket;
+    Token operation;
+    IntrVarPtr<Expression> expression;
 };
 
-struct Slicing
+struct Comparison : Expression::Base<Comparison>
 {
-    std::unique_ptr<Primary> primary;
-    BaseToken openSquareBracket;
-    struct ProperSlice
-    {
-        std::unique_ptr<Expression> optionalLowerBound;
-        BaseToken firstColon;
-        std::unique_ptr<Expression> optionalUpperBound;
-        BaseToken secondColon;
-        std::unique_ptr<Expression> optionalStride;
-    };
-    CommaList<std::variant<ProperSlice, Expression>> sliceList;
-    BaseToken closeSquareBracket;
-};
-
-struct Comprehension;
-
-struct AssignmentExpression;
-
-struct ArgumentList
-{
-    struct PositionalItem
-    {
-        struct Star
-        {
-            BaseToken asterisk;
-            std::unique_ptr<Expression> expression;
-        };
-        std::variant<std::unique_ptr<AssignmentExpression>, Star> variant;
-    };
-
-    struct PositionalArguments
-    {
-        PositionalItem firstItem;
-        std::vector<std::pair<BaseToken, PositionalItem>> rest;
-    };
-
-    struct KeywordItem
-    {
-        IdentifierToken identifier;
-        BaseToken assignmentOperator;
-        std::unique_ptr<Expression> expression;
-    };
-
-    struct StarredAndKeywords
-    {
-        struct Expression
-        {
-            BaseToken asterisk;
-            std::unique_ptr<Syntax::Expression> expression;
-        };
-        KeywordItem first;
-        using Variant = std::variant<KeywordItem, Expression>;
-        std::vector<std::pair<BaseToken, Variant>> rest;
-    };
-
-    struct KeywordArguments
-    {
-        struct Expression
-        {
-            BaseToken doubleAsterisk;
-            std::unique_ptr<Syntax::Expression> expression;
-        };
-        Expression first;
-        using Variant = std::variant<KeywordItem, Expression>;
-        std::vector<std::pair<BaseToken, Variant>> rest;
-    };
-
-    std::optional<PositionalArguments> positionalArguments;
-    std::optional<BaseToken> firstComma;
-    std::optional<StarredAndKeywords> starredAndKeywords;
-    std::optional<BaseToken> secondComma;
-    std::optional<KeywordArguments> keywordArguments;
-};
-
-struct Call
-{
-    std::unique_ptr<Primary> primary;
-    BaseToken openParentheses;
-    std::variant<std::monostate, std::pair<ArgumentList, std::optional<BaseToken>>, std::unique_ptr<Comprehension>>
-        variant;
-    BaseToken closeParentheses;
-};
-
-struct Primary
-{
-    std::variant<Atom, AttributeRef, Subscription, Slicing, Call> variant;
-};
-
-struct AwaitExpr
-{
-    BaseToken awaitToken;
-    Primary primary;
-};
-
-struct UExpr;
-
-struct Power
-{
-    std::variant<AwaitExpr, Primary> variant;
-    std::optional<std::pair<BaseToken, std::unique_ptr<UExpr>>> rightHand;
-};
-
-struct UExpr
-{
-    std::variant<Power, std::pair<Token, std::unique_ptr<UExpr>>> variant;
-};
-
-struct MExpr
-{
-    struct AtBin
-    {
-        std::unique_ptr<MExpr> lhs;
-        BaseToken atToken;
-        std::unique_ptr<MExpr> rhs;
-    };
-
-    struct BinOp
-    {
-        std::unique_ptr<MExpr> lhs;
-        Token binToken;
-        UExpr rhs;
-    };
-
-    std::variant<UExpr, std::unique_ptr<AtBin>, std::unique_ptr<BinOp>> variant;
-};
-
-struct AExpr
-{
-    struct BinOp
-    {
-        std::unique_ptr<AExpr> lhs;
-        Token binToken;
-        MExpr rhs;
-    };
-
-    std::variant<MExpr, std::unique_ptr<BinOp>> variant;
-};
-
-struct ShiftExpr
-{
-    struct BinOp
-    {
-        std::unique_ptr<ShiftExpr> lhs;
-        Token binToken;
-        AExpr rhs;
-    };
-
-    std::variant<AExpr, std::unique_ptr<BinOp>> variant;
-};
-
-struct AndExpr
-{
-    struct BinOp
-    {
-        std::unique_ptr<AndExpr> lhs;
-        BaseToken bitAndToken;
-        ShiftExpr rhs;
-    };
-
-    std::variant<ShiftExpr, std::unique_ptr<BinOp>> variant;
-};
-
-struct XorExpr
-{
-    struct BinOp
-    {
-        std::unique_ptr<XorExpr> lhs;
-        BaseToken bitXorToken;
-        AndExpr rhs;
-    };
-
-    std::variant<AndExpr, std::unique_ptr<BinOp>> variant;
-};
-
-struct OrExpr
-{
-    struct BinOp
-    {
-        std::unique_ptr<OrExpr> lhs;
-        BaseToken bitOrToken;
-        XorExpr rhs;
-    };
-
-    std::variant<XorExpr, std::unique_ptr<BinOp>> variant;
-};
-
-struct Comparison
-{
-    OrExpr left;
+    IntrVarPtr<Expression> first;
     struct Operator
     {
         Token firstToken;
         std::optional<Token> secondToken;
     };
-    std::vector<std::pair<Operator, OrExpr>> rest;
+    std::vector<std::pair<Operator, IntrVarPtr<Expression>>> rest;
 };
 
-struct NotTest
+using Target = Expression;
+
+struct AttributeRef : Expression::Base<AttributeRef>
 {
-    std::variant<Comparison, std::pair<BaseToken, std::unique_ptr<NotTest>>> variant;
+    IntrVarPtr<Expression> object;
+    BaseToken dot;
+    IdentifierToken identifier;
 };
 
-struct AndTest
+struct Subscription : Expression::Base<Subscription>
 {
-    struct BinOp
-    {
-        std::unique_ptr<AndTest> lhs;
-        BaseToken andToken;
-        NotTest rhs;
-    };
-
-    std::variant<NotTest, std::unique_ptr<BinOp>> variant;
+    IntrVarPtr<Expression> object;
+    BaseToken openSquareBracket;
+    IntrVarPtr<Expression> index;
+    BaseToken closeSquareBracket;
 };
 
-struct OrTest
+struct Slice : Expression::Base<Slice>
 {
-    struct BinOp
-    {
-        std::unique_ptr<OrTest> lhs;
-        BaseToken orToken;
-        AndTest rhs;
-    };
-
-    std::variant<AndTest, std::unique_ptr<BinOp>> variant;
+    IntrVarPtr<Expression> maybeLowerBound;
+    BaseToken firstColon;
+    IntrVarPtr<Expression> maybeUpperBound;
+    std::optional<BaseToken> maybeSecondColon;
+    IntrVarPtr<Expression> maybeStride;
 };
 
-struct AssignmentExpression
+struct Assignment : Expression::Base<Assignment>
 {
-    std::optional<std::pair<IdentifierToken, BaseToken>> identifierAndWalrus;
-    std::unique_ptr<Expression> expression;
+    IdentifierToken variable;
+    BaseToken walrus;
+    IntrVarPtr<Expression> expression;
 };
 
-struct ConditionalExpression
+struct Conditional : Expression::Base<Conditional>
 {
-    OrTest value;
-    struct Suffix
-    {
-        BaseToken ifToken;
-        std::unique_ptr<OrTest> test;
-        BaseToken elseToken;
-        std::unique_ptr<Expression> elseValue;
-    };
-    std::optional<Suffix> suffix;
+    IntrVarPtr<Expression> trueValue;
+    BaseToken ifToken;
+    IntrVarPtr<Expression> condition;
+    BaseToken elseToken;
+    IntrVarPtr<Expression> elseValue;
 };
 
-struct LambdaExpression;
-
-struct Expression
+struct Argument
 {
-    std::variant<ConditionalExpression, std::unique_ptr<LambdaExpression>> variant;
+    std::optional<IdentifierToken> maybeName;
+    std::optional<Token> maybeExpansionsOrEqual;
+    IntrVarPtr<Expression> expression;
 };
-
-struct ParameterList;
-
-struct LambdaExpression
-{
-    BaseToken lambdaToken;
-    std::unique_ptr<ParameterList> parameterList;
-    BaseToken colonToken;
-    Expression expression;
-};
-
-struct StarredItem
-{
-    std::variant<AssignmentExpression, std::pair<BaseToken, OrExpr>> variant;
-};
-
-using StarredList = CommaList<StarredItem>;
-
-struct StarredExpression
-{
-    struct Items
-    {
-        std::vector<std::pair<StarredItem, BaseToken>> leading;
-        std::unique_ptr<StarredItem> last;
-    };
-    std::variant<Expression, Items> variant;
-};
-
-struct Target;
-
-using TargetList = CommaList<Target>;
 
 struct CompIf;
 
@@ -346,200 +107,179 @@ struct CompFor
 {
     std::optional<BaseToken> awaitToken;
     BaseToken forToken;
-    TargetList targets;
+    IntrVarPtr<Target> targets;
     BaseToken inToken;
-    OrTest orTest;
+    IntrVarPtr<Expression> test;
     std::variant<std::monostate, std::unique_ptr<CompFor>, std::unique_ptr<CompIf>> compIter;
 };
 
 struct CompIf
 {
     BaseToken ifToken;
-    OrTest orTest;
-    std::variant<std::monostate, CompFor, std::unique_ptr<CompIf>> compIter;
+    IntrVarPtr<Expression> test;
+    std::variant<std::monostate, std::unique_ptr<CompFor>, std::unique_ptr<CompIf>> compIter;
 };
 
 struct Comprehension
 {
-    AssignmentExpression assignmentExpression;
+    IntrVarPtr<Expression> expression;
     CompFor compFor;
 };
 
-struct YieldExpression
+struct Call : Expression::Base<Call>
+{
+    IntrVarPtr<Expression> expression;
+    BaseToken openParenth;
+    std::variant<std::vector<Argument>, Comprehension> variant;
+    BaseToken closeParenth;
+};
+
+struct Parameter
+{
+    enum Kind
+    {
+        Normal,
+        PosOnly,
+        KeywordOnly,
+        PosRest,
+        KeywordRest,
+    } kind;
+    std::optional<BaseToken> maybeStars;
+    IdentifierToken name;
+    IntrVarPtr<Expression> maybeType;
+    IntrVarPtr<Expression> maybeDefault;
+};
+
+struct Lambda : Expression::Base<Lambda>
+{
+    BaseToken lambdaKeyword;
+    std::vector<Parameter> parameters;
+    BaseToken colon;
+    IntrVarPtr<Expression> expression;
+};
+
+struct Yield : Expression::Base<Yield>
 {
     BaseToken yieldToken;
-    std::variant<std::monostate, ExpressionList, std::pair<BaseToken, Expression>> variant;
+    std::optional<BaseToken> fromToken;
+    IntrVarPtr<Expression> maybeExpression;
 };
 
-struct Enclosure
+struct Generator : Expression::Base<Generator>
 {
-    struct ParenthForm
+    BaseToken openParenth;
+    IntrVarPtr<Expression> expression;
+    CompFor compFor;
+    BaseToken closeParenth;
+};
+
+struct StarredItem
+{
+    std::optional<BaseToken> maybeStar;
+    IntrVarPtr<Expression> expression;
+};
+
+struct TupleConstruct : Expression::Base<TupleConstruct>
+{
+    // This and 'maybeCloseBracket' are guaranteed to be active when 'items' is empty.
+    std::optional<BaseToken> maybeOpenBracket;
+    std::vector<StarredItem> items;
+    std::optional<BaseToken> maybeCloseBracket;
+};
+
+struct ListDisplay : Expression::Base<ListDisplay>
+{
+    BaseToken openSquare;
+    std::variant<std::vector<StarredItem>, Comprehension> variant;
+    BaseToken closeSquare;
+};
+
+struct SetDisplay : Expression::Base<SetDisplay>
+{
+    BaseToken openBrace;
+    std::variant<std::vector<StarredItem>, Comprehension> variant;
+    BaseToken closeBrace;
+};
+
+struct DictDisplay : Expression::Base<DictDisplay>
+{
+    BaseToken openBrace;
+
+    struct KeyDatum
     {
-        BaseToken openParenth;
-        std::optional<StarredExpression> expression;
-        BaseToken closeParenth;
+        IntrVarPtr<Expression> key;
+        BaseToken colonOrPowerOf;
+        IntrVarPtr<Expression> maybeValue;
     };
 
-    struct ListDisplay
+    struct DictComprehension
     {
-        BaseToken openSquare;
-        std::variant<std::monostate, StarredList, Comprehension> variant;
-        BaseToken closeSquare;
-    };
-
-    struct SetDisplay
-    {
-        BaseToken openBrace;
-        std::variant<StarredList, Comprehension> variant;
-        BaseToken closeBrace;
-    };
-
-    struct DictDisplay
-    {
-        BaseToken openBrace;
-        struct KeyDatum
-        {
-            struct Key
-            {
-                Expression first;
-                BaseToken colon;
-                Expression second;
-            };
-            struct Datum
-            {
-                BaseToken powerOf;
-                OrExpr orExpr;
-            };
-            std::variant<Key, Datum> variant;
-        };
-        struct DictComprehension
-        {
-            Expression first;
-            BaseToken colon;
-            Expression second;
-            CompFor compFor;
-        };
-        std::variant<std::monostate, CommaList<KeyDatum>, DictComprehension> variant;
-        BaseToken closeBrace;
-    };
-
-    struct GeneratorExpression
-    {
-        BaseToken openParenth;
-        Expression expression;
+        IntrVarPtr<Expression> first;
+        BaseToken colon;
+        IntrVarPtr<Expression> second;
         CompFor compFor;
-        BaseToken closeParenth;
     };
 
-    struct YieldAtom
-    {
-        BaseToken openParenth;
-        YieldExpression yieldExpression;
-        BaseToken closeParenth;
-    };
-
-    std::variant<ParenthForm, ListDisplay, SetDisplay, DictDisplay, GeneratorExpression, YieldAtom> variant;
+    std::variant<std::vector<KeyDatum>, DictComprehension> variant;
+    BaseToken closeBrace;
 };
 
-struct Target
+struct SimpleStmt
+    : AbstractIntrusiveVariant<SimpleStmt, struct ExpressionStmt, struct AssertStmt, struct AssignmentStmt,
+                               struct SingleTokenStmt, struct DelStmt, struct ReturnStmt, struct RaiseStmt,
+                               struct ImportStmt, struct GlobalOrNonLocalStmt>
 {
-    struct Parenth
-    {
-        BaseToken openParenth;
-        std::optional<TargetList> targetList;
-        BaseToken closeParenth;
-    };
-
-    struct Square
-    {
-        BaseToken openSquare;
-        std::optional<TargetList> targetList;
-        BaseToken closeSquare;
-    };
-
-    std::variant<IdentifierToken, Parenth, Square, AttributeRef, Subscription, Slicing,
-                 std::pair<BaseToken, std::unique_ptr<Target>>>
-        variant;
+    using AbstractIntrusiveVariant::AbstractIntrusiveVariant;
 };
 
-
-struct AssignmentStmt
+struct ExpressionStmt : SimpleStmt::Base<ExpressionStmt>
 {
-    std::vector<std::pair<TargetList, BaseToken>> targets;
-    std::variant<StarredExpression, YieldExpression> variant;
+    IntrVarPtr<Expression> expression;
 };
 
-struct AugTarget
-{
-    std::variant<IdentifierToken, AttributeRef, Subscription, Slicing> variant;
-};
-
-struct AugmentedAssignmentStmt
-{
-    AugTarget augTarget;
-    Token augOp;
-    std::variant<ExpressionList, YieldExpression> variant;
-};
-
-struct AnnotatedAssignmentSmt
-{
-    AugTarget augTarget;
-    BaseToken colon;
-    Expression expression;
-    std::optional<std::pair<BaseToken, std::variant<StarredExpression, YieldExpression>>> optionalAssignmentStmt;
-};
-
-struct AssertStmt
+struct AssertStmt : SimpleStmt::Base<AssertStmt>
 {
     BaseToken assertKeyword;
-    Expression condition;
-    std::optional<std::pair<BaseToken, Expression>> message;
+    IntrVarPtr<Expression> condition;
+    IntrVarPtr<Expression> maybeMessage;
 };
 
-struct PassStmt
+struct AssignmentStmt : SimpleStmt::Base<AssignmentStmt>
 {
-    BaseToken pass;
+    std::vector<std::pair<IntrVarPtr<Target>, Token>> targets;
+    IntrVarPtr<Expression> maybeAnnotation;
+    IntrVarPtr<Expression> maybeExpression;
 };
 
-struct DelStmt
+struct SingleTokenStmt : SimpleStmt::Base<SingleTokenStmt>
+{
+    Token token;
+};
+
+struct DelStmt : SimpleStmt::Base<DelStmt>
 {
     BaseToken del;
-    TargetList targetList;
+    IntrVarPtr<Target> targetList;
 };
 
-struct ReturnStmt
+struct ReturnStmt : SimpleStmt::Base<ReturnStmt>
 {
     BaseToken returnKeyword;
-    std::optional<ExpressionList> expressions;
+    IntrVarPtr<Expression> maybeExpression;
 };
 
-struct YieldStmt
-{
-    YieldExpression yieldExpression;
-};
-
-struct RaiseStmt
+struct RaiseStmt : SimpleStmt::Base<RaiseStmt>
 {
     BaseToken raise;
-    std::optional<std::pair<Expression, std::optional<std::pair<BaseToken, Expression>>>> expressions;
+    IntrVarPtr<Expression> maybeException;
+    IntrVarPtr<Expression> maybeCause;
 };
 
-struct BreakStmt
-{
-    BaseToken breakKeyword;
-};
-
-struct ContinueStmt
-{
-    BaseToken continueKeyword;
-};
-
-struct ImportStmt
+struct ImportStmt : SimpleStmt::Base<ImportStmt>
 {
     struct Module
     {
-        std::vector<std::pair<IdentifierToken, BaseToken>> leading;
-        IdentifierToken lastIdentifier;
+        std::vector<IdentifierToken> identifiers;
     };
 
     struct RelativeModule
@@ -548,40 +288,21 @@ struct ImportStmt
         std::optional<Module> module;
     };
 
-    struct ImportAsAs
+    struct ImportAs
     {
         BaseToken import;
-        Module module;
-        std::optional<std::pair<BaseToken, IdentifierToken>> name;
-        struct Further
-        {
-            BaseToken comma;
-            Module module;
-            std::optional<std::pair<BaseToken, IdentifierToken>> name;
-        };
-        std::vector<Further> rest;
+        std::vector<std::pair<Module, std::optional<IdentifierToken>>> modules;
     };
 
-    struct FromImportList
+    struct FromImport
     {
         BaseToken from;
         RelativeModule relativeModule;
         BaseToken import;
-        std::optional<BaseToken> openParenth;
-        IdentifierToken identifier;
-        std::optional<std::pair<BaseToken, IdentifierToken>> name;
-        struct Further
-        {
-            BaseToken comma;
-            IdentifierToken identifier;
-            std::optional<std::pair<BaseToken, IdentifierToken>> name;
-        };
-        std::vector<Further> rest;
-        std::optional<BaseToken> comma;
-        std::optional<BaseToken> closeParenth;
+        std::vector<std::pair<IdentifierToken, std::optional<IdentifierToken>>> imports;
     };
 
-    struct FromImportAll
+    struct ImportAll
     {
         BaseToken from;
         RelativeModule relativeModule;
@@ -589,58 +310,33 @@ struct ImportStmt
         BaseToken star;
     };
 
-    std::variant<ImportAsAs, FromImportList, FromImportAll> variant;
+    std::variant<ImportAs, FromImport, ImportAll> variant;
 };
 
-struct FutureStmt
+struct GlobalOrNonLocalStmt : SimpleStmt::Base<GlobalOrNonLocalStmt>
 {
-    BaseToken from;
-    BaseToken future;
-    BaseToken import;
-    std::optional<BaseToken> openParenth;
-    IdentifierToken identifier;
-    std::optional<std::pair<BaseToken, IdentifierToken>> name;
-    std::vector<Syntax::ImportStmt::FromImportList::Further> rest;
-    std::optional<BaseToken> comma;
-    std::optional<BaseToken> closeParenth;
+    Token token;
+    std::vector<IdentifierToken> identifiers;
 };
-
-struct GlobalStmt
-{
-    BaseToken global;
-    IdentifierToken identifier;
-    std::vector<std::pair<BaseToken, IdentifierToken>> rest;
-};
-
-struct NonLocalStmt
-{
-    BaseToken nonLocal;
-    IdentifierToken identifier;
-    std::vector<std::pair<BaseToken, IdentifierToken>> rest;
-};
-
-struct SimpleStmt
-{
-    std::variant<StarredExpression, AssertStmt, AssignmentStmt, AugmentedAssignmentStmt, AnnotatedAssignmentSmt,
-                 PassStmt, DelStmt, ReturnStmt, YieldStmt, RaiseStmt, BreakStmt, ContinueStmt, ImportStmt, FutureStmt,
-                 GlobalStmt, NonLocalStmt>
-        variant;
-};
-
-using StmtList = CommaList<SimpleStmt>;
 
 struct Suite;
 
-struct IfStmt
+struct CompoundStmt : AbstractIntrusiveVariant<CompoundStmt, struct IfStmt, struct WhileStmt, struct ForStmt,
+                                               struct TryStmt, struct WithStmt, struct FuncDef, struct ClassDef>
+{
+    using AbstractIntrusiveVariant::AbstractIntrusiveVariant;
+};
+
+struct IfStmt : CompoundStmt::Base<IfStmt>
 {
     BaseToken ifKeyword;
-    AssignmentExpression condition;
+    IntrVarPtr<Expression> condition;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
     struct Elif
     {
         BaseToken elif;
-        AssignmentExpression condition;
+        IntrVarPtr<Expression> condition;
         BaseToken colon;
         std::unique_ptr<Suite> suite;
     };
@@ -654,39 +350,48 @@ struct IfStmt
     std::optional<Else> elseSection;
 };
 
-struct WhileStmt
+struct WhileStmt : CompoundStmt::Base<WhileStmt>
 {
     BaseToken whileKeyword;
-    AssignmentExpression condition;
+    IntrVarPtr<Expression> condition;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
     std::optional<IfStmt::Else> elseSection;
 };
 
-struct ForStmt
+struct ForStmt : CompoundStmt::Base<ForStmt>
 {
+    std::optional<BaseToken> maybeAsyncKeyword;
     BaseToken forKeyword;
-    TargetList targetList;
+    IntrVarPtr<Target> targetList;
     BaseToken inKeyword;
-    ExpressionList expressionList;
+    IntrVarPtr<Expression> expression;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
     std::optional<IfStmt::Else> elseSection;
 };
 
-struct TryStmt
+struct TryStmt : CompoundStmt::Base<TryStmt>
 {
     BaseToken tryKeyword;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
-    struct Except
+    struct ExceptArgs
     {
         BaseToken exceptKeyword;
-        std::optional<std::pair<Expression, std::optional<std::pair<BaseToken, IdentifierToken>>>> expression;
+        IntrVarPtr<Expression> filter;
+        std::optional<IdentifierToken> maybeName;
         BaseToken colon;
         std::unique_ptr<Suite> suite;
     };
-    std::vector<Except> excepts;
+    std::vector<ExceptArgs> excepts;
+    struct ExceptAll
+    {
+        BaseToken exceptKeyword;
+        BaseToken colon;
+        std::unique_ptr<Suite> suite;
+    };
+    std::optional<ExceptAll> maybeExceptAll;
     std::optional<IfStmt::Else> elseSection;
     struct Finally
     {
@@ -697,97 +402,37 @@ struct TryStmt
     std::optional<Finally> finally;
 };
 
-struct WithStmt
+struct WithStmt : CompoundStmt::Base<WithStmt>
 {
+    std::optional<BaseToken> maybeAsyncKeyword;
     BaseToken withKeyword;
     struct WithItem
     {
-        Expression expression;
-        std::optional<std::pair<BaseToken, Target>> target;
+        IntrVarPtr<Expression> expression;
+        IntrVarPtr<Target> maybeTarget;
     };
-    WithItem first;
-    std::vector<std::pair<BaseToken, WithItem>> rest;
+    std::vector<WithItem> items;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
-};
-
-struct ParameterList
-{
-    struct Parameter
-    {
-        IdentifierToken identifier;
-        std::optional<std::pair<BaseToken, Expression>> type;
-    };
-
-    struct DefParameter
-    {
-        Parameter parameter;
-        std::optional<std::pair<BaseToken, Expression>> defaultArg;
-    };
-
-    struct StarArgs
-    {
-        struct DoubleStar
-        {
-            BaseToken doubleStar;
-            Parameter parameter;
-            std::optional<BaseToken> comma;
-        };
-
-        struct Star
-        {
-            BaseToken star;
-            std::optional<Parameter> parameter;
-            std::vector<std::pair<BaseToken, DefParameter>> defParameters;
-            struct Further
-            {
-                BaseToken comma;
-                std::optional<DoubleStar> doubleStar;
-            };
-            std::optional<Further> further;
-        };
-        std::variant<Star, DoubleStar> variant;
-    };
-
-    struct NoPosOnly
-    {
-        struct DefParams
-        {
-            DefParameter first;
-            std::vector<std::pair<BaseToken, DefParameter>> rest;
-            std::optional<std::pair<BaseToken, std::optional<StarArgs>>> suffix;
-        };
-        std::variant<DefParams, StarArgs> variant;
-    };
-
-    struct PosOnly
-    {
-        DefParameter first;
-        std::vector<std::pair<BaseToken, DefParameter>> rest;
-        BaseToken comma;
-        BaseToken slash;
-        std::optional<std::pair<BaseToken, std::optional<NoPosOnly>>> suffix;
-    };
-    std::variant<PosOnly, NoPosOnly> variant;
 };
 
 struct Decorator
 {
     BaseToken atSign;
-    AssignmentExpression assignmentExpression;
+    IntrVarPtr<Expression> expression;
     BaseToken newline;
 };
 
-struct FuncDef
+struct FuncDef : CompoundStmt::Base<FuncDef>
 {
     std::vector<Decorator> decorators;
     std::optional<BaseToken> async;
     BaseToken def;
     IdentifierToken funcName;
     BaseToken openParenth;
-    std::optional<ParameterList> parameterList;
+    std::vector<Parameter> parameterList;
     BaseToken closeParenth;
-    std::optional<std::pair<BaseToken, Expression>> suffix;
+    IntrVarPtr<Expression> maybeSuffix;
     BaseToken colon;
     std::unique_ptr<Suite> suite;
 
@@ -797,7 +442,7 @@ struct FuncDef
     IdentifierSet unknown; // only temporarily used
 };
 
-struct ClassDef
+struct ClassDef : CompoundStmt::Base<ClassDef>
 {
     std::vector<Decorator> decorators;
     BaseToken classKeyword;
@@ -805,7 +450,7 @@ struct ClassDef
     struct Inheritance
     {
         BaseToken openParenth;
-        std::optional<ArgumentList> argumentList;
+        std::vector<Argument> argumentList;
         BaseToken closeParenth;
     };
     std::optional<Inheritance> inheritance;
@@ -817,54 +462,14 @@ struct ClassDef
     IdentifierSet unknown; // only temporarily used
 };
 
-struct AsyncForStmt
-{
-    BaseToken async;
-    ForStmt forStmt;
-};
-
-struct AsyncWithStmt
-{
-    BaseToken async;
-    WithStmt withStmt;
-};
-
-struct CompoundStmt
-{
-    std::variant<IfStmt, WhileStmt, ForStmt, TryStmt, WithStmt, FuncDef, ClassDef, AsyncForStmt, AsyncWithStmt> variant;
-};
-
-struct Statement
-{
-    struct SingleLine
-    {
-        StmtList stmtList;
-        BaseToken newline;
-    };
-    std::variant<SingleLine, CompoundStmt> variant;
-};
-
 struct Suite
 {
-    struct SingleLine
-    {
-        StmtList stmtList;
-        BaseToken newline;
-    };
-
-    struct MultiLine
-    {
-        BaseToken newline;
-        BaseToken indent;
-        std::vector<Statement> statements;
-        BaseToken dedent;
-    };
-    std::variant<SingleLine, MultiLine> variant;
+    std::vector<std::variant<IntrVarPtr<SimpleStmt>, IntrVarPtr<CompoundStmt>>> statements;
 };
 
 struct FileInput
 {
-    std::vector<std::variant<BaseToken, Statement>> input;
+    Suite input;
     IdentifierSet globals;
 };
 
@@ -872,195 +477,132 @@ struct FileInput
 
 namespace pylir::Diag
 {
-template <class T, class>
-struct LocationProvider;
 
 template <>
-struct LocationProvider<Syntax::Enclosure, void>
+struct LocationProvider<Syntax::TupleConstruct>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Enclosure& value) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::TupleConstruct& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::LambdaExpression, void>
+struct LocationProvider<Syntax::Lambda>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::LambdaExpression& value) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Lambda& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::Expression, void>
+struct LocationProvider<Syntax::Expression>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::Expression& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::ConditionalExpression, void>
+struct LocationProvider<Syntax::Conditional>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ConditionalExpression& value) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Conditional& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::OrTest, void>
+struct LocationProvider<Syntax::BinOp>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::OrTest& value) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::BinOp& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::AndTest, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AndTest& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::NotTest, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::NotTest& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::Comparison, void>
+struct LocationProvider<Syntax::Comparison>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::Comparison& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::OrExpr, void>
+struct LocationProvider<Syntax::UnaryOp>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::OrExpr& value) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::UnaryOp& power) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::XorExpr, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::XorExpr& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::AndExpr, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AndExpr& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::ShiftExpr, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ShiftExpr& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::AExpr, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AExpr& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::MExpr, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::MExpr& binOp) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::UExpr, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::UExpr& power) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::Power, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Power& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::AwaitExpr, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::AwaitExpr& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::Primary, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Primary& value) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::Call, void>
+struct LocationProvider<Syntax::Call>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::Call& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::Slicing, void>
+struct LocationProvider<Syntax::DictDisplay>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Slicing& value) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::DictDisplay& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::Subscription, void>
+struct LocationProvider<Syntax::SetDisplay>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::SetDisplay& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::ListDisplay>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ListDisplay& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Yield>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Yield& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Generator>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Generator& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Slice>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Slice& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::Subscription>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::Subscription& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::AttributeRef, void>
+struct LocationProvider<Syntax::AttributeRef>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::AttributeRef& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::Atom, void>
+struct LocationProvider<Syntax::Atom>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::Atom& value) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::StarredItem, void>
+struct LocationProvider<Syntax::StarredItem>
 {
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredItem& starredItem) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::AssignmentExpression, void>
+struct LocationProvider<Syntax::Assignment>
 {
-    static std::pair<std::size_t, std::size_t>
-        getRange(const Syntax::AssignmentExpression& assignmentExpression) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Assignment& assignmentExpression) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::StarredExpression, void>
+struct LocationProvider<Syntax::Argument>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredExpression& starredItem) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Argument& argument) noexcept;
 };
 
 template <>
-struct LocationProvider<Syntax::ExpressionList, void>
+struct LocationProvider<Syntax::Parameter>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ExpressionList& expressionList) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Parameter& parameter) noexcept;
 };
 
-template <>
-struct LocationProvider<Syntax::StarredList, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredList& starredList) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::ArgumentList, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ArgumentList& argumentList) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::ParameterList::Parameter, void>
-{
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::ParameterList::Parameter& parameter) noexcept;
-};
-
-template <>
-struct LocationProvider<Syntax::ParameterList::DefParameter, void>
-{
-    static std::pair<std::size_t, std::size_t>
-        getRange(const Syntax::ParameterList::DefParameter& defParameter) noexcept;
-};
 
 } // namespace pylir::Diag

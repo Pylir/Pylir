@@ -114,7 +114,7 @@ void pylir::Parser::addToNamespace(const IdentifierToken& token)
     }
 }
 
-void pylir::Parser::addToNamespace(const Syntax::TargetList& targetList)
+void pylir::Parser::addToNamespace(const Syntax::Target& target)
 {
     class TargetVisitor : public Syntax::Visitor<TargetVisitor>
     {
@@ -123,18 +123,18 @@ void pylir::Parser::addToNamespace(const Syntax::TargetList& targetList)
 
         using Visitor::visit;
 
-        void visit(const Syntax::Target& target)
+        void visit(const Syntax::Atom& atom)
         {
-            if (const auto* identifier = std::get_if<IdentifierToken>(&target.variant))
+            if (atom.token.getTokenType() == TokenType::Identifier)
             {
-                callback(*identifier);
+                callback(IdentifierToken(atom.token));
             }
-            Visitor::visit(target);
+            Visitor::visit(atom);
         }
     } visitor{{},
               [&](const IdentifierToken& token)
               { addToNamespace(token); }};
-    visitor.visit(targetList);
+    visitor.visit(target);
 }
 
 tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType tokenType)

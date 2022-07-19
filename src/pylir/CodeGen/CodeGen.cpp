@@ -74,17 +74,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         m_builder.createStore(unbound, mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(identifier.kind)));
     }
 
-    for (const auto& iter : fileInput.input)
-    {
-        if (const auto* statement = std::get_if<Syntax::Statement>(&iter))
-        {
-            visit(*statement);
-            if (!m_builder.getInsertionBlock())
-            {
-                break;
-            }
-        }
-    }
+    visit(fileInput.input);
     if (needsTerminator())
     {
         m_builder.create<mlir::func::ReturnOp>();
@@ -93,236 +83,180 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     return m_module;
 }
 
-void pylir::CodeGen::visit(const Syntax::Statement& statement)
+void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
 {
-    if (!m_builder.getInsertionBlock())
+    if (!raiseStmt.maybeException)
+    {
+        // TODO: Get current exception via sys.exc_info()
+        PYLIR_UNREACHABLE;
+    }
+    auto expression = visit(*raiseStmt.maybeException);
+    if (!expression)
     {
         return;
     }
-    pylir::match(
-        statement.variant, [&](const Syntax::CompoundStmt& compoundStmt) { visit(compoundStmt); },
-        [&](const Syntax::Statement::SingleLine& singleLine) { visit(singleLine.stmtList); });
-}
+    // TODO: attach __cause__ and __context__
+    m_builder.setCurrentLoc(getLoc(raiseStmt, raiseStmt.raise));
+    auto typeOf = m_builder.createTypeOf(expression);
+    auto typeObject = m_builder.createTypeRef();
+    auto isTypeSubclass = buildSubclassCheck(typeOf, typeObject);
+    BlockPtr isType, instanceBlock;
+    instanceBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+    m_builder.create<mlir::cf::CondBranchOp>(isTypeSubclass, isType, instanceBlock, mlir::ValueRange{expression});
 
-void pylir::CodeGen::visit(const Syntax::StmtList& stmtList)
-{
-    if (!m_builder.getInsertionBlock())
     {
-        return;
-    }
-    visit(*stmtList.firstExpr);
-    for (const auto& iter : stmtList.remainingExpr)
-    {
-        if (!m_builder.getInsertionBlock())
+        implementBlock(isType);
+        auto baseException = m_builder.createBaseExceptionRef();
+        auto isBaseException = buildSubclassCheck(expression, baseException);
+        BlockPtr typeError, createException;
+        m_builder.create<mlir::cf::CondBranchOp>(isBaseException, createException, typeError);
+
         {
-            return;
+            implementBlock(typeError);
+            auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
+                                                m_currentExceptBlock);
+            raiseException(exception);
         }
-        visit(*iter.second);
+
+        implementBlock(createException);
+        auto exception = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
+                                                    m_builder.createMakeTuple({expression}), {}, m_currentExceptBlock);
+        m_builder.create<mlir::cf::BranchOp>(instanceBlock, mlir::ValueRange{exception});
     }
+
+    implementBlock(instanceBlock);
+    typeOf = m_builder.createTypeOf(instanceBlock->getArgument(0));
+    auto baseException = m_builder.createBaseExceptionRef();
+    auto isBaseException = buildSubclassCheck(typeOf, baseException);
+    BlockPtr typeError, raiseBlock;
+    m_builder.create<mlir::cf::CondBranchOp>(isBaseException, raiseBlock, typeError);
+
+    {
+        implementBlock(typeError);
+        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name, {},
+                                            m_currentExceptBlock);
+        raiseException(exception);
+    }
+
+    implementBlock(raiseBlock);
+    raiseException(instanceBlock->getArgument(0));
 }
 
-void pylir::CodeGen::visit(const Syntax::CompoundStmt& compoundStmt)
+void pylir::CodeGen::visit(const Syntax::ReturnStmt& returnStmt)
 {
-    pylir::match(compoundStmt.variant, [&](const auto& value) { visit(value); });
+    m_builder.setCurrentLoc(getLoc(returnStmt, returnStmt.returnKeyword));
+    if (!returnStmt.maybeExpression)
+    {
+        executeFinallyBlocks(false);
+        auto none = m_builder.createNoneRef();
+        m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{none});
+        m_builder.clearInsertionPoint();
+        return;
+    }
+    auto value = visit(*returnStmt.maybeExpression);
+    if (!value)
+    {
+        return;
+    }
+    executeFinallyBlocks(true);
+    m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{value});
+    m_builder.clearInsertionPoint();
 }
 
-void pylir::CodeGen::visit(const Syntax::SimpleStmt& simpleStmt)
+void pylir::CodeGen::visit(const Syntax::SingleTokenStmt& singleTokenStmt)
 {
-    pylir::match(
-        simpleStmt.variant,
-        [](const auto&)
-        {
-            // TODO
-            PYLIR_UNREACHABLE;
-        },
-        [&](const Syntax::RaiseStmt& raiseStmt)
-        {
-            if (!raiseStmt.expressions)
-            {
-                // TODO: Get current exception via sys.exc_info()
-                PYLIR_UNREACHABLE;
-            }
-            auto expression = visit(raiseStmt.expressions->first);
-            if (!expression)
-            {
-                return;
-            }
-            // TODO: attach __cause__ and __context__
-            m_builder.setCurrentLoc(getLoc(raiseStmt, raiseStmt.raise));
-            auto typeOf = m_builder.createTypeOf(expression);
-            auto typeObject = m_builder.createTypeRef();
-            auto isTypeSubclass = buildSubclassCheck(typeOf, typeObject);
-            BlockPtr isType, instanceBlock;
-            instanceBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-            m_builder.create<mlir::cf::CondBranchOp>(isTypeSubclass, isType, instanceBlock,
-                                                     mlir::ValueRange{expression});
-
-            {
-                implementBlock(isType);
-                auto baseException = m_builder.createBaseExceptionRef();
-                auto isBaseException = buildSubclassCheck(expression, baseException);
-                BlockPtr typeError, createException;
-                m_builder.create<mlir::cf::CondBranchOp>(isBaseException, createException, typeError);
-
-                {
-                    implementBlock(typeError);
-                    auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                        Py::Builtins::TypeError.name, {}, m_currentExceptBlock);
-                    raiseException(exception);
-                }
-
-                implementBlock(createException);
-                auto exception =
-                    Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
-                                               m_builder.createMakeTuple({expression}), {}, m_currentExceptBlock);
-                m_builder.create<mlir::cf::BranchOp>(instanceBlock, mlir::ValueRange{exception});
-            }
-
-            implementBlock(instanceBlock);
-            typeOf = m_builder.createTypeOf(instanceBlock->getArgument(0));
-            auto baseException = m_builder.createBaseExceptionRef();
-            auto isBaseException = buildSubclassCheck(typeOf, baseException);
-            BlockPtr typeError, raiseBlock;
-            m_builder.create<mlir::cf::CondBranchOp>(isBaseException, raiseBlock, typeError);
-
-            {
-                implementBlock(typeError);
-                auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Py::Builtins::TypeError.name,
-                                                    {}, m_currentExceptBlock);
-                raiseException(exception);
-            }
-
-            implementBlock(raiseBlock);
-            raiseException(instanceBlock->getArgument(0));
-        },
-        [&](const Syntax::ReturnStmt& returnStmt)
-        {
-            m_builder.setCurrentLoc(getLoc(returnStmt, returnStmt.returnKeyword));
-            if (!returnStmt.expressions)
-            {
-                executeFinallyBlocks(false);
-                auto none = m_builder.createNoneRef();
-                m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{none});
-                m_builder.clearInsertionPoint();
-                return;
-            }
-            auto value = visit(*returnStmt.expressions);
-            if (!value)
-            {
-                return;
-            }
-            executeFinallyBlocks(true);
-            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{value});
-            m_builder.clearInsertionPoint();
-        },
-        [&](const Syntax::BreakStmt& breakStmt)
-        {
+    switch (singleTokenStmt.token.getTokenType())
+    {
+        case TokenType::BreakKeyword:
             executeFinallyBlocks();
-            m_builder.setCurrentLoc(getLoc(breakStmt, breakStmt.breakKeyword));
+            m_builder.setCurrentLoc(getLoc(singleTokenStmt, singleTokenStmt.token));
             m_builder.create<mlir::cf::BranchOp>(m_currentLoop.breakBlock);
             m_builder.clearInsertionPoint();
-        },
-        [&](const Syntax::ContinueStmt& continueStmt)
-        {
+            return;
+        case TokenType::ContinueKeyword:
             executeFinallyBlocks();
-            m_builder.setCurrentLoc(getLoc(continueStmt, continueStmt.continueKeyword));
+            m_builder.setCurrentLoc(getLoc(singleTokenStmt, singleTokenStmt.token));
             m_builder.create<mlir::cf::BranchOp>(m_currentLoop.continueBlock);
             m_builder.clearInsertionPoint();
-        },
-        [&](const Syntax::NonLocalStmt&) {},
-        [&](const Syntax::GlobalStmt& globalStmt)
-        {
-            if (!m_functionScope)
-            {
-                return;
-            }
-            auto handleIdentifier = [&](const IdentifierToken& token)
-            {
-                auto result = m_globalScope.identifiers.find(token.getValue());
-                PYLIR_ASSERT(result != m_globalScope.identifiers.end());
-                m_functionScope->identifiers.insert(*result);
-            };
-            handleIdentifier(globalStmt.identifier);
-            for (const auto& [token, identifier] : globalStmt.rest)
-            {
-                (void)token;
-                handleIdentifier(identifier);
-            }
-        },
-        [&](const Syntax::PassStmt&) {}, [&](const Syntax::StarredExpression& expression) { visit(expression); },
-        [&](const Syntax::AssignmentStmt& statement) { visit(statement); });
+            return;
+        case TokenType::PassKeyword: return;
+        default: PYLIR_UNREACHABLE;
+    }
 }
 
-void pylir::CodeGen::assignTarget(const Syntax::Target& target, mlir::Value value)
+void pylir::CodeGen::visit(const Syntax::GlobalOrNonLocalStmt& globalOrNonLocalStmt)
 {
-    pylir::match(
-        target.variant, [&](const IdentifierToken& identifierToken) { writeIdentifier(identifierToken, value); },
-        [&](const Syntax::Target::Parenth& parenth)
-        {
-            if (parenth.targetList)
-            {
-                assignTarget(*parenth.targetList, value);
-                return;
-            }
-            // TODO
-            PYLIR_UNREACHABLE;
-        },
-        [&](const Syntax::Subscription& subscription)
-        {
-            auto container = visit(*subscription.primary);
-            if (!container)
-            {
-                return;
-            }
-            auto indices = visit(subscription.expressionList);
-            if (!container)
-            {
-                return;
-            }
-
-            m_builder.setCurrentLoc(getLoc(subscription, subscription));
-            Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__setitem__",
-                                       m_builder.createMakeTuple({container, indices, value}), {},
-                                       m_currentExceptBlock);
-        },
-        [&](const Syntax::Target::Square& square)
-        {
-            if (square.targetList)
-            {
-                assignTarget(*square.targetList, value);
-                return;
-            }
-            // TODO
-            PYLIR_UNREACHABLE;
-        },
-        [&](const auto&)
-        {
-            // TODO
-            PYLIR_UNREACHABLE;
-        });
-}
-
-void pylir::CodeGen::assignTarget(const Syntax::TargetList& targetList, mlir::Value value)
-{
-    if (targetList.remainingExpr.empty() && !targetList.trailingComma)
+    if (globalOrNonLocalStmt.token.getTokenType() == TokenType::NonlocalKeyword)
     {
-        assignTarget(*targetList.firstExpr, value);
         return;
     }
-    // TODO
+    if (!m_functionScope)
+    {
+        return;
+    }
+    for (const auto& identifier : globalOrNonLocalStmt.identifiers)
+    {
+        auto result = m_globalScope.identifiers.find(identifier.getValue());
+        PYLIR_ASSERT(result != m_globalScope.identifiers.end());
+        m_functionScope->identifiers.insert(*result);
+    }
+}
+
+void pylir::CodeGen::assignTarget(const Syntax::Atom& atom, mlir::Value value)
+{
+    writeIdentifier(IdentifierToken{atom.token}, value);
+}
+
+void pylir::CodeGen::assignTarget(const Syntax::Subscription& subscription, mlir::Value value)
+{
+    auto container = visit(*subscription.object);
+    if (!container)
+    {
+        return;
+    }
+    auto indices = visit(*subscription.index);
+    if (!container)
+    {
+        return;
+    }
+
+    m_builder.setCurrentLoc(getLoc(subscription, subscription));
+    Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__setitem__",
+                               m_builder.createMakeTuple({container, indices, value}), {}, m_currentExceptBlock);
+}
+
+void pylir::CodeGen::assignTarget(const Syntax::AttributeRef& attributeRef, mlir::Value value)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::assignTarget(const Syntax::TupleConstruct& tupleConstruct, mlir::Value value)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::assignTarget(const Syntax::ListDisplay& listDisplay, mlir::Value value)
+{
+    // TODO:
     PYLIR_UNREACHABLE;
 }
 
 void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
 {
-    auto rhs = pylir::match(assignmentStmt.variant, [&](const auto& value) { return visit(value); });
+    if (!assignmentStmt.maybeExpression)
+    {
+        return;
+    }
+    auto rhs = visit(*assignmentStmt.maybeExpression);
     if (!rhs)
     {
         return;
     }
     for (const auto& [list, token] : assignmentStmt.targets)
     {
-        assignTarget(list, rhs);
+        assignTarget(*list, rhs);
         if (!m_builder.getInsertionBlock())
         {
             return;
@@ -330,161 +264,43 @@ void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
     }
 }
 
-template <mlir::Value (pylir::CodeGen::*op)(const std::vector<pylir::Py::IterArg>&)>
-mlir::Value pylir::CodeGen::visit(const Syntax::StarredList& starredList)
+std::vector<pylir::Py::IterArg> pylir::CodeGen::visit(llvm::ArrayRef<Syntax::StarredItem> starredItems)
 {
-    m_builder.setCurrentLoc(getLoc(starredList, starredList));
     std::vector<Py::IterArg> operands;
-    auto handleItem = [&](const Syntax::StarredItem& item)
+    for (const auto& iter : starredItems)
     {
-        return pylir::match(
-            item.variant,
-            [&](const Syntax::AssignmentExpression& assignment)
-            {
-                auto value = visit(assignment);
-                if (!value)
-                {
-                    return false;
-                }
-                operands.emplace_back(value);
-                return true;
-            },
-            [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
-            {
-                auto value = visit(pair.second);
-                if (!value)
-                {
-                    return false;
-                }
-                operands.emplace_back(Py::IterExpansion{value});
-                return true;
-            });
-    };
-    if (!handleItem(*starredList.firstExpr))
-    {
-        return {};
-    }
-    for (const auto& iter : starredList.remainingExpr)
-    {
-        if (!handleItem(*iter.second))
-        {
-            return {};
-        }
-    }
-    return std::invoke(op, *this, operands);
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::StarredExpression& starredExpression)
-{
-    return pylir::match(
-        starredExpression.variant,
-        [&](const Syntax::StarredExpression::Items& items) -> mlir::Value
-        {
-            if (items.leading.empty())
-            {
-                if (!items.last)
-                {
-                    return {};
-                }
-                return visit(pylir::get<Syntax::AssignmentExpression>(items.last->variant));
-            }
-            m_builder.setCurrentLoc(getLoc(starredExpression, starredExpression));
-            std::vector<Py::IterArg> operands;
-            auto handleItem = [&](const Syntax::StarredItem& item)
-            {
-                return pylir::match(
-                    item.variant,
-                    [&](const Syntax::AssignmentExpression& assignment)
-                    {
-                        auto value = visit(assignment);
-                        if (!value)
-                        {
-                            return false;
-                        }
-                        operands.emplace_back(value);
-                        return true;
-                    },
-                    [&](const std::pair<BaseToken, Syntax::OrExpr>& pair)
-                    {
-                        auto value = visit(pair.second);
-                        if (!value)
-                        {
-                            return false;
-                        }
-                        operands.emplace_back(Py::IterExpansion{value});
-                        return true;
-                    });
-            };
-            for (const auto& iter : items.leading)
-            {
-                if (!handleItem(iter.first))
-                {
-                    return {};
-                }
-            }
-            if (items.last)
-            {
-                if (!handleItem(*items.last))
-                {
-                    return {};
-                }
-            }
-            return makeTuple(operands);
-        },
-        [&](const Syntax::Expression& expression) { return visit(expression); });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::ExpressionList& expressionList)
-{
-    if (!expressionList.trailingComma && expressionList.remainingExpr.empty())
-    {
-        return visit(*expressionList.firstExpr);
-    }
-
-    m_builder.setCurrentLoc(getLoc(expressionList, expressionList));
-    std::vector<mlir::Value> operands(1 + expressionList.remainingExpr.size());
-    operands[0] = visit(*expressionList.firstExpr);
-    if (!operands[0])
-    {
-        return {};
-    }
-    for (const auto& iter : llvm::enumerate(expressionList.remainingExpr))
-    {
-        auto value = visit(*iter.value().second);
+        auto value = visit(*iter.expression);
         if (!value)
         {
             return {};
         }
-        operands[iter.index() + 1] = value;
-    }
-    return m_builder.createMakeTuple(operands, m_builder.getI32ArrayAttr({}));
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::YieldExpression& yieldExpression)
-{
-    return {};
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::Expression& expression)
-{
-    return pylir::match(
-        expression.variant,
-        [&](const Syntax::ConditionalExpression& conditionalExpression) { return visit(conditionalExpression); },
-        [&](const std::unique_ptr<Syntax::LambdaExpression>& lambdaExpression) -> mlir::Value
+        if (iter.maybeStar)
         {
-            // TODO return visit(*lambdaExpression);
-            PYLIR_UNREACHABLE;
-        });
+            operands.emplace_back(Py::IterExpansion{value});
+        }
+        else
+        {
+            operands.emplace_back(value);
+        }
+    }
+    return operands;
 }
 
-mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expression)
+mlir::Value pylir::CodeGen::visit(const Syntax::TupleConstruct& tupleConstruct)
 {
-    if (!expression.suffix)
-    {
-        return visit(expression.value);
-    }
-    m_builder.setCurrentLoc(getLoc(expression, expression.suffix->ifToken));
-    auto condition = toI1(visit(*expression.suffix->test));
+    return makeTuple(visit(tupleConstruct.items));
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::Yield&)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::Conditional& conditional)
+{
+    m_builder.setCurrentLoc(getLoc(conditional, conditional));
+    auto condition = toI1(visit(*conditional.condition));
     if (!condition)
     {
         return {};
@@ -497,14 +313,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     m_builder.create<mlir::cf::CondBranchOp>(condition, found, elseBlock);
 
     implementBlock(found);
-    auto trueValue = visit(expression.value);
+    auto trueValue = visit(*conditional.trueValue);
     if (trueValue)
     {
         m_builder.create<mlir::cf::BranchOp>(thenBlock, trueValue);
     }
 
     implementBlock(elseBlock);
-    auto falseValue = visit(*expression.suffix->elseValue);
+    auto falseValue = visit(*conditional.elseValue);
     if (falseValue)
     {
         m_builder.create<mlir::cf::BranchOp>(thenBlock, falseValue);
@@ -518,14 +334,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ConditionalExpression& expressio
     return thenBlock->getArgument(0);
 }
 
-mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
+mlir::Value pylir::CodeGen::visit(const Syntax::BinOp& binOp)
 {
-    return pylir::match(
-        expression.variant, [&](const Syntax::AndTest& andTest) { return visit(andTest); },
-        [&](const std::unique_ptr<Syntax::OrTest::BinOp>& binOp) -> mlir::Value
+    switch (binOp.operation.getTokenType())
+    {
+        case TokenType::OrKeyword:
         {
-            m_builder.setCurrentLoc(getLoc(expression, binOp->orToken));
-            auto lhs = visit(*binOp->lhs);
+            m_builder.setCurrentLoc(getLoc(binOp, binOp));
+            auto lhs = visit(*binOp.lhs);
             if (!lhs)
             {
                 return {};
@@ -536,7 +352,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
             m_builder.create<mlir::cf::CondBranchOp>(toI1(lhs), found, lhs, rhsTry, mlir::ValueRange{});
 
             implementBlock(rhsTry);
-            auto rhs = visit(binOp->rhs);
+            auto rhs = visit(*binOp.rhs);
             if (rhs)
             {
                 m_builder.create<mlir::cf::BranchOp>(found, rhs);
@@ -544,17 +360,11 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::OrTest& expression)
 
             implementBlock(found);
             return found->getArgument(0);
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
-{
-    return pylir::match(
-        expression.variant, [&](const Syntax::NotTest& notTest) { return visit(notTest); },
-        [&](const std::unique_ptr<Syntax::AndTest::BinOp>& binOp) -> mlir::Value
+        }
+        case TokenType::AndKeyword:
         {
-            m_builder.setCurrentLoc(getLoc(expression, binOp->andToken));
-            auto lhs = visit(*binOp->lhs);
+            m_builder.setCurrentLoc(getLoc(binOp, binOp));
+            auto lhs = visit(*binOp.lhs);
             if (!lhs)
             {
                 return {};
@@ -566,7 +376,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
                                                      mlir::ValueRange{lhs});
 
             implementBlock(rhsTry);
-            auto rhs = visit(binOp->rhs);
+            auto rhs = visit(*binOp.rhs);
             if (rhs)
             {
                 m_builder.create<mlir::cf::BranchOp>(found, rhs);
@@ -574,21 +384,46 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AndTest& expression)
 
             implementBlock(found);
             return found->getArgument(0);
-        });
+        }
+        case TokenType::Plus: return this->binOp("__add__", "__radd__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::Minus: return this->binOp("__sub__", "__rsub__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::BitOr: return this->binOp("__or__", "__ror__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::BitXor: return this->binOp("__xor__", "__rxor__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::BitAnd: return this->binOp("__and__", "__rand__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::ShiftLeft:
+            return this->binOp("__lshift__", "__rlshift__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::ShiftRight:
+            return this->binOp("__rshift__", "__rrshift__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::Star: return this->binOp("__mul__", "__rmul__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::Divide: return this->binOp("__div__", "__rdiv__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::IntDivide:
+            return this->binOp("__floordiv__", "__rfloordiv__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::Remainder: return this->binOp("__mod__", "__rmod__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::AtSign: return this->binOp("__matmul__", "__rmatmul__", visit(*binOp.lhs), visit(*binOp.rhs));
+        case TokenType::PowerOf: return this->binOp("__pow__", "__rpow__", visit(*binOp.lhs), visit(*binOp.rhs));
+        default: PYLIR_UNREACHABLE;
+    }
 }
 
-mlir::Value pylir::CodeGen::visit(const Syntax::NotTest& expression)
+mlir::Value pylir::CodeGen::visit(const Syntax::UnaryOp& unaryOp)
 {
-    return pylir::match(
-        expression.variant, [&](const Syntax::Comparison& comparison) { return visit(comparison); },
-        [&](const std::pair<BaseToken, std::unique_ptr<Syntax::NotTest>>& pair) -> mlir::Value
+    switch (unaryOp.operation.getTokenType())
+    {
+        case TokenType::NotKeyword:
         {
-            m_builder.setCurrentLoc(getLoc(expression, pair.first));
-            auto value = toI1(visit(*pair.second));
+            m_builder.setCurrentLoc(getLoc(unaryOp, unaryOp));
+            auto value = toI1(visit(*unaryOp.expression));
             auto one = m_builder.create<mlir::arith::ConstantOp>(m_builder.getBoolAttr(true));
             auto inverse = m_builder.create<mlir::arith::XOrIOp>(one, value);
             return m_builder.createBoolFromI1(inverse);
-        });
+        }
+        case TokenType::Minus:
+        case TokenType::Plus:
+        case TokenType::BitNegate:
+            // TODO:
+            PYLIR_UNREACHABLE;
+        default: PYLIR_UNREACHABLE;
+    }
 }
 
 mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, mlir::Value lhs, mlir::Value rhs)
@@ -698,12 +533,8 @@ mlir::Value pylir::CodeGen::binOp(llvm::StringRef method, llvm::StringRef revMet
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
 {
-    if (comparison.rest.empty())
-    {
-        return visit(comparison.left);
-    }
     mlir::Value result;
-    auto first = visit(comparison.left);
+    auto first = visit(*comparison.first);
     if (!first)
     {
         return {};
@@ -751,7 +582,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
         {
             invert = true;
         }
-        auto other = visit(rhs);
+        auto other = visit(*rhs);
         if (other)
         {
             mlir::Value cmp;
@@ -792,214 +623,43 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
     return result;
 }
 
-mlir::Value pylir::CodeGen::visit(const Syntax::OrExpr& orExpr)
+mlir::Value pylir::CodeGen::visit(const Syntax::Call& call)
 {
-    return pylir::match(
-        orExpr.variant, [&](const Syntax::XorExpr& xorExpr) { return visit(xorExpr); },
-        [&](const std::unique_ptr<Syntax::OrExpr::BinOp>& binOp) -> mlir::Value
-        {
-            auto lhs = visit(*binOp->lhs);
-            auto rhs = visit(binOp->rhs);
-            m_builder.setCurrentLoc(getLoc(orExpr, binOp->bitOrToken));
-            return this->binOp("__or__", "__ror__", lhs, rhs);
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::XorExpr& xorExpr)
-{
-    return pylir::match(
-        xorExpr.variant, [&](const Syntax::AndExpr& andExpr) { return visit(andExpr); },
-        [&](const std::unique_ptr<Syntax::XorExpr::BinOp>& binOp) -> mlir::Value
-        {
-            auto lhs = visit(*binOp->lhs);
-            auto rhs = visit(binOp->rhs);
-            m_builder.setCurrentLoc(getLoc(xorExpr, binOp->bitXorToken));
-            return this->binOp("__xor__", "__rxor__", lhs, rhs);
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::AndExpr& andExpr)
-{
-    return pylir::match(
-        andExpr.variant, [&](const Syntax::ShiftExpr& shiftExpr) { return visit(shiftExpr); },
-        [&](const std::unique_ptr<Syntax::AndExpr::BinOp>& binOp) -> mlir::Value
-        {
-            auto lhs = visit(*binOp->lhs);
-            auto rhs = visit(binOp->rhs);
-            m_builder.setCurrentLoc(getLoc(andExpr, binOp->bitAndToken));
-            return this->binOp("__and__", "__rand__", lhs, rhs);
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::ShiftExpr& shiftExpr)
-{
-    return pylir::match(
-        shiftExpr.variant, [&](const Syntax::AExpr& aExpr) { return visit(aExpr); },
-        [&](const std::unique_ptr<Syntax::ShiftExpr::BinOp>& binOp) -> mlir::Value
-        {
-            auto lhs = visit(*binOp->lhs);
-            auto rhs = visit(binOp->rhs);
-            m_builder.setCurrentLoc(getLoc(shiftExpr, binOp->binToken));
-            switch (binOp->binToken.getTokenType())
-            {
-                case TokenType::ShiftLeft: return this->binOp("__lshift__", "__rlshift__", lhs, rhs);
-                case TokenType::ShiftRight: return this->binOp("__rshift__", "__rrshift__", lhs, rhs);
-                default: PYLIR_UNREACHABLE;
-            }
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::AExpr& aExpr)
-{
-    return pylir::match(
-        aExpr.variant, [&](const Syntax::MExpr& mExpr) { return visit(mExpr); },
-        [&](const std::unique_ptr<Syntax::AExpr::BinOp>& binOp) -> mlir::Value
-        {
-            auto lhs = visit(*binOp->lhs);
-            if (!lhs)
-            {
-                return {};
-            }
-            auto rhs = visit(binOp->rhs);
-            if (!rhs)
-            {
-                return {};
-            }
-            m_builder.setCurrentLoc(getLoc(aExpr, binOp->binToken));
-            switch (binOp->binToken.getTokenType())
-            {
-                case TokenType::Plus: return this->binOp("__add__", "__radd__", lhs, rhs);
-                case TokenType::Minus: return this->binOp("__sub__", "__rsub__", lhs, rhs);
-                default: PYLIR_UNREACHABLE;
-            }
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::MExpr& mExpr)
-{
-    return pylir::match(
-        mExpr.variant, [&](const Syntax::UExpr& uExpr) { return visit(uExpr); },
-        [&](const std::unique_ptr<Syntax::MExpr::BinOp>& binOp) -> mlir::Value
-        {
-            auto lhs = visit(*binOp->lhs);
-            auto rhs = visit(binOp->rhs);
-            m_builder.setCurrentLoc(getLoc(mExpr, binOp->binToken));
-            switch (binOp->binToken.getTokenType())
-            {
-                case TokenType::Star: return this->binOp("__mul__", "__rmul__", lhs, rhs);
-                case TokenType::Divide: return this->binOp("__truediv__", "__rtruedev__", lhs, rhs);
-                case TokenType::IntDivide: return this->binOp("__floordiv__", "__rfloordiv__", lhs, rhs);
-                case TokenType::Remainder: return this->binOp("__mod__", "__rmod__", lhs, rhs);
-                default: PYLIR_UNREACHABLE;
-            }
-        },
-        [&](const std::unique_ptr<Syntax::MExpr::AtBin>& atBin) -> mlir::Value
-        {
-            auto lhs = visit(*atBin->lhs);
-            auto rhs = visit(*atBin->rhs);
-            m_builder.setCurrentLoc(getLoc(mExpr, atBin->atToken));
-            return this->binOp("__matmul__", "__rmatmul__", lhs, rhs);
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::UExpr& uExpr)
-{
-    return pylir::match(
-        uExpr.variant, [&](const Syntax::Power& power) { return visit(power); },
-        [&](const std::pair<Token, std::unique_ptr<Syntax::UExpr>>& pair) -> mlir::Value
-        {
-            auto value = visit(*pair.second);
-            switch (pair.first.getTokenType())
-            {
-                case TokenType::Minus:
-                {
-                    // TODO
-                    PYLIR_UNREACHABLE;
-                }
-                case TokenType::Plus:
-
-                    // TODO
-                    PYLIR_UNREACHABLE;
-                case TokenType::BitNegate:
-
-                    // TODO
-                    PYLIR_UNREACHABLE;
-                default: PYLIR_UNREACHABLE;
-            }
-        });
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::Power& power)
-{
-    auto lhs = pylir::match(power.variant, [&](const auto& value) { return visit(value); });
-    if (!power.rightHand)
+    auto callable = visit(*call.expression);
+    if (!callable)
     {
-        return lhs;
+        return {};
     }
-    auto rhs = visit(*power.rightHand->second);
-    m_builder.setCurrentLoc(getLoc(power, power.rightHand->first));
-    return binOp("__pow__", "__rpow__", lhs, rhs);
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::AwaitExpr& awaitExpr)
-{
-    // TODO
-    PYLIR_UNREACHABLE;
-}
-
-mlir::Value pylir::CodeGen::visit(const Syntax::Primary& primary)
-{
-    return pylir::match(
-        primary.variant, [&](const Syntax::Atom& atom) { return visit(atom); },
-        [&](const Syntax::Subscription& subscription) { return visit(subscription); },
-        [&](const Syntax::Call& call) -> mlir::Value
+    m_builder.setCurrentLoc(getLoc(call, call.openParenth));
+    auto [tuple, keywords] = pylir::match(
+        call.variant,
+        [&](const std::vector<Syntax::Argument>& vector) -> std::pair<mlir::Value, mlir::Value>
+        { return visit(vector); },
+        [&](const Syntax::Comprehension& comprehension) -> std::pair<mlir::Value, mlir::Value>
         {
-            auto callable = visit(*call.primary);
-            if (!callable)
-            {
-                return {};
-            }
-            m_builder.setCurrentLoc(getLoc(call, call.openParentheses));
-            auto [tuple, keywords] = pylir::match(
-                call.variant,
-                [&](std::monostate) -> std::pair<mlir::Value, mlir::Value> {
-                    return {m_builder.createConstant(m_builder.getTupleAttr()),
-                            m_builder.createConstant(m_builder.getDictAttr())};
-                },
-                [&](const std::pair<Syntax::ArgumentList, std::optional<BaseToken>>& pair)
-                    -> std::pair<mlir::Value, mlir::Value> { return visit(pair.first); },
-                [&](const std::unique_ptr<Syntax::Comprehension>& comprehension) -> std::pair<mlir::Value, mlir::Value>
+            auto list = m_builder.createMakeList();
+            auto one = m_builder.create<mlir::arith::ConstantIndexOp>(1);
+            visit(
+                [&](mlir::Value element)
                 {
-                    auto list = m_builder.createMakeList();
-                    auto one = m_builder.create<mlir::arith::ConstantIndexOp>(1);
-                    visit(
-                        [&](mlir::Value element)
-                        {
-                            auto len = m_builder.createListLen(list);
-                            auto newLen = m_builder.create<mlir::arith::AddIOp>(len, one);
-                            m_builder.createListResize(list, newLen);
-                            m_builder.createListSetItem(list, len, element);
-                        },
-                        *comprehension);
-                    if (!m_builder.getInsertionBlock())
-                    {
-                        return {};
-                    }
-                    return {m_builder.createListToTuple(list), m_builder.createConstant(m_builder.getDictAttr())};
-                });
-            if (!tuple || !keywords)
+                    auto len = m_builder.createListLen(list);
+                    auto newLen = m_builder.create<mlir::arith::AddIOp>(len, one);
+                    m_builder.createListResize(list, newLen);
+                    m_builder.createListSetItem(list, len, element);
+                },
+                comprehension);
+            if (!m_builder.getInsertionBlock())
             {
                 return {};
             }
-            return Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
-                                              m_builder.createTuplePrepend(callable, tuple), keywords,
-                                              m_currentExceptBlock);
-        },
-        [&](const auto&) -> mlir::Value
-        {
-            // TODO
-            PYLIR_UNREACHABLE;
+            return {m_builder.createListToTuple(list), m_builder.createConstant(m_builder.getDictAttr())};
         });
+    if (!tuple || !keywords)
+    {
+        return {};
+    }
+    return Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__",
+                                      m_builder.createTuplePrepend(callable, tuple), keywords, m_currentExceptBlock);
 }
 
 void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mlir::Value value)
@@ -1143,57 +803,34 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
 {
-    return pylir::match(
-        atom.variant,
-        [&](const Syntax::Atom::Literal& literal) -> mlir::Value
-        {
-            m_builder.setCurrentLoc(getLoc(atom, literal.token));
-            switch (literal.token.getTokenType())
-            {
-                case TokenType::IntegerLiteral:
-                {
-                    return m_builder.createConstant(pylir::get<BigInt>(literal.token.getValue()));
-                }
-                case TokenType::FloatingPointLiteral:
-                {
-                    return m_builder.createConstant(pylir::get<double>(literal.token.getValue()));
-                }
-                case TokenType::ComplexLiteral:
-                {
-                    // TODO:
-                    PYLIR_UNREACHABLE;
-                }
-                case TokenType::StringLiteral:
-                {
-                    return m_builder.createConstant(pylir::get<std::string>(literal.token.getValue()));
-                }
-                case TokenType::ByteLiteral:
-                    // TODO:
-                    PYLIR_UNREACHABLE;
-                case TokenType::TrueKeyword:
-                {
-                    return m_builder.createConstant(true);
-                }
-                case TokenType::FalseKeyword:
-                {
-                    return m_builder.createConstant(false);
-                }
-                case TokenType::NoneKeyword: return m_builder.createNoneRef();
-                default: PYLIR_UNREACHABLE;
-            }
-        },
-        [&](const IdentifierToken& identifierToken) -> mlir::Value { return readIdentifier(identifierToken); },
-        [&](const std::unique_ptr<Syntax::Enclosure>& enclosure) -> mlir::Value { return visit(*enclosure); });
+    switch (atom.token.getTokenType())
+    {
+        case TokenType::IntegerLiteral: return m_builder.createConstant(pylir::get<BigInt>(atom.token.getValue()));
+        case TokenType::ComplexLiteral:
+            // TODO:
+            PYLIR_UNREACHABLE;
+        case TokenType::FloatingPointLiteral:
+            return m_builder.createConstant(pylir::get<double>(atom.token.getValue()));
+        case TokenType::StringLiteral: return m_builder.createConstant(pylir::get<std::string>(atom.token.getValue()));
+        case TokenType::ByteLiteral:
+            // TODO:
+            PYLIR_UNREACHABLE;
+        case TokenType::TrueKeyword: return m_builder.createConstant(true);
+        case TokenType::FalseKeyword: return m_builder.createConstant(false);
+        case TokenType::NoneKeyword: return m_builder.createNoneRef();
+        case TokenType::Identifier: return readIdentifier(IdentifierToken{atom.token});
+        default: PYLIR_UNREACHABLE;
+    }
 }
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscription)
 {
-    auto container = visit(*subscription.primary);
+    auto container = visit(*subscription.object);
     if (!container)
     {
         return {};
     }
-    auto indices = visit(subscription.expressionList);
+    auto indices = visit(*subscription.index);
     if (!container)
     {
         return {};
@@ -1218,143 +855,106 @@ mlir::Value pylir::CodeGen::toBool(mlir::Value value)
     return boolean;
 }
 
-mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Enclosure& enclosure)
+mlir::Value pylir::CodeGen::visit(const Syntax::ListDisplay& listDisplay)
 {
+    m_builder.setCurrentLoc(getLoc(listDisplay, listDisplay.openSquare));
     return pylir::match(
-        enclosure.variant,
-        [&](const Syntax::Enclosure::ParenthForm& parenthForm) -> mlir::Value
+        listDisplay.variant, [&](std::monostate) -> mlir::Value { return m_builder.createMakeList(); },
+        [&](const std::vector<Syntax::StarredItem>& list) -> mlir::Value
         {
-            if (parenthForm.expression)
-            {
-                return visit(*parenthForm.expression);
-            }
-            m_builder.setCurrentLoc(getLoc(parenthForm, parenthForm.openParenth));
-            return m_builder.createConstant(m_builder.getTupleAttr());
+            auto operands = visit(list);
+            return makeList(operands);
         },
-        [&](const Syntax::Enclosure::ListDisplay& listDisplay) -> mlir::Value
+        [&](const Syntax::Comprehension& comprehension) -> mlir::Value
         {
-            m_builder.setCurrentLoc(getLoc(listDisplay, listDisplay.openSquare));
-            return pylir::match(
-                listDisplay.variant, [&](std::monostate) -> mlir::Value { return m_builder.createMakeList(); },
-                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<&CodeGen::makeList>(list); },
-                [&](const Syntax::Comprehension& comprehension) -> mlir::Value
+            auto list = m_builder.createMakeList();
+            auto one = m_builder.create<mlir::arith::ConstantIndexOp>(1);
+            visit(
+                [&](mlir::Value element)
                 {
-                    auto list = m_builder.createMakeList();
-                    auto one = m_builder.create<mlir::arith::ConstantIndexOp>(1);
-                    visit(
-                        [&](mlir::Value element)
-                        {
-                            auto len = m_builder.createListLen(list);
-                            auto newLen = m_builder.create<mlir::arith::AddIOp>(len, one);
-                            m_builder.createListResize(list, newLen);
-                            m_builder.createListSetItem(list, len, element);
-                        },
-                        comprehension);
-                    if (!m_builder.getInsertionBlock())
-                    {
-                        return {};
-                    }
-                    return list;
-                });
-        },
-        [&](const Syntax::Enclosure::SetDisplay& setDisplay) -> mlir::Value
-        {
-            auto loc = getLoc(setDisplay, setDisplay.openBrace);
-            m_builder.setCurrentLoc(loc);
-            return pylir::match(
-                setDisplay.variant,
-                [&](const Syntax::StarredList& list) -> mlir::Value { return visit<&CodeGen::makeSet>(list); },
-                [&](const Syntax::Comprehension&) -> mlir::Value
-                {
-                    // TODO:
-                    PYLIR_UNREACHABLE;
-                });
-        },
-        [&](const Syntax::Enclosure::DictDisplay& dictDisplay) -> mlir::Value
-        {
-            auto loc = getLoc(dictDisplay, dictDisplay.openBrace);
-            m_builder.setCurrentLoc(loc);
-            return pylir::match(
-                dictDisplay.variant, [&](std::monostate) -> mlir::Value { return m_builder.createMakeDict(); },
-                [&](const Syntax::CommaList<Syntax::Enclosure::DictDisplay::KeyDatum>& list) -> mlir::Value
-                {
-                    std::vector<Py::DictArg> result;
-                    result.reserve(list.remainingExpr.size() + 1);
-                    auto handleOne = [&](const Syntax::Enclosure::DictDisplay::KeyDatum& keyDatum)
-                    {
-                        return pylir::match(
-                            keyDatum.variant,
-                            [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Key& key)
-                            {
-                                auto first = visit(key.first);
-                                if (!first)
-                                {
-                                    return false;
-                                }
-                                auto second = visit(key.second);
-                                if (!second)
-                                {
-                                    return false;
-                                }
-                                result.push_back(std::pair{first, second});
-                                return true;
-                            },
-                            [&](const Syntax::Enclosure::DictDisplay::KeyDatum::Datum& key)
-                            {
-                                auto mapping = visit(key.orExpr);
-                                if (!mapping)
-                                {
-                                    return false;
-                                }
-                                result.emplace_back(Py::MappingExpansion{mapping});
-                                return true;
-                            });
-                    };
-                    if (!handleOne(*list.firstExpr))
-                    {
-                        return {};
-                    }
-                    for (const auto& [token, iter] : list.remainingExpr)
-                    {
-                        (void)token;
-                        if (!handleOne(*iter))
-                        {
-                            return {};
-                        }
-                    }
-                    return m_builder.createMakeDict(result);
+                    auto len = m_builder.createListLen(list);
+                    auto newLen = m_builder.create<mlir::arith::AddIOp>(len, one);
+                    m_builder.createListResize(list, newLen);
+                    m_builder.createListSetItem(list, len, element);
                 },
-                [&](const Syntax::Enclosure::DictDisplay::DictComprehension&) -> mlir::Value
-                {
-                    // TODO:
-                    PYLIR_UNREACHABLE;
-                });
+                comprehension);
+            if (!m_builder.getInsertionBlock())
+            {
+                return {};
+            }
+            return list;
+        });
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::SetDisplay& setDisplay)
+{
+    auto loc = getLoc(setDisplay, setDisplay.openBrace);
+    m_builder.setCurrentLoc(loc);
+    return pylir::match(
+        setDisplay.variant,
+        [&](const std::vector<Syntax::StarredItem>& list) -> mlir::Value
+        {
+            auto operands = visit(list);
+            return makeSet(operands);
         },
-        [&](const auto&) -> mlir::Value
+        [&](const Syntax::Comprehension&) -> mlir::Value
         {
             // TODO:
             PYLIR_UNREACHABLE;
         });
 }
 
-mlir::Value pylir::CodeGen::visit(const pylir::Syntax::AssignmentExpression& assignmentExpression)
+mlir::Value pylir::CodeGen::visit(const Syntax::DictDisplay& dictDisplay)
 {
-    if (!assignmentExpression.identifierAndWalrus)
-    {
-        return visit(*assignmentExpression.expression);
-    }
-    auto value = visit(*assignmentExpression.expression);
+    auto loc = getLoc(dictDisplay, dictDisplay.openBrace);
+    m_builder.setCurrentLoc(loc);
+    return pylir::match(
+        dictDisplay.variant,
+        [&](const std::vector<Syntax::DictDisplay::KeyDatum>& list) -> mlir::Value
+        {
+            std::vector<Py::DictArg> result;
+            for (const auto& iter : list)
+            {
+                auto key = visit(*iter.key);
+                if (!key)
+                {
+                    return {};
+                }
+                if (!iter.maybeValue)
+                {
+                    result.emplace_back(Py::MappingExpansion{key});
+                    continue;
+                }
+                auto value = visit(*iter.maybeValue);
+                if (!value)
+                {
+                    return {};
+                }
+                result.emplace_back(std::pair{key, value});
+            }
+            return m_builder.createMakeDict(result);
+        },
+        [&](const Syntax::DictDisplay::DictComprehension&) -> mlir::Value
+        {
+            // TODO:
+            PYLIR_UNREACHABLE;
+        });
+}
+
+mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Assignment& assignment)
+{
+    auto value = visit(*assignment.expression);
     if (!value)
     {
         return {};
     }
-    writeIdentifier(assignmentExpression.identifierAndWalrus->first, value);
+    writeIdentifier(assignment.variable, value);
     return value;
 }
 
 void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
 {
-    auto condition = visit(ifStmt.condition);
+    auto condition = visit(*ifStmt.condition);
     if (!condition)
     {
         return;
@@ -1395,7 +995,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     for (const auto& iter : llvm::enumerate(ifStmt.elifs))
     {
         m_builder.setCurrentLoc(getLoc(iter.value().elif, iter.value().elif));
-        condition = visit(iter.value().condition);
+        condition = visit(*iter.value().condition);
         if (!condition)
         {
             return;
@@ -1450,7 +1050,7 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
 
     implementBlock(conditionBlock);
     auto conditionSeal = markOpenBlock(conditionBlock);
-    auto condition = visit(whileStmt.condition);
+    auto condition = visit(*whileStmt.condition);
     if (!condition)
     {
         return;
@@ -1488,7 +1088,7 @@ void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
     }
 }
 
-void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::Value iterable,
+void pylir::CodeGen::visitForConstruct(const Syntax::Target& targets, mlir::Value iterable,
                                        llvm::function_ref<void()> execSuite,
                                        const std::optional<Syntax::IfStmt::Else>& elseSection)
 {
@@ -1561,40 +1161,38 @@ void pylir::CodeGen::visitForConstruct(const Syntax::TargetList& targets, mlir::
 
 void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
 {
-    auto iterable = visit(forStmt.expressionList);
+    auto iterable = visit(*forStmt.expression);
     if (!iterable)
     {
         return;
     }
     auto loc = getLoc(forStmt, forStmt.forKeyword);
     visitForConstruct(
-        forStmt.targetList, iterable, [&] { visit(*forStmt.suite); }, forStmt.elseSection);
+        *forStmt.targetList, iterable, [&] { visit(*forStmt.suite); }, forStmt.elseSection);
 }
 
-void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation,
-                           const Syntax::AssignmentExpression& iteration, const Syntax::CompFor& compFor)
+void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
+                           const Syntax::CompFor& compFor)
 {
     m_builder.setCurrentLoc(getLoc(compFor, compFor.forToken));
-    auto iterable = visit(compFor.orTest);
+    auto iterable = visit(*compFor.test);
     if (!iterable)
     {
         return;
     }
-    visitForConstruct(
-        compFor.targets, iterable,
-        [&]
-        {
-            pylir::match(
-                compFor.compIter, [&](std::monostate) { insertOperation(visit(iteration)); },
-                [&](const std::unique_ptr<Syntax::CompFor>& compFor) { visit(insertOperation, iteration, *compFor); },
-                [&](const std::unique_ptr<Syntax::CompIf>& compIf) { visit(insertOperation, iteration, *compIf); });
-        });
+    visitForConstruct(*compFor.targets, iterable,
+                      [&]
+                      {
+                          pylir::match(
+                              compFor.compIter, [&](std::monostate) { insertOperation(visit(iteration)); },
+                              [&](const auto& ptr) { visit(insertOperation, iteration, *ptr); });
+                      });
 }
 
-void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation,
-                           const Syntax::AssignmentExpression& iteration, const Syntax::CompIf& compIf)
+void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
+                           const Syntax::CompIf& compIf)
 {
-    auto condition = visit(compIf.orTest);
+    auto condition = visit(*compIf.test);
     if (!condition)
     {
         return;
@@ -1607,15 +1205,14 @@ void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation
     implementBlock(trueBlock);
     pylir::match(
         compIf.compIter, [&](std::monostate) { insertOperation(visit(iteration)); },
-        [&](const Syntax::CompFor& compFor) { visit(insertOperation, iteration, compFor); },
-        [&](const std::unique_ptr<Syntax::CompIf>& compIf) { visit(insertOperation, iteration, *compIf); });
+        [&](const auto& ptr) { visit(insertOperation, iteration, *ptr); });
     implementBlock(thenBlock);
 }
 
 void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation,
                            const Syntax::Comprehension& comprehension)
 {
-    visit(insertOperation, comprehension.assignmentExpression, comprehension.compFor);
+    visit(insertOperation, *comprehension.expression, comprehension.compFor);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
@@ -1690,33 +1287,16 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
     for (const auto& iter : tryStmt.excepts)
     {
         m_builder.setCurrentLoc(getLoc(iter, iter.exceptKeyword));
-        if (!iter.expression)
-        {
-            visit(*iter.suite);
-            if (needsTerminator())
-            {
-                if (tryStmt.finally)
-                {
-                    auto finallySection = enterFinallyCode();
-                    visit(*tryStmt.finally->suite);
-                }
-                if (needsTerminator())
-                {
-                    m_builder.create<mlir::cf::BranchOp>(continueBlock);
-                }
-            }
-            continue;
-        }
-        auto value = visit(iter.expression->first);
+        auto value = visit(*iter.filter);
         if (!value)
         {
             return;
         }
-        if (iter.expression->second)
+        if (iter.maybeName)
         {
             // TODO: Python requires this identifier to be unbound at the end of the exception handler as if done in
             //       a finally section
-            writeIdentifier(iter.expression->second->second, exceptionHandler->getArgument(0));
+            writeIdentifier(*iter.maybeName, exceptionHandler->getArgument(0));
         }
         auto tupleType = m_builder.createTupleRef();
         auto isTuple = m_builder.createIs(m_builder.createTypeOf(value), tupleType);
@@ -1794,6 +1374,22 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         }
         implementBlock(skipBlock);
     }
+    if (tryStmt.maybeExceptAll)
+    {
+        visit(*tryStmt.maybeExceptAll->suite);
+        if (needsTerminator())
+        {
+            if (tryStmt.finally)
+            {
+                auto finallySection = enterFinallyCode();
+                visit(*tryStmt.finally->suite);
+            }
+            if (needsTerminator())
+            {
+                m_builder.create<mlir::cf::BranchOp>(continueBlock);
+            }
+        }
+    }
     if (needsTerminator())
     {
         if (tryStmt.finally)
@@ -1817,140 +1413,28 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
     std::vector<IdentifierToken> functionParametersTokens;
     std::vector<FunctionParameter> functionParameters;
-    if (funcDef.parameterList)
+    for (const auto& iter : funcDef.parameterList)
     {
-        class ParamVisitor : public Syntax::Visitor<ParamVisitor>
+        functionParametersTokens.push_back(iter.name);
+        functionParameters.push_back({std::string{iter.name.getValue()},
+                                      static_cast<FunctionParameter::Kind>(iter.kind), iter.maybeDefault != nullptr});
+        if (!iter.maybeDefault)
         {
-        public:
-            std::vector<Py::IterArg>& defaultParameters;
-            std::vector<Py::DictArg>& keywordOnlyDefaultParameters;
-            std::vector<FunctionParameter>& functionParameters;
-            std::vector<IdentifierToken>& functionParametersTokens;
-            std::function<mlir::Value(const Syntax::Expression&)> calcCallback;
-            Py::PyBuilder& builder;
-            std::function<mlir::Location(const IdentifierToken&)> locCallback;
-            FunctionParameter::Kind kind{};
-
-            using Visitor::visit;
-
-            void visit(const Syntax::ParameterList::Parameter& param)
-            {
-                if (!builder.getInsertionBlock())
-                {
-                    return;
-                }
-                functionParameters.push_back({std::string(param.identifier.getValue()), kind, false});
-                functionParametersTokens.push_back(param.identifier);
-            }
-
-            void visit(const Syntax::ParameterList::DefParameter& defParameter)
-            {
-                if (!builder.getInsertionBlock())
-                {
-                    return;
-                }
-                Visitor::visit(defParameter);
-                if (!defParameter.defaultArg)
-                {
-                    return;
-                }
-                if (!builder.getInsertionBlock())
-                {
-                    return;
-                }
-                functionParameters.back().hasDefaultParam = true;
-                auto value = calcCallback(defParameter.defaultArg->second);
-                if (!value)
-                {
-                    return;
-                }
-                if (kind != FunctionParameter::KeywordOnly)
-                {
-                    defaultParameters.emplace_back(value);
-                    return;
-                }
-                builder.setCurrentLoc(locCallback(defParameter.parameter.identifier));
-                auto name = builder.createConstant(defParameter.parameter.identifier.getValue());
-                keywordOnlyDefaultParameters.push_back(std::pair{name, value});
-            }
-
-            void visit(const Syntax::ParameterList::PosOnly& posOnlyNode)
-            {
-                if (!builder.getInsertionBlock())
-                {
-                    return;
-                }
-                kind = FunctionParameter::PosOnly;
-                Visitor::visit(posOnlyNode);
-            }
-
-            void visit(const Syntax::ParameterList::NoPosOnly& noPosOnly)
-            {
-                if (!builder.getInsertionBlock())
-                {
-                    return;
-                }
-                kind = FunctionParameter::Normal;
-                Visitor::visit(noPosOnly);
-            }
-
-            void visit(const Syntax::ParameterList::StarArgs& star)
-            {
-                if (!builder.getInsertionBlock())
-                {
-                    return;
-                }
-                auto doubleStarHandler = [&](const Syntax::ParameterList::StarArgs::DoubleStar& doubleStar)
-                {
-                    visit(doubleStar.parameter);
-                    if (!builder.getInsertionBlock())
-                    {
-                        return;
-                    }
-                    functionParameters.back().kind = FunctionParameter::KeywordRest;
-                };
-                pylir::match(
-                    star.variant,
-                    [&](const Syntax::ParameterList::StarArgs::Star& star)
-                    {
-                        kind = FunctionParameter::KeywordOnly;
-                        if (star.parameter)
-                        {
-                            visit(*star.parameter);
-                            if (!builder.getInsertionBlock())
-                            {
-                                return;
-                            }
-                            functionParameters.back().kind = FunctionParameter::PosRest;
-                        }
-                        for (const auto& iter : llvm::make_second_range(star.defParameters))
-                        {
-                            visit(iter);
-                            if (!builder.getInsertionBlock())
-                            {
-                                return;
-                            }
-                        }
-                        if (star.further && star.further->doubleStar)
-                        {
-                            doubleStarHandler(*star.further->doubleStar);
-                        }
-                    },
-                    doubleStarHandler);
-            }
-        } visitor{{},
-                  defaultParameters,
-                  keywordOnlyDefaultParameters,
-                  functionParameters,
-                  functionParametersTokens,
-                  [this](const Syntax::Expression& expression) { return visit(expression); },
-                  m_builder,
-                  [this](const IdentifierToken& token) { return getLoc(token, token); }};
-        visitor.visit(*funcDef.parameterList);
-        if (!m_builder.getInsertionBlock())
+            continue;
+        }
+        auto value = visit(*iter.maybeDefault);
+        if (!value)
         {
             return;
         }
+        if (iter.kind != Syntax::Parameter::KeywordOnly)
+        {
+            defaultParameters.emplace_back(value);
+            continue;
+        }
+        m_builder.setCurrentLoc(getLoc(iter, iter));
+        auto name = m_builder.createConstant(iter.name.getValue());
+        keywordOnlyDefaultParameters.push_back(std::pair{name, value});
     }
     m_builder.setCurrentLoc(getLoc(funcDef.funcName, funcDef.funcName));
     auto qualifiedName = m_qualifiers + std::string(funcDef.funcName.getValue());
@@ -1959,10 +1443,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     {
         pylir::ValueReset namespaceReset(m_classNamespace);
         m_classNamespace = {};
-        func = mlir::func::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
-                                    m_builder.getFunctionType(std::vector<mlir::Type>(1 + functionParameters.size(),
-                                                                                      m_builder.getDynamicType()),
-                                                              {m_builder.getDynamicType()}));
+        func =
+            mlir::func::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
+                                       m_builder.getFunctionType(std::vector<mlir::Type>(1 + functionParameters.size(),
+                                                                                         m_builder.getDynamicType()),
+                                                                 {m_builder.getDynamicType()}));
         func.setPrivate();
         auto reset = implementFunction(func);
 
@@ -2075,7 +1560,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     for (const auto& iter : llvm::reverse(funcDef.decorators))
     {
         auto decLoc = getLoc(iter.atSign, iter.atSign);
-        auto decorator = visit(iter.assignmentExpression);
+        auto decorator = visit(*iter.expression);
         if (!decorator)
         {
             return;
@@ -2090,9 +1575,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
 {
     m_builder.setCurrentLoc(getLoc(classDef, classDef.className));
     mlir::Value bases, keywords;
-    if (classDef.inheritance && classDef.inheritance->argumentList)
+    if (classDef.inheritance)
     {
-        std::tie(bases, keywords) = visit(*classDef.inheritance->argumentList);
+        std::tie(bases, keywords) = visit(classDef.inheritance->argumentList);
     }
     else
     {
@@ -2124,132 +1609,37 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     //    writeIdentifier(classDef.className, value);
 }
 
-void pylir::CodeGen::visit(const pylir::Syntax::AsyncForStmt& asyncForStmt) {}
-
-void pylir::CodeGen::visit(const pylir::Syntax::AsyncWithStmt& asyncWithStmt) {}
-
 void pylir::CodeGen::visit(const Syntax::Suite& suite)
 {
-    pylir::match(
-        suite.variant, [&](const Syntax::Suite::SingleLine& singleLine) { visit(singleLine.stmtList); },
-        [&](const Syntax::Suite::MultiLine& singleLine)
-        {
-            for (const auto& iter : singleLine.statements)
-            {
-                visit(iter);
-            }
-        });
+    for (const auto& iter : suite.statements)
+    {
+        pylir::match(iter, [&](const auto& ptr) { visit(*ptr); });
+    }
 }
 
-std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(const pylir::Syntax::ArgumentList& argumentList)
+std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(llvm::ArrayRef<pylir::Syntax::Argument> argumentList)
 {
-    m_builder.setCurrentLoc(getLoc(argumentList, argumentList));
     std::vector<Py::IterArg> iterArgs;
     std::vector<Py::DictArg> dictArgs;
-    if (argumentList.positionalArguments)
+    for (const auto& iter : argumentList)
     {
-        auto handlePositionalItem = [&](const Syntax::ArgumentList::PositionalItem& positionalItem)
+        if (iter.maybeName)
         {
-            return pylir::match(
-                positionalItem.variant,
-                [&](const std::unique_ptr<Syntax::AssignmentExpression>& expression)
-                {
-                    auto iter = visit(*expression);
-                    if (!iter)
-                    {
-                        return false;
-                    }
-                    iterArgs.emplace_back(iter);
-                    return true;
-                },
-                [&](const Syntax::ArgumentList::PositionalItem::Star& star)
-                {
-                    auto iter = visit(*star.expression);
-                    if (!iter)
-                    {
-                        return false;
-                    }
-                    iterArgs.emplace_back(Py::IterExpansion{iter});
-                    return true;
-                });
-        };
-        if (!handlePositionalItem(argumentList.positionalArguments->firstItem))
-        {
-            return {{}, {}};
+            m_builder.setCurrentLoc(getLoc(*iter.maybeName, *iter.maybeName));
+            mlir::Value key = m_builder.createConstant(iter.maybeName->getValue());
+            dictArgs.push_back(std::pair{key, visit(*iter.expression)});
+            continue;
         }
-        for (const auto& [token, rest] : argumentList.positionalArguments->rest)
+        if (!iter.maybeExpansionsOrEqual)
         {
-            (void)token;
-            if (!handlePositionalItem(rest))
-            {
-                return {{}, {}};
-            }
+            iterArgs.emplace_back(visit(*iter.expression));
+            continue;
         }
-    }
-    auto handleKeywordItem = [&](const Syntax::ArgumentList::KeywordItem& keywordItem)
-    {
-        m_builder.setCurrentLoc(getLoc(keywordItem.identifier, keywordItem.identifier));
-        auto key = m_builder.createConstant(keywordItem.identifier.getValue());
-        auto value = visit(*keywordItem.expression);
-        if (!value)
+        switch (iter.maybeExpansionsOrEqual->getTokenType())
         {
-            return false;
-        }
-        dictArgs.push_back(std::pair{key, value});
-        return true;
-    };
-    if (argumentList.starredAndKeywords)
-    {
-        auto handleExpression = [&](const Syntax::ArgumentList::StarredAndKeywords::Expression& expression)
-        {
-            auto value = visit(*expression.expression);
-            if (!value)
-            {
-                return false;
-            }
-            iterArgs.emplace_back(Py::IterExpansion{value});
-            return true;
-        };
-        auto handleStarredAndKeywords = [&](const Syntax::ArgumentList::StarredAndKeywords::Variant& variant)
-        { return pylir::match(variant, handleKeywordItem, handleExpression); };
-        if (!handleKeywordItem(argumentList.starredAndKeywords->first))
-        {
-            return {{}, {}};
-        }
-        for (const auto& [token, variant] : argumentList.starredAndKeywords->rest)
-        {
-            (void)token;
-            if (!handleStarredAndKeywords(variant))
-            {
-                return {{}, {}};
-            }
-        }
-    }
-    if (argumentList.keywordArguments)
-    {
-        auto handleExpression = [&](const Syntax::ArgumentList::KeywordArguments::Expression& expression)
-        {
-            auto value = visit(*expression.expression);
-            if (!value)
-            {
-                return false;
-            }
-            dictArgs.emplace_back(Py::MappingExpansion{value});
-            return true;
-        };
-        auto handleKeywordArguments = [&](const Syntax::ArgumentList::KeywordArguments::Variant& variant)
-        { return pylir::match(variant, handleKeywordItem, handleExpression); };
-        if (!handleExpression(argumentList.keywordArguments->first))
-        {
-            return {{}, {}};
-        }
-        for (const auto& [token, variant] : argumentList.keywordArguments->rest)
-        {
-            (void)token;
-            if (!handleKeywordArguments(variant))
-            {
-                return {{}, {}};
-            }
+            case TokenType::Star: iterArgs.emplace_back(Py::IterExpansion{visit(*iter.expression)}); break;
+            case TokenType::PowerOf: dictArgs.emplace_back(Py::MappingExpansion{visit(*iter.expression)}); break;
+            default: PYLIR_UNREACHABLE;
         }
     }
     auto tuple = makeTuple(iterArgs);
@@ -2606,4 +1996,51 @@ void pylir::CodeGen::buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock,
     auto one = m_builder.create<mlir::arith::ConstantIndexOp>(1);
     auto nextIter = m_builder.create<mlir::arith::AddIOp>(conditionBlock->getArgument(0), one);
     m_builder.create<mlir::cf::BranchOp>(conditionBlock, mlir::ValueRange{nextIter});
+}
+
+void pylir::CodeGen::visit(const Syntax::ExpressionStmt& expressionStmt)
+{
+    visit(*expressionStmt.expression);
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::Slice& slice)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+mlir::Value pylir::CodeGen::visit(const Syntax::Generator& generator)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::visit(const Syntax::AssertStmt& assertStmt)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::visit(const Syntax::DelStmt& delStmt)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::visit(const Syntax::ImportStmt& importStmt)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
 }

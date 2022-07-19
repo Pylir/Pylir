@@ -34,8 +34,6 @@ constexpr auto ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS =
 
 constexpr auto USE_HEX_OR_OCTAL_ESCAPES_INSTEAD = FMT_STRING("use hex or octal escapes instead");
 
-constexpr auto INVALID_NUMBER_PREFIX_N = FMT_STRING("invalid number prefix '{}'");
-
 constexpr auto UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS = FMT_STRING("underscore only allowed between digits");
 
 constexpr auto NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED = FMT_STRING("number with leading zeros not allowed");
@@ -58,9 +56,20 @@ constexpr auto NEXT_CLOSEST_INDENTATION_N = FMT_STRING("next closest indent {}")
 
 constexpr auto CANNOT_ASSIGN_TO_N = FMT_STRING("cannot assign to {}");
 
+constexpr auto OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES =
+    FMT_STRING("operator {:q^} cannot assign to multiple variables");
+
+constexpr auto OPERATOR_N_CANNOT_ASSIGN_TO_SINGLE_TUPLE_ELEMENT =
+    FMT_STRING("operator {:q^} cannot assign to single tuple element");
+
+constexpr auto OPERATOR_N_CANNOT_ASSIGN_TO_EMPTY_TUPLE = FMT_STRING("operator {:q^} cannot assign to empty tuple");
+
 constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_N = FMT_STRING("cannot assign to result of {}");
 
 constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N = FMT_STRING("cannot assign to result of operator {:q^}");
+
+constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N =
+    FMT_STRING("cannot assign to result of unary operator {:q^}");
 
 constexpr auto UNKNOWN_FEATURE_N = FMT_STRING("unknown feature '{}'");
 
@@ -139,6 +148,41 @@ constexpr auto NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEF
     FMT_STRING("no default argument for parameter '{}' following parameters with default arguments");
 
 constexpr auto PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE = FMT_STRING("parameter '{}' with default argument here");
+
+constexpr auto POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS =
+    FMT_STRING("positional argument not allowed following keyword arguments");
+
+constexpr auto POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING =
+    FMT_STRING("positional argument not allowed following dictionary unpacking");
+
+constexpr auto ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING =
+    FMT_STRING("iterable unpacking not allowed following dictionary unpacking");
+
+constexpr auto FIRST_KEYWORD_ARGUMENT_N_HERE = FMT_STRING("first keyword argument '{}' here");
+
+constexpr auto FIRST_DICTIONARY_UNPACKING_HERE = FMT_STRING("first dictionary unpacking here");
+
+constexpr auto AT_LEAST_ONE_PARAMETER_REQUIRED_BEFORE_POSITIONAL_ONLY_INDICATOR =
+    FMT_STRING("at least one parameter required before positional-only indicator");
+
+constexpr auto POSITIONAL_ONLY_INDICATOR_MAY_ONLY_APPEAR_ONCE =
+    FMT_STRING("positional-only indicator may only appear once");
+
+constexpr auto PREVIOUS_OCCURRENCE_HERE = FMT_STRING("previous occurrence here");
+
+constexpr auto NO_MORE_PARAMETERS_ALLOWED_AFTER_EXCESS_KEYWORD_PARAMETER_N =
+    FMT_STRING("no more parameters allowed after excess-keyword parameter '{}'");
+
+constexpr auto EXCESS_KEYWORD_PARAMETER_N_HERE = FMT_STRING("excess-keyword parameter '{}' here");
+
+constexpr auto STARRED_PARAMETER_NOT_ALLOWED_AFTER_KEYWORD_ONLY_INDICATOR =
+    FMT_STRING("starred parameter not allowed after keyword-only indicator");
+
+constexpr auto KEYWORD_ONLY_INDICATOR_HERE = FMT_STRING("keyword-only indicator here");
+
+constexpr auto ONLY_ONE_STARRED_PARAMETER_ALLOWED = FMT_STRING("only one starred parameter allowed");
+
+constexpr auto STARRED_PARAMETER_N_HERE = FMT_STRING("starred parameter '{}' here");
 
 constexpr auto EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST =
     FMT_STRING("except clause without expression must come last");

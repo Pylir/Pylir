@@ -257,21 +257,20 @@ class CodeGen
 
     std::string formImplName(std::string_view symbol);
 
-    void assignTarget(const Syntax::TargetList& targetList, mlir::Value value);
-
-    void assignTarget(const Syntax::Target& target, mlir::Value value);
+    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    void assignTarget(const T& variant, mlir::Value value)
+    {
+        variant.match([=](const auto& sub) { assignTarget(sub, value); });
+    }
 
     mlir::Value binOp(llvm::StringRef method, mlir::Value lhs, mlir::Value rhs);
 
     mlir::Value binOp(llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs, mlir::Value rhs);
 
-    template <mlir::Value (CodeGen::*op)(const std::vector<Py::IterArg>&)>
-    mlir::Value visit(const Syntax::StarredList& starredList);
-
-    void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::AssignmentExpression& iteration,
+    void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
                const Syntax::CompFor& compFor);
 
-    void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::AssignmentExpression& iteration,
+    void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
                const Syntax::CompIf& compIf);
 
     void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Comprehension& comprehension);
@@ -323,20 +322,32 @@ class CodeGen
         implementBlock(blockPtr.get());
     }
 
-    void visitForConstruct(const Syntax::TargetList& targets, mlir::Value iterable,
-                           llvm::function_ref<void()> execSuite,
+    void visitForConstruct(const Syntax::Target& targets, mlir::Value iterable, llvm::function_ref<void()> execSuite,
                            const std::optional<Syntax::IfStmt::Else>& elseSection = {});
+
+    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    decltype(auto) visit(const T& variant)
+    {
+        auto lambda = [&] { return variant.match([=](const auto& sub) -> decltype(auto) { return visit(sub); }); };
+        using Ret = decltype(lambda());
+        if (!m_builder.getInsertionBlock())
+        {
+            if constexpr (std::is_void_v<Ret>)
+            {
+                return;
+            }
+            else
+            {
+                return Ret{};
+            }
+        }
+        return lambda();
+    }
 
 public:
     CodeGen(mlir::MLIRContext* context, Diag::Document& document);
 
     mlir::ModuleOp visit(const Syntax::FileInput& fileInput);
-
-    void visit(const Syntax::Statement& statement);
-
-    void visit(const Syntax::StmtList& stmtList);
-
-    void visit(const Syntax::CompoundStmt& compoundStmt);
 
     void visit(const Syntax::IfStmt& ifStmt);
 
@@ -352,63 +363,80 @@ public:
 
     void visit(const Syntax::ClassDef& classDef);
 
-    void visit(const Syntax::AsyncForStmt& asyncForStmt);
-
-    void visit(const Syntax::AsyncWithStmt& asyncWithStmt);
-
     void visit(const Syntax::Suite& suite);
-
-    void visit(const Syntax::SimpleStmt& continueStmt);
 
     void visit(const Syntax::AssignmentStmt& assignmentStmt);
 
-    mlir::Value visit(const Syntax::StarredExpression& starredExpression);
+    void visit(const Syntax::RaiseStmt& raiseStmt);
 
-    mlir::Value visit(const Syntax::ExpressionList& expressionList);
+    void visit(const Syntax::ReturnStmt& returnStmt);
 
-    mlir::Value visit(const Syntax::YieldExpression& yieldExpression);
+    void visit(const Syntax::SingleTokenStmt& singleTokenStmt);
 
-    mlir::Value visit(const Syntax::Expression& expression);
+    void visit(const Syntax::GlobalOrNonLocalStmt& globalOrNonLocalStmt);
 
-    mlir::Value visit(const Syntax::ConditionalExpression& expression);
+    void visit(const Syntax::ExpressionStmt& expressionStmt);
 
-    mlir::Value visit(const Syntax::OrTest& expression);
+    void visit(const Syntax::AssertStmt& assertStmt);
 
-    mlir::Value visit(const Syntax::AndTest& expression);
+    void visit(const Syntax::DelStmt& delStmt);
 
-    mlir::Value visit(const Syntax::NotTest& expression);
+    void visit(const Syntax::ImportStmt& importStmt);
+
+    void assignTarget(const Syntax::Atom& atom, mlir::Value value);
+
+    void assignTarget(const Syntax::Subscription& subscription, mlir::Value value);
+
+    void assignTarget(const Syntax::AttributeRef& attributeRef, mlir::Value value);
+
+    void assignTarget(const Syntax::TupleConstruct& tupleConstruct, mlir::Value value);
+
+    void assignTarget(const Syntax::ListDisplay& listDisplay, mlir::Value value);
+
+    template <class T,
+              std::enable_if_t<std::is_base_of_v<Syntax::Target, T> && !std::is_same_v<Syntax::Target, T>>* = nullptr>
+    void assignTarget(const T&, mlir::Value)
+    {
+        PYLIR_UNREACHABLE;
+    }
+
+    mlir::Value visit(const Syntax::Yield& yield);
+
+    mlir::Value visit(const Syntax::Conditional& expression);
 
     mlir::Value visit(const Syntax::Comparison& comparison);
-
-    mlir::Value visit(const Syntax::OrExpr& orExpr);
-
-    mlir::Value visit(const Syntax::XorExpr& xorExpr);
-
-    mlir::Value visit(const Syntax::AndExpr& andExpr);
-
-    mlir::Value visit(const Syntax::ShiftExpr& shiftExpr);
-
-    mlir::Value visit(const Syntax::AExpr& aExpr);
-
-    mlir::Value visit(const Syntax::MExpr& mExpr);
-
-    mlir::Value visit(const Syntax::UExpr& uExpr);
-
-    mlir::Value visit(const Syntax::Power& power);
-
-    mlir::Value visit(const Syntax::AwaitExpr& awaitExpr);
-
-    mlir::Value visit(const Syntax::Primary& primary);
 
     mlir::Value visit(const Syntax::Atom& atom);
 
     mlir::Value visit(const Syntax::Subscription& primary);
 
-    mlir::Value visit(const Syntax::Enclosure& enclosure);
+    mlir::Value visit(const Syntax::Assignment& assignment);
 
-    mlir::Value visit(const Syntax::AssignmentExpression& assignmentExpression);
+    mlir::Value visit(const Syntax::TupleConstruct& tupleConstruct);
 
-    std::pair<mlir::Value, mlir::Value> visit(const Syntax::ArgumentList& argumentList);
+    mlir::Value visit(const Syntax::BinOp& binOp);
+
+    mlir::Value visit(const Syntax::UnaryOp& unaryOp);
+
+    mlir::Value visit(const Syntax::AttributeRef& attributeRef);
+
+    mlir::Value visit(const Syntax::Slice& slice);
+
+    mlir::Value visit(const Syntax::Call& call);
+
+    mlir::Value visit(const Syntax::Lambda& lambda);
+
+    mlir::Value visit(const Syntax::Generator& generator);
+
+    mlir::Value visit(const Syntax::ListDisplay& listDisplay);
+
+    mlir::Value visit(const Syntax::SetDisplay& setDisplay);
+
+    mlir::Value visit(const Syntax::DictDisplay& dictDisplay);
+
+    std::vector<Py::IterArg> visit(llvm::ArrayRef<Syntax::StarredItem> starredItems);
+
+    std::pair<mlir::Value, mlir::Value> visit(llvm::ArrayRef<Syntax::Argument> argumentList);
 };
 
 inline mlir::OwningOpRef<mlir::ModuleOp> codegen(mlir::MLIRContext* context, const Syntax::FileInput& input,

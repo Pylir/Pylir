@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <pylir/Diagnostics/LocationProvider.hpp>
 #include <pylir/Support/BigInt.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
@@ -218,9 +219,6 @@ using IdentifierMap = std::unordered_map<IdentifierToken, T, IdentifierHash, Ide
 
 namespace Diag
 {
-template <class T, class>
-struct LocationProvider;
-
 template <class T>
 struct LocationProvider<T, std::enable_if_t<std::is_base_of_v<BaseToken, T>>>
 {

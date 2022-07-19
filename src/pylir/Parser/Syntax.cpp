@@ -1,352 +1,175 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
 #include "Syntax.hpp"
 
-#include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
+using namespace pylir::Diag;
+using namespace pylir::Syntax;
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Enclosure, void>::getRange(const Syntax::Enclosure& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<TupleConstruct>::getRange(const TupleConstruct& value) noexcept
 {
-    return pylir::match(
-        value.variant,
-        [](const Syntax::Enclosure::ParenthForm& parenthForm) -> std::pair<std::size_t, std::size_t> {
-            return {range(parenthForm.openParenth).first, range(parenthForm.closeParenth).second};
-        },
-        [](const Syntax::Enclosure::GeneratorExpression& parenthForm) -> std::pair<std::size_t, std::size_t> {
-            return {range(parenthForm.openParenth).first, range(parenthForm.closeParenth).second};
-        },
-        [](const Syntax::Enclosure::YieldAtom& parenthForm) -> std::pair<std::size_t, std::size_t> {
-            return {range(parenthForm.openParenth).first, range(parenthForm.closeParenth).second};
-        },
-        [](const Syntax::Enclosure::ListDisplay& parenthForm) -> std::pair<std::size_t, std::size_t> {
-            return {range(parenthForm.openSquare).first, range(parenthForm.closeSquare).second};
-        },
-        [](const Syntax::Enclosure::SetDisplay& parenthForm) -> std::pair<std::size_t, std::size_t> {
-            return {range(parenthForm.openBrace).first, range(parenthForm.closeBrace).second};
-        },
-        [](const Syntax::Enclosure::DictDisplay& parenthForm) -> std::pair<std::size_t, std::size_t> {
-            return {range(parenthForm.openBrace).first, range(parenthForm.closeBrace).second};
-        });
-}
-
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::LambdaExpression, void>::getRange(
-    const Syntax::LambdaExpression& value) noexcept
-{
-    return {range(value.lambdaToken).first, range(value.expression).second};
-}
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Expression, void>::getRange(const Syntax::Expression& value) noexcept
-{
-    return pylir::match(
-        value.variant,
-        [](const Syntax::ConditionalExpression& conditionalExpression) { return range(conditionalExpression); },
-        [](const std::unique_ptr<Syntax::LambdaExpression>& ptr) { return range(*ptr); });
-}
-
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::ConditionalExpression, void>::getRange(
-    const Syntax::ConditionalExpression& value) noexcept
-{
-    if (!value.suffix)
+    if (value.maybeOpenBracket)
     {
-        return range(value.value);
+        return {range(*value.maybeOpenBracket).first, range(*value.maybeCloseBracket).second};
     }
-    return {range(value.value).first, range(*value.suffix->elseValue).second};
+    PYLIR_ASSERT(!value.items.empty());
+    return {range(value.items.front()).first, range(value.items.back()).second};
 }
 
-namespace
+std::pair<std::size_t, std::size_t> LocationProvider<Lambda>::getRange(const Lambda& value) noexcept
 {
-template <class ThisClass>
-auto rangeOfBin(const ThisClass& thisClass)
-{
-    return pylir::match(
-        thisClass.variant,
-        [](const std::unique_ptr<typename ThisClass::BinOp>& binOp) -> std::pair<std::size_t, std::size_t>
-        {
-            auto& [lhs, token, rhs] = *binOp;
-            return {pylir::Diag::range(*lhs).first, pylir::Diag::range(rhs).second};
-        },
-        [](const auto& value) -> std::pair<std::size_t, std::size_t> { return pylir::Diag::range(value); });
-}
-} // namespace
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::OrTest, void>::getRange(const Syntax::OrTest& value) noexcept
-{
-    return rangeOfBin(value);
+    return {range(value.lambdaKeyword).first, range(*value.expression).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::AndTest, void>::getRange(const Syntax::AndTest& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Expression>::getRange(const Expression& value) noexcept
 {
-    return rangeOfBin(value);
+    return value.match([&](auto&& sub) { return range(sub); });
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::OrExpr, void>::getRange(const Syntax::OrExpr& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Conditional>::getRange(const Conditional& value) noexcept
 {
-    return rangeOfBin(value);
+    return {range(*value.trueValue).first, range(*value.elseValue).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::XorExpr, void>::getRange(const Syntax::XorExpr& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<BinOp>::getRange(const BinOp& value) noexcept
 {
-    return rangeOfBin(value);
+    return {range(*value.lhs).first, range(*value.rhs).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::AndExpr, void>::getRange(const Syntax::AndExpr& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Comparison>::getRange(const Comparison& value) noexcept
 {
-    return rangeOfBin(value);
+    return {range(*value.first).first, range(*value.rest.back().second).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::ShiftExpr, void>::getRange(const Syntax::ShiftExpr& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<UnaryOp>::getRange(const UnaryOp& value) noexcept
 {
-    return rangeOfBin(value);
+    return {range(value.operation).first, range(*value.expression).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::AExpr, void>::getRange(const Syntax::AExpr& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Call>::getRange(const Call& value) noexcept
 {
-    return rangeOfBin(value);
+    return {range(*value.expression).first, range(value.closeParenth).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::NotTest, void>::getRange(const Syntax::NotTest& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<DictDisplay>::getRange(const DictDisplay& value) noexcept
 {
-    return pylir::match(
-        value.variant, [](const Syntax::Comparison& comparison) { return range(comparison); },
-        [](const std::pair<BaseToken, std::unique_ptr<Syntax::NotTest>>& pair) -> std::pair<std::size_t, std::size_t> {
-            return {range(pair.first).first, range(*pair.second).second};
-        });
+    return {range(value.openBrace).first, range(value.closeBrace).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Comparison, void>::getRange(const Syntax::Comparison& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<SetDisplay>::getRange(const SetDisplay& value) noexcept
 {
-    if (value.rest.empty())
+    return {range(value.openBrace).first, range(value.closeBrace).second};
+}
+
+std::pair<std::size_t, std::size_t> LocationProvider<ListDisplay>::getRange(const ListDisplay& value) noexcept
+{
+    return {range(value.openSquare).first, range(value.closeSquare).second};
+}
+
+std::pair<std::size_t, std::size_t> LocationProvider<Yield>::getRange(const Yield& value) noexcept
+{
+    return {range(value.yieldToken).first, range(*value.maybeExpression).second};
+}
+
+std::pair<std::size_t, std::size_t> LocationProvider<Generator>::getRange(const Generator& value) noexcept
+{
+    return {range(value.openParenth).first, range(value.closeParenth).second};
+}
+
+std::pair<std::size_t, std::size_t> LocationProvider<Slice>::getRange(const Slice& value) noexcept
+{
+    std::size_t start;
+    std::size_t end;
+    if (value.maybeLowerBound)
     {
-        return range(value.left);
+        start = range(*value.maybeLowerBound).first;
     }
-    return {range(value.left).first, range(value.rest.back().second).second};
-}
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::MExpr, void>::getRange(const Syntax::MExpr& value) noexcept
-{
-    return pylir::match(
-        value.variant, [](const Syntax::UExpr& uExpr) { return range(uExpr); },
-        [](const std::unique_ptr<Syntax::MExpr::AtBin>& atBin) -> std::pair<std::size_t, std::size_t> {
-            return {range(*atBin->lhs).first, range(*atBin->rhs).second};
-        },
-        [](const std::unique_ptr<Syntax::MExpr::BinOp>& binOp) -> std::pair<std::size_t, std::size_t> {
-            return {range(*binOp->lhs).first, range(binOp->rhs).second};
-        });
-}
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::UExpr, void>::getRange(const Syntax::UExpr& value) noexcept
-{
-    return pylir::match(
-        value.variant, [](const Syntax::Power& power) { return range(power); },
-        [](const std::pair<Token, std::unique_ptr<Syntax::UExpr>>& pair) -> std::pair<std::size_t, std::size_t> {
-            return {range(pair.first).first, range(*pair.second).second};
-        });
-}
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Power, void>::getRange(const Syntax::Power& value) noexcept
-{
-    auto first = pylir::match(value.variant, [](auto&& value) { return range(value); });
-    if (!value.rightHand)
+    else
     {
-        return first;
+        start = range(value.firstColon).first;
     }
-    return {first.first, range(*value.rightHand->second).second};
+    if (value.maybeStride)
+    {
+        end = range(*value.maybeStride).second;
+    }
+    else if (value.maybeUpperBound)
+    {
+        end = range(*value.maybeUpperBound).second;
+    }
+    else
+    {
+        end = range(value.firstColon).second;
+    }
+    return {start, end};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::AwaitExpr, void>::getRange(const Syntax::AwaitExpr& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Subscription>::getRange(const Subscription& value) noexcept
 {
-    return {range(value.awaitToken).first, range(value.primary).second};
+    return {range(*value.object).first, range(value.closeSquareBracket).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Primary, void>::getRange(const Syntax::Primary& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<AttributeRef>::getRange(const AttributeRef& value) noexcept
 {
-    return pylir::match(value.variant, [](auto&& value) { return range(value); });
+    return {range(*value.object).first, range(value.identifier).second};
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Atom, void>::getRange(const Syntax::Atom& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Atom>::getRange(const Atom& value) noexcept
 {
-    return pylir::match(
-        value.variant, [](const Syntax::Atom::Literal& literal) { return range(literal.token); },
-        [](const IdentifierToken& identifier) { return range(identifier); },
-        [](const std::unique_ptr<Syntax::Enclosure>& enclosure) { return range(*enclosure); });
+    return range(value.token);
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Call, void>::getRange(const Syntax::Call& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<StarredItem>::getRange(const StarredItem& value) noexcept
 {
-    return {range(*value.primary).second, range(value.closeParentheses).second};
+    if (value.maybeStar)
+    {
+        return {range(*value.maybeStar).first, range(*value.expression).second};
+    }
+    return range(*value.expression);
 }
 
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::Slicing, void>::getRange(const Syntax::Slicing& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Assignment>::getRange(const Assignment& value) noexcept
 {
-    return {range(*value.primary).second, range(value.closeSquareBracket).second};
+    return {range(value.variable).first, range(*value.expression).second};
 }
 
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::Subscription, void>::getRange(
-    const Syntax::Subscription& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Argument>::getRange(const Argument& value) noexcept
 {
-    return {range(*value.primary).second, range(value.closeSquareBracket).second};
-}
-
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::AttributeRef, void>::getRange(
-    const Syntax::AttributeRef& value) noexcept
-{
-    return {range(*value.primary).second, range(value.identifier).second};
-}
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::StarredItem, void>::getRange(const Syntax::StarredItem& value) noexcept
-{
-    return pylir::match(
-        value.variant,
-        [](const Syntax::AssignmentExpression& assignmentExpression) { return range(assignmentExpression); },
-        [](const std::pair<BaseToken, Syntax::OrExpr>& pair) -> std::pair<std::size_t, std::size_t> {
-            return {range(pair.first).first, range(pair.second).second};
-        });
-}
-
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::AssignmentExpression, void>::getRange(
-    const Syntax::AssignmentExpression& value) noexcept
-{
-    if (!value.identifierAndWalrus)
+    std::size_t start;
+    if (value.maybeName)
+    {
+        start = range(*value.maybeName).first;
+    }
+    else if (value.maybeExpansionsOrEqual)
+    {
+        start = range(*value.maybeExpansionsOrEqual).first;
+    }
+    else
     {
         return range(*value.expression);
     }
-    return {range(value.identifierAndWalrus->first).first, range(*value.expression).second};
+    return {start, range(*value.expression).second};
 }
 
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::StarredExpression, void>::getRange(
-    const Syntax::StarredExpression& value) noexcept
+std::pair<std::size_t, std::size_t> LocationProvider<Parameter>::getRange(const Parameter& value) noexcept
 {
-    return pylir::match(
-        value.variant, [](const Syntax::Expression& expression) { return range(expression); },
-        [](const Syntax::StarredExpression::Items& items) -> std::pair<std::size_t, std::size_t>
-        {
-            if (!items.leading.empty())
-            {
-                if (items.last)
-                {
-                    return {range(items.leading.front().first).first, range(*items.last).second};
-                }
-                return {range(items.leading.front().first).first, range(items.leading.back().second).second};
-            }
-            if (items.last)
-            {
-                return range(*items.last);
-            }
-            return {0, 0};
-        });
-}
-
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::ExpressionList, void>::getRange(
-    const Syntax::ExpressionList& expressionList) noexcept
-{
-    auto first = range(*expressionList.firstExpr);
-    if (expressionList.trailingComma)
+    std::size_t start;
+    if (value.maybeStars)
     {
-        return {first.first, range(*expressionList.trailingComma).second};
+        start = range(*value.maybeStars).first;
     }
-    if (expressionList.remainingExpr.empty())
+    else
     {
-        return first;
+        start = range(value.name).first;
     }
-    return {first.first, range(*expressionList.remainingExpr.back().second).second};
-}
-
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::StarredList, void>::getRange(
-    const Syntax::StarredList& starredList) noexcept
-{
-    auto first = range(*starredList.firstExpr);
-    if (starredList.trailingComma)
+    std::size_t end;
+    if (value.maybeDefault)
     {
-        return {first.first, range(*starredList.trailingComma).second};
+        end = range(*value.maybeDefault).second;
     }
-    if (starredList.remainingExpr.empty())
+    else if (value.maybeType)
     {
-        return first;
+        end = range(*value.maybeType).second;
     }
-    return {first.first, range(*starredList.remainingExpr.back().second).second};
-}
-
-std::pair<std::size_t, std::size_t> pylir::Diag::LocationProvider<pylir::Syntax::ArgumentList, void>::getRange(
-    const Syntax::ArgumentList& argumentList) noexcept
-{
-    auto handlePositionalItem = [&](const Syntax::ArgumentList::PositionalItem& item)
+    else
     {
-        return pylir::match(
-            item.variant, [&](const Syntax::ArgumentList::PositionalItem::Star& star) { return range(star.asterisk); },
-            [&](const std::unique_ptr<Syntax::AssignmentExpression>& assignmentExpression)
-            { return range(*assignmentExpression); });
-    };
-    std::pair<std::size_t, std::size_t> first;
-    if (argumentList.positionalArguments)
-    {
-        first = handlePositionalItem(argumentList.positionalArguments->firstItem);
+        end = range(value.name).second;
     }
-    else if (argumentList.starredAndKeywords)
-    {
-        first = range(argumentList.starredAndKeywords->first.identifier);
-    }
-    else if (argumentList.keywordArguments)
-    {
-        first = range(argumentList.keywordArguments->first.doubleAsterisk);
-    }
-
-    std::pair<std::size_t, std::size_t> last;
-    if (argumentList.keywordArguments)
-    {
-        last = range(argumentList.keywordArguments->first.doubleAsterisk);
-    }
-    else if (argumentList.starredAndKeywords)
-    {
-        last = range(argumentList.starredAndKeywords->first.identifier);
-    }
-    else if (argumentList.positionalArguments)
-    {
-        last = handlePositionalItem(argumentList.positionalArguments->firstItem);
-    }
-    return {first.first, last.second};
-}
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::ParameterList::Parameter, void>::getRange(
-        const Syntax::ParameterList::Parameter& parameter) noexcept
-{
-    if (!parameter.type)
-    {
-        return range(parameter.identifier);
-    }
-    return {range(parameter.identifier).first, range(parameter.type->second).second};
-}
-
-std::pair<std::size_t, std::size_t>
-    pylir::Diag::LocationProvider<pylir::Syntax::ParameterList::DefParameter, void>::getRange(
-        const Syntax::ParameterList::DefParameter& defParameter) noexcept
-{
-    if (!defParameter.defaultArg)
-    {
-        return range(defParameter.parameter);
-    }
-    return {range(defParameter.parameter).first, range(defParameter.defaultArg->second).second};
+    return {start, end};
 }
