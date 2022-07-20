@@ -26,7 +26,7 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
     IntrVarPtr<Syntax::Expression> leftOverStarredExpression;
     do
     {
-        if (hadFirst && (m_current == m_lexer.end() || !firstInTarget(m_current->getTokenType())))
+        if (hadFirst && !peekedIs(firstInTarget))
         {
             break;
         }
@@ -35,25 +35,25 @@ tl::expected<pylir::Syntax::AssignmentStmt, std::string>
         {
             return tl::unexpected{std::move(starredExpression).error()};
         }
-        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Assignment)
+        auto assignment = maybeConsume(TokenType::Assignment);
+        if (!assignment)
         {
             leftOverStarredExpression = std::move(*starredExpression);
             break;
         }
-        auto assignment = *m_current++;
-        auto error = checkTarget(**starredExpression, assignment);
+        auto error = checkTarget(**starredExpression, *assignment);
         if (!error)
         {
             return tl::unexpected{std::move(error).error()};
         }
         addToNamespace(**starredExpression);
-        targets.emplace_back(std::move(*starredExpression), assignment);
-    } while (m_current != m_lexer.end() && firstInTarget(m_current->getTokenType()));
+        targets.emplace_back(std::move(*starredExpression), *assignment);
+    } while (peekedIs(firstInTarget));
     if (leftOverStarredExpression)
     {
         return Syntax::AssignmentStmt{{}, std::move(targets), nullptr, std::move(leftOverStarredExpression)};
     }
-    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
+    if (peekedIs(TokenType::YieldKeyword))
     {
         auto yieldExpr = parseYieldExpression();
         if (!yieldExpr)
@@ -121,7 +121,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                         .emitError()};
             }
             auto returnKeyword = *m_current++;
-            if (m_current == m_lexer.end() || !firstInExpression(m_current->getTokenType()))
+            if (!peekedIs(firstInExpression))
             {
                 return make_node<Syntax::ReturnStmt>(returnKeyword, nullptr);
             }
@@ -144,7 +144,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
         case TokenType::RaiseKeyword:
         {
             auto raise = *m_current++;
-            if (m_current == m_lexer.end() || !firstInExpression(m_current->getTokenType()))
+            if (!peekedIs(firstInExpression))
             {
                 return make_node<Syntax::RaiseStmt>(raise, nullptr, nullptr);
             }
@@ -153,11 +153,10 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
             {
                 return tl::unexpected{std::move(expression).error()};
             }
-            if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::FromKeyword)
+            if (!maybeConsume(TokenType::FromKeyword))
             {
                 return make_node<Syntax::RaiseStmt>(raise, std::move(*expression), nullptr);
             }
-            auto from = *m_current++;
             auto source = parseExpression();
             if (!source)
             {
@@ -176,9 +175,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
             }
             std::vector<IdentifierToken> identifiers;
             identifiers.emplace_back(std::move(*identifier));
-            while (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma)
+            while (maybeConsume(TokenType::Comma))
             {
-                m_current++;
                 auto another = expect(TokenType::Identifier);
                 if (!another)
                 {
@@ -399,23 +397,21 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                     {
                         return tl::unexpected{std::move(augTarget).error()};
                     }
-                    if (m_current->getTokenType() == TokenType::Colon)
+                    if (auto colon = maybeConsume(TokenType::Colon))
                     {
-                        auto colon = *m_current++;
                         auto expression = parseExpression();
                         if (!expression)
                         {
                             return tl::unexpected{std::move(expression).error()};
                         }
                         std::vector<std::pair<IntrVarPtr<Syntax::Target>, Token>> vector;
-                        vector.emplace_back(std::move(*starredExpression), colon);
-                        if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Assignment)
+                        vector.emplace_back(std::move(*starredExpression), std::move(*colon));
+                        if (!maybeConsume(TokenType::Assignment))
                         {
                             return make_node<Syntax::AssignmentStmt>(std::move(vector), std::move(*expression),
                                                                      nullptr);
                         }
-                        auto assignment = *m_current++;
-                        if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
+                        if (peekedIs(TokenType::YieldKeyword))
                         {
                             auto yield = parseYieldExpression();
                             if (!yield)
@@ -437,7 +433,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                     auto augOp = *m_current++;
                     std::vector<std::pair<IntrVarPtr<Syntax::Target>, Token>> vector;
                     vector.emplace_back(std::move(*starredExpression), augOp);
-                    if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::YieldKeyword)
+                    if (peekedIs(TokenType::YieldKeyword))
                     {
                         auto yield = parseYieldExpression();
                         if (!yield)
@@ -471,11 +467,10 @@ tl::expected<pylir::Syntax::AssertStmt, std::string> pylir::Parser::parseAssertS
     {
         return tl::unexpected{std::move(expression).error()};
     }
-    if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Comma)
+    if (!maybeConsume(TokenType::Comma))
     {
         return Syntax::AssertStmt{{}, std::move(*assertKeyword), std::move(*expression), nullptr};
     }
-    m_current++;
     auto message = parseExpression();
     if (!message)
     {
@@ -809,22 +804,21 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
                 return tl::unexpected{std::move(identifier).error()};
             }
             identifiers.emplace_back(std::move(*identifier));
-            if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Dot)
+            if (!maybeConsume(TokenType::Dot))
             {
                 return Syntax::ImportStmt::Module{std::move(identifiers)};
             }
-            m_current++;
         } while (true);
     };
 
     auto parseRelativeModule = [&]() -> tl::expected<Syntax::ImportStmt::RelativeModule, std::string>
     {
         std::vector<BaseToken> dots;
-        for (; m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Dot; m_current++)
+        while (auto dot = maybeConsume(TokenType::Dot))
         {
-            dots.emplace_back(*m_current);
+            dots.emplace_back(*dot);
         }
-        if (!dots.empty() && (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Identifier))
+        if (!dots.empty() && !peekedIs(TokenType::Identifier))
         {
             return Syntax::ImportStmt::RelativeModule{std::move(dots), std::nullopt};
         }
@@ -851,15 +845,11 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
 
             bool first = true;
             std::vector<std::pair<Syntax::ImportStmt::Module, std::optional<IdentifierToken>>> modules;
-            while (first || (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma))
+            while (first || maybeConsume(TokenType::Comma))
             {
                 if (first)
                 {
                     first = false;
-                }
-                else
-                {
-                    m_current++;
                 }
                 auto nextModule = parseModule();
                 if (!nextModule)
@@ -867,9 +857,8 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
                     return tl::unexpected{std::move(nextModule).error()};
                 }
                 std::optional<IdentifierToken> nextName;
-                if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+                if (maybeConsume(TokenType::AsKeyword))
                 {
-                    m_current++;
                     auto identifier = expect(TokenType::Identifier);
                     if (!identifier)
                     {
@@ -894,33 +883,25 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
             {
                 return tl::unexpected{std::move(import).error()};
             }
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Star)
+            if (auto star = maybeConsume(TokenType::Star))
             {
-                auto star = *m_current++;
-                return Syntax::ImportStmt{{}, Syntax::ImportStmt::ImportAll{from, std::move(*relative), *import, star}};
+                return Syntax::ImportStmt{{},
+                                          Syntax::ImportStmt::ImportAll{from, std::move(*relative), *import, *star}};
             }
-            std::optional<BaseToken> openParenth;
-            if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::OpenParentheses)
-            {
-                openParenth = *m_current++;
-            }
+
+            std::optional<BaseToken> openParenth = maybeConsume(TokenType::OpenParentheses);
 
             bool first = true;
             std::vector<std::pair<IdentifierToken, std::optional<IdentifierToken>>> imports;
-            while (first || (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::Comma))
+            while (first || maybeConsume(TokenType::Comma))
             {
                 if (first)
                 {
                     first = false;
                 }
-                else
+                else if (openParenth && peekedIs(TokenType::CloseParentheses))
                 {
-                    m_current++;
-                    if (openParenth
-                        && (m_current == m_lexer.end() || m_current->getTokenType() == TokenType::CloseParentheses))
-                    {
-                        break;
-                    }
+                    break;
                 }
                 auto imported = expect(TokenType::Identifier);
                 if (!imported)
@@ -928,9 +909,8 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
                     return tl::unexpected{std::move(imported).error()};
                 }
                 std::optional<IdentifierToken> nextName;
-                if (m_current != m_lexer.end() && m_current->getTokenType() == TokenType::AsKeyword)
+                if (maybeConsume(TokenType::AsKeyword))
                 {
-                    auto as = *m_current++;
                     auto identifier = expect(TokenType::Identifier);
                     if (!identifier)
                     {

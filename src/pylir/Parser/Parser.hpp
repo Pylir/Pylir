@@ -48,7 +48,110 @@ class Parser
     bool m_inLoop = false;
     bool m_inFunc = false;
 
-    tl::expected<Token, std::string> expect(TokenType tokenType);
+    /// Attempts to peek ahead in the token stream and returns the token if it matches the given predicate. If it does
+    /// not match, or there are no more tokens it returns an empty optional.
+    template <class P>
+    [[nodiscard]] std::optional<Token> peekedIs(P predicate)
+    {
+        if (m_current == m_lexer.end())
+        {
+            return std::nullopt;
+        }
+        if (predicate(m_current->getTokenType()))
+        {
+            return *m_current;
+        }
+        return std::nullopt;
+    }
+
+    /// Attempts to peek ahead in the token stream and returns the token if it is one of the listed token types. If it
+    /// does not match, or there are no more tokens it returns an empty optional.
+    [[nodiscard]] std::optional<Token> peekedIs(std::initializer_list<TokenType> tokenTypes)
+    {
+        return peekedIs([=](TokenType type) { return llvm::is_contained(tokenTypes, type); });
+    }
+
+    /// Attempts to peek ahead in the token stream and returns the token if it matches the token type. If it
+    /// does not match, or there are no more tokens it returns an empty optional.
+    [[nodiscard]] std::optional<Token> peekedIs(TokenType tokenType)
+    {
+        return peekedIs({tokenType});
+    }
+
+    /// Checks whether the next token does not match the predicate. This differs from `!peekedIs(predicate)' as it
+    /// still returns false if the token stream is empty.
+    template <class P>
+    [[nodiscard]] bool peekedIsNot(P predicate)
+    {
+        if (m_current == m_lexer.end())
+        {
+            return false;
+        }
+        return !peekedIs(predicate);
+    }
+
+    /// Checks whether the next token is none of the given token types. This differs from `!peekedIs(tokenTypes)' as it
+    /// still returns false if the token stream is empty.
+    [[nodiscard]] bool peekedIsNot(std::initializer_list<TokenType> tokenTypes)
+    {
+        if (m_current == m_lexer.end())
+        {
+            return false;
+        }
+        return !peekedIs(tokenTypes);
+    }
+
+    /// Checks whether the next token is not of the given token type. This differs from `!peekedIs(tokenType)' as it
+    /// still returns false if the token stream is empty.
+    [[nodiscard]] bool peekedIsNot(TokenType tokenType)
+    {
+        if (m_current == m_lexer.end())
+        {
+            return false;
+        }
+        return !peekedIs(tokenType);
+    }
+
+    /// Attempts to peek ahead in the token stream and checks if the token matches the given predicate. If it does it
+    /// returns the token and advances the token stream to the next token. If it does not match, or there are no more
+    /// tokens it returns an empty optional.
+    std::optional<Token> maybeConsume(llvm::function_ref<bool(TokenType)> predicate)
+    {
+        auto result = peekedIs(predicate);
+        if (result)
+        {
+            m_current++;
+        }
+        return result;
+    }
+
+    /// Attempts to peek ahead in the token stream and checks if the token is one of the given token types. If it does
+    /// it returns the token and advances the token stream to the next token. If it does not match, or there are no more
+    /// tokens it returns an empty optional.
+    std::optional<Token> maybeConsume(std::initializer_list<TokenType> tokenTypes)
+    {
+        auto result = peekedIs(tokenTypes);
+        if (result)
+        {
+            m_current++;
+        }
+        return result;
+    }
+
+    /// Attempts to peek ahead in the token stream and checks if the token is the given token type. If it does it
+    /// returns the token and advances the token stream to the next token. If it does not match, or there are no more
+    /// tokens it returns an empty optional.
+    std::optional<Token> maybeConsume(TokenType tokenType)
+    {
+        auto result = peekedIs(tokenType);
+        if (result)
+        {
+            m_current++;
+        }
+        return result;
+    }
+
+    [[nodiscard]] tl::expected<Token, std::string> expect(TokenType tokenType);
 
     void addToNamespace(const Token& token);
 
@@ -87,9 +190,8 @@ class Parser
         }
         std::vector<T> rest;
         rest.push_back(std::move(*optionalFirst));
-        while (m_current != m_lexer.end() && m_current->getTokenType() == tokenType)
+        while (maybeConsume(tokenType))
         {
-            m_current++;
             if (!checkFunc(m_current->getTokenType()))
             {
                 break;
@@ -113,15 +215,14 @@ class Parser
             return tl::unexpected{std::move(first).error()};
         }
         IntrVarPtr<Syntax::Expression> current{std::move(*first)};
-        while (m_current != m_lexer.end() && ((m_current->getTokenType() == allowed) || ...))
+        while (auto op = maybeConsume({allowed...}))
         {
-            auto op = *m_current++;
             auto rhs = (this->*parseLesser)();
             if (!rhs)
             {
                 return tl::unexpected{std::move(rhs).error()};
             }
-            current = make_node<Syntax::BinOp>(std::move(current), std::move(op), std::move(*rhs));
+            current = make_node<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
         }
         return std::move(current);
     }
