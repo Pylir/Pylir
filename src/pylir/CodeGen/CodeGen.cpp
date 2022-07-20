@@ -56,7 +56,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 
     for (const auto& token : fileInput.globals)
     {
-        m_builder.setCurrentLoc(getLoc(token, token));
+        auto locExit = changeLoc(token);
         auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()));
         m_globalScope.identifiers.emplace(token.getValue(), Identifier{op.getOperation()});
     }
@@ -96,7 +96,7 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
         return;
     }
     // TODO: attach __cause__ and __context__
-    m_builder.setCurrentLoc(getLoc(raiseStmt, raiseStmt.raise));
+    auto locExit = changeLoc(raiseStmt);
     auto typeOf = m_builder.createTypeOf(expression);
     auto typeObject = m_builder.createTypeRef();
     auto isTypeSubclass = buildSubclassCheck(typeOf, typeObject);
@@ -144,7 +144,7 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
 
 void pylir::CodeGen::visit(const Syntax::ReturnStmt& returnStmt)
 {
-    m_builder.setCurrentLoc(getLoc(returnStmt, returnStmt.returnKeyword));
+    auto locExit = changeLoc(returnStmt);
     if (!returnStmt.maybeExpression)
     {
         executeFinallyBlocks(false);
@@ -165,17 +165,16 @@ void pylir::CodeGen::visit(const Syntax::ReturnStmt& returnStmt)
 
 void pylir::CodeGen::visit(const Syntax::SingleTokenStmt& singleTokenStmt)
 {
+    auto locExit = changeLoc(singleTokenStmt);
     switch (singleTokenStmt.token.getTokenType())
     {
         case TokenType::BreakKeyword:
             executeFinallyBlocks();
-            m_builder.setCurrentLoc(getLoc(singleTokenStmt, singleTokenStmt.token));
             m_builder.create<mlir::cf::BranchOp>(m_currentLoop.breakBlock);
             m_builder.clearInsertionPoint();
             return;
         case TokenType::ContinueKeyword:
             executeFinallyBlocks();
-            m_builder.setCurrentLoc(getLoc(singleTokenStmt, singleTokenStmt.token));
             m_builder.create<mlir::cf::BranchOp>(m_currentLoop.continueBlock);
             m_builder.clearInsertionPoint();
             return;
@@ -204,11 +203,13 @@ void pylir::CodeGen::visit(const Syntax::GlobalOrNonLocalStmt& globalOrNonLocalS
 
 void pylir::CodeGen::assignTarget(const Syntax::Atom& atom, mlir::Value value)
 {
+    auto locExit = changeLoc(atom);
     writeIdentifier(IdentifierToken{atom.token}, value);
 }
 
 void pylir::CodeGen::assignTarget(const Syntax::Subscription& subscription, mlir::Value value)
 {
+    auto locExit = changeLoc(subscription);
     auto container = visit(*subscription.object);
     if (!container)
     {
@@ -220,7 +221,6 @@ void pylir::CodeGen::assignTarget(const Syntax::Subscription& subscription, mlir
         return;
     }
 
-    m_builder.setCurrentLoc(getLoc(subscription, subscription));
     Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__setitem__",
                                m_builder.createMakeTuple({container, indices, value}), {}, m_currentExceptBlock);
 }
@@ -245,6 +245,7 @@ void pylir::CodeGen::assignTarget(const Syntax::ListDisplay& listDisplay, mlir::
 
 void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
 {
+    auto locExit = changeLoc(assignmentStmt);
     if (!assignmentStmt.maybeExpression)
     {
         return;
@@ -288,6 +289,7 @@ std::vector<pylir::Py::IterArg> pylir::CodeGen::visit(llvm::ArrayRef<Syntax::Sta
 
 mlir::Value pylir::CodeGen::visit(const Syntax::TupleConstruct& tupleConstruct)
 {
+    auto locExit = changeLoc(tupleConstruct);
     return makeTuple(visit(tupleConstruct.items));
 }
 
@@ -299,7 +301,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Yield&)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Conditional& conditional)
 {
-    m_builder.setCurrentLoc(getLoc(conditional, conditional));
+    auto locExit = changeLoc(conditional);
     auto condition = toI1(visit(*conditional.condition));
     if (!condition)
     {
@@ -336,11 +338,11 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Conditional& conditional)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::BinOp& binOp)
 {
+    auto locExit = changeLoc(binOp);
     switch (binOp.operation.getTokenType())
     {
         case TokenType::OrKeyword:
         {
-            m_builder.setCurrentLoc(getLoc(binOp, binOp));
             auto lhs = visit(*binOp.lhs);
             if (!lhs)
             {
@@ -363,7 +365,6 @@ mlir::Value pylir::CodeGen::visit(const Syntax::BinOp& binOp)
         }
         case TokenType::AndKeyword:
         {
-            m_builder.setCurrentLoc(getLoc(binOp, binOp));
             auto lhs = visit(*binOp.lhs);
             if (!lhs)
             {
@@ -411,7 +412,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::UnaryOp& unaryOp)
     {
         case TokenType::NotKeyword:
         {
-            m_builder.setCurrentLoc(getLoc(unaryOp, unaryOp));
+            auto locExit = changeLoc(unaryOp);
             auto value = toI1(visit(*unaryOp.expression));
             auto one = m_builder.create<mlir::arith::ConstantOp>(m_builder.getBoolAttr(true));
             auto inverse = m_builder.create<mlir::arith::XOrIOp>(one, value);
@@ -542,8 +543,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
     auto previousRHS = first;
     for (const auto& [op, rhs] : comparison.rest)
     {
-        m_builder.setCurrentLoc(getLoc(op.firstToken, op.firstToken));
-
+        auto locExit = changeLoc(op.firstToken);
         BlockPtr found;
         if (result)
         {
@@ -630,7 +630,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Call& call)
     {
         return {};
     }
-    m_builder.setCurrentLoc(getLoc(call, call.openParenth));
+    auto locExit = changeLoc(call);
     auto [tuple, keywords] = pylir::match(
         call.variant,
         [&](const std::vector<Syntax::Argument>& vector) -> std::pair<mlir::Value, mlir::Value>
@@ -664,7 +664,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Call& call)
 
 void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mlir::Value value)
 {
-    m_builder.setCurrentLoc(getLoc(identifierToken, identifierToken));
+    auto locExit = changeLoc(identifierToken);
     if (m_classNamespace)
     {
         auto str = m_builder.createConstant(identifierToken.getValue());
@@ -689,7 +689,7 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
 
 mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToken)
 {
-    m_builder.setCurrentLoc(getLoc(identifierToken, identifierToken));
+    auto locExit = changeLoc(identifierToken);
     BlockPtr classNamespaceFound;
     Scope* scope;
     if (m_classNamespace)
@@ -836,19 +836,21 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscriptio
         return {};
     }
 
-    m_builder.setCurrentLoc(getLoc(subscription, subscription));
+    auto locExit = changeLoc(subscription);
     return buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__getitem__",
                                   m_builder.createMakeTuple({container, indices}), {}, m_currentExceptBlock);
 }
 
 mlir::Value pylir::CodeGen::toI1(mlir::Value value)
 {
+    auto locExit = changeLoc(value.getLoc());
     auto boolean = toBool(value);
     return m_builder.createBoolToI1(boolean);
 }
 
 mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 {
+    auto locExit = changeLoc(value.getLoc());
     auto tuple = m_builder.createMakeTuple({m_builder.createBoolRef(), value});
     auto boolean =
         Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__call__", tuple, {}, m_currentExceptBlock);
@@ -857,9 +859,9 @@ mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::ListDisplay& listDisplay)
 {
-    m_builder.setCurrentLoc(getLoc(listDisplay, listDisplay.openSquare));
+    auto locExit = changeLoc(listDisplay);
     return pylir::match(
-        listDisplay.variant, [&](std::monostate) -> mlir::Value { return m_builder.createMakeList(); },
+        listDisplay.variant,
         [&](const std::vector<Syntax::StarredItem>& list) -> mlir::Value
         {
             auto operands = visit(list);
@@ -888,8 +890,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ListDisplay& listDisplay)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::SetDisplay& setDisplay)
 {
-    auto loc = getLoc(setDisplay, setDisplay.openBrace);
-    m_builder.setCurrentLoc(loc);
+    auto locExit = changeLoc(setDisplay);
     return pylir::match(
         setDisplay.variant,
         [&](const std::vector<Syntax::StarredItem>& list) -> mlir::Value
@@ -906,8 +907,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::SetDisplay& setDisplay)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::DictDisplay& dictDisplay)
 {
-    auto loc = getLoc(dictDisplay, dictDisplay.openBrace);
-    m_builder.setCurrentLoc(loc);
+    auto locExit = changeLoc(dictDisplay);
     return pylir::match(
         dictDisplay.variant,
         [&](const std::vector<Syntax::DictDisplay::KeyDatum>& list) -> mlir::Value
@@ -943,6 +943,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::DictDisplay& dictDisplay)
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Assignment& assignment)
 {
+    auto locExit = changeLoc(assignment);
     auto value = visit(*assignment.expression);
     if (!value)
     {
@@ -954,6 +955,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Assignment& assignment)
 
 void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
 {
+    auto locExit = changeLoc(ifStmt, ifStmt.ifKeyword);
     auto condition = visit(*ifStmt.condition);
     if (!condition)
     {
@@ -978,7 +980,6 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     {
         elseBlock = new mlir::Block;
     }
-    m_builder.setCurrentLoc(getLoc(ifStmt.ifKeyword, ifStmt.ifKeyword));
     m_builder.create<mlir::cf::CondBranchOp>(toI1(condition), trueBlock, elseBlock);
 
     implementBlock(trueBlock);
@@ -994,7 +995,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
     implementBlock(elseBlock);
     for (const auto& iter : llvm::enumerate(ifStmt.elifs))
     {
-        m_builder.setCurrentLoc(getLoc(iter.value().elif, iter.value().elif));
+        auto locExit2 = changeLoc(ifStmt, iter.value().elif);
         condition = visit(*iter.value().condition);
         if (!condition)
         {
@@ -1035,7 +1036,7 @@ void pylir::CodeGen::visit(const Syntax::IfStmt& ifStmt)
 
 void pylir::CodeGen::visit(const Syntax::WhileStmt& whileStmt)
 {
-    m_builder.setCurrentLoc(getLoc(whileStmt, whileStmt.whileKeyword));
+    auto locExit = changeLoc(whileStmt);
     auto conditionBlock = BlockPtr{};
     auto thenBlock = BlockPtr{};
     auto exitBlock = llvm::make_scope_exit(
@@ -1161,6 +1162,7 @@ void pylir::CodeGen::visitForConstruct(const Syntax::Target& targets, mlir::Valu
 
 void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
 {
+    auto locExit = changeLoc(forStmt);
     auto iterable = visit(*forStmt.expression);
     if (!iterable)
     {
@@ -1174,7 +1176,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt)
 void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
                            const Syntax::CompFor& compFor)
 {
-    m_builder.setCurrentLoc(getLoc(compFor, compFor.forToken));
+    auto locExit = changeLoc(compFor);
     auto iterable = visit(*compFor.test);
     if (!iterable)
     {
@@ -1192,6 +1194,7 @@ void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation
 void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
                            const Syntax::CompIf& compIf)
 {
+    auto locExit = changeLoc(compIf);
     auto condition = visit(*compIf.test);
     if (!condition)
     {
@@ -1212,11 +1215,13 @@ void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation
 void pylir::CodeGen::visit(llvm::function_ref<void(mlir::Value)> insertOperation,
                            const Syntax::Comprehension& comprehension)
 {
+    auto locExit = changeLoc(comprehension);
     visit(insertOperation, *comprehension.expression, comprehension.compFor);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
 {
+    auto locExit = changeLoc(tryStmt);
     BlockPtr exceptionHandler;
     exceptionHandler->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
     auto exceptionHandlerSeal = markOpenBlock(exceptionHandler);
@@ -1286,7 +1291,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
 
     for (const auto& iter : tryStmt.excepts)
     {
-        m_builder.setCurrentLoc(getLoc(iter, iter.exceptKeyword));
+        auto locExit2 = changeLoc(tryStmt, iter.exceptKeyword);
         auto value = visit(*iter.filter);
         if (!value)
         {
@@ -1399,13 +1404,16 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         }
         if (needsTerminator())
         {
-            m_builder.setCurrentLoc(getLoc(tryStmt, tryStmt.tryKeyword));
             m_builder.createRaise(exceptionHandler->getArgument(0));
         }
     }
 }
 
-void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt) {}
+void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt)
+{
+    //TODO:
+    PYLIR_UNREACHABLE;
+}
 
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
@@ -1432,11 +1440,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             defaultParameters.emplace_back(value);
             continue;
         }
-        m_builder.setCurrentLoc(getLoc(iter, iter));
+        auto locExit = changeLoc(iter);
         auto name = m_builder.createConstant(iter.name.getValue());
         keywordOnlyDefaultParameters.push_back(std::pair{name, value});
     }
-    m_builder.setCurrentLoc(getLoc(funcDef.funcName, funcDef.funcName));
+    auto locExit = changeLoc(funcDef);
     auto qualifiedName = m_qualifiers + std::string(funcDef.funcName.getValue());
     std::vector<IdentifierToken> usedClosures;
     mlir::func::FuncOp func;
@@ -1559,7 +1567,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     }
     for (const auto& iter : llvm::reverse(funcDef.decorators))
     {
-        auto decLoc = getLoc(iter.atSign, iter.atSign);
+        auto locExit2 = changeLoc(iter);
         auto decorator = visit(*iter.expression);
         if (!decorator)
         {
@@ -1625,7 +1633,7 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(llvm::ArrayRef<pylir::
     {
         if (iter.maybeName)
         {
-            m_builder.setCurrentLoc(getLoc(*iter.maybeName, *iter.maybeName));
+            auto locExit = changeLoc(iter);
             mlir::Value key = m_builder.createConstant(iter.maybeName->getValue());
             dictArgs.push_back(std::pair{key, visit(*iter.expression)});
             continue;

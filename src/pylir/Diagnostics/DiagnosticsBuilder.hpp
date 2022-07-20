@@ -219,7 +219,7 @@ public:
     DiagnosticsBuilder(const void* context, const Document& document, const T& location, const S& message,
                        Args&&... args)
         : m_messages{Message{&document,
-                             range(location, context).first,
+                             rangeLoc(location, context).first,
                              fmt::format(message, std::forward<Args>(args)...),
                              {}}},
           m_context(context)
@@ -228,7 +228,7 @@ public:
 
     template <class T, class S, class... Args>
     DiagnosticsBuilder(const Document& document, const T& location, const S& message, Args&&... args)
-        : m_messages{Message{&document, range(location).first, fmt::format(message, std::forward<Args>(args)...), {}}}
+        : m_messages{Message{&document, rangeLoc(location).first, fmt::format(message, std::forward<Args>(args)...), {}}}
     {
     }
 
@@ -240,7 +240,7 @@ public:
                                                           DiagnosticsBuilder&>
     {
         m_messages.back().labels.push_back(
-            {range(start, m_context).first, range(end, m_context).second, std::move(labelText), colour, emphasis});
+            {rangeLoc(start, m_context).first, rangeLoc(end, m_context).second, std::move(labelText), colour, emphasis});
         return *this;
     }
 
@@ -259,7 +259,7 @@ public:
                   std::optional<emphasis> emphasis =
                       std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        auto [start, end] = range(pos, m_context);
+        auto [start, end] = rangeLoc(pos, m_context);
         m_messages.back().labels.push_back({start, end, std::move(labelText), colour, emphasis});
         return *this;
     }
@@ -277,7 +277,7 @@ public:
     auto addNote(const T& location, const S& message,
                  Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        return addNote(*m_messages.back().document, range(location, m_context).first,
+        return addNote(*m_messages.back().document, rangeLoc(location, m_context).first,
                        fmt::format(message, std::forward<Args>(args)...));
     }
 
@@ -286,7 +286,7 @@ public:
                  Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
         m_messages.push_back(
-            {&document, range(location, m_context).first, fmt::format(message, std::forward<Args>(args)...), {}});
+            {&document, rangeLoc(location, m_context).first, fmt::format(message, std::forward<Args>(args)...), {}});
         return *this;
     }
 

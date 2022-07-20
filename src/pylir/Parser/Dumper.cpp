@@ -627,7 +627,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Decorator& decorator)
 std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
 {
     std::string_view title;
-    if (funcDef.async)
+    if (funcDef.maybeAsyncKeyword)
     {
         title = "async function";
     }

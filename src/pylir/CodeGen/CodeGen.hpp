@@ -247,10 +247,18 @@ class CodeGen
     std::vector<UnpackResults> createOverload(const std::vector<FunctionParameter>& parameters, mlir::Value tuple,
                                               mlir::Value dict, Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
 
-    template <class AST, class FallBackLocation>
-    mlir::Location getLoc(const AST& astObject, const FallBackLocation& fallBackLocation)
+    template <class AST>
+    mlir::Location getLoc(const AST& astObject)
     {
-        auto [line, col] = m_document->getLineCol(Diag::range(fallBackLocation).first);
+        auto [line, col] = m_document->getLineCol(Diag::pointLoc(astObject));
+        return mlir::OpaqueLoc::get(
+            &astObject, mlir::FileLineColLoc::get(m_builder.getStringAttr(m_document->getFilename()), line, col));
+    }
+
+    template <class AST, class LineLoc>
+    mlir::Location getLoc(const AST& astObject, const LineLoc& lineLoc)
+    {
+        auto [line, col] = m_document->getLineCol(Diag::pointLoc(lineLoc));
         return mlir::OpaqueLoc::get(
             &astObject, mlir::FileLineColLoc::get(m_builder.getStringAttr(m_document->getFilename()), line, col));
     }
@@ -341,7 +349,39 @@ class CodeGen
                 return Ret{};
             }
         }
+        auto currLoc = m_builder.getCurrentLoc();
+        auto exit = llvm::make_scope_exit([=] { m_builder.setCurrentLoc(currLoc); });
+        if constexpr (Diag::hasLocationProvider_v<T>)
+        {
+            m_builder.setCurrentLoc(getLoc(variant));
+        }
         return lambda();
+    }
+
+    template <class T, std::enable_if_t<!std::is_convertible_v<T, mlir::Location>>* = nullptr>
+    [[nodiscard]] auto changeLoc(const T& astNode)
+    {
+        auto currLoc = m_builder.getCurrentLoc();
+        auto exit = llvm::make_scope_exit([=] { m_builder.setCurrentLoc(currLoc); });
+        m_builder.setCurrentLoc(getLoc(astNode));
+        return exit;
+    }
+
+    template <class T, class F>
+    [[nodiscard]] auto changeLoc(const T& astNode, const F& lineLocProv)
+    {
+        auto currLoc = m_builder.getCurrentLoc();
+        auto exit = llvm::make_scope_exit([=] { m_builder.setCurrentLoc(currLoc); });
+        m_builder.setCurrentLoc(getLoc(astNode, lineLocProv));
+        return exit;
+    }
+
+    [[nodiscard]] auto changeLoc(mlir::Location loc)
+    {
+        auto currLoc = m_builder.getCurrentLoc();
+        auto exit = llvm::make_scope_exit([=] { m_builder.setCurrentLoc(currLoc); });
+        m_builder.setCurrentLoc(loc);
+        return exit;
     }
 
 public:
