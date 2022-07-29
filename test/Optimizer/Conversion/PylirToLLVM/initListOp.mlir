@@ -19,12 +19,10 @@ func.func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][%[[ZERO]], 0]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
 // CHECK-NEXT: llvm.store %[[LIST]], %[[GEP]]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.mlir.constant(1 : index) : i64
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[MEMORY]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
 // CHECK-NEXT: llvm.store %[[LEN]], %[[SIZE_PTR]]
 // CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant
@@ -35,20 +33,14 @@ func.func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[TUPLE_MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][%[[ZERO]], 0]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 0]
 // CHECK-NEXT: llvm.store %[[TUPLE_TYPE]], %[[GEP]]
 // CHECK-NEXT: %[[CAPACITY:.*]] = llvm.mlir.constant(1 : i{{.*}})
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 1]
 // CHECK-NEXT: llvm.store %[[CAPACITY]], %[[GEP]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][%[[ZERO]], 2]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[ZERO2:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[FIRST:.*]] = llvm.getelementptr %[[TRAILING]][%[[ZERO]], %[[ZERO2]]]
+// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 2]
+// CHECK-NEXT: %[[FIRST:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
 // CHECK-NEXT: llvm.store %[[LIST]], %[[FIRST]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][%[[ZERO]], 2]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 2]
 // CHECK-NEXT: llvm.store %[[TUPLE_MEMORY]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[MEMORY]]

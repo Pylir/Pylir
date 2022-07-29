@@ -581,7 +581,8 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         manager.addPass(mlir::createSymbolDCEPass());
         nested = &manager.nestAny();
         nested->addPass(pylir::createLoadForwardingPass());
-        nested->addPass(mlir::createSCCPPass());
+        // TODO: upstream broke this, reenable when fixed
+        // nested->addPass(mlir::createSCCPPass());
         manager.addPass(pylir::Py::createMonomorphPass());
         manager.addPass(pylir::Py::createTrialInlinerPass());
         manager.addPass(mlir::createSymbolDCEPass());
@@ -593,7 +594,8 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         nested->addPass(mlir::createCanonicalizerPass());
         nested->addPass(mlir::createCSEPass());
         nested->addPass(pylir::createLoadForwardingPass());
-        nested->addPass(mlir::createSCCPPass());
+        // TODO: upstream broke this, reenable when fixed
+        // nested->addPass(mlir::createSCCPPass());
     }
     manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
 }

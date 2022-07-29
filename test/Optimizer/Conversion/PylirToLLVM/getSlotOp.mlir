@@ -15,10 +15,8 @@ func.func @foo() -> !py.dynamic {
 // CHECK-LABEL: @foo
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.type
 // CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
-// CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant({{[0-9]+}} : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][%[[SIZE]]] : {{.*}}, i8
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP]][%[[ZERO]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][{{[0-9]+}}] : {{.*}}, i8
+// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP]][0]
 // CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: llvm.return %[[LOAD]]
 

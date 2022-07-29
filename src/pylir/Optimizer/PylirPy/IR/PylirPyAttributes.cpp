@@ -114,30 +114,15 @@ void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
     walkAttrsFn(getSlots());
 }
 
-mlir::SubElementAttrInterface pylir::Py::DictAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::DictAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                 llvm::ArrayRef<mlir::Type>) const
 {
-    auto type = getTypeObject();
-    auto slots = getSlots();
-    auto vector = getValue().vec();
-    for (auto [index, attr] : replacements)
+    auto type = replAttrs.take_back(2).back().cast<mlir::FlatSymbolRefAttr>();
+    auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
+    std::vector<std::pair<mlir::Attribute, mlir::Attribute>> vector;
+    for (std::size_t i = 0; i < replAttrs.size() - 2; i += 2)
     {
-        if (index == vector.size() * 2)
-        {
-            type = attr.cast<mlir::FlatSymbolRefAttr>();
-        }
-        else if (index == vector.size() * 2 + 1)
-        {
-            slots = attr.cast<mlir::DictionaryAttr>();
-        }
-        else if (index & 1)
-        {
-            vector[index / 2].second = attr;
-        }
-        else
-        {
-            vector[index / 2].first = attr;
-        }
+        vector.emplace_back(replAttrs[i], replAttrs[i + 1]);
     }
     return get(getContext(), vector, type, slots);
 }
@@ -152,22 +137,10 @@ void doTypeObjectSlotsWalk(Op op, llvm::function_ref<void(mlir::Attribute)> walk
 }
 
 template <class Op, class... Args>
-Op doTypeObjectSlotsReplace(Op op, ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements,
-                            std::size_t offset, Args&&... prior)
+Op doTypeObjectSlotsReplace(Op op, llvm::ArrayRef<mlir::Attribute> replAttrs, Args&&... prior)
 {
-    auto type = op.getTypeObject();
-    auto slots = op.getSlots();
-    for (auto [index, attr] : replacements)
-    {
-        if (index == offset)
-        {
-            type = attr.template cast<mlir::FlatSymbolRefAttr>();
-        }
-        else if (index == offset + 1)
-        {
-            slots = attr.template cast<mlir::DictionaryAttr>();
-        }
-    }
+    auto type = replAttrs.take_back(2).back().cast<mlir::FlatSymbolRefAttr>();
+    auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
     return Op::get(op.getContext(), std::forward<Args>(prior)..., type, slots);
 }
 } // namespace
@@ -178,10 +151,10 @@ void pylir::Py::ObjectAttr::walkImmediateSubElements(llvm::function_ref<void(mli
     doTypeObjectSlotsWalk(*this, walkAttrsFn);
 }
 
-mlir::SubElementAttrInterface pylir::Py::ObjectAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::ObjectAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                   llvm::ArrayRef<mlir::Type>) const
 {
-    return doTypeObjectSlotsReplace(*this, replacements, 0);
+    return doTypeObjectSlotsReplace(*this, replAttrs);
 }
 
 void pylir::Py::IntAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -190,10 +163,10 @@ void pylir::Py::IntAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::
     doTypeObjectSlotsWalk(*this, walkAttrsFn);
 }
 
-mlir::SubElementAttrInterface pylir::Py::IntAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::IntAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                llvm::ArrayRef<mlir::Type>) const
 {
-    return doTypeObjectSlotsReplace(*this, replacements, 0, getValue());
+    return doTypeObjectSlotsReplace(*this, replAttrs, getValue());
 }
 
 void pylir::Py::BoolAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -202,10 +175,10 @@ void pylir::Py::BoolAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
     doTypeObjectSlotsWalk(*this, walkAttrsFn);
 }
 
-mlir::SubElementAttrInterface pylir::Py::BoolAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::BoolAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                 llvm::ArrayRef<mlir::Type>) const
 {
-    return doTypeObjectSlotsReplace(*this, replacements, 0, getValue());
+    return doTypeObjectSlotsReplace(*this, replAttrs, getValue());
 }
 
 void pylir::Py::FloatAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -214,10 +187,10 @@ void pylir::Py::FloatAttr::walkImmediateSubElements(llvm::function_ref<void(mlir
     doTypeObjectSlotsWalk(*this, walkAttrsFn);
 }
 
-mlir::SubElementAttrInterface pylir::Py::FloatAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::FloatAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                  llvm::ArrayRef<mlir::Type>) const
 {
-    return doTypeObjectSlotsReplace(*this, replacements, 0, getValue());
+    return doTypeObjectSlotsReplace(*this, replAttrs, getValue());
 }
 
 void pylir::Py::StrAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -226,10 +199,10 @@ void pylir::Py::StrAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::
     doTypeObjectSlotsWalk(*this, walkAttrsFn);
 }
 
-mlir::SubElementAttrInterface pylir::Py::StrAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::StrAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                llvm::ArrayRef<mlir::Type>) const
 {
-    return doTypeObjectSlotsReplace(*this, replacements, 0, getValue());
+    return doTypeObjectSlotsReplace(*this, replAttrs, getValue());
 }
 
 void pylir::Py::TupleAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -242,23 +215,11 @@ void pylir::Py::TupleAttr::walkImmediateSubElements(llvm::function_ref<void(mlir
     walkAttrsFn(getTypeObject());
 }
 
-mlir::SubElementAttrInterface pylir::Py::TupleAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::TupleAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                  llvm::ArrayRef<mlir::Type>) const
 {
-    mlir::FlatSymbolRefAttr typeObject = getTypeObject();
-    auto vector = llvm::to_vector(getValue());
-    for (auto& [index, attr] : replacements)
-    {
-        if (index == getValue().size())
-        {
-            typeObject = attr.cast<mlir::FlatSymbolRefAttr>();
-        }
-        else
-        {
-            vector[index] = attr;
-        }
-    }
-    return get(getContext(), vector, typeObject);
+    auto typeObject = replAttrs.back().cast<mlir::FlatSymbolRefAttr>();
+    return get(getContext(), replAttrs.drop_back(), typeObject);
 }
 
 void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -272,28 +233,12 @@ void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
     walkAttrsFn(getSlots());
 }
 
-mlir::SubElementAttrInterface pylir::Py::ListAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::ListAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                 llvm::ArrayRef<mlir::Type>) const
 {
-    mlir::FlatSymbolRefAttr typeObject = getTypeObject();
-    auto slots = getSlots();
-    auto vector = llvm::to_vector(getValue());
-    for (auto& [index, attr] : replacements)
-    {
-        if (index == getValue().size())
-        {
-            typeObject = attr.cast<mlir::FlatSymbolRefAttr>();
-        }
-        else if (index == getValue().size() + 1)
-        {
-            slots = attr.cast<mlir::DictionaryAttr>();
-        }
-        else
-        {
-            vector[index] = attr;
-        }
-    }
-    return get(getContext(), vector, typeObject, slots);
+    auto typeObject = replAttrs.take_back(2).front().cast<mlir::FlatSymbolRefAttr>();
+    auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
+    return get(getContext(), replAttrs.drop_back(2), typeObject, slots);
 }
 
 void pylir::Py::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -307,28 +252,12 @@ void pylir::Py::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::
     walkAttrsFn(getSlots());
 }
 
-mlir::SubElementAttrInterface pylir::Py::SetAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::SetAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                llvm::ArrayRef<mlir::Type>) const
 {
-    mlir::FlatSymbolRefAttr typeObject = getTypeObject();
-    auto slots = getSlots();
-    auto vector = llvm::to_vector(getValue());
-    for (auto& [index, attr] : replacements)
-    {
-        if (index == getValue().size())
-        {
-            typeObject = attr.cast<mlir::FlatSymbolRefAttr>();
-        }
-        else if (index == getValue().size() + 1)
-        {
-            slots = attr.cast<mlir::DictionaryAttr>();
-        }
-        else
-        {
-            vector[index] = attr;
-        }
-    }
-    return get(getContext(), vector, typeObject, slots);
+    auto typeObject = replAttrs.take_back(2).front().cast<mlir::FlatSymbolRefAttr>();
+    auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
+    return get(getContext(), replAttrs.drop_back(2), typeObject, slots);
 }
 
 void pylir::Py::FunctionAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -344,25 +273,14 @@ void pylir::Py::FunctionAttr::walkImmediateSubElements(llvm::function_ref<void(m
     }
 }
 
-mlir::SubElementAttrInterface pylir::Py::FunctionAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::FunctionAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                     llvm::ArrayRef<mlir::Type>) const
 {
-    auto value = getValue();
-    auto qualName = getQualName();
-    auto defaults = getDefaults();
-    auto kwDefaults = getKwDefaults();
-    auto dict = getDict();
-    for (auto [index, attr] : replacements)
-    {
-        switch (index)
-        {
-            case 0: value = attr.cast<mlir::FlatSymbolRefAttr>(); break;
-            case 1: qualName = attr; break;
-            case 2: kwDefaults = attr; break;
-            case 3: defaults = attr; break;
-            case 4: dict = attr; break;
-        }
-    }
+    auto value = replAttrs[0].cast<mlir::FlatSymbolRefAttr>();
+    auto qualName = replAttrs[1];
+    auto defaults = replAttrs[2];
+    auto kwDefaults = replAttrs[4];
+    auto dict = replAttrs.size() > 5 ? replAttrs[5] : getDict();
     return get(getContext(), value, qualName, defaults, kwDefaults, dict);
 }
 
@@ -374,20 +292,11 @@ void pylir::Py::TypeAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
     walkAttrsFn(getSlots());
 }
 
-mlir::SubElementAttrInterface pylir::Py::TypeAttr::replaceImmediateSubAttribute(
-    ::llvm::ArrayRef<std::pair<size_t, ::mlir::Attribute>> replacements) const
+mlir::Attribute pylir::Py::TypeAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
+                                                                 llvm::ArrayRef<mlir::Type>) const
 {
-    auto value = getMroTuple();
-    auto typeObject = getTypeObject();
-    auto slots = getSlots();
-    for (auto [index, attr] : replacements)
-    {
-        switch (index)
-        {
-            case 0: value = attr; break;
-            case 1: typeObject = attr.cast<mlir::FlatSymbolRefAttr>(); break;
-            case 2: slots = attr.cast<mlir::DictionaryAttr>(); break;
-        }
-    }
+    auto value = replAttrs[0];
+    auto typeObject = replAttrs[1].cast<mlir::FlatSymbolRefAttr>();
+    auto slots = replAttrs[2].cast<mlir::DictionaryAttr>();
     return get(getContext(), value, typeObject, slots);
 }

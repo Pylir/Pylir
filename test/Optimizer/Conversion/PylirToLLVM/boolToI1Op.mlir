@@ -7,10 +7,8 @@ func.func @test(%arg : !py.dynamic) -> i1 {
 
 // CHECK: @test
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG]][%[[ZERO]], 1]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][%[[ZERO]], 0]
+// CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG]][0, 1]
+// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[USED:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.icmp "ne" %[[USED]], %[[ZERO]]

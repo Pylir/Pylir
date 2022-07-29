@@ -14,8 +14,7 @@ func.func @linear_search(%tuple : !py.dynamic) -> i1 {
 // CHECK-LABEL: @linear_search
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[ADDR:.*]] = llvm.mlir.addressof @one
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARG0]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: llvm.br ^[[CONDITION:[[:alnum:]]+]]
@@ -25,10 +24,8 @@ func.func @linear_search(%tuple : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[ITER]], %[[SIZE]]
 // CHECK-NEXT: llvm.cond_br %[[CMP]], ^[[BODY:.*]], ^[[EXIT:.*]](%[[CMP]] : i1)
 // CHECK-NEXT: ^[[BODY]]:
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARG0]][%[[ZERO]], 2]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP]][%[[ZERO]], %[[ITER]]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ARG0]][0, 2]
+// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP]][0, %[[ITER]]]
 // CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP2]]
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[LOAD]], %[[ADDR]]
 // CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : index)

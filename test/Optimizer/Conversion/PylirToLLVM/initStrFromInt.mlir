@@ -15,16 +15,11 @@ func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @foo
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%{{.*}})
-// CHECK: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][%[[ZERO]], 0]
+// CHECK: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
 // CHECK-NEXT: llvm.store %{{.*}}, %[[GEP]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[BUFFER:.*]] = llvm.getelementptr %[[MEMORY]][%[[ZERO]], 1]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[MP_INT_PTR:.*]] = llvm.getelementptr %[[ARG0]][%[[ZERO]], 1]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[BUFFER]][%[[ZERO]], 0]
+// CHECK-NEXT: %[[BUFFER:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
+// CHECK-NEXT: %[[MP_INT_PTR:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
+// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[BUFFER]][0, 0]
 // CHECK-NEXT: %[[TEN:.*]] = llvm.mlir.constant(10 : i32)
 // CHECK-NEXT: llvm.call @mp_radix_size_overestimate(%[[MP_INT_PTR]], %[[TEN]], %[[SIZE_PTR]])
 // CHECK-NEXT: %[[CAP:.*]] = llvm.load %[[SIZE_PTR]]
@@ -34,10 +29,8 @@ func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[ONE_I:.*]] = llvm.mlir.constant(1 : index)
 // CHECK-NEXT: %[[SIZE_1:.*]] = llvm.sub %[[SIZE]], %[[ONE_I]]
 // CHECK-NEXT: llvm.store %[[SIZE_1]], %[[SIZE_PTR]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[CAP_PTR:.*]] = llvm.getelementptr %[[BUFFER]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[CAP_PTR:.*]] = llvm.getelementptr %[[BUFFER]][0, 1]
 // CHECK-NEXT: llvm.store %[[CAP]], %[[CAP_PTR]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER]][%[[ZERO]], 2]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER]][0, 2]
 // CHECK-NEXT: llvm.store %[[MEMORY2]], %[[GEP]]
 // CHECK-NEXT: llvm.return %[[MEMORY]]

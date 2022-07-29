@@ -12,15 +12,12 @@ func.func @foo(%list : !py.dynamic, %length : index) {
 // CHECK-LABEL: llvm.func @foo
 // CHECK-SAME: %[[LIST:[[:alnum:]]+]]
 // CHECK-SAME: %[[NEW_LENGTH:[[:alnum:]]+]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[TUPLE_PTR_PTR:.*]] = llvm.getelementptr %[[LIST]][%[[ZERO]], 2]
+// CHECK-NEXT: %[[TUPLE_PTR_PTR:.*]] = llvm.getelementptr %[[LIST]][0, 2]
 // CHECK-NEXT: %[[TUPLE_PTR:.*]] = llvm.load %[[TUPLE_PTR_PTR]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[LIST]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[LIST]][0, 1]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.load %[[SIZE_PTR]]
 // CHECK-NEXT: %[[ONE_INDEX:.*]] = llvm.mlir.constant(1 : index)
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_PTR]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_PTR]][0, 1]
 // CHECK-NEXT: %[[CAPACITY:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[GROW:.*]] = llvm.icmp "ult" %[[CAPACITY]], %[[NEW_LENGTH]]
 // CHECK-NEXT: llvm.cond_br %[[GROW]], ^[[GROW_BLOCK:.*]], ^[[END_BLOCK:[[:alnum:]]+]]
@@ -28,8 +25,7 @@ func.func @foo(%list : !py.dynamic, %length : index) {
 // CHECK-NEXT: ^[[GROW_BLOCK]]:
 // CHECK-NEXT: %[[SHL:.*]] = llvm.shl %[[CAPACITY]], %[[ONE_INDEX]]
 // CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.umax"(%[[SHL]], %[[NEW_LENGTH]])
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_PTR]][%[[ZERO]], 0]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_PTR]][0, 0]
 // CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[TRAILING_SIZE:.*]] = llvm.mul %[[NEW_CAP]], %[[ELEMENT_SIZE]]
@@ -39,28 +35,19 @@ func.func @foo(%list : !py.dynamic, %length : index) {
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
 // CHECK-NEXT: %[[FALSE_C:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[TUPLE_MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE_C]])
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][%[[ZERO]], 0]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 0]
 // CHECK-NEXT: llvm.store %[[TUPLE_TYPE]], %[[GEP]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][%[[ZERO]], 1]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 1]
 // CHECK-NEXT: llvm.store %[[NEW_CAP]], %[[GEP]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][%[[ZERO]], 2]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[ZERO2:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][%[[ZERO]], %[[ZERO2]]]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_PTR]][%[[ZERO]], 2]
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[ZERO2:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[PREV_ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][%[[ZERO]], %[[ZERO2]]]
+// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 2]
+// CHECK-NEXT: %[[ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
+// CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_PTR]][0, 2]
+// CHECK-NEXT: %[[PREV_ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[TRAILING_SIZE:.*]] = llvm.mul %[[LEN]], %[[ELEMENT_SIZE]]
 // CHECK-NEXT: %[[FALSE_C:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[PREV_ARRAY]], %[[TRAILING_SIZE]], %[[FALSE_C]])
-// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{[0-9]+}})
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST]][%[[ZERO]], 2]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST]][0, 2]
 // CHECK-NEXT: llvm.store %[[TUPLE_MEMORY]], %[[GEP]]
 // CHECK-NEXT: llvm.br ^[[END_BLOCK]]
 
