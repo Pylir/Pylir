@@ -541,6 +541,8 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
         {
             return tl::unexpected{std::move(expression).error()};
         }
+
+        // Remember the indices of both the first keyword argument and the first mapping expansion.
         if (keywordName && !firstKeywordIndex)
         {
             firstKeywordIndex = arguments.size();
@@ -553,7 +555,8 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
 
         if (!expansionOrEqual && (firstKeywordIndex || firstMappingExpansionIndex))
         {
-            if (!firstMappingExpansionIndex || firstKeywordIndex < firstMappingExpansionIndex)
+            // We diagnose whichever one of the two cases happened first.
+            if (!firstMappingExpansionIndex || (firstKeywordIndex && firstKeywordIndex < firstMappingExpansionIndex))
             {
                 return tl::unexpected{
                     createDiagnosticsBuilder(**expression,
@@ -568,19 +571,20 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
                 createDiagnosticsBuilder(**expression,
                                          Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
                     .addLabel(**expression, std::nullopt, Diag::ERROR_COLOUR)
-                    .addNote(arguments[*firstKeywordIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
-                    .addLabel(arguments[*firstKeywordIndex], std::nullopt, Diag::NOTE_COLOUR)
+                    .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
+                    .addLabel(arguments[*firstMappingExpansionIndex], std::nullopt, Diag::NOTE_COLOUR)
                     .emitError()};
         }
 
         if (expansionOrEqual && expansionOrEqual->getTokenType() == TokenType::Star && firstMappingExpansionIndex)
         {
-            return tl::unexpected{createDiagnosticsBuilder(
-                                      **expression, Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
-                                      .addLabel(**expression, std::nullopt, Diag::ERROR_COLOUR)
-                                      .addNote(arguments[*firstKeywordIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
-                                      .addLabel(arguments[*firstKeywordIndex], std::nullopt, Diag::NOTE_COLOUR)
-                                      .emitError()};
+            return tl::unexpected{
+                createDiagnosticsBuilder(**expression,
+                                         Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
+                    .addLabel(**expression, std::nullopt, Diag::ERROR_COLOUR)
+                    .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
+                    .addLabel(arguments[*firstMappingExpansionIndex], std::nullopt, Diag::NOTE_COLOUR)
+                    .emitError()};
         }
         arguments.push_back({std::move(keywordName), std::move(expansionOrEqual), std::move(*expression)});
     }

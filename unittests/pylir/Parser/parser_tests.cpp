@@ -206,3 +206,31 @@ TEST_CASE("Parse function definition", "[Parser]")
                  "  pass",
                  pylir::Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS, "c");
 }
+
+TEST_CASE("Parser argument list", "[Parser]")
+{
+    PARSER_EMITS("foo(a = 3, c)", pylir::Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS);
+    PARSER_EMITS("foo(**a, c)", pylir::Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING);
+    PARSER_EMITS("foo(a = 3, **b, c)", pylir::Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS);
+    PARSER_EMITS("foo(**b, *c)", pylir::Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING);
+}
+
+namespace
+{
+void parse(std::string_view source)
+{
+    pylir::Diag::Document document(std::string{source});
+    pylir::Parser parser(document);
+
+    auto expected = parser.parseFileInput();
+    if (!expected)
+    {
+        std::cerr << expected.error();
+    }
+}
+} // namespace
+
+TEST_CASE("Parser fuzzer discoveries", "[Parser]")
+{
+    parse("5(**~5(**10,j)p");
+}
