@@ -13,7 +13,7 @@
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/ObjectFromTypeObjectInterface.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
 
 #include "PylirPyTypes.hpp"
 
@@ -67,7 +67,7 @@ public:
             return TypeRefineResult::Success;                                                                   \
         }                                                                                                       \
     };
-#include <pylir/Interfaces/Builtins.def>
+#include <pylir/Interfaces/BuiltinsModule.def>
 
 template <class ConcreteType>
 class RefinedTypeTupleApproximate : public TypeRefineableInterface::Trait<ConcreteType>

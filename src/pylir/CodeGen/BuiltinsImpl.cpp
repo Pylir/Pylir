@@ -10,7 +10,7 @@
 
 #include <llvm/ADT/StringSet.h>
 
-#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
 #include "CodeGen.hpp"
@@ -185,7 +185,7 @@ std::vector<pylir::CodeGen::UnpackResults>
 {
     return unpackArgsKeywords(
         tuple, dict, parameters, [&](std::size_t index) { return m_builder.createConstant(posArgs.getValue()[index]); },
-        [&](std::string_view name)
+        [&](llvm::StringRef name)
         {
             const auto* result = std::find_if(kwArgs.getValue().begin(), kwArgs.getValue().end(),
                                               [&](const auto& pair)
@@ -195,7 +195,7 @@ std::vector<pylir::CodeGen::UnpackResults>
                                                   {
                                                       return false;
                                                   }
-                                                  return str.getValue() == llvm::StringRef{name};
+                                                  return str.getValue() == name;
                                               });
             return m_builder.createConstant(result->second);
         });

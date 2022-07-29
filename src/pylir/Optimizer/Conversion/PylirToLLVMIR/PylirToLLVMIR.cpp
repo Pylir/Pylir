@@ -356,39 +356,39 @@ public:
 
     mlir::LLVM::LLVMStructType getBuiltinsInstanceType(llvm::StringRef builtinsName)
     {
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Object.name})
+        if (builtinsName == pylir::Py::Builtins::Object.name)
         {
             return getPyObjectType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Tuple.name})
+        if (builtinsName == pylir::Py::Builtins::Tuple.name)
         {
             return getPyTupleType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::List.name})
+        if (builtinsName == pylir::Py::Builtins::List.name)
         {
             return getPyListType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Type.name})
+        if (builtinsName == pylir::Py::Builtins::Type.name)
         {
             return getPyTypeType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Function.name})
+        if (builtinsName == pylir::Py::Builtins::Function.name)
         {
             return getPyFunctionType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Str.name})
+        if (builtinsName == pylir::Py::Builtins::Str.name)
         {
             return getPyStringType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Int.name})
+        if (builtinsName == pylir::Py::Builtins::Int.name)
         {
             return getPyIntType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::Dict.name})
+        if (builtinsName == pylir::Py::Builtins::Dict.name)
         {
             return getPyDictType();
         }
-        if (builtinsName == llvm::StringRef{pylir::Py::Builtins::BaseException.name})
+        if (builtinsName == pylir::Py::Builtins::BaseException.name)
         {
             return getPyBaseExceptionType();
         }

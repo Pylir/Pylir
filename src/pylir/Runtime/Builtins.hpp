@@ -22,7 +22,7 @@ namespace Builtins
 {
 #define BUILTIN(name, symbol, ...) extern PyObject name asm(symbol);
 #define BUILTIN_TYPE(name, symbol, ...) extern PyTypeObject name asm(symbol);
-#include <pylir/Interfaces/Builtins.def>
+#include <pylir/Interfaces/BuiltinsModule.def>
 } // namespace Builtins
 
 template <PyTypeObject&>
@@ -87,6 +87,6 @@ constexpr static std::size_t BaseExceptionSlotCount =
         using instanceType = PyBaseException;                                     \
         constexpr static std::size_t slotCount = details::BaseExceptionSlotCount; \
     };
-#include <pylir/Interfaces/Builtins.def>
+#include <pylir/Interfaces/BuiltinsModule.def>
 
 } // namespace pylir::rt

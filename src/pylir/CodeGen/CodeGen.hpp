@@ -11,9 +11,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OwningOpRef.h>
 
-#include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/ScopeExit.h>
-#include <llvm/ADT/SmallPtrSet.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -23,9 +21,8 @@
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/ValueReset.hpp>
 
-#include <map>
-#include <stack>
 #include <tuple>
+#include <unordered_map>
 
 namespace pylir
 {
@@ -215,9 +212,9 @@ class CodeGen
     };
 
     std::vector<UnpackResults> unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
-                                                const std::vector<FunctionParameter>& parameters,
-                                                llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
-                                                llvm::function_ref<mlir::Value(std::string_view)> kwDefault = {});
+                                                  const std::vector<FunctionParameter>& parameters,
+                                                  llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
+                                                  llvm::function_ref<mlir::Value(llvm::StringRef)> kwDefault = {});
 
     mlir::func::FuncOp buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
                                        const std::vector<FunctionParameter>& parameters);
@@ -292,33 +289,6 @@ class CodeGen
 
     void createBuiltinsImpl();
 
-    [[nodiscard]] auto implementFunction(mlir::func::FuncOp funcOp)
-    {
-        auto tuple =
-            std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
-                            pylir::valueResetMany(m_currentFunc, m_currentRegion, m_currentLoop, m_currentExceptBlock,
-                                                  std::move(m_functionScope), m_qualifiers));
-        m_currentLoop = {nullptr, nullptr};
-        m_currentExceptBlock = nullptr;
-        m_currentFunc = funcOp;
-        m_currentRegion = &m_currentFunc.getBody();
-        m_module.push_back(m_currentFunc);
-        m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
-        m_functionScope.emplace(Scope{{},
-                                      SSABuilder(
-                                          [this](mlir::BlockArgument arg) -> mlir::Value
-                                          {
-                                              auto prev = m_builder.getCurrentLoc();
-                                              m_builder.setCurrentLoc(arg.getLoc());
-                                              mlir::OpBuilder::InsertionGuard guard{m_builder};
-                                              m_builder.setInsertionPointToStart(arg.getOwner());
-                                              auto value = m_builder.createConstant(m_builder.getUnboundAttr());
-                                              m_builder.setCurrentLoc(prev);
-                                              return value;
-                                          })});
-        return tuple;
-    }
-
     void implementBlock(mlir::Block* block)
     {
         m_currentRegion->push_back(block);
@@ -382,6 +352,30 @@ class CodeGen
         auto exit = llvm::make_scope_exit([=] { m_builder.setCurrentLoc(currLoc); });
         m_builder.setCurrentLoc(loc);
         return exit;
+    }
+
+    [[nodiscard]] auto implementFunction(mlir::func::FuncOp funcOp)
+    {
+        auto tuple =
+            std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
+                            pylir::valueResetMany(m_currentFunc, m_currentRegion, m_currentLoop, m_currentExceptBlock,
+                                                  std::move(m_functionScope), m_qualifiers));
+        m_currentLoop = {nullptr, nullptr};
+        m_currentExceptBlock = nullptr;
+        m_currentFunc = funcOp;
+        m_currentRegion = &m_currentFunc.getBody();
+        m_module.push_back(m_currentFunc);
+        m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
+        m_functionScope.emplace(Scope{{},
+                                      SSABuilder(
+                                          [this](mlir::BlockArgument arg) -> mlir::Value
+                                          {
+                                              auto locExit = changeLoc(arg.getLoc());
+                                              mlir::OpBuilder::InsertionGuard guard{m_builder};
+                                              m_builder.setInsertionPointToStart(arg.getOwner());
+                                              return m_builder.createConstant(m_builder.getUnboundAttr());
+                                          })});
+        return tuple;
     }
 
 public:

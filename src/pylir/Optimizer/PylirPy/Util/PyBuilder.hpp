@@ -138,14 +138,14 @@ public:
     {                                                             \
         return mlir::FlatSymbolRefAttr::get(getContext(), (str)); \
     }
-#include <pylir/Interfaces/Builtins.def>
+#include <pylir/Interfaces/BuiltinsModule.def>
 
 #define BUILTIN(name, _1, _2, type, ...)                     \
     Py::ConstantOp create##name##Ref()                       \
     {                                                        \
         return create<Py::ConstantOp>(get##name##Builtin()); \
     }
-#include <pylir/Interfaces/Builtins.def>
+#include <pylir/Interfaces/BuiltinsModule.def>
 
     Py::ConstantOp createConstant(mlir::Attribute constant)
     {

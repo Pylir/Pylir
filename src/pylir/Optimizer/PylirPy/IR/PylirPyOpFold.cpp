@@ -510,7 +510,7 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
         return mlir::Value{*this};
     }
     auto type = operands[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-    if (type && type.getValue() == llvm::StringRef{Builtins::Tuple.name}
+    if (type && type.getValue() == Builtins::Tuple.name
         && mlir::isa_and_nonnull<Py::TupleDropFrontOp, Py::TuplePrependOp, Py::MakeTupleOp, Py::MakeTupleExOp>(
             getTuple().getDefiningOp()))
     {

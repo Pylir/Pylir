@@ -11,7 +11,7 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
 #include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 

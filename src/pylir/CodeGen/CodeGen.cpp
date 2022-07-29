@@ -16,7 +16,7 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Parser/Visitor.hpp>
 #include <pylir/Support/Functional.hpp>
@@ -39,7 +39,7 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
         {
             continue;
         }
-        constexpr std::string_view builtinsModule = "builtins.";
+        constexpr llvm::StringLiteral builtinsModule = "builtins.";
         if (iter.name.substr(0, builtinsModule.size()) != builtinsModule)
         {
             continue;
@@ -1678,10 +1678,9 @@ void pylir::CodeGen::raiseException(mlir::Value exceptionObject)
 }
 
 std::vector<pylir::CodeGen::UnpackResults>
-    pylir::CodeGen::unpackArgsKeywords(mlir::Value tuple, mlir::Value dict,
-                                       const std::vector<FunctionParameter>& parameters,
-                                       llvm::function_ref<mlir::Value(std::size_t)> posDefault,
-                                       llvm::function_ref<mlir::Value(std::string_view)> kwDefault)
+    pylir::CodeGen::unpackArgsKeywords(
+    mlir::Value tuple, mlir::Value dict, const std::vector<FunctionParameter>& parameters,
+    llvm::function_ref<mlir::Value(std::size_t)> posDefault, llvm::function_ref<mlir::Value(llvm::StringRef)> kwDefault)
 {
     auto tupleLen = m_builder.createTupleLen(tuple);
 

@@ -27,7 +27,7 @@ TYPE_SLOT(__str__, Str)
 TYPE_SLOT(__repr__, Repr)
 TYPE_SLOT(__call__, Call)
 TYPE_SLOT(__getitem__, GetItem)
-TYPE_SLOT(__setitem__, setItem)
+TYPE_SLOT(__setitem__, SetItem)
 TYPE_SLOT(__get__, Get)
 
 #undef TYPE_SLOT

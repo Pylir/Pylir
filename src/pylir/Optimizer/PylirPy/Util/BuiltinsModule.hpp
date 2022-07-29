@@ -7,22 +7,22 @@
 #pragma once
 
 #include <array>
-#include <string_view>
+#include <llvm/ADT/StringRef.h>
 
 namespace pylir::Py::Builtins
 {
 
 struct Builtin
 {
-    std::string_view name;
+    llvm::StringLiteral name;
     bool isPublic;
 };
 
 #define BUILTIN(x, s, isPublic, ...) constexpr Builtin x = {s, isPublic};
-#include <pylir/Interfaces/Builtins.def>
+#include <pylir/Interfaces/BuiltinsModule.def>
 
 constexpr std::array allBuiltins = {
 #define BUILTIN(x, ...) x,
-#include <pylir/Interfaces/Builtins.def>
+#include <pylir/Interfaces/BuiltinsModule.def>
 };
 } // namespace pylir::Py::Builtins

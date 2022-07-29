@@ -10,7 +10,7 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/SubElementInterfaces.h>
 
-#include <pylir/Optimizer/PylirPy/Util/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
 #include <pylir/Support/BigInt.hpp>
 
 #include <map>

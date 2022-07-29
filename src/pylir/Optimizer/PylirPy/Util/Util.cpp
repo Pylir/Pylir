@@ -9,7 +9,7 @@
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 
-#include "Builtins.hpp"
+#include "BuiltinsModule.hpp"
 
 namespace
 {
