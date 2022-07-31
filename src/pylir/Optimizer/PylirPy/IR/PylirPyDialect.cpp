@@ -86,21 +86,5 @@ mlir::LogicalResult pylir::Py::PylirPyDialect::verifyOperationAttribute(mlir::Op
         }
         return mlir::success();
     }
-    if (attribute.getName() == specializationOfAttr)
-    {
-        if (!attribute.getValue().isa<mlir::StringAttr>())
-        {
-            return op->emitOpError("Expected ") << specializationOfAttr << " to be a string attr";
-        }
-        return mlir::success();
-    }
-    if (attribute.getName() == specializationTypeAttr)
-    {
-        if (!attribute.getValue().isa<mlir::TypeAttr>())
-        {
-            return op->emitOpError("Expected ") << specializationTypeAttr << " to be a type attr";
-        }
-        return mlir::success();
-    }
     return op->emitOpError("Unknown dialect attribute ") << attribute.getName();
 }

@@ -10,8 +10,8 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
 #include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
@@ -20,6 +20,44 @@
 
 namespace
 {
+
+mlir::Value callOrInvoke(mlir::Location loc, mlir::OpBuilder& builder, mlir::Block* dest,
+                         const pylir::Builtins::Builtin& callable, llvm::ArrayRef<pylir::Py::IterArg> args,
+                         mlir::Block* exceptionHandlerBlock)
+{
+    mlir::Value result;
+    if (exceptionHandlerBlock)
+    {
+        auto* happyPath = new mlir::Block;
+        result = builder
+                     .create<pylir::Py::InvokeOp>(
+                         loc, builder.getType<pylir::Py::DynamicType>(), pylir::Builtins::PylirCall.name,
+                         mlir::ValueRange{
+                             builder.create<pylir::Py::ConstantOp>(
+                                 loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), callable.name)),
+                             builder.create<pylir::Py::MakeTupleOp>(loc, args),
+                             builder.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(builder.getContext())),
+                         },
+                         mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptionHandlerBlock)
+                     .getResult(0);
+        happyPath->insertBefore(dest);
+        builder.setInsertionPointToStart(happyPath);
+    }
+    else
+    {
+        result = builder
+                     .create<pylir::Py::CallOp>(
+                         loc, builder.getType<pylir::Py::DynamicType>(), pylir::Builtins::PylirCall.name,
+                         mlir::ValueRange{
+                             builder.create<pylir::Py::ConstantOp>(
+                                 loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), callable.name)),
+                             builder.create<pylir::Py::MakeTupleOp>(loc, args),
+                             builder.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(builder.getContext())),
+                         })
+                     .getResult(0);
+    }
+    return result;
+}
 
 struct CallMethodPattern : mlir::OpRewritePattern<pylir::Py::CallMethodOp>
 {
@@ -167,7 +205,7 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
             }
             begin++;
             auto iterObject =
-                pylir::Py::buildSpecialMethodCall(loc, rewriter, "__iter__", {iter.value()}, {}, exceptionHandlerBlock);
+                callOrInvoke(loc, rewriter, dest, pylir::Builtins::Iter, {iter.value()}, exceptionHandlerBlock);
             auto* condition = new mlir::Block;
             rewriter.create<mlir::cf::BranchOp>(loc, condition);
 
@@ -175,8 +213,8 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
             rewriter.setInsertionPointToStart(condition);
             auto* stopIterationHandler = new mlir::Block;
             stopIterationHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
-            auto next =
-                pylir::Py::buildSpecialMethodCall(loc, rewriter, "__next__", iterObject, {}, stopIterationHandler);
+
+            auto next = callOrInvoke(loc, rewriter, dest, pylir::Builtins::Next, {iterObject}, stopIterationHandler);
 
             auto len = rewriter.create<pylir::Py::ListLenOp>(loc, list);
             auto newLen = rewriter.create<mlir::arith::AddIOp>(loc, len, one);
@@ -187,7 +225,7 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
             stopIterationHandler->insertBefore(dest);
             rewriter.setInsertionPointToStart(stopIterationHandler);
             auto stopIterationType = rewriter.create<pylir::Py::ConstantOp>(
-                loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::StopIteration.name));
+                loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Builtins::StopIteration.name));
             auto typeOf = rewriter.create<pylir::Py::TypeOfOp>(loc, stopIterationHandler->getArgument(0));
             auto isStopIteration = rewriter.create<pylir::Py::IsOp>(loc, stopIterationType, typeOf);
             auto* continueBlock = new mlir::Block;

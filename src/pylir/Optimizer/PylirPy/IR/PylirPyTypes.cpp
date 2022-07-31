@@ -11,7 +11,7 @@
 #include <llvm/ADT/SetVector.h>
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
+#include <pylir/Interfaces/Builtins.hpp>
 
 #include "PylirPyAttributes.hpp"
 #include "PylirPyDialect.hpp"

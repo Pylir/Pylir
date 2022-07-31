@@ -1,7 +1,5 @@
 # RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
-# XFAIL: *
-
 # CHECK-LABEL: __init__
 
 global x
@@ -13,14 +11,9 @@ x()
 # CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
 
 # CHECK: ^[[HAPPY_PATH]]:
-# CHECK-DAG: %[[TUPLE:.*]] = py.constant #py.tuple<()>
-# CHECK-DAG: %[[DICT:.*]] = py.constant #py.dict<{}>
-# CHECK: %[[RESULT:.*]], %[[SUCCESS:.*]] = py.getFunction %[[X_LOADED]]
-# CHECK: cond_br %[[SUCCESS]], ^[[HAPPY_PATH:[[:alnum:]]+]]
-
-# CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[FUNCTION:.*]] = py.function.getFunction %[[RESULT]]
-# CHECK: call_indirect %[[FUNCTION]](%[[RESULT]], %[[TUPLE]], %[[DICT]])
+# CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple ()
+# CHECK-DAG: %[[DICT:.*]] = py.constant(#py.dict<{}>)
+# CHECK: py.call @pylir__call__(%[[X_LOADED]], %[[TUPLE]], %[[DICT]])
 
 x(5, k=3)
 
@@ -29,17 +22,12 @@ x(5, k=3)
 # CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
 
 # CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[FIVE:.*]] = py.constant #py.int<5>
-# CHECK: %[[K:.*]] = py.constant #py.str<"k">
-# CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (%[[FIVE]])
-# CHECK-DAG: %[[DICT:.*]] = py.makeDict (%[[K]] : %[[THREE]])
-# CHECK: %[[RESULT:.*]], %[[SUCCESS:.*]] = py.getFunction %[[X_LOADED]]
-# CHECK: cond_br %[[SUCCESS]], ^[[HAPPY_PATH:[[:alnum:]]+]]
-
-# CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[FUNCTION:.*]] = py.function.getFunction %[[RESULT]]
-# CHECK: call_indirect %[[FUNCTION]](%[[RESULT]], %[[TUPLE]], %[[DICT]])
+# CHECK-DAG: %[[FIVE:.*]] = py.constant(#py.int<5>)
+# CHECK-DAG: %[[NAME:.*]] = py.constant(#py.str<"k">)
+# CHECK-DAG: %[[THREE:.*]] = py.constant(#py.int<3>)
+# CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[FIVE]])
+# CHECK: %[[DICT:.*]] = py.makeDict (%[[NAME]] : %[[THREE]])
+# CHECK: py.call @pylir__call__(%[[X_LOADED]], %[[TUPLE]], %[[DICT]])
 
 x(*(), **{})
 
@@ -48,13 +36,8 @@ x(*(), **{})
 # CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
 
 # CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[ARG1:.*]] = py.constant #py.tuple<()>
-# CHECK: %[[ARG2:.*]] = py.makeDict ()
-# CHECK-DAG: %[[TUPLE:.*]] = py.makeTuple (*%[[ARG1]])
-# CHECK-DAG: %[[DICT:.*]] = py.makeDict (**%[[ARG2]])
-# CHECK: %[[RESULT:.*]], %[[SUCCESS:.*]] = py.getFunction %[[X_LOADED]]
-# CHECK: cond_br %[[SUCCESS]], ^[[HAPPY_PATH:[[:alnum:]]+]]
-
-# CHECK: ^[[HAPPY_PATH]]:
-# CHECK: %[[FUNCTION:.*]] = py.function.getFunction %[[RESULT]]
-# CHECK: call_indirect %[[FUNCTION]](%[[RESULT]], %[[TUPLE]], %[[DICT]])
+# CHECK: %[[TUPLE1:.*]] = py.makeTuple ()
+# CHECK: %[[DICT1:.*]] = py.makeDict ()
+# CHECK: %[[TUPLE:.*]] = py.makeTuple (*%[[TUPLE1]])
+# CHECK: %[[DICT:.*]] = py.makeDict (**%[[DICT1]])
+# CHECK: py.call @pylir__call__(%[[X_LOADED]], %[[TUPLE]], %[[DICT]])

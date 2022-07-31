@@ -9,11 +9,11 @@
 #include <mlir/IR/Matchers.h>
 #include <mlir/IR/OpDefinition.h>
 
+#include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/ObjectFromTypeObjectInterface.hpp>
-#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
 
 #include "PylirPyTypes.hpp"
 
@@ -52,20 +52,20 @@ public:
     }
 };
 
-#define BUILTIN_TYPE(x, ...)                                                                                    \
-    template <class ConcreteType>                                                                               \
-    class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                  \
-    {                                                                                                           \
-    public:                                                                                                     \
-        pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,                       \
-                                                llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,  \
-                                                mlir::SymbolTableCollection&)                                   \
-        {                                                                                                       \
-            auto* context = this->getOperation()->getContext();                                                 \
-            result.emplace_back(                                                                                \
-                pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, pylir::Py::Builtins::x.name))); \
-            return TypeRefineResult::Success;                                                                   \
-        }                                                                                                       \
+#define BUILTIN_TYPE(x, ...)                                                                                   \
+    template <class ConcreteType>                                                                              \
+    class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                 \
+    {                                                                                                          \
+    public:                                                                                                    \
+        pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,                      \
+                                                llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result, \
+                                                mlir::SymbolTableCollection&)                                  \
+        {                                                                                                      \
+            auto* context = this->getOperation()->getContext();                                                \
+            result.emplace_back(                                                                               \
+                pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, pylir::Builtins::x.name)));    \
+            return TypeRefineResult::Success;                                                                  \
+        }                                                                                                      \
     };
 #include <pylir/Interfaces/BuiltinsModule.def>
 

@@ -1527,6 +1527,15 @@ void Monomorph::runOnOperation()
 
     bool changed = false;
     mlir::SymbolTable table(getOperation());
+
+    auto doClone = [this, &table](Clone& clone)
+    {
+        clone.function = clone.function->clone(clone.mapping);
+        mlir::cast<mlir::SymbolOpInterface>(*clone.function).setPrivate();
+        table.insert(clone.function);
+        m_functionsCloned++;
+    };
+
     llvm::DenseMap<FunctionSpecialization, Clone> clones;
     for (auto& [func, orchestrator] : results)
     {
@@ -1567,10 +1576,7 @@ void Monomorph::runOnOperation()
             // Roots are not cloned but updated in place.
             if (clone.function == func.function && !isRoot)
             {
-                clone.function = clone.function->clone(clone.mapping);
-                mlir::cast<mlir::SymbolOpInterface>(*clone.function).setPrivate();
-                table.insert(clone.function);
-                m_functionsCloned++;
+                doClone(clone);
             }
 
             auto cloneValue = clone.mapping.lookupOrDefault(instrValue);
@@ -1647,10 +1653,7 @@ void Monomorph::runOnOperation()
                 // Lazy cloning of this function if it has not yet occurred. Just like in the constant setting loop.
                 if (thisClone.function == thisFunc.function && !isRoot)
                 {
-                    thisClone.function = thisClone.function->clone(thisClone.mapping);
-                    mlir::cast<mlir::SymbolOpInterface>(*thisClone.function).setPrivate();
-                    table.insert(thisClone.function);
-                    m_functionsCloned++;
+                    doClone(thisClone);
                     cloneOccurred = true;
                     call = calcCall();
                 }

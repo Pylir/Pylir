@@ -13,7 +13,7 @@
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
+#include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Support/Text.hpp>
 #include <pylir/Support/Variant.hpp>
 
@@ -753,7 +753,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference\n");
                 }
                 if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
-                    ref && ref.getValue() != pylir::Py::Builtins::None.name)
+                    ref && ref.getValue() != pylir::Builtins::None.name)
                 {
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                     if (!lookup)
@@ -771,7 +771,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference\n");
                 }
                 if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
-                    ref && ref.getValue() != pylir::Py::Builtins::None.name)
+                    ref && ref.getValue() != pylir::Builtins::None.name)
                 {
                     auto lookup = table.lookup<pylir::Py::GlobalValueOp>(ref.getValue());
                     if (!lookup)

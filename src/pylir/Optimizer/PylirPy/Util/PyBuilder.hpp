@@ -140,12 +140,64 @@ public:
     }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
-#define BUILTIN(name, _1, _2, type, ...)                     \
+#define BUILTIN(name, ...)                                   \
     Py::ConstantOp create##name##Ref()                       \
     {                                                        \
         return create<Py::ConstantOp>(get##name##Builtin()); \
     }
 #include <pylir/Interfaces/BuiltinsModule.def>
+
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                                                                    \
+    mlir::Value createPylir##name##Intrinsic(mlir::Value first, mlir::Value second, mlir::Value third,                 \
+                                             mlir::Block* exceptBlock = nullptr)                                       \
+    {                                                                                                                  \
+        if (!exceptBlock)                                                                                              \
+        {                                                                                                              \
+            return create<Py::CallOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                   \
+                                      mlir::ValueRange{first, second, third})                                          \
+                .getResult(0);                                                                                         \
+        }                                                                                                              \
+        auto* happyPath = new mlir::Block;                                                                             \
+        auto op = create<Py::InvokeOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                  \
+                                       mlir::ValueRange{first, second, third}, mlir::ValueRange{}, mlir::ValueRange{}, \
+                                       happyPath, exceptBlock);                                                        \
+        implementBlock(happyPath);                                                                                     \
+        return op.getResult(0);                                                                                        \
+    }
+
+#define COMPILER_BUILTIN_BIN_OP(name, slotName)                                                                       \
+    mlir::Value createPylir##name##Intrinsic(mlir::Value lhs, mlir::Value rhs, mlir::Block* exceptBlock = nullptr)    \
+    {                                                                                                                 \
+        if (!exceptBlock)                                                                                             \
+        {                                                                                                             \
+            return create<Py::CallOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                  \
+                                      mlir::ValueRange{lhs, rhs})                                                     \
+                .getResult(0);                                                                                        \
+        }                                                                                                             \
+        auto* happyPath = new mlir::Block;                                                                            \
+        auto op = create<Py::InvokeOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                 \
+                                       mlir::ValueRange{lhs, rhs}, mlir::ValueRange{}, mlir::ValueRange{}, happyPath, \
+                                       exceptBlock);                                                                  \
+        implementBlock(happyPath);                                                                                    \
+        return op.getResult(0);                                                                                       \
+    }
+
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName)                                                          \
+    mlir::Value createPylir##name##Intrinsic(mlir::Value val, mlir::Block* exceptBlock = nullptr)          \
+    {                                                                                                      \
+        if (!exceptBlock)                                                                                  \
+        {                                                                                                  \
+            return create<Py::CallOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), val)  \
+                .getResult(0);                                                                             \
+        }                                                                                                  \
+        auto* happyPath = new mlir::Block;                                                                 \
+        auto op = create<Py::InvokeOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), val, \
+                                       mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptBlock);    \
+        implementBlock(happyPath);                                                                         \
+        return op.getResult(0);                                                                            \
+    }
+
+#include <pylir/Interfaces/CompilerBuiltins.def>
 
     Py::ConstantOp createConstant(mlir::Attribute constant)
     {

@@ -9,7 +9,7 @@
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 
-#include "BuiltinsModule.hpp"
+#include <pylir/Interfaces/Builtins.hpp>
 
 namespace
 {
@@ -61,7 +61,7 @@ mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value 
     builder.create<mlir::cf::CondBranchOp>(loc, failure, notBound, typeCall);
 
     implementBlock(builder, notBound);
-    auto typeError = pylir::Py::buildException(loc, builder, pylir::Py::Builtins::TypeError.name, {}, exceptionHandler);
+    auto typeError = pylir::Py::buildException(loc, builder, pylir::Builtins::TypeError.name, {}, exceptionHandler);
     raiseException(loc, builder, typeError, exceptionHandler);
 
     implementBlock(builder, typeCall);
@@ -124,7 +124,7 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
 
     implementBlock(builder, exec);
     auto function = builder.create<Py::ConstantOp>(
-        loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Py::Builtins::Function.name));
+        loc, mlir::FlatSymbolRefAttr::get(builder.getContext(), Builtins::Function.name));
     auto callableType = builder.create<Py::TypeOfOp>(loc, lookup.getResult());
     auto isFunction = builder.create<Py::IsOp>(loc, callableType, function);
     auto* isFunctionBlock = new mlir::Block;
@@ -181,7 +181,7 @@ mlir::Value pylir::Py::buildSpecialMethodCall(mlir::Location loc, mlir::OpBuilde
     auto result = buildTrySpecialMethodCall(loc, builder, methodName, tuple, kwargs, notFound, exceptionHandler);
     mlir::OpBuilder::InsertionGuard guard{builder};
     implementBlock(builder, notFound);
-    auto exception = Py::buildException(loc, builder, Py::Builtins::TypeError.name, {}, exceptionHandler);
+    auto exception = Py::buildException(loc, builder, Builtins::TypeError.name, {}, exceptionHandler);
     raiseException(loc, builder, exception, exceptionHandler);
     return result;
 }

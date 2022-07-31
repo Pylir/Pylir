@@ -845,8 +845,7 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
                                                    llvm::SmallVectorImpl<mlir::OpFoldResult>&)
 {
     static llvm::StringSet<> immutableTypes = {
-        Py::Builtins::Float.name, Py::Builtins::Int.name,   Py::Builtins::Bool.name,
-        Py::Builtins::Str.name,   Py::Builtins::Tuple.name,
+        Builtins::Float.name, Builtins::Int.name, Builtins::Bool.name, Builtins::Str.name, Builtins::Tuple.name,
     };
     if (!getConstant() && getInitializer() && immutableTypes.contains(getInitializer()->getTypeObject().getValue()))
     {

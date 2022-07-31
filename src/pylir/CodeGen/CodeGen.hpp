@@ -239,7 +239,7 @@ class CodeGen
 
     Py::GlobalValueOp createExternal(llvm::StringRef objectName);
 
-    void binCheckOtherOp(mlir::Value other, const Py::Builtins::Builtin& builtin);
+    void binCheckOtherOp(mlir::Value other, const Builtins::Builtin& builtin);
 
     std::vector<UnpackResults> createOverload(const std::vector<FunctionParameter>& parameters, mlir::Value tuple,
                                               mlir::Value dict, Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
@@ -268,10 +268,6 @@ class CodeGen
         variant.match([=](const auto& sub) { assignTarget(sub, value); });
     }
 
-    mlir::Value binOp(llvm::StringRef method, mlir::Value lhs, mlir::Value rhs);
-
-    mlir::Value binOp(llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs, mlir::Value rhs);
-
     void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
                const Syntax::CompFor& compFor);
 
@@ -288,6 +284,8 @@ class CodeGen
     }
 
     void createBuiltinsImpl();
+
+    void createCompilerBuiltinsImpl();
 
     void implementBlock(mlir::Block* block)
     {

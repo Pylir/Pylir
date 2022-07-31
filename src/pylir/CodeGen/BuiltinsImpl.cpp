@@ -10,7 +10,7 @@
 
 #include <llvm/ADT/StringSet.h>
 
-#include <pylir/Optimizer/PylirPy/Util/BuiltinsModule.hpp>
+#include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
 #include "CodeGen.hpp"
@@ -229,7 +229,7 @@ mlir::Value implementLenBuiltin(pylir::Py::PyBuilder& builder, mlir::Value objec
 }
 } // namespace
 
-void pylir::CodeGen::binCheckOtherOp(mlir::Value other, const Py::Builtins::Builtin& builtin)
+void pylir::CodeGen::binCheckOtherOp(mlir::Value other, const Builtins::Builtin& builtin)
 {
     auto otherType = m_builder.createTypeOf(other);
     auto otherIsType = buildSubclassCheck(
@@ -555,7 +555,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                [&](mlir::ValueRange)
                                { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant(false)}); });
         });
-    m_builder.createGlobalValue(Py::Builtins::None.name, true, m_builder.getObjectAttr(m_builder.getNoneTypeBuiltin()),
+    m_builder.createGlobalValue(Builtins::None.name, true, m_builder.getObjectAttr(m_builder.getNoneTypeBuiltin()),
                                 true);
     createClass(
         m_builder.getNotImplementedTypeBuiltin(), {},
@@ -570,7 +570,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                 [&](mlir::ValueRange)
                 { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant("NotImplemented")}); });
         });
-    m_builder.createGlobalValue(Py::Builtins::NotImplemented.name, true,
+    m_builder.createGlobalValue(Builtins::NotImplemented.name, true,
                                 m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
     createClass(m_builder.getFunctionBuiltin(), {},
                 [&](SlotMapImpl& slots)
@@ -668,8 +668,8 @@ void pylir::CodeGen::createBuiltinsImpl()
                     m_builder.create<mlir::cf::CondBranchOp>(isStr, strBlock, notStrBlock);
 
                     implementBlock(notStrBlock);
-                    auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                        Py::Builtins::TypeError.name, {}, nullptr);
+                    auto exception =
+                        Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {}, nullptr);
                     raiseException(exception);
 
                     implementBlock(strBlock);
@@ -726,7 +726,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
                             implementBlock(exception);
                             auto object = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                             Py::Builtins::KeyError.name, {}, nullptr);
+                                                             Builtins::KeyError.name, {}, nullptr);
                             m_builder.createRaise(object);
 
                             implementBlock(success);
@@ -853,7 +853,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                {
                                    auto self = functionArguments[0];
                                    auto other = functionArguments[1];
-                                   binCheckOtherOp(other, Py::Builtins::Int);
+                                   binCheckOtherOp(other, Builtins::Int);
                                    auto add = m_builder.createIntAdd(self, other);
                                    m_builder.create<mlir::func::ReturnOp>(mlir::Value{add});
                                });
@@ -863,7 +863,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                 {
                     auto self = functionArguments[0];
                     auto other = functionArguments[1];
-                    binCheckOtherOp(other, Py::Builtins::Int);
+                    binCheckOtherOp(other, Builtins::Int);
                     auto cmp = m_builder.createIntCmp(kind, self, other);
                     auto boolean = m_builder.createBoolFromI1(cmp);
                     m_builder.create<mlir::func::ReturnOp>(mlir::Value{boolean});
@@ -1085,7 +1085,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 
                        implementBlock(notStrBlock);
                        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                           Py::Builtins::TypeError.name, {}, nullptr);
+                                                           Builtins::TypeError.name, {}, nullptr);
                        raiseException(exception);
 
                        implementBlock(strBlock);

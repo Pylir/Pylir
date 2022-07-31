@@ -131,10 +131,9 @@ public:
         m_collectionSection = mlir::StringAttr::get(context, "py_coll");
         m_constantSection = mlir::StringAttr::get(context, "py_const");
 
-        for (const auto& iter :
-             {pylir::Py::Builtins::Object, pylir::Py::Builtins::Tuple, pylir::Py::Builtins::List,
-              pylir::Py::Builtins::Type, pylir::Py::Builtins::Function, pylir::Py::Builtins::Str,
-              pylir::Py::Builtins::Int, pylir::Py::Builtins::Dict, pylir::Py::Builtins::BaseException})
+        for (const auto& iter : {pylir::Builtins::Object, pylir::Builtins::Tuple, pylir::Builtins::List,
+                                 pylir::Builtins::Type, pylir::Builtins::Function, pylir::Builtins::Str,
+                                 pylir::Builtins::Int, pylir::Builtins::Dict, pylir::Builtins::BaseException})
         {
             auto ref = mlir::FlatSymbolRefAttr::get(&getContext(), iter.name);
             m_layoutTypeCache[ref] = ref;
@@ -356,39 +355,39 @@ public:
 
     mlir::LLVM::LLVMStructType getBuiltinsInstanceType(llvm::StringRef builtinsName)
     {
-        if (builtinsName == pylir::Py::Builtins::Object.name)
+        if (builtinsName == pylir::Builtins::Object.name)
         {
             return getPyObjectType();
         }
-        if (builtinsName == pylir::Py::Builtins::Tuple.name)
+        if (builtinsName == pylir::Builtins::Tuple.name)
         {
             return getPyTupleType();
         }
-        if (builtinsName == pylir::Py::Builtins::List.name)
+        if (builtinsName == pylir::Builtins::List.name)
         {
             return getPyListType();
         }
-        if (builtinsName == pylir::Py::Builtins::Type.name)
+        if (builtinsName == pylir::Builtins::Type.name)
         {
             return getPyTypeType();
         }
-        if (builtinsName == pylir::Py::Builtins::Function.name)
+        if (builtinsName == pylir::Builtins::Function.name)
         {
             return getPyFunctionType();
         }
-        if (builtinsName == pylir::Py::Builtins::Str.name)
+        if (builtinsName == pylir::Builtins::Str.name)
         {
             return getPyStringType();
         }
-        if (builtinsName == pylir::Py::Builtins::Int.name)
+        if (builtinsName == pylir::Builtins::Int.name)
         {
             return getPyIntType();
         }
-        if (builtinsName == pylir::Py::Builtins::Dict.name)
+        if (builtinsName == pylir::Builtins::Dict.name)
         {
             return getPyDictType();
         }
-        if (builtinsName == pylir::Py::Builtins::BaseException.name)
+        if (builtinsName == pylir::Builtins::BaseException.name)
         {
             return getPyBaseExceptionType();
         }
@@ -406,7 +405,7 @@ public:
         if (mro.empty())
         {
             // TODO: This is a special case that I should probably disallow at one point instead
-            winner = mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Py::Builtins::Object.name);
+            winner = mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Object.name);
         }
         else
         {
@@ -1519,9 +1518,9 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
             linkage = mlir::LLVM::linkage::Linkage::External;
         }
         static llvm::DenseSet<llvm::StringRef> immutable = {
-            pylir::Py::Builtins::Tuple.name,
-            pylir::Py::Builtins::Float.name,
-            pylir::Py::Builtins::Str.name,
+            pylir::Builtins::Tuple.name,
+            pylir::Builtins::Float.name,
+            pylir::Builtins::Str.name,
         };
         bool constant = op.getConstant();
         if (!op.isDeclaration())
@@ -2257,7 +2256,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
             rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
         mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
@@ -2322,7 +2321,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
             rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
         mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
@@ -2459,7 +2458,7 @@ struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T>
             mlir::OpBuilder::InsertionGuard guard{rewriter};
             rewriter.setInsertionPointToStart(&op->getParentRegion()->front());
             catchType = this->getConstant(
-                op.getLoc(), mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Py::Builtins::BaseException.name),
+                op.getLoc(), mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Builtins::BaseException.name),
                 rewriter);
         }
         // We use a integer of pointer width instead of a pointer to keep it opaque to statepoint passes.
@@ -2585,7 +2584,7 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
 
         rewriter.setInsertionPointToEnd(block);
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Type.name));
+            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
             rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
         auto* hasSlotsBlock = new mlir::Block;
@@ -2665,8 +2664,8 @@ struct InitListOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
 
         list.sizePtr(op.getLoc()).store(op.getLoc(), size);
 
-        auto tupleType = getConstant(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Py::Builtins::Tuple.name), rewriter);
+        auto tupleType =
+            getConstant(op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Tuple.name), rewriter);
         auto tupleMemory = rewriter.create<pylir::Mem::GCAllocTupleOp>(op.getLoc(), tupleType, size);
         mlir::Value tupleInit =
             rewriter.create<pylir::Mem::InitTupleOp>(op.getLoc(), op.getType(), tupleMemory, adaptor.getInitializer());

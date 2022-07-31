@@ -174,8 +174,8 @@ def PylirPy_DictAttr : TypeObjectSlotsAttr<"Dict",
 def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	[ParamSpec<AttrParameter<"mlir::FlatSymbolRefAttr", "">, "value">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::StrAttr::get($_ctxt, \"\")">, "qualName">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Py::Builtins::None.name)">, "defaults">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Py::Builtins::None.name)">, "kwDefaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Builtins::None.name)">, "defaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kwDefaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
 	 ], [DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>,
 	     DeclareAttrInterfaceMethods<ObjectAttrInterface>]>

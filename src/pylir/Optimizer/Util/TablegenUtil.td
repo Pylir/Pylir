@@ -24,7 +24,7 @@ class ParamSpecBuilder<list<ParamSpec> spec, code extraCode = ""> : AttrBuilder<
 >;
 
 class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::mlir::FlatSymbolRefAttr",
-	"::mlir::FlatSymbolRefAttr::get($_ctxt, ::pylir::Py::Builtins::" # name # ".name)", description>;
+	"::mlir::FlatSymbolRefAttr::get($_ctxt, ::pylir::Builtins::" # name # ".name)", description>;
 
 class CustomPrint<AttrOrTypeParameter x, string elementParse = ?, string elementPrint = ?>
 	: AttrOrTypeParameter<x.cppType, x.summary, x.cppAccessorType>
