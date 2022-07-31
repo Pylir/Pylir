@@ -35,15 +35,14 @@ TEST_CASE("Lex comments", "[Lexer]")
 {
     SECTION("Comment to end of line")
     {
-        pylir::Diag::Document document("# comment\n"
-                                       "");
+        pylir::Diag::Document document("# comment\n");
         pylir::Lexer lexer(document, 1);
         std::vector result(lexer.begin(), lexer.end());
-        REQUIRE(result.size() == 2);
+        REQUIRE(result.size() == 1);
         auto& token = result.front();
         CHECK(token.getTokenType() == pylir::TokenType::Newline);
         CHECK(token.getFileId() == 1);
-        CHECK(token.getOffset() == 9);
+        CHECK(token.getOffset() == 10);
         CHECK(std::holds_alternative<std::monostate>(token.getValue()));
     }
     SECTION("Comment to end of file")
@@ -815,6 +814,33 @@ TEST_CASE("Lex indentation", "[Lexer]")
         CHECK(result[5] == pylir::TokenType::Identifier);
         CHECK(result[6] == pylir::TokenType::Newline);
         CHECK(result[7] == pylir::TokenType::Dedent);
+    }
+    SECTION("Comment")
+    {
+        pylir::Diag::Document document("foo\n"
+                                       "# a comment\n"
+                                       "\tfoobar"
+                                       "\n"
+                                       "    # a comment\n"
+                                       "[\n"
+                                       "# a comment\n"
+                                       "3\n"
+                                       "]");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 10);
+        CHECK(result[0] == pylir::TokenType::Identifier);
+        CHECK(result[1] == pylir::TokenType::Newline);
+        CHECK(result[2] == pylir::TokenType::Indent);
+        CHECK(result[3] == pylir::TokenType::Identifier);
+        CHECK(result[4] == pylir::TokenType::Newline);
+        CHECK(result[5] == pylir::TokenType::Dedent);
+        CHECK(result[6] == pylir::TokenType::OpenSquareBracket);
+        CHECK(result[7] == pylir::TokenType::IntegerLiteral);
+        CHECK(result[8] == pylir::TokenType::CloseSquareBracket);
+        CHECK(result[9] == pylir::TokenType::Newline);
     }
     LEXER_EMITS("foo\n"
                 "    bar\n"

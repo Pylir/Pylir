@@ -327,6 +327,20 @@ bool pylir::Lexer::parseNext()
                 {
                     break;
                 }
+
+                // Skip over blank logical lines. If the last token before the comment was a newline, or we have no
+                // tokens, as this is file begin, no newline tokens are generated because the whole lines was blank
+                if (m_tokens.empty() || m_tokens.back().getTokenType() == TokenType::Newline)
+                {
+                    m_current++;
+                    // We still need to potentially parse an indent for the next line now however.
+                    parseIndent();
+                    // This should always be true, since no newline tokens can be generated while the depth is not 0,
+                    // hence the above if condition never being able to be true (also since depth is increased by the
+                    // generation of open bracket tokens, hence it can't be empty either).
+                    PYLIR_ASSERT(m_depth == 0);
+                    continue;
+                }
             }
                 [[fallthrough]];
             case U'\n':
@@ -1491,6 +1505,14 @@ void pylir::Lexer::parseIndent()
             default: indent++;
         }
     }
+
+    // If this is the indent right before a comment, then the line is going to be blank and no indents nor dedent
+    // should be generated.
+    if (m_current != m_document->end() && *m_current == U'#')
+    {
+        return;
+    }
+
     if (indent < m_indentation.top().first)
     {
         std::pair<std::size_t, std::size_t> previous;
