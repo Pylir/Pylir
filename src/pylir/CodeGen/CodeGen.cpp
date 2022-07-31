@@ -120,9 +120,9 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
         }
 
         implementBlock(createException);
-        auto exception =
-            m_builder.createPylirCallIntrinsic(expression, m_builder.createMakeTuple(),
-                                               m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+        auto tuple = m_builder.createMakeTuple();
+        auto dict = m_builder.createConstant(m_builder.getDictAttr());
+        auto exception = m_builder.createPylirCallIntrinsic(expression, tuple, dict, m_currentExceptBlock);
         m_builder.create<mlir::cf::BranchOp>(instanceBlock, mlir::ValueRange{exception});
     }
 
@@ -755,8 +755,10 @@ mlir::Value pylir::CodeGen::toI1(mlir::Value value)
 mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 {
     auto locExit = changeLoc(value.getLoc());
-    return m_builder.createPylirCallIntrinsic(m_builder.createBoolRef(), m_builder.createMakeTuple({value}),
-                                              m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+    auto boolRef = m_builder.createBoolRef();
+    auto tuple = m_builder.createMakeTuple({value});
+    auto dict = m_builder.createConstant(m_builder.getDictAttr());
+    return m_builder.createPylirCallIntrinsic(boolRef, tuple, dict, m_currentExceptBlock);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::ListDisplay& listDisplay)
@@ -995,9 +997,10 @@ void pylir::CodeGen::visitForConstruct(const Syntax::Target& targets, mlir::Valu
                                        llvm::function_ref<void()> execSuite,
                                        const std::optional<Syntax::IfStmt::Else>& elseSection)
 {
-    auto iterObject =
-        m_builder.createPylirCallIntrinsic(m_builder.createIterRef(), m_builder.createMakeTuple({iterable}),
-                                           m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+    auto iterRef = m_builder.createIterRef();
+    auto tuple = m_builder.createMakeTuple({iterable});
+    auto dict = m_builder.createConstant(m_builder.getDictAttr());
+    auto iterObject = m_builder.createPylirCallIntrinsic(iterRef, tuple, dict, m_currentExceptBlock);
 
     BlockPtr condition;
     m_builder.create<mlir::cf::BranchOp>(condition);
@@ -1016,9 +1019,9 @@ void pylir::CodeGen::visitForConstruct(const Syntax::Target& targets, mlir::Valu
 
     auto stopIterationSeal = markOpenBlock(stopIterationHandler);
     stopIterationHandler->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-    auto next =
-        m_builder.createPylirCallIntrinsic(m_builder.createNextRef(), m_builder.createMakeTuple({iterObject}),
-                                           m_builder.createConstant(m_builder.getDictAttr()), stopIterationHandler);
+    auto nextRef = m_builder.createNextRef();
+    tuple = m_builder.createMakeTuple({iterObject});
+    auto next = m_builder.createPylirCallIntrinsic(nextRef, tuple, dict, stopIterationHandler);
     assignTarget(targets, next);
     mlir::Block* elseBlock;
     if (elseSection)
@@ -1477,9 +1480,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         {
             return;
         }
-        value =
-            m_builder.createPylirCallIntrinsic(decorator, m_builder.createMakeTuple({value}),
-                                               m_builder.createConstant(m_builder.getDictAttr()), m_currentExceptBlock);
+        auto tuple = m_builder.createMakeTuple({value});
+        auto dict = m_builder.createConstant(m_builder.getDictAttr());
+        value = m_builder.createPylirCallIntrinsic(decorator, tuple, dict, m_currentExceptBlock);
     }
     writeIdentifier(funcDef.funcName, value);
 }
