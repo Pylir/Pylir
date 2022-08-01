@@ -166,7 +166,9 @@ public:
 
     std::string dump(const Syntax::RaiseStmt& raiseStmt);
 
-    std::string dump(const Syntax::ImportStmt& token);
+    std::string dump(const Syntax::ImportStmt& importStmt);
+
+    std::string dump(const Syntax::FutureStmt& futureStmt);
 
     std::string dump(const Syntax::IfStmt& ifStmt);
 

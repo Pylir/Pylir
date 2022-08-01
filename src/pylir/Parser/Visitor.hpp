@@ -276,6 +276,8 @@ public:
 
     void visit(const ImportStmt&) {}
 
+    void visit(const FutureStmt&) {}
+
     void visit(const GlobalOrNonLocalStmt&) {}
 
     void visit(const IfStmt& ifStmt)

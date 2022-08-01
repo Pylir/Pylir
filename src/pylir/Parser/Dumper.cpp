@@ -429,7 +429,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
     {
         auto dots = std::string(module.dots.size(), '.');
         auto builder = createBuilder("relative module {}", dots);
-        if (!module.module)
+        if (module.module)
         {
             builder.add(dumpModule(*module.module));
         }
@@ -468,6 +468,23 @@ std::string pylir::Dumper::dump(const pylir::Syntax::ImportStmt& importStmt)
             }
             return result.emit();
         });
+}
+
+std::string pylir::Dumper::dump(const pylir::Syntax::FutureStmt& futureStmt)
+{
+    auto result = createBuilder("import futures");
+    for (const auto& [object, name] : futureStmt.imports)
+    {
+        if (name)
+        {
+            result.add(fmt::format("{} as {}", object.getValue(), name->getValue()));
+        }
+        else
+        {
+            result.add(object.getValue());
+        }
+    }
+    return result.emit();
 }
 
 std::string pylir::Dumper::dump(const pylir::Syntax::AssignmentStmt& assignmentStmt)

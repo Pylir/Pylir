@@ -227,7 +227,7 @@ struct DictDisplay : Expression::Base<DictDisplay>
 struct SimpleStmt
     : AbstractIntrusiveVariant<SimpleStmt, struct ExpressionStmt, struct AssertStmt, struct AssignmentStmt,
                                struct SingleTokenStmt, struct DelStmt, struct ReturnStmt, struct RaiseStmt,
-                               struct ImportStmt, struct GlobalOrNonLocalStmt>
+                               struct ImportStmt, struct FutureStmt, struct GlobalOrNonLocalStmt>
 {
     using AbstractIntrusiveVariant::AbstractIntrusiveVariant;
 };
@@ -311,6 +311,14 @@ struct ImportStmt : SimpleStmt::Base<ImportStmt>
     };
 
     std::variant<ImportAs, FromImport, ImportAll> variant;
+};
+
+struct FutureStmt : SimpleStmt::Base<FutureStmt>
+{
+    BaseToken from;
+    BaseToken future;
+    BaseToken import;
+    std::vector<std::pair<IdentifierToken, std::optional<IdentifierToken>>> imports;
 };
 
 struct GlobalOrNonLocalStmt : SimpleStmt::Base<GlobalOrNonLocalStmt>
@@ -702,6 +710,14 @@ struct LocationProvider<Syntax::ImportStmt>
     static std::pair<std::size_t, std::size_t> getRange(const Syntax::ImportStmt& value) noexcept;
 
     static std::size_t getPoint(const Syntax::ImportStmt& value) noexcept;
+};
+
+template <>
+struct LocationProvider<Syntax::FutureStmt>
+{
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::FutureStmt& value) noexcept;
+
+    static std::size_t getPoint(const Syntax::FutureStmt& value) noexcept;
 };
 
 template <>

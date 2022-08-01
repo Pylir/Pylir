@@ -320,6 +320,26 @@ std::size_t LocationProvider<ImportStmt>::getPoint(const ImportStmt& value) noex
     return pylir::match(value.variant, [](const auto& value) { return pointLoc(value.import); });
 }
 
+std::pair<std::size_t, std::size_t> LocationProvider<FutureStmt>::getRange(const FutureStmt& value) noexcept
+{
+    auto start = rangeLoc(value.from).first;
+    std::size_t end;
+    if (value.imports.back().second)
+    {
+        end = rangeLoc(*value.imports.back().second).second;
+    }
+    else
+    {
+        end = rangeLoc(value.imports.back().first).second;
+    }
+    return {start, end};
+}
+
+std::size_t LocationProvider<FutureStmt>::getPoint(const FutureStmt& value) noexcept
+{
+    return pointLoc(value.future);
+}
+
 std::pair<std::size_t, std::size_t>
     LocationProvider<GlobalOrNonLocalStmt>::getRange(const GlobalOrNonLocalStmt& value) noexcept
 {

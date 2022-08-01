@@ -415,6 +415,8 @@ public:
 
     void visit(const Syntax::ImportStmt& importStmt);
 
+    void visit(const Syntax::FutureStmt& futureStmt);
+
     void assignTarget(const Syntax::Atom& atom, mlir::Value value);
 
     void assignTarget(const Syntax::Subscription& subscription, mlir::Value value);

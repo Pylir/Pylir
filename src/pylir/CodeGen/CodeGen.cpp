@@ -1962,3 +1962,9 @@ void pylir::CodeGen::visit(const Syntax::ImportStmt& importStmt)
     // TODO:
     PYLIR_UNREACHABLE;
 }
+
+void pylir::CodeGen::visit(const Syntax::FutureStmt& importStmt)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}

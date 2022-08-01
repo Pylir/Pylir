@@ -341,6 +341,9 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                         return tl::unexpected{std::move(result).error()};
                     }
                 }
+                return make_node<Syntax::FutureStmt>(fromImportAs->from,
+                                                     fromImportAs->relativeModule.module->identifiers.front(),
+                                                     fromImportAs->import, std::move(fromImportAs->imports));
             }
             return std::make_unique<Syntax::ImportStmt>(std::move(*import));
         }
