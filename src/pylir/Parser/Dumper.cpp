@@ -30,16 +30,13 @@ std::vector<std::string_view> splitLines(std::string_view text)
 
 std::string dumpVariables(const pylir::IdentifierSet& tokens)
 {
-    std::vector<std::string> variables(tokens.size());
-    std::transform(tokens.begin(), tokens.end(), variables.begin(),
-                   [](const pylir::IdentifierToken& token) { return std::string(token.getValue()); });
-    std::sort(variables.begin(), variables.end());
-    PYLIR_ASSERT(!variables.empty());
-    std::string text = variables[0];
-    for (std::size_t i = 1; i < variables.size(); i++)
+    PYLIR_ASSERT(!tokens.empty());
+    auto iter = tokens.begin();
+    std::string text{(iter++)->getValue()};
+    for (; iter != tokens.end(); iter++)
     {
         text += ", ";
-        text += variables[i];
+        text += iter->getValue();
     }
     return text;
 }

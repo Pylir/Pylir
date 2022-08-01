@@ -12,9 +12,9 @@
 #include <pylir/Support/Variant.hpp>
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 
@@ -213,7 +213,27 @@ struct IdentifierEquals
     }
 };
 
-using IdentifierSet = std::unordered_set<IdentifierToken, IdentifierHash, IdentifierEquals>;
+struct IdentifierLess
+{
+    bool operator()(const IdentifierToken& lhs, const IdentifierToken& rhs) const noexcept
+    {
+        return lhs.getValue() < rhs.getValue();
+    }
+
+    bool operator()(const IdentifierToken& lhs, std::string_view rhs) const noexcept
+    {
+        return lhs.getValue() < rhs;
+    }
+
+    bool operator()(std::string_view lhs, const IdentifierToken& rhs) const noexcept
+    {
+        return lhs < rhs.getValue();
+    }
+
+    using is_transparent = void;
+};
+
+using IdentifierSet = std::set<IdentifierToken, IdentifierLess>;
 template <class T>
 using IdentifierMap = std::unordered_map<IdentifierToken, T, IdentifierHash, IdentifierEquals>;
 

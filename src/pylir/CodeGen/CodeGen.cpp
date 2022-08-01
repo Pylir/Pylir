@@ -22,6 +22,8 @@
 #include <pylir/Support/Functional.hpp>
 #include <pylir/Support/ValueReset.hpp>
 
+#include <unordered_set>
+
 pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document)
     : m_builder(
         [&]
@@ -340,6 +342,12 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Conditional& conditional)
 mlir::Value pylir::CodeGen::visit(const Syntax::BinOp& binOp)
 {
     auto locExit = changeLoc(binOp);
+    auto doBinOp = [&](auto intrMember)
+    {
+        auto lhs = visit(*binOp.lhs);
+        auto rhs = visit(*binOp.rhs);
+        return (m_builder.*intrMember)(lhs, rhs, m_currentExceptBlock);
+    };
     switch (binOp.operation.getTokenType())
     {
         case TokenType::OrKeyword:
@@ -387,30 +395,18 @@ mlir::Value pylir::CodeGen::visit(const Syntax::BinOp& binOp)
             implementBlock(found);
             return found->getArgument(0);
         }
-        case TokenType::Plus:
-            return m_builder.createPylirAddIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::Minus:
-            return m_builder.createPylirSubIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::BitOr:
-            return m_builder.createPylirOrIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::BitXor:
-            return m_builder.createPylirXorIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::BitAnd:
-            return m_builder.createPylirAndIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::ShiftLeft:
-            return m_builder.createPylirLShiftIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::ShiftRight:
-            return m_builder.createPylirRShiftIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::Star:
-            return m_builder.createPylirMulIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::Divide:
-            return m_builder.createPylirDivIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::IntDivide:
-            return m_builder.createPylirFloorDivIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::Remainder:
-            return m_builder.createPylirModIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
-        case TokenType::AtSign:
-            return m_builder.createPylirMatMulIntrinsic(visit(*binOp.lhs), visit(*binOp.rhs), m_currentExceptBlock);
+        case TokenType::Plus: return doBinOp(&Py::PyBuilder::createPylirAddIntrinsic);
+        case TokenType::Minus: return doBinOp(&Py::PyBuilder::createPylirSubIntrinsic);
+        case TokenType::BitOr: return doBinOp(&Py::PyBuilder::createPylirOrIntrinsic);
+        case TokenType::BitXor: return doBinOp(&Py::PyBuilder::createPylirXorIntrinsic);
+        case TokenType::BitAnd: return doBinOp(&Py::PyBuilder::createPylirAndIntrinsic);
+        case TokenType::ShiftLeft: return doBinOp(&Py::PyBuilder::createPylirLShiftIntrinsic);
+        case TokenType::ShiftRight: return doBinOp(&Py::PyBuilder::createPylirRShiftIntrinsic);
+        case TokenType::Star: return doBinOp(&Py::PyBuilder::createPylirMulIntrinsic);
+        case TokenType::Divide: return doBinOp(&Py::PyBuilder::createPylirDivIntrinsic);
+        case TokenType::IntDivide: return doBinOp(&Py::PyBuilder::createPylirFloorDivIntrinsic);
+        case TokenType::Remainder: return doBinOp(&Py::PyBuilder::createPylirModIntrinsic);
+        case TokenType::AtSign: return doBinOp(&Py::PyBuilder::createPylirMatMulIntrinsic);
         case TokenType::PowerOf:
             // TODO:
         default: PYLIR_UNREACHABLE;
@@ -588,7 +584,7 @@ void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mli
         [&](mlir::Value cell)
         {
             auto cellType = m_builder.createCellRef();
-            m_builder.createSetSlot(value, cellType, "cell_contents", cell);
+            m_builder.createSetSlot(cell, cellType, "cell_contents", value);
         },
         [&](SSABuilder::DefinitionsMap& localMap) { localMap[m_builder.getBlock()] = value; });
 }
@@ -1326,11 +1322,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
-    std::vector<IdentifierToken> functionParametersTokens;
+    std::vector<std::string_view> functionParametersTokens;
     std::vector<FunctionParameter> functionParameters;
     for (const auto& iter : funcDef.parameterList)
     {
-        functionParametersTokens.push_back(iter.name);
+        functionParametersTokens.push_back(iter.name.getValue());
         functionParameters.push_back({std::string{iter.name.getValue()},
                                       static_cast<FunctionParameter::Kind>(iter.kind), iter.maybeDefault != nullptr});
         if (!iter.maybeDefault)
@@ -1368,10 +1364,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 
         m_qualifiers.append(funcDef.funcName.getValue());
         m_qualifiers += ".<locals>.";
-        auto locals = funcDef.localVariables;
-        auto closures = funcDef.closures;
+        std::unordered_set<std::string_view> parameterSet(functionParametersTokens.size());
         for (auto [name, value] : llvm::zip(functionParametersTokens, llvm::drop_begin(func.getArguments())))
         {
+            parameterSet.insert(name);
             if (funcDef.closures.count(name))
             {
                 auto closureType = m_builder.createCellRef();
@@ -1380,22 +1376,29 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 auto metaType = m_builder.createTypeOf(closureType);
                 auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
                 mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
-                m_functionScope->identifiers.emplace(name.getValue(), Identifier{cell});
-                closures.erase(name);
+                m_functionScope->identifiers.emplace(name, Identifier{cell});
             }
             else
             {
                 m_functionScope->identifiers.emplace(
-                    name.getValue(), Identifier{SSABuilder::DefinitionsMap{{m_builder.getBlock(), value}}});
-                locals.erase(name);
+                    name, Identifier{SSABuilder::DefinitionsMap{{m_builder.getBlock(), value}}});
             }
         }
-        for (const auto& iter : locals)
+
+        for (const auto& iter : funcDef.localVariables)
         {
+            if (parameterSet.count(iter.getValue()))
+            {
+                continue;
+            }
             m_functionScope->identifiers.emplace(iter.getValue(), Identifier{SSABuilder::DefinitionsMap{}});
         }
-        for (const auto& iter : closures)
+        for (const auto& iter : funcDef.closures)
         {
+            if (parameterSet.count(iter.getValue()))
+            {
+                continue;
+            }
             auto closureType = m_builder.createCellRef();
             auto tuple = m_builder.createMakeTuple({closureType});
             auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
