@@ -38,7 +38,7 @@ struct PylirPyCostInterface : public pylir::DialectCostInterface
             .Case([](pylir::Py::UnreachableOp) { return 0; })
             .Case([](pylir::Py::RaiseOp) { return 5; })
             .Case<pylir::Py::FunctionCallOp, pylir::Py::FunctionInvokeOp>([](auto) { return 10; })
-            .Case<pylir::Py::MROLookupOp, pylir::Py::CallMethodOp, pylir::Py::CallMethodExOp>([](auto) { return 20; })
+            .Case([](pylir::Py::MROLookupOp) { return 20; })
             .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListOp, pylir::Py::MakeListExOp,
                   pylir::Py::MakeSetOp, pylir::Py::MakeSetExOp>([](auto op)
                                                                 { return op.getIterExpansion().empty() ? 2 : 30; })

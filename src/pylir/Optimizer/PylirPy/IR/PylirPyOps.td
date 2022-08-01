@@ -558,23 +558,6 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
     let hasFolder = 1;
 }
 
-def PylirPy_CallMethodOp : PylirPy_Op<"callMethod", [AddableExceptionHandling<"CallMethodExOp">]> {
-
-    let arguments = (ins DynamicType:$method, DynamicType:$args, DynamicType:$keywords);
-    let results = (outs DynamicType:$result);
-
-    let description = [{
-        This op attempts to call `$callable` using an iterative chain of method lookups of `__call__` and descriptors
-        until a function could be returned and called. If no such function exists `$result` is unbound.
-        `$callable` is typically the result of a `py.mroLookup` for a specific method in the type object of `$self`.
-        `$args` and `$keywords` correspond to the positional and keyword arguments respectively.
-    }];
-
-    let assemblyFormat = "$method`(``*` `` $args `,` `*` `` `*` `` $keywords `)` attr-dict";
-}
-
-def PylirPy_CallMethodExOp : AddExceptionHandling<PylirPy_CallMethodOp>;
-
 // Make ops
 
 def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [AlwaysBound, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,

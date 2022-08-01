@@ -193,6 +193,70 @@ void buildSetItemOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRe
     builder.create<mlir::func::ReturnOp>(result);
 }
 
+void buildMethodCallOpCompilerBuiltin(pylir::Py::PyBuilder& builder)
+{
+    auto func = builder.create<mlir::func::FuncOp>(
+        "pylirMethodCall",
+        builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
+                                builder.getDynamicType()));
+    mlir::OpBuilder::InsertionGuard guard{builder};
+    builder.setInsertionPointToStart(func.addEntryBlock());
+
+    auto self = func.getArgument(0);
+    auto args = func.getArgument(1);
+    auto kws = func.getArgument(2);
+
+    auto* condition = new mlir::Block;
+    condition->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+    builder.create<mlir::cf::BranchOp>(condition, self);
+
+    func.push_back(condition);
+    builder.setInsertionPointToStart(condition);
+    self = condition->getArgument(0);
+    auto selfType = builder.createTypeOf(self);
+    auto mroTuple = builder.createTypeMRO(selfType);
+    auto lookup = builder.createMROLookup(mroTuple, "__call__");
+    auto* raiseBlock = new mlir::Block;
+    auto* body = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), body, raiseBlock);
+
+    func.push_back(raiseBlock);
+    builder.setInsertionPointToStart(raiseBlock);
+    auto typeError =
+        pylir::Py::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+    builder.createRaise(typeError);
+
+    func.push_back(body);
+    builder.setInsertionPointToStart(body);
+    auto callableType = builder.createTypeOf(lookup.getResult());
+    auto isFunction = builder.createIs(callableType, builder.createFunctionRef());
+    auto* isFunctionBlock = new mlir::Block;
+    auto* notFunctionBlock = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(isFunction, isFunctionBlock, notFunctionBlock);
+
+    func.push_back(isFunctionBlock);
+    builder.setInsertionPointToStart(isFunctionBlock);
+    mlir::Value result = builder.createFunctionCall(lookup.getResult(),
+                                                    {lookup.getResult(), builder.createTuplePrepend(self, args), kws});
+    builder.create<mlir::func::ReturnOp>(result);
+
+    func.push_back(notFunctionBlock);
+    builder.setInsertionPointToStart(notFunctionBlock);
+    mroTuple = builder.createTypeMRO(callableType);
+    auto getMethod = builder.createMROLookup(mroTuple, "__get__");
+    auto* isDescriptor = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(getMethod.getSuccess(), isDescriptor, condition, lookup.getResult());
+
+    func.push_back(isDescriptor);
+    builder.setInsertionPointToStart(isDescriptor);
+    selfType = builder.createTypeOf(self);
+    auto tuple = builder.createMakeTuple({self, selfType});
+    auto emptyDict = builder.createConstant(builder.getDictAttr());
+    result =
+        builder.create<pylir::Py::CallOp>(func, mlir::ValueRange{getMethod.getResult(), tuple, emptyDict}).getResult(0);
+    builder.create<mlir::cf::BranchOp>(condition, result);
+}
+
 } // namespace
 
 void pylir::CodeGen::createCompilerBuiltinsImpl()
@@ -209,4 +273,5 @@ void pylir::CodeGen::createCompilerBuiltinsImpl()
     build##name##OpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
+    buildMethodCallOpCompilerBuiltin(m_builder);
 }

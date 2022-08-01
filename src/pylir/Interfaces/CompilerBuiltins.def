@@ -33,6 +33,8 @@
 #define TYPE_SLOT_OP(slotName, cppName, ...) COMPILER_BUILTIN(cppName, pylir##slotName)
 #include "Slots.def"
 
+COMPILER_BUILTIN(CallMethod, pylirMethodCall)
+
 #undef COMPILER_BUILTIN_SLOT_TO_API_NAME
 #undef COMPILER_BUILTIN_TERNARY_OP
 #undef COMPILER_BUILTIN_REV_BIN_OP

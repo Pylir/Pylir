@@ -199,6 +199,21 @@ public:
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
 
+    mlir::Value createPylirCallMethodIntrinsic(mlir::Value self, mlir::Value tuple, mlir::Value keywords,
+                                               mlir::Block* exceptBlock = nullptr)
+    {
+        if (!exceptBlock)
+        {
+            return create<Py::CallOp>(getDynamicType(), "pylirCallMethod", mlir::ValueRange{self, tuple, keywords})
+                .getResult(0);
+        }
+        auto* happyPath = new mlir::Block;
+        auto op = create<Py::InvokeOp>(getDynamicType(), "pylirCallMethod", mlir::ValueRange{self, tuple, keywords},
+                                       mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptBlock);
+        implementBlock(happyPath);
+        return op.getResult(0);
+    }
+
     Py::ConstantOp createConstant(mlir::Attribute constant)
     {
         if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())

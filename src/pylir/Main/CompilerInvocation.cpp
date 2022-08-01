@@ -586,10 +586,10 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         manager.addPass(pylir::Py::createTrialInlinerPass());
         manager.addPass(mlir::createSymbolDCEPass());
     }
-    manager.addPass(pylir::Py::createExpandPyDialectPass());
+    nested = &manager.nestAny();
+    nested->addPass(pylir::Py::createExpandPyDialectPass());
     if (level != "0")
     {
-        nested = &manager.nestAny();
         nested->addPass(mlir::createCanonicalizerPass());
         nested->addPass(mlir::createCSEPass());
         nested->addPass(pylir::createLoadForwardingPass());

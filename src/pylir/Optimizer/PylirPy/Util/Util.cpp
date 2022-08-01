@@ -40,34 +40,6 @@ void raiseException(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value ex
     }
 }
 
-mlir::Value buildCall(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value self, mlir::Value tuple,
-                      mlir::Value kwargs, mlir::Block* exceptionHandler)
-{
-    mlir::Value result;
-    if (!exceptionHandler)
-    {
-        result = builder.create<pylir::Py::CallMethodOp>(loc, self, tuple, kwargs);
-    }
-    else
-    {
-        auto* happyPath = new mlir::Block;
-        result = builder.create<pylir::Py::CallMethodExOp>(loc, self, tuple, kwargs, mlir::ValueRange{},
-                                                           mlir::ValueRange{}, happyPath, exceptionHandler);
-        implementBlock(builder, happyPath);
-    }
-    auto failure = builder.create<pylir::Py::IsUnboundValueOp>(loc, result);
-    auto* typeCall = new mlir::Block;
-    auto* notBound = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(loc, failure, notBound, typeCall);
-
-    implementBlock(builder, notBound);
-    auto typeError = pylir::Py::buildException(loc, builder, pylir::Builtins::TypeError.name, {}, exceptionHandler);
-    raiseException(loc, builder, typeError, exceptionHandler);
-
-    implementBlock(builder, typeCall);
-    return result;
-}
-
 } // namespace
 
 mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& builder, std::string_view kind,
@@ -114,8 +86,6 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
         kwargs = emptyDict;
     }
     auto element = builder.create<Py::TupleGetItemOp>(loc, tuple, builder.create<mlir::arith::ConstantIndexOp>(loc, 0));
-    auto dropped =
-        builder.create<Py::TupleDropFrontOp>(loc, builder.create<mlir::arith::ConstantIndexOp>(loc, 1), tuple);
     auto type = builder.create<Py::TypeOfOp>(loc, element);
     auto mroTuple = builder.create<Py::TypeMROOp>(loc, type).getResult();
     auto lookup = builder.create<Py::MROLookupOp>(loc, mroTuple, methodName.str());
@@ -161,13 +131,22 @@ mlir::Value pylir::Py::buildTrySpecialMethodCall(mlir::Location loc, mlir::OpBui
 
     implementBlock(builder, isDescriptor);
     auto selfType = builder.create<Py::TypeOfOp>(loc, element);
-    result = buildCall(loc, builder, getMethod.getResult(),
-                       builder.create<Py::MakeTupleOp>(loc, std::vector<Py::IterArg>{element, selfType}), emptyDict,
-                       exceptionHandler);
+    result =
+        builder
+            .create<CallOp>(loc, builder.getType<DynamicType>(), Builtins::PylirCallMethod.name,
+                            mlir::ValueRange{getMethod.getResult(),
+                                             builder.create<MakeTupleOp>(loc, std::vector<IterArg>{element, selfType}),
+                                             emptyDict})
+            .getResult(0);
     builder.create<mlir::cf::BranchOp>(loc, mergeBlock, result);
 
     implementBlock(builder, mergeBlock);
-    result = buildCall(loc, builder, mergeBlock->getArgument(0), dropped, kwargs, exceptionHandler);
+    auto dropped =
+        builder.create<Py::TupleDropFrontOp>(loc, builder.create<mlir::arith::ConstantIndexOp>(loc, 1), tuple);
+    result = builder
+                 .create<CallOp>(loc, builder.getType<DynamicType>(), Builtins::PylirCallMethod.name,
+                                 mlir::ValueRange{mergeBlock->getArgument(0), dropped, kwargs})
+                 .getResult(0);
     builder.create<mlir::cf::BranchOp>(loc, exitBlock, result);
 
     implementBlock(builder, exitBlock);

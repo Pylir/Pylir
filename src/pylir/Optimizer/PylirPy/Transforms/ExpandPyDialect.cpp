@@ -59,31 +59,6 @@ mlir::Value callOrInvoke(mlir::Location loc, mlir::OpBuilder& builder, mlir::Blo
     return result;
 }
 
-struct CallMethodPattern : mlir::OpRewritePattern<pylir::Py::CallMethodOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::CallMethodOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::CallMethodOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        rewriter.replaceOpWithNewOp<pylir::Py::CallOp>(op, op.getType(), pylir::Py::pylirCallIntrinsic,
-                                                       op.getOperands());
-        return mlir::success();
-    }
-};
-
-struct CallMethodExPattern : mlir::OpRewritePattern<pylir::Py::CallMethodExOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::CallMethodExOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::CallMethodExOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        rewriter.replaceOpWithNewOp<pylir::Py::InvokeOp>(
-            op, op.getType(), "$pylir_call", llvm::ArrayRef{op.getMethod(), op.getArgs(), op.getKeywords()},
-            op.getNormalDestOperands(), op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
-        return mlir::success();
-    }
-};
-
 struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
 {
     using mlir::OpRewritePattern<pylir::Py::MROLookupOp>::OpRewritePattern;
@@ -271,74 +246,6 @@ struct ExpandPyDialectPass : public ExpandPyDialectBase<ExpandPyDialectPass>
 
 void ExpandPyDialectPass::runOnOperation()
 {
-    auto module = getOperation();
-    if (!module.lookupSymbol(pylir::Py::pylirCallIntrinsic))
-    {
-        pylir::Py::PyBuilder builder(&getContext());
-        builder.setInsertionPointToEnd(module.getBody());
-        auto func = builder.create<mlir::func::FuncOp>(
-            pylir::Py::pylirCallIntrinsic,
-            builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
-                                    {builder.getDynamicType()}));
-        func.setPrivate();
-        builder.setInsertionPointToStart(func.addEntryBlock());
-
-        auto self = func.getArgument(0);
-        auto args = func.getArgument(1);
-        auto kws = func.getArgument(2);
-
-        auto* condition = new mlir::Block;
-        condition->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
-        builder.create<mlir::cf::BranchOp>(condition, self);
-
-        func.push_back(condition);
-        builder.setInsertionPointToStart(condition);
-        self = condition->getArgument(0);
-        auto selfType = builder.createTypeOf(self);
-        auto mroTuple = builder.createTypeMRO(selfType);
-        auto lookup = builder.createMROLookup(mroTuple, "__call__");
-        auto* exitBlock = new mlir::Block;
-        exitBlock->addArgument(builder.getType<pylir::Py::DynamicType>(), builder.getCurrentLoc());
-        auto unbound = builder.createConstant(builder.getUnboundAttr());
-        auto* body = new mlir::Block;
-        builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), body, exitBlock, mlir::ValueRange{unbound});
-
-        func.push_back(body);
-        builder.setInsertionPointToStart(body);
-        auto callableType = builder.createTypeOf(lookup.getResult());
-        auto isFunction = builder.createIs(callableType, builder.createFunctionRef());
-        auto* isFunctionBlock = new mlir::Block;
-        auto* notFunctionBlock = new mlir::Block;
-        builder.create<mlir::cf::CondBranchOp>(isFunction, isFunctionBlock, notFunctionBlock);
-
-        func.push_back(isFunctionBlock);
-        builder.setInsertionPointToStart(isFunctionBlock);
-        mlir::Value result = builder.createFunctionCall(
-            lookup.getResult(), {lookup.getResult(), builder.createTuplePrepend(self, args), kws});
-        builder.create<mlir::func::ReturnOp>(result);
-
-        func.push_back(notFunctionBlock);
-        builder.setInsertionPointToStart(notFunctionBlock);
-        mroTuple = builder.createTypeMRO(callableType);
-        auto getMethod = builder.createMROLookup(mroTuple, "__get__");
-        auto* isDescriptor = new mlir::Block;
-        builder.create<mlir::cf::CondBranchOp>(getMethod.getSuccess(), isDescriptor, condition, lookup.getResult());
-
-        func.push_back(isDescriptor);
-        builder.setInsertionPointToStart(isDescriptor);
-        selfType = builder.createTypeOf(self);
-        auto tuple = builder.createMakeTuple({self, selfType});
-        auto emptyDict = builder.createConstant(builder.getDictAttr());
-        result = builder.create<pylir::Py::CallOp>(func, mlir::ValueRange{getMethod.getResult(), tuple, emptyDict})
-                     .getResult(0);
-        // TODO: check result is not unbound
-        builder.create<mlir::cf::BranchOp>(condition, result);
-
-        func.push_back(exitBlock);
-        builder.setInsertionPointToStart(exitBlock);
-        builder.create<mlir::func::ReturnOp>(exitBlock->getArgument(0));
-    }
-
     mlir::ConversionTarget target(getContext());
     target.addDynamicallyLegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp,
                                  pylir::Py::MakeDictOp>(
@@ -350,20 +257,17 @@ void ExpandPyDialectPass::runOnOperation()
                     [](auto op) { return op.getIterExpansion().empty(); })
                 .Default(false);
         });
-    target.addIllegalOp<pylir::Py::CallMethodOp, pylir::Py::CallMethodExOp, pylir::Py::MROLookupOp,
-                        pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp, pylir::Py::MakeSetExOp,
-                        pylir::Py::MakeDictExOp>();
+    target.addIllegalOp<pylir::Py::MROLookupOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp,
+                        pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp>();
     target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
     mlir::RewritePatternSet patterns(&getContext());
     patterns.add<MROLookupPattern>(&getContext());
-    patterns.add<CallMethodPattern>(&getContext());
-    patterns.add<CallMethodExPattern>(&getContext());
     patterns.add<TupleUnrollPattern>(&getContext());
     patterns.add<TupleExUnrollPattern>(&getContext());
     patterns.add<ListUnrollPattern<pylir::Py::MakeListOp>>(&getContext());
     patterns.add<ListUnrollPattern<pylir::Py::MakeListExOp>>(&getContext());
-    if (mlir::failed(mlir::applyPartialConversion(module, target, std::move(patterns))))
+    if (mlir::failed(mlir::applyPartialConversion(getOperation(), target, std::move(patterns))))
     {
         signalPassFailure();
         return;
