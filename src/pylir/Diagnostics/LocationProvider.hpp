@@ -46,6 +46,15 @@ struct LocationProvider<T, std::enable_if_t<std::is_integral_v<T>>>
     }
 };
 
+template <class U, class V>
+struct LocationProvider<std::pair<U, V>, std::enable_if_t<std::is_integral_v<U> && std::is_integral_v<V>>>
+{
+    static std::pair<std::size_t, std::size_t> getRange(std::pair<U, V> value) noexcept
+    {
+        return value;
+    }
+};
+
 template <class T, class = void>
 struct hasLocationProviderRangeOneArg : std::false_type
 {

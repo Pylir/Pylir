@@ -30,6 +30,7 @@ target_link_libraries(PylirMain
         MLIRArithmeticToLLVM
         MLIRToLLVMIRTranslationRegistration
         CodeGen
+        PylirLinker
         PylirToLLVMIR
         PylirPyTransforms
         PylirPyToPylirMem

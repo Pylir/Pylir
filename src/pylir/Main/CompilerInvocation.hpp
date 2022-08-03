@@ -6,7 +6,9 @@
 
 #pragma once
 
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/IR/OwningOpRef.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/LogicalResult.h>
 
@@ -19,6 +21,8 @@
 #include <pylir/Parser/Syntax.hpp>
 
 #include <memory>
+#include <list>
+#include <mutex>
 #include <optional>
 
 #include "CommandLine.hpp"
@@ -26,12 +30,14 @@
 
 namespace pylir
 {
+struct CodeGenOptions;
+
 class CompilerInvocation
 {
     std::optional<mlir::MLIRContext> m_mlirContext;
     std::unique_ptr<llvm::LLVMContext> m_llvmContext;
-    std::optional<Diag::Document> m_document;
-    std::optional<Syntax::FileInput> m_fileInput;
+    std::list<Diag::Document> m_documents;
+    std::list<Syntax::FileInput> m_fileInputs;
     std::unique_ptr<llvm::TargetMachine> m_targetMachine;
     llvm::raw_pwrite_stream* m_output = nullptr;
     std::optional<llvm::sys::fs::TempFile> m_outputFile;
@@ -64,6 +70,9 @@ private:
     mlir::LogicalResult finalizeOutputStream(mlir::LogicalResult result);
 
     void addOptimizationPasses(llvm::StringRef level, mlir::OpPassManager& manager);
+
+    mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> codegenPythonToMLIR(const llvm::opt::InputArgList& args,
+                                                                           const cli::CommandLine& commandLine);
 
     mlir::LogicalResult ensureTargetMachine(const llvm::opt::InputArgList& args, const cli::CommandLine& commandLine,
                                             const pylir::Toolchain& toolchain,

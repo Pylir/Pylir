@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 set(PYLIR_TEST_DEPENDS
-        FileCheck count not
+        FileCheck count not split-file
         pylir-opt
         pylir-translate
         pylir

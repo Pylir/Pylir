@@ -34,13 +34,16 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Path.h>
+#include <llvm/Support/Program.h>
 #include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/ThreadPool.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/Conversion/Passes.hpp>
+#include <pylir/Optimizer/Linker/Linker.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
@@ -184,28 +187,35 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             exit.reset();
-            m_document = Diag::Document(std::move(content), inputFile->getValue());
+            auto& document = m_documents.emplace_back(std::move(content), inputFile->getValue());
+            Syntax::FileInput* fileInput;
             {
-                pylir::Parser parser(*m_document);
+                pylir::Parser parser(document);
                 auto tree = parser.parseFileInput();
                 if (!tree)
                 {
                     llvm::errs() << tree.error();
                     return mlir::failure();
                 }
-                m_fileInput = std::move(*tree);
+                fileInput = &m_fileInputs.emplace_back(std::move(*tree));
             }
             if (args.hasArg(OPT_dump_ast))
             {
                 pylir::Dumper dumper;
-                llvm::outs() << dumper.dump(*m_fileInput);
+                llvm::outs() << dumper.dump(*fileInput);
             }
             if (action == SyntaxOnly)
             {
                 return mlir::success();
             }
             ensureMLIRContext(args);
-            mlirModule = pylir::codegen(&*m_mlirContext, *m_fileInput, *m_document);
+
+            auto module = codegenPythonToMLIR(args, commandLine);
+            if (mlir::failed(module))
+            {
+                return mlir::failure();
+            }
+            mlirModule = std::move(*module);
             [[fallthrough]];
         }
         case FileType::MLIR:
@@ -691,4 +701,156 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureLLVMInit(const llvm::opt::I
     refs.push_back(nullptr);
     llvm::cl::ResetAllOptionOccurrences();
     return mlir::success(llvm::cl::ParseCommandLineOptions(refs.size() - 1, refs.data(), "", &llvm::errs()));
+}
+
+mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
+    pylir::CompilerInvocation::codegenPythonToMLIR(const llvm::opt::InputArgList& args,
+                                                   const cli::CommandLine& commandLine)
+{
+    pylir::CodeGenOptions options{};
+    std::vector<std::string> importPaths;
+    {
+        llvm::SmallString<100> docPath{m_documents.front().getFilename()};
+        llvm::sys::fs::make_absolute(docPath);
+        llvm::sys::path::remove_filename(docPath);
+        importPaths.emplace_back(docPath);
+    }
+    for (auto& iter : args.getAllArgValues(OPT_I))
+    {
+        llvm::SmallString<100> path{iter};
+        llvm::sys::fs::make_absolute(path);
+        importPaths.emplace_back(path);
+    }
+
+    auto appendEnvVar = [&](llvm::StringRef value)
+    {
+        llvm::SmallVector<llvm::StringRef> output;
+        value.split(output, llvm::sys::EnvPathSeparator);
+        llvm::transform(output, std::back_inserter(importPaths),
+                        [](llvm::SmallString<100> path)
+                        {
+                            llvm::sys::fs::make_absolute(path);
+                            return std::string{path};
+                        });
+    };
+
+    if (auto* pythonPath = std::getenv("PYTHONPATH"))
+    {
+        appendEnvVar(pythonPath);
+    }
+    if (auto* pythonHome = std::getenv("PYTHONHOME"))
+    {
+        appendEnvVar(pythonHome);
+    }
+    else
+    {
+        llvm::SmallString<100> libDirPath = commandLine.getExecutablePath();
+        llvm::sys::path::remove_filename(libDirPath);
+        llvm::sys::path::append(libDirPath, "..", "lib");
+        importPaths.emplace_back(libDirPath);
+    }
+    options.importPaths = std::move(importPaths);
+
+    // Protects 'futures' and 'loaded'.
+    std::mutex dataStructureMutex;
+    // std::list is used deliberately here as we need iteration stability on push_back. This is important for the
+    // case where multi threading is disabled: We are used deferred launches in futures to have as compatible of
+    // interfaces as possible and these are only launched when the item to be computed is retrieved. That retrieval
+    // may however import more item and append to 'futures'. Since we are already mid-iteration, this has to be
+    // possible.
+    std::list<std::shared_future<mlir::ModuleOp>> futures;
+    llvm::StringSet<> loaded;
+
+    // Protects output to 'llvm::errs()'.
+    std::mutex outputMutex;
+    // Protects 'm_fileInputs' and 'm_documents'.
+    std::mutex sourceDSMutex;
+
+    options.warningCallback = [&](Diag::DiagnosticsBuilder&& builder)
+    {
+        std::unique_lock lock{outputMutex};
+        llvm::errs() << builder.emitWarning();
+    };
+
+    options.moduleLoadCallback = [&](CodeGenOptions::LoadRequest&& request)
+    {
+        std::unique_lock lock{dataStructureMutex};
+        if (!loaded.insert(request.qualifier).second)
+        {
+            return;
+        }
+
+        auto action = [&, request = std::move(request)]() mutable -> mlir::ModuleOp
+        {
+            std::optional exit = llvm::make_scope_exit([&] { llvm::sys::fs::closeFile(request.handle); });
+            llvm::sys::fs::file_status status;
+            {
+                auto error = llvm::sys::fs::status(request.handle, status);
+                if (error)
+                {
+                    std::unique_lock lock{outputMutex};
+                    llvm::errs() << Diag::DiagnosticsBuilder(*request.document, request.location,
+                                                             pylir::Diag::FAILED_TO_ACCESS_FILE_N, request.filePath)
+                                        .addLabel(request.location, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                                        .emitError();
+                    return nullptr;
+                }
+            }
+            std::string content(status.getSize(), '\0');
+            auto read = llvm::sys::fs::readNativeFile(request.handle, {content.data(), content.size()});
+            if (!read)
+            {
+                std::unique_lock lock{outputMutex};
+                llvm::errs() << Diag::DiagnosticsBuilder(*request.document, request.location,
+                                                         pylir::Diag::FAILED_TO_READ_FILE_N, request.filePath)
+                                    .addLabel(request.location, std::nullopt, pylir::Diag::ERROR_COLOUR)
+                                    .emitError();
+                return nullptr;
+            }
+            exit.reset();
+
+            std::unique_lock sourceLock{sourceDSMutex};
+            auto& document = m_documents.emplace_back(std::move(content), request.filePath);
+            sourceLock.unlock();
+
+            pylir::Parser parser(document);
+            auto tree = parser.parseFileInput();
+            if (!tree)
+            {
+                std::unique_lock lock{outputMutex};
+                llvm::errs() << tree.error();
+                return nullptr;
+            }
+
+            sourceLock.lock();
+            auto& fileInput = m_fileInputs.emplace_back(std::move(*tree));
+            sourceLock.unlock();
+
+            auto copyOption = options;
+            copyOption.qualifier = std::move(request.qualifier);
+            return pylir::codegen(&*m_mlirContext, fileInput, document, copyOption).release();
+        };
+
+        if (m_mlirContext->isMultithreadingEnabled())
+        {
+            futures.push_back(m_mlirContext->getThreadPool().async(std::move(action)));
+        }
+        else
+        {
+            futures.push_back(std::async(std::launch::deferred, std::move(action)).share());
+        }
+    };
+
+    auto mainModule = pylir::codegen(&*m_mlirContext, m_fileInputs.front(), m_documents.front(), options);
+    std::vector<mlir::OwningOpRef<mlir::ModuleOp>> importedModules;
+    importedModules.push_back(std::move(mainModule));
+    // The real size of `futures` is unknown as it grows while we are iterating through here. Hence, we NEED to use
+    // a back inserter.
+    llvm::transform(futures, std::back_inserter(importedModules), [](const auto& future) { return future.get(); });
+    if (!llvm::all_of(importedModules, llvm::identity<mlir::OwningOpRef<mlir::ModuleOp>>{}))
+    {
+        return mlir::failure();
+    }
+
+    return linkModules(importedModules);
 }

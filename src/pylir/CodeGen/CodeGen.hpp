@@ -12,6 +12,7 @@
 #include <mlir/IR/OwningOpRef.h>
 
 #include <llvm/ADT/ScopeExit.h>
+#include <llvm/Support/FileSystem.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -27,8 +28,26 @@
 namespace pylir
 {
 
+struct CodeGenOptions
+{
+    std::vector<std::string> importPaths;
+    std::function<void(Diag::DiagnosticsBuilder&&)> warningCallback;
+
+    struct LoadRequest
+    {
+        llvm::sys::fs::file_t handle;
+        std::string qualifier;
+        std::pair<std::size_t, std::size_t> location;
+        Diag::Document* document;
+        std::string filePath;
+    };
+    std::function<void(LoadRequest&&)> moduleLoadCallback;
+    std::string qualifier;
+};
+
 class CodeGen
 {
+    CodeGenOptions m_options;
     Py::PyBuilder m_builder;
     mlir::ModuleOp m_module;
     mlir::func::FuncOp m_currentFunc;
@@ -190,6 +209,32 @@ class CodeGen
     mlir::Value makeSet(const std::vector<Py::IterArg>& args);
 
     mlir::Value makeDict(const std::vector<Py::DictArg>& args);
+
+    struct ModuleSpec
+    {
+        std::size_t dots;
+        std::pair<std::size_t, std::size_t> dotsLocation;
+
+        struct Component
+        {
+            std::string name;
+            std::pair<std::size_t, std::size_t> location;
+        };
+        std::vector<Component> components;
+
+        explicit ModuleSpec(const Syntax::ImportStmt::Module& module);
+
+        explicit ModuleSpec(const Syntax::ImportStmt::RelativeModule& relativeModule);
+    };
+
+    struct ModuleImport
+    {
+        std::string moduleSymbolName;
+        bool successful;
+        std::pair<std::size_t, std::size_t> location;
+    };
+
+    std::vector<ModuleImport> importModules(llvm::ArrayRef<ModuleSpec> specs);
 
     struct FunctionParameter
     {
@@ -376,8 +421,15 @@ class CodeGen
         return tuple;
     }
 
+    template <class T, class S, class... Args>
+    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message,
+                                                                    Args&&... args) const
+    {
+        return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
+    }
+
 public:
-    CodeGen(mlir::MLIRContext* context, Diag::Document& document);
+    CodeGen(mlir::MLIRContext* context, Diag::Document& document, CodeGenOptions&& options);
 
     mlir::ModuleOp visit(const Syntax::FileInput& fileInput);
 
@@ -474,9 +526,9 @@ public:
 };
 
 inline mlir::OwningOpRef<mlir::ModuleOp> codegen(mlir::MLIRContext* context, const Syntax::FileInput& input,
-                                                 Diag::Document& document)
+                                                 Diag::Document& document, CodeGenOptions options)
 {
-    CodeGen codegen{context, document};
+    CodeGen codegen(context, document, std::move(options));
     return codegen.visit(input);
 }
 

@@ -30,6 +30,7 @@ def o : JoinedOrSeparate<["-"], "o">, HelpText<"Write output to <file>">, MetaVa
 def grp_language : OptionGroup<"Language">, HelpText<"Language options">;
 
 def fsyntax_only : F<"fsyntax-only", "Don't compile the source file, but do check for valid syntax">, Group<grp_language>;
+def I : JoinedOrSeparate<["-"], "I">, HelpText<"Additional directories to load modules from">, Group<grp_language>;
 
 def grp_actions : OptionGroup<"Actions">, HelpText<"Action options">;
 
