@@ -30,6 +30,8 @@ std::unique_ptr<mlir::Pass> createTestLoopInfo();
 
 std::unique_ptr<mlir::Pass> createTestHelloWorld();
 
+std::unique_ptr<mlir::Pass> createTestLinker();
+
 #define GEN_PASS_REGISTRATION
 #include "Passes.h.inc"
 

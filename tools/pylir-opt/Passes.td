@@ -36,4 +36,8 @@ def TestHelloWorld : Pass<"test-hello-world"> {
     let constructor = "::createTestHelloWorld()";
 }
 
+def TestLinker : Pass<"test-linker", "::mlir::ModuleOp"> {
+    let constructor = "::createTestLinker()";
+}
+
 #endif
