@@ -236,6 +236,18 @@ class CodeGen
 
     std::vector<ModuleImport> importModules(llvm::ArrayRef<ModuleSpec> specs);
 
+    struct Intrinsic
+    {
+        std::string name;
+        std::vector<IdentifierToken> identifiers;
+    };
+
+    std::optional<Intrinsic> checkForIntrinsic(const Syntax::Expression& expression);
+
+    mlir::Value callIntrinsic(Intrinsic&& intrinsic, llvm::ArrayRef<Syntax::Argument> arguments);
+
+    mlir::Value intrinsicConstant(Intrinsic&& intrinsic);
+
     struct FunctionParameter
     {
         std::string name;

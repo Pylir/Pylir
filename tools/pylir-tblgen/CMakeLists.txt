@@ -4,8 +4,5 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_subdirectory(pylir)
-add_subdirectory(pylir-opt)
-add_subdirectory(pylir-translate)
-add_subdirectory(pylir-reduce)
-add_subdirectory(pylir-tblgen)
+add_tablegen(pylir-tblgen PYLIR main.cpp IntrinsicGen.cpp)
+target_link_libraries(pylir-tblgen PRIVATE MLIRTableGen MLIRSupportIndentedOstream)

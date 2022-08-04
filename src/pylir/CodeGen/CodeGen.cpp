@@ -540,12 +540,23 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Call& call)
 {
+    auto locExit = changeLoc(call);
+    if (auto intr = checkForIntrinsic(*call.expression))
+    {
+        const auto* args = std::get_if<std::vector<Syntax::Argument>>(&call.variant);
+        if (!args)
+        {
+            // TODO: error/warning
+            return {};
+        }
+        return callIntrinsic(std::move(*intr), *args);
+    }
+
     auto callable = visit(*call.expression);
     if (!callable)
     {
         return {};
     }
-    auto locExit = changeLoc(call);
     auto [tuple, keywords] = pylir::match(
         call.variant,
         [&](const std::vector<Syntax::Argument>& vector) -> std::pair<mlir::Value, mlir::Value>
@@ -1947,6 +1958,10 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef)
 {
+    if (auto intr = checkForIntrinsic(attributeRef))
+    {
+        return intrinsicConstant(std::move(*intr));
+    }
     // TODO:
     PYLIR_UNREACHABLE;
 }
@@ -1973,12 +1988,25 @@ void pylir::CodeGen::visit(const Syntax::ImportStmt& importStmt)
 {
     std::vector<ModuleSpec> specs;
 
+    auto moduleIsIntrinsic = [](const Syntax::ImportStmt::Module& module)
+    {
+        if (module.identifiers.size() < 2)
+        {
+            return false;
+        }
+        return module.identifiers[0].getValue() == "pylir" && module.identifiers[1].getValue() == "intr";
+    };
+
     pylir::match(
         importStmt.variant,
         [&](const Syntax::ImportStmt::ImportAs& importAs)
         {
             for (const auto& iter : importAs.modules)
             {
+                if (!iter.second && moduleIsIntrinsic(iter.first))
+                {
+                    continue;
+                }
                 specs.emplace_back(iter.first);
             }
         },
@@ -2159,4 +2187,80 @@ pylir::CodeGen::ModuleSpec::ModuleSpec(const pylir::Syntax::ImportStmt::Relative
                             return Component{std::string(token.getValue()), Diag::rangeLoc(token)};
                         });
     }
+}
+
+std::optional<pylir::CodeGen::Intrinsic> pylir::CodeGen::checkForIntrinsic(const Syntax::Expression& expression)
+{
+    std::vector<IdentifierToken> identifiers;
+    const Syntax::Expression* current = &expression;
+    while (const auto* ref = current->dyn_cast<Syntax::AttributeRef>())
+    {
+        identifiers.push_back(ref->identifier);
+        current = ref->object.get();
+    }
+    const auto* atom = current->dyn_cast<Syntax::Atom>();
+    if (!atom || atom->token.getTokenType() != TokenType::Identifier)
+    {
+        return std::nullopt;
+    }
+    identifiers.emplace_back(atom->token);
+    std::reverse(identifiers.begin(), identifiers.end());
+    if (identifiers.size() < 2 || identifiers[0].getValue() != "pylir" || identifiers[1].getValue() != "intr")
+    {
+        return std::nullopt;
+    }
+
+    auto name =
+        llvm::join(llvm::map_range(identifiers, [](const IdentifierToken& token) { return token.getValue(); }), ".");
+    return Intrinsic{std::move(name), std::move(identifiers)};
+}
+
+mlir::Value pylir::CodeGen::callIntrinsic(Intrinsic&& intrinsic, llvm::ArrayRef<Syntax::Argument> arguments)
+{
+    std::string_view intrName = intrinsic.name;
+    llvm::SmallVector<mlir::Value> args;
+    for (const auto& iter : arguments)
+    {
+        // TODO: diagnose expansion, keyword etc.
+        auto arg = visit(*iter.expression);
+        if (!arg)
+        {
+            return {};
+        }
+        args.push_back(arg);
+    }
+
+#include <pylir/CodeGen/CodeGenIntr.cpp.inc>
+
+    // TODO: diagnose unknown intr
+    return {};
+}
+
+mlir::Value pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrinsic)
+{
+    std::string_view intrName = intrinsic.name;
+    if (intrName == "pylir.intr.type.__slots__")
+    {
+        llvm::SmallVector<mlir::Attribute> attrs;
+#define TYPE_SLOT(slot, ...) attrs.push_back(m_builder.getStrAttr(#slot));
+#include <pylir/Interfaces/Slots.def>
+        return m_builder.createConstant(m_builder.getTupleAttr(attrs));
+    }
+    if (intrName == "pylir.intr.function.__slots__")
+    {
+        llvm::SmallVector<mlir::Attribute> attrs;
+#define FUNCTION_SLOT(slot, ...) attrs.push_back(m_builder.getStrAttr(#slot));
+#include <pylir/Interfaces/Slots.def>
+        return m_builder.createConstant(m_builder.getTupleAttr(attrs));
+    }
+    if (intrName == "pylir.intr.BaseException.__slots__")
+    {
+        llvm::SmallVector<mlir::Attribute> attrs;
+#define BASEEXCEPTION_SLOT(slot, ...) attrs.push_back(m_builder.getStrAttr(#slot));
+#include <pylir/Interfaces/Slots.def>
+        return m_builder.createConstant(m_builder.getTupleAttr(attrs));
+    }
+
+    // TODO: diagnose unknown intr
+    return {};
 }
