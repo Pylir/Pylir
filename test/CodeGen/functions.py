@@ -58,6 +58,11 @@ def foo():
 # CHECK: %[[C1:.*]] = arith.constant 1
 # CHECK: %[[Y_CELL:.*]] = py.tuple.getItem %[[CLOSURE]][%[[C1]]]
 # CHECK: %[[X:.*]] = py.getSlot "cell_contents" from %[[X_CELL]]
+# CHECK: %[[X_UNBOUND:.*]] = py.isUnboundValue %[[X]]
+# CHECK: cf.cond_br %[[X_UNBOUND]], ^[[RAISE_BLOCK:.*]], ^[[SUCCESS_BLOCK:[[:alnum:]]+]]
+# CHECK: ^[[RAISE_BLOCK]]:
+# CHECK: raise
+# CHECK: ^[[SUCCESS_BLOCK]]:
 # CHECK: %[[Y:.*]] = py.getSlot "cell_contents" from %[[Y_CELL]]
 # CHECK: %[[RES:.*]] = py.call @pylir__add__(%[[X]], %[[Y]])
 # CHECK: return %[[RES]]

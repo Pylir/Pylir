@@ -683,8 +683,8 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
                 m_builder.createGetSlot(pylir::get<mlir::Value>(result->second.kind), cellType, "cell_contents");
             auto successBlock = BlockPtr{};
             auto failureBlock = BlockPtr{};
-            auto success = m_builder.createIsUnboundValue(getAttrOp);
-            m_builder.create<mlir::cf::CondBranchOp>(success, successBlock, failureBlock);
+            auto failure = m_builder.createIsUnboundValue(getAttrOp);
+            m_builder.create<mlir::cf::CondBranchOp>(failure, failureBlock, successBlock);
 
             implementBlock(failureBlock);
             auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::UnboundLocalError.name,
