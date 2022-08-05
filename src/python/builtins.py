@@ -10,6 +10,7 @@ import pylir.intr.str
 import pylir.intr.type
 import pylir.intr.function
 import pylir.intr.dict
+import pylir.intr.tuple
 
 
 @pylir.intr.const_export
@@ -181,6 +182,28 @@ class dict:
 
     def __len__(self):
         return pylir.intr.dict.len(self)
+
+
+@pylir.intr.const_export
+class tuple:
+    def __len__(self):
+        return pylir.intr.tuple.len(self)
+
+    def __getitem__(self, item):
+        # TODO: negative indices, use index etc.
+        return pylir.intr.tuple.getItem(self, item)
+
+    def __repr__(self):
+        if len(self) == 0:
+            return "()"
+        res = pylir.intr.str.concat("(", repr(self[0]))
+        if len(self) == 1:
+            return pylir.intr.str.concat(res, ",)")
+        i = 1
+        while i < len(self):
+            res = pylir.intr.str.concat(res, ", ", repr(self[i]))
+            i = i + 1
+        return pylir.intr.str.concat(res, ")")
 
 
 @pylir.intr.const_export

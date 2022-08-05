@@ -13,6 +13,7 @@ set(sources builtins.py
   pylir/intr/BaseException/__init__.pyi
   pylir/intr/function/__init__.pyi
   pylir/intr/dict/__init__.pyi
+  pylir/intr/tuple/__init__.pyi
   )
 
 set(outputs)
