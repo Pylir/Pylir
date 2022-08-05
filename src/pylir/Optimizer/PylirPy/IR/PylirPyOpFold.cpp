@@ -804,6 +804,21 @@ mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Att
     return mlir::BoolAttr::get(getContext(), false);
 }
 
+mlir::OpFoldResult pylir::Py::StrConcatOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    std::string res;
+    for (const auto& iter : operands)
+    {
+        auto str = iter.dyn_cast_or_null<StrAttr>();
+        if (!str)
+        {
+            return nullptr;
+        }
+        res += str.getValue();
+    }
+    return StrAttr::get(getContext(), res);
+}
+
 mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
     auto constantDict = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::DictAttr>();

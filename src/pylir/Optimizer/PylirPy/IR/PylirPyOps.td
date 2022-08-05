@@ -434,6 +434,8 @@ def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoCapture, AlwaysBound, Refi
         Creates a new string by concatenating all `$strings` from left to right. If any of the operands are not
         really a string (or a subclass of) the behaviour is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect]> {
