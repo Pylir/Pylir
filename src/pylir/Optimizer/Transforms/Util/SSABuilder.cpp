@@ -103,7 +103,14 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
 
     for (auto ba : bas)
     {
-        tryRemoveTrivialBlockArgument(ba);
+        if (ba == same)
+        {
+            same = tryRemoveTrivialBlockArgument(ba);
+        }
+        else
+        {
+            tryRemoveTrivialBlockArgument(ba);
+        }
     }
 
     return same;
