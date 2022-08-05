@@ -321,28 +321,6 @@ void pylir::CodeGen::createBuiltinsImpl()
     m_builder.createGlobalValue(Builtins::NotImplemented.name, true,
                                 m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
 
-    createClass(m_builder.getFunctionBuiltin(), {},
-                [&](SlotMapImpl& slots)
-                {
-                    slots["__call__"] =
-                        createFunction("builtins.function.__call__",
-                                       {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                        FunctionParameter{"", FunctionParameter::PosRest, false},
-                                        FunctionParameter{"", FunctionParameter::KeywordRest, false}},
-                                       [&](mlir::ValueRange functionArguments)
-                                       {
-                                           auto self = functionArguments[0];
-                                           auto args = functionArguments[1];
-                                           auto kw = functionArguments[2];
-                                           mlir::Value result = m_builder.createFunctionCall(self, {self, args, kw});
-                                           m_builder.create<mlir::func::ReturnOp>(result);
-                                       });
-                    slots["__slots__"] = createGlobalConstant(m_builder.getTupleAttr({
-#define FUNCTION_SLOT(x, ...) m_builder.getStrAttr(#x),
-#include <pylir/Interfaces/Slots.def>
-                    }));
-                });
-
     createClass(m_builder.getCellBuiltin(), {},
                 [&](SlotMapImpl& slots)
                 {

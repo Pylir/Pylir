@@ -8,6 +8,7 @@ import pylir.intr.BaseException
 import pylir.intr.object
 import pylir.intr.str
 import pylir.intr.type
+import pylir.intr.function
 
 
 @pylir.intr.const_export
@@ -135,6 +136,18 @@ class NotImplementedType:
 
     def __repr__(self):
         return "NotImplemented"
+
+
+@pylir.intr.const_export
+class function:
+    __slots__ = pylir.intr.function.__slots__
+
+    # The '/' making 'self' a positional parameter here is actually required
+    # as otherwise we'd have a stack overflow! Calling __call__ would otherwise
+    # do dictionary lookups for 'self' which lead to calls to __eq__ and
+    # __hash__ of functions which then lead back to here.
+    def __call__(self, /, *args, **kwargs):
+        return pylir.intr.function.call(self, self, args, kwargs)
 
 
 @pylir.intr.const_export
