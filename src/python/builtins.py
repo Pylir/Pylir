@@ -145,9 +145,9 @@ class function:
     __slots__ = pylir.intr.function.__slots__
 
     # The '/' making 'self' a positional parameter here is actually required
-    # as otherwise we'd have a stack overflow! Calling __call__ would otherwise
+    # as otherwise we'd have a stack overflow! Calling __call__ would
     # do dictionary lookups for 'self' which lead to calls to __eq__ and
-    # __hash__ of functions which then lead back to here.
+    # __hash__ functions which then lead back to here.
     def __call__(self, /, *args, **kwargs):
         return pylir.intr.function.call(self, self, args, kwargs)
 
@@ -167,7 +167,7 @@ class cell:
 @pylir.intr.const_export
 class dict:
     def __getitem__(self, item):
-        # This awkward dance here of using the walrus operator is required here
+        # This awkward dance of using the walrus operator is required here
         # as storing the result and then using it as the argument of a function
         # would not work in the case that 'tryGetItem' returns an unbound value.
         # This way we can pipe the result into both 'res' and the intrinsic
