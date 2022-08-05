@@ -8,6 +8,7 @@
 #include <mlir/TableGen/GenInfo.h>
 #include <mlir/TableGen/Operator.h>
 
+#include <llvm/ADT/Sequence.h>
 #include <llvm/Support/FormatVariadic.h>
 #include <llvm/TableGen/Record.h>
 #include <llvm/TableGen/TableGenBackend.h>
@@ -33,17 +34,13 @@ bool attrIsCompatible(const mlir::tblgen::Attribute& attr)
 
 bool opCanBeIntrinsic(const mlir::tblgen::Operator& op)
 {
-    if (op.getNumSuccessors() != 0 || op.getNumRegions() != 0 || op.getTrait("::mlir::OpTrait::IsTerminator"))
-    {
-        return false;
-    }
-    // For the time being we only support ops with 0 or 1 result. May support more in the future via returning a tuple.
-    if (op.getNumResults() > 1)
+    if (op.getNumSuccessors() != 0 || op.getNumRegions() != 0 || op.getTrait("::mlir::OpTrait::IsTerminator")
+        || op.getNumVariableLengthOperands() > 1)
     {
         return false;
     }
     if (llvm::any_of(op.getOperands(), [](const mlir::tblgen::NamedTypeConstraint& op)
-                     { return !typeIsCompatible(op.constraint) || op.isOptional() || op.isVariadic(); })
+                     { return !typeIsCompatible(op.constraint) || op.isOptional(); })
         || llvm::any_of(op.getResults(),
                         [](const mlir::tblgen::NamedTypeConstraint& op) {
                             return !typeIsCompatible(op.constraint) || op.isOptional() || op.isVariadic()
@@ -132,36 +129,67 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
         auto opName = op.getOperationName().substr(op.getDialectName().size() + 1);
         os << llvm::formatv("if(intrName == \"pylir.intr.{0}\")\n", opName);
         auto isOpScope = os.scope("{\n", "}\n");
-        os << llvm::formatv("if(args.size() != {0})\n", op.getNumArgs());
+        if (op.getNumVariableLengthOperands() == 0)
         {
-            auto ifScope = os.scope("{\n", "}\n");
-            // TODO: emit proper diagnostic
-            os << "return {};\n";
+            os << llvm::formatv("if(args.size() != {0})\n", op.getNumArgs());
+            {
+                auto ifScope = os.scope("{\n", "}\n");
+                // TODO: emit proper diagnostic
+                os << "return {};\n";
+            }
         }
         os << "::llvm::SmallVector<::mlir::Value> operands;\n";
         os << "::llvm::SmallVector<::mlir::NamedAttribute> attributes;\n";
+        std::string argOffset = "0";
         for (const auto& iter : llvm::enumerate(op.getArgs()))
         {
             if (auto* type = iter.value().dyn_cast<mlir::tblgen::NamedTypeConstraint*>())
             {
-                os << llvm::formatv("operands.push_back({0});\n",
-                                    genInputTypeConversion(llvm::formatv("args[{0}]", iter.index()), type->constraint));
+                if (!type->isVariadic())
+                {
+                    os << llvm::formatv(
+                        "operands.push_back({0});\n",
+                        genInputTypeConversion(llvm::formatv("args[{0} + {1}]", iter.index(), argOffset),
+                                               type->constraint));
+                    continue;
+                }
+
+                os << llvm::formatv("for (size_t i = {0}; i < args.size() - {1}; i++)\n", iter.index(),
+                                    op.getNumArgs() - iter.index() - 1);
+                auto forScope = os.scope("{\n", "}\n");
+                os << llvm::formatv("operands.push_back({0});\n", genInputTypeConversion("args[i]", type->constraint));
+
+                argOffset = llvm::formatv("args.size() - {0} - {1} - 1 - {1}", op.getNumArgs(), iter.index());
+
                 continue;
             }
             auto scope = os.scope("{\n", "}\n");
             auto* attr = iter.value().get<mlir::tblgen::NamedAttribute*>();
-            os << llvm::formatv("attributes.emplace_back(m_builder.getStringAttr(\"{0}\"), {1});\n", attr->name,
-                                genAttrConversion(os, llvm::formatv("args[{0}]", iter.index()), attr->attr));
+            os << llvm::formatv(
+                "attributes.emplace_back(m_builder.getStringAttr(\"{0}\"), {1});\n", attr->name,
+                genAttrConversion(os, llvm::formatv("args[{0} + {1}]", iter.index(), argOffset), attr->attr));
         }
         os << llvm::formatv("auto op = m_builder.create<{0}>({1}operands, attributes);\n", op.getQualCppClassName(),
                             op.getNumResults() == 0 ? "::mlir::TypeRange{}, " : "");
-        if (op.getNumResults() == 0)
+        switch (op.getNumResults())
         {
-            os << "return m_builder.createNoneRef();\n";
-            continue;
+            case 0: os << "return m_builder.createNoneRef();\n"; continue;
+            case 1:
+                os << llvm::formatv("return {0};\n",
+                                    genOutputTypeConversion("op->getResult(0)", op.getResultTypeConstraint(0)));
+                continue;
+            default:
+            {
+                llvm::SmallVector<std::string> results;
+                for (const auto& iter : llvm::enumerate(op.getResults()))
+                {
+                    results.push_back(genOutputTypeConversion(llvm::formatv("op->getResult({0})", iter.index()),
+                                                              iter.value().constraint));
+                }
+                os << llvm::formatv("return m_builder.createMakeTuple({{ {0} });\n", llvm::join(results, ", "));
+                continue;
+            }
         }
-        os << llvm::formatv("return {0};\n",
-                            genOutputTypeConversion("op->getResult(0)", op.getResultTypeConstraint(0)));
     }
 
     return false;
