@@ -257,7 +257,7 @@ def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, Alwa
 def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound, ObjectFromTypeObjectInterface,
     DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
     let arguments = (ins DynamicType:$tuple, DynamicType:$type_object);
-    let results = (outs Res<DynamicType, "", [MemAlloc]>:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
     let assemblyFormat = [{
         $tuple `:` $type_object attr-dict
