@@ -72,11 +72,22 @@ void FoldHandlesPass::runOnOperation()
         {
             continue;
         }
-        pylir::Py::ObjectAttrInterface attr;
+
+        mlir::Attribute attr;
         if (!mlir::matchPattern(singleStore.getValue(), mlir::m_Constant(&attr)))
         {
             continue;
         }
+
+        // If the single store into the handle is already a reference to a global value there isn't a lot to be done
+        // except replace all loads with such a reference. Otherwise, we create a global value with the constant as
+        // initializer instead of the handle.
+        auto constantStorage = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
+        if (!constantStorage)
+        {
+            constantStorage = mlir::FlatSymbolRefAttr::get(handle);
+        }
+
         for (auto* op : llvm::make_early_inc_range(users))
         {
             // Turn any loads into constants referring to a py.globalValue
@@ -85,14 +96,19 @@ void FoldHandlesPass::runOnOperation()
                 continue;
             }
             pylir::Py::PyBuilder builder(op);
-            auto newOp = builder.createConstant(mlir::FlatSymbolRefAttr::get(handle));
+            auto newOp = builder.createConstant(constantStorage);
             op->replaceAllUsesWith(newOp);
             op->erase();
         }
         singleStore->erase();
-        pylir::Py::PyBuilder builder(handle);
-        auto globalValue = builder.createGlobalValue(handle.getSymName(), false, attr);
-        globalValue.setVisibility(handle.getVisibility());
+
+        // Create the global value if the constant was not a reference but a constant object.
+        if (auto initializer = attr.dyn_cast<pylir::Py::ObjectAttrInterface>())
+        {
+            pylir::Py::PyBuilder builder(handle);
+            auto globalValue = builder.createGlobalValue(handle.getSymName(), true, initializer);
+            globalValue.setVisibility(handle.getVisibility());
+        }
         handle->erase();
         m_singleStoreHandlesConverted++;
         changed = true;

@@ -16,7 +16,7 @@ func.func @bar() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-// CHECK: py.globalValue "private" @foo = #py.int<5>
+// CHECK: py.globalValue "private" const @foo = #py.int<5>
 
 // CHECK-LABEL: @test
 // CHECK-NOT: py.store %{{.*}} into @foo
@@ -44,3 +44,30 @@ func.func @test() {
 // CHECK-LABEL: @test
 // CHECK-NOT: py.store %{{.*}} into @foo
 // CHECK: return
+
+// -----
+
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.globalHandle "private" @foo
+
+func.func @test() {
+    %0 = py.constant(@builtins.int)
+    py.store %0 into @foo
+    return
+}
+
+func.func @bar() -> !py.dynamic {
+    %0 = py.load @foo
+    return %0 : !py.dynamic
+}
+
+// CHECK-LABEL: @test
+// CHECK-NOT: py.store %{{.*}} into @foo
+// CHECK: return
+
+// CHECK-LABEL: @bar
+// CHECK-NEXT: %[[C:.*]] = py.constant(@builtins.int)
+// CHECK-NEXT: return %[[C]]
