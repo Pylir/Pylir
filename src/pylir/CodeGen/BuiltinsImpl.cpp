@@ -415,55 +415,7 @@ void pylir::CodeGen::createBuiltinsImpl()
                                                   m_builder.create<mlir::func::ReturnOp>(self);
                                               });
         });
-    createClass(m_builder.getDictBuiltin(), {},
-                [&](SlotMapImpl& slots)
-                {
-                    slots["__getitem__"] = createFunction(
-                        "builtins.dict.__getitem__",
-                        {{"", FunctionParameter::PosOnly, false}, {"", FunctionParameter::PosOnly, false}},
-                        [&](mlir::ValueRange functionArguments)
-                        {
-                            auto dict = functionArguments[0];
-                            auto key = functionArguments[1];
-                            // TODO: check dict is dict or subclass
-                            mlir::Value lookup = m_builder.createDictTryGetItem(dict, key);
-                            auto isUnbound = m_builder.createIsUnboundValue(lookup);
-                            auto* exception = new mlir::Block;
-                            auto* success = new mlir::Block;
-                            m_builder.create<mlir::cf::CondBranchOp>(isUnbound, exception, success);
 
-                            implementBlock(exception);
-                            auto object = Py::buildException(m_builder.getCurrentLoc(), m_builder,
-                                                             Builtins::KeyError.name, {}, nullptr);
-                            m_builder.createRaise(object);
-
-                            implementBlock(success);
-                            m_builder.create<mlir::func::ReturnOp>(lookup);
-                        });
-
-                    slots["__setitem__"] = createFunction("builtins.dict.__setitem__",
-                                                          {{"", FunctionParameter::PosOnly, false},
-                                                           {"", FunctionParameter::PosOnly, false},
-                                                           {"", FunctionParameter::PosOnly, false}},
-                                                          [&](mlir::ValueRange functionArguments)
-                                                          {
-                                                              auto dict = functionArguments[0];
-                                                              auto key = functionArguments[1];
-                                                              auto value = functionArguments[2];
-                                                              // TODO: check dict is dict or subclass
-                                                              m_builder.createDictSetItem(dict, key, value);
-                                                          });
-                    slots["__len__"] =
-                        createFunction("builtins.dict.__len__", {{"", FunctionParameter::PosOnly, false}},
-                                       [&](mlir::ValueRange functionArguments)
-                                       {
-                                           auto self = functionArguments[0];
-                                           // TODO: maybe check its dict
-                                           auto len = m_builder.createDictLen(self);
-                                           auto integer = m_builder.createIntFromInteger(len);
-                                           m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{integer});
-                                       });
-                });
     // Stubs
     createClass(
         m_builder.getTupleBuiltin(), {},

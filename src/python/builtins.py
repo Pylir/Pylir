@@ -9,6 +9,7 @@ import pylir.intr.object
 import pylir.intr.str
 import pylir.intr.type
 import pylir.intr.function
+import pylir.intr.dict
 
 
 @pylir.intr.const_export
@@ -160,6 +161,26 @@ class cell:
         if len(args) == 1:
             pylir.intr.setSlot(obj, cell, "cell_contents", args[0])
         return obj
+
+
+@pylir.intr.const_export
+class dict:
+    def __getitem__(self, item):
+        # This awkward dance here of using the walrus operator is required here
+        # as storing the result and then using it as the argument of a function
+        # would not work in the case that 'tryGetItem' returns an unbound value.
+        # This way we can pipe the result into both 'res' and the intrinsic
+        success = pylir.intr.isUnboundValue(
+            res := pylir.intr.dict.tryGetItem(self, item))
+        if not success:
+            raise KeyError
+        return res
+
+    def __setitem__(self, key, value):
+        pylir.intr.dict.setItem(self, key, value)
+
+    def __len__(self):
+        return pylir.intr.dict.len(self)
 
 
 @pylir.intr.const_export

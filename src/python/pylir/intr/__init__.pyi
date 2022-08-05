@@ -22,3 +22,7 @@ def getSlot(obj: object, type: type, slot: str):
 
 def setSlot(obj: object, type: type, slot: str, value: object):
     pass
+
+
+def isUnboundValue(obj: object) -> bool:
+    pass
