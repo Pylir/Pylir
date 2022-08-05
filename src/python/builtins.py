@@ -107,7 +107,7 @@ class OverflowError(ArithmeticError):
 
 @pylir.intr.const_export
 class StopIteration(Exception):
-    __slots__ = ("value",)
+    __slots__ = "value"
 
     def __init__(self, *args):
         pylir.intr.setSlot(self, StopIteration, "args", args)
@@ -148,6 +148,18 @@ class function:
     # __hash__ of functions which then lead back to here.
     def __call__(self, /, *args, **kwargs):
         return pylir.intr.function.call(self, self, args, kwargs)
+
+
+@pylir.intr.const_export
+class cell:
+    __slots__ = "cell_contents"
+
+    def __new__(cls, *args, **kwargs):
+        obj = pylir.intr.makeObject(cls)
+        # TODO: error if args is not equal to 0 or 1
+        if len(args) == 1:
+            pylir.intr.setSlot(obj, cell, "cell_contents", args[0])
+        return obj
 
 
 @pylir.intr.const_export

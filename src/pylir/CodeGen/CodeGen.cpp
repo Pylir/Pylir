@@ -1798,6 +1798,18 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                 PYLIR_UNREACHABLE;
             }
         }
+        if (key == "__slots__")
+        {
+            if (auto str = attr.dyn_cast<Py::StrAttr>())
+            {
+                attr = m_builder.getTupleAttr({str});
+            }
+            if (!attr.isa<Py::TupleAttr>())
+            {
+                // TODO: diagnostic
+                PYLIR_UNREACHABLE;
+            }
+        }
         if (key != "__slots__" || !parentSlots)
         {
             slots.emplace_back(m_builder.getStringAttr(key), attr);

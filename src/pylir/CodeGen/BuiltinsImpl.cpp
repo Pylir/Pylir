@@ -321,26 +321,6 @@ void pylir::CodeGen::createBuiltinsImpl()
     m_builder.createGlobalValue(Builtins::NotImplemented.name, true,
                                 m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
 
-    createClass(m_builder.getCellBuiltin(), {},
-                [&](SlotMapImpl& slots)
-                {
-                    slots["__slots__"] =
-                        createGlobalConstant(m_builder.getTupleAttr({m_builder.getStrAttr("cell_contents")}));
-                    slots["__new__"] = createFunction("builtins.cell.__new__",
-                                                      {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                                       FunctionParameter{"", FunctionParameter::PosRest, false}},
-                                                      [&](mlir::ValueRange functionArguments)
-                                                      {
-                                                          auto clazz = functionArguments[0];
-                                                          [[maybe_unused]] auto args = functionArguments[1];
-
-                                                          // TODO: maybe check clazz
-                                                          auto obj = m_builder.createMakeObject(clazz);
-                                                          // TODO: check args for size, if len 0, set cell_content to
-                                                          // unbound, if len 1 set to the value else error
-                                                          m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{obj});
-                                                      });
-                });
     createClass(
         m_builder.getStrBuiltin(), {},
         [&](SlotMapImpl& slots)
