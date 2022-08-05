@@ -1717,17 +1717,19 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                 // TODO: diagnostic
                 PYLIR_UNREACHABLE;
             }
-            auto value = visit(*iter.expression);
-            if (!value)
-            {
-                // maybe diagnostic?
-                return;
-            }
-            if (!mlir::matchPattern(value, mlir::m_Constant(&basesConst.emplace_back())))
+            auto* atom = iter.expression->dyn_cast<Syntax::Atom>();
+            if (!atom || atom->token.getTokenType() != TokenType::Identifier)
             {
                 // TODO: diagnostic
                 PYLIR_UNREACHABLE;
             }
+            auto result = m_builtinNamespace.find(pylir::get<std::string>(atom->token.getValue()));
+            if (result == m_builtinNamespace.end())
+            {
+                // TODO: diagnostic
+                PYLIR_UNREACHABLE;
+            }
+            basesConst.push_back(result->second);
         }
     }
 
@@ -1767,11 +1769,33 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         }
         auto read = functionScope->ssaBuilder.readVariable(m_builder.getCurrentLoc(), m_builder.getDynamicType(), *map,
                                                            &func.getBody().back());
+        // This is a special case that we support for the sake of being able to use tuples when specifying slots.
         mlir::Attribute attr;
-        if (!mlir::matchPattern(read, mlir::m_Constant(&attr)))
+        if (auto makeTupleOp = read.getDefiningOp<Py::MakeTupleOp>();
+            makeTupleOp && makeTupleOp.getIterExpansion().empty())
         {
-            // TODO: diagnostic
-            PYLIR_UNREACHABLE;
+            llvm::SmallVector<mlir::Attribute> attrs;
+            for (auto iter : makeTupleOp.getArguments())
+            {
+                if (mlir::matchPattern(iter, mlir::m_Constant(&attr)))
+                {
+                    attrs.push_back(attr);
+                }
+                else
+                {
+                    // TODO: diagnostic
+                    PYLIR_UNREACHABLE;
+                }
+            }
+            attr = m_builder.getTupleAttr(attrs);
+        }
+        else
+        {
+            if (!mlir::matchPattern(read, mlir::m_Constant(&attr)))
+            {
+                // TODO: diagnostic
+                PYLIR_UNREACHABLE;
+            }
         }
         if (key != "__slots__" || !parentSlots)
         {
@@ -2517,5 +2541,5 @@ mlir::Value pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrin
     }
 
     // TODO: diagnose unknown intr
-    return {};
+    PYLIR_UNREACHABLE;
 }

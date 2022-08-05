@@ -16,5 +16,9 @@ def makeObject(cls: type) -> type:
     pass
 
 
-def getSlot(obj: object, type: type, slot: str) -> object:
+def getSlot(obj: object, type: type, slot: str):
+    pass
+
+
+def setSlot(obj: object, type: type, slot: str, value: object):
     pass

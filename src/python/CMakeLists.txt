@@ -10,6 +10,7 @@ set(sources builtins.py
   pylir/intr/object/__init__.pyi
   pylir/intr/str/__init__.pyi
   pylir/intr/type/__init__.pyi
+  pylir/intr/BaseException/__init__.pyi
   )
 
 set(outputs)

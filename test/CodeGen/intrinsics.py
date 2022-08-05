@@ -10,7 +10,7 @@ t = pylir.intr.typeOf(foo)
 print(pylir.intr.getSlot(foo, t, "__qualname__"))
 
 # CHECK: %[[PRINT:.*]] = py.constant(@builtins.print)
-# CHECK: %[[FOO:.*]] = py.load @foo
+# CHECK: %[[FOO:.*]] = py.load @foo$handle
 # CHECK: %[[NAME:.*]] = py.getSlot "__qualname__" from %[[FOO]]
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[NAME]])
 # CHECK: py.call @pylir__call__(%[[PRINT]], %[[TUPLE]], %{{.*}})
@@ -25,20 +25,21 @@ pylir.intr.int.cmp("ne", 0, 1)
 mro = pylir.intr.type.mro(t)
 t = pylir.intr.mroLookup(mro, "__new__")
 
-# CHECK: %[[MRO:.*]] = py.type.mro
-# CHECK: py.store %[[MRO]] into @mro
-# CHECK: %[[MRO:.*]] = py.load @mro
+# CHECK: %[[T:.*]] = py.load @t$handle
+# CHECK: %[[MRO:.*]] = py.type.mro %[[T]]
+# CHECK: py.store %[[MRO]] into @mro$handle
+# CHECK: %[[MRO:.*]] = py.load @mro$handle
 # CHECK: %[[RES:.*]], %[[SUCCESS:.*]] = py.mroLookup "__new__" in %[[MRO]]
 # CHECK: %[[BOOL:.*]] = py.bool.fromI1 %[[SUCCESS]]
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[RES]], %[[BOOL]])
-# CHECK: py.store %[[TUPLE]] into @t
+# CHECK: py.store %[[TUPLE]] into @t$handle
 
 pylir.intr.function.call(t[0], t[0], (5,), {})
 
-# CHECK: %[[T:.*]] = py.load @t
+# CHECK: %[[T:.*]] = py.load @t$handle
 # CHECK: %[[ZERO:.*]] = py.constant(#py.int<0>)
 # CHECK: %[[ITEM1:.*]] = py.call @pylir__getitem__(%[[T]], %[[ZERO]])
-# CHECK: %[[T:.*]] = py.load @t
+# CHECK: %[[T:.*]] = py.load @t$handle
 # CHECK: %[[ZERO:.*]] = py.constant(#py.int<0>)
 # CHECK: %[[ITEM2:.*]] = py.call @pylir__getitem__(%[[T]], %[[ZERO]])
 # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)

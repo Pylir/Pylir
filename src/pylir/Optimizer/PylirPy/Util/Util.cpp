@@ -62,8 +62,8 @@ mlir::Value pylir::Py::buildException(mlir::Location loc, mlir::OpBuilder& build
         implementBlock(builder, happyPath);
     }
     auto dict = builder.create<Py::ConstantOp>(loc, Py::DictAttr::get(builder.getContext(), {}));
-    auto metaType = builder.create<Py::TypeOfOp>(loc, typeObj);
-    auto newMethod = builder.create<Py::GetSlotOp>(loc, typeObj, metaType, "__new__");
+    auto mro = builder.create<Py::TypeMROOp>(loc, typeObj);
+    auto newMethod = builder.create<Py::MROLookupOp>(loc, mro, "__new__").getResult();
 
     auto obj = builder.create<Py::FunctionCallOp>(loc, newMethod, mlir::ValueRange{newMethod, tuple, dict});
     auto objType = builder.create<Py::TypeOfOp>(loc, obj);
