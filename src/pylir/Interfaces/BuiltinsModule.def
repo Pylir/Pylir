@@ -49,6 +49,7 @@ BUILTIN(Repr, "builtins.repr", true, Function)
 BUILTIN(Iter, "builtins.iter", true, Function)
 BUILTIN(Next, "builtins.next", true, Function)
 BUILTIN(Pow, "builtins.pow", true, Function)
+BUILTIN(Id, "builtins.id", true, Function)
 
 #undef BUILTIN
 #undef BUILTIN_TYPE

@@ -316,115 +316,116 @@ void pylir::CodeGen::createBuiltinsImpl()
                         });
                 });
 
-    createClass(
-        m_builder.getObjectBuiltin(), {},
-        [this](SlotMapImpl& slots)
-        {
-            slots["__new__"] = createFunction("builtins.object.__new__",
-                                              {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                               FunctionParameter{"", FunctionParameter::PosRest, false},
-                                               FunctionParameter{"", FunctionParameter::KeywordRest, false}},
-                                              [&](mlir::ValueRange functionArgs)
-                                              {
-                                                  auto clazz = functionArgs[0];
-                                                  [[maybe_unused]] auto args = functionArgs[1];
-                                                  [[maybe_unused]] auto kw = functionArgs[2];
-                                                  // TODO: How to handle non `type` derived type objects?
-                                                  auto obj = m_builder.createMakeObject(clazz);
-                                                  m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{obj});
-                                              });
-            slots["__init__"] =
-                createFunction("builtins.object.__init__", {FunctionParameter{"", FunctionParameter::PosOnly, false}});
-            slots["__eq__"] = createFunction(
-                "builtins.object.__eq__",
-                {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                 FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                [&](mlir::ValueRange functionArgs)
-                {
-                    auto lhs = functionArgs[0];
-                    auto rhs = functionArgs[1];
-                    auto equal = m_builder.createIs(lhs, rhs);
-                    mlir::Value trueC = m_builder.createConstant(true);
-                    mlir::Value notImplemented = m_builder.createNotImplementedRef();
-                    auto* mergeBlock = new mlir::Block;
-                    mergeBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-                    m_builder.create<mlir::cf::CondBranchOp>(equal, mergeBlock, trueC, mergeBlock, notImplemented);
+//    createClass(
+//        m_builder.getObjectBuiltin(), {},
+//        [this](SlotMapImpl& slots)
+//        {
+//            slots["__new__"] = createFunction("builtins.object.__new__",
+//                                              {FunctionParameter{"", FunctionParameter::PosOnly, false},
+//                                               FunctionParameter{"", FunctionParameter::PosRest, false},
+//                                               FunctionParameter{"", FunctionParameter::KeywordRest, false}},
+//                                              [&](mlir::ValueRange functionArgs)
+//                                              {
+//                                                  auto clazz = functionArgs[0];
+//                                                  [[maybe_unused]] auto args = functionArgs[1];
+//                                                  [[maybe_unused]] auto kw = functionArgs[2];
+//                                                  // TODO: How to handle non `type` derived type objects?
+//                                                  auto obj = m_builder.createMakeObject(clazz);
+//                                                  m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{obj});
+//                                              });
+//            slots["__init__"] =
+//                createFunction("builtins.object.__init__", {FunctionParameter{"", FunctionParameter::PosOnly, false}});
+//            slots["__eq__"] = createFunction(
+//                "builtins.object.__eq__",
+//                {FunctionParameter{"", FunctionParameter::PosOnly, false},
+//                 FunctionParameter{"", FunctionParameter::PosOnly, false}},
+//                [&](mlir::ValueRange functionArgs)
+//                {
+//                    auto lhs = functionArgs[0];
+//                    auto rhs = functionArgs[1];
+//                    auto equal = m_builder.createIs(lhs, rhs);
+//                    mlir::Value trueC = m_builder.createConstant(true);
+//                    mlir::Value notImplemented = m_builder.createNotImplementedRef();
+//                    auto* mergeBlock = new mlir::Block;
+//                    mergeBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+//                    m_builder.create<mlir::cf::CondBranchOp>(equal, mergeBlock, trueC, mergeBlock, notImplemented);
+//
+//                    implementBlock(mergeBlock);
+//                    m_builder.create<mlir::func::ReturnOp>(mergeBlock->getArgument(0));
+//                });
+//            slots["__ne__"] =
+//                createFunction("builtins.object.__ne__",
+//                               {FunctionParameter{"", FunctionParameter::PosOnly, false},
+//                                FunctionParameter{"", FunctionParameter::PosOnly, false}},
+//                               [&](mlir::ValueRange functionArgs)
+//                               {
+//                                   auto lhs = functionArgs[0];
+//                                   auto rhs = functionArgs[1];
+//                                   auto tuple = m_builder.createMakeTuple({lhs, rhs});
+//                                   auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder,
+//                                                                            "__eq__", tuple, {}, nullptr);
+//                                   auto notImplemented = m_builder.createNotImplementedRef();
+//                                   auto isNotImplemented = m_builder.createIs(result, notImplemented);
+//                                   auto* isImplementedBlock = new mlir::Block;
+//                                   auto* endBlock = new mlir::Block;
+//                                   endBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+//                                   m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, endBlock,
+//                                                                            mlir::ValueRange{notImplemented},
+//                                                                            isImplementedBlock, mlir::ValueRange{});
+//
+//                                   implementBlock(isImplementedBlock);
+//                                   tuple = m_builder.createMakeTuple({m_builder.createBoolRef(), result});
+//                                   auto boolean = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder,
+//                                                                             "__call__", tuple, {}, nullptr);
+//                                   mlir::Value i1 = m_builder.createBoolToI1(boolean);
+//                                   auto trueC = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
+//                                   i1 = m_builder.create<mlir::arith::XOrIOp>(i1, trueC);
+//                                   auto asBoolean = m_builder.createBoolFromI1(i1);
+//                                   m_builder.create<mlir::cf::BranchOp>(endBlock, mlir::ValueRange{asBoolean});
+//
+//                                   implementBlock(endBlock);
+//                                   m_builder.create<mlir::func::ReturnOp>(endBlock->getArgument(0));
+//                               });
+//            slots["__hash__"] =
+//                createFunction("builtins.object.__hash__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+//                               [&](mlir::ValueRange functionArgs)
+//                               {
+//                                   auto self = functionArgs[0];
+//                                   auto hash = m_builder.createObjectHash(self);
+//                                   auto result = m_builder.createIntFromInteger(hash);
+//                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{result});
+//                               });
+//            mlir::func::FuncOp objectReprFunc;
+//            Py::GlobalValueOp objectReprObj;
+//            slots["__repr__"] = objectReprObj = createFunction(
+//                "builtins.object.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+//                [&](mlir::ValueRange functionArgs)
+//                {
+//                    auto self = functionArgs[0];
+//                    auto type = m_builder.createTypeOf(self);
+//                    auto name = m_builder.createGetSlot(type, m_builder.createTypeRef(), "__name__");
+//                    auto id = m_builder.createObjectId(self);
+//                    auto integer = m_builder.createIntFromInteger(id);
+//                    // TODO: hex
+//                    auto str = m_builder.createIntToStr(integer);
+//                    mlir::Value concat = m_builder.createStrConcat({m_builder.createConstant("<"), name,
+//                                                                    m_builder.createConstant(" object at "), str,
+//                                                                    m_builder.createConstant(">")});
+//                    m_builder.create<mlir::func::ReturnOp>(concat);
+//                },
+//                &objectReprFunc);
+//            slots["__str__"] =
+//                createFunction("builtins.object.__str__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
+//                               [&](mlir::ValueRange functionArgs)
+//                               {
+//                                   auto self = functionArgs[0];
+//                                   auto result =
+//                                       Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__",
+//                                                                  m_builder.createMakeTuple({self}), {}, nullptr);
+//                                   m_builder.create<mlir::func::ReturnOp>(result);
+//                               });
+//        });
 
-                    implementBlock(mergeBlock);
-                    m_builder.create<mlir::func::ReturnOp>(mergeBlock->getArgument(0));
-                });
-            slots["__ne__"] =
-                createFunction("builtins.object.__ne__",
-                               {FunctionParameter{"", FunctionParameter::PosOnly, false},
-                                FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                               [&](mlir::ValueRange functionArgs)
-                               {
-                                   auto lhs = functionArgs[0];
-                                   auto rhs = functionArgs[1];
-                                   auto tuple = m_builder.createMakeTuple({lhs, rhs});
-                                   auto result = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder,
-                                                                            "__eq__", tuple, {}, nullptr);
-                                   auto notImplemented = m_builder.createNotImplementedRef();
-                                   auto isNotImplemented = m_builder.createIs(result, notImplemented);
-                                   auto* isImplementedBlock = new mlir::Block;
-                                   auto* endBlock = new mlir::Block;
-                                   endBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-                                   m_builder.create<mlir::cf::CondBranchOp>(isNotImplemented, endBlock,
-                                                                            mlir::ValueRange{notImplemented},
-                                                                            isImplementedBlock, mlir::ValueRange{});
-
-                                   implementBlock(isImplementedBlock);
-                                   tuple = m_builder.createMakeTuple({m_builder.createBoolRef(), result});
-                                   auto boolean = Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder,
-                                                                             "__call__", tuple, {}, nullptr);
-                                   mlir::Value i1 = m_builder.createBoolToI1(boolean);
-                                   auto trueC = m_builder.create<mlir::arith::ConstantIntOp>(true, 1);
-                                   i1 = m_builder.create<mlir::arith::XOrIOp>(i1, trueC);
-                                   auto asBoolean = m_builder.createBoolFromI1(i1);
-                                   m_builder.create<mlir::cf::BranchOp>(endBlock, mlir::ValueRange{asBoolean});
-
-                                   implementBlock(endBlock);
-                                   m_builder.create<mlir::func::ReturnOp>(endBlock->getArgument(0));
-                               });
-            slots["__hash__"] =
-                createFunction("builtins.object.__hash__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                               [&](mlir::ValueRange functionArgs)
-                               {
-                                   auto self = functionArgs[0];
-                                   auto hash = m_builder.createObjectHash(self);
-                                   auto result = m_builder.createIntFromInteger(hash);
-                                   m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{result});
-                               });
-            mlir::func::FuncOp objectReprFunc;
-            Py::GlobalValueOp objectReprObj;
-            slots["__repr__"] = objectReprObj = createFunction(
-                "builtins.object.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                [&](mlir::ValueRange functionArgs)
-                {
-                    auto self = functionArgs[0];
-                    auto type = m_builder.createTypeOf(self);
-                    auto name = m_builder.createGetSlot(type, m_builder.createTypeRef(), "__name__");
-                    auto id = m_builder.createObjectId(self);
-                    auto integer = m_builder.createIntFromInteger(id);
-                    // TODO: hex
-                    auto str = m_builder.createIntToStr(integer);
-                    mlir::Value concat = m_builder.createStrConcat({m_builder.createConstant("<"), name,
-                                                                    m_builder.createConstant(" object at "), str,
-                                                                    m_builder.createConstant(">")});
-                    m_builder.create<mlir::func::ReturnOp>(concat);
-                },
-                &objectReprFunc);
-            slots["__str__"] =
-                createFunction("builtins.object.__str__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                               [&](mlir::ValueRange functionArgs)
-                               {
-                                   auto self = functionArgs[0];
-                                   auto result =
-                                       Py::buildSpecialMethodCall(m_builder.getCurrentLoc(), m_builder, "__repr__",
-                                                                  m_builder.createMakeTuple({self}), {}, nullptr);
-                                   m_builder.create<mlir::func::ReturnOp>(result);
-                               });
-        });
     auto baseException = createClass(
         m_builder.getBaseExceptionBuiltin(), {},
         [&](SlotMapImpl& slots)

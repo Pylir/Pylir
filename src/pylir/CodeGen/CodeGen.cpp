@@ -63,36 +63,46 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document, Co
 mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_builder.setInsertionPointToEnd(m_module.getBody());
-    if (m_qualifiers.empty())
     {
-        createCompilerBuiltinsImpl();
+        for (const auto& token : fileInput.globals)
+        {
+            auto locExit = changeLoc(token);
+            auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()));
+            m_globalScope.identifiers.emplace(token.getValue(), Identifier{op.getOperation()});
+        }
+        m_builder.setCurrentLoc(m_builder.getUnknownLoc());
+
+        auto initFunc = mlir::func::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__",
+                                                   m_builder.getFunctionType({}, {}));
+        auto reset = implementFunction(initFunc);
+        // We aren't actually at function scope, even if we are implementing a function
+        m_functionScope.reset();
+
+        // Initialize builtins from main module.
+        if (m_qualifiers.empty())
+        {
+            importModules({ModuleSpec({ModuleSpec::Component{"builtins", {0, 1}}})});
+            m_builder.create<Py::CallOp>(mlir::TypeRange{}, "builtins.__init__");
+        }
+
+        // Go through all globals again and initialize them explicitly to unbound
+        auto unbound = m_builder.createConstant(m_builder.getUnboundAttr());
+        for (auto& [name, identifier] : m_globalScope.identifiers)
+        {
+            m_builder.createStore(unbound, mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(identifier.kind)));
+        }
+
+        visit(fileInput.input);
+        if (needsTerminator())
+        {
+            m_builder.create<mlir::func::ReturnOp>();
+        }
+    }
+
+    if (m_qualifiers == "builtins.")
+    {
         createBuiltinsImpl();
-    }
-
-    for (const auto& token : fileInput.globals)
-    {
-        auto locExit = changeLoc(token);
-        auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()));
-        m_globalScope.identifiers.emplace(token.getValue(), Identifier{op.getOperation()});
-    }
-    m_builder.setCurrentLoc(m_builder.getUnknownLoc());
-
-    auto initFunc = mlir::func::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__",
-                                               m_builder.getFunctionType({}, {}));
-    auto reset = implementFunction(initFunc);
-    // We aren't actually at function scope, even if we are implementing a function
-    m_functionScope.reset();
-    // Go through all globals again and initialize them explicitly to unbound
-    auto unbound = m_builder.createConstant(m_builder.getUnboundAttr());
-    for (auto& [name, identifier] : m_globalScope.identifiers)
-    {
-        m_builder.createStore(unbound, mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(identifier.kind)));
-    }
-
-    visit(fileInput.input);
-    if (needsTerminator())
-    {
-        m_builder.create<mlir::func::ReturnOp>();
+        createCompilerBuiltinsImpl();
     }
 
     return m_module;
@@ -205,7 +215,7 @@ void pylir::CodeGen::visit(const Syntax::GlobalOrNonLocalStmt& globalOrNonLocalS
     {
         return;
     }
-    if (!m_functionScope)
+    if (inGlobalScope())
     {
         return;
     }
@@ -220,7 +230,7 @@ void pylir::CodeGen::visit(const Syntax::GlobalOrNonLocalStmt& globalOrNonLocalS
 void pylir::CodeGen::assignTarget(const Syntax::Atom& atom, mlir::Value value)
 {
     auto locExit = changeLoc(atom);
-    writeIdentifier(IdentifierToken{atom.token}, value);
+    writeIdentifier(pylir::get<std::string>(atom.token.getValue()), value);
 }
 
 void pylir::CodeGen::assignTarget(const Syntax::Subscription& subscription, mlir::Value value)
@@ -589,15 +599,19 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Call& call)
 
 void pylir::CodeGen::writeIdentifier(std::string_view text, mlir::Value value)
 {
-    auto locExit = changeLoc(identifierToken);
+    if (m_constantClass)
+    {
+        getCurrentScope().identifiers.insert({text, Identifier{SSABuilder::DefinitionsMap{}}});
+    }
+
     if (m_classNamespace)
     {
-        auto str = m_builder.createConstant(identifierToken.getValue());
+        auto str = m_builder.createConstant(text);
         m_builder.createDictSetItem(m_classNamespace, str, value);
         return;
     }
 
-    auto result = getCurrentScope().identifiers.find(identifierToken.getValue());
+    auto result = getCurrentScope().identifiers.find(text);
     // Should not be possible
     PYLIR_ASSERT(result != getCurrentScope().identifiers.end());
 
@@ -872,7 +886,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Assignment& assignment)
     {
         return {};
     }
-    writeIdentifier(assignment.variable, value);
+    writeIdentifier(assignment.variable.getValue(), value);
     return value;
 }
 
@@ -1227,7 +1241,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
         {
             // TODO: Python requires this identifier to be unbound at the end of the exception handler as if done in
             //       a finally section
-            writeIdentifier(*iter.maybeName, exceptionHandler->getArgument(0));
+            writeIdentifier(iter.maybeName->getValue(), exceptionHandler->getArgument(0));
         }
         auto tupleType = m_builder.createTupleRef();
         auto isTuple = m_builder.createIs(m_builder.createTypeOf(value), tupleType);
@@ -1337,12 +1351,55 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
 
 void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt)
 {
-    //TODO:
+    // TODO:
     PYLIR_UNREACHABLE;
+}
+
+std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(llvm::ArrayRef<Syntax::Decorator> decorators,
+                                                             bool additionalConstCondition)
+{
+    bool constExport = false;
+    for (const auto& iter : decorators)
+    {
+        auto intr = checkForIntrinsic(*iter.expression);
+        if (!intr)
+        {
+            continue;
+        }
+        if (intr->name == "pylir.intr.const_export")
+        {
+            if (!inGlobalScope())
+            {
+                // TODO: emit error as required
+                PYLIR_UNREACHABLE;
+            }
+            constExport = true;
+        }
+    }
+
+    if (constExport || additionalConstCondition)
+    {
+        for (const auto& iter : decorators)
+        {
+            if (checkForIntrinsic(*iter.expression))
+            {
+                continue;
+            }
+            // TODO: emit error as unsupported
+            PYLIR_UNREACHABLE;
+        }
+    }
+    return constExport;
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
+    auto constExport = checkDecoratorIntrinsics(funcDef.decorators, m_constantClass);
+    if (!constExport)
+    {
+        return;
+    }
+
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
     std::vector<const IdentifierToken*> functionParametersTokens;
@@ -1376,6 +1433,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     std::vector<IdentifierToken> usedCells;
     mlir::func::FuncOp func;
     {
+        pylir::ValueReset constantReset(m_constantClass);
+        m_constantClass = false;
         pylir::ValueReset namespaceReset(m_classNamespace);
         m_classNamespace = {};
         func =
@@ -1457,6 +1516,68 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
         func = buildFunctionCC(formImplName(qualifiedName + "$cc"), func, functionParameters);
     }
+
+    if (*constExport || m_constantClass)
+    {
+        std::vector<mlir::Attribute> defaultPosParams;
+        for (auto& iter : defaultParameters)
+        {
+            if (std::holds_alternative<Py::IterExpansion>(iter))
+            {
+                // TODO: emit error as unsupported
+                PYLIR_UNREACHABLE;
+            }
+            if (!mlir::matchPattern(pylir::get<mlir::Value>(iter), mlir::m_Constant(&defaultPosParams.emplace_back())))
+            {
+                // TODO: emit error as required
+                PYLIR_UNREACHABLE;
+            }
+        }
+        std::vector<std::pair<mlir::Attribute, mlir::Attribute>> keywordDefaultParams;
+        for (auto& iter : keywordOnlyDefaultParameters)
+        {
+            if (std::holds_alternative<Py::MappingExpansion>(iter))
+            {
+                // TODO: emit error as unsupported
+                PYLIR_UNREACHABLE;
+            }
+            auto [key, value] = pylir::get<std::pair<mlir::Value, mlir::Value>>(iter);
+            if (!mlir::matchPattern(key, mlir::m_Constant(&keywordDefaultParams.emplace_back().first)))
+            {
+                // TODO: emit error as required
+                PYLIR_UNREACHABLE;
+            }
+            if (!mlir::matchPattern(value, mlir::m_Constant(&keywordDefaultParams.back().second)))
+            {
+                // TODO: emit error as required
+                PYLIR_UNREACHABLE;
+            }
+        }
+        Py::GlobalValueOp valueOp;
+        {
+            mlir::OpBuilder::InsertionGuard guard{m_builder};
+            m_builder.setInsertionPointToEnd(m_module.getBody());
+
+            if (!m_constantClass)
+            {
+                auto handle = m_module.lookupSymbol<Py::GlobalHandleOp>(qualifiedName);
+                auto result = mlir::SymbolTable::replaceAllSymbolUses(
+                    handle, m_builder.getStringAttr(qualifiedName + "$handle"), m_module);
+                PYLIR_ASSERT(mlir::succeeded(result));
+                handle.setSymNameAttr(m_builder.getStringAttr(qualifiedName + "$handle"));
+            }
+
+            valueOp = m_builder.createGlobalValue(
+                qualifiedName, true,
+                m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(func), m_builder.getStrAttr(qualifiedName),
+                                          m_builder.getTupleAttr(defaultPosParams),
+                                          m_builder.getDictAttr(keywordDefaultParams)),
+                *constExport);
+        }
+        writeIdentifier(funcDef.funcName.getValue(), m_builder.createConstant(mlir::FlatSymbolRefAttr::get(valueOp)));
+        return;
+    }
+
     mlir::Value value = m_builder.createMakeFunc(mlir::FlatSymbolRefAttr::get(func));
     auto type = m_builder.createTypeOf(value);
     m_builder.createSetSlot(value, type, "__qualname__", m_builder.createConstant(qualifiedName));
@@ -1506,6 +1627,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     }
     for (const auto& iter : llvm::reverse(funcDef.decorators))
     {
+        if (checkForIntrinsic(*iter.expression))
+        {
+            continue;
+        }
         auto locExit2 = changeLoc(iter);
         auto decorator = visit(*iter.expression);
         if (!decorator)
@@ -1521,40 +1646,182 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 
 void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
 {
+    auto constExport = checkDecoratorIntrinsics(classDef.decorators, false);
+    if (!constExport)
+    {
+        return;
+    }
+
     m_builder.setCurrentLoc(getLoc(classDef, classDef.className));
     mlir::Value bases, keywords;
-    if (classDef.inheritance)
+    if (!*constExport)
     {
-        std::tie(bases, keywords) = visit(classDef.inheritance->argumentList);
-    }
-    else
-    {
-        bases = m_builder.createConstant(m_builder.getTupleAttr());
-        keywords = m_builder.createConstant(m_builder.getDictAttr());
+        if (classDef.inheritance)
+        {
+            std::tie(bases, keywords) = visit(classDef.inheritance->argumentList);
+        }
+        else
+        {
+            bases = m_builder.createConstant(m_builder.getTupleAttr());
+            keywords = m_builder.createConstant(m_builder.getDictAttr());
+        }
     }
     auto qualifiedName = m_qualifiers + std::string(classDef.className.getValue());
     auto name = m_builder.createConstant(qualifiedName);
 
+    std::optional<CodeGen::Scope> functionScope;
     mlir::func::FuncOp func;
     {
-        func =
-            mlir::func::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
-                                 m_builder.getFunctionType(std::vector<mlir::Type>(2 /* cell tuple + namespace dict */,
-                                                                                   m_builder.getDynamicType()),
-                                                           {m_builder.getDynamicType()}));
+        func = mlir::func::FuncOp::create(
+            m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
+            m_builder.getFunctionType(
+                std::vector<mlir::Type>(2 /* cell tuple + namespace dict */, m_builder.getDynamicType()),
+                {m_builder.getDynamicType()}));
         func.setPrivate();
         auto reset = implementFunction(func);
         m_qualifiers.append(classDef.className.getValue()) += ".";
 
         pylir::ValueReset namespaceReset(m_classNamespace);
-        m_classNamespace = func.getArgument(1);
+        m_classNamespace = *constExport ? nullptr : func.getArgument(1);
+
+        pylir::ValueReset constClassReset(m_constantClass);
+        m_constantClass = *constExport;
 
         visit(*classDef.suite);
-        m_builder.create<mlir::func::ReturnOp>(m_classNamespace);
+        if (*constExport)
+        {
+            functionScope = std::move(m_functionScope);
+            m_builder.create<mlir::func::ReturnOp>();
+        }
+        else
+        {
+            m_builder.create<mlir::func::ReturnOp>(m_classNamespace);
+        }
     }
-    // TODO:
-    //    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
-    //    writeIdentifier(classDef.className, value);
+
+    if (!*constExport)
+    {
+        // TODO:
+        //    auto value = m_builder.createMakeClass(mlir::FlatSymbolRefAttr::get(func), name, bases, keywords);
+        //    writeIdentifier(classDef.className, value);
+        return;
+    }
+
+    auto funcDeleteExit = llvm::make_scope_exit(
+        [&]
+        {
+            // the function scope has to deleted before the function as it still has references to values in the
+            // function via value trackers
+            functionScope.reset();
+            func.erase();
+        });
+
+    // The global handles are usually equal to the variable name since they are the actual bindings referring to
+    // objects. For this intrinsic however, the class becomes a global exported and gets the qualified name, hence
+    // we need to rename the handle and it's users so far.
+    auto handle = m_module.lookupSymbol<Py::GlobalHandleOp>(qualifiedName);
+    auto result =
+        mlir::SymbolTable::replaceAllSymbolUses(handle, m_builder.getStringAttr(qualifiedName + "$handle"), m_module);
+    PYLIR_ASSERT(mlir::succeeded(result));
+    handle.setSymNameAttr(m_builder.getStringAttr(qualifiedName + "$handle"));
+
+    std::vector<mlir::FlatSymbolRefAttr> basesConst;
+    if (classDef.inheritance)
+    {
+        for (const auto& iter : classDef.inheritance->argumentList)
+        {
+            if (iter.maybeName || iter.maybeExpansionsOrEqual)
+            {
+                // TODO: diagnostic
+                PYLIR_UNREACHABLE;
+            }
+            auto value = visit(*iter.expression);
+            if (!value)
+            {
+                // maybe diagnostic?
+                return;
+            }
+            if (!mlir::matchPattern(value, mlir::m_Constant(&basesConst.emplace_back())))
+            {
+                // TODO: diagnostic
+                PYLIR_UNREACHABLE;
+            }
+        }
+    }
+
+    std::vector<mlir::Attribute> mroTuple{mlir::FlatSymbolRefAttr::get(m_builder.getContext(), qualifiedName)};
+    Py::TupleAttr parentSlots;
+    if (basesConst.empty())
+    {
+        if (qualifiedName != m_builder.getObjectBuiltin().getValue())
+        {
+            mroTuple.push_back(m_builder.getObjectBuiltin());
+        }
+    }
+    else
+    {
+        PYLIR_ASSERT(basesConst.size() == 1 && "Multiple inheritance not yet implemented");
+        auto baseResolved = m_module.lookupSymbol<Py::GlobalValueOp>(basesConst[0]);
+        if (!baseResolved)
+        {
+            // TODO: diagnostic
+            PYLIR_UNREACHABLE;
+        }
+        auto typeAttr = baseResolved.getInitializerAttr().cast<pylir::Py::TypeAttr>();
+        auto baseMRO = dereference<Py::TupleAttr>(typeAttr.getMroTuple());
+        PYLIR_ASSERT(baseMRO);
+        mroTuple.insert(mroTuple.end(), baseMRO.getValue().begin(), baseMRO.getValue().end());
+        parentSlots = dereference<Py::TupleAttr>(typeAttr.getSlots().get("__slots__"));
+    }
+
+    llvm::SmallVector<mlir::NamedAttribute> slots;
+    for (auto& [key, value] : functionScope->identifiers)
+    {
+        auto* map = std::get_if<SSABuilder::DefinitionsMap>(&value.kind);
+        if (!map)
+        {
+            // TODO: diagnostic
+            PYLIR_UNREACHABLE;
+        }
+        auto read = functionScope->ssaBuilder.readVariable(m_builder.getCurrentLoc(), m_builder.getDynamicType(), *map,
+                                                           &func.getBody().back());
+        mlir::Attribute attr;
+        if (!mlir::matchPattern(read, mlir::m_Constant(&attr)))
+        {
+            // TODO: diagnostic
+            PYLIR_UNREACHABLE;
+        }
+        if (key != "__slots__" || !parentSlots)
+        {
+            slots.emplace_back(m_builder.getStringAttr(key), attr);
+            continue;
+        }
+        auto origTuple = dereference<Py::TupleAttr>(attr);
+        if (!origTuple)
+        {
+            // TODO: diagnostic
+            PYLIR_UNREACHABLE;
+        }
+        auto vector = llvm::to_vector(origTuple.getValue());
+        vector.append(parentSlots.getValue().begin(), parentSlots.getValue().end());
+        slots.emplace_back(m_builder.getStringAttr("__slots__"), m_builder.getTupleAttr(vector));
+        parentSlots = nullptr;
+    }
+    if (parentSlots)
+    {
+        slots.emplace_back(m_builder.getStringAttr("__slots__"), parentSlots);
+    }
+    slots.emplace_back(m_builder.getStringAttr("__name__"), m_builder.getStrAttr(classDef.className.getValue()));
+
+    Py::GlobalValueOp valueOp;
+    {
+        mlir::OpBuilder::InsertionGuard guard{m_builder};
+        m_builder.setInsertionPointToEnd(m_module.getBody());
+        valueOp = m_builder.createGlobalValue(
+            qualifiedName, true,
+            m_builder.getTypeAttr(m_builder.getTupleAttr(mroTuple), m_builder.getDictionaryAttr(slots)), true);
+    }
+    writeIdentifier(classDef.className.getValue(), m_builder.createConstant(mlir::FlatSymbolRefAttr::get(valueOp)));
 }
 
 void pylir::CodeGen::visit(const Syntax::Suite& suite)

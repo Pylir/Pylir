@@ -56,6 +56,7 @@ class CodeGen
     mlir::Value m_classNamespace{};
     std::unordered_map<std::string, std::size_t> m_implNames;
     std::unordered_map<std::string_view, mlir::FlatSymbolRefAttr> m_builtinNamespace;
+    bool m_constantClass = false;
 
     struct Loop
     {
@@ -114,6 +115,11 @@ class CodeGen
     Scope& getCurrentScope()
     {
         return m_functionScope ? *m_functionScope : m_globalScope;
+    }
+
+    bool inGlobalScope() const
+    {
+        return !m_functionScope;
     }
 
     class BlockPtr
@@ -193,7 +199,7 @@ class CodeGen
 
     mlir::Value readIdentifier(const IdentifierToken& token);
 
-    void writeIdentifier(const IdentifierToken& token, mlir::Value value);
+    void writeIdentifier(std::string_view name, mlir::Value value);
 
     void raiseException(mlir::Value exceptionObject);
 
@@ -225,6 +231,11 @@ class CodeGen
         explicit ModuleSpec(const Syntax::ImportStmt::Module& module);
 
         explicit ModuleSpec(const Syntax::ImportStmt::RelativeModule& relativeModule);
+
+        explicit ModuleSpec(std::vector<Component> components)
+            : dots{}, dotsLocation{}, components(std::move(components))
+        {
+        }
     };
 
     struct ModuleImport
@@ -247,6 +258,25 @@ class CodeGen
     mlir::Value callIntrinsic(Intrinsic&& intrinsic, llvm::ArrayRef<Syntax::Argument> arguments);
 
     mlir::Value intrinsicConstant(Intrinsic&& intrinsic);
+
+    std::optional<bool> checkDecoratorIntrinsics(llvm::ArrayRef<Syntax::Decorator> decorators,
+                                                 bool additionalConstCondition);
+
+    template <class T>
+    T dereference(mlir::Attribute attr)
+    {
+        if (auto val = attr.dyn_cast_or_null<T>())
+        {
+            return val;
+        }
+        auto ref = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
+        if (!ref)
+        {
+            return nullptr;
+        }
+        auto globalValue = m_module.lookupSymbol<Py::GlobalValueOp>(ref);
+        return globalValue.getInitializerAttr().dyn_cast_or_null<T>();
+    }
 
     struct FunctionParameter
     {
