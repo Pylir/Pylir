@@ -316,40 +316,11 @@ void pylir::CodeGen::createBuiltinsImpl()
                         });
                 });
 
-    createClass(m_builder.getNoneTypeBuiltin(), {},
-                [&](SlotMapImpl& slots)
-                {
-                    slots["__new__"] = createFunction(
-                        "builtins.NoneType.__new__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                        [&](mlir::ValueRange)
-                        { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()}); });
-                    slots["__repr__"] = createFunction(
-                        "builtins.NoneType.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                        [&](mlir::ValueRange) {
-                            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant("None")});
-                        });
-                    slots["__bool__"] = createFunction(
-                        "builtins.NoneType.__bool__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                        [&](mlir::ValueRange)
-                        { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant(false)}); });
-                });
     m_builder.createGlobalValue(Builtins::None.name, true, m_builder.getObjectAttr(m_builder.getNoneTypeBuiltin()),
                                 true);
-    createClass(
-        m_builder.getNotImplementedTypeBuiltin(), {},
-        [&](SlotMapImpl& slots)
-        {
-            slots["__new__"] = createFunction(
-                "builtins.NotImplementedType.__new__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                [&](mlir::ValueRange)
-                { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNotImplementedRef()}); });
-            slots["__repr__"] = createFunction(
-                "builtins.NotImplementedType.__repr__", {FunctionParameter{"", FunctionParameter::PosOnly, false}},
-                [&](mlir::ValueRange)
-                { m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createConstant("NotImplemented")}); });
-        });
     m_builder.createGlobalValue(Builtins::NotImplemented.name, true,
                                 m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
+
     createClass(m_builder.getFunctionBuiltin(), {},
                 [&](SlotMapImpl& slots)
                 {
@@ -371,6 +342,7 @@ void pylir::CodeGen::createBuiltinsImpl()
 #include <pylir/Interfaces/Slots.def>
                     }));
                 });
+
     createClass(m_builder.getCellBuiltin(), {},
                 [&](SlotMapImpl& slots)
                 {

@@ -117,5 +117,26 @@ class StopIteration(Exception):
 
 
 @pylir.intr.const_export
+class NoneType:
+    def __new__(cls, *args, **kwargs):
+        return None
+
+    def __repr__(self):
+        return "None"
+
+    def __bool__(self):
+        return False
+
+
+@pylir.intr.const_export
+class NotImplementedType:
+    def __new__(cls, *args, **kwargs):
+        return NotImplemented
+
+    def __repr__(self):
+        return "NotImplemented"
+
+
+@pylir.intr.const_export
 def id(obj):
     return pylir.intr.object.id(obj)
