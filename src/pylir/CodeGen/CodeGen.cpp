@@ -67,7 +67,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         for (const auto& token : fileInput.globals)
         {
             auto locExit = changeLoc(token);
-            auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()));
+            auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()) + "$handle");
             m_globalScope.identifiers.emplace(token.getValue(), Identifier{op.getOperation()});
         }
         m_builder.setCurrentLoc(m_builder.getUnknownLoc());
@@ -1558,15 +1558,6 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             mlir::OpBuilder::InsertionGuard guard{m_builder};
             m_builder.setInsertionPointToEnd(m_module.getBody());
 
-            if (!m_constantClass)
-            {
-                auto handle = m_module.lookupSymbol<Py::GlobalHandleOp>(qualifiedName);
-                auto result = mlir::SymbolTable::replaceAllSymbolUses(
-                    handle, m_builder.getStringAttr(qualifiedName + "$handle"), m_module);
-                PYLIR_ASSERT(mlir::succeeded(result));
-                handle.setSymNameAttr(m_builder.getStringAttr(qualifiedName + "$handle"));
-            }
-
             valueOp = m_builder.createGlobalValue(
                 qualifiedName, true,
                 m_builder.getFunctionAttr(mlir::FlatSymbolRefAttr::get(func), m_builder.getStrAttr(qualifiedName),
@@ -1715,15 +1706,6 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
             functionScope.reset();
             func.erase();
         });
-
-    // The global handles are usually equal to the variable name since they are the actual bindings referring to
-    // objects. For this intrinsic however, the class becomes a global exported and gets the qualified name, hence
-    // we need to rename the handle and it's users so far.
-    auto handle = m_module.lookupSymbol<Py::GlobalHandleOp>(qualifiedName);
-    auto result =
-        mlir::SymbolTable::replaceAllSymbolUses(handle, m_builder.getStringAttr(qualifiedName + "$handle"), m_module);
-    PYLIR_ASSERT(mlir::succeeded(result));
-    handle.setSymNameAttr(m_builder.getStringAttr(qualifiedName + "$handle"));
 
     std::vector<mlir::FlatSymbolRefAttr> basesConst;
     if (classDef.inheritance)
