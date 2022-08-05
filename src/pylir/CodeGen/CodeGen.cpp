@@ -587,7 +587,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Call& call)
     return m_builder.createPylirCallIntrinsic(callable, tuple, keywords, m_currentExceptBlock);
 }
 
-void pylir::CodeGen::writeIdentifier(const IdentifierToken& identifierToken, mlir::Value value)
+void pylir::CodeGen::writeIdentifier(std::string_view text, mlir::Value value)
 {
     auto locExit = changeLoc(identifierToken);
     if (m_classNamespace)
@@ -1345,11 +1345,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
-    std::vector<std::string_view> functionParametersTokens;
+    std::vector<const IdentifierToken*> functionParametersTokens;
     std::vector<FunctionParameter> functionParameters;
     for (const auto& iter : funcDef.parameterList)
     {
-        functionParametersTokens.push_back(iter.name.getValue());
+        functionParametersTokens.push_back(&iter.name);
         functionParameters.push_back({std::string{iter.name.getValue()},
                                       static_cast<FunctionParameter::Kind>(iter.kind), iter.maybeDefault != nullptr});
         if (!iter.maybeDefault)
@@ -1370,9 +1370,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         auto name = m_builder.createConstant(iter.name.getValue());
         keywordOnlyDefaultParameters.push_back(std::pair{name, value});
     }
+
     auto locExit = changeLoc(funcDef);
     auto qualifiedName = m_qualifiers + std::string(funcDef.funcName.getValue());
-    std::vector<IdentifierToken> usedClosures;
+    std::vector<IdentifierToken> usedCells;
     mlir::func::FuncOp func;
     {
         pylir::ValueReset namespaceReset(m_classNamespace);
@@ -1390,8 +1391,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         std::unordered_set<std::string_view> parameterSet(functionParametersTokens.size());
         for (auto [name, value] : llvm::zip(functionParametersTokens, llvm::drop_begin(func.getArguments())))
         {
-            parameterSet.insert(name);
-            if (funcDef.closures.count(name))
+            parameterSet.insert(name->getValue());
+            if (funcDef.scope.identifiers.find(*name)->second == Syntax::Scope::Cell)
             {
                 auto closureType = m_builder.createCellRef();
                 auto tuple = m_builder.createMakeTuple({closureType, value});
@@ -1399,48 +1400,53 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                 auto metaType = m_builder.createTypeOf(closureType);
                 auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
                 mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
-                m_functionScope->identifiers.emplace(name, Identifier{cell});
+                m_functionScope->identifiers.emplace(name->getValue(), Identifier{cell});
             }
             else
             {
                 m_functionScope->identifiers.emplace(
-                    name, Identifier{SSABuilder::DefinitionsMap{{m_builder.getBlock(), value}}});
+                    name->getValue(), Identifier{SSABuilder::DefinitionsMap{{m_builder.getBlock(), value}}});
             }
         }
 
-        for (const auto& iter : funcDef.localVariables)
-        {
-            if (parameterSet.count(iter.getValue()))
-            {
-                continue;
-            }
-            m_functionScope->identifiers.emplace(iter.getValue(), Identifier{SSABuilder::DefinitionsMap{}});
-        }
-        for (const auto& iter : funcDef.closures)
-        {
-            if (parameterSet.count(iter.getValue()))
-            {
-                continue;
-            }
-            auto closureType = m_builder.createCellRef();
-            auto tuple = m_builder.createMakeTuple({closureType});
-            auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
-            auto metaType = m_builder.createTypeOf(closureType);
-            auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
-            mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
-            m_functionScope->identifiers.emplace(iter.getValue(), Identifier{cell});
-        }
-        if (!funcDef.nonLocalVariables.empty())
+        mlir::Value closureTuple;
         {
             auto self = func.getArgument(0);
             auto metaType = m_builder.createFunctionRef();
-            auto closureTuple = m_builder.createGetSlot(self, metaType, "__closure__");
-            for (const auto& iter : llvm::enumerate(funcDef.nonLocalVariables))
+            closureTuple = m_builder.createGetSlot(self, metaType, "__closure__");
+        }
+
+        for (const auto& [iter, kind] : funcDef.scope.identifiers)
+        {
+            if (parameterSet.count(iter.getValue()))
             {
-                auto constant = m_builder.create<mlir::arith::ConstantIndexOp>(iter.index());
-                auto cell = m_builder.createTupleGetItem(closureTuple, constant);
-                m_functionScope->identifiers.emplace(iter.value().getValue(), Identifier{mlir::Value{cell}});
-                usedClosures.push_back(iter.value());
+                continue;
+            }
+            switch (kind)
+            {
+                case Syntax::Scope::Local:
+                    m_functionScope->identifiers.emplace(iter.getValue(), Identifier{SSABuilder::DefinitionsMap{}});
+                    break;
+                case Syntax::Scope::Cell:
+                {
+                    auto closureType = m_builder.createCellRef();
+                    auto tuple = m_builder.createMakeTuple({closureType});
+                    auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
+                    auto metaType = m_builder.createTypeOf(closureType);
+                    auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
+                    mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
+                    m_functionScope->identifiers.emplace(iter.getValue(), Identifier{cell});
+                    break;
+                }
+                case Syntax::Scope::NonLocal:
+                {
+                    auto constant = m_builder.create<mlir::arith::ConstantIndexOp>(usedCells.size());
+                    auto cell = m_builder.createTupleGetItem(closureTuple, constant);
+                    m_functionScope->identifiers.emplace(iter.getValue(), Identifier{mlir::Value{cell}});
+                    usedCells.push_back(iter);
+                    break;
+                }
+                default: break;
             }
         }
 
@@ -1480,14 +1486,14 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
     }
     {
         mlir::Value closure;
-        if (usedClosures.empty())
+        if (usedCells.empty())
         {
             closure = m_builder.createNoneRef();
         }
         else
         {
-            std::vector<Py::IterArg> args(usedClosures.size());
-            std::transform(usedClosures.begin(), usedClosures.end(), args.begin(),
+            std::vector<Py::IterArg> args(usedCells.size());
+            std::transform(usedCells.begin(), usedCells.end(), args.begin(),
                            [&](const IdentifierToken& token) -> Py::IterArg
                            {
                                auto result = getCurrentScope().identifiers.find(token.getValue());
@@ -1510,7 +1516,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         auto dict = m_builder.createConstant(m_builder.getDictAttr());
         value = m_builder.createPylirCallIntrinsic(decorator, tuple, dict, m_currentExceptBlock);
     }
-    writeIdentifier(funcDef.funcName, value);
+    writeIdentifier(funcDef.funcName.getValue(), value);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)

@@ -197,7 +197,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                     {
                         switch (result->second)
                         {
-                            case Scope::Kind::Local:
+                            case Syntax::Scope::Kind::Local:
+                            case Syntax::Scope::Kind::Cell:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(
                                         nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
@@ -206,7 +207,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                         .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
                                         .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
                                         .emitError()};
-                            case Scope::Kind::Global:
+                            case Syntax::Scope::Kind::Global:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(
                                         nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
@@ -215,7 +216,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                         .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
                                         .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
                                         .emitError()};
-                            case Scope::Kind::Unknown:
+                            case Syntax::Scope::Kind::Unknown:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION,
                                                              nonLocal.getValue())
@@ -223,7 +224,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                         .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
                                         .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
                                         .emitError()};
-                            case Scope::Kind::NonLocal: break;
+                            case Syntax::Scope::Kind::NonLocal: break;
                         }
                     }
                     return {};
@@ -237,7 +238,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                     }
                     if (!m_namespace.empty())
                     {
-                        m_namespace.back().identifiers.emplace(iter, Scope::Kind::NonLocal);
+                        m_namespace.back().identifiers.insert({iter, Syntax::Scope::Kind::NonLocal});
                     }
                 }
                 return make_node<Syntax::GlobalOrNonLocalStmt>(keyword, std::move(identifiers));
@@ -252,7 +253,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                     {
                         switch (result->second)
                         {
-                            case Scope::Kind::Local:
+                            case Syntax::Scope::Kind::Local:
+                            case Syntax::Scope::Kind::Cell:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(
                                         global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
@@ -261,7 +263,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                         .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
                                         .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
                                         .emitError()};
-                            case Scope::Kind::NonLocal:
+                            case Syntax::Scope::Kind::NonLocal:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(
                                         global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE,
@@ -270,7 +272,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                         .addNote(result->first, Diag::NONLOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
                                         .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
                                         .emitError()};
-                            case Scope::Kind::Unknown:
+                            case Syntax::Scope::Kind::Unknown:
                                 return tl::unexpected{createDiagnosticsBuilder(global,
                                                                                Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION,
                                                                                global.getValue())
@@ -278,7 +280,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                                           .addNote(result->first, Diag::N_USED_HERE, global.getValue())
                                                           .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
                                                           .emitError()};
-                            case Scope::Kind::Global: break;
+                            case Syntax::Scope::Kind::Global: break;
                         }
                     }
                     return {};
@@ -290,7 +292,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                         return tl::unexpected{std::move(error).error()};
                     }
                     m_globals.insert(iter);
-                    m_namespace.back().identifiers.emplace(iter, Scope::Kind::Global);
+                    m_namespace.back().identifiers.insert({iter, Syntax::Scope::Kind::Global});
                 }
             }
             else

@@ -30,20 +30,7 @@ class Parser
 #include "Features.def"
     const Diag::Document* m_document;
 
-    struct Scope
-    {
-        enum class Kind
-        {
-            Local,
-            NonLocal,
-            Global,
-            Unknown
-        };
-
-        bool classScope{};
-        IdentifierMap<Kind> identifiers;
-    };
-    std::vector<Scope> m_namespace;
+    std::vector<Syntax::Scope> m_namespace;
     IdentifierSet m_globals;
     bool m_inLoop = false;
     bool m_inFunc = false;
@@ -165,9 +152,8 @@ class Parser
         return std::unique_ptr<T>(new T{{}, std::forward<Args>(args)...});
     }
 
-    tl::expected<IdentifierSet, std::string> finishNamespace(pylir::Syntax::Suite& suite,
-                                                             const IdentifierSet& nonLocals,
-                                                             std::vector<const pylir::IdentifierSet*> scopes = {});
+    tl::expected<void, std::string> finishNamespace(pylir::Syntax::Suite& suite,
+                                                             pylir::Syntax::Scope* maybeScope = nullptr) const;
 
     bool lookaheadEquals(tcb::span<const TokenType> tokens);
 

@@ -6,15 +6,16 @@
 
 #pragma once
 
+#include <llvm/ADT/MapVector.h>
+#include <llvm/ADT/SetVector.h>
+
 #include <pylir/Diagnostics/LocationProvider.hpp>
 #include <pylir/Support/BigInt.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
 
 #include <cstdint>
-#include <set>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -173,6 +174,10 @@ class IdentifierToken : public BaseToken
 {
     std::string m_value;
 
+    friend struct llvm::DenseMapInfo<IdentifierToken>;
+
+    explicit IdentifierToken(std::string value) : BaseToken(0, 0, 0), m_value(std::move(value)) {}
+
 public:
     explicit IdentifierToken(const Token& token)
         : BaseToken(token.getOffset(), token.getSize(), token.getFileId()),
@@ -197,45 +202,38 @@ public:
     }
 };
 
-struct IdentifierHash
-{
-    std::size_t operator()(const IdentifierToken& identifierToken) const noexcept
-    {
-        return std::hash<std::string_view>{}(identifierToken.getValue());
-    }
-};
+} // namespace pylir
 
-struct IdentifierEquals
+template <>
+struct llvm::DenseMapInfo<pylir::IdentifierToken>
 {
-    bool operator()(const IdentifierToken& lhs, const IdentifierToken& rhs) const noexcept
+    static pylir::IdentifierToken getEmptyKey()
+    {
+        return pylir::IdentifierToken("");
+    }
+
+    static pylir::IdentifierToken getTombstoneKey()
+    {
+        return pylir::IdentifierToken("0");
+    }
+
+    static unsigned getHashValue(const pylir::IdentifierToken& val)
+    {
+        return llvm::hash_combine_range(val.getValue().begin(), val.getValue().end());
+    }
+
+    static bool isEqual(const pylir::IdentifierToken& lhs, const pylir::IdentifierToken& rhs)
     {
         return lhs.getValue() == rhs.getValue();
     }
 };
 
-struct IdentifierLess
+namespace pylir
 {
-    bool operator()(const IdentifierToken& lhs, const IdentifierToken& rhs) const noexcept
-    {
-        return lhs.getValue() < rhs.getValue();
-    }
 
-    bool operator()(const IdentifierToken& lhs, std::string_view rhs) const noexcept
-    {
-        return lhs.getValue() < rhs;
-    }
-
-    bool operator()(std::string_view lhs, const IdentifierToken& rhs) const noexcept
-    {
-        return lhs < rhs.getValue();
-    }
-
-    using is_transparent = void;
-};
-
-using IdentifierSet = std::set<IdentifierToken, IdentifierLess>;
+using IdentifierSet = llvm::SetVector<IdentifierToken>;
 template <class T>
-using IdentifierMap = std::unordered_map<IdentifierToken, T, IdentifierHash, IdentifierEquals>;
+using IdentifierMap = llvm::MapVector<IdentifierToken, T>;
 
 namespace Diag
 {

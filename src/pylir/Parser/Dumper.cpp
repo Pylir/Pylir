@@ -6,6 +6,7 @@
 
 #include "Dumper.hpp"
 
+#include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/SmallString.h>
 
 #include <pylir/Support/Variant.hpp>
@@ -28,7 +29,7 @@ std::vector<std::string_view> splitLines(std::string_view text)
     return result;
 }
 
-std::string dumpVariables(const pylir::IdentifierSet& tokens)
+std::string dumpVariables(llvm::ArrayRef<pylir::IdentifierToken> tokens)
 {
     PYLIR_ASSERT(!tokens.empty());
     auto iter = tokens.begin();
@@ -510,7 +511,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FileInput& fileInput)
     auto builder = createBuilder("file input");
     if (!fileInput.globals.empty())
     {
-        builder.add(dumpVariables(fileInput.globals), "globals");
+        builder.add(dumpVariables(llvm::to_vector(fileInput.globals)), "globals");
     }
     for (const auto& iter : fileInput.input.statements)
     {
@@ -662,17 +663,33 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
     {
         builder.add(*funcDef.maybeSuffix, "suffix");
     }
-    if (!funcDef.localVariables.empty())
+
+    std::vector<IdentifierToken> localVariables;
+    std::vector<IdentifierToken> nonLocalVariables;
+    std::vector<IdentifierToken> cells;
+
+    for (const auto& [id, kind] : funcDef.scope.identifiers)
     {
-        builder.add(dumpVariables(funcDef.localVariables), "locals");
+        switch (kind)
+        {
+            case Syntax::Scope::Local: localVariables.push_back(id); break;
+            case Syntax::Scope::NonLocal: nonLocalVariables.push_back(id); break;
+            case Syntax::Scope::Cell: cells.push_back(id); break;
+            default: break;
+        }
     }
-    if (!funcDef.nonLocalVariables.empty())
+
+    if (!localVariables.empty())
     {
-        builder.add(dumpVariables(funcDef.nonLocalVariables), "nonlocals");
+        builder.add(dumpVariables(localVariables), "locals");
     }
-    if (!funcDef.closures.empty())
+    if (!nonLocalVariables.empty())
     {
-        builder.add(dumpVariables(funcDef.closures), "closures");
+        builder.add(dumpVariables(nonLocalVariables), "nonlocals");
+    }
+    if (!cells.empty())
+    {
+        builder.add(dumpVariables(cells), "cells");
     }
     return builder.add(*funcDef.suite).emit();
 }
@@ -691,13 +708,26 @@ std::string pylir::Dumper::dump(const Syntax::ClassDef& classDef)
             builder.add(iter);
         }
     }
-    if (!classDef.localVariables.empty())
+    std::vector<IdentifierToken> localVariables;
+    std::vector<IdentifierToken> nonLocalVariables;
+
+    for (const auto& [id, kind] : classDef.scope.identifiers)
     {
-        builder.add(dumpVariables(classDef.localVariables), "locals");
+        switch (kind)
+        {
+            case Syntax::Scope::Local: localVariables.push_back(id); break;
+            case Syntax::Scope::NonLocal: nonLocalVariables.push_back(id); break;
+            default: break;
+        }
     }
-    if (!classDef.nonLocalVariables.empty())
+
+    if (!localVariables.empty())
     {
-        builder.add(dumpVariables(classDef.nonLocalVariables), "nonlocals");
+        builder.add(dumpVariables(localVariables), "locals");
+    }
+    if (!nonLocalVariables.empty())
+    {
+        builder.add(dumpVariables(nonLocalVariables), "nonlocals");
     }
     builder.add(*classDef.suite);
     return builder.emit();

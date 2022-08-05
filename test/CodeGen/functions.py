@@ -25,12 +25,12 @@ def foo():
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = py.getSlot "__new__" from %[[CELL_TYPE]]
-# CHECK: %[[X:.*]] = py.function.call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
+# CHECK: %[[Y:.*]] = py.function.call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
 # CHECK: %[[CELL_TYPE:.*]] = py.constant(@builtins.cell)
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = py.getSlot "__new__" from %[[CELL_TYPE]]
-# CHECK: %[[Y:.*]] = py.function.call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
+# CHECK: %[[X:.*]] = py.function.call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
 # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
 # CHECK: py.setSlot "cell_contents" of %[[Y]] : %{{.*}} to %[[FIVE]]
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)

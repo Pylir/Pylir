@@ -431,6 +431,20 @@ struct Decorator
     BaseToken newline;
 };
 
+struct Scope
+{
+    enum Kind
+    {
+        Local,
+        Cell,
+        NonLocal,
+        Global,
+        Unknown
+    };
+
+    IdentifierMap<Kind> identifiers;
+};
+
 struct FuncDef : CompoundStmt::Base<FuncDef>
 {
     std::vector<Decorator> decorators;
@@ -444,10 +458,7 @@ struct FuncDef : CompoundStmt::Base<FuncDef>
     BaseToken colon;
     std::unique_ptr<Suite> suite;
 
-    IdentifierSet localVariables;
-    IdentifierSet nonLocalVariables;
-    IdentifierSet closures;
-    IdentifierSet unknown; // only temporarily used
+    Scope scope;
 };
 
 struct ClassDef : CompoundStmt::Base<ClassDef>
@@ -465,9 +476,7 @@ struct ClassDef : CompoundStmt::Base<ClassDef>
     BaseToken colon;
     std::unique_ptr<Suite> suite;
 
-    IdentifierSet localVariables;
-    IdentifierSet nonLocalVariables;
-    IdentifierSet unknown; // only temporarily used
+    Scope scope;
 };
 
 struct Suite

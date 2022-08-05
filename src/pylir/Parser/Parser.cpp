@@ -107,10 +107,10 @@ void pylir::Parser::addToNamespace(const IdentifierToken& token)
         m_globals.insert(token);
         return;
     }
-    auto result = m_namespace.back().identifiers.find(token);
-    if (result == m_namespace.back().identifiers.end() || result->second == Scope::Kind::Unknown)
+    auto result = m_namespace.back().identifiers.insert({token, Syntax::Scope::Local}).first;
+    if (result->second == Syntax::Scope::Unknown)
     {
-        m_namespace.back().identifiers.insert_or_assign(result, token, Scope::Kind::Local);
+        result->second = Syntax::Scope::Local;
     }
 }
 

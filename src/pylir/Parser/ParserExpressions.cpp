@@ -66,7 +66,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
             {
                 // emplace will only insert if it is not already contained. So it will only be marked as unknown
                 // if we didn't know it's kind already
-                m_namespace.back().identifiers.emplace(token, Scope::Kind::Unknown);
+                m_namespace.back().identifiers.insert({IdentifierToken{token}, Syntax::Scope::Kind::Unknown});
             }
             return make_node<Syntax::Atom>(token);
         }

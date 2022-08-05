@@ -1,6 +1,6 @@
 # RUN: pylir %s -fsyntax-only -dump-ast | FileCheck %s
 
-# CHECK: globals: bar, foo, outer, outer2, outer3, x
+# CHECK: globals: foo, x, outer, outer2, outer3, bar, Foo
 
 def foo():
     global x
@@ -16,13 +16,13 @@ def foo():
 # CHECK-LABEL: function foo
 # CHECK-NEXT: locals: inner
 # CHECK-NOT: nonlocals:
-# CHECK-NEXT: closures: a, c
+# CHECK-NEXT: cells: c, a
 
 # CHECK-LABEL: function inner
 # CHECK-NEXT: parameter b
 # CHECK-NEXT: locals: b
-# CHECK-NEXT: nonlocals: a, c
-# CHECK-NOT: closures:
+# CHECK-NEXT: nonlocals: c, a
+# CHECK-NOT: cells:
 
 def outer():
     def inner():
@@ -34,16 +34,16 @@ def outer():
 
 # CHECK-LABEL: function outer
 # CHECK-NEXT: locals: inner
-# CHECK-NEXT: closures: x
+# CHECK-NEXT: cells: x
 
 # CHECK-LABEL: function inner
 # CHECK-NEXT: locals: inner2
 # CHECK-NEXT: nonlocals: x
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 # CHECK-LABEL: function inner2
 # CHECK-NOT: locals:
 # CHECK-NEXT: nonlocals: x
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 
 x = 0
 
@@ -58,12 +58,12 @@ def outer2():
 # CHECK-LABEL: function outer2
 # CHECK-NEXT: locals: inner
 # CHECK-NOT: nonlocals
-# CHECK-NEXT: closures: x
+# CHECK-NEXT: cells: x
 
 # CHECK-LABEL: function inner
 # CHECK-NOT: locals:
 # CHECK-NEXT: nonlocals: x
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 
 def outer3():
     y = 3
@@ -78,17 +78,17 @@ def outer3():
 
 # CHECK-LABEL: function outer3
 # CHECK-NEXT: locals: Foo
-# CHECK-NEXT: closures: y
-# CHECK-NOT: closures:
+# CHECK-NEXT: cells: y
+# CHECK-NOT: nonlocals:
 # CHECK-LABEL: class Foo
 # CHECK-NEXT: locals: foo
 # CHECK-NEXT: nonlocals: y
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 # CHECK-LABEL: function foo
 # CHECK-NEXT: parameter
 # CHECK-NEXT: locals: self
 # CHECK-NEXT: nonlocals: y
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 
 def bar():
     x = 3
@@ -99,23 +99,59 @@ def bar():
                 def inner2():
                     nonlocal x
 
+
 # CHECK-LABEL: function bar
 # CHECK-NEXT: locals: Bar
-# CHECK-NEXT: closures: x
+# CHECK-NEXT: cells: x
 # CHECK-LABEL: class Bar
 # CHECK-NEXT: locals: outer
 # CHECK-NEXT: nonlocals: x
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 # CHECK-LABEL: function outer
 # CHECK-NEXT: parameter
-# CHECK-NEXT: locals: inner, self
+# CHECK-NEXT: locals: self, inner
 # CHECK-NEXT: nonlocals: x
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 # CHECK-LABEL: function inner
 # CHECK-NEXT: locals: inner2
 # CHECK-NEXT: nonlocals: x
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
 # CHECK-LABEL: function inner2
 # CHECK-NOT: locals:
 # CHECK-NEXT: nonlocals: x
-# CHECK-NOT: closures:
+# CHECK-NOT: cells:
+
+class Foo:
+    def bar(self):
+        return Foo
+
+
+# CHECK-LABEL: class Foo
+# CHECK-NEXT: locals: bar
+# CHECK-NOT: cells:
+# CHECK-NOT: nonlocals:
+# CHECK-LABEL: function bar
+# CHECK: locals: self
+# CHECK-NOT: cells:
+# CHECK-NOT: nonlocals:
+
+def foo():
+    x = 3
+
+    def inner():
+        global x
+
+        def inner2():
+            return x
+
+# CHECK-LABEL: function foo
+# CHECK-NEXT: locals: x, inner
+# CHECK-NOT: cells:
+# CHECK-LABEL: function inner
+# CHECK-NEXT: locals: inner2
+# CHECK-NOT: nonlocals:
+# CHECK-NOT: cells:
+# CHECK-LABEL: function inner2
+# CHECK-NOT: nonlocals:
+# CHECK-NOT: cells:
+# CHECK-NOT: locals:

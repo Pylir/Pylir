@@ -866,69 +866,99 @@ class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
             return;
         }
 
-        for (auto& iter : def.nonLocalVariables)
+        for (auto& [id, kind] : def.scope.identifiers)
         {
-            if (std::none_of(scopes.begin(), scopes.end(),
-                             [&](const pylir::IdentifierSet* set) -> bool { return set->count(iter); }))
+            switch (kind)
             {
-                error = onError(iter);
-                break;
+                case pylir::Syntax::Scope::NonLocal:
+                {
+                    if (std::none_of(scopes.begin(), scopes.end(),
+                                     [&id = id](const pylir::Syntax::Scope* scope) -> bool
+                                     { return scope->identifiers.count(id); }))
+                    {
+                        error = onError(id);
+                        break;
+                    }
+                    break;
+                }
+                case pylir::Syntax::Scope::Unknown:
+                {
+                    for (auto& iter : llvm::reverse(scopes))
+                    {
+                        auto res = iter->identifiers.find(id);
+                        if (res != iter->identifiers.end())
+                        {
+                            switch (res->second)
+                            {
+                                case pylir::Syntax::Scope::Global: kind = pylir::Syntax::Scope::Global; break;
+                                case pylir::Syntax::Scope::Unknown: continue;
+                                case pylir::Syntax::Scope::Cell:
+                                case pylir::Syntax::Scope::Local:
+                                case pylir::Syntax::Scope::NonLocal: kind = pylir::Syntax::Scope::NonLocal; break;
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+                default: break;
             }
         }
-
-        for (auto& iter : def.unknown)
-        {
-            if (std::any_of(scopes.begin(), scopes.end(),
-                            [&](const pylir::IdentifierSet* set) -> bool { return set->count(iter); })
-                || globals.count(iter))
-            {
-                def.nonLocalVariables.insert(iter);
-            }
-        }
-        def.unknown.clear();
 
         // add any non locals from nested functions except if they are local to this function aka the referred
         // to local
-        for (auto& iter : def.nonLocalVariables)
+        for (auto& [id, kind] : def.scope.identifiers)
         {
+            if (kind != pylir::Syntax::Scope::NonLocal)
+            {
+                continue;
+            }
             pylir::match(
                 parentDef,
-                [&](std::monostate)
+                [&id = id, this](std::monostate)
                 {
-                    // Any non locals going up that haven't caused an error are from the very top level function at
-                    // global scope
-                    closures.insert(iter);
-                },
-                [&](pylir::Syntax::FuncDef* funcDef)
-                {
-                    if (auto result = funcDef->localVariables.find(iter); result == funcDef->localVariables.end())
+                    if (!maybeTopLevelFunction)
                     {
-                        funcDef->nonLocalVariables.insert(iter);
+                        return;
                     }
-                    else
+                    // Special case for the very top level function that is finishing the namespace.
+                    // its scope is the very first one
+                    auto iter = maybeTopLevelFunction->identifiers.insert({id, pylir::Syntax::Scope::NonLocal}).first;
+                    if (iter->second == pylir::Syntax::Scope::Local)
                     {
-                        funcDef->localVariables.erase(result);
-                        funcDef->closures.insert(iter);
+                        iter->second = pylir::Syntax::Scope::Cell;
                     }
                 },
-                [&](pylir::Syntax::ClassDef* classDef) { classDef->nonLocalVariables.insert(iter); });
+                [&id = id](pylir::Syntax::FuncDef* funcDef)
+                {
+                    auto iter = funcDef->scope.identifiers.insert({id, pylir::Syntax::Scope::NonLocal}).first;
+                    if (iter->second == pylir::Syntax::Scope::Local)
+                    {
+                        iter->second = pylir::Syntax::Scope::Cell;
+                    }
+                },
+                [&id = id](pylir::Syntax::ClassDef* classDef) {
+                    classDef->scope.identifiers.insert({id, pylir::Syntax::Scope::NonLocal});
+                });
         }
     }
 
-    std::vector<const pylir::IdentifierSet*> scopes;
+    pylir::Syntax::Scope* maybeTopLevelFunction;
+    std::vector<const pylir::Syntax::Scope*> scopes;
     std::function<std::string(const pylir::IdentifierToken&)> onError;
     std::variant<std::monostate, pylir::Syntax::FuncDef*, pylir::Syntax::ClassDef*> parentDef;
-    const pylir::IdentifierSet& globals;
 
 public:
-    pylir::IdentifierSet closures;
     std::optional<std::string> error;
 
-    NamespaceVisitor(std::vector<const pylir::IdentifierSet*>&& scopes,
-                     std::function<std::string(const pylir::IdentifierToken&)>&& onError,
-                     const pylir::IdentifierSet& globals)
-        : scopes(std::move(scopes)), onError(std::move(onError)), globals(globals)
+    NamespaceVisitor(pylir::Syntax::Scope* maybeScope,
+                     std::function<std::string(const pylir::IdentifierToken&)>&& onError)
+        : maybeTopLevelFunction(maybeScope), onError(std::move(onError))
     {
+        if (maybeScope)
+        {
+            scopes.push_back(maybeScope);
+        }
     }
 
     using Visitor::visit;
@@ -949,10 +979,10 @@ public:
 
     void visit(const pylir::Syntax::FuncDef& funcDef)
     {
-        scopes.push_back(&funcDef.localVariables);
-        auto exit = llvm::make_scope_exit([&] { scopes.pop_back(); });
         auto& def = const_cast<pylir::Syntax::FuncDef&>(funcDef);
         {
+            scopes.push_back(&funcDef.scope);
+            auto exit = llvm::make_scope_exit([&] { scopes.pop_back(); });
             pylir::ValueReset reset(parentDef);
             parentDef = &def;
             Visitor::visit(funcDef);
@@ -963,32 +993,22 @@ public:
 
 } // namespace
 
-tl::expected<pylir::IdentifierSet, std::string>
-    pylir::Parser::finishNamespace(pylir::Syntax::Suite& suite, const IdentifierSet& nonLocals,
-                                   std::vector<const pylir::IdentifierSet*> scopes)
+tl::expected<void, std::string> pylir::Parser::finishNamespace(Syntax::Suite& suite, Syntax::Scope* maybeScope) const
 {
-    if (auto first = nonLocals.begin(); first != nonLocals.end())
-    {
-        return tl::unexpected{
-            createDiagnosticsBuilder(*first, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, first->getValue())
-                .addLabel(*first, std::nullopt, Diag::ERROR_COLOUR)
-                .emitError()};
-    }
-    NamespaceVisitor visitor{std::move(scopes),
+    NamespaceVisitor visitor(maybeScope,
                              [&](const IdentifierToken& token)
                              {
                                  return createDiagnosticsBuilder(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
                                                                  token.getValue())
                                      .addLabel(token, std::nullopt, Diag::ERROR_COLOUR)
                                      .emitError();
-                             },
-                             m_globals};
+                             });
     visitor.visit(suite);
     if (visitor.error)
     {
         return tl::unexpected{std::move(*visitor.error)};
     }
-    return std::move(visitor.closures);
+    return {};
 }
 
 tl::expected<pylir::Syntax::FuncDef, std::string>
@@ -1054,46 +1074,34 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     m_inLoop = false;
     m_inFunc = true;
     auto suite = parseSuite();
-    IdentifierSet locals;
-    IdentifierSet nonLocals;
-    IdentifierSet closures;
-    IdentifierSet unknowns;
-
-    for (auto& [token, kind] : m_namespace.back().identifiers)
-    {
-        switch (kind)
-        {
-            case Scope::Kind::Local: locals.insert(token); break;
-            case Scope::Kind::NonLocal: nonLocals.insert(token); break;
-            case Scope::Kind::Unknown: unknowns.insert(token); break;
-            default: break;
-        }
-    }
-
-    exit.reset();
     if (!suite)
     {
         return tl::unexpected{std::move(suite).error()};
     }
 
+    auto scope = std::move(m_namespace.back());
+    exit.reset();
     if (m_namespace.empty())
     {
         // this indicates that this funcdef is at global scope or only nested in classes. We now need to resolve any
         // nonlocals inside any nested funcDefs and figure out whether any unknowns are nonlocal or global
 
-        // Unknowns of this funcDef can't be nonlocal as only variables from the global namespace could be in use. Clear
-        // it. CodeGen will issue NameErrors if need be
-        unknowns.clear();
+        for (auto& [iter, kind] : scope.identifiers)
+        {
+            if (kind != Syntax::Scope::NonLocal)
+            {
+                continue;
+            }
+            return tl::unexpected{
+                createDiagnosticsBuilder(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
+                    .addLabel(iter, std::nullopt, Diag::ERROR_COLOUR)
+                    .emitError()};
+        }
 
-        auto error = finishNamespace(*suite, nonLocals, {&locals});
+        auto error = finishNamespace(*suite, &scope);
         if (!error)
         {
             return tl::unexpected{std::move(error.error())};
-        }
-        closures = std::move(*error);
-        for (const auto& iter : closures)
-        {
-            locals.erase(iter);
         }
     }
 
@@ -1108,10 +1116,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
                            std::move(suffix),
                            *colon,
                            std::make_unique<Syntax::Suite>(std::move(*suite)),
-                           std::move(locals),
-                           std::move(nonLocals),
-                           std::move(closures),
-                           std::move(unknowns)};
+                           std::move(scope)};
 }
 
 tl::expected<pylir::Syntax::ClassDef, std::string>
@@ -1155,37 +1160,32 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     }
     m_namespace.emplace_back();
     std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
-    m_namespace.back().classScope = true;
     pylir::ValueReset resetLoop(m_inLoop, m_inLoop);
     pylir::ValueReset resetFunc(m_inFunc, m_inFunc);
     m_inLoop = false;
     m_inFunc = false;
     auto suite = parseSuite();
-    IdentifierSet nonLocals;
-    IdentifierSet locals;
-    IdentifierSet unknowns;
-
-    for (auto& [token, kind] : m_namespace.back().identifiers)
-    {
-        switch (kind)
-        {
-            case Scope::Kind::NonLocal: nonLocals.insert(token); break;
-            case Scope::Kind::Local: locals.insert(token); break;
-            case Scope::Kind::Unknown: unknowns.insert(token); break;
-            default: break;
-        }
-    }
-
     if (!suite)
     {
         return tl::unexpected{std::move(suite).error()};
     }
+
+    auto scope = std::move(m_namespace.back());
     exit.reset();
     if (m_namespace.empty())
     {
-        // unknowns can't be nonlocal because locals don't exist at global scope anymore
-        unknowns.clear();
-        if (auto error = finishNamespace(*suite, nonLocals); !error)
+        for (auto& [iter, kind] : scope.identifiers)
+        {
+            if (kind != Syntax::Scope::NonLocal)
+            {
+                continue;
+            }
+            return tl::unexpected{
+                createDiagnosticsBuilder(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
+                    .addLabel(iter, std::nullopt, Diag::ERROR_COLOUR)
+                    .emitError()};
+        }
+        if (auto error = finishNamespace(*suite); !error)
         {
             return tl::unexpected{std::move(error.error())};
         }
@@ -1197,7 +1197,5 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
                             std::move(inheritance),
                             *colon,
                             std::make_unique<Syntax::Suite>(std::move(*suite)),
-                            std::move(locals),
-                            std::move(nonLocals),
-                            std::move(unknowns)};
+                            std::move(scope)};
 }
