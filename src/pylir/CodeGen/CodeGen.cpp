@@ -64,13 +64,13 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_builder.setInsertionPointToEnd(m_module.getBody());
     {
+        auto moduleBeginLoc = changeLoc(fileInput, m_document->getStartOfFileLoc());
         for (const auto& token : fileInput.globals)
         {
             auto locExit = changeLoc(token);
             auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()) + "$handle");
             m_globalScope.identifiers.emplace(token.getValue(), Identifier{op.getOperation()});
         }
-        m_builder.setCurrentLoc(m_builder.getUnknownLoc());
 
         auto initFunc = mlir::func::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__",
                                                    m_builder.getFunctionType({}, {}));
@@ -101,6 +101,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 
     if (m_qualifiers == "builtins.")
     {
+        auto locExit = changeLoc(fileInput, m_document->getEndOfFileLoc());
         createBuiltinsImpl();
         createCompilerBuiltinsImpl();
     }
