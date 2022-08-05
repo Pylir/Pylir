@@ -17,6 +17,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Diagnostics.h>
 #include <mlir/IR/OwningOpRef.h>
+#include <mlir/IR/Verifier.h>
 #include <mlir/Parser/Parser.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
@@ -237,6 +238,10 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             }
 #ifndef NDEBUG
             manager.enableVerifier();
+            if (mlir::failed(mlir::verify(*mlirModule)))
+            {
+                return mlir::failure();
+            }
     #if !defined(__MINGW32_MAJOR_VERSION) || !defined(__clang__)
             manager.enableCrashReproducerGeneration("failure.mlir");
     #endif
