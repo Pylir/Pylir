@@ -18,12 +18,9 @@
 #include <locale>
 #include <unordered_map>
 
-pylir::Lexer::Lexer(const Diag::Document& document, int fieldId,
+pylir::Lexer::Lexer(const Diag::Document& document,
                     std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback)
-    : m_fileId(fieldId),
-      m_document(&document),
-      m_current(m_document->begin()),
-      m_warningCallback(std::move(warningCallback))
+    : m_document(&document), m_current(m_document->begin()), m_warningCallback(std::move(warningCallback))
 {
 }
 
@@ -349,7 +346,7 @@ bool pylir::Lexer::parseNext()
                 m_current++;
                 if (m_depth == 0)
                 {
-                    m_tokens.emplace_back(offset, 1, m_fileId, TokenType::Newline);
+                    m_tokens.emplace_back(offset, 1, TokenType::Newline);
                     parseIndent();
                     break;
                 }
@@ -363,7 +360,7 @@ bool pylir::Lexer::parseNext()
                     auto builder =
                         createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
                             .addLabel(m_current - m_document->begin(), "\\n", Diag::INSERT_COLOUR);
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(), m_fileId,
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(),
                                           TokenType::SyntaxError, builder.emitError());
                     return true;
                 }
@@ -374,7 +371,7 @@ bool pylir::Lexer::parseNext()
                                                  Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
                             .addLabel(m_current - m_document->begin(), "\\n", Diag::INSERT_COLOUR,
                                       Diag::emphasis::strikethrough);
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(), m_fileId,
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(),
                                           TokenType::SyntaxError, builder.emitError());
                     return true;
                 }
@@ -389,13 +386,13 @@ bool pylir::Lexer::parseNext()
                 {
                     if (auto opt = parseLiteral(false, false))
                     {
-                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                              TokenType::StringLiteral, std::move(*opt));
+                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::StringLiteral,
+                                              std::move(*opt));
                     }
                     else
                     {
-                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                              TokenType::SyntaxError, std::move(opt).error());
+                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
+                                              std::move(opt).error());
                     }
                 }
                 else
@@ -410,13 +407,13 @@ bool pylir::Lexer::parseNext()
             {
                 if (auto opt = parseLiteral(false, false))
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                          TokenType::StringLiteral, std::move(*opt));
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::StringLiteral,
+                                          std::move(*opt));
                 }
                 else
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                          TokenType::SyntaxError, std::move(opt).error());
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
+                                          std::move(opt).error());
                 }
                 break;
             }
@@ -450,12 +447,12 @@ bool pylir::Lexer::parseNext()
                         m_current = std::next(m_current);
                         if (auto opt = parseLiteral(true, false))
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
                                                   TokenType::StringLiteral, std::move(*opt));
                         }
                         else
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
                                                   TokenType::SyntaxError, std::move(opt).error());
                         }
                         break;
@@ -479,12 +476,12 @@ bool pylir::Lexer::parseNext()
                         }
                         if (auto opt = parseLiteral(true, true))
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
                                                   TokenType::ByteLiteral, std::move(*opt));
                         }
                         else
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
+                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
                                                   TokenType::SyntaxError, std::move(opt).error());
                         }
                         break;
@@ -523,13 +520,13 @@ bool pylir::Lexer::parseNext()
                 }
                 if (auto opt = parseLiteral(raw, true))
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                          TokenType::ByteLiteral, std::move(*opt));
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::ByteLiteral,
+                                          std::move(*opt));
                 }
                 else
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId,
-                                          TokenType::SyntaxError, std::move(opt).error());
+                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
+                                          std::move(opt).error());
                 }
                 break;
             }
@@ -554,7 +551,7 @@ bool pylir::Lexer::parseNext()
                    || *std::next(m_current) > U'9')
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::Dot);
+                    m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::Dot);
                     break;
                 }
                 [[fallthrough]];
@@ -578,17 +575,17 @@ bool pylir::Lexer::parseNext()
                 if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, TokenType::MinusAssignment);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, TokenType::MinusAssignment);
                 }
                 else if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'>')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, TokenType::Arrow);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, TokenType::Arrow);
                 }
                 else
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::Minus);
+                    m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::Minus);
                 }
                 break;
             }
@@ -619,12 +616,12 @@ bool pylir::Lexer::parseNext()
                 if (std::next(m_current) == m_document->end() || *std::next(m_current) != U'=')
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, normal);
+                    m_tokens.emplace_back(start - m_document->begin(), 1, normal);
                 }
                 else if (std::next(m_current) != m_document->end())
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, assignment);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, assignment);
                 }
                 break;
             }
@@ -658,34 +655,34 @@ bool pylir::Lexer::parseNext()
                     if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
                     {
                         std::advance(m_current, 2);
-                        m_tokens.emplace_back(start - m_document->begin(), 3, m_fileId, twiceAss);
+                        m_tokens.emplace_back(start - m_document->begin(), 3, twiceAss);
                     }
                     else
                     {
                         m_current++;
-                        m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, twice);
+                        m_tokens.emplace_back(start - m_document->begin(), 2, twice);
                     }
                 }
                 else if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, singleAss);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, singleAss);
                 }
                 else
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, single);
+                    m_tokens.emplace_back(start - m_document->begin(), 1, single);
                 }
                 break;
             }
             case U'~':
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::BitNegate);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::BitNegate);
                 break;
             case U'(':
                 m_depth++;
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenParentheses);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::OpenParentheses);
                 break;
             case U')':
                 if (m_depth != 0)
@@ -693,12 +690,12 @@ bool pylir::Lexer::parseNext()
                     m_depth--;
                 }
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseParentheses);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::CloseParentheses);
                 break;
             case U'[':
                 m_depth++;
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenSquareBracket);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::OpenSquareBracket);
                 break;
             case U']':
                 if (m_depth != 0)
@@ -706,12 +703,12 @@ bool pylir::Lexer::parseNext()
                     m_depth--;
                 }
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseSquareBracket);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::CloseSquareBracket);
                 break;
             case U'{':
                 m_depth++;
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::OpenBrace);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::OpenBrace);
                 break;
             case U'}':
                 if (m_depth != 0)
@@ -719,21 +716,21 @@ bool pylir::Lexer::parseNext()
                     m_depth--;
                 }
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::CloseBrace);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::CloseBrace);
                 break;
             case U',':
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::Comma);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::Comma);
                 break;
             case U';':
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, m_fileId, TokenType::SemiColon);
+                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::SemiColon);
                 break;
             case U'!':
                 if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, m_fileId, TokenType::NotEqual);
+                    m_tokens.emplace_back(start - m_document->begin(), 2, TokenType::NotEqual);
                     break;
                 }
                 [[fallthrough]];
@@ -752,7 +749,7 @@ bool pylir::Lexer::parseNext()
     } while (m_current != m_document->end());
     if (m_current == m_document->end())
     {
-        m_tokens.emplace_back(m_current - m_document->begin(), 0, m_fileId, TokenType::Newline);
+        m_tokens.emplace_back(m_current - m_document->begin(), 0, TokenType::Newline);
         parseIndent();
     }
     return true;
@@ -766,8 +763,7 @@ void pylir::Lexer::parseIdentifier()
         auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_CHARACTER_N,
                                                 Text::toUTF8String({&*m_current, 1}))
                            .addLabel(m_current - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
-        m_tokens.emplace_back(m_current - m_document->begin(), 1, m_fileId, TokenType::SyntaxError,
-                              builder.emitError());
+        m_tokens.emplace_back(m_current - m_document->begin(), 1, TokenType::SyntaxError, builder.emitError());
         m_current++;
         return;
     }
@@ -815,7 +811,7 @@ void pylir::Lexer::parseIdentifier()
     };
     if (auto result = keywords.find(utf32); result != keywords.end())
     {
-        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, result->second);
+        m_tokens.emplace_back(start - m_document->begin(), m_current - start, result->second);
         return;
     }
 
@@ -823,8 +819,7 @@ void pylir::Lexer::parseIdentifier()
     [[maybe_unused]] bool ok;
     auto utf8 = Text::toUTF8String(normalized, &ok);
     PYLIR_ASSERT(ok);
-    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Identifier,
-                          std::move(utf8));
+    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::Identifier, std::move(utf8));
 }
 
 namespace
@@ -1329,8 +1324,7 @@ void pylir::Lexer::parseNumber()
             createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
                 .addLabel(end - 1 - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR)
                 .addLabel(start - m_document->begin(), end - m_document->begin() - 2, std::nullopt, Diag::ERROR_COMPLY);
-        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
-                              builder.emitError());
+        m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError, builder.emitError());
         return;
     }
     std::string text;
@@ -1355,8 +1349,8 @@ void pylir::Lexer::parseNumber()
                                          Diag::ERROR_COMPLY)
                                .addLabel(m_current - m_document->begin(), suffixEnd - m_document->begin() - 1,
                                          std::nullopt, Diag::ERROR_COLOUR, Diag::emphasis::strikethrough);
-            m_tokens.emplace_back(m_current - m_document->begin(), suffixEnd - m_current, m_fileId,
-                                  TokenType::SyntaxError, builder.emitError());
+            m_tokens.emplace_back(m_current - m_document->begin(), suffixEnd - m_current, TokenType::SyntaxError,
+                                  builder.emitError());
             m_current = suffixEnd;
             return;
         }
@@ -1368,7 +1362,7 @@ void pylir::Lexer::parseNumber()
         if (radix == 10 && m_current != m_document->end() && (*m_current == U'j' || *m_current == U'J'))
         {
             m_current++;
-            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::ComplexLiteral,
+            m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::ComplexLiteral,
                                   integer.roundToDouble());
             checkSuffix();
             return;
@@ -1386,12 +1380,11 @@ void pylir::Lexer::parseNumber()
                     .addNote(numberStart - m_document->begin(), Diag::REMOVE_LEADING_ZEROS)
                     .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin() - 1, std::nullopt,
                               Diag::NOTE_COMPLY, Diag::emphasis::strikethrough);
-            m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+            m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError,
                                   builder.emitError());
             return;
         }
-        m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::IntegerLiteral,
-                              std::move(integer));
+        m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::IntegerLiteral, std::move(integer));
         checkSuffix();
         return;
     }
@@ -1430,7 +1423,7 @@ void pylir::Lexer::parseNumber()
                                .addLabel(start - m_document->begin(), end - m_document->begin() - 1, std::nullopt,
                                          Diag::ERROR_COMPLY)
                                .addLabel(end - m_document->begin(), std::nullopt, Diag::ERROR_COLOUR);
-            m_tokens.emplace_back(start - m_document->begin(), end - start, m_fileId, TokenType::SyntaxError,
+            m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError,
                                   builder.emitError());
             return;
         }
@@ -1479,7 +1472,7 @@ void pylir::Lexer::parseNumber()
         m_current++;
         tokenType = TokenType::ComplexLiteral;
     }
-    m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, tokenType, number);
+    m_tokens.emplace_back(start - m_document->begin(), m_current - start, tokenType, number);
     checkSuffix();
 }
 
@@ -1518,8 +1511,7 @@ void pylir::Lexer::parseIndent()
         std::pair<std::size_t, std::size_t> previous;
         do
         {
-            m_tokens.emplace_back(start - m_document->begin(), start - m_document->begin(), m_fileId,
-                                  TokenType::Dedent);
+            m_tokens.emplace_back(start - m_document->begin(), start - m_document->begin(), TokenType::Dedent);
             previous = m_indentation.top();
             m_indentation.pop();
         } while (indent < m_indentation.top().first);
@@ -1541,13 +1533,13 @@ void pylir::Lexer::parseIndent()
                              m_indentation.top().first)
                     .addLabel(m_tokens[m_indentation.top().second], std::nullopt, Diag::NOTE_COLOUR);
             }
-            m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::SyntaxError,
+            m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
                                   builder.emitError());
         }
     }
     else if (indent > m_indentation.top().first)
     {
-        m_tokens.emplace_back(start - m_document->begin(), m_current - start, m_fileId, TokenType::Indent);
+        m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::Indent);
         m_indentation.emplace(indent, m_tokens.size() - 1);
     }
 }

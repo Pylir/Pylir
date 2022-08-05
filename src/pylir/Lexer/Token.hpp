@@ -120,26 +120,20 @@ enum class TokenType : std::uint8_t
 
 class BaseToken
 {
-    int m_offset;
-    int m_size;
-    int m_fileId;
+    std::uint32_t m_offset;
+    std::uint32_t m_size;
 
 public:
-    BaseToken(int offset, int size, int fileId) : m_offset(offset), m_size(size), m_fileId(fileId) {}
+    BaseToken(std::uint32_t offset, std::uint32_t size) : m_offset(offset), m_size(size) {}
 
-    [[nodiscard]] int getOffset() const
+    [[nodiscard]] std::uint32_t getOffset() const
     {
         return m_offset;
     }
 
-    [[nodiscard]] int getSize() const
+    [[nodiscard]] std::uint32_t getSize() const
     {
         return m_size;
-    }
-
-    [[nodiscard]] int getFileId() const
-    {
-        return m_fileId;
     }
 };
 
@@ -154,8 +148,8 @@ private:
     Variant m_value;
 
 public:
-    Token(int offset, int size, int fileId, TokenType tokenType, Variant value = {})
-        : BaseToken(offset, size, fileId), m_tokenType(tokenType), m_value(std::move(value))
+    Token(uint32_t offset, uint32_t size, TokenType tokenType, Variant value = {})
+        : BaseToken(offset, size), m_tokenType(tokenType), m_value(std::move(value))
     {
     }
 
@@ -176,18 +170,16 @@ class IdentifierToken : public BaseToken
 
     friend struct llvm::DenseMapInfo<IdentifierToken>;
 
-    explicit IdentifierToken(std::string value) : BaseToken(0, 0, 0), m_value(std::move(value)) {}
+    explicit IdentifierToken(std::string value) : BaseToken(0, 0), m_value(std::move(value)) {}
 
 public:
     explicit IdentifierToken(const Token& token)
-        : BaseToken(token.getOffset(), token.getSize(), token.getFileId()),
-          m_value(pylir::get<std::string>(token.getValue()))
+        : BaseToken(token.getOffset(), token.getSize()), m_value(pylir::get<std::string>(token.getValue()))
     {
     }
 
     explicit IdentifierToken(Token&& token)
-        : BaseToken(token.getOffset(), token.getSize(), token.getFileId()),
-          m_value(pylir::get<std::string>(std::move(token).getValue()))
+        : BaseToken(token.getOffset(), token.getSize()), m_value(pylir::get<std::string>(std::move(token).getValue()))
     {
     }
 

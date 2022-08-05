@@ -26,7 +26,6 @@ namespace pylir
 {
 class Lexer
 {
-    int m_fileId;
     std::vector<Token> m_tokens;
     const Diag::Document* m_document;
     Diag::Document::const_iterator m_current;
@@ -54,7 +53,7 @@ public:
     using size_type = std::size_t;
 
     explicit Lexer(
-        const Diag::Document& document, int fileId = 0,
+        const Diag::Document& document,
         std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback = [](auto&&) {});
 
     ~Lexer() = default;

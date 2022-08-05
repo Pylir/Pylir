@@ -252,9 +252,9 @@ class Parser
 
 public:
     explicit Parser(
-        const Diag::Document& document, int fileId = 0,
+        const Diag::Document& document,
         std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> callBack = [](auto&&) {})
-        : m_lexer(document, fileId, std::move(callBack)),
+        : m_lexer(document, std::move(callBack)),
           m_current(m_lexer.begin()),
 #define HANDLE_FEATURE(x)
 #define HANDLE_REQUIRED_FEATURE(x) m_##x{true},

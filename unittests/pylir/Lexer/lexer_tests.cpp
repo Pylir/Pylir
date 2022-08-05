@@ -36,24 +36,22 @@ TEST_CASE("Lex comments", "[Lexer]")
     SECTION("Comment to end of line")
     {
         pylir::Diag::Document document("# comment\n");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         auto& token = result.front();
         CHECK(token.getTokenType() == pylir::TokenType::Newline);
-        CHECK(token.getFileId() == 1);
         CHECK(token.getOffset() == 10);
         CHECK(std::holds_alternative<std::monostate>(token.getValue()));
     }
     SECTION("Comment to end of file")
     {
         pylir::Diag::Document document("# comment");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         auto& token = result.front();
         CHECK(token.getTokenType() == pylir::TokenType::Newline);
-        CHECK(token.getFileId() == 1);
         CHECK(token.getOffset() == 9);
         CHECK(std::holds_alternative<std::monostate>(token.getValue()));
     }
@@ -67,7 +65,7 @@ TEST_CASE("Lex newlines", "[Lexer]")
                                        "Unix\n"
                                        "OldMac\r"
                                        "");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 7);
         CHECK(result[0].getTokenType() == pylir::TokenType::Identifier);
@@ -92,7 +90,7 @@ TEST_CASE("Lex newlines", "[Lexer]")
     SECTION("Implicit continuation")
     {
         pylir::Diag::Document document("(\n5\n)");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const auto& token) { return token.getTokenType(); });
@@ -110,7 +108,7 @@ TEST_CASE("Lex line continuation", "[Lexer]")
     {
         pylir::Diag::Document document("\\\n"
                                        "");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         CHECK(result.front().getOffset() == 2); // It should be the EOF newline, not the one after the backslash
@@ -128,7 +126,7 @@ TEST_CASE("Lex identifiers", "[Lexer]")
     SECTION("Unicode")
     {
         pylir::Diag::Document document("株式会社");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
@@ -140,7 +138,7 @@ TEST_CASE("Lex identifiers", "[Lexer]")
     SECTION("Normalized")
     {
         pylir::Diag::Document document("ＫＡＤＯＫＡＷＡ");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
@@ -155,7 +153,7 @@ TEST_CASE("Lex keywords", "[Lexer]")
 {
     pylir::Diag::Document document(
         "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield");
-    pylir::Lexer lexer(document, 1);
+    pylir::Lexer lexer(document);
     std::vector<pylir::TokenType> result;
     std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                    [](const pylir::Token& token) { return token.getTokenType(); });
@@ -393,7 +391,7 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Decimal")
     {
         pylir::Diag::Document document("30");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -405,7 +403,7 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Binary")
     {
         pylir::Diag::Document document("0b10");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -417,7 +415,7 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Octal")
     {
         pylir::Diag::Document document("0o30");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -429,7 +427,7 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Hex")
     {
         pylir::Diag::Document document("0x30");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -441,7 +439,7 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Underline")
     {
         pylir::Diag::Document document("0x_3_0");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -454,7 +452,7 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Null")
     {
         pylir::Diag::Document document("0000000000000");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -472,7 +470,7 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Normal")
     {
         pylir::Diag::Document document("3.14");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -484,7 +482,7 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Trailing dot")
     {
         pylir::Diag::Document document("10.");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -496,7 +494,7 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Leading dot")
     {
         pylir::Diag::Document document(".001");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -508,7 +506,7 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Exponent")
     {
         pylir::Diag::Document document("1e100");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -520,7 +518,7 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Neg exponent")
     {
         pylir::Diag::Document document("3.14e-10");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -532,7 +530,7 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("0")
     {
         pylir::Diag::Document document("0e0");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -544,7 +542,7 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Underlines")
     {
         pylir::Diag::Document document("3.14_15_93");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -561,7 +559,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Normal")
     {
         pylir::Diag::Document document("3.14j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -573,7 +571,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Trailing dot")
     {
         pylir::Diag::Document document("10.j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -585,7 +583,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Integer")
     {
         pylir::Diag::Document document("10j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -597,7 +595,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Leading dot")
     {
         pylir::Diag::Document document(".001j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -609,7 +607,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Exponent")
     {
         pylir::Diag::Document document("1e100j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -621,7 +619,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Neg exponent")
     {
         pylir::Diag::Document document("3.14e-10j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -633,7 +631,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("0")
     {
         pylir::Diag::Document document("0e0j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -645,7 +643,7 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Underlines")
     {
         pylir::Diag::Document document("3.14_15_93j");
-        pylir::Lexer lexer(document, 1);
+        pylir::Lexer lexer(document);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -660,7 +658,7 @@ TEST_CASE("Lex operators and delimiters", "[Lexer]")
 {
     pylir::Diag::Document document(
         "+ - * ** / // % @ << >> & | ^ ~ := < > <= >= == != ( ) [ ] { } , : . ; @ = -> += -= *= /= //= %= @= &= |= ^= >>= <<= **=");
-    pylir::Lexer lexer(document, 1);
+    pylir::Lexer lexer(document);
     std::vector<pylir::TokenType> result;
     std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                    [](const pylir::Token& token) { return token.getTokenType(); });
