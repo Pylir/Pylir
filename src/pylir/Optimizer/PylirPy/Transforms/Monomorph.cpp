@@ -1659,7 +1659,7 @@ void Monomorph::runOnOperation()
                 }
 
                 auto* newCall = setCallee(call, mlir::FlatSymbolRefAttr::get(calleeClone.function));
-                if (newCall)
+                if (newCall && thisClone.function != thisFunc.function)
                 {
                     // call is now invalid, but it's still contained within the mapping. Have to update it.
                     thisClone.mapping.map(origCall->getResults(), newCall->getResults());
