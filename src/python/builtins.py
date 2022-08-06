@@ -286,5 +286,18 @@ class list:
 
 
 @pylir.intr.const_export
+def repr(arg):
+    mro = pylir.intr.type.mro(type(arg))
+    t = pylir.intr.mroLookup(mro, "__repr__")
+    if not t[1]:
+        raise TypeError
+    res = unary_method_call(t[0], arg)
+    mro = pylir.intr.type.mro(type(res))
+    if not pylir.intr.tuple.contains(mro, str):
+        raise TypeError
+    return res
+
+
+@pylir.intr.const_export
 def id(obj):
     return pylir.intr.object.id(obj)
