@@ -13,6 +13,7 @@ import pylir.intr.dict
 import pylir.intr.tuple
 import pylir.intr.int
 import pylir.intr.bool
+import pylir.intr.list
 
 
 # TODO: replace with more generic method_call once we have proper iter and
@@ -275,6 +276,13 @@ class bool(int):
 
     def __repr__(self):
         return "True" if self else "False"
+
+
+@pylir.intr.const_export
+class list:
+
+    def __len__(self):
+        return pylir.intr.list.len(self)
 
 
 @pylir.intr.const_export

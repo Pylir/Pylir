@@ -416,21 +416,6 @@ void pylir::CodeGen::createBuiltinsImpl()
                                               });
         });
 
-    createClass(m_builder.getListBuiltin(), {},
-                [&](SlotMapImpl& slots)
-                {
-                    slots["__len__"] =
-                        createFunction("builtins.list.__len__", {{"", FunctionParameter::PosOnly, false}},
-                                       [&](mlir::ValueRange functionArguments)
-                                       {
-                                           auto self = functionArguments[0];
-                                           // TODO: maybe check its list
-                                           auto len = m_builder.createListLen(self);
-                                           auto integer = m_builder.createIntFromInteger(len);
-                                           m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{integer});
-                                       });
-                });
-
     createFunction(
         m_builder.getPrintBuiltin().getValue(),
         {
