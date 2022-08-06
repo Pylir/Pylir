@@ -90,7 +90,7 @@ std::string genAttrConversion(mlir::raw_indented_ostream& os, std::string inputV
     {
         auto failureScope = os.scope("{\n", "}\n");
         // TODO: actual diagnostic
-        os << "return {};\n";
+        os << "PYLIR_UNREACHABLE;\n";
     }
     if (attr.getDefName() == "StrAttr")
     {
@@ -103,7 +103,7 @@ std::string genAttrConversion(mlir::raw_indented_ostream& os, std::string inputV
     {
         auto failureScope = os.scope("{\n", "}\n");
         // TODO: actual diagnostic
-        os << "return {};\n";
+        os << "PYLIR_UNREACHABLE;\n";
     }
     return llvm::formatv("{0}::get(m_builder.getContext(), *value)", enumAttr.getStorageType());
 }
@@ -135,7 +135,7 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
             {
                 auto ifScope = os.scope("{\n", "}\n");
                 // TODO: emit proper diagnostic
-                os << "return {};\n";
+                os << "PYLIR_UNREACHABLE;\n";
             }
         }
         os << "::llvm::SmallVector<::mlir::Value> operands;\n";
