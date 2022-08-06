@@ -883,6 +883,10 @@ public:
         {
             return builder.create<mlir::LLVM::AddressOfOp>(loc, m_objectPtrType, ref);
         }
+        if (attribute.isa<pylir::Py::UnboundAttr>())
+        {
+            return builder.create<mlir::LLVM::NullOp>(loc, m_objectPtrType);
+        }
 
         return address = builder.create<mlir::LLVM::AddressOfOp>(
                    loc, m_objectPtrType,
@@ -1479,12 +1483,7 @@ struct ConstantOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Cons
     mlir::LogicalResult matchAndRewrite(pylir::Py::ConstantOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        if (auto unbound = adaptor.getConstant().dyn_cast<pylir::Py::UnboundAttr>())
-        {
-            rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
-            return mlir::success();
-        }
-        auto value = getConstant(op.getLoc(), op.getConstant(), rewriter);
+        auto value = getConstant(op.getLoc(), adaptor.getConstant(), rewriter);
         rewriter.replaceOp(op, {value});
         return mlir::success();
     }
