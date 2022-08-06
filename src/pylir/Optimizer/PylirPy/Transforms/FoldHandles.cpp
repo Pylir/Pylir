@@ -80,9 +80,13 @@ void FoldHandlesPass::runOnOperation()
         }
 
         // If the single store into the handle is already a reference to a global value there isn't a lot to be done
-        // except replace all loads with such a reference. Otherwise, we create a global value with the constant as
-        // initializer instead of the handle.
-        auto constantStorage = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
+        // except replace all loads with such a reference. Otherwise if not unbound, we create a global value with the
+        // constant as initializer instead of the handle.
+        mlir::Attribute constantStorage = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
+        if (!constantStorage)
+        {
+            constantStorage = attr.dyn_cast<pylir::Py::UnboundAttr>();
+        }
         if (!constantStorage)
         {
             constantStorage = mlir::FlatSymbolRefAttr::get(handle);
