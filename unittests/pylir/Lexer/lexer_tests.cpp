@@ -817,8 +817,7 @@ TEST_CASE("Lex indentation", "[Lexer]")
     {
         pylir::Diag::Document document("foo\n"
                                        "# a comment\n"
-                                       "\tfoobar"
-                                       "\n"
+                                       "\tfoobar\n"
                                        "    # a comment\n"
                                        "[\n"
                                        "# a comment\n"
@@ -839,6 +838,43 @@ TEST_CASE("Lex indentation", "[Lexer]")
         CHECK(result[7] == pylir::TokenType::IntegerLiteral);
         CHECK(result[8] == pylir::TokenType::CloseSquareBracket);
         CHECK(result[9] == pylir::TokenType::Newline);
+    }
+    SECTION("Complete blank")
+    {
+        pylir::Diag::Document document("class bool(int):\n"
+                                       "\n"
+                                       "\tpass");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 11);
+        CHECK(result[0] == pylir::TokenType::ClassKeyword);
+        CHECK(result[1] == pylir::TokenType::Identifier);
+        CHECK(result[2] == pylir::TokenType::OpenParentheses);
+        CHECK(result[3] == pylir::TokenType::Identifier);
+        CHECK(result[4] == pylir::TokenType::CloseParentheses);
+        CHECK(result[5] == pylir::TokenType::Colon);
+        CHECK(result[6] == pylir::TokenType::Newline);
+        CHECK(result[7] == pylir::TokenType::Indent);
+        CHECK(result[8] == pylir::TokenType::PassKeyword);
+        CHECK(result[9] == pylir::TokenType::Newline);
+        CHECK(result[10] == pylir::TokenType::Dedent);
+    }
+    SECTION("Not in depth")
+    {
+        pylir::Diag::Document document("[\n"
+                                       "\t3\n"
+                                       "]");
+        pylir::Lexer lexer(document);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        REQUIRE(result.size() == 4);
+        CHECK(result[0] == pylir::TokenType::OpenSquareBracket);
+        CHECK(result[1] == pylir::TokenType::IntegerLiteral);
+        CHECK(result[2] == pylir::TokenType::CloseSquareBracket);
+        CHECK(result[3] == pylir::TokenType::Newline);
     }
     LEXER_EMITS("foo\n"
                 "    bar\n"
