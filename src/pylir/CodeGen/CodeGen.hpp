@@ -269,7 +269,7 @@ class CodeGen
         {
             return val;
         }
-        auto ref = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
+        auto ref = attr.dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
         if (!ref)
         {
             return nullptr;

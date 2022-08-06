@@ -781,18 +781,28 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Subscription& subscriptio
 
 mlir::Value pylir::CodeGen::toI1(mlir::Value value)
 {
-    auto locExit = changeLoc(value.getLoc());
     auto boolean = toBool(value);
     return m_builder.createBoolToI1(boolean);
 }
 
 mlir::Value pylir::CodeGen::toBool(mlir::Value value)
 {
-    auto locExit = changeLoc(value.getLoc());
     auto boolRef = m_builder.createBoolRef();
+    auto type = m_builder.createTypeOf(value);
+    auto isBool = m_builder.createIs(type, boolRef);
+    BlockPtr continueBlock;
+    continueBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
+    BlockPtr boolCallBlock;
+    m_builder.create<mlir::cf::CondBranchOp>(isBool, continueBlock, value, boolCallBlock, mlir::ValueRange{});
+
+    implementBlock(boolCallBlock);
     auto tuple = m_builder.createMakeTuple({value});
     auto dict = m_builder.createConstant(m_builder.getDictAttr());
-    return m_builder.createPylirCallIntrinsic(boolRef, tuple, dict, m_currentExceptBlock);
+    auto result = m_builder.createPylirCallIntrinsic(boolRef, tuple, dict, m_currentExceptBlock);
+    m_builder.create<mlir::cf::BranchOp>(continueBlock, result);
+
+    implementBlock(continueBlock);
+    return continueBlock->getArgument(0);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::ListDisplay& listDisplay)

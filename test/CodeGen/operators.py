@@ -66,9 +66,15 @@ def boolean_ops(a, b):
     # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
     # CHECK: %[[RES:.*]] = py.call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
     # CHECK: %[[BOOL:.*]] = py.constant(@builtins.bool)
+    # CHECK: %[[TYPE:.*]] = py.typeOf %[[RES]]
+    # CHECK: %[[IS_BOOL:.*]] = py.is %[[TYPE]], %[[BOOL]]
+    # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
+    # CHECK: ^[[CALC_BOOL]]:
     # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[RES]])
     # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
     # CHECK: %[[RES_AS_BOOL:.*]] = py.call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
+    # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
+    # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
     # CHECK: %[[RES_AS_I1:.*]] = py.bool.toI1 %[[RES_AS_BOOL]]
     # CHECK: cf.cond_br %[[RES_AS_I1]], ^[[CALCULATE_B_BLOCK:.*]], ^[[DEST:.*]](%[[RES]] : !py.dynamic)
 
@@ -87,9 +93,15 @@ def boolean_ops(a, b):
     # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
     # CHECK: %[[RES:.*]] = py.call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
     # CHECK: %[[BOOL:.*]] = py.constant(@builtins.bool)
+    # CHECK: %[[TYPE:.*]] = py.typeOf %[[RES]]
+    # CHECK: %[[IS_BOOL:.*]] = py.is %[[TYPE]], %[[BOOL]]
+    # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
+    # CHECK: ^[[CALC_BOOL]]:
     # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[RES]])
     # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
     # CHECK: %[[RES_AS_BOOL:.*]] = py.call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
+    # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
+    # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
     # CHECK: %[[RES_AS_I1:.*]] = py.bool.toI1 %[[RES_AS_BOOL]]
     # CHECK: cf.cond_br %[[RES_AS_I1]], ^[[DEST:.*]](%[[RES]] : !py.dynamic), ^[[CALCULATE_B_BLOCK:[[:alnum:]]+]]
 
@@ -105,9 +117,15 @@ def boolean_ops(a, b):
 
     c = not a
     # CHECK: %[[BOOL:.*]] = py.constant(@builtins.bool)
+    # CHECK: %[[TYPE:.*]] = py.typeOf %[[A]]
+    # CHECK: %[[IS_BOOL:.*]] = py.is %[[TYPE]], %[[BOOL]]
+    # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[A]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
+    # CHECK: ^[[CALC_BOOL]]:
     # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[A]])
     # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
     # CHECK: %[[RES_AS_BOOL:.*]] = py.call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
+    # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
+    # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
     # CHECK: %[[RES_AS_I1:.*]] = py.bool.toI1 %[[RES_AS_BOOL]]
     # CHECK: %[[TRUE:.*]] = arith.constant true
     # CHECK: %[[INVERTED:.*]] = arith.xori %[[TRUE]], %[[RES_AS_I1]]

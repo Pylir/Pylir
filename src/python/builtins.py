@@ -11,6 +11,18 @@ import pylir.intr.type
 import pylir.intr.function
 import pylir.intr.dict
 import pylir.intr.tuple
+import pylir.intr.int
+import pylir.intr.bool
+
+
+# TODO: replace with more generic method_call once we have proper iter and
+#       dictionary unpacking
+def unary_method_call(method, obj):
+    mro = pylir.intr.type.mro(type(method))
+    t = pylir.intr.mroLookup(mro, "__get__")
+    if t[1]:
+        method = t[0](obj, type(obj))
+    return method(obj)
 
 
 @pylir.intr.const_export
@@ -204,6 +216,65 @@ class tuple:
             res = pylir.intr.str.concat(res, ", ", repr(self[i]))
             i = i + 1
         return pylir.intr.str.concat(res, ")")
+
+
+@pylir.intr.const_export
+class int:
+    def __repr__(self):
+        return pylir.intr.int.toStr(self)
+
+    # TODO: These are the bare minimum and do not take into account the type
+    #       of other.
+    def __add__(self, other):
+        return pylir.intr.int.add(self, other)
+
+    def __eq__(self, other):
+        return pylir.intr.int.cmp("eq", self, other)
+
+    def __ne__(self, other):
+        return pylir.intr.int.cmp("ne", self, other)
+
+    def __lt__(self, other):
+        return pylir.intr.int.cmp("lt", self, other)
+
+    def __le__(self, other):
+        return pylir.intr.int.cmp("le", self, other)
+
+    def __gt__(self, other):
+        return pylir.intr.int.cmp("gt", self, other)
+
+    def __ge__(self, other):
+        return pylir.intr.int.cmp("ge", self, other)
+
+    def __index__(self):
+        return self
+
+    def __bool__(self):
+        return self != 0
+
+
+@pylir.intr.const_export
+class bool(int):
+
+    def __new__(cls, arg=False):
+        mro = pylir.intr.type.mro(type(arg))
+        t = pylir.intr.mroLookup(mro, "__bool__")
+        if not t[1]:
+            # TODO: This should be replaced in the future by dispatching
+            #       to common code used to implement 'len'. We only want to
+            #       return false if the type does not have __len__, but not
+            #       if its implementation raises a TypeError
+            try:
+                return len(arg) != 0
+            except TypeError:
+                return True
+        return unary_method_call(t[0], arg)
+
+    def __bool__(self):
+        return self
+
+    def __repr__(self):
+        return "True" if self else "False"
 
 
 @pylir.intr.const_export
