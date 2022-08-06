@@ -157,3 +157,39 @@ func.func @__init__() -> !py.dynamic {
 // CHECK-NEXT: %[[TYPE:.*]] = py.constant(@builtins.BaseException)
 // CHECK-NEXT: %[[EX:.*]] = py.makeObject %[[TYPE]]
 // CHECK-NEXT: py.raise %[[EX]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.BaseException = #py.type
+py.globalValue const @builtins.tuple = #py.type
+py.globalValue const @builtins.str = #py.type
+py.globalValue const @builtins.dict = #py.type
+py.globalValue const @builtins.function = #py.type
+py.globalValue const @builtins.None = #py.type
+
+py.globalValue "private" @function
+
+func.func @inline_foo() -> !py.dynamic {
+    %0 = py.constant(@builtins.BaseException)
+    %1 = py.makeObject %0
+	py.raise %1
+}
+
+func.func @__init__() -> !py.dynamic {
+	%1 = py.call @inline_foo() : () -> !py.dynamic
+    %r = test.random
+    cf.cond_br %r, ^bb0, ^bb1
+
+^bb0:
+	return %1 : !py.dynamic
+
+^bb1:
+    test.use(%r) : i1
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: @__init__
+// CHECK-NEXT: %[[TYPE:.*]] = py.constant(@builtins.BaseException)
+// CHECK-NEXT: %[[EX:.*]] = py.makeObject %[[TYPE]]
+// CHECK-NEXT: py.raise %[[EX]]

@@ -64,23 +64,16 @@ void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface
 
     preBlock->getOperations().splice(preBlock->end(), firstInlinedBlock->getOperations());
     firstInlinedBlock->erase();
-    if (postBlock->hasNoPredecessors())
+    for (auto [res, arg] : llvm::zip(call->getResults(), postBlock->getArguments()))
     {
-        postBlock->erase();
+        res.replaceAllUsesWith(arg);
     }
-    else
+    if (exceptionHandler)
     {
-        for (auto [res, arg] : llvm::zip(call->getResults(), postBlock->getArguments()))
-        {
-            res.replaceAllUsesWith(arg);
-        }
-        if (exceptionHandler)
-        {
-            mlir::OpBuilder builder(call);
-            builder.create<mlir::cf::BranchOp>(
-                call->getLoc(), exceptionHandler.getHappyPath(),
-                static_cast<mlir::OperandRange>(exceptionHandler.getNormalDestOperandsMutable()));
-        }
-        call.erase();
+        mlir::OpBuilder builder(call);
+        builder.create<mlir::cf::BranchOp>(
+            call->getLoc(), exceptionHandler.getHappyPath(),
+            static_cast<mlir::OperandRange>(exceptionHandler.getNormalDestOperandsMutable()));
     }
+    call.erase();
 }
