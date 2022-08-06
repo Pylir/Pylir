@@ -571,7 +571,7 @@ public:
                 returnType = m_cabi->getInt(&getContext());
                 argumentTypes = {m_objectPtrType, m_objectPtrType};
                 functionName = "mp_cmp";
-                passThroughAttributes = {"inaccessiblememonly", "gc-leaf-function", "nounwind"};
+                passThroughAttributes = {"inaccessiblemem_or_argmemonly", "gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_add:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -584,7 +584,7 @@ public:
                     &getContext(), {getIndexType(), mlir::IntegerType::get(&getContext(), 1)});
                 argumentTypes = {m_objectPtrType, getIndexType()};
                 functionName = "pylir_int_get";
-                passThroughAttributes = {"inaccessiblememonly", "gc-leaf-function", "nounwind"};
+                passThroughAttributes = {"inaccessiblemem_or_argmemonly", "gc-leaf-function", "nounwind"};
                 break;
             case Runtime::pylir_dict_lookup:
                 returnType = m_objectPtrType;
