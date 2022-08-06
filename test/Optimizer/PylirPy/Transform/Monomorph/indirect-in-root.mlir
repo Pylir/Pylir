@@ -23,11 +23,9 @@ func.func @__init__() -> !py.dynamic {
 
 // CHECK-LABEL: func.func @real
 
-// CHECK-LABEL: func.func @stub
-
 // CHECK-LABEL: @__init__
 // CHECK: py.call @[[REAL_CLONE:.*]](%{{.*}})
 
 // CHECK: func.func private @[[REAL_CLONE:([[:alnum:]]|_)+]]
-// CHECK: %[[TYPE:.*]] = py.constant(@builtins.int)
+// CHECK: %[[TYPE:.*]] = py.constant(@builtins.function)
 // CHECK: return %[[TYPE]]
