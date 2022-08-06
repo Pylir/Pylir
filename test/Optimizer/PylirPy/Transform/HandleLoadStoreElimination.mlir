@@ -148,3 +148,34 @@ func.func @test() -> !py.dynamic {
 
 // -----
 
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+py.globalHandle @foo
+
+func.func @test() -> !py.dynamic {
+    %0 = py.constant(#py.str<"value">)
+    py.store %0 into @foo
+    %r = test.random
+    cf.cond_br %r, ^bb0, ^bb1
+
+^bb0:
+    %1 = py.constant(#py.str<"other">)
+    py.store %1 into @foo
+    cf.br ^bb1
+
+^bb1:
+    cf.br ^bb2
+
+^bb2:
+    %2 = py.load @foo
+    return %2 : !py.dynamic
+}
+
+// CHECK-LABEL:  func @test
+// CHECK: %[[C1:.*]] = py.constant(#py.str<"value">)
+// CHECK: cf.cond_br %{{.*}}, ^{{.*}}, ^[[BB1:.*]](%[[C1]] : !py.dynamic)
+// CHECK: %[[C2:.*]] = py.constant(#py.str<"other">)
+// CHECK: cf.br ^[[BB1]](%[[C2]] : !py.dynamic)
+// CHECK: ^[[BB1]](%[[ARG:.*]]: !py.dynamic):
+// CHECK: return %[[ARG]]

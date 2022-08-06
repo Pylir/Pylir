@@ -33,17 +33,13 @@ void pylir::SSABuilder::sealBlock(mlir::Block* block)
 }
 
 mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
-                                            mlir::Block* block, bool* createdBlockArg)
+                                            mlir::Block* block)
 {
     if (auto result = map.find(block); result != map.end())
     {
-        if (createdBlockArg)
-        {
-            *createdBlockArg = false;
-        }
         return result->second;
     }
-    return readVariableRecursive(loc, type, map, block, createdBlockArg);
+    return readVariableRecursive(loc, type, map, block);
 }
 
 void pylir::SSABuilder::removeBlockArgumentOperands(mlir::BlockArgument argument)
@@ -128,31 +124,23 @@ mlir::Value pylir::SSABuilder::addBlockArguments(DefinitionsMap& map, mlir::Bloc
 }
 
 mlir::Value pylir::SSABuilder::readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
-                                                     mlir::Block* block, bool* createdBlockArg)
+                                                     mlir::Block* block)
 {
     mlir::Value val;
     if (auto result = m_openBlocks.find(block); result != m_openBlocks.end())
     {
         val = block->addArgument(type, loc);
         result->second.emplace_back(&map);
-        if (createdBlockArg)
-        {
-            *createdBlockArg = true;
-        }
     }
     else if (auto* pred = block->getUniquePredecessor())
     {
-        val = readVariable(loc, type, map, pred, createdBlockArg);
+        val = readVariable(loc, type, map, pred);
     }
     else
     {
         val = block->addArgument(type, loc);
         map[block] = val;
         val = addBlockArguments(map, val.cast<mlir::BlockArgument>());
-        if (createdBlockArg)
-        {
-            *createdBlockArg = true;
-        }
     }
     map[block] = val;
     return val;

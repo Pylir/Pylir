@@ -30,11 +30,41 @@ protected:
     void runOnOperation() override;
 
 private:
-    bool optimizeBlock(mlir::Block& block, mlir::Value clobberTracker,
-                       llvm::DenseMap<mlir::Block*, BlockData>& blockArgUsages,
+    bool optimizeBlock(mlir::Block& block, mlir::Value clobberTracker, BlockData& blockArgUsages,
                        llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap>& definitions,
                        pylir::SSABuilder& ssaBuilder);
 };
+
+bool dependsOnClobber(mlir::BlockArgument argument, mlir::Value clobber,
+                      llvm::SmallDenseMap<mlir::BlockArgument, bool, 8>& seen)
+{
+    auto [result, inserted] = seen.insert({argument, false});
+    if (!inserted)
+    {
+        return result->second;
+    }
+    auto* block = argument.getParentBlock();
+    for (auto iter = block->pred_begin(); iter != block->pred_end(); iter++)
+    {
+        auto branch = llvm::dyn_cast<mlir::BranchOpInterface>((*iter)->getTerminator());
+        if (!branch)
+        {
+            // Conservative result.
+            return result->second = true;
+        }
+        auto operands = branch.getSuccessorOperands(iter.getSuccessorIndex());
+        auto op = operands[argument.getArgNumber()];
+        if (op == clobber)
+        {
+            return result->second = true;
+        }
+        if (auto newArg = op.dyn_cast_or_null<mlir::BlockArgument>(); newArg && dependsOnClobber(newArg, clobber, seen))
+        {
+            return result->second = true;
+        }
+    }
+    return false;
+}
 
 void HandleLoadStoreEliminationPass::runOnOperation()
 {
@@ -48,7 +78,7 @@ void HandleLoadStoreEliminationPass::runOnOperation()
     }
     for (auto& region : topLevel->getRegions())
     {
-        llvm::DenseMap<mlir::Block*, BlockData> blockArgUsages;
+        BlockData blockArgUsages;
         llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap> definitions;
         pylir::SSABuilder ssaBuilder([&clobberTracker](mlir::BlockArgument) -> mlir::Value
                                      { return clobberTracker->getResult(0); });
@@ -59,54 +89,52 @@ void HandleLoadStoreEliminationPass::runOnOperation()
                                                               definitions, ssaBuilder);
                                  });
 
-        for (auto& [block, blockData] : blockArgUsages)
+        llvm::SmallDenseMap<mlir::BlockArgument, bool, 8> blockArgsClobber;
+        for (auto& [load, tracker] : blockArgUsages.candidates)
         {
-            for (auto& [load, tracker] : blockData.candidates)
+            mlir::Value value = tracker;
+            if (value == clobberTracker->getResult(0))
             {
-                mlir::Value value = tracker;
-                if (value == clobberTracker->getResult(0))
-                {
-                    continue;
-                }
-                auto blockArg = value.dyn_cast<mlir::BlockArgument>();
-                if (!blockArg)
-                {
-                    // Simplification has lead to the block argument being simplified to a single value which is not
-                    // a clobber
-                    load.replaceAllUsesWith(value);
-                    load->erase();
-                    changed = true;
-                    continue;
-                }
-                llvm::SmallVector<mlir::SuccessorOperands> blockArgOperands;
-                bool hasClobber = false;
-                for (auto pred = block->pred_begin(); pred != block->pred_end(); pred++)
-                {
-                    auto terminator = mlir::dyn_cast<mlir::BranchOpInterface>((*pred)->getTerminator());
-                    PYLIR_ASSERT(terminator);
-                    auto ops = terminator.getSuccessorOperands(pred.getSuccessorIndex());
-                    blockArgOperands.emplace_back(ops);
-                    if (ops[blockArg.getArgNumber()] == clobberTracker->getResult(0))
-                    {
-                        hasClobber = true;
-                    }
-                }
-                if (!hasClobber)
-                {
-                    changed = true;
-                    load.replaceAllUsesWith(value);
-                    load->erase();
-                    continue;
-                }
-                // the block argument persistent and one of the inputs is a clobber. The load is therefore not
-                // redundant as it has to reload and the block argument should be removed instead
-                for (auto& range : blockArgOperands)
-                {
-                    range.erase(blockArg.getArgNumber());
-                }
-                tracker = mlir::Value{};
-                blockArg.getOwner()->eraseArgument(blockArg.getArgNumber());
+                continue;
             }
+            auto blockArg = value.dyn_cast<mlir::BlockArgument>();
+            if (!blockArg)
+            {
+                // Simplification has lead to the block argument being simplified to a single value which is not
+                // a clobber
+                load.replaceAllUsesWith(value);
+                load->erase();
+                changed = true;
+                continue;
+            }
+
+            // Only if the block argument does not depend on clobbers is it safe to replae the load with it. Otherwise,
+            // a re-load is required.
+            if (!dependsOnClobber(blockArg, clobberTracker->getResult(0), blockArgsClobber))
+            {
+                changed = true;
+                load.replaceAllUsesWith(value);
+                load->erase();
+                continue;
+            }
+        }
+
+        // Any block args that depend on the clobberTracker, and hence are unused by normal IR, have to now be deleted.
+        for (auto& [blockArg, clobbered] : blockArgsClobber)
+        {
+            if (!clobbered)
+            {
+                continue;
+            }
+            for (auto pred = blockArg.getOwner()->pred_begin(); pred != blockArg.getOwner()->pred_end(); pred++)
+            {
+                auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
+                terminator.getSuccessorOperands(pred.getSuccessorIndex()).erase(blockArg.getArgNumber());
+            }
+            // Other block args that we will be deleting, but haven't yet, might still have a use of this block arg.
+            // Drop those.
+            blockArg.dropAllUses();
+            blockArg.getOwner()->eraseArgument(blockArg.getArgNumber());
         }
     }
     if (!changed)
@@ -118,7 +146,7 @@ void HandleLoadStoreEliminationPass::runOnOperation()
 }
 
 bool HandleLoadStoreEliminationPass::optimizeBlock(
-    mlir::Block& block, mlir::Value clobberTracker, llvm::DenseMap<mlir::Block*, BlockData>& blockArgUsages,
+    mlir::Block& block, mlir::Value clobberTracker, BlockData& blockArgUsages,
     llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap>& definitions, pylir::SSABuilder& ssaBuilder)
 {
     bool changed = false;
@@ -129,18 +157,20 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
         {
             unusedStores.erase(load.getHandleAttr());
             auto& map = definitions[load.getHandleAttr()];
-            bool createdBlockArg;
-            auto read = ssaBuilder.readVariable(load->getLoc(), load.getType(), map, &block, &createdBlockArg);
+            auto read = ssaBuilder.readVariable(load->getLoc(), load.getType(), map, &block);
             if (read == clobberTracker)
             {
                 // Make a definition to avoid reloads
                 map[&block] = load;
                 continue;
             }
-            if (createdBlockArg)
+            // If it's a block arg we can't immediately replace it as it might still be clobbered from one of the
+            // predecessor branches. We record these for now and instead handle them after having traversed every block.
+            // Also making a definition in case this load does remain, so that there are no reloads.
+            if (read.isa<mlir::BlockArgument>())
             {
                 map[&block] = load;
-                blockArgUsages[&block].candidates.emplace_back(load, read);
+                blockArgUsages.candidates.emplace_back(load, read);
                 continue;
             }
 
