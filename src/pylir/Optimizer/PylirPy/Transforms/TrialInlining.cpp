@@ -360,15 +360,14 @@ protected:
         }
 
         TrialDataBase dataBase;
-        if (mlir::failed(mlir::failableParallelForEach(&getContext(), functions,
-                                                       [&](const auto& iter)
-                                                       {
-                                                           mlir::OpPassManager copy = m_passManager;
-                                                           return optimize(iter, dataBase, originalCallables, copy);
-                                                       })))
+        for (auto& iter : functions)
         {
-            signalPassFailure();
-            return;
+            mlir::OpPassManager copy = m_passManager;
+            if (mlir::failed(optimize(iter, dataBase, originalCallables, copy)))
+            {
+                signalPassFailure();
+                return;
+            }
         }
     }
 
