@@ -7,6 +7,7 @@
 #ifndef PYLIR_PY_TYPES_TABLEGEN
 #define PYLIR_PY_TYPES_TABLEGEN
 
+include "mlir/IR/SubElementInterfaces.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/Util/TablegenUtil.td"
 include "pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.td"
@@ -28,7 +29,7 @@ def PylirPy_UnboundType : PylirPy_ObjectType<"Unbound"> {
     }];
 }
 
-def PylirPy_ClassType : PylirPy_ObjectType<"Class"> {
+def PylirPy_ClassType : PylirPy_ObjectType<"Class", [DeclareTypeInterfaceMethods<SubElementTypeInterface>]> {
 	let mnemonic = "class";
 	let summary = "class type";
 
@@ -41,7 +42,7 @@ def PylirPy_ClassType : PylirPy_ObjectType<"Class"> {
 	let assemblyFormat = "`<` $typeObject `>`";
 }
 
-def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
+def PylirPy_TupleType : PylirPy_ObjectType<"Tuple", [DeclareTypeInterfaceMethods<SubElementTypeInterface>]> {
 	let mnemonic = "tuple";
 	let summary = "tuple type";
 
@@ -61,7 +62,7 @@ def PylirPy_TupleType : PylirPy_ObjectType<"Tuple"> {
 	let assemblyFormat = "`<` $elements (`,` $typeObject^)? `>`";
 }
 
-def PylirPy_VariantType : PylirPy_ObjectType<"Variant"> {
+def PylirPy_VariantType : PylirPy_ObjectType<"Variant", [DeclareTypeInterfaceMethods<SubElementTypeInterface>]> {
 	let mnemonic = "variant";
 	let summary = "variant type";
 

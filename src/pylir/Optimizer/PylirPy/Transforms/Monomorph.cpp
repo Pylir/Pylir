@@ -31,6 +31,8 @@
 #include "PassDetail.hpp"
 #include "Passes.hpp"
 
+#define DEBUG_TYPE "monomorph"
+
 namespace
 {
 class Monomorph : public MonomorphBase<Monomorph>
@@ -61,6 +63,29 @@ struct FunctionSpecialization
         return !(rhs == *this);
     }
 };
+
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, FunctionSpecialization& specialization)
+{
+    os << specialization.function.getName() << '(';
+    llvm::interleaveComma(specialization.argTypes, os,
+                          [&](TypeFlowArgValue value)
+                          {
+                              if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                              {
+                                  os << ref;
+                              }
+                              else if (auto type = value.dyn_cast<pylir::Py::ObjectTypeInterface>())
+                              {
+                                  os << type;
+                              }
+                              else
+                              {
+                                  os << "<<NULL>>";
+                              }
+                          });
+    os << ')';
+    return os;
+}
 
 } // namespace
 
@@ -562,6 +587,11 @@ class Orchestrator
     friend class InQueueCount;
 
 public:
+    [[nodiscard]] llvm::StringRef getName() const
+    {
+        return m_typeFlowIR.getFunction().getName();
+    }
+
     [[nodiscard]] bool finishedExecution() const
     {
         return m_inQueueCount == 0 && m_activeCalls.empty();
@@ -1071,6 +1101,11 @@ class Scheduler
                 }
             }
         }
+        LLVM_DEBUG({
+            llvm::dbgs() << "Recursion detected: ";
+            llvm::interleaveComma(cycle, llvm::dbgs(), [](Orchestrator* orch) { llvm::dbgs() << orch->getName(); });
+            llvm::dbgs() << '\n';
+        });
         auto info = std::make_shared<RecursionInfo>(std::move(containedOrchs));
         for (auto* orch : cycle)
         {
@@ -1180,6 +1215,10 @@ class Scheduler
                           {
                               iter.frame.getValues()[dest] = value;
                           }
+                          LLVM_DEBUG({
+                              llvm::dbgs() << "Queued " << iter.orchestrator->getName() << ": "
+                                           << iter.frame.getNextExecutedOp().getBlock();
+                          });
                           queue.emplace(std::move(iter.frame), iter.orchestrator);
                           iter.orchestrator->removeActiveCaller(orch);
                       });
@@ -1252,6 +1291,9 @@ class Scheduler
             }
             PYLIR_ASSERT(bestCandidate);
 
+            LLVM_DEBUG(
+                { llvm::dbgs() << "Recursion fully expanded; Breaking at " << bestCandidate->getName() << '\n'; });
+
             info->phase = RecursionInfo::Phase::Breaking;
             info->broken = bestCandidate;
             info->seen.insert({bestCandidate->getReturnTypes().begin(), bestCandidate->getReturnTypes().end()});
@@ -1260,7 +1302,27 @@ class Scheduler
         }
     }
 
+    std::size_t m_maxTypeSize;
+    mlir::Pass::Statistic& m_typesOverDefined;
+
+    [[nodiscard]] bool typeIsOverDefined(mlir::Type type) const
+    {
+        auto subElements = type.dyn_cast<mlir::SubElementTypeInterface>();
+        if (!subElements)
+        {
+            return false;
+        }
+        std::size_t counter = 0;
+        subElements.walkSubTypes([&](auto&&) { counter++; });
+        return counter > m_maxTypeSize;
+    }
+
 public:
+    Scheduler(std::size_t maxTypeSize, mlir::Pass::Statistic& typesOverDefined)
+        : m_maxTypeSize(maxTypeSize), m_typesOverDefined(typesOverDefined)
+    {
+    }
+
     /// Run the typeflow analysis starting from the given root functions. These may not take any DynamicType function
     /// arguments.
     void run(llvm::ArrayRef<mlir::FunctionOpInterface> roots, mlir::AnalysisManager moduleManager)
@@ -1281,14 +1343,25 @@ public:
         {
             auto front = std::move(queue.front());
             queue.pop();
+            LLVM_DEBUG({
+                llvm::dbgs() << "Executing " << front.second->getName() << ": ";
+                front.first.getNextExecutedOp().getBlock()->printAsOperand(llvm::dbgs());
+                llvm::dbgs() << "\n";
+            });
             auto result = front.second->execute(front.first, collection);
             if (auto* vec = std::get_if<std::vector<ExecutionFrame>>(&result))
             {
                 if (!vec->empty())
                 {
+                    LLVM_DEBUG({ llvm::dbgs() << "Returned with successors: \n"; });
                     // Successor blocks and this execution round was definitely not the last one from the orchestrator.
                     for (auto& iter : *vec)
                     {
+                        LLVM_DEBUG({
+                            llvm::dbgs() << "- ";
+                            iter.getNextExecutedOp().getBlock()->printAsOperand(llvm::dbgs());
+                            llvm::dbgs() << '\n';
+                        });
                         queue.emplace(std::move(iter), front.second);
                     }
                     continue;
@@ -1299,6 +1372,7 @@ public:
                 auto* orch = front.second.get();
                 if (front.second.release() != 0)
                 {
+                    LLVM_DEBUG({ llvm::dbgs() << "Finished with no successors\n"; });
                     continue;
                 }
 
@@ -1316,8 +1390,13 @@ public:
                 // If not part of a recursion just schedule all waiting calls.
                 if (!orch->inRecursions())
                 {
+                    LLVM_DEBUG({ llvm::dbgs() << "Finished function execution: Retiring\n"; });
                     for (auto& iter : std::move(*orch).getWaitingCallers())
                     {
+                        LLVM_DEBUG({
+                            llvm::dbgs() << "Queued " << iter.orchestrator->getName() << ": "
+                                         << iter.frame.getNextExecutedOp().getBlock();
+                        });
                         for (auto [dest, value] : llvm::zip(iter.resultValues, orch->getReturnTypes()))
                         {
                             iter.frame.getValues()[dest] = value;
@@ -1341,6 +1420,7 @@ public:
                 // recursion.
                 if (!info->seen.insert({orch->getReturnTypes().begin(), orch->getReturnTypes().end()}).second)
                 {
+                    LLVM_DEBUG({ llvm::dbgs() << "Finished recursion cycle: Retiring cycle\n"; });
                     std::shared_ptr<RecursionInfo> infoKeepAlive = info;
                     for (auto* retiringOrch : llvm::make_first_range(infoKeepAlive->containedOrchsToCycleCalls))
                     {
@@ -1355,6 +1435,10 @@ public:
                             {
                                 iter.frame.getValues()[dest] = value;
                             }
+                            LLVM_DEBUG({
+                                llvm::dbgs() << "Queued " << iter.orchestrator->getName() << ": "
+                                             << iter.frame.getNextExecutedOp().getBlock();
+                            });
                             queue.emplace(std::move(iter.frame), iter.orchestrator);
                         }
                         retiringOrch->retire();
@@ -1362,6 +1446,7 @@ public:
                     continue;
                 }
 
+                LLVM_DEBUG({ llvm::dbgs() << "Recursion result inaccurate: Reevaluating\n"; });
                 for (auto& [cycleOrch, calls] : info->containedOrchsToCycleCalls)
                 {
                     for (auto& call : calls)
@@ -1375,13 +1460,48 @@ public:
                 continue;
             }
             auto& call = pylir::get<FunctionCall>(result);
+            LLVM_DEBUG({ llvm::dbgs() << "Returned with call to " << call.functionSpecialization << '\n'; });
+
+            if (call.functionSpecialization.function.isExternal()
+                || llvm::any_of(call.functionSpecialization.argTypes,
+                                [this](TypeFlowArgValue arg)
+                                {
+                                    if (auto type = arg.dyn_cast<pylir::Py::ObjectTypeInterface>())
+                                    {
+                                        return typeIsOverDefined(type);
+                                    }
+                                    return false;
+                                }))
+            {
+                if (!call.functionSpecialization.function.isExternal())
+                {
+                    LLVM_DEBUG({
+                        llvm::dbgs() << "Function argument contains more than " << m_maxTypeSize
+                                     << " types. Function call marked over defined.\n";
+                    });
+                    m_typesOverDefined++;
+                }
+                else
+                {
+                    LLVM_DEBUG({ llvm::dbgs() << "Calling external function. Function call marked over defined.\n"; });
+                }
+                for (auto dest : call.resultValues)
+                {
+                    front.first.getValues()[dest] = {};
+                }
+                queue.emplace(std::move(front));
+                continue;
+            }
+
             auto [existing, inserted] = m_orchestrators.insert({std::move(call.functionSpecialization), nullptr});
             if (inserted)
             {
+                LLVM_DEBUG({ llvm::dbgs() << "First time calling\n"; });
                 existing->second = createOrchestrator(existing->first.function, moduleManager);
             }
             else if (existing->second->finishedExecution() || existing->second->hasPreliminaryReturnTypes())
             {
+                LLVM_DEBUG({ llvm::dbgs() << "Already finished\n"; });
                 // This orchestrator has already finished execution and there is no need to wait.
                 for (auto [dest, value] : llvm::zip(call.resultValues, existing->second->getReturnTypes()))
                 {
@@ -1394,6 +1514,12 @@ public:
             auto* orch = front.second.get();
             if (!call.resultValues.empty())
             {
+                LLVM_DEBUG({
+                    if (!inserted)
+                    {
+                        llvm::dbgs() << "Still executing: Adding to waiters\n";
+                    }
+                });
                 existing->second->addWaitingCall(std::move(front.first), orch, call.resultValues);
                 if (orch != existing->second.get())
                 {
@@ -1514,7 +1640,7 @@ void Monomorph::runOnOperation()
 
     llvm::MapVector<FunctionSpecialization, std::unique_ptr<Orchestrator>> results;
     {
-        Scheduler scheduler;
+        Scheduler scheduler(m_maxTypeSize, m_typesOverDefined);
         scheduler.run(roots.getArrayRef(), getAnalysisManager());
         results = std::move(scheduler.getResults());
     }
@@ -1644,7 +1770,7 @@ void Monomorph::runOnOperation()
                 auto* call = calcCall();
                 // We only change the call-site if the callee had to be cloned, since cloned implies IR was changed
                 // based on prior analysis.
-                if (!func.function || calleeClone.function == func.function
+                if (!func.function || !calleeClone.function || calleeClone.function == func.function
                     || !calleeDiffers(call, mlir::FlatSymbolRefAttr::get(calleeClone.function)))
                 {
                     continue;
