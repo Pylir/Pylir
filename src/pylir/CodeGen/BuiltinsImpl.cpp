@@ -206,44 +206,6 @@ pylir::Py::GlobalValueOp pylir::CodeGen::createExternal(llvm::StringRef objectNa
     return m_builder.createGlobalValue(objectName, true);
 }
 
-namespace
-{
-mlir::Value implementLenBuiltin(pylir::Py::PyBuilder& builder, mlir::Value object,
-                                mlir::Block* PYLIR_NULLABLE notFoundBlock)
-{
-    auto tuple = builder.createMakeTuple({object});
-    mlir::Value result;
-    if (notFoundBlock)
-    {
-        result = pylir::Py::buildTrySpecialMethodCall(builder.getCurrentLoc(), builder, "__len__", tuple, {},
-                                                      notFoundBlock, nullptr);
-    }
-    else
-    {
-        result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__len__", tuple, {}, nullptr);
-    }
-    tuple = builder.createMakeTuple({result});
-    result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, "__index__", tuple, {}, nullptr);
-    // TODO: Check not negative && fits in host size_t
-    return result;
-}
-} // namespace
-
-void pylir::CodeGen::binCheckOtherOp(mlir::Value other, const Builtins::Builtin& builtin)
-{
-    auto otherType = m_builder.createTypeOf(other);
-    auto otherIsType = buildSubclassCheck(
-        otherType, m_builder.createConstant(mlir::FlatSymbolRefAttr::get(m_builder.getContext(), builtin.name)));
-    auto* otherIsTypeBlock = new mlir::Block;
-    auto* elseBlock = new mlir::Block;
-    m_builder.create<mlir::cf::CondBranchOp>(otherIsType, otherIsTypeBlock, elseBlock);
-
-    implementBlock(elseBlock);
-    m_builder.create<mlir::func::ReturnOp>(mlir::Value{m_builder.createNotImplementedRef()});
-
-    implementBlock(otherIsTypeBlock);
-}
-
 void pylir::CodeGen::createBuiltinsImpl()
 {
     createClass(m_builder.getTypeBuiltin(), {},
@@ -497,16 +459,6 @@ void pylir::CodeGen::createBuiltinsImpl()
         nullptr, {},
         m_builder.getDictAttr({{m_builder.getStrAttr("sep"), m_builder.getStrAttr(" ")},
                                {m_builder.getStrAttr("end"), m_builder.getStrAttr("\n")}}));
-    createFunction(m_builder.getLenBuiltin().getValue(),
-                   {
-                       {"", FunctionParameter::PosOnly, false},
-                   },
-                   [&](mlir::ValueRange functionArguments)
-                   {
-                       auto object = functionArguments[0];
-                       auto result = implementLenBuiltin(m_builder, object, nullptr);
-                       m_builder.create<mlir::func::ReturnOp>(result);
-                   });
 
     createExternal("sys.__excepthook__");
 }

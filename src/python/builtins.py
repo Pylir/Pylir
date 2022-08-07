@@ -261,14 +261,16 @@ class bool(int):
         mro = pylir.intr.type.mro(type(arg))
         t = pylir.intr.mroLookup(mro, "__bool__")
         if not t[1]:
-            # TODO: This should be replaced in the future by dispatching
-            #       to common code used to implement 'len'. We only want to
-            #       return false if the type does not have __len__, but not
-            #       if its implementation raises a TypeError
-            try:
-                return len(arg) != 0
-            except TypeError:
+            mro = pylir.intr.type.mro(type(arg))
+            t = pylir.intr.mroLookup(mro, "__len__")
+            if not t[1]:
                 return True
+            res = unary_method_call(t[0], arg)
+            mro = pylir.intr.type.mro(type(res))
+            t = pylir.intr.mroLookup(mro, "__index__")
+            if not t[1]:
+                raise TypeError
+            return unary_method_call(t[0], res) != 0
         return unary_method_call(t[0], arg)
 
     def __bool__(self):
@@ -296,6 +298,20 @@ def repr(arg):
     if not pylir.intr.tuple.contains(mro, str):
         raise TypeError
     return res
+
+
+@pylir.intr.const_export
+def len(arg):
+    mro = pylir.intr.type.mro(type(arg))
+    t = pylir.intr.mroLookup(mro, "__len__")
+    if not t[1]:
+        raise TypeError
+    res = unary_method_call(t[0], arg)
+    mro = pylir.intr.type.mro(type(res))
+    t = pylir.intr.mroLookup(mro, "__index__")
+    if not t[1]:
+        raise TypeError
+    return unary_method_call(t[0], res)
 
 
 @pylir.intr.const_export
