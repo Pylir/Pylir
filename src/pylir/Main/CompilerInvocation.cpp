@@ -763,7 +763,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
     // interfaces as possible and these are only launched when the item to be computed is retrieved. That retrieval
     // may however import more item and append to 'futures'. Since we are already mid-iteration, this has to be
     // possible.
-    std::list<std::shared_future<mlir::ModuleOp>> futures;
+    std::list<std::pair<std::shared_future<mlir::ModuleOp>, std::string>> futures;
     llvm::StringSet<> loaded;
 
     // Protects output to 'llvm::errs()'.
@@ -780,7 +780,8 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
     options.moduleLoadCallback = [&](CodeGenOptions::LoadRequest&& request)
     {
         std::unique_lock lock{dataStructureMutex};
-        if (!loaded.insert(request.qualifier).second)
+        auto qualifier = request.qualifier;
+        if (!loaded.insert(qualifier).second)
         {
             return;
         }
@@ -838,11 +839,11 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
 
         if (m_mlirContext->isMultithreadingEnabled())
         {
-            futures.push_back(m_mlirContext->getThreadPool().async(std::move(action)));
+            futures.emplace_back(m_mlirContext->getThreadPool().async(std::move(action)), std::move(qualifier));
         }
         else
         {
-            futures.push_back(std::async(std::launch::deferred, std::move(action)).share());
+            futures.emplace_back(std::async(std::launch::deferred, std::move(action)).share(), std::move(qualifier));
         }
     };
 
@@ -851,11 +852,19 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
     importedModules.push_back(std::move(mainModule));
     // The real size of `futures` is unknown as it grows while we are iterating through here. Hence, we NEED to use
     // a back inserter.
-    llvm::transform(futures, std::back_inserter(importedModules), [](const auto& future) { return future.get(); });
-    if (!llvm::all_of(importedModules, llvm::identity<mlir::OwningOpRef<mlir::ModuleOp>>{}))
+    std::vector<std::pair<mlir::OwningOpRef<mlir::ModuleOp>, std::string>> calculatedImports;
+    std::transform(std::move_iterator(futures.begin()), std::move_iterator(futures.end()),
+                   std::back_inserter(calculatedImports),
+                   [](auto&& pair) {
+                       return std::pair{pair.first.get(), std::move(pair.second)};
+                   });
+    if (!llvm::all_of(llvm::make_first_range(calculatedImports), llvm::identity<mlir::OwningOpRef<mlir::ModuleOp>>{}))
     {
         return mlir::failure();
     }
+    std::sort(calculatedImports.begin(), calculatedImports.end(), llvm::less_second{});
+    std::transform(std::move_iterator(calculatedImports.begin()), std::move_iterator(calculatedImports.end()),
+                   std::back_inserter(importedModules), [](auto&& pair) { return std::move(pair.first); });
 
     return linkModules(importedModules);
 }
