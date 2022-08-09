@@ -1350,7 +1350,7 @@ class Scheduler
         auto knownRatio = [](Orchestrator* orch)
         {
             return llvm::count_if(orch->getReturnTypes(),
-                                  [](pylir::Py::ObjectTypeInterface val) { return val.getTypeObject() != nullptr; })
+                                  [](pylir::Py::ObjectTypeInterface val) { return val && val.getTypeObject() != nullptr; })
                    / static_cast<double>(orch->getReturnTypes().size());
         };
 
