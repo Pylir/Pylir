@@ -30,5 +30,6 @@ func.func @__init__() -> !py.dynamic {
 }
 
 // CHECK-LABEL: func @__init__
-// CHECK: %[[TYPE:.*]] = py.constant(@builtins.int)
+// CHECK: %[[RES:.*]] = py.call @foo
+// CHECK: %[[TYPE:.*]] = py.typeOf %[[RES]]
 // CHECK: return %[[TYPE]]

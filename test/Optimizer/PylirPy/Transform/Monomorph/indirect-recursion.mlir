@@ -41,5 +41,6 @@ func.func @root() -> !py.dynamic {
 }
 
 // CHECK-LABEL: func @root
-// CHECK: %[[TYPE:.*]] = py.constant(@builtins.int)
+// CHECK: %[[RES:.*]] = py.call @header
+// CHECK: %[[TYPE:.*]] = py.typeOf %[[RES]]
 // CHECK: return %[[TYPE]]
