@@ -27,6 +27,52 @@ def unary_method_call(method, obj):
 
 
 @pylir.intr.const_export
+class type:
+    __slots__ = pylir.intr.type.__slots__
+
+    def __call__(self, *args, **kwargs):
+        # I usually try to avoid intrinsics where possible to have as much of a
+        # readable and normal python code as possible but due to special
+        # importance of the below code path, this code is somewhat exempt.
+        # The short of it is, that calling 'len' or using the '[]' binary
+        # operator would lead to an infinite recursion in this case as all
+        # these implementations call 'type'. I don't want to forbid that either
+        # and hence we'll use intrinsics here that do not touch any other
+        # builtin types, functions or operators.
+        tuple_len = pylir.intr.tuple.len(args)
+        dict_len = pylir.intr.dict.len(kwargs)
+        tuple_len_is_one = pylir.intr.int.cmp("eq", tuple_len, 1)
+        dict_len_is_zero = pylir.intr.int.cmp("eq", dict_len, 0)
+        if self is type and tuple_len_is_one and dict_len_is_zero:
+            return pylir.intr.typeOf(pylir.intr.tuple.getItem(args, 0))
+
+        mro = pylir.intr.type.mro(self)
+        new_method = pylir.intr.tuple.getItem(
+            pylir.intr.mroLookup(mro, "__new__"), 0)
+        # TODO: This is not the proper sequence to call a function and only
+        #       works for `function`, but not arbitrary callables.
+        #       Proper would be 'new_method(new_method,*args,**kwargs)' once
+        #       unpacking is supported.
+        res = pylir.intr.function.call(new_method, new_method,
+                                       pylir.intr.tuple.prepend(self, args),
+                                       kwargs)
+        res_type = pylir.intr.typeOf(res)
+        mro = pylir.intr.type.mro(res_type)
+        if not pylir.intr.tuple.contains(mro, self):
+            return res
+        init_method = pylir.intr.tuple.getItem(
+            pylir.intr.mroLookup(mro, "__init__"), 0)
+        # TODO: Same as above but:
+        #       'init_method(init_method, res, *args, **kwargs)'
+        init_ret = pylir.intr.function.call(init_method, init_method,
+                                            pylir.intr.tuple.prepend(res, args),
+                                            kwargs)
+        if init_ret is not None:
+            raise TypeError
+        return res
+
+
+@pylir.intr.const_export
 class object:
     def __new__(cls, *args, **kwargs):
         return pylir.intr.makeObject(cls)

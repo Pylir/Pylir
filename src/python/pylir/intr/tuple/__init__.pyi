@@ -13,3 +13,6 @@ def getItem(tuple, index):
 
 def contains(tuple, element):
     pass
+
+def prepend(element, tuple):
+    pass
