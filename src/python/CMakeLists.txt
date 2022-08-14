@@ -26,9 +26,9 @@ foreach (f ${sources})
     add_custom_command(OUTPUT ${dst}
       DEPENDS ${src}
       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${src} ${dst}
-      COMMENT "Copying pylir's ${f}..."
+      COMMENT "Copying pylirs ${f}..."
       )
     list(APPEND outputs ${dst})
 endforeach ()
 
-add_custom_target(pylir-stdlib ALL DEPENDS ${outputs})
+add_custom_target(pylir-stdlib ALL DEPENDS ${outputs} SOURCES ${sources})
