@@ -827,7 +827,7 @@ public:
     }
 };
 
-llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Orchestrator& orchestrator)
+[[maybe_unused]] llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Orchestrator& orchestrator)
 {
     if (orchestrator.getValues().empty())
     {
