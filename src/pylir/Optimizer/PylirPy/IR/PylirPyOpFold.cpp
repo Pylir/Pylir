@@ -661,17 +661,7 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     {
         return nullptr;
     }
-    if (op->hasTrait<Py::AlwaysBound>() || op->hasAttr(Py::alwaysBoundAttr))
-    {
-        return mlir::BoolAttr::get(getContext(), false);
-    }
-    auto callOpInterface = mlir::dyn_cast<mlir::CallOpInterface>(op);
-    if (!callOpInterface)
-    {
-        return nullptr;
-    }
-    auto func = mlir::dyn_cast_or_null<mlir::FunctionOpInterface>(callOpInterface.resolveCallable());
-    if (func && func.getResultAttr(getValue().cast<mlir::OpResult>().getResultNumber(), Py::alwaysBoundAttr))
+    if (op->hasTrait<Py::AlwaysBound>())
     {
         return mlir::BoolAttr::get(getContext(), false);
     }
@@ -891,8 +881,7 @@ mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, :
         }
         callee = functionAttr.getValue();
     }
-    auto call = rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), callee, op.getCallOperands());
-    call->setAttr(Py::alwaysBoundAttr, rewriter.getUnitAttr());
+    rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), callee, op.getCallOperands());
     return mlir::success();
 }
 
@@ -917,10 +906,9 @@ mlir::LogicalResult pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp o
         }
         callee = functionAttr.getValue();
     }
-    auto call = rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, op.getType(), callee, op.getCallOperands(),
-                                                          op.getNormalDestOperands(), op.getUnwindDestOperands(),
-                                                          op.getHappyPath(), op.getExceptionPath());
-    call->setAttr(Py::alwaysBoundAttr, rewriter.getUnitAttr());
+    rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, op.getType(), callee, op.getCallOperands(),
+                                              op.getNormalDestOperands(), op.getUnwindDestOperands(), op.getHappyPath(),
+                                              op.getExceptionPath());
     return mlir::success();
 }
 

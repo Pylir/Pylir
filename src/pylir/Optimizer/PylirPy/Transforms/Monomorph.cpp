@@ -1415,7 +1415,6 @@ mlir::Operation* setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
                 mlir::OpBuilder builder(op);
                 auto newCall =
                     builder.create<pylir::Py::CallOp>(op.getLoc(), op->getResultTypes(), callee, op.getCallOperands());
-                newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                 op->replaceAllUsesWith(newCall);
                 op->erase();
                 return newCall;
@@ -1427,7 +1426,6 @@ mlir::Operation* setCallee(mlir::Operation* op, mlir::FlatSymbolRefAttr callee)
                 auto newCall = builder.create<pylir::Py::InvokeOp>(
                     op.getLoc(), op->getResultTypes(), callee, op.getCallOperands(), op.getNormalDestOperands(),
                     op.getUnwindDestOperands(), op.getHappyPath(), op.getExceptionPath());
-                newCall->setAttr(pylir::Py::alwaysBoundAttr, builder.getUnitAttr());
                 op->replaceAllUsesWith(newCall);
                 op->erase();
                 return newCall;
@@ -1523,7 +1521,7 @@ void Monomorph::runOnOperation()
                 return mlir::OpBuilder::atBlockBegin(cloneValue.cast<mlir::BlockArgument>().getParentBlock());
             }();
             // Due to the lack of a better way we just use PylirPyDialect for now. It can handle every kind of constant
-            // including ones by arith. 
+            // including ones by arith.
             mlir::Dialect* dialect = getContext().getLoadedDialect<pylir::Py::PylirPyDialect>();
             auto* constant = dialect->materializeConstant(builder, attr, cloneValue.getType(), cloneValue.getLoc());
             PYLIR_ASSERT(constant);

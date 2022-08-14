@@ -901,16 +901,12 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
 
 // Control Flow
 
-class PylirPy_CallBase<string mnemonic,list<Trait> traits = []> : PylirPy_Op<mnemonic,
-                                            !listconcat(traits, [DeclareOpInterfaceMethods<CallOpInterface>])> {
+def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+    DeclareOpInterfaceMethods<CallOpInterface>, AlwaysBound, AddableExceptionHandling<"InvokeOp">]> {
     let summary = "call operation";
 
-    let results = (outs Variadic<AnyType>:$results);
-}
-
-def PylirPy_CallOp : PylirPy_CallBase<"call", [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-	AddableExceptionHandling<"InvokeOp">]> {
     let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<AnyType>:$call_operands);
+    let results = (outs Variadic<AnyType>:$results);
 
     let assemblyFormat = [{
         $callee `(` $call_operands `)` attr-dict `:` functional-type($call_operands, results)

@@ -9,8 +9,3 @@
 #include <mlir/IR/Dialect.h>
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyOpsDialect.h.inc"
-
-namespace pylir::Py
-{
-constexpr llvm::StringLiteral alwaysBoundAttr = "py.always_bound";
-} // namespace pylir::Py

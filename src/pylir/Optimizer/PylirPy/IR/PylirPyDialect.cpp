@@ -78,13 +78,5 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
 mlir::LogicalResult pylir::Py::PylirPyDialect::verifyOperationAttribute(mlir::Operation* op,
                                                                         mlir::NamedAttribute attribute)
 {
-    if (attribute.getName() == alwaysBoundAttr)
-    {
-        if (!attribute.getValue().isa<mlir::UnitAttr>())
-        {
-            return op->emitOpError("Expected ") << alwaysBoundAttr << " to be a unit attr";
-        }
-        return mlir::success();
-    }
     return op->emitOpError("Unknown dialect attribute ") << attribute.getName();
 }
