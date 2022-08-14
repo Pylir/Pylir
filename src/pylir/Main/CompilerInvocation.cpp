@@ -323,7 +323,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                                          { return pass->getName().equals_insensitive(beforeName); },
                                          [afterName, afterAll](mlir::Pass* pass, mlir::Operation*)
                                          { return afterAll || pass->getName().equals_insensitive(afterName); },
-                                         false);
+                                         args.hasArg(OPT_Xprint_module_scope), false, false, llvm::errs(),
+                                         mlir::OpPrintingFlags().enableDebugInfo().assumeVerified());
             }
             if (args.hasArg(OPT_Xtiming))
             {

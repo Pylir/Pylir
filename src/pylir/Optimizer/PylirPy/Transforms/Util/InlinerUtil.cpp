@@ -11,6 +11,27 @@
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
+namespace
+{
+void remapInlinedLocations(llvm::iterator_range<mlir::Region::iterator> range, mlir::Location callerLoc)
+{
+    llvm::DenseMap<mlir::Location, mlir::Location> mappedLocations;
+    auto remapOpLoc = [&](mlir::Operation* op)
+    {
+        auto [iter, inserted] = mappedLocations.try_emplace(op->getLoc(), op->getLoc());
+        if (inserted)
+        {
+            iter->second = mlir::CallSiteLoc::get(op->getLoc(), callerLoc);
+        }
+        op->setLoc(iter->second);
+    };
+    for (auto& block : range)
+    {
+        block.walk(remapOpLoc);
+    }
+}
+} // namespace
+
 void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable)
 {
     auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*call);
@@ -26,7 +47,8 @@ void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface
     callable.getCallableRegion()->cloneInto(preBlock->getParent(), postBlock->getIterator(), mapping);
 
     auto* firstInlinedBlock = preBlock->getNextNode();
-    for (auto& iter : llvm::make_range(firstInlinedBlock->getIterator(), postBlock->getIterator()))
+    auto inlineBlocksRange = llvm::make_range(firstInlinedBlock->getIterator(), postBlock->getIterator());
+    for (auto& iter : inlineBlocksRange)
     {
         if (exceptionHandler)
         {
@@ -61,6 +83,8 @@ void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface
             continue;
         }
     }
+
+    remapInlinedLocations(inlineBlocksRange, call->getLoc());
 
     preBlock->getOperations().splice(preBlock->end(), firstInlinedBlock->getOperations());
     firstInlinedBlock->erase();

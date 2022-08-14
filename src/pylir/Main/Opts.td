@@ -85,3 +85,4 @@ def Xprint_before : Joined<["-"], "Xprint-before=">, Group<grp_internal>;
 def Xprint_after : Joined<["-"], "Xprint-after=">, Group<grp_internal>;
 def Xprint_after_all : F<"Xprint-after-all", "Print IR to stderr after every pass">, Group<grp_internal>;
 def Xprint_pipeline : F<"Xprint-pipeline", "Print the pass pipeline to stderr">, Group<grp_internal>;
+def Xprint_module_scope : F<"Xprint-module-scope", "Use module scope for printing IR">, Group<grp_internal>;
