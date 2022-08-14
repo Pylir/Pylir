@@ -104,6 +104,9 @@ constexpr auto FAILED_TO_FIND_LINKER = FMT_STRING("failed to find linker");
 
 constexpr auto ATTEMPTED_N = FMT_STRING("attempted {}");
 
+constexpr auto OUTPUT_CANNOT_BE_STDOUT_WHEN_WRITING_DEPENDENCY_FILE =
+    FMT_STRING("output cannot be stdout when writing dependency file");
+
 constexpr auto COULD_NOT_FIND_TARGET_N = FMT_STRING("could not find target '{}'");
 
 constexpr auto UNSUPPORTED_TARGET_N = FMT_STRING("unsupported target '{}'");

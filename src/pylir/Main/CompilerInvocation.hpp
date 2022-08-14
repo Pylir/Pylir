@@ -15,6 +15,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/Option/Arg.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Target/TargetMachine.h>
 
 #include <pylir/Diagnostics/Document.hpp>
@@ -42,7 +43,8 @@ class CompilerInvocation
     llvm::raw_pwrite_stream* m_output = nullptr;
     std::optional<llvm::sys::fs::TempFile> m_outputFile;
     std::optional<llvm::raw_fd_ostream> m_outFileStream;
-    std::string m_realOutputFilename;
+    std::string m_compileStepOutputFilename;
+    std::string m_actionOutputFilename;
 
     enum FileType
     {

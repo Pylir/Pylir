@@ -40,6 +40,8 @@ def emit_mlir : F<"emit-mlir", "Emit MLIR IR">, Group<grp_actions>;
 def emit_pylir : F<"emit-pylir", "Emit Pylir IR">, Group<grp_actions>;
 def dump_ast : F<"dump-ast", "Dump AST for input file to stdout">, Group<grp_actions>;
 def S : F<"S", "Emit textual assembly file">, Group<grp_actions>;
+def M : JoinedOrSeparate<["-"], "M">, HelpText<"Write depfile of compilation to <file>">, MetaVarName<"<file>">,
+        Group<grp_actions>;
 
 def grp_codegen : OptionGroup<"CodeGen">, HelpText<"Codegen options">;
 

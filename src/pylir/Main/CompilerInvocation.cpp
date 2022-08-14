@@ -85,6 +85,38 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
     return false;
 #endif
 }
+
+// https://cmake.org/cmake/help/latest/command/add_custom_command.html for format
+llvm::SmallString<100> escapeForMakefile(llvm::StringRef filename)
+{
+    llvm::SmallString<100> result;
+    for (char c : filename)
+    {
+        switch (c)
+        {
+            case '$':
+                // Single $ turn to two $.
+                result.push_back('$');
+                break;
+            case ' ':
+            case '#':
+                // These just get escaped.
+                result.push_back('\\');
+                break;
+            default: break;
+        }
+        result.push_back(c);
+    }
+    return result;
+}
+
+void writeDependencyOutput(llvm::raw_ostream& ostream, llvm::StringRef outputFilename,
+                           llvm::ArrayRef<std::string> additionalInputFiles)
+{
+    ostream << escapeForMakefile(outputFilename) << ": ";
+    llvm::interleave(llvm::map_range(additionalInputFiles, escapeForMakefile), ostream, " ");
+    ostream << '\n';
+}
 } // namespace
 
 mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inputFile,
@@ -93,12 +125,48 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
                                                              CompilerInvocation::Action action)
 {
     const auto& args = commandLine.getArgs();
+    std::optional<llvm::ToolOutputFile> outputFile;
     if (!commandLine.onlyPrint())
     {
+        if (auto* arg = args.getLastArg(OPT_M))
+        {
+            std::error_code ec;
+            outputFile.emplace(arg->getValue(), ec, llvm::sys::fs::OF_Text);
+            if (ec)
+            {
+                llvm::errs() << commandLine.createDiagnosticsBuilder(arg, Diag::FAILED_TO_OPEN_FILE_N, arg->getValue())
+                                    .addLabel(arg, std::nullopt, Diag::ERROR_COLOUR)
+                                    .emitError();
+                return mlir::failure();
+            }
+            if (arg = args.getLastArg(OPT_o); arg && arg->getValue() == llvm::StringRef{"-"})
+            {
+                llvm::errs() << commandLine
+                                    .createDiagnosticsBuilder(
+                                        arg, Diag::OUTPUT_CANNOT_BE_STDOUT_WHEN_WRITING_DEPENDENCY_FILE)
+                                    .addLabel(arg, std::nullopt, Diag::ERROR_COLOUR)
+                                    .emitError();
+                return mlir::failure();
+            }
+        }
         if (mlir::failed(compilation(inputFile, commandLine, toolchain, action)))
         {
             return mlir::failure();
         }
+    }
+    if (outputFile)
+    {
+        // The very first document is the main input file which build systems already depend on. Hence, there is no
+        // need to add it to the output.
+        std::vector<std::string> additionalInputFiles(m_documents.size() - 1);
+        llvm::transform(llvm::drop_begin(m_documents), additionalInputFiles.begin(),
+                        [](const Diag::Document& document) { return document.getFilename(); });
+
+        // The document order is non-deterministic when multi threading is enabled. Sort them to make it deterministic
+        // again.
+        std::sort(additionalInputFiles.begin(), additionalInputFiles.end());
+        writeDependencyOutput(outputFile->os(), m_actionOutputFilename, additionalInputFiles);
+        outputFile->keep();
     }
     if (action != Link)
     {
@@ -548,7 +616,8 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::op
     m_outputFile = std::move(*tempFile);
     m_outFileStream.emplace(m_outputFile->FD, false);
     m_output = &*m_outFileStream;
-    m_realOutputFilename = realOutputFilename.str();
+    m_compileStepOutputFilename = realOutputFilename.str();
+    m_actionOutputFilename = action == Link ? args.getLastArgValue(OPT_o) : m_compileStepOutputFilename;
     return mlir::success();
 }
 
@@ -572,12 +641,12 @@ mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::Logica
         }
         return mlir::failure();
     }
-    if (auto error = m_outputFile->keep(m_realOutputFilename))
+    if (auto error = m_outputFile->keep(m_compileStepOutputFilename))
     {
         llvm::consumeError(std::move(error));
         llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
                                                 fmt::format(pylir::Diag::FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N,
-                                                            m_outputFile->TmpName, m_realOutputFilename));
+                                                            m_outputFile->TmpName, m_compileStepOutputFilename));
         return mlir::failure();
     }
     return mlir::success();
