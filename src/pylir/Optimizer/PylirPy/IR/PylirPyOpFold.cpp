@@ -1220,6 +1220,61 @@ struct ArithSelectTypeRefinable
     }
 };
 
+// select %con, (Op %lhs..., %x, %rhs...), (Op %lhs..., %y, %rhs...) -> Op %lhs..., (select %con, %x, %y), %rhs...
+struct ArithSelectTransform : mlir::OpRewritePattern<mlir::arith::SelectOp>
+{
+    using mlir::OpRewritePattern<mlir::arith::SelectOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(mlir::arith::SelectOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        auto* lhs = op.getTrueValue().getDefiningOp();
+        auto* rhs = op.getFalseValue().getDefiningOp();
+        if (!lhs || !rhs || lhs->getAttrDictionary() != rhs->getAttrDictionary() || lhs->getName() != rhs->getName()
+            || op.getTrueValue().cast<mlir::OpResult>().getResultNumber()
+                   != op.getFalseValue().cast<mlir::OpResult>().getResultNumber()
+            || lhs->getResultTypes() != rhs->getResultTypes() || lhs->hasTrait<mlir::OpTrait::IsTerminator>()
+            || lhs->getNumRegions() != 0 || rhs->getNumRegions() != 0 || lhs->getNumOperands() != rhs->getNumOperands()
+            || !mlir::MemoryEffectOpInterface::hasNoEffect(lhs) || !mlir::MemoryEffectOpInterface::hasNoEffect(rhs))
+        {
+            return mlir::failure();
+        }
+        std::optional<std::size_t> differing;
+        for (auto [lhsOp, rhsOp] : llvm::zip(lhs->getOpOperands(), rhs->getOpOperands()))
+        {
+            if (lhsOp.get() == rhsOp.get())
+            {
+                continue;
+            }
+            if (differing)
+            {
+                return mlir::failure();
+            }
+            differing = lhsOp.getOperandNumber();
+        }
+        if (!differing)
+        {
+            rewriter.replaceOp(op, op.getTrueValue());
+            return mlir::success();
+        }
+        if (lhs->getOperand(*differing).getType() != rhs->getOperand(*differing).getType())
+        {
+            return mlir::failure();
+        }
+
+        auto newSelect = rewriter.create<mlir::arith::SelectOp>(
+            op.getLoc(), op.getCondition(), lhs->getOperand(*differing), rhs->getOperand(*differing));
+        mlir::OperationState state(op.getLoc(), lhs->getName());
+        state.addAttributes(lhs->getAttrs());
+        state.addTypes(lhs->getResultTypes());
+        auto operands = llvm::to_vector(lhs->getOperands());
+        operands[*differing] = newSelect;
+        state.addOperands(operands);
+        auto* newOp = rewriter.create(state);
+        rewriter.replaceOp(op, newOp->getResult(op.getTrueValue().cast<mlir::OpResult>().getResultNumber()));
+        return mlir::success();
+    }
+};
+
 pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
                                          mlir::Attribute attr)
 {
@@ -1300,6 +1355,7 @@ void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(::mlir::RewritePatte
     populateWithGenerated(results);
     results.insert<NoopBlockArgRemove>(getContext());
     results.insert<PassthroughArgRemove>(getContext());
+    results.insert<ArithSelectTransform>(getContext());
 }
 
 void pylir::Py::PylirPyDialect::initializeExternalModels()
