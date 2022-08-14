@@ -126,7 +126,7 @@ mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::Ty
 {
     if (auto lhsAttr = operands[0].dyn_cast_or_null<mlir::Attribute>())
     {
-        if (auto rhsAttr = operands[0].dyn_cast_or_null<mlir::Attribute>())
+        if (auto rhsAttr = operands[1].dyn_cast_or_null<mlir::Attribute>())
         {
             if (lhsAttr != rhsAttr)
             {
