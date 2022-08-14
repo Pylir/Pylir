@@ -1502,7 +1502,7 @@ void Monomorph::runOnOperation()
                 {
                     continue;
                 }
-                instrValue = mapping.mapValue(key);
+                instrValue = mapping.mapResult(key);
             }
 
             // Cloning of a function body is done lazily for the case where no value has changed.
@@ -1522,16 +1522,9 @@ void Monomorph::runOnOperation()
 
                 return mlir::OpBuilder::atBlockBegin(cloneValue.cast<mlir::BlockArgument>().getParentBlock());
             }();
-            mlir::Dialect* dialect;
-            if (cloneValue.isa<mlir::BlockArgument>())
-            {
-                // Due to the lack of a better way in the case of a block argument we just use PylirPyDialect for now.
-                dialect = getContext().getLoadedDialect<pylir::Py::PylirPyDialect>();
-            }
-            else
-            {
-                dialect = cloneValue.getDefiningOp()->getDialect();
-            }
+            // Due to the lack of a better way we just use PylirPyDialect for now. It can handle every kind of constant
+            // including ones by arith. 
+            mlir::Dialect* dialect = getContext().getLoadedDialect<pylir::Py::PylirPyDialect>();
             auto* constant = dialect->materializeConstant(builder, attr, cloneValue.getType(), cloneValue.getLoc());
             PYLIR_ASSERT(constant);
             cloneValue.replaceAllUsesWith(constant->getResult(0));

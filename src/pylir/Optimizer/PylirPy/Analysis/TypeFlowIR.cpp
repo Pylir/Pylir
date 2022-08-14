@@ -88,6 +88,23 @@ mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAtt
     return mlir::failure();
 }
 
+namespace
+{
+mlir::Value mapBackOperand(mlir::Value foldResult, mlir::Operation* normalIROp, mlir::Operation* typeFlowIROp)
+{
+    // A value returned by the fold operation has to somewhat be mapped back to a value within the TypeFlowIR.
+    // This is not 100% possible all the time, but we do so on best effort basis. If it is not possible
+    // we can't use the fold result.
+    auto* res = llvm::find_if(normalIROp->getOpOperands(),
+                              [foldResult](mlir::OpOperand& operand) { return operand.get() == foldResult; });
+    if (res == normalIROp->getOpOperands().end())
+    {
+        return {};
+    }
+    return typeFlowIROp->getOperand(res->getOperandNumber());
+}
+} // namespace
+
 mlir::LogicalResult pylir::TypeFlow::TupleLenOp::exec(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> operands,
                                                       ::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>& results,
                                                       ::mlir::SymbolTableCollection&)
@@ -99,18 +116,26 @@ mlir::LogicalResult pylir::TypeFlow::TupleLenOp::exec(::llvm::ArrayRef<::pylir::
             mlirFoldResults))
         && !mlirFoldResults.empty())
     {
+        bool success = true;
         for (auto [iter, type] : llvm::zip(mlirFoldResults, getInstruction()->getResultTypes()))
         {
             if (auto attr = iter.dyn_cast<mlir::Attribute>())
             {
                 results.emplace_back(attr);
+                continue;
             }
-            else
+            auto value = mapBackOperand(iter.get<mlir::Value>(), getInstruction(), *this);
+            if (!value)
             {
-                results.emplace_back(mapValue(iter.get<mlir::Value>()));
+                success = false;
+                break;
             }
+            results.emplace_back(value);
         }
-        return mlir::success();
+        if (success)
+        {
+            return mlir::success();
+        }
     }
     if (auto type = operands[0].dyn_cast_or_null<pylir::Py::TupleType>())
     {
@@ -174,6 +199,7 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
             mlirFoldResults))
         && !mlirFoldResults.empty())
     {
+        bool success = true;
         for (auto [iter, type] : llvm::zip(mlirFoldResults, getInstruction()->getResultTypes()))
         {
             // If this is a calc then all types that aren't `!py.dynamic` are ignored.
@@ -186,18 +212,23 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
                 if (!getValueCalc())
                 {
                     results.emplace_back(pylir::Py::typeOfConstant(attr, collection, getInstruction()));
+                    continue;
                 }
-                else
-                {
-                    results.emplace_back(attr);
-                }
+                results.emplace_back(attr);
+                continue;
             }
-            else
+            auto value = mapBackOperand(iter.get<mlir::Value>(), getInstruction(), *this);
+            if (!value)
             {
-                results.emplace_back(mapValue(iter.get<mlir::Value>()));
+                success = false;
+                break;
             }
+            results.emplace_back(value);
         }
-        return mlir::success();
+        if (success)
+        {
+            return mlir::success();
+        }
     }
     if (getValueCalc())
     {

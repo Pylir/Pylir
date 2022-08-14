@@ -27,7 +27,7 @@ def TypeFlowValueMappingInterface : OpInterface<"TypeFlowValueMappingInterface">
         InterfaceMethod<[{
             Maps a result value of this operation to the corresponding value of the mapped instruction in the original
             IR.
-        }], "::mlir::Value", "mapValue", (ins "::mlir::Value":$resultValue), "", [{
+        }], "::mlir::Value", "mapResult", (ins "::mlir::Value":$resultValue), "", [{
             return $_op.getInstruction()->getResult(resultValue.cast<mlir::OpResult>().getResultNumber());
         }]>,
     ];
