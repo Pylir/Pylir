@@ -23,7 +23,7 @@ mlir_tablegen(TestDialect.cpp.inc -gen-dialect-defs -dialect="test")
 add_public_tablegen_target(TestDialectIncGen)
 add_dependencies(mlir-headers TestDialectIncGen)
 
-add_executable(pylir-opt main.cpp TestMemorySSA.cpp TestDialect.cpp TestInlinerInterface.cpp TestTypeFlow.cpp TestAliasSetTracker.cpp TestLoopInfo.cpp TestHelloWorld.cpp TestLinker.cpp)
+add_executable(pylir-opt main.cpp TestMemorySSA.cpp TestDialect.cpp TestInlinerInterface.cpp TestTypeFlow.cpp TestAliasSetTracker.cpp TestLoopInfo.cpp TestHelloWorld.cpp TestLinker.cpp TestInlineAll.cpp)
 target_link_libraries(pylir-opt PRIVATE MLIRMlirOptMain ${dialect_libs} ${conversion_libs} PylirAnalysis PylirPyTransformsUtil PylirPyAnalysis PylirLinker)
 target_include_directories(pylir-opt SYSTEM PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(pylir-opt TestPassIncGen)

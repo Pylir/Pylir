@@ -40,4 +40,20 @@ def TestLinker : Pass<"test-linker", "::mlir::ModuleOp"> {
     let constructor = "::createTestLinker()";
 }
 
+def TestInlineAll : Pass<"test-inline-all", "::mlir::ModuleOp"> {
+    let constructor = "::createTestInlineAll()";
+
+    let statistics = [
+    	Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
+    	Statistic<"m_recursionLimitReached", "Recursion limits reached", "Amount of times a recursion chain was disabled in a caller">,
+    ];
+
+    let options = [
+    	Option<"m_maxRecursionDepth", "max-recursion-depth", "std::size_t", "4",
+    			"Maximum amount of times a recursive function deemed profitable may be inlined">,
+        Option<"m_optimizationPipeline", "optimization-pipeline", "std::string", "",
+                "Optimization pipeline used to perform the inlining trials">,
+    ];
+}
+
 #endif
