@@ -334,6 +334,40 @@ class list:
 
 
 @pylir.intr.const_export
+class str:
+
+    def __new__(cls, object=None, encoding=None, errors=None):
+        """
+        Formal overloads to be detected:
+        - str(object='')
+        - str(object=b'', encoding='utf-8', errors='strict')
+            if one of encoding or errors is specified
+        """
+        if encoding is None and errors is None:
+            object = '' if object is None else object
+            mro = pylir.intr.type.mro(type(object))
+            t = pylir.intr.mroLookup(mro, "__str__")
+            res = unary_method_call(t[0], object)
+            mro = pylir.intr.type.mro(type(res))
+            if not pylir.intr.tuple.contains(mro, str):
+                raise TypeError
+            return res
+        raise NotImplementedError
+
+    # Positional only arguments are required for here and down below as the call
+    # would otherwise do dictionary lookups for the keyword arguments, leading
+    # to infinite recursion.
+    def __hash__(self, /):
+        return pylir.intr.str.hash(self)
+
+    def __eq__(self, other, /):
+        return pylir.intr.str.equal(self, other)
+
+    def __str__(self, /):
+        return self
+
+
+@pylir.intr.const_export
 def repr(arg):
     mro = pylir.intr.type.mro(type(arg))
     t = pylir.intr.mroLookup(mro, "__repr__")

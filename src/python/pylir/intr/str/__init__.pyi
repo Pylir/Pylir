@@ -6,3 +6,11 @@
 
 def concat(*args):
     pass
+
+
+def equal(lhs, rhs):
+    pass
+
+
+def hash(str):
+    pass
