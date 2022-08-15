@@ -12,15 +12,7 @@ using namespace pylir::rt;
 
 std::size_t PyObjectHasher::operator()(PyObject* object) const noexcept
 {
-    // TODO: use hash
-    auto* hashFunction = type(*object).getSlot(PyTypeObject::Hash);
-    PYLIR_ASSERT(hashFunction);
-    auto* integer = (*hashFunction)(*object).dyn_cast<PyInt>();
-    if (!integer)
-    {
-        // TODO: something
-    }
-    return integer->to<std::size_t>();
+    return Builtins::Hash(*object).cast<PyInt>().to<std::size_t>();
 }
 
 bool PyObjectEqual::operator()(PyObject* lhs, PyObject* rhs) const noexcept

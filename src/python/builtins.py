@@ -414,3 +414,12 @@ def print(*objects, sep=None, end=None):
         res = pylir.intr.str.concat(res, str(objects[i]))
         i = i + 1
     pylir.intr.intr.print(pylir.intr.str.concat(res, end))
+
+
+@pylir.intr.const_export
+def hash(obj, /):
+    t = pylir.intr.mroLookup(pylir.intr.type.mro(type(obj)), "__hash__")
+    if not t[1] or t[0] is None:
+        raise TypeError
+    # TODO: Check in range of sys.maxsize
+    return unary_method_call(t[0], obj)
