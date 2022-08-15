@@ -261,6 +261,11 @@ void buildMethodCallOpCompilerBuiltin(pylir::Py::PyBuilder& builder)
 
 void pylir::CodeGen::createCompilerBuiltinsImpl()
 {
+    m_builder.createGlobalValue(Builtins::None.name, true, m_builder.getObjectAttr(m_builder.getNoneTypeBuiltin()),
+                                true);
+    m_builder.createGlobalValue(Builtins::NotImplemented.name, true,
+                                m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
+
 #define COMPILER_BUILTIN_REV_BIN_OP(name, slotName, revSlotName) \
     buildRevBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName, #revSlotName);
 #define COMPILER_BUILTIN_BIN_OP(name, slotName) \

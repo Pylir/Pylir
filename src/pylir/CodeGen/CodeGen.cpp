@@ -102,7 +102,6 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
     if (m_qualifiers == "builtins.")
     {
         auto locExit = changeLoc(fileInput, m_document->getEndOfFileLoc());
-        createBuiltinsImpl();
         createCompilerBuiltinsImpl();
     }
 

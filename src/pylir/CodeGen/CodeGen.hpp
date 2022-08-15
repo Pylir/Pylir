@@ -306,31 +306,6 @@ class CodeGen
     mlir::func::FuncOp buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
                                        const std::vector<FunctionParameter>& parameters);
 
-    Py::GlobalValueOp createGlobalConstant(Py::ObjectAttrInterface value);
-
-    using SlotMapImpl = std::map<std::string_view, std::variant<mlir::FlatSymbolRefAttr, mlir::SymbolOpInterface>>;
-
-    Py::GlobalValueOp createClass(mlir::FlatSymbolRefAttr className,
-                                  llvm::MutableArrayRef<Py::GlobalValueOp> bases = {},
-                                  llvm::function_ref<void(SlotMapImpl&)> implementation = {});
-
-    Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
-                                     llvm::function_ref<void(mlir::Value, mlir::ValueRange)> implementation = {},
-                                     mlir::func::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
-                                     Py::DictAttr kwArgs = {});
-
-    Py::GlobalValueOp createFunction(llvm::StringRef functionName, const std::vector<FunctionParameter>& parameters,
-                                     llvm::function_ref<void(mlir::ValueRange)> implementation,
-                                     mlir::func::FuncOp* implOut = nullptr, Py::TupleAttr posArgs = {},
-                                     Py::DictAttr kwArgs = {});
-
-    Py::GlobalValueOp createExternal(llvm::StringRef objectName);
-
-    void binCheckOtherOp(mlir::Value other, const Builtins::Builtin& builtin);
-
-    std::vector<UnpackResults> createOverload(const std::vector<FunctionParameter>& parameters, mlir::Value tuple,
-                                              mlir::Value dict, Py::TupleAttr posArgs = {}, Py::DictAttr kwArgs = {});
-
     template <class AST>
     mlir::Location getLoc(const AST& astObject)
     {
@@ -369,8 +344,6 @@ class CodeGen
                && (m_builder.getBlock()->empty()
                    || !m_builder.getBlock()->back().hasTrait<mlir::OpTrait::IsTerminator>());
     }
-
-    void createBuiltinsImpl();
 
     void createCompilerBuiltinsImpl();
 
