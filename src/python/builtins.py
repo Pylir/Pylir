@@ -27,6 +27,14 @@ def unary_method_call(method, obj):
     return method(obj)
 
 
+def binary_method_call(method, self, other):
+    mro = pylir.intr.type.mro(type(method))
+    t = pylir.intr.mroLookup(mro, "__get__")
+    if t[1]:
+        method = t[0](self, type(self))
+    return method(self, other)
+
+
 @pylir.intr.const_export
 class type:
     __slots__ = pylir.intr.type.__slots__
@@ -375,8 +383,7 @@ def repr(arg):
     if not t[1]:
         raise TypeError
     res = unary_method_call(t[0], arg)
-    mro = pylir.intr.type.mro(type(res))
-    if not pylir.intr.tuple.contains(mro, str):
+    if not isinstance(res, str):
         raise TypeError
     return res
 
@@ -423,3 +430,38 @@ def hash(obj, /):
         raise TypeError
     # TODO: Check in range of sys.maxsize
     return unary_method_call(t[0], obj)
+
+
+def object_isinstance(inst, cls, /):
+    if pylir.intr.tuple.contains(pylir.intr.type.mro(type(cls)), type):
+        return pylir.intr.tuple.contains(pylir.intr.type.mro(type(inst)), cls)
+    # TODO: abstract
+    raise NotImplementedError
+
+
+@pylir.intr.const_export
+def isinstance(inst, cls, /):
+    if type(inst) is cls:
+        return True
+
+    cls_type = type(cls)
+    if cls_type is type:
+        return object_isinstance(inst, cls)
+
+    if cls_type is tuple:
+        i = 0
+        # If the below causes stack overflow replace with intrinsics! Should be
+        # fine as long as all methods called here don't use the tuple form of
+        # isinstance.
+        tuple_len = len(cls)
+        while i < tuple_len:
+            if isinstance(inst, cls[i]):
+                return True
+            i = i + 1
+        return False
+
+    t = pylir.intr.mroLookup(pylir.intr.type.mro(cls_type), "__instancecheck__")
+    if t[1]:
+        return binary_method_call(t[0], cls, inst)
+
+    return object_isinstance(inst, cls)

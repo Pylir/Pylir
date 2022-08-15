@@ -51,6 +51,7 @@ BUILTIN(Next, "builtins.next", true, PyFunction)
 BUILTIN(Pow, "builtins.pow", true, PyFunction)
 BUILTIN(Id, "builtins.id", true, PyFunction)
 BUILTIN(Hash, "builtins.hash", true, PyFunction)
+BUILTIN(IsInstance, "builtins.isinstance", true, PyFunction)
 
 #undef BUILTIN
 #undef BUILTIN_TYPE
