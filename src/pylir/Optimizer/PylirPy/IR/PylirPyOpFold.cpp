@@ -639,6 +639,27 @@ mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Att
     return mlir::success();
 }
 
+mlir::OpFoldResult pylir::Py::IntCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto lhs = operands[0].dyn_cast_or_null<IntAttrInterface>();
+    auto rhs = operands[1].dyn_cast_or_null<IntAttrInterface>();
+    if (!lhs || !rhs)
+    {
+        return nullptr;
+    }
+    bool result;
+    switch (getPred())
+    {
+        case IntCmpKind::eq: result = lhs.getIntegerValue() == rhs.getIntegerValue(); break;
+        case IntCmpKind::ne: result = lhs.getIntegerValue() != rhs.getIntegerValue(); break;
+        case IntCmpKind::lt: result = lhs.getIntegerValue() < rhs.getIntegerValue(); break;
+        case IntCmpKind::le: result = lhs.getIntegerValue() <= rhs.getIntegerValue(); break;
+        case IntCmpKind::gt: result = lhs.getIntegerValue() > rhs.getIntegerValue(); break;
+        case IntCmpKind::ge: result = lhs.getIntegerValue() >= rhs.getIntegerValue(); break;
+    }
+    return mlir::BoolAttr::get(getContext(), result);
+}
+
 mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (operands[0])

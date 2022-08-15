@@ -511,6 +511,8 @@ def PylirPy_IntCmpOp : PylirPy_Op<"int.cmp", [NoSideEffect]> {
     let results = (outs I1:$result);
 
     let assemblyFormat = "$pred $lhs `,` $rhs attr-dict";
+
+    let hasFolder = 1;
 }
 
 def PylirPy_IntAddOp : PylirPy_Op<"int.add", [NoCapture, Commutative, AlwaysBound, NoSideEffect, RefinedType<"Int">,
