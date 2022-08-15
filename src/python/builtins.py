@@ -14,6 +14,7 @@ import pylir.intr.tuple
 import pylir.intr.int
 import pylir.intr.bool
 import pylir.intr.list
+import pylir.intr.intr
 
 
 # TODO: replace with more generic method_call once we have proper iter and
@@ -397,3 +398,19 @@ def len(arg):
 @pylir.intr.const_export
 def id(obj):
     return pylir.intr.object.id(obj)
+
+
+@pylir.intr.const_export
+def print(*objects, sep=None, end=None):
+    # TODO: check sep & end are actually str if not None
+    sep = " " if sep is None else sep
+    end = "\n" if end is None else end
+    i = 0
+    tuple_len = len(objects)
+    res = ""
+    while i < tuple_len:
+        if i != 0:
+            res = pylir.intr.str.concat(res, sep)
+        res = pylir.intr.str.concat(res, str(objects[i]))
+        i = i + 1
+    pylir.intr.intr.print(pylir.intr.str.concat(res, end))

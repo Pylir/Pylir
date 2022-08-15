@@ -17,6 +17,7 @@ set(sources builtins.py
   pylir/intr/int/__init__.pyi
   pylir/intr/bool/__init__.pyi
   pylir/intr/list/__init__.pyi
+  pylir/intr/intr/__init__.pyi
   )
 
 set(outputs)
