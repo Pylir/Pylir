@@ -9,16 +9,16 @@
 #endif
 
 #ifndef BUILTIN_TYPE
-#define BUILTIN_TYPE(...) BUILTIN(__VA_ARGS__, Type)
+#define BUILTIN_TYPE(...) BUILTIN(__VA_ARGS__, PyTypeObject)
 #endif
 
 #ifndef BUILTIN_EXCEPTION
 #define BUILTIN_EXCEPTION(...) BUILTIN_TYPE(__VA_ARGS__)
 #endif
 
-BUILTIN(None, "builtins.None", true, NoneType)
+BUILTIN(None, "builtins.None", true, PyObject)
 BUILTIN_TYPE(NoneType, "builtins.NoneType", false)
-BUILTIN(NotImplemented, "builtins.NotImplemented", true, NotImplementedType)
+BUILTIN(NotImplemented, "builtins.NotImplemented", true, PyObject)
 BUILTIN_TYPE(NotImplementedType, "builtins.NotImplementedType", false)
 BUILTIN_TYPE(Type, "builtins.type", true)
 BUILTIN_TYPE(Object, "builtins.object", true)
@@ -43,14 +43,14 @@ BUILTIN_EXCEPTION(IndexError, "builtins.IndexError", true)
 BUILTIN_EXCEPTION(StopIteration, "builtins.StopIteration", true)
 BUILTIN_EXCEPTION(ArithmeticError, "builtins.ArithmeticError", true)
 BUILTIN_EXCEPTION(OverflowError, "builtins.OverflowError", true)
-BUILTIN(Print, "builtins.print", true, Function)
-BUILTIN(Len, "builtins.len", true, Function)
-BUILTIN(Repr, "builtins.repr", true, Function)
-BUILTIN(Iter, "builtins.iter", true, Function)
-BUILTIN(Next, "builtins.next", true, Function)
-BUILTIN(Pow, "builtins.pow", true, Function)
-BUILTIN(Id, "builtins.id", true, Function)
-BUILTIN(Hash, "builtins.hash", true, Function)
+BUILTIN(Print, "builtins.print", true, PyFunction)
+BUILTIN(Len, "builtins.len", true, PyFunction)
+BUILTIN(Repr, "builtins.repr", true, PyFunction)
+BUILTIN(Iter, "builtins.iter", true, PyFunction)
+BUILTIN(Next, "builtins.next", true, PyFunction)
+BUILTIN(Pow, "builtins.pow", true, PyFunction)
+BUILTIN(Id, "builtins.id", true, PyFunction)
+BUILTIN(Hash, "builtins.hash", true, PyFunction)
 
 #undef BUILTIN
 #undef BUILTIN_TYPE

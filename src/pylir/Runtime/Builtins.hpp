@@ -20,8 +20,7 @@ class PyBaseException;
 
 namespace Builtins
 {
-#define BUILTIN(name, symbol, ...) extern PyObject name asm(symbol);
-#define BUILTIN_TYPE(name, symbol, ...) extern PyTypeObject name asm(symbol);
+#define BUILTIN(name, symbol, _, Type, ...) extern Type name asm(symbol);
 #include <pylir/Interfaces/BuiltinsModule.def>
 } // namespace Builtins
 
