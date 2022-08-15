@@ -534,6 +534,8 @@ def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCapture, AlwaysBound, NoSide
         Converts a python integer into a python string. If `$input` is not really an int (or subclass of)
         the behaviour is undefined.
     }];
+
+    let hasFolder = 1;
 }
 
 // Intrinsics

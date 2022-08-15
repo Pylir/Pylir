@@ -660,6 +660,16 @@ mlir::OpFoldResult pylir::Py::IntCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute>
     return mlir::BoolAttr::get(getContext(), result);
 }
 
+mlir::OpFoldResult pylir::Py::IntToStrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto integer = operands[0].dyn_cast_or_null<IntAttrInterface>();
+    if (!integer)
+    {
+        return nullptr;
+    }
+    return StrAttr::get(getContext(), integer.getIntegerValue().toString());
+}
+
 mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (operands[0])
