@@ -24,6 +24,10 @@ def unary_method_call(method, obj):
     t = pylir.intr.mroLookup(mro, "__get__")
     if t[1]:
         method = t[0](obj, type(obj))
+    # TODO: This is incorrect. One should not be passing any arguments, and obj
+    #       should be bound as the self parameter by the __get__ implementation
+    #       of function. Until this is implemented we are doing this
+    #       incorrectly.
     return method(obj)
 
 
@@ -32,6 +36,8 @@ def binary_method_call(method, self, other):
     t = pylir.intr.mroLookup(mro, "__get__")
     if t[1]:
         method = t[0](self, type(self))
+    # TODO: This is incorrect; See unary_method call description for details.
+    #       Should be `method(other)` in the future.
     return method(self, other)
 
 

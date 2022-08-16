@@ -1,4 +1,3 @@
-
 // Copyright 2022 Markus Böck
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
@@ -12,7 +11,7 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Support/BigInt.hpp>
 
-namespace pylir::Py
+namespace pylir
 {
 class PyBuilder : public mlir::OpBuilder
 {

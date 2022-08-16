@@ -17,7 +17,6 @@ target_link_libraries(PylirPyTransforms
         PylirAnalysis
         PylirPyAnalysis
         PylirPyDialect
-        PylirPyUtil
         PylirTransformsUtils
         PylirPyTransformsUtil
         MLIRTransforms

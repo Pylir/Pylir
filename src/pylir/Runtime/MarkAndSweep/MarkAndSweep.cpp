@@ -43,15 +43,20 @@ void introspectObject(pylir::rt::PyObject* object, F f)
 {
     if (auto* tuple = object->dyn_cast<pylir::rt::PyTuple>())
     {
-        for (auto& iter : *tuple)
+        for (auto* iter : *tuple)
         {
+            //TODO: Remove/reconsider this if tuple are supposed to be able to have unbound elements
+            if (!iter)
+            {
+                continue;
+            }
             f(iter);
         }
         return;
     }
     if (auto* list = object->dyn_cast<pylir::rt::PyList>())
     {
-        for (auto& iter : *list)
+        for (auto* iter : *list)
         {
             f(iter);
         }

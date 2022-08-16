@@ -11,7 +11,6 @@
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
 
 #include "PassDetail.hpp"
 #include "Passes.hpp"
@@ -25,10 +24,9 @@ struct FoldHandlesPass : public FoldHandlesBase<FoldHandlesPass>
     pylir::Py::GlobalValueOp createGlobalValueFromHandle(pylir::Py::GlobalHandleOp handleOp,
                                                          pylir::Py::ObjectAttrInterface initializer, bool constant)
     {
-        pylir::Py::PyBuilder builder(handleOp);
-        auto globalValue = builder.createGlobalValue(handleOp.getSymName(), constant, initializer);
-        globalValue.setVisibility(handleOp.getVisibility());
-        return globalValue;
+        mlir::OpBuilder builder(handleOp);
+        return builder.create<pylir::Py::GlobalValueOp>(handleOp->getLoc(), handleOp.getSymName(),
+                                                        handleOp.getSymVisibilityAttr(), constant, initializer);
     }
 
     void replaceLoadsWithAttr(llvm::ArrayRef<mlir::Operation*> users, mlir::Attribute constant)
@@ -40,8 +38,8 @@ struct FoldHandlesPass : public FoldHandlesBase<FoldHandlesPass>
             {
                 continue;
             }
-            pylir::Py::PyBuilder builder(op);
-            auto newOp = builder.createConstant(constant);
+            mlir::OpBuilder builder(op);
+            auto newOp = builder.create<pylir::Py::ConstantOp>(op->getLoc(), constant);
             op->replaceAllUsesWith(newOp);
             op->erase();
         }
@@ -147,9 +145,9 @@ void FoldHandlesPass::runOnOperation()
                     {
                         auto value = createGlobalValueFromHandle(
                             handle, pylir::Py::FunctionAttr::get(&getContext(), makeFuncOp.getFunctionAttr()), false);
-                        pylir::Py::PyBuilder builder(makeFuncOp);
+                        mlir::OpBuilder builder(makeFuncOp);
                         auto ref = mlir::FlatSymbolRefAttr::get(value);
-                        auto c = builder.createConstant(ref);
+                        auto c = builder.create<pylir::Py::ConstantOp>(makeFuncOp->getLoc(), ref);
                         makeFuncOp->replaceAllUsesWith(c);
                         makeFuncOp->erase();
                         return ref;

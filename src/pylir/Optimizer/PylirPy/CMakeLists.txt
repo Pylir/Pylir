@@ -6,6 +6,5 @@
 
 add_subdirectory(IR)
 add_subdirectory(Transforms)
-add_subdirectory(Util)
 add_subdirectory(Interfaces)
 add_subdirectory(Analysis)

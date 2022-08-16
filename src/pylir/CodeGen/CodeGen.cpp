@@ -19,7 +19,6 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Parser/Visitor.hpp>
 #include <pylir/Support/Functional.hpp>
 #include <pylir/Support/ValueReset.hpp>
@@ -138,8 +137,8 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
 
         {
             implementBlock(typeError);
-            auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
-                                                m_currentExceptBlock);
+            auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
+                                            m_currentExceptBlock);
             raiseException(exception);
         }
 
@@ -159,8 +158,8 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
 
     {
         implementBlock(typeError);
-        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
-                                            m_currentExceptBlock);
+        auto exception =
+            buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
         raiseException(exception);
     }
 
@@ -282,22 +281,22 @@ void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
     }
     for (const auto& [target, token] : assignmentStmt.targets)
     {
-        mlir::Value (Py::PyBuilder::*binOp)(mlir::Value, mlir::Value, mlir::Block*) = nullptr;
+        mlir::Value (PyBuilder::*binOp)(mlir::Value, mlir::Value, mlir::Block*) = nullptr;
         switch (token.getTokenType())
         {
             case TokenType::Assignment: break;
-            case TokenType::PlusAssignment: binOp = &Py::PyBuilder::createPylirIAddIntrinsic; break;
-            case TokenType::MinusAssignment: binOp = &Py::PyBuilder::createPylirISubIntrinsic; break;
-            case TokenType::TimesAssignment: binOp = &Py::PyBuilder::createPylirIMulIntrinsic; break;
-            case TokenType::DivideAssignment: binOp = &Py::PyBuilder::createPylirIDivIntrinsic; break;
-            case TokenType::IntDivideAssignment: binOp = &Py::PyBuilder::createPylirIFloorDivIntrinsic; break;
-            case TokenType::RemainderAssignment: binOp = &Py::PyBuilder::createPylirIModIntrinsic; break;
-            case TokenType::AtAssignment: binOp = &Py::PyBuilder::createPylirIMatMulIntrinsic; break;
-            case TokenType::BitAndAssignment: binOp = &Py::PyBuilder::createPylirIAndIntrinsic; break;
-            case TokenType::BitOrAssignment: binOp = &Py::PyBuilder::createPylirIOrIntrinsic; break;
-            case TokenType::BitXorAssignment: binOp = &Py::PyBuilder::createPylirIXorIntrinsic; break;
-            case TokenType::ShiftRightAssignment: binOp = &Py::PyBuilder::createPylirIRShiftIntrinsic; break;
-            case TokenType::ShiftLeftAssignment: binOp = &Py::PyBuilder::createPylirILShiftIntrinsic; break;
+            case TokenType::PlusAssignment: binOp = &PyBuilder::createPylirIAddIntrinsic; break;
+            case TokenType::MinusAssignment: binOp = &PyBuilder::createPylirISubIntrinsic; break;
+            case TokenType::TimesAssignment: binOp = &PyBuilder::createPylirIMulIntrinsic; break;
+            case TokenType::DivideAssignment: binOp = &PyBuilder::createPylirIDivIntrinsic; break;
+            case TokenType::IntDivideAssignment: binOp = &PyBuilder::createPylirIFloorDivIntrinsic; break;
+            case TokenType::RemainderAssignment: binOp = &PyBuilder::createPylirIModIntrinsic; break;
+            case TokenType::AtAssignment: binOp = &PyBuilder::createPylirIMatMulIntrinsic; break;
+            case TokenType::BitAndAssignment: binOp = &PyBuilder::createPylirIAndIntrinsic; break;
+            case TokenType::BitOrAssignment: binOp = &PyBuilder::createPylirIOrIntrinsic; break;
+            case TokenType::BitXorAssignment: binOp = &PyBuilder::createPylirIXorIntrinsic; break;
+            case TokenType::ShiftRightAssignment: binOp = &PyBuilder::createPylirIRShiftIntrinsic; break;
+            case TokenType::ShiftLeftAssignment: binOp = &PyBuilder::createPylirILShiftIntrinsic; break;
             case TokenType::PowerOfAssignment:
                 // TODO:
                 PYLIR_UNREACHABLE;
@@ -454,18 +453,18 @@ mlir::Value pylir::CodeGen::visit(const Syntax::BinOp& binOp)
             implementBlock(found);
             return found->getArgument(0);
         }
-        case TokenType::Plus: return doBinOp(&Py::PyBuilder::createPylirAddIntrinsic);
-        case TokenType::Minus: return doBinOp(&Py::PyBuilder::createPylirSubIntrinsic);
-        case TokenType::BitOr: return doBinOp(&Py::PyBuilder::createPylirOrIntrinsic);
-        case TokenType::BitXor: return doBinOp(&Py::PyBuilder::createPylirXorIntrinsic);
-        case TokenType::BitAnd: return doBinOp(&Py::PyBuilder::createPylirAndIntrinsic);
-        case TokenType::ShiftLeft: return doBinOp(&Py::PyBuilder::createPylirLShiftIntrinsic);
-        case TokenType::ShiftRight: return doBinOp(&Py::PyBuilder::createPylirRShiftIntrinsic);
-        case TokenType::Star: return doBinOp(&Py::PyBuilder::createPylirMulIntrinsic);
-        case TokenType::Divide: return doBinOp(&Py::PyBuilder::createPylirDivIntrinsic);
-        case TokenType::IntDivide: return doBinOp(&Py::PyBuilder::createPylirFloorDivIntrinsic);
-        case TokenType::Remainder: return doBinOp(&Py::PyBuilder::createPylirModIntrinsic);
-        case TokenType::AtSign: return doBinOp(&Py::PyBuilder::createPylirMatMulIntrinsic);
+        case TokenType::Plus: return doBinOp(&PyBuilder::createPylirAddIntrinsic);
+        case TokenType::Minus: return doBinOp(&PyBuilder::createPylirSubIntrinsic);
+        case TokenType::BitOr: return doBinOp(&PyBuilder::createPylirOrIntrinsic);
+        case TokenType::BitXor: return doBinOp(&PyBuilder::createPylirXorIntrinsic);
+        case TokenType::BitAnd: return doBinOp(&PyBuilder::createPylirAndIntrinsic);
+        case TokenType::ShiftLeft: return doBinOp(&PyBuilder::createPylirLShiftIntrinsic);
+        case TokenType::ShiftRight: return doBinOp(&PyBuilder::createPylirRShiftIntrinsic);
+        case TokenType::Star: return doBinOp(&PyBuilder::createPylirMulIntrinsic);
+        case TokenType::Divide: return doBinOp(&PyBuilder::createPylirDivIntrinsic);
+        case TokenType::IntDivide: return doBinOp(&PyBuilder::createPylirFloorDivIntrinsic);
+        case TokenType::Remainder: return doBinOp(&PyBuilder::createPylirModIntrinsic);
+        case TokenType::AtSign: return doBinOp(&PyBuilder::createPylirMatMulIntrinsic);
         case TokenType::PowerOf:
             // TODO:
         default: PYLIR_UNREACHABLE;
@@ -705,8 +704,8 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             implementBlock(classNamespaceFound);
             return classNamespaceFound->getArgument(0);
         }
-        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
-                                            /*TODO: string arg*/ {}, m_currentExceptBlock);
+        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
+                                        /*TODO: string arg*/ {}, m_currentExceptBlock);
         raiseException(exception);
         if (!m_classNamespace)
         {
@@ -738,8 +737,8 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
             m_builder.create<mlir::cf::CondBranchOp>(failure, failureBlock, successBlock);
 
             implementBlock(failureBlock);
-            auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::UnboundLocalError.name,
-                                                /*TODO: string arg*/ {}, m_currentExceptBlock);
+            auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::UnboundLocalError.name,
+                                            /*TODO: string arg*/ {}, m_currentExceptBlock);
             raiseException(exception);
 
             implementBlock(successBlock);
@@ -754,14 +753,14 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     implementBlock(unbound);
     if (result->second.kind.index() == Identifier::Global)
     {
-        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
-                                            /*TODO: string arg*/ {}, m_currentExceptBlock);
+        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
+                                        /*TODO: string arg*/ {}, m_currentExceptBlock);
         raiseException(exception);
     }
     else
     {
-        auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::UnboundLocalError.name,
-                                            /*TODO: string arg*/ {}, m_currentExceptBlock);
+        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::UnboundLocalError.name,
+                                        /*TODO: string arg*/ {}, m_currentExceptBlock);
         raiseException(exception);
     }
 
@@ -1308,8 +1307,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             m_builder.create<mlir::cf::CondBranchOp>(isSubclass, noTypeErrorBlock, raiseBlock);
 
             implementBlock(raiseBlock);
-            auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
-                                                m_currentExceptBlock);
+            auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
+                                            m_currentExceptBlock);
             raiseException(exception);
 
             implementBlock(noTypeErrorBlock);
@@ -1331,9 +1330,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
                                   m_builder.create<mlir::cf::CondBranchOp>(isSubclass, noTypeErrorBlock, raiseBlock);
 
                                   implementBlock(raiseBlock);
-                                  auto exception =
-                                      Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name,
-                                                         {}, m_currentExceptBlock);
+                                  auto exception = buildException(m_builder.getCurrentLoc(), m_builder,
+                                                                  Builtins::TypeError.name, {}, m_currentExceptBlock);
                                   raiseException(exception);
 
                                   implementBlock(noTypeErrorBlock);
@@ -2018,8 +2016,8 @@ std::vector<pylir::CodeGen::UnpackResults>
                         isUnbound, resultBlock, mlir::ValueRange{lookup.getResult()}, boundBlock, mlir::ValueRange{});
 
                     implementBlock(boundBlock);
-                    auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name,
-                                                        {}, m_currentExceptBlock);
+                    auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
+                                                    m_currentExceptBlock);
                     raiseException(exception);
                 }
                 else
@@ -2060,8 +2058,8 @@ std::vector<pylir::CodeGen::UnpackResults>
                 implementBlock(unboundBlock);
                 if (!iter.hasDefaultParam)
                 {
-                    auto exception = Py::buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name,
-                                                        {}, m_currentExceptBlock);
+                    auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
+                                                    m_currentExceptBlock);
                     raiseException(exception);
                 }
                 else
@@ -2601,4 +2599,36 @@ mlir::Value pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrin
 
     // TODO: diagnose unknown intr
     PYLIR_UNREACHABLE;
+}
+
+mlir::Value pylir::buildException(mlir::Location loc, PyBuilder& builder, std::string_view kind,
+                                  std::vector<Py::IterArg> args, mlir::Block* exceptionHandler)
+{
+    auto typeObj = builder.createConstant(mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
+    args.emplace(args.begin(), typeObj);
+    mlir::Value tuple;
+    if (!exceptionHandler
+        || std::none_of(args.begin(), args.end(),
+                        [](const Py::IterArg& arg) { return std::holds_alternative<Py::IterExpansion>(arg); }))
+    {
+        tuple = builder.createMakeTuple(args);
+    }
+    else
+    {
+        auto* happyPath = new mlir::Block;
+        tuple = builder.createMakeTupleEx(args, happyPath, exceptionHandler);
+        builder.getBlock()->getParent()->push_back(happyPath);
+        builder.setInsertionPointToStart(happyPath);
+    }
+    auto dict = builder.createConstant(builder.getDictAttr());
+    auto mro = builder.createTypeMRO(typeObj);
+    auto newMethod = builder.createMROLookup(mro, "__new__").getResult();
+
+    auto obj = builder.createFunctionCall(newMethod, {newMethod, tuple, dict});
+    auto objType = builder.createTypeOf(obj);
+    auto context = builder.createNoneRef();
+    builder.create<Py::SetSlotOp>(loc, obj, objType, "__context__", context);
+    auto cause = builder.createNoneRef();
+    builder.create<Py::SetSlotOp>(loc, obj, objType, "__cause__", cause);
+    return obj;
 }

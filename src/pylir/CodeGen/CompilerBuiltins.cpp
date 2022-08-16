@@ -8,7 +8,6 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
 #include "CodeGen.hpp"
 
@@ -29,7 +28,49 @@ void implementBlock(mlir::OpBuilder& builder, mlir::Block* block)
     builder.setInsertionPointToStart(block);
 }
 
-mlir::Value binOp(pylir::Py::PyBuilder& builder, llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs,
+mlir::Value buildTrySpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine methodName, mlir::Value args,
+                                      mlir::Value kws, mlir::Block* notFoundPath)
+{
+    auto element = builder.createTupleGetItem(args, builder.create<mlir::arith::ConstantIndexOp>(0));
+    auto elementType = builder.createTypeOf(element);
+    auto mroTuple = builder.createTypeMRO(elementType);
+    auto lookup = builder.createMROLookup(mroTuple, methodName.str());
+    auto* exec = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(builder.getCurrentLoc(), lookup.getSuccess(), exec, notFoundPath);
+
+    implementBlock(builder, exec);
+    mroTuple = builder.createTypeMRO(builder.createTypeOf(lookup.getResult()));
+    auto getMethod = builder.createMROLookup(mroTuple, "__get__");
+    auto* isDescriptor = new mlir::Block;
+    auto* mergeBlock = new mlir::Block;
+    mergeBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+    builder.create<mlir::cf::CondBranchOp>(builder.getCurrentLoc(), getMethod.getSuccess(), isDescriptor, mergeBlock,
+                                           mlir::ValueRange{lookup.getResult()});
+
+    implementBlock(builder, isDescriptor);
+    auto tuple = builder.createMakeTuple({element, elementType});
+    auto result = builder.createPylirCallIntrinsic(getMethod.getResult(), tuple, builder.createMakeDict());
+    builder.create<mlir::cf::BranchOp>(builder.getCurrentLoc(), mergeBlock, result);
+
+    implementBlock(builder, mergeBlock);
+    // TODO: This is incorrect. One should be passing all but args[0], as args[0] will already be bound by the __get__
+    //       descriptor of function. We haven't yet implemented this however, hence this is the stop gap solution.
+    return builder.createPylirCallIntrinsic(mergeBlock->getArgument(0), args, kws);
+}
+
+mlir::Value buildSpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine methodName, mlir::Value args, mlir::Value kws)
+{
+    auto* notFound = new mlir::Block;
+    auto result = buildTrySpecialMethodCall(builder, methodName, args, kws, notFound);
+    mlir::OpBuilder::InsertionGuard guard{builder};
+    implementBlock(builder, notFound);
+    auto exception =
+        pylir::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+    builder.createRaise(exception);
+    return result;
+}
+
+mlir::Value binOp(pylir::PyBuilder& builder, llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs,
                   mlir::Value rhs)
 {
     auto trueC = builder.create<mlir::arith::ConstantIntOp>(true, 1);
@@ -81,17 +122,17 @@ mlir::Value binOp(pylir::Py::PyBuilder& builder, llvm::StringRef method, llvm::S
 
     implementBlock(builder, callReversedBlock);
     auto tuple = builder.createMakeTuple({rhs, lhs});
-    auto reverseResult =
-        pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, revMethod, tuple, {}, nullptr);
+    auto dict = builder.createMakeDict();
+    auto reverseResult = buildSpecialMethodCall(builder, revMethod, tuple, dict);
     auto isNotImplemented = builder.createIs(reverseResult, builder.createNotImplementedRef());
     builder.create<mlir::cf::CondBranchOp>(isNotImplemented, normalMethodBlock, mlir::ValueRange{trueC}, endBlock,
                                            mlir::ValueRange{reverseResult});
 
     implementBlock(builder, normalMethodBlock);
-    tuple = builder.createMakeTuple({lhs, rhs});
     auto* typeErrorBlock = new mlir::Block;
-    auto result = pylir::Py::buildTrySpecialMethodCall(builder.getCurrentLoc(), builder, method, tuple, {},
-                                                       typeErrorBlock, nullptr);
+    tuple = builder.createMakeTuple({lhs, rhs});
+    dict = builder.createMakeDict();
+    auto result = buildTrySpecialMethodCall(builder, method, tuple, dict, typeErrorBlock);
     isNotImplemented = builder.createIs(result, builder.createNotImplementedRef());
     auto* maybeTryReverse = new mlir::Block;
     builder.create<mlir::cf::CondBranchOp>(isNotImplemented, maybeTryReverse, endBlock, mlir::ValueRange{result});
@@ -102,8 +143,7 @@ mlir::Value binOp(pylir::Py::PyBuilder& builder, llvm::StringRef method, llvm::S
 
     implementBlock(builder, actuallyTryReverse);
     tuple = builder.createMakeTuple({rhs, lhs});
-    reverseResult = pylir::Py::buildTrySpecialMethodCall(builder.getCurrentLoc(), builder, revMethod, tuple, {},
-                                                         typeErrorBlock, nullptr);
+    reverseResult = buildTrySpecialMethodCall(builder, revMethod, tuple, dict, typeErrorBlock);
     isNotImplemented = builder.createIs(reverseResult, builder.createNotImplementedRef());
     builder.create<mlir::cf::CondBranchOp>(isNotImplemented, typeErrorBlock, endBlock, mlir::ValueRange{reverseResult});
 
@@ -111,7 +151,7 @@ mlir::Value binOp(pylir::Py::PyBuilder& builder, llvm::StringRef method, llvm::S
     if (method != "__eq__" && method != "__ne__")
     {
         auto typeError =
-            pylir::Py::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+            pylir::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
         builder.createRaise(typeError);
     }
     else
@@ -129,7 +169,7 @@ mlir::Value binOp(pylir::Py::PyBuilder& builder, llvm::StringRef method, llvm::S
     return endBlock->getArgument(0);
 }
 
-void buildRevBinOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method,
+void buildRevBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method,
                                   llvm::StringRef revMethod)
 {
     auto func = builder.create<mlir::func::FuncOp>(
@@ -141,7 +181,7 @@ void buildRevBinOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRef
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildBinOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -151,52 +191,27 @@ void buildBinOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRef fu
     mlir::Value lhs = func.getArgument(0);
     mlir::Value rhs = func.getArgument(1);
     auto tuple = builder.createMakeTuple({lhs, rhs});
-    auto result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, method, tuple, {}, nullptr);
+    auto dict = builder.createMakeDict();
+    auto result = buildSpecialMethodCall(builder, method, tuple, dict);
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildUnaryOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildUnaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName, builder.getFunctionType({builder.getDynamicType()}, builder.getDynamicType()));
     mlir::OpBuilder::InsertionGuard guard{builder};
     builder.setInsertionPointToStart(func.addEntryBlock());
     auto tuple = builder.createMakeTuple({func.getArgument(0)});
-    auto result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, method, tuple, {}, nullptr);
+    auto dict = builder.createMakeDict();
+    auto result = buildSpecialMethodCall(builder, method, tuple, dict);
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildCallOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildCallOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
-        builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
-                                builder.getDynamicType()));
-    mlir::OpBuilder::InsertionGuard guard{builder};
-    builder.setInsertionPointToStart(func.addEntryBlock());
-    auto tuple = builder.createTuplePrepend(func.getArgument(0), func.getArgument(1));
-    auto result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, method, tuple,
-                                                    func.getArgument(2), nullptr);
-    builder.create<mlir::func::ReturnOp>(result);
-}
-
-void buildSetItemOpCompilerBuiltin(pylir::Py::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
-{
-    auto func = builder.create<mlir::func::FuncOp>(
-        functionName,
-        builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
-                                builder.getDynamicType()));
-    mlir::OpBuilder::InsertionGuard guard{builder};
-    builder.setInsertionPointToStart(func.addEntryBlock());
-    auto tuple = builder.createMakeTuple({func.getArgument(0), func.getArgument(1), func.getArgument(2)});
-    auto result = pylir::Py::buildSpecialMethodCall(builder.getCurrentLoc(), builder, method, tuple, {}, nullptr);
-    builder.create<mlir::func::ReturnOp>(result);
-}
-
-void buildMethodCallOpCompilerBuiltin(pylir::Py::PyBuilder& builder)
-{
-    auto func = builder.create<mlir::func::FuncOp>(
-        "pylirMethodCall",
         builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
                                 builder.getDynamicType()));
     mlir::OpBuilder::InsertionGuard guard{builder};
@@ -206,59 +221,38 @@ void buildMethodCallOpCompilerBuiltin(pylir::Py::PyBuilder& builder)
     auto args = func.getArgument(1);
     auto kws = func.getArgument(2);
 
-    auto* condition = new mlir::Block;
-    condition->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
-    builder.create<mlir::cf::BranchOp>(condition, self);
-
-    func.push_back(condition);
-    builder.setInsertionPointToStart(condition);
-    self = condition->getArgument(0);
     auto selfType = builder.createTypeOf(self);
-    auto mroTuple = builder.createTypeMRO(selfType);
-    auto lookup = builder.createMROLookup(mroTuple, "__call__");
-    auto* raiseBlock = new mlir::Block;
-    auto* body = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), body, raiseBlock);
-
-    func.push_back(raiseBlock);
-    builder.setInsertionPointToStart(raiseBlock);
-    auto typeError =
-        pylir::Py::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
-    builder.createRaise(typeError);
-
-    func.push_back(body);
-    builder.setInsertionPointToStart(body);
-    auto callableType = builder.createTypeOf(lookup.getResult());
-    auto isFunction = builder.createIs(callableType, builder.createFunctionRef());
+    // We have to somehow break this recursion by detecting a function type and calling it directly.
+    auto isFunction = builder.createIs(selfType, builder.createFunctionRef());
     auto* isFunctionBlock = new mlir::Block;
     auto* notFunctionBlock = new mlir::Block;
     builder.create<mlir::cf::CondBranchOp>(isFunction, isFunctionBlock, notFunctionBlock);
 
-    func.push_back(isFunctionBlock);
-    builder.setInsertionPointToStart(isFunctionBlock);
-    mlir::Value result = builder.createFunctionCall(lookup.getResult(),
-                                                    {lookup.getResult(), builder.createTuplePrepend(self, args), kws});
+    implementBlock(builder, isFunctionBlock);
+    mlir::Value result = builder.createFunctionCall(self, {self, args, kws});
     builder.create<mlir::func::ReturnOp>(result);
 
-    func.push_back(notFunctionBlock);
-    builder.setInsertionPointToStart(notFunctionBlock);
-    mroTuple = builder.createTypeMRO(callableType);
-    auto getMethod = builder.createMROLookup(mroTuple, "__get__");
-    auto* isDescriptor = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(getMethod.getSuccess(), isDescriptor, condition, lookup.getResult());
-
-    func.push_back(isDescriptor);
-    builder.setInsertionPointToStart(isDescriptor);
-    selfType = builder.createTypeOf(self);
-    auto tuple = builder.createMakeTuple({self, selfType});
-    auto emptyDict = builder.createConstant(builder.getDictAttr());
-    result =
-        builder.create<pylir::Py::CallOp>(func, mlir::ValueRange{getMethod.getResult(), tuple, emptyDict}).getResult(0);
-    builder.create<mlir::cf::BranchOp>(condition, result);
+    implementBlock(builder, notFunctionBlock);
+    result = buildSpecialMethodCall(builder, "__call__", builder.createTuplePrepend(self, args), kws);
+    builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildIOpCompilerBuiltins(pylir::Py::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method,
-                              mlir::Value (pylir::Py::PyBuilder::*normalOp)(mlir::Value, mlir::Value, mlir::Block*))
+void buildSetItemOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+{
+    auto func = builder.create<mlir::func::FuncOp>(
+        functionName,
+        builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
+                                builder.getDynamicType()));
+    mlir::OpBuilder::InsertionGuard guard{builder};
+    builder.setInsertionPointToStart(func.addEntryBlock());
+    auto tuple = builder.createMakeTuple({func.getArgument(0), func.getArgument(1), func.getArgument(2)});
+    auto dict = builder.createMakeDict();
+    auto result = buildSpecialMethodCall(builder, method, tuple, dict);
+    builder.create<mlir::func::ReturnOp>(result);
+}
+
+void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method,
+                              mlir::Value (pylir::PyBuilder::*normalOp)(mlir::Value, mlir::Value, mlir::Block*))
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -291,7 +285,7 @@ void buildIOpCompilerBuiltins(pylir::Py::PyBuilder& builder, llvm::StringRef fun
 
     implementBlock(builder, throwBlock);
     auto typeError =
-        pylir::Py::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+        pylir::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
     builder.createRaise(typeError);
 
     implementBlock(builder, returnBlock);
@@ -320,8 +314,7 @@ void pylir::CodeGen::createCompilerBuiltinsImpl()
 
 #define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                                          \
     buildIOpCompilerBuiltins(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName, \
-                             &::pylir::Py::PyBuilder::createPylir##normalOp##Intrinsic);
+                             &::pylir::PyBuilder::createPylir##normalOp##Intrinsic);
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
-    buildMethodCallOpCompilerBuiltin(m_builder);
 }

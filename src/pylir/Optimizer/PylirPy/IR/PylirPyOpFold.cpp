@@ -11,7 +11,6 @@
 #include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 #include <pylir/Support/Variant.hpp>
 
 #include "PylirPyDialect.hpp"

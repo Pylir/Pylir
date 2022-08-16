@@ -11,5 +11,5 @@ pylir_tablegen(CodeGenIntr.cpp.inc -gen-intrinsics)
 add_public_tablegen_target(CodeGenIntrIncGen)
 
 add_library(CodeGen CodeGen.cpp CompilerBuiltins.cpp)
-target_link_libraries(CodeGen PUBLIC PylirPyDialect Parser PRIVATE PylirPyUtil PRIVATE PylirTransformsUtils MLIRFuncDialect)
+target_link_libraries(CodeGen PUBLIC PylirPyDialect Parser PRIVATE PylirTransformsUtils MLIRFuncDialect)
 add_dependencies(CodeGen CodeGenIntrIncGen)

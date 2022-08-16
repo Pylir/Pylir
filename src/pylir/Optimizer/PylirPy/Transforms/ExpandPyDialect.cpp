@@ -12,8 +12,6 @@
 
 #include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
-#include <pylir/Optimizer/PylirPy/Util/Util.hpp>
 
 #include "PassDetail.hpp"
 #include "Passes.hpp"

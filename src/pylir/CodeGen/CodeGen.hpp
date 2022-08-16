@@ -16,7 +16,6 @@
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/Util/PyBuilder.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 #include <pylir/Parser/Syntax.hpp>
 #include <pylir/Support/Macros.hpp>
@@ -24,6 +23,8 @@
 
 #include <tuple>
 #include <unordered_map>
+
+#include "PyBuilder.hpp"
 
 namespace pylir
 {
@@ -48,7 +49,7 @@ struct CodeGenOptions
 class CodeGen
 {
     CodeGenOptions m_options;
-    Py::PyBuilder m_builder;
+    PyBuilder m_builder;
     mlir::ModuleOp m_module;
     mlir::func::FuncOp m_currentFunc;
     mlir::Region* m_currentRegion{};
@@ -539,6 +540,9 @@ public:
 
     std::pair<mlir::Value, mlir::Value> visit(llvm::ArrayRef<Syntax::Argument> argumentList);
 };
+
+mlir::Value buildException(mlir::Location loc, PyBuilder& builder, std::string_view kind, std::vector<Py::IterArg> args,
+                           mlir::Block* PYLIR_NULLABLE exceptionHandler);
 
 inline mlir::OwningOpRef<mlir::ModuleOp> codegen(mlir::MLIRContext* context, const Syntax::FileInput& input,
                                                  Diag::Document& document, CodeGenOptions options)
