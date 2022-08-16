@@ -402,6 +402,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                     {
                         return tl::unexpected{std::move(augTarget).error()};
                     }
+                    addToNamespace(**starredExpression);
                     if (auto colon = maybeConsume(TokenType::Colon))
                     {
                         auto expression = parseExpression();

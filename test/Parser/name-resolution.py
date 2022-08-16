@@ -144,6 +144,7 @@ def foo():
         def inner2():
             return x
 
+
 # CHECK-LABEL: function foo
 # CHECK-NEXT: locals: x, inner
 # CHECK-NOT: cells:
@@ -155,3 +156,16 @@ def foo():
 # CHECK-NOT: nonlocals:
 # CHECK-NOT: cells:
 # CHECK-NOT: locals:
+
+def foo():
+    x += 3
+
+
+# CHECK-LABEL: function foo
+# CHECK-NEXT: locals: x
+
+def bar():
+    x: 3
+
+# CHECK-LABEL: function bar
+# CHECK-NEXT: locals: x
