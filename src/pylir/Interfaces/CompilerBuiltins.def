@@ -26,6 +26,11 @@
 #define COMPILER_BUILTIN_TERNARY_OP(name, slotName, ...) COMPILER_BUILTIN(name, pylir##slotName)
 #endif
 
+#ifndef COMPILER_BUILTIN_IOP
+#define COMPILER_BUILTIN_IOP(name, slotName, ...) COMPILER_BUILTIN_BIN_OP(name, slotName)
+#endif
+
+#define TYPE_SLOT_IOP(slotName, cppName, normalCppName, ...) COMPILER_BUILTIN_IOP(cppName, slotName, normalCppName)
 #define TYPE_SLOT_TERNARY_OP(slotName, cppName, ...) COMPILER_BUILTIN_TERNARY_OP(cppName, slotName)
 #define TYPE_SLOT_REV_BIN_OP(slotName, revSlotName, cppName, ...) COMPILER_BUILTIN_REV_BIN_OP(cppName, slotName, revSlotName)
 #define TYPE_SLOT_BIN_OP(slotName, cppName, ...) COMPILER_BUILTIN_BIN_OP(cppName, slotName)
@@ -35,6 +40,7 @@
 
 COMPILER_BUILTIN(CallMethod, pylirMethodCall)
 
+#undef COMPILER_BUILTIN_IOP
 #undef COMPILER_BUILTIN_SLOT_TO_API_NAME
 #undef COMPILER_BUILTIN_TERNARY_OP
 #undef COMPILER_BUILTIN_REV_BIN_OP

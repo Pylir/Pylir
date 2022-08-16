@@ -257,6 +257,47 @@ void buildMethodCallOpCompilerBuiltin(pylir::Py::PyBuilder& builder)
     builder.create<mlir::cf::BranchOp>(condition, result);
 }
 
+void buildIOpCompilerBuiltins(pylir::Py::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method,
+                              mlir::Value (pylir::Py::PyBuilder::*normalOp)(mlir::Value, mlir::Value, mlir::Block*))
+{
+    auto func = builder.create<mlir::func::FuncOp>(
+        functionName,
+        builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType()}, builder.getDynamicType()));
+    mlir::OpBuilder::InsertionGuard guard{builder};
+    builder.setInsertionPointToStart(func.addEntryBlock());
+    mlir::Value lhs = func.getArgument(0);
+    mlir::Value rhs = func.getArgument(1);
+
+    auto lhsType = builder.createTypeOf(lhs);
+    auto mro = builder.createTypeMRO(lhsType);
+    auto lookup = builder.createMROLookup(mro, method);
+    auto* fallback = new mlir::Block;
+    auto* callIOp = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), callIOp, fallback);
+
+    implementBlock(builder, callIOp);
+    auto res = builder.createPylirCallIntrinsic(lookup.getResult(), builder.createMakeTuple({lhs, rhs}),
+                                                builder.createMakeDict());
+    auto isNotImplemented = builder.createIs(res, builder.createNotImplementedRef());
+    auto* returnBlock = new mlir::Block;
+    returnBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+    builder.create<mlir::cf::CondBranchOp>(isNotImplemented, fallback, returnBlock, res);
+
+    implementBlock(builder, fallback);
+    res = (builder.*normalOp)(lhs, rhs, nullptr);
+    isNotImplemented = builder.createIs(res, builder.createNotImplementedRef());
+    auto* throwBlock = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(isNotImplemented, throwBlock, returnBlock, res);
+
+    implementBlock(builder, throwBlock);
+    auto typeError =
+        pylir::Py::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+    builder.createRaise(typeError);
+
+    implementBlock(builder, returnBlock);
+    builder.create<mlir::func::ReturnOp>(builder.getCurrentLoc(), returnBlock->getArgument(0));
+}
+
 } // namespace
 
 void pylir::CodeGen::createCompilerBuiltinsImpl()
@@ -276,6 +317,10 @@ void pylir::CodeGen::createCompilerBuiltinsImpl()
 
 #define COMPILER_BUILTIN_TERNARY_OP(name, slotName) \
     build##name##OpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
+
+#define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                                          \
+    buildIOpCompilerBuiltins(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName, \
+                             &::pylir::Py::PyBuilder::createPylir##normalOp##Intrinsic);
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
     buildMethodCallOpCompilerBuiltin(m_builder);

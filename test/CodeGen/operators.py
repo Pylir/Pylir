@@ -131,3 +131,36 @@ def boolean_ops(a, b):
     # CHECK: %[[INVERTED:.*]] = arith.xori %[[TRUE]], %[[RES_AS_I1]]
     # CHECK: %[[AS_BOOL:.*]] = py.bool.fromI1 %[[INVERTED]]
     # CHECK: py.store %[[AS_BOOL]] into @c
+
+
+# CHECK-LABEL: @"aug_assign_ops$impl[0]"
+# CHECK-SAME: %{{[[:alnum:]]+}}
+# CHECK-SAME: %[[A:[[:alnum:]]+]]
+# CHECK-SAME: %[[B:[[:alnum:]]+]]
+def aug_assign_ops(a, b):
+    a += b
+    # CHECK: %[[A_1:.*]] = py.call @pylir__iadd__(%[[A]], %[[B]])
+    a -= b
+    # CHECK: %[[A_2:.*]] = py.call @pylir__isub__(%[[A_1]], %[[B]])
+    a *= b
+    # CHECK: %[[A_3:.*]] = py.call @pylir__imul__(%[[A_2]], %[[B]])
+    a /= b
+    # CHECK: %[[A_4:.*]] = py.call @pylir__idiv__(%[[A_3]], %[[B]])
+    a //= b
+    # CHECK: %[[A_5:.*]] = py.call @pylir__ifloordiv__(%[[A_4]], %[[B]])
+    a %= b
+    # CHECK: %[[A_6:.*]] = py.call @pylir__imod__(%[[A_5]], %[[B]])
+    a @= b
+    # CHECK: %[[A_7:.*]] = py.call @pylir__imatmul__(%[[A_6]], %[[B]])
+    a &= b
+    # CHECK: %[[A_8:.*]] = py.call @pylir__iand__(%[[A_7]], %[[B]])
+    a |= b
+    # CHECK: %[[A_9:.*]] = py.call @pylir__ior__(%[[A_8]], %[[B]])
+    a ^= b
+    # CHECK: %[[A_10:.*]] = py.call @pylir__ixor__(%[[A_9]], %[[B]])
+    a >>= b
+    # CHECK: %[[A_11:.*]] = py.call @pylir__irshift__(%[[A_10]], %[[B]])
+    a <<= b
+    # CHECK: %[[A_12:.*]] = py.call @pylir__ilshift__(%[[A_11]], %[[B]])
+    return a
+    # CHECK: return %[[A_12]]

@@ -268,8 +268,8 @@ class tuple:
             return res + ",)"
         i = 1
         while i < len(self):
-            res = res + ", " + repr(self[i])
-            i = i + 1
+            res += ", " + repr(self[i])
+            i += 1
         return res + ")"
 
 
@@ -418,9 +418,9 @@ def print(*objects, sep=None, end=None):
     res = ""
     while i < tuple_len:
         if i != 0:
-            res = res + sep
-        res = res + str(objects[i])
-        i = i + 1
+            res += sep
+        res += str(objects[i])
+        i += 1
     pylir.intr.intr.print(res + end)
 
 
@@ -458,7 +458,7 @@ def isinstance(inst, cls, /):
         while i < tuple_len:
             if isinstance(inst, cls[i]):
                 return True
-            i = i + 1
+            i += 1
         return False
 
     t = pylir.intr.mroLookup(pylir.intr.type.mro(cls_type), "__instancecheck__")

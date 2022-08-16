@@ -280,9 +280,46 @@ void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
     {
         return;
     }
-    for (const auto& [list, token] : assignmentStmt.targets)
+    for (const auto& [target, token] : assignmentStmt.targets)
     {
-        assignTarget(*list, rhs);
+        mlir::Value (Py::PyBuilder::*binOp)(mlir::Value, mlir::Value, mlir::Block*) = nullptr;
+        switch (token.getTokenType())
+        {
+            case TokenType::Assignment: break;
+            case TokenType::PlusAssignment: binOp = &Py::PyBuilder::createPylirIAddIntrinsic; break;
+            case TokenType::MinusAssignment: binOp = &Py::PyBuilder::createPylirISubIntrinsic; break;
+            case TokenType::TimesAssignment: binOp = &Py::PyBuilder::createPylirIMulIntrinsic; break;
+            case TokenType::DivideAssignment: binOp = &Py::PyBuilder::createPylirIDivIntrinsic; break;
+            case TokenType::IntDivideAssignment: binOp = &Py::PyBuilder::createPylirIFloorDivIntrinsic; break;
+            case TokenType::RemainderAssignment: binOp = &Py::PyBuilder::createPylirIModIntrinsic; break;
+            case TokenType::AtAssignment: binOp = &Py::PyBuilder::createPylirIMatMulIntrinsic; break;
+            case TokenType::BitAndAssignment: binOp = &Py::PyBuilder::createPylirIAndIntrinsic; break;
+            case TokenType::BitOrAssignment: binOp = &Py::PyBuilder::createPylirIOrIntrinsic; break;
+            case TokenType::BitXorAssignment: binOp = &Py::PyBuilder::createPylirIXorIntrinsic; break;
+            case TokenType::ShiftRightAssignment: binOp = &Py::PyBuilder::createPylirIRShiftIntrinsic; break;
+            case TokenType::ShiftLeftAssignment: binOp = &Py::PyBuilder::createPylirILShiftIntrinsic; break;
+            case TokenType::PowerOfAssignment:
+                // TODO:
+                PYLIR_UNREACHABLE;
+                break;
+            default: PYLIR_UNREACHABLE;
+        }
+        mlir::Value assignedValue;
+        if (binOp == nullptr)
+        {
+            assignedValue = rhs;
+        }
+        else
+        {
+            auto lhs = visit(*target);
+            if (!lhs)
+            {
+                return;
+            }
+            auto tokenLoc = changeLoc(assignmentStmt, token);
+            assignedValue = (m_builder.*binOp)(lhs, rhs, m_currentExceptBlock);
+        }
+        assignTarget(*target, assignedValue);
         if (!m_builder.getInsertionBlock())
         {
             return;

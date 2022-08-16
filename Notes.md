@@ -138,3 +138,21 @@ def bin_op(normal, reverse, lhs, rhs):
         raise TypeError
     return result
 ```
+
+# Calling an inplace operator
+
+```py
+def inplace_op(lhs, rhs, inplace, fallback):
+    impl = type(lhs).mroLookup(inplace)
+    if impl is not None:
+        res = impl(lhs, rhs)
+        if res is not NotImplemented:
+            return res
+    res = fallback(lhs, rhs)
+    if res is NotImplemented:
+        raise TypeError
+    return res
+```
+
+Called for any augmented assignment statements which always have the form `lhs $= <expr>` where `$` is a binary
+operator. The returned value of the above is then assigned to `lhs`. 
