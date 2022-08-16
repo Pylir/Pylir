@@ -102,8 +102,7 @@ class object:
     def __repr__(self):
         # TODO: Use hex formatting when turning the id to a string
         name = pylir.intr.getSlot(type(self), type, "__name__")
-        return pylir.intr.str.concat("<", name, " object at ", str(id(self)),
-                                     ">")
+        return "<" + name + " object at " + str(id(self)) + ">"
 
     def __str__(self):
         return repr(self)
@@ -264,14 +263,14 @@ class tuple:
     def __repr__(self):
         if len(self) == 0:
             return "()"
-        res = pylir.intr.str.concat("(", repr(self[0]))
+        res = "(" + repr(self[0])
         if len(self) == 1:
-            return pylir.intr.str.concat(res, ",)")
+            return res + ",)"
         i = 1
         while i < len(self):
-            res = pylir.intr.str.concat(res, ", ", repr(self[i]))
+            res = res + ", " + repr(self[i])
             i = i + 1
-        return pylir.intr.str.concat(res, ")")
+        return res + ")"
 
 
 @pylir.intr.const_export
@@ -357,8 +356,7 @@ class str:
             mro = pylir.intr.type.mro(type(object))
             t = pylir.intr.mroLookup(mro, "__str__")
             res = unary_method_call(t[0], object)
-            mro = pylir.intr.type.mro(type(res))
-            if not pylir.intr.tuple.contains(mro, str):
+            if not isinstance(res, str):
                 raise TypeError
             return res
         raise NotImplementedError
@@ -374,6 +372,9 @@ class str:
 
     def __str__(self, /):
         return self
+
+    def __add__(self, other):
+        return pylir.intr.str.concat(self, other)
 
 
 @pylir.intr.const_export
@@ -417,10 +418,10 @@ def print(*objects, sep=None, end=None):
     res = ""
     while i < tuple_len:
         if i != 0:
-            res = pylir.intr.str.concat(res, sep)
-        res = pylir.intr.str.concat(res, str(objects[i]))
+            res = res + sep
+        res = res + str(objects[i])
         i = i + 1
-    pylir.intr.intr.print(pylir.intr.str.concat(res, end))
+    pylir.intr.intr.print(res + end)
 
 
 @pylir.intr.const_export
