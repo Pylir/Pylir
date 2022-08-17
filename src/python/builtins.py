@@ -5,16 +5,16 @@
 #  // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import pylir.intr.BaseException
+import pylir.intr.bool
+import pylir.intr.dict
+import pylir.intr.function
+import pylir.intr.int
+import pylir.intr.intr
+import pylir.intr.list
 import pylir.intr.object
 import pylir.intr.str
-import pylir.intr.type
-import pylir.intr.function
-import pylir.intr.dict
 import pylir.intr.tuple
-import pylir.intr.int
-import pylir.intr.bool
-import pylir.intr.list
-import pylir.intr.intr
+import pylir.intr.type
 
 
 # TODO: replace with more generic method_call once we have proper iter and
@@ -472,3 +472,63 @@ def isinstance(inst, cls, /):
         return binary_method_call(t[0], cls, inst)
 
     return object_isinstance(inst, cls)
+
+
+@pylir.intr.const_export
+class SeqIter:
+    __slots__ = ("__seq", "__i")
+
+    def __init__(self, seq) -> None:
+        pylir.intr.setSlot(self, SeqIter, "__seq", seq)
+        pylir.intr.setSlot(self, SeqIter, "__i", 0)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        index = pylir.intr.getSlot(self, SeqIter, "__i")
+        seq = pylir.intr.getSlot(self, SeqIter, "__seq")
+        if index >= len(seq):
+            raise StopIteration
+        item = seq[index]
+        pylir.intr.setSlot(self, SeqIter, "__i", index + 1)
+        return item
+
+
+@pylir.intr.const_export
+def iter(*args):
+    if not (1 <= len(args) <= 2):
+        raise TypeError
+
+    if len(args) == 1:
+        obj = args[0]
+        mro = pylir.intr.type.mro(type(obj))
+        t = pylir.intr.mroLookup(mro, "__iter__")
+        if t[1]:
+            if t[0] is None:
+                raise TypeError
+            return unary_method_call(t[0], obj)
+        t = pylir.intr.mroLookup(mro, "__getitem__")
+        if not t[1]:
+            raise TypeError
+        return SeqIter(obj)
+
+    raise NotImplementedError
+
+
+@pylir.intr.const_export
+def next(*args):
+    if not (1 <= len(args) <= 2):
+        raise TypeError
+    obj = args[0]
+    mro = pylir.intr.type.mro(type(obj))
+    t = pylir.intr.mroLookup(mro, "__next__")
+    if not t[1]:
+        raise TypeError
+
+    try:
+        return unary_method_call(t[0], obj)
+    except StopIteration as e:
+        if len(args) == 2:
+            return args[1]
+        raise e
