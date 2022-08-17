@@ -27,7 +27,7 @@ func.func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: ^[[UNWIND]]:
 // CHECK-NEXT: %[[LANDING_PAD:.*]] = llvm.landingpad
 // CHECK-SAME: catch %[[BASE_EXCEPTION]]
-// CHECK-NEXT: %[[EXCEPTION_HEADER_i8:.*]] = llvm.extractvalue %[[LANDING_PAD]][0 : i32]
+// CHECK-NEXT: %[[EXCEPTION_HEADER_i8:.*]] = llvm.extractvalue %[[LANDING_PAD]][0]
 // CHECK-NEXT: %[[OFFSETOF:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[GEP:.*]] = llvm.sub %[[EXCEPTION_HEADER_i8]], %[[OFFSETOF]]
 // CHECK-NEXT: %[[EXCEPTION_OBJECT:.*]] = llvm.inttoptr %[[GEP]]

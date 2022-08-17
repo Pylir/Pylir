@@ -168,4 +168,4 @@ inline llvm::hash_code hash_value(TypeAttrUnion value)
 }
 } // namespace pylir::Py
 
-#include "pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.h.inc"
+#include "pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.h.inc"

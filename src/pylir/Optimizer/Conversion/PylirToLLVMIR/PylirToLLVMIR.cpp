@@ -633,8 +633,7 @@ public:
         auto typeObjectAttr = *globalValueOp.getInitializer();
         auto typeObj =
             builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), m_objectPtrType, objectAttr.getTypeObject());
-        undef =
-            builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, typeObj, builder.getI32ArrayAttr({0}));
+        undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, typeObj, 0);
         llvm::TypeSwitch<pylir::Py::ObjectAttrInterface>(objectAttr)
             .Case(
                 [&](pylir::Py::StrAttr attr)
@@ -643,9 +642,9 @@ public:
                     auto sizeConstant = builder.create<mlir::LLVM::ConstantOp>(
                         global.getLoc(), getIndexType(), builder.getI64IntegerAttr(values.size()));
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, sizeConstant,
-                                                                      builder.getI32ArrayAttr({1, 0}));
+                                                                      llvm::ArrayRef<std::int64_t>{1, 0});
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, sizeConstant,
-                                                                      builder.getI32ArrayAttr({1, 1}));
+                                                                      llvm::ArrayRef<std::int64_t>{1, 1});
 
                     auto elementType = builder.getI8Type();
 
@@ -667,21 +666,20 @@ public:
                         global.getLoc(), builder.getType<mlir::LLVM::LLVMPointerType>(),
                         mlir::FlatSymbolRefAttr::get(bufferObject));
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, bufferAddress,
-                                                                      builder.getI32ArrayAttr({1, 2}));
+                                                                      llvm::ArrayRef<std::int64_t>{1, 2});
                 })
             .Case(
                 [&](pylir::Py::TupleAttr attr)
                 {
                     auto sizeConstant = builder.create<mlir::LLVM::ConstantOp>(
                         global.getLoc(), getIndexType(), builder.getI64IntegerAttr(attr.getValue().size()));
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, sizeConstant,
-                                                                      builder.getI32ArrayAttr({1}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, sizeConstant, 1);
                     for (const auto& iter : llvm::enumerate(attr.getValue()))
                     {
                         auto constant = getConstant(global.getLoc(), iter.value(), builder);
                         undef = builder.create<mlir::LLVM::InsertValueOp>(
                             global.getLoc(), undef, constant,
-                            builder.getI32ArrayAttr({2, static_cast<std::int32_t>(iter.index())}));
+                            llvm::ArrayRef<std::int64_t>{2, static_cast<std::int32_t>(iter.index())});
                     }
                 })
             .Case(
@@ -689,8 +687,7 @@ public:
                 {
                     auto sizeConstant = builder.create<mlir::LLVM::ConstantOp>(
                         global.getLoc(), getIndexType(), builder.getI64IntegerAttr(attr.getValue().size()));
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, sizeConstant,
-                                                                      builder.getI32ArrayAttr({1}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, sizeConstant, 1);
                     auto tupleObject = m_globalBuffers.lookup(attr);
                     if (!tupleObject)
                     {
@@ -708,16 +705,14 @@ public:
                     }
                     auto address = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), m_objectPtrType,
                                                                            mlir::FlatSymbolRefAttr::get(tupleObject));
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, address,
-                                                                      builder.getI32ArrayAttr({2}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, address, 2);
                 })
             .Case(
                 [&](pylir::Py::FloatAttr floatAttr)
                 {
                     auto constant = builder.create<mlir::LLVM::ConstantOp>(
                         global.getLoc(), builder.getF64Type(), builder.getF64FloatAttr(floatAttr.getDoubleValue()));
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, constant,
-                                                                      builder.getI32ArrayAttr({1}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, constant, 1);
                 })
             .Case(
                 [&](pylir::Py::IntAttrInterface integer)
@@ -747,9 +742,8 @@ public:
                         {
                             auto constant = builder.create<mlir::LLVM::ConstantOp>(
                                 global.getLoc(), elementType, builder.getIntegerAttr(elementType, element.value()));
-                            arrayUndef = builder.create<mlir::LLVM::InsertValueOp>(
-                                global.getLoc(), arrayUndef, constant,
-                                builder.getI32ArrayAttr({static_cast<std::int32_t>(element.index())}));
+                            arrayUndef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), arrayUndef,
+                                                                                   constant, element.index());
                         }
                         builder.create<mlir::LLVM::ReturnOp>(global.getLoc(), arrayUndef);
                     }
@@ -794,15 +788,13 @@ public:
                     auto null = builder.create<mlir::LLVM::NullOp>(global.getLoc(),
                                                                    mlir::LLVM::LLVMPointerType::get(&getContext()));
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI,
-                                                                      builder.getI32ArrayAttr({1, 0}));
+                                                                      llvm::ArrayRef<std::int64_t>{1, 0});
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI,
-                                                                      builder.getI32ArrayAttr({1, 1}));
+                                                                      llvm::ArrayRef<std::int64_t>{1, 1});
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, null,
-                                                                      builder.getI32ArrayAttr({1, 2}));
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI,
-                                                                      builder.getI32ArrayAttr({2}));
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, null,
-                                                                      builder.getI32ArrayAttr({3}));
+                                                                      llvm::ArrayRef<std::int64_t>{1, 2});
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI, 2);
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, null, 3);
                     if (dict.getValue().empty())
                     {
                         return;
@@ -832,23 +824,19 @@ public:
                             global.getLoc(), getIndexType(),
                             builder.getI32IntegerAttr(getPlatformABI().getSizeOf(instanceType)
                                                       / (getPointerBitwidth() / 8)));
-                        undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asCount,
-                                                                          builder.getI32ArrayAttr({1}));
+                        undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, asCount, 1);
                     }
                     auto layoutRef = getConstant(global.getLoc(), layoutType, builder);
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, layoutRef,
-                                                                      builder.getI32ArrayAttr({2}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, layoutRef, 2);
                     auto mroConstant = getConstant(global.getLoc(), attr.getMroTuple(), builder);
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, mroConstant,
-                                                                      builder.getI32ArrayAttr({3}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, mroConstant, 3);
                 })
             .Case(
                 [&](pylir::Py::FunctionAttr function)
                 {
                     auto address = builder.create<mlir::LLVM::AddressOfOp>(
                         global.getLoc(), mlir::LLVM::LLVMPointerType::get(&getContext()), function.getValue());
-                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, address,
-                                                                      builder.getI32ArrayAttr({1}));
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, address, 1);
                 });
         const auto& map = typeObjectAttr.getSlots();
         if (auto result = map.get("__slots__"))
@@ -865,10 +853,9 @@ public:
                 {
                     value = getConstant(global.getLoc(), element, builder);
                 }
-                auto indices = builder.getI32ArrayAttr(
-                    {static_cast<std::int32_t>(global.getType().cast<mlir::LLVM::LLVMStructType>().getBody().size()
-                                               - 1),
-                     static_cast<std::int32_t>(slot.index())});
+                auto indices = {
+                    static_cast<std::int64_t>(global.getType().cast<mlir::LLVM::LLVMStructType>().getBody().size() - 1),
+                    static_cast<std::int64_t>(slot.index())};
                 undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, value, indices);
             }
         }
@@ -1884,10 +1871,8 @@ struct IntGetIntegerOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py:
         auto size = createIndexConstant(rewriter, op.getLoc(), sizeOf(converted));
         auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_int_get,
                                         {mlir::Value{mpInt}, size});
-        mlir::Value first = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), getIndexType(), result,
-                                                                        rewriter.getI32ArrayAttr({0}));
-        auto second = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), rewriter.getI1Type(), result,
-                                                                  rewriter.getI32ArrayAttr({1}));
+        mlir::Value first = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), result, 0);
+        auto second = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), result, 1);
         if (first.getType() != converted)
         {
             first = rewriter.create<mlir::LLVM::TruncOp>(op.getLoc(), converted, first);
@@ -2465,8 +2450,7 @@ struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T>
         auto literal = mlir::LLVM::LLVMStructType::getLiteral(
             this->getContext(), {this->getIntPtrType(REF_ADDRESS_SPACE), rewriter.getI32Type()});
         auto landingPad = rewriter.create<mlir::LLVM::LandingpadOp>(op.getLoc(), literal, catchType);
-        mlir::Value exceptionHeader = rewriter.create<mlir::LLVM::ExtractValueOp>(
-            op.getLoc(), literal.getBody()[0], landingPad, rewriter.getI32ArrayAttr({0}));
+        mlir::Value exceptionHeader = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), landingPad, 0);
         {
             // Itanium ABI mandates a pointer to the exception header be returned by the landing pad.
             // So we need to subtract the offset of the exception header inside of PyBaseException to get to it.

@@ -10,9 +10,9 @@ func.func @constants() -> !py.dynamic {
 // CHECK: llvm.mlir.global private unnamed_addr constant @[[CONSTANT:const\$[[:alnum:]]*]]
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
-// CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0 : i32]
+// CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant(0 : i{{.*}})
-// CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1 : i32]
+// CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1]
 // CHECK-NEXT: llvm.return %[[UNDEF2]]
 
 // CHECK-LABEL: @constants
@@ -31,11 +31,11 @@ func.func @constants() -> !py.dynamic {
 // CHECK: llvm.mlir.global private unnamed_addr constant @[[CONSTANT:const\$[[:alnum:]]*]]
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
-// CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0 : i32]
+// CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant(1 : i{{.*}})
-// CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1 : i32]
+// CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1]
 // CHECK-NEXT: %[[NULLPTR:.*]] = llvm.mlir.null
-// CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[NULLPTR]], %[[UNDEF2]][2 : i32, 0 : i32]
+// CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[NULLPTR]], %[[UNDEF2]][2, 0]
 // CHECK-NEXT: llvm.return %[[UNDEF3]]
 
 // CHECK-LABEL: @constants

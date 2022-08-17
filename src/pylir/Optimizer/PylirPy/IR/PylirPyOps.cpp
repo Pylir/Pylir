@@ -43,12 +43,12 @@ mlir::Operation* cloneWithoutExceptionHandlingImpl(mlir::OpBuilder& builder, T e
                 continue;
             }
             llvm::SmallVector<std::int32_t> sizes;
-            for (auto integer : iter.getValue().template cast<mlir::DenseIntElementsAttr>())
+            for (auto integer : iter.getValue().template cast<mlir::DenseI32ArrayAttr>().asArrayRef())
             {
-                sizes.push_back(integer.getZExtValue());
+                sizes.push_back(integer);
             }
             sizes.resize(sizes.size() - 2);
-            attributes.back().setValue(builder.getI32VectorAttr(sizes));
+            attributes.back().setValue(builder.getDenseI32ArrayAttr(sizes));
         }
     }
     state.addAttributes(attributes);
@@ -62,7 +62,8 @@ namespace pylir::Py::details
 mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::Operation* operation,
                                                 const mlir::OperationName& invokeVersion, ::mlir::Block* happyPath,
                                                 mlir::Block* exceptionPath, mlir::ValueRange unwindOperands,
-                                                llvm::StringRef attrSizedSegmentName, llvm::ArrayRef<OperandShape> shape)
+                                                llvm::StringRef attrSizedSegmentName,
+                                                llvm::ArrayRef<OperandShape> shape)
 {
     mlir::OperationState state(operation->getLoc(), invokeVersion);
     state.addTypes(operation->getResultTypes());
@@ -78,13 +79,13 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
         if (iter.getName() == attrSizedSegmentName)
         {
             llvm::SmallVector<std::int32_t> sizes;
-            for (auto integer : iter.getValue().template cast<mlir::DenseIntElementsAttr>())
+            for (auto integer : iter.getValue().cast<mlir::DenseI32ArrayAttr>().asArrayRef())
             {
-                sizes.push_back(integer.getZExtValue());
+                sizes.push_back(integer);
             }
             sizes.push_back(0);
             sizes.push_back(unwindOperands.size());
-            attributes.back().setValue(builder.getI32VectorAttr(sizes));
+            attributes.back().setValue(builder.getDenseI32ArrayAttr(sizes));
         }
     }
     if (!operation->hasTrait<mlir::OpTrait::AttrSizedOperandSegments>())
@@ -111,7 +112,7 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
         }
         values.push_back(0);
         values.push_back(unwindOperands.size());
-        attributes.emplace_back(builder.getStringAttr(attrSizedSegmentName), builder.getI32VectorAttr(values));
+        attributes.emplace_back(builder.getStringAttr(attrSizedSegmentName), builder.getDenseI32ArrayAttr(values));
     }
     state.addAttributes(attributes);
     return builder.create(state);

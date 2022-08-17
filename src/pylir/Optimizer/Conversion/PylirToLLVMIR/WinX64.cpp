@@ -155,15 +155,15 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
             {
                 return {};
             }
-            return call.getResult(0);
+            return call.getResult();
         case IntegerRegister:
         {
             auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
             auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(
                 loc, mlir::LLVM::LLVMPointerType::get(adjustments.originalRetType), one, 1);
             auto casted = builder.create<mlir::LLVM::BitcastOp>(
-                loc, mlir::LLVM::LLVMPointerType::get(call.getResult(0).getType()), tempAlloca);
-            builder.create<mlir::LLVM::StoreOp>(loc, call.getResult(0), casted);
+                loc, mlir::LLVM::LLVMPointerType::get(call.getResult().getType()), tempAlloca);
+            builder.create<mlir::LLVM::StoreOp>(loc, call.getResult(), casted);
             return builder.create<mlir::LLVM::LoadOp>(loc, tempAlloca);
         }
         case PointerToTemporary: return builder.create<mlir::LLVM::LoadOp>(loc, returnSlot);

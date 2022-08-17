@@ -87,7 +87,7 @@ def MemoryDefOp : MemorySSA_Op<"def"> {
 }
 
 def MemoryBranchOp : MemorySSA_Op<"br", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {
-    let arguments = (ins VariadicOfVariadic<MemoryDefType, "arg_sizes">:$branch_args, I32ElementsAttr:$arg_sizes);
+    let arguments = (ins VariadicOfVariadic<MemoryDefType, "arg_sizes">:$branch_args, DenseI32ArrayAttr:$arg_sizes);
     let results = (outs);
 
     let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);

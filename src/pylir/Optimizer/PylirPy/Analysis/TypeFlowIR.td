@@ -179,7 +179,7 @@ def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOp
 
 def TypeFlow_BranchOp : TypeFlow_Op<"branch",
 	[Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, NoSideEffect]> {
-	let arguments = (ins VariadicOfVariadic<TypeFlow_MetaType, "arg_sizes">:$branch_args, I32ElementsAttr:$arg_sizes);
+	let arguments = (ins VariadicOfVariadic<TypeFlow_MetaType, "arg_sizes">:$branch_args, DenseI32ArrayAttr:$arg_sizes);
 	let results = (outs);
 
 	let successors = (successor VariadicSuccessor<AnySuccessor>:$successors);

@@ -333,7 +333,7 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
         {
             if (call->getNumResults() > 0)
             {
-                return call.getResult(0);
+                return call.getResult();
             }
             return {};
         },
@@ -344,8 +344,8 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
             auto tempAlloca = builder.create<mlir::LLVM::AllocaOp>(
                 loc, mlir::LLVM::LLVMPointerType::get(adjustments.originalRetType), one, 1);
             auto casted = builder.create<mlir::LLVM::BitcastOp>(
-                loc, mlir::LLVM::LLVMPointerType::get(call.getResult(0).getType()), tempAlloca);
-            builder.create<mlir::LLVM::StoreOp>(loc, call.getResult(0), casted);
+                loc, mlir::LLVM::LLVMPointerType::get(call.getResult().getType()), tempAlloca);
+            builder.create<mlir::LLVM::StoreOp>(loc, call.getResult(), casted);
             return builder.create<mlir::LLVM::LoadOp>(loc, tempAlloca);
         });
 }

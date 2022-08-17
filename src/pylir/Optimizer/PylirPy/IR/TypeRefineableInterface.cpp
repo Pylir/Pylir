@@ -6,7 +6,7 @@
 
 #include "TypeRefineableInterface.hpp"
 
-#include "pylir/Optimizer/PylirPy/Interfaces/TypeRefineableInterface.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.cpp.inc"
 
 #include "PylirPyAttributes.hpp"
 
