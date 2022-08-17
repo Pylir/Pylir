@@ -456,15 +456,12 @@ def isinstance(inst, cls, /):
         return object_isinstance(inst, cls)
 
     if cls_type is tuple:
-        i = 0
         # If the below causes stack overflow replace with intrinsics! Should be
         # fine as long as all methods called here don't use the tuple form of
         # isinstance.
-        tuple_len = len(cls)
-        while i < tuple_len:
-            if isinstance(inst, cls[i]):
+        for it in cls:
+            if isinstance(inst, it):
                 return True
-            i += 1
         return False
 
     t = pylir.intr.mroLookup(pylir.intr.type.mro(cls_type), "__instancecheck__")
