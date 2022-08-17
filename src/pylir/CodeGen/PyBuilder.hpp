@@ -390,11 +390,11 @@ public:
         return create<Py::MakeTupleOp>(args);
     }
 
-    Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<mlir::Value> args, mlir::ArrayAttr iterExpansion)
+    Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
     {
         if (!iterExpansion)
         {
-            iterExpansion = getI32ArrayAttr({});
+            iterExpansion = getDenseI32ArrayAttr({});
         }
         return create<Py::MakeTupleOp>(args, iterExpansion);
     }
@@ -419,11 +419,11 @@ public:
         return create<Py::MakeListOp>(args);
     }
 
-    Py::MakeListOp createMakeList(llvm::ArrayRef<mlir::Value> args, mlir::ArrayAttr iterExpansion)
+    Py::MakeListOp createMakeList(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
     {
         if (!iterExpansion)
         {
-            iterExpansion = getI32ArrayAttr({});
+            iterExpansion = getDenseI32ArrayAttr({});
         }
         return create<Py::MakeListOp>(args, iterExpansion);
     }
@@ -448,11 +448,11 @@ public:
         return create<Py::MakeSetOp>(args);
     }
 
-    Py::MakeSetOp createMakeSet(llvm::ArrayRef<mlir::Value> args, mlir::ArrayAttr iterExpansion)
+    Py::MakeSetOp createMakeSet(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
     {
         if (!iterExpansion)
         {
-            iterExpansion = getI32ArrayAttr({});
+            iterExpansion = getDenseI32ArrayAttr({});
         }
         return create<Py::MakeSetOp>(args, iterExpansion);
     }
@@ -478,11 +478,11 @@ public:
     }
 
     Py::MakeDictOp createMakeDict(llvm::ArrayRef<mlir::Value> keys, llvm::ArrayRef<mlir::Value> values,
-                                  mlir::ArrayAttr mappingExpansion = {})
+                                  mlir::DenseI32ArrayAttr mappingExpansion = {})
     {
         if (!mappingExpansion)
         {
-            mappingExpansion = getI32ArrayAttr({});
+            mappingExpansion = getDenseI32ArrayAttr({});
         }
         return create<Py::MakeDictOp>(keys, values, mappingExpansion);
     }

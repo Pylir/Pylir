@@ -121,7 +121,7 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
 
 bool pylir::Py::DictArgsIterator::isCurrentlyExpansion()
 {
-    return m_currExp != m_expansions.end() && m_currExp->cast<mlir::IntegerAttr>().getValue() == m_index;
+    return m_currExp != m_expansions.end() && *m_currExp == m_index;
 }
 
 pylir::Py::DictArg pylir::Py::DictArgsIterator::operator*()
@@ -137,7 +137,7 @@ pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator++()
 {
     m_keys++;
     m_index++;
-    while (m_currExp != m_expansions.end() && m_currExp->cast<mlir::IntegerAttr>().getValue().ule(m_index))
+    while (m_currExp != m_expansions.end() && *m_currExp <= m_index)
     {
         m_currExp++;
     }
@@ -156,7 +156,7 @@ pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator--()
         m_currExp--;
     }
     m_index--;
-    while (m_currExp != m_expansions.begin() && m_currExp->cast<mlir::IntegerAttr>().getValue().ugt(m_index))
+    while (m_currExp != m_expansions.begin() && *m_currExp > m_index)
     {
         m_currExp--;
     }
@@ -181,10 +181,10 @@ namespace
 {
 bool parseIterArguments(mlir::OpAsmParser& parser,
                         llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& operands,
-                        mlir::ArrayAttr& iterExpansion)
+                        mlir::DenseI32ArrayAttr& iterExpansion)
 {
     llvm::SmallVector<std::int32_t> iters;
-    auto exit = llvm::make_scope_exit([&] { iterExpansion = parser.getBuilder().getI32ArrayAttr(iters); });
+    auto exit = llvm::make_scope_exit([&] { iterExpansion = parser.getBuilder().getDenseI32ArrayAttr(iters); });
 
     if (parser.parseLParen())
     {
@@ -221,14 +221,11 @@ bool parseIterArguments(mlir::OpAsmParser& parser,
 }
 
 void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange operands,
-                        mlir::ArrayAttr iterExpansion)
+                        mlir::DenseI32ArrayAttr iterExpansion)
 {
     printer << '(';
-    llvm::DenseSet<std::uint32_t> iters;
-    for (auto iter : iterExpansion.getAsValueRange<mlir::IntegerAttr>())
-    {
-        iters.insert(iter.getZExtValue());
-    }
+    auto ref = iterExpansion.asArrayRef();
+    llvm::DenseSet<std::uint32_t> iters(ref.begin(), ref.end());
     int i = 0;
     llvm::interleaveComma(operands, printer,
                           [&](mlir::Value value)
@@ -248,10 +245,10 @@ void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::Ope
 
 bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& keys,
                            llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& values,
-                           mlir::ArrayAttr& mappingExpansion)
+                           mlir::DenseI32ArrayAttr& mappingExpansion)
 {
     llvm::SmallVector<std::int32_t> mappings;
-    auto exit = llvm::make_scope_exit([&] { mappingExpansion = parser.getBuilder().getI32ArrayAttr(mappings); });
+    auto exit = llvm::make_scope_exit([&] { mappingExpansion = parser.getBuilder().getDenseI32ArrayAttr(mappings); });
 
     if (parser.parseLParen())
     {
@@ -295,14 +292,11 @@ bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir
 }
 
 void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange keys,
-                           mlir::OperandRange values, mlir::ArrayAttr mappingExpansion)
+                           mlir::OperandRange values, mlir::DenseI32ArrayAttr mappingExpansion)
 {
     printer << '(';
-    llvm::DenseSet<std::uint32_t> iters;
-    for (auto iter : mappingExpansion.getAsValueRange<mlir::IntegerAttr>())
-    {
-        iters.insert(iter.getZExtValue());
-    }
+    auto ref = mappingExpansion.asArrayRef();
+    llvm::DenseSet<std::uint32_t> iters(ref.begin(), ref.end());
     int i = 0;
     std::size_t valueCounter = 0;
     llvm::interleaveComma(keys, printer,
@@ -390,7 +384,7 @@ void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
 }
 
 void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -408,7 +402,7 @@ void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
 }
 
 void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -426,7 +420,7 @@ void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operatio
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion));
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
 }
 
 void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
@@ -449,7 +443,7 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
                 mappingExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion));
+    build(odsBuilder, odsState, keys, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion));
 }
 
 namespace
@@ -543,7 +537,7 @@ void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
 }
 
@@ -564,7 +558,7 @@ void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
 }
 
@@ -585,7 +579,7 @@ void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
                 iterExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, values, odsBuilder.getI32ArrayAttr(iterExpansion), normalDestOperands,
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
 }
 
@@ -611,7 +605,7 @@ void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
                 mappingExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, keys, values, odsBuilder.getI32ArrayAttr(mappingExpansion), normalDestOperands,
+    build(odsBuilder, odsState, keys, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
 }
 
@@ -621,11 +615,11 @@ template <class T>
 llvm::SmallVector<pylir::Py::IterArg> getIterArgs(T op)
 {
     llvm::SmallVector<pylir::Py::IterArg> result(op.getNumOperands());
-    auto range = op.getIterExpansionAttr().template getAsValueRange<mlir::IntegerAttr>();
+    auto range = op.getIterExpansion();
     auto begin = range.begin();
     for (const auto& pair : llvm::enumerate(op.getOperands()))
     {
-        if (begin == range.end() || *begin != pair.index())
+        if (begin == range.end() || static_cast<std::size_t>(*begin) != pair.index())
         {
             result[pair.index()] = pair.value();
             continue;

@@ -114,7 +114,7 @@ struct TupleUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleOp>
     void rewrite(pylir::Py::MakeTupleOp op, mlir::PatternRewriter& rewriter) const override
     {
         rewriter.setInsertionPoint(op);
-        auto list = rewriter.create<pylir::Py::MakeListOp>(op.getLoc(), op.getArguments(), op.getIterExpansion());
+        auto list = rewriter.create<pylir::Py::MakeListOp>(op.getLoc(), op.getArguments(), op.getIterExpansionAttr());
         rewriter.replaceOpWithNewOp<pylir::Py::ListToTupleOp>(op, list);
     }
 
@@ -131,7 +131,7 @@ struct TupleExUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>
     void rewrite(pylir::Py::MakeTupleExOp op, mlir::PatternRewriter& rewriter) const override
     {
         rewriter.setInsertionPoint(op);
-        auto list = rewriter.create<pylir::Py::MakeListExOp>(op.getLoc(), op.getArguments(), op.getIterExpansion(),
+        auto list = rewriter.create<pylir::Py::MakeListExOp>(op.getLoc(), op.getArguments(), op.getIterExpansionAttr(),
                                                              op.getNormalDestOperands(), op.getUnwindDestOperands(),
                                                              op.getHappyPath(), op.getExceptionPath());
         rewriter.replaceOpWithNewOp<pylir::Py::ListToTupleOp>(op, list);
@@ -160,15 +160,15 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
         auto dest = block->splitBlock(op);
         rewriter.setInsertionPointToEnd(block);
         auto loc = op.getLoc();
-        auto range = op.getIterExpansion().template getAsRange<mlir::IntegerAttr>();
+        auto range = op.getIterExpansion();
         PYLIR_ASSERT(!range.empty());
         auto begin = range.begin();
-        auto prefix = op.getOperands().take_front((*begin).getValue().getZExtValue());
+        auto prefix = op.getOperands().take_front(*begin);
         auto one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-        auto list = rewriter.create<pylir::Py::MakeListOp>(loc, prefix, rewriter.getI32ArrayAttr({}));
-        for (const auto& iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), (*begin).getValue().getZExtValue()))
+        auto list = rewriter.create<pylir::Py::MakeListOp>(loc, prefix, rewriter.getDenseI32ArrayAttr({}));
+        for (const auto& iter : llvm::drop_begin(llvm::enumerate(op.getOperands()), *begin))
         {
-            if (begin == range.end() || (*begin).getValue() != iter.index())
+            if (begin == range.end() || static_cast<std::size_t>(*begin) != iter.index())
             {
                 auto len = rewriter.create<pylir::Py::ListLenOp>(loc, list);
                 auto newLen = rewriter.create<mlir::arith::AddIOp>(loc, len, one);

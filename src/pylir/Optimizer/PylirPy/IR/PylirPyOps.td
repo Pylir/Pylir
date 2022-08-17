@@ -571,7 +571,7 @@ def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [AlwaysBound, DeclareOpInterfa
 													ReturnsImmutable,
 													AddableExceptionHandling<"MakeTupleExOp">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
-                         I32ArrayAttr:$iter_expansion
+                         DenseI32ArrayAttr:$iter_expansion
                          );
 
     let results = (outs DynamicType:$result);
@@ -621,7 +621,7 @@ def PylirPy_MakeTupleExOp : AddExceptionHandling<PylirPy_MakeTupleOp> {
 def PylirPy_MakeListOp : PylirPy_Op<"makeList",
 	[AlwaysBound, AddableExceptionHandling<"MakeListExOp">, RefinedType<"List">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
-                         I32ArrayAttr:$iter_expansion
+                         DenseI32ArrayAttr:$iter_expansion
                          );
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
@@ -656,7 +656,7 @@ def PylirPy_MakeListExOp : AddExceptionHandling<PylirPy_MakeListOp> {
 def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHandling<"MakeSetExOp">,
 												RefinedType<"Set">]> {
     let arguments = (ins Variadic<DynamicType>:$arguments,
-                         I32ArrayAttr:$iter_expansion
+                         DenseI32ArrayAttr:$iter_expansion
                          );
 
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
@@ -694,7 +694,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     let arguments = (ins
                         Variadic<DynamicType>:$keys,
                         Variadic<DynamicType>:$values,
-                        I32ArrayAttr:$mapping_expansion
+                        DenseI32ArrayAttr:$mapping_expansion
                         );
 
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
@@ -710,7 +710,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     let extraClassDeclaration = [{
         llvm::iterator_range<::pylir::Py::DictArgsIterator> getDictArgs()
         {
-            auto expansion = getMappingExpansion().getValue();
+            auto expansion = getMappingExpansion();
             return llvm::make_range(
                 DictArgsIterator(getKeys().begin(), getValues().begin(), expansion.begin(), expansion, 0),
                 DictArgsIterator(getKeys().end(), getValues().end(), expansion.end(), expansion, getKeys().size())

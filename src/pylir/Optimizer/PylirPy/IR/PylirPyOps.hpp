@@ -137,9 +137,9 @@ class DictArgsIterator
 {
     mlir::OperandRange::iterator m_keys;
     mlir::OperandRange::iterator m_values;
-    llvm::ArrayRef<mlir::Attribute> m_expansions;
-    llvm::ArrayRef<mlir::Attribute>::iterator m_currExp;
-    std::size_t m_index = 0;
+    llvm::ArrayRef<std::int32_t> m_expansions;
+    llvm::ArrayRef<std::int32_t>::iterator m_currExp;
+    std::int32_t m_index = 0;
 
     bool isCurrentlyExpansion();
 
@@ -151,9 +151,13 @@ public:
     using iterator_category = std::bidirectional_iterator_tag;
 
     DictArgsIterator(mlir::OperandRange::iterator keys, mlir::OperandRange::iterator values,
-                     llvm::ArrayRef<mlir::Attribute>::iterator expIterator, llvm::ArrayRef<mlir::Attribute> expansions,
+                     llvm::ArrayRef<std::int32_t>::iterator expIterator, llvm::ArrayRef<std::int32_t> expansions,
                      std::size_t index)
-        : m_keys(keys), m_values(values), m_expansions(expansions), m_currExp(expIterator), m_index(index)
+        : m_keys(keys),
+          m_values(values),
+          m_expansions(expansions),
+          m_currExp(expIterator),
+          m_index(static_cast<std::int32_t>(index))
     {
     }
 

@@ -123,7 +123,7 @@ struct MakeExOpTupleExpansionRemove : TupleExpansionRemover<T>
     }
 };
 
-template <class ExOp, mlir::ArrayAttr (ExOp::*expansionAttr)()>
+template <class ExOp, llvm::ArrayRef<std::int32_t> (ExOp::*expansionAttr)()>
 struct MakeExOpExceptionSimplifier : mlir::OpRewritePattern<ExOp>
 {
     using mlir::OpRewritePattern<ExOp>::OpRewritePattern;
@@ -527,7 +527,7 @@ namespace
 {
 template <class Attr>
 llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                             mlir::ArrayAttr iterExpansion)
+                                             llvm::ArrayRef<int32_t> iterExpansion, mlir::MLIRContext* context)
 {
     if (!std::all_of(operands.begin(), operands.end(),
                      [](mlir::Attribute attr) -> bool { return static_cast<bool>(attr); }))
@@ -535,11 +535,11 @@ llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute>
         return llvm::None;
     }
     llvm::SmallVector<mlir::Attribute> result;
-    auto range = iterExpansion.getAsValueRange<mlir::IntegerAttr>();
-    auto begin = range.begin();
+    auto range = iterExpansion;
+    const auto* begin = range.begin();
     for (const auto& pair : llvm::enumerate(operands))
     {
-        if (begin == range.end() || pair.index() != *begin)
+        if (begin == range.end() || static_cast<std::int32_t>(pair.index()) != *begin)
         {
             result.push_back(pair.value());
             continue;
@@ -558,13 +558,13 @@ llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute>
             return llvm::None;
         }
     }
-    return Attr::get(iterExpansion.getContext(), result);
+    return Attr::get(context, result);
 }
 } // namespace
 
 mlir::OpFoldResult pylir::Py::MakeTupleOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto result = doConstantIterExpansion<pylir::Py::TupleAttr>(operands, getIterExpansion()))
+    if (auto result = doConstantIterExpansion<pylir::Py::TupleAttr>(operands, getIterExpansion(), getContext()))
     {
         return *result;
     }
@@ -1301,7 +1301,7 @@ pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Locatio
     {
         arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
     }
-    return builder.create<pylir::Py::MakeTupleOp>(loc, input.getType(), arguments, builder.getI32ArrayAttr({}));
+    return builder.create<pylir::Py::MakeTupleOp>(loc, input.getType(), arguments, builder.getDenseI32ArrayAttr({}));
 }
 
 bool isTypeSlot(llvm::StringRef ref)
