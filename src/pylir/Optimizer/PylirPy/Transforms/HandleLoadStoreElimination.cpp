@@ -35,35 +35,37 @@ private:
                        pylir::SSABuilder& ssaBuilder);
 };
 
-bool dependsOnClobber(mlir::BlockArgument argument, mlir::Value clobber,
-                      llvm::SmallDenseMap<mlir::BlockArgument, bool, 8>& seen)
+// Does a recursive depth first walk of all block args that are transitive users of 'clobberValue'.
+void discoverDependsOnClobber(mlir::Value clobberValue, llvm::SmallDenseSet<mlir::BlockArgument>& seen)
 {
-    auto [result, inserted] = seen.insert({argument, false});
-    if (!inserted)
+    llvm::SmallVector<mlir::Value> stack{clobberValue};
+    while (!stack.empty())
     {
-        return result->second;
+        auto value = stack.pop_back_val();
+        for (auto& iter : value.getUses())
+        {
+            // A lot of the uses are the ValueTrackers within the SSABuilders map. It's faster to just skip over them
+            // than do an interface lookup each time.
+            if (!iter.getOwner()->getBlock())
+            {
+                continue;
+            }
+            auto branch = mlir::dyn_cast<mlir::BranchOpInterface>(iter.getOwner());
+            if (!branch)
+            {
+                continue;
+            }
+            auto succBlockArg = branch.getSuccessorBlockArgument(iter.getOperandNumber());
+            if (!succBlockArg)
+            {
+                continue;
+            }
+            if (seen.insert(*succBlockArg).second)
+            {
+                stack.push_back(*succBlockArg);
+            }
+        }
     }
-    auto* block = argument.getParentBlock();
-    for (auto iter = block->pred_begin(); iter != block->pred_end(); iter++)
-    {
-        auto branch = llvm::dyn_cast<mlir::BranchOpInterface>((*iter)->getTerminator());
-        if (!branch)
-        {
-            // Conservative result.
-            return result->second = true;
-        }
-        auto operands = branch.getSuccessorOperands(iter.getSuccessorIndex());
-        auto op = operands[argument.getArgNumber()];
-        if (op == clobber)
-        {
-            return result->second = true;
-        }
-        if (auto newArg = op.dyn_cast_or_null<mlir::BlockArgument>(); newArg && dependsOnClobber(newArg, clobber, seen))
-        {
-            return result->second = true;
-        }
-    }
-    return false;
 }
 
 void HandleLoadStoreEliminationPass::runOnOperation()
@@ -89,7 +91,9 @@ void HandleLoadStoreEliminationPass::runOnOperation()
                                                               definitions, ssaBuilder);
                                  });
 
-        llvm::SmallDenseMap<mlir::BlockArgument, bool, 8> blockArgsClobber;
+        llvm::SmallDenseSet<mlir::BlockArgument> blockArgsClobber;
+        discoverDependsOnClobber(clobberTracker->getResult(0), blockArgsClobber);
+
         for (auto& [load, tracker] : blockArgUsages.candidates)
         {
             mlir::Value value = tracker;
@@ -108,9 +112,9 @@ void HandleLoadStoreEliminationPass::runOnOperation()
                 continue;
             }
 
-            // Only if the block argument does not depend on clobbers is it safe to replae the load with it. Otherwise,
+            // Only if the block argument does not depend on clobbers is it safe to replace the load with it. Otherwise,
             // a re-load is required.
-            if (!dependsOnClobber(blockArg, clobberTracker->getResult(0), blockArgsClobber))
+            if (!blockArgsClobber.contains(blockArg))
             {
                 changed = true;
                 load.replaceAllUsesWith(value);
@@ -120,12 +124,8 @@ void HandleLoadStoreEliminationPass::runOnOperation()
         }
 
         // Any block args that depend on the clobberTracker, and hence are unused by normal IR, have to now be deleted.
-        for (auto& [blockArg, clobbered] : blockArgsClobber)
+        for (auto& blockArg : blockArgsClobber)
         {
-            if (!clobbered)
-            {
-                continue;
-            }
             for (auto pred = blockArg.getOwner()->pred_begin(); pred != blockArg.getOwner()->pred_end(); pred++)
             {
                 auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
