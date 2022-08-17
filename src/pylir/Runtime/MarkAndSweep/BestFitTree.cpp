@@ -418,7 +418,7 @@ void pylir::rt::BestFitTree::insert(BlockHeader* blockHeader)
 auto pylir::rt::BestFitTree::doAllocation(BlockHeader* blockHeader, std::size_t size) const -> BlockHeader*
 {
     blockHeader->markAllocated();
-    auto sizeAligned = pylir::roundUpTo(size, alignof(std::max_align_t));
+    auto sizeAligned = pylir::roundUpTo(size, alignof(PyBaseException));
     if (blockHeader->size <= m_lowerBlockSizeLimit + sizeof(BlockHeader) + sizeAligned)
     {
         return nullptr;
