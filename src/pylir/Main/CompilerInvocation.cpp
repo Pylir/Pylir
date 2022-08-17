@@ -313,6 +313,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
     #if !defined(__MINGW32_MAJOR_VERSION) || !defined(__clang__)
             manager.enableCrashReproducerGeneration("failure.mlir");
     #endif
+#else
+            manager.enableVerifier(false);
 #endif
             if (args.hasArg(OPT_Xprint_before, OPT_Xprint_after, OPT_Xprint_after_all))
             {
@@ -340,7 +342,6 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 {
                     return mlir::failure();
                 }
-                // TODO: remove assumeVerified
                 mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
                 return finalizeOutputStream(mlir::success());
             }
@@ -355,7 +356,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 {
                     return mlir::failure();
                 }
-                mlirModule->print(*m_output, mlir::OpPrintingFlags{}.enableDebugInfo());
+                mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
                 return finalizeOutputStream(mlir::success());
             }
             if (mlir::failed(ensureTargetMachine(args, commandLine, toolchain)))
