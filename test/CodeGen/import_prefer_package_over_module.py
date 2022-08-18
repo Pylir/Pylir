@@ -1,5 +1,6 @@
 # RUN: split-file %s %t
 # RUN: pylir %t/main.py -S -emit-pylir -o - | FileCheck %s
+# RUN: pylir %t/main.py -S -emit-pylir -o - -Xsingle-threaded | FileCheck %s
 
 #--- main.py
 
