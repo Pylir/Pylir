@@ -5,4 +5,4 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_tablegen(pylir-tblgen PYLIR main.cpp IntrinsicGen.cpp)
-target_link_libraries(pylir-tblgen PRIVATE MLIRTableGen MLIRSupportIndentedOstream)
+target_link_libraries(pylir-tblgen PRIVATE MLIRTblgenLib MLIRSupportIndentedOstream)
