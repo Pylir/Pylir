@@ -63,10 +63,18 @@ public:
     void printVersion(llvm::raw_ostream& out) const;
 
     template <class T, class S, class... Args>
-    [[nodiscard]] pylir::Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message,
-                                                                           Args&&... args) const
+    [[nodiscard]] pylir::Diag::DiagnosticsBuilder createError(const T& location, const S& message, Args&&... args) const
     {
-        return pylir::Diag::DiagnosticsBuilder(this, m_rendered, location, message, std::forward<Args>(args)...);
+        return pylir::Diag::DiagnosticsBuilder(this, m_rendered, Diag::Severity::Error, location, message,
+                                               std::forward<Args>(args)...);
+    }
+
+    template <class T, class S, class... Args>
+    [[nodiscard]] pylir::Diag::DiagnosticsBuilder createWarning(const T& location, const S& message,
+                                                                Args&&... args) const
+    {
+        return pylir::Diag::DiagnosticsBuilder(this, m_rendered, Diag::Severity::Warning, location, message,
+                                               std::forward<Args>(args)...);
     }
 };
 

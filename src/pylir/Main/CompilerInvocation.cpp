@@ -134,18 +134,15 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             outputFile.emplace(arg->getValue(), ec, llvm::sys::fs::OF_Text);
             if (ec)
             {
-                llvm::errs() << commandLine.createDiagnosticsBuilder(arg, Diag::FAILED_TO_OPEN_FILE_N, arg->getValue())
-                                    .addLabel(arg, std::nullopt, Diag::ERROR_COLOUR)
-                                    .emitError();
+                llvm::errs()
+                    << commandLine.createError(arg, Diag::FAILED_TO_OPEN_FILE_N, arg->getValue()).addLabel(arg).emit();
                 return mlir::failure();
             }
             if (arg = args.getLastArg(OPT_o); arg && arg->getValue() == llvm::StringRef{"-"})
             {
-                llvm::errs() << commandLine
-                                    .createDiagnosticsBuilder(
-                                        arg, Diag::OUTPUT_CANNOT_BE_STDOUT_WHEN_WRITING_DEPENDENCY_FILE)
-                                    .addLabel(arg, std::nullopt, Diag::ERROR_COLOUR)
-                                    .emitError();
+                llvm::errs() << commandLine.createError(arg, Diag::OUTPUT_CANNOT_BE_STDOUT_WHEN_WRITING_DEPENDENCY_FILE)
+                                    .addLabel(arg)
+                                    .emit();
                 return mlir::failure();
             }
         }
@@ -185,7 +182,7 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
     {
         llvm::consumeError(std::move(error));
         llvm::errs() << pylir::Diag::formatLine(
-            pylir::Diag::Error, fmt::format(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_outputFile->TmpName));
+            Diag::Severity::Error, fmt::format(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_outputFile->TmpName));
         return mlir::failure();
     }
     bool success = toolchain.link(commandLine, fileName);
@@ -223,10 +220,9 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 llvm::consumeError(fd.takeError());
                 llvm::errs() << commandLine
-                                    .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N,
-                                                              inputFile->getValue())
-                                    .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                    .emitError();
+                                    .createError(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N, inputFile->getValue())
+                                    .addLabel(inputFile)
+                                    .emit();
                 return mlir::failure();
             }
             std::optional exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
@@ -236,10 +232,10 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 if (error)
                 {
                     llvm::errs() << commandLine
-                                        .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N,
-                                                                  inputFile->getValue())
-                                        .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                        .emitError();
+                                        .createError(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N,
+                                                     inputFile->getValue())
+                                        .addLabel(inputFile)
+                                        .emit();
                     return mlir::failure();
                 }
             }
@@ -249,10 +245,9 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 llvm::consumeError(fd.takeError());
                 llvm::errs() << commandLine
-                                    .createDiagnosticsBuilder(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N,
-                                                              inputFile->getValue())
-                                    .addLabel(inputFile, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                    .emitError();
+                                    .createError(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N, inputFile->getValue())
+                                    .addLabel(inputFile)
+                                    .emit();
                 return mlir::failure();
             }
             exit.reset();
@@ -513,16 +508,15 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 if (arg)
                 {
                     llvm::errs() << commandLine
-                                        .createDiagnosticsBuilder(arg,
-                                                                  pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N,
-                                                                  m_targetMachine->getTargetTriple().str(), format)
-                                        .addLabel(arg, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                        .emitError();
+                                        .createError(arg, pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N,
+                                                     m_targetMachine->getTargetTriple().str(), format)
+                                        .addLabel(arg)
+                                        .emit();
                     return finalizeOutputStream(mlir::failure());
                 }
                 llvm::errs() << pylir::Diag::formatLine(
-                    pylir::Diag::Error, fmt::format(pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N,
-                                                    m_targetMachine->getTargetTriple().str(), format));
+                    Diag::Severity::Error, fmt::format(pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N,
+                                                       m_targetMachine->getTargetTriple().str(), format));
                 return finalizeOutputStream(mlir::failure());
             }
 
@@ -612,7 +606,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::op
     {
         llvm::consumeError(tempFile.takeError());
         llvm::errs() << pylir::Diag::formatLine(
-            pylir::Diag::Error, fmt::format(pylir::Diag::FAILED_TO_CREATE_TEMPORARY_FILE_N, tempFileName.str()));
+            Diag::Severity::Error, fmt::format(pylir::Diag::FAILED_TO_CREATE_TEMPORARY_FILE_N, tempFileName.str()));
         return mlir::failure();
     }
     m_outputFile = std::move(*tempFile);
@@ -638,7 +632,7 @@ mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::Logica
         {
             llvm::consumeError(std::move(error));
             llvm::errs() << pylir::Diag::formatLine(
-                pylir::Diag::Error,
+                Diag::Severity::Error,
                 fmt::format(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, m_outputFile->TmpName));
         }
         return mlir::failure();
@@ -646,7 +640,7 @@ mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::Logica
     if (auto error = m_outputFile->keep(m_compileStepOutputFilename))
     {
         llvm::consumeError(std::move(error));
-        llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
+        llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error,
                                                 fmt::format(pylir::Diag::FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N,
                                                             m_outputFile->TmpName, m_compileStepOutputFilename));
         return mlir::failure();
@@ -708,14 +702,13 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
         auto* outputArg = args.getLastArg(OPT_target_EQ);
         if (!outputArg)
         {
-            llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Error,
+            llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error,
                                                     fmt::format(pylir::Diag::COULD_NOT_FIND_TARGET_N, triple->str()));
             return mlir::failure();
         }
-        llvm::errs() << commandLine
-                            .createDiagnosticsBuilder(outputArg, pylir::Diag::COULD_NOT_FIND_TARGET_N, triple->str())
-                            .addLabel(outputArg, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                            .emitError();
+        llvm::errs() << commandLine.createError(outputArg, pylir::Diag::COULD_NOT_FIND_TARGET_N, triple->str())
+                            .addLabel(outputArg)
+                            .emit();
         return mlir::failure();
     }
 
@@ -732,10 +725,9 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
     {
         auto* optArg = args.getLastArg(OPT_O);
         llvm::errs() << commandLine
-                            .createDiagnosticsBuilder(optArg, pylir::Diag::INVALID_OPTIMIZATION_LEVEL_N,
-                                                      optArg->getAsString(args))
-                            .addLabel(optArg, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                            .emitError();
+                            .createError(optArg, pylir::Diag::INVALID_OPTIMIZATION_LEVEL_N, optArg->getAsString(args))
+                            .addLabel(optArg)
+                            .emit();
         return mlir::failure();
     }
 
@@ -845,7 +837,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
     options.warningCallback = [&](Diag::DiagnosticsBuilder&& builder)
     {
         std::unique_lock lock{outputMutex};
-        llvm::errs() << builder.emitWarning();
+        llvm::errs() << builder.emit();
     };
 
     options.moduleLoadCallback = [&](CodeGenOptions::LoadRequest&& request)
@@ -866,10 +858,10 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
                 if (error)
                 {
                     std::unique_lock lock{outputMutex};
-                    llvm::errs() << Diag::DiagnosticsBuilder(*request.document, request.location,
+                    llvm::errs() << Diag::DiagnosticsBuilder(*request.document, Diag::Severity::Error, request.location,
                                                              pylir::Diag::FAILED_TO_ACCESS_FILE_N, request.filePath)
-                                        .addLabel(request.location, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                        .emitError();
+                                        .addLabel(request.location)
+                                        .emit();
                     return nullptr;
                 }
             }
@@ -878,10 +870,10 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
             if (!read)
             {
                 std::unique_lock lock{outputMutex};
-                llvm::errs() << Diag::DiagnosticsBuilder(*request.document, request.location,
+                llvm::errs() << Diag::DiagnosticsBuilder(*request.document, Diag::Severity::Error, request.location,
                                                          pylir::Diag::FAILED_TO_READ_FILE_N, request.filePath)
-                                    .addLabel(request.location, std::nullopt, pylir::Diag::ERROR_COLOUR)
-                                    .emitError();
+                                    .addLabel(request.location)
+                                    .emit();
                 return nullptr;
             }
             exit.reset();

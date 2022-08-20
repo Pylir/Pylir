@@ -141,10 +141,9 @@ tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType t
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{
-            createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, tokenType)
-                .addLabel(m_document->getText().size(), fmt::format("{}", tokenType), Diag::ERROR_COLOUR)
-                .emitError()};
+        return tl::unexpected{createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, tokenType)
+                                  .addLabel(m_document->getText().size(), fmt::format("{}", tokenType))
+                                  .emit()};
     }
     if (m_current->getTokenType() == TokenType::SyntaxError)
     {
@@ -154,8 +153,8 @@ tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType t
     {
         return tl::unexpected{
             createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, tokenType, m_current->getTokenType())
-                .addLabel(*m_current, fmt::format("{}", tokenType), Diag::ERROR_COLOUR, Diag::emphasis::strikethrough)
-                .emitError()};
+                .addLabel(*m_current, fmt::format("{}", tokenType), Diag::flags::strikethrough)
+                .emit()};
     }
 
     return *m_current++;

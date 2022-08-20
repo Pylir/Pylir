@@ -72,8 +72,9 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
         }
         if (linkerPath.empty())
         {
-            llvm::errs() << pylir::Diag::formatLine(Diag::Error, fmt::format(pylir::Diag::FAILED_TO_FIND_LINKER))
-                         << pylir::Diag::formatLine(Diag::Note,
+            llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error,
+                                                    fmt::format(pylir::Diag::FAILED_TO_FIND_LINKER))
+                         << pylir::Diag::formatLine(Diag::Severity::Note,
                                                     fmt::format(pylir::Diag::ATTEMPTED_N, fmt::join(attempts, ", ")));
             return false;
         }

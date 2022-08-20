@@ -152,7 +152,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     auto gccInstall = findGCCInstallation(m_triple, commandLine);
     if (!gccInstall)
     {
-        llvm::errs() << pylir::Diag::formatLine(Diag::Error, "Failed to find a GCC installation");
+        llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error, "Failed to find a GCC installation");
         return false;
     }
     std::vector<std::string> arguments;
@@ -198,7 +198,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     const auto* emulation = getEmulation(m_triple, commandLine);
     if (!emulation)
     {
-        llvm::errs() << pylir::Diag::formatLine(Diag::Error,
+        llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error,
                                                 fmt::format("Missing emulation for target '{}'", m_triple.str()));
         return false;
     }

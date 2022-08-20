@@ -96,8 +96,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
             {
                 return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP,
                                                                m_current->getTokenType())
-                                          .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
-                                          .emitError()};
+                                          .addLabel(*m_current)
+                                          .emit()};
             }
             return make_node<Syntax::SingleTokenStmt>(*m_current++);
         case TokenType::DelKeyword:
@@ -117,8 +117,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
             {
                 return tl::unexpected{
                     createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION)
-                        .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
-                        .emitError()};
+                        .addLabel(*m_current)
+                        .emit()};
             }
             auto returnKeyword = *m_current++;
             if (!peekedIs(firstInExpression))
@@ -203,27 +203,27 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                     createDiagnosticsBuilder(
                                         nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
                                         nonLocal.getValue())
-                                        .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addLabel(nonLocal)
                                         .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
-                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                        .emitError()};
+                                        .addLabel(result->first)
+                                        .emit()};
                             case Syntax::Scope::Kind::Global:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(
                                         nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
                                         nonLocal.getValue())
-                                        .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addLabel(nonLocal)
                                         .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
-                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                        .emitError()};
+                                        .addLabel(result->first)
+                                        .emit()};
                             case Syntax::Scope::Kind::Unknown:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION,
                                                              nonLocal.getValue())
-                                        .addLabel(nonLocal, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addLabel(nonLocal)
                                         .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
-                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                        .emitError()};
+                                        .addLabel(result->first)
+                                        .emit()};
                             case Syntax::Scope::Kind::NonLocal: break;
                         }
                     }
@@ -259,27 +259,27 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                                     createDiagnosticsBuilder(
                                         global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
                                         global.getValue())
-                                        .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addLabel(global)
                                         .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
-                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                        .emitError()};
+                                        .addLabel(result->first)
+                                        .emit()};
                             case Syntax::Scope::Kind::NonLocal:
                                 return tl::unexpected{
                                     createDiagnosticsBuilder(
                                         global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE,
                                         global.getValue())
-                                        .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
+                                        .addLabel(global)
                                         .addNote(result->first, Diag::NONLOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
-                                        .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                        .emitError()};
+                                        .addLabel(result->first)
+                                        .emit()};
                             case Syntax::Scope::Kind::Unknown:
                                 return tl::unexpected{createDiagnosticsBuilder(global,
                                                                                Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION,
                                                                                global.getValue())
-                                                          .addLabel(global, std::nullopt, Diag::ERROR_COLOUR)
+                                                          .addLabel(global)
                                                           .addNote(result->first, Diag::N_USED_HERE, global.getValue())
-                                                          .addLabel(result->first, std::nullopt, Diag::NOTE_COLOUR)
-                                                          .emitError()};
+                                                          .addLabel(result->first)
+                                                          .emit()};
                             case Syntax::Scope::Kind::Global: break;
                         }
                     }
@@ -333,8 +333,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
 #include "Features.def"
                     return tl::unexpected{
                         createDiagnosticsBuilder(identifierToken, Diag::UNKNOWN_FEATURE_N, identifierToken.getValue())
-                            .addLabel(identifierToken, std::nullopt, Diag::ERROR_COLOUR)
-                            .emitError()};
+                            .addLabel(identifierToken)
+                            .emit()};
                 };
                 for (auto& iter : fromImportAs->imports)
                 {
@@ -527,24 +527,24 @@ struct Visitor
                     return parser
                         .createDiagnosticsBuilder(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_EMPTY_TUPLE,
                                                   assignOp.getTokenType())
-                        .addLabel(tupleConstruct, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError();
+                        .addLabel(tupleConstruct)
+                        .addLabel(assignOp, Diag::flags::secondaryColour)
+                        .emit();
                 case 1:
                     return parser
                         .createDiagnosticsBuilder(tupleConstruct,
                                                   Diag::OPERATOR_N_CANNOT_ASSIGN_TO_SINGLE_TUPLE_ELEMENT,
                                                   assignOp.getTokenType())
-                        .addLabel(tupleConstruct, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError();
+                        .addLabel(tupleConstruct)
+                        .addLabel(assignOp, Diag::flags::secondaryColour)
+                        .emit();
                 default:
                     return parser
                         .createDiagnosticsBuilder(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
                                                   assignOp.getTokenType())
-                        .addLabel(tupleConstruct, std::nullopt, Diag::ERROR_COLOUR)
-                        .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                        .emitError();
+                        .addLabel(tupleConstruct)
+                        .addLabel(assignOp, Diag::flags::secondaryColour)
+                        .emit();
             }
         }
         for (const auto& iter : tupleConstruct.items)
@@ -560,17 +560,17 @@ struct Visitor
     std::optional<std::string> visit(const Syntax::DictDisplay& expression)
     {
         return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
-            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(expression)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::SetDisplay& expression)
     {
         return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
-            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(expression)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::ListDisplay& expression)
@@ -578,9 +578,9 @@ struct Visitor
         if (std::holds_alternative<Syntax::Comprehension>(expression.variant) || augmented)
         {
             return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
-                .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
-                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                .emitError();
+                .addLabel(expression)
+                .addLabel(assignOp, Diag::flags::secondaryColour)
+                .emit();
         }
         for (const auto& iter : pylir::get<std::vector<Syntax::StarredItem>>(expression.variant))
         {
@@ -595,17 +595,17 @@ struct Visitor
     std::optional<std::string> visit(const Syntax::Yield& expression)
     {
         return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
-            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(expression)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::Generator& expression)
     {
         return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
-            .addLabel(expression, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(expression)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::BinOp& binOp)
@@ -613,17 +613,17 @@ struct Visitor
         return parser
             .createDiagnosticsBuilder(binOp.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
                                       binOp.operation.getTokenType())
-            .addLabel(binOp.operation, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(binOp.operation)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::Lambda& lambda)
     {
         return parser.createDiagnosticsBuilder(lambda, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression")
-            .addLabel(lambda, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(lambda)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::Atom& expression)
@@ -639,9 +639,9 @@ struct Visitor
             case TokenType::ByteLiteral:
             case TokenType::ComplexLiteral:
                 return parser.createDiagnosticsBuilder(expression.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
-                    .addLabel(expression.token, std::nullopt, Diag::ERROR_COLOUR)
-                    .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                    .emitError();
+                    .addLabel(expression.token)
+                    .addLabel(assignOp, Diag::flags::secondaryColour)
+                    .emit();
             default: return std::nullopt;
         }
     }
@@ -649,9 +649,9 @@ struct Visitor
     std::optional<std::string> visit(const Syntax::Call& call)
     {
         return parser.createDiagnosticsBuilder(call.openParenth, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
-            .addLabel(call.openParenth, call, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(call.openParenth, call)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::UnaryOp& expression)
@@ -659,9 +659,9 @@ struct Visitor
         return parser
             .createDiagnosticsBuilder(expression.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
                                       expression.operation.getTokenType())
-            .addLabel(expression.operation, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(expression.operation)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::Comparison& comparison)
@@ -675,35 +675,35 @@ struct Visitor
                 .createDiagnosticsBuilder(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
                                           fmt::format(FMT_STRING("'{} {}'"), back.firstToken.getTokenType(),
                                                       back.secondToken->getTokenType()))
-                .addLabel(back.firstToken, *back.secondToken, std::nullopt, Diag::ERROR_COLOUR)
-                .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-                .emitError();
+                .addLabel(back.firstToken, *back.secondToken)
+                .addLabel(assignOp, Diag::flags::secondaryColour)
+                .emit();
         }
 
         return parser
             .createDiagnosticsBuilder(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
                                       back.firstToken.getTokenType())
-            .addLabel(back.firstToken, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(back.firstToken)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::Conditional& expression)
     {
         return parser
             .createDiagnosticsBuilder(expression.ifToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression")
-            .addLabel(expression.ifToken, *expression.elseValue, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(expression.ifToken, *expression.elseValue)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 
     std::optional<std::string> visit(const Syntax::Assignment& assignment)
     {
         return parser
             .createDiagnosticsBuilder(assignment.walrus, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
-            .addLabel(assignment.walrus, std::nullopt, Diag::ERROR_COLOUR)
-            .addLabel(assignOp, std::nullopt, Diag::ERROR_COMPLY)
-            .emitError();
+            .addLabel(assignment.walrus)
+            .addLabel(assignOp, Diag::flags::secondaryColour)
+            .emit();
     }
 };
 } // namespace
@@ -840,8 +840,8 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
         return tl::unexpected{
             createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N,
                                      fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword))
-                .addLabel(m_document->getText().size(), std::nullopt, Diag::ERROR_COLOUR)
-                .emitError()};
+                .addLabel(m_document->getText().size())
+                .emit()};
     }
     switch (m_current->getTokenType())
     {
@@ -943,7 +943,7 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
                 createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
                                          fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword),
                                          m_current->getTokenType())
-                    .addLabel(*m_current, std::nullopt, Diag::ERROR_COLOUR)
-                    .emitError()};
+                    .addLabel(*m_current)
+                    .emit()};
     }
 }

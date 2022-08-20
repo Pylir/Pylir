@@ -267,7 +267,8 @@ public:
     [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message,
                                                                     Args&&... args) const
     {
-        return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
+        return Diag::DiagnosticsBuilder(*m_document, Diag::Severity::Error, location, message,
+                                        std::forward<Args>(args)...);
     }
 
     /**

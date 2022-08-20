@@ -10,12 +10,16 @@
 
 #include <iostream>
 
+using namespace pylir::Diag;
+
 TEST_CASE("Diagnostics labels", "[Diag]")
 {
     SECTION("Simple")
     {
-        pylir::Diag::Document document("A normal text", "filename");
-        auto result = pylir::Diag::DiagnosticsBuilder(document, 2, "A message").addLabel(2, 7, "Label").emitError();
+        Document document("A normal text", "filename");
+        auto result = DiagnosticsBuilder(document, Severity::Error, 2, "A message")
+                          .addLabel(2, 7, "Label", flags::noColour)
+                          .emit();
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     |   ~~~~~~\n"
                                            "     |      |\n"
@@ -24,8 +28,9 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     }
     SECTION("Arrow")
     {
-        pylir::Diag::Document document("A normal text", "filename");
-        auto result = pylir::Diag::DiagnosticsBuilder(document, 0, "A message").addLabel(0, "Label").emitError();
+        Document document("A normal text", "filename");
+        auto result =
+            DiagnosticsBuilder(document, Severity::Error, 0, "A message").addLabel(0, "Label", flags::noColour).emit();
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     | ^\n"
                                            "     | |\n"
@@ -34,8 +39,8 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     }
     SECTION("Without text")
     {
-        pylir::Diag::Document document("A normal text", "filename");
-        auto result = pylir::Diag::DiagnosticsBuilder(document, 0, "A message").addLabel(0).emitError();
+        Document document("A normal text", "filename");
+        auto result = DiagnosticsBuilder(document, Severity::Error, 0, "A message").addLabel(0, flags::noColour).emit();
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     | ^\n"));
         CHECK_THAT(result, !Catch::Contains("   1 | A normal text\n"
@@ -47,11 +52,11 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     {
         SECTION("Same line")
         {
-            pylir::Diag::Document document("A normal text", "filename");
-            auto result = pylir::Diag::DiagnosticsBuilder(document, 0, "A message")
-                              .addLabel(2, 7, "Label")
-                              .addLabel(0, "kek")
-                              .emitError();
+            Document document("A normal text", "filename");
+            auto result = DiagnosticsBuilder(document, Severity::Error, 0, "A message")
+                              .addLabel(2, 7, "Label", flags::noColour)
+                              .addLabel(0, "kek", flags::noColour)
+                              .emit();
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                                "     | ^ ~~~~~~\n"
                                                "     | |    |\n"
@@ -60,11 +65,11 @@ TEST_CASE("Diagnostics labels", "[Diag]")
         }
         SECTION("Too close")
         {
-            pylir::Diag::Document document("A normal text", "filename");
-            auto result = pylir::Diag::DiagnosticsBuilder(document, 0, "A message")
-                              .addLabel(2, 7, "Label")
-                              .addLabel(0, "other")
-                              .emitError();
+            Document document("A normal text", "filename");
+            auto result = DiagnosticsBuilder(document, Severity::Error, 0, "A message")
+                              .addLabel(2, 7, "Label", flags::noColour)
+                              .addLabel(0, "other", flags::noColour)
+                              .emit();
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                                "     | ^ ~~~~~~\n"
                                                "     | |    |\n"
@@ -77,8 +82,8 @@ TEST_CASE("Diagnostics labels", "[Diag]")
 
 TEST_CASE("Diagnostics margins", "[Diag]")
 {
-    pylir::Diag::Document document("Multi\nLine\nText", "filename");
-    auto result = pylir::Diag::DiagnosticsBuilder(document, 6, "A message").emitError();
+    Document document("Multi\nLine\nText", "filename");
+    auto result = DiagnosticsBuilder(document, Severity::Error, 6, "A message").emit();
     CHECK_THAT(result, Catch::Contains("   1 | Multi\n"
                                        "   2 | Line\n"
                                        "   3 | Text\n",

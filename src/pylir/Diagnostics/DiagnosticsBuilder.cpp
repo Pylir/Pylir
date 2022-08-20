@@ -35,11 +35,11 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             fmt::text_style style;
             if (iter.optionalColour)
             {
-                style |= fmt::fg(static_cast<fmt::color>(*iter.optionalColour));
+                style |= fmt::fg(*iter.optionalColour);
             }
             if (iter.optionalEmphasis)
             {
-                style |= static_cast<fmt::emphasis>(*iter.optionalEmphasis);
+                style |= *iter.optionalEmphasis;
             }
             // If not pointing at newline
             if (iter.start - offset != line.size())
@@ -77,7 +77,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             fmt::text_style style;
             if (iter.optionalColour)
             {
-                style = fmt::fg(static_cast<fmt::color>(*iter.optionalColour));
+                style = fmt::fg(*iter.optionalColour);
             }
             if (iter.start - offset == line.size())
             {
@@ -118,7 +118,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             fmt::text_style style;
             if (iter.optionalColour)
             {
-                style = fmt::fg(static_cast<fmt::color>(*iter.optionalColour));
+                style = fmt::fg(*iter.optionalColour);
             }
             auto thisMid = (iter.end - iter.start) / 2 + iter.start - offset;
             for (auto codepoint : line.substr(lastEnd, thisMid - lastEnd))
@@ -150,7 +150,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
                 fmt::text_style style;
                 if (iter->optionalColour)
                 {
-                    style = fmt::fg(static_cast<fmt::color>(*iter->optionalColour));
+                    style = fmt::fg(*iter->optionalColour);
                 }
                 auto thisMid = (iter->end - iter->start) / 2 + iter->start - offset;
                 for (auto codepoint : line.substr(lastEnd, thisMid - lastEnd))
@@ -203,25 +203,25 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
     return result;
 }
 
-std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message, Severity severity) const
+std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message) const
 {
     const auto& document = *message.document;
     auto [lineNumber, colNumber] = document.getLineCol(message.location);
     std::string_view severityStr;
     fmt::color colour;
-    switch (severity)
+    switch (message.severity)
     {
-        case Warning:
+        case Severity::Warning:
             severityStr = "warning";
-            colour = static_cast<fmt::color>(Diag::WARNING_COLOUR);
+            colour = WARNING_COLOUR;
             break;
-        case Error:
+        case Severity::Error:
             severityStr = "error";
-            colour = static_cast<fmt::color>(Diag::ERROR_COLOUR);
+            colour = ERROR_COLOUR;
             break;
-        case Note:
+        case Severity::Note:
             severityStr = "note";
-            colour = static_cast<fmt::color>(Diag::NOTE_COLOUR);
+            colour = NOTE_COLOUR;
             break;
         default: PYLIR_UNREACHABLE;
     }
@@ -318,17 +318,17 @@ std::string pylir::Diag::formatLine(Severity severity, std::string_view message)
     fmt::color colour;
     switch (severity)
     {
-        case Warning:
+        case Severity::Warning:
             severityStr = "warning";
-            colour = static_cast<fmt::color>(Diag::WARNING_COLOUR);
+            colour = DiagnosticsBuilder::WARNING_COLOUR;
             break;
-        case Error:
+        case Severity::Error:
             severityStr = "error";
-            colour = static_cast<fmt::color>(Diag::ERROR_COLOUR);
+            colour = DiagnosticsBuilder::ERROR_COLOUR;
             break;
-        case Note:
+        case Severity::Note:
             severityStr = "note";
-            colour = static_cast<fmt::color>(Diag::NOTE_COLOUR);
+            colour = DiagnosticsBuilder::NOTE_COLOUR;
             break;
         default: PYLIR_UNREACHABLE;
     }

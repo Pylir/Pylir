@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <variant>
+
+#include <fmt/color.h>
 #include <fmt/format.h>
 
 #include "Document.hpp"
@@ -13,194 +16,196 @@
 
 namespace pylir::Diag
 {
-enum class colour : uint32_t
+
+namespace flags
 {
-    alice_blue = 0xF0F8FF,
-    antique_white = 0xFAEBD7,
-    aqua = 0x00FFFF,
-    aquamarine = 0x7FFFD4,
-    azure = 0xF0FFFF,
-    beige = 0xF5F5DC,
-    bisque = 0xFFE4C4,
-    black = 0x000000,
-    blanched_almond = 0xFFEBCD,
-    blue = 0x0000FF,
-    blue_violet = 0x8A2BE2,
-    brown = 0xA52A2A,
-    burly_wood = 0xDEB887,
-    cadet_blue = 0x5F9EA0,
-    chartreuse = 0x7FFF00,
-    chocolate = 0xD2691E,
-    coral = 0xFF7F50,
-    cornflower_blue = 0x6495ED,
-    cornsilk = 0xFFF8DC,
-    crimson = 0xDC143C,
-    cyan = 0x00FFFF,
-    dark_blue = 0x00008B,
-    dark_cyan = 0x008B8B,
-    dark_golden_rod = 0xB8860B,
-    dark_gray = 0xA9A9A9,
-    dark_green = 0x006400,
-    dark_khaki = 0xBDB76B,
-    dark_magenta = 0x8B008B,
-    dark_olive_green = 0x556B2F,
-    dark_orange = 0xFF8C00,
-    dark_orchid = 0x9932CC,
-    dark_red = 0x8B0000,
-    dark_salmon = 0xE9967A,
-    dark_sea_green = 0x8FBC8F,
-    dark_slate_blue = 0x483D8B,
-    dark_slate_gray = 0x2F4F4F,
-    dark_turquoise = 0x00CED1,
-    dark_violet = 0x9400D3,
-    deep_pink = 0xFF1493,
-    deep_sky_blue = 0x00BFFF,
-    dim_gray = 0x696969,
-    dodger_blue = 0x1E90FF,
-    fire_brick = 0xB22222,
-    floral_white = 0xFFFAF0,
-    forest_green = 0x228B22,
-    fuchsia = 0xFF00FF,
-    gainsboro = 0xDCDCDC,
-    ghost_white = 0xF8F8FF,
-    gold = 0xFFD700,
-    golden_rod = 0xDAA520,
-    gray = 0x808080,
-    green = 0x008000,
-    green_yellow = 0xADFF2F,
-    honey_dew = 0xF0FFF0,
-    hot_pink = 0xFF69B4,
-    indian_red = 0xCD5C5C,
-    indigo = 0x4B0082,
-    ivory = 0xFFFFF0,
-    khaki = 0xF0E68C,
-    lavender = 0xE6E6FA,
-    lavender_blush = 0xFFF0F5,
-    lawn_green = 0x7CFC00,
-    lemon_chiffon = 0xFFFACD,
-    light_blue = 0xADD8E6,
-    light_coral = 0xF08080,
-    light_cyan = 0xE0FFFF,
-    light_golden_rod_yellow = 0xFAFAD2,
-    light_gray = 0xD3D3D3,
-    light_green = 0x90EE90,
-    light_pink = 0xFFB6C1,
-    light_salmon = 0xFFA07A,
-    light_sea_green = 0x20B2AA,
-    light_sky_blue = 0x87CEFA,
-    light_slate_gray = 0x778899,
-    light_steel_blue = 0xB0C4DE,
-    light_yellow = 0xFFFFE0,
-    lime = 0x00FF00,
-    lime_green = 0x32CD32,
-    linen = 0xFAF0E6,
-    magenta = 0xFF00FF,
-    maroon = 0x800000,
-    medium_aquamarine = 0x66CDAA,
-    medium_blue = 0x0000CD,
-    medium_orchid = 0xBA55D3,
-    medium_purple = 0x9370DB,
-    medium_sea_green = 0x3CB371,
-    medium_slate_blue = 0x7B68EE,
-    medium_spring_green = 0x00FA9A,
-    medium_turquoise = 0x48D1CC,
-    medium_violet_red = 0xC71585,
-    midnight_blue = 0x191970,
-    mint_cream = 0xF5FFFA,
-    misty_rose = 0xFFE4E1,
-    moccasin = 0xFFE4B5,
-    navajo_white = 0xFFDEAD,
-    navy = 0x000080,
-    old_lace = 0xFDF5E6,
-    olive = 0x808000,
-    olive_drab = 0x6B8E23,
-    orange = 0xFFA500,
-    orange_red = 0xFF4500,
-    orchid = 0xDA70D6,
-    pale_golden_rod = 0xEEE8AA,
-    pale_green = 0x98FB98,
-    pale_turquoise = 0xAFEEEE,
-    pale_violet_red = 0xDB7093,
-    papaya_whip = 0xFFEFD5,
-    peach_puff = 0xFFDAB9,
-    peru = 0xCD853F,
-    pink = 0xFFC0CB,
-    plum = 0xDDA0DD,
-    powder_blue = 0xB0E0E6,
-    purple = 0x800080,
-    rebecca_purple = 0x663399,
-    red = 0xFF0000,
-    rosy_brown = 0xBC8F8F,
-    royal_blue = 0x4169E1,
-    saddle_brown = 0x8B4513,
-    salmon = 0xFA8072,
-    sandy_brown = 0xF4A460,
-    sea_green = 0x2E8B57,
-    sea_shell = 0xFFF5EE,
-    sienna = 0xA0522D,
-    silver = 0xC0C0C0,
-    sky_blue = 0x87CEEB,
-    slate_blue = 0x6A5ACD,
-    slate_gray = 0x708090,
-    snow = 0xFFFAFA,
-    spring_green = 0x00FF7F,
-    steel_blue = 0x4682B4,
-    tan = 0xD2B48C,
-    teal = 0x008080,
-    thistle = 0xD8BFD8,
-    tomato = 0xFF6347,
-    turquoise = 0x40E0D0,
-    violet = 0xEE82EE,
-    wheat = 0xF5DEB3,
-    white = 0xFFFFFF,
-    white_smoke = 0xF5F5F5,
-    yellow = 0xFFFF00,
-    yellow_green = 0x9ACD32
+namespace detail
+{
+
+/// Payload created through assigning to a FlagParam.
+template <class T, class ID>
+struct FlagValue
+{
+    T value;
+
+    /// Whether this FlagValue was created via assignment to 'flag'.
+    template <auto& flag>
+    constexpr static bool isInstanceOf()
+    {
+        return std::is_same_v<typename std::decay_t<decltype(flag)>::identifier, ID>;
+    }
 };
 
-constexpr auto ERROR_COLOUR = colour::red;
-
-constexpr auto WARNING_COLOUR = colour::magenta;
-
-constexpr auto NOTE_COLOUR = colour::cyan;
-
-constexpr auto INSERT_COLOUR = colour::lime_green;
-
-constexpr auto ERROR_COMPLY = colour::peru;
-
-constexpr auto WARNING_COMPLY = colour::peru;
-
-constexpr auto NOTE_COMPLY = colour::peru;
-
-enum class emphasis : uint8_t
+/// Flag parameter which allows to use a named parameter syntax for function calls.
+/// Example:
+/// constexpr auto flag = FlagParam(std::in_place_type<int>,[]{});
+///
+/// template <class... Args>
+/// void foo(Args&&...args)
+/// {
+///     std::optional<int> flagValue = getFlag<flag>(std::forward<Args>(args)...);
+///     ....
+/// }
+///
+/// foo(flag = 3);
+///
+/// A flag may also not carry a value in which case it is constructed as 'FlagParam([]{})'. Whether the flag was
+/// specified can then be queried via 'getFlag<Args...>()'. When a flag does carry a value it is required to be assigned
+/// to, otherwise a compile time error is emitted.
+///
+/// The purpose of the lambda parameter is purely to create a new unique type for the sake of compile time verification.
+/// It allows users of FlagParam to uniquely identify the source flag a value came from and to trigger compile time
+/// errors if incompatible flags were specified.
+template <class ID, class T = std::monostate>
+class FlagParam
 {
-    bold = 1,
-    italic = 1 << 1,
-    underline = 1 << 2,
-    strikethrough = 1 << 3
+public:
+    /// Construct a 'FlagParam' that contains the type T.
+    constexpr FlagParam(std::in_place_type_t<T>, ID) {}
+
+    /// Constructs a 'FlagParam' without a value.
+    constexpr FlagParam(ID) {}
+
+    using value_type = T;
+    using identifier = ID;
+
+    /// Assigns a value to this, creating a FlagValue in the process.
+    template <class U, class V = T, std::enable_if_t<!std::is_same_v<V, std::monostate>>* = nullptr>
+    constexpr FlagValue<T, ID> operator=(U&& value) const
+    {
+        return {std::forward<U>(value)};
+    }
+
+    /// Checks whether this 'FlagParam' is the specific 'flag'.
+    template <auto& flag>
+    constexpr static bool isInstanceOf()
+    {
+        return std::is_same_v<typename std::decay_t<decltype(flag)>::identifier, ID>;
+    }
 };
 
-enum Severity
+/// Template used to check whether 'T' is a flag. This may either then be a 'FlagParam', if it does not carry a value
+/// or a 'FlagValue' if it does.
+template <class T>
+struct IsFlag : std::false_type
+{
+};
+
+template <class ID>
+struct IsFlag<flags::detail::FlagParam<ID, std::monostate>> : std::true_type
+{
+};
+
+template <class ID, class T>
+struct IsFlag<flags::detail::FlagParam<ID, T>> : std::true_type
+{
+    static_assert(sizeof(T) == 0, "Flag requires value but none was assigned via '='.");
+};
+
+template <class T, class ID>
+struct IsFlag<typename flags::detail::FlagValue<T, ID>> : std::true_type
+{
+};
+
+/// Function to extract the value of a given flag from a parameter pack of flags. If the flag is not contained, an empty
+/// optional is returned. If the flag is specified multiple times, the last occurrences value is used.
+template <auto& flag, class... Args, class ValueType = typename std::decay_t<decltype(flag)>::value_type>
+constexpr std::optional<ValueType> getFlag(Args&&... args)
+{
+    static_assert((true && ... && IsFlag<std::decay_t<Args>>{}));
+    std::optional<ValueType> result;
+    (
+        [&](auto&& arg)
+        {
+            if constexpr (std::decay_t<decltype(arg)>::template isInstanceOf<flag>())
+            {
+                result.emplace(std::forward<decltype(arg.value)>(arg.value));
+            }
+        }(args),
+        ...);
+    return result;
+}
+
+/// Returns true if the given flag is contained within the list of 'Args'.
+template <auto& flag, class... Args>
+constexpr bool hasFlag()
+{
+    return (std::decay_t<Args>::template isInstanceOf<flag>() || ...);
+}
+
+} // namespace detail
+
+/// Flags used to customize the effect of 'addLabel' in DiagnosticBuilder. A flag may also carry a value of the type
+/// specified in 'std::in_place_type', in which case it is required to set a value via assignment.
+/// Example:
+///         builder.addLabel(0, 1, flags::label = "text", flags::bold);
+
+/// Label to be used when printing. This is plain text which appears underneath the highlight markers.
+constexpr auto label = detail::FlagParam(std::in_place_type<std::string>, [] {});
+/// Indicates that no colour should be used when printing the source code. By default 'primaryColour' is used to
+/// highlight the source code denoted by the location given to 'addLabel'.
+constexpr auto noColour = detail::FlagParam([] {});
+/// Use the primary colour to highlight the source code. The precise colour is determined by the kind of message the
+/// 'addLabel' call is being attached to.
+/// This is the default.
+constexpr auto primaryColour = detail::FlagParam([] {});
+/// Use the secondary colour to highlight the source code. This colour is meant to complement the primary colour and
+/// used to highlight things that aren't off as high of an importance as the primary colour.
+constexpr auto secondaryColour = detail::FlagParam([] {});
+/// Colour used to indicate to the user that the given label is meant as an suggestion how to fix their code.
+constexpr auto insertColour = detail::FlagParam([] {});
+/// Modifies the text the label is highlighting to be struck through. Used to indicate parts of the source code that
+/// should be removed.
+constexpr auto strikethrough = detail::FlagParam([] {});
+/// Modifies the text the label is highlighting to be displayed in a bolder font.
+constexpr auto bold = detail::FlagParam([] {});
+/// Modifies the text the label is highlighting to be displayed as italic.
+constexpr auto italic = detail::FlagParam([] {});
+
+} // namespace flags
+
+/// Severity of the message. Printed as part of a message and affects the primary and secondary colours used for
+/// highlighting.
+enum class Severity
 {
     Warning,
     Error,
     Note
 };
 
-
+/// Class used to build a compiler diagnostic. It makes use of the builder pattern to be able to conveniently chain
+/// a series of method calls, modifying the result. The final diagnostic can then be converted to a std::string via
+/// 'emit'.
+///
+/// While building, the diagnostic consists of the initial header message set in the constructor, its severity and
+/// is then followed by output of source code. The printing of the source code can further be customized via calls to
+/// 'addLabel' which allow to underline, colour, label as well as modify the character style used to print portions of
+/// the source code. The source code to be printed is determined via the locations passed to the constructor as well as
+/// any locations passed to 'addLabel'.
+///
+/// Following the initial diagnostic, one can also attach additional notes via 'addNote'. These follow the same
+/// formatting as errors and warnings described above. 'addLabel' calls always affect the last diagnostic added,
+/// including notes.
 class DiagnosticsBuilder
 {
+public:
+    constexpr static auto ERROR_COLOUR = fmt::color::red;
+    constexpr static auto WARNING_COLOUR = fmt::color::magenta;
+    constexpr static auto NOTE_COLOUR = fmt::color::cyan;
+
+private:
     struct Label
     {
         std::size_t start;
         std::size_t end;
         std::optional<std::string> labelText;
-        std::optional<colour> optionalColour;
-        std::optional<emphasis> optionalEmphasis;
+        std::optional<fmt::color> optionalColour;
+        std::optional<fmt::emphasis> optionalEmphasis;
     };
 
     struct Message
     {
+        Severity severity;
         const Document* document;
         std::size_t location;
         std::string message;
@@ -212,13 +217,105 @@ class DiagnosticsBuilder
     static std::string printLine(std::size_t width, std::size_t lineNumber, const pylir::Diag::Document& document,
                                  std::vector<Label> labels);
 
-    [[nodiscard]] std::string emitMessage(const Message& message, Severity severity) const;
+    [[nodiscard]] std::string emitMessage(const Message& message) const;
+
+    template <class... Args>
+    static void verify()
+    {
+        constexpr bool hasPrimary = flags::detail::hasFlag<flags::primaryColour, Args...>();
+        constexpr bool hasSecondary = flags::detail::hasFlag<flags::secondaryColour, Args...>();
+        constexpr bool hasInsert = flags::detail::hasFlag<flags::insertColour, Args...>();
+        constexpr bool hasNoColour = flags::detail::hasFlag<flags::noColour, Args...>();
+        static_assert(hasPrimary + hasSecondary + hasInsert + hasNoColour <= 1,
+                      "Only one of primary, secondary, no colour or insert colour may be specified.");
+
+        static_assert(flags::detail::hasFlag<flags::strikethrough, Args...>()
+                              + flags::detail::hasFlag<flags::bold, Args...>()
+                              + flags::detail::hasFlag<flags::italic, Args...>()
+                          <= 1,
+                      "Only one of strikethrough, bold or italic may be specified.");
+    }
+
+    template <class... Args>
+    std::optional<fmt::color> getColour()
+    {
+        if constexpr (flags::detail::hasFlag<flags::secondaryColour, Args...>())
+        {
+            switch (m_messages.back().severity)
+            {
+                case Severity::Error: return fmt::color::orange;
+                case Severity::Warning: return fmt::color::plum;
+                case Severity::Note: return fmt::color::spring_green;
+            }
+        }
+        else if constexpr (flags::detail::hasFlag<flags::insertColour, Args...>())
+        {
+            return fmt::color::lime_green;
+        }
+        else if constexpr (flags::detail::hasFlag<flags::noColour, Args...>())
+        {
+            return std::nullopt;
+        }
+        switch (m_messages.back().severity)
+        {
+            case Severity::Error: return ERROR_COLOUR;
+            case Severity::Warning: return WARNING_COLOUR;
+            case Severity::Note: return NOTE_COLOUR;
+        }
+        PYLIR_UNREACHABLE;
+    }
+
+    template <class... Args>
+    std::optional<fmt::emphasis> getEmphasis(Args&... args)
+    {
+        std::optional<fmt::emphasis> emphasis;
+        (
+            [&](auto& arg)
+            {
+                using Arg = std::decay_t<decltype(arg)>;
+                if constexpr (Arg::template isInstanceOf<flags::strikethrough>())
+                {
+                    emphasis = fmt::emphasis::strikethrough;
+                }
+                if constexpr (Arg::template isInstanceOf<flags::bold>())
+                {
+                    emphasis = fmt::emphasis::bold;
+                }
+                if constexpr (Arg::template isInstanceOf<flags::italic>())
+                {
+                    emphasis = fmt::emphasis::italic;
+                }
+            }(args),
+            ...);
+        return emphasis;
+    }
 
 public:
+    /// Creates a new DiagnosticBuilder for a message with the given 'severity' with a diagnostic at 'location' within
+    /// 'document'. 'location' may be any type that can be used as a location via 'rangeLoc'. See its documentation
+    /// for details.
+    ///
+    /// The severity specifies the kind of message this diagnostic is producing. This is used as prefix when printing
+    /// and for the colours to use as primary and secondary colours.
+    /// The actual text message printed is produced via 'message', which may use 'fmt::format' style formatting options
+    /// with 'args' as extra arguments.
     template <class T, class S, class... Args>
-    DiagnosticsBuilder(const void* context, const Document& document, const T& location, const S& message,
-                       Args&&... args)
-        : m_messages{Message{&document,
+    DiagnosticsBuilder(const Document& document, Severity severity, const T& location, const S& message, Args&&... args)
+        : m_messages{Message{severity,
+                             &document,
+                             rangeLoc(location).first,
+                             fmt::format(message, std::forward<Args>(args)...),
+                             {}}}
+    {
+    }
+
+    /// Same as the previous constructor but with a context parameter used to gather the precise location within the
+    /// document using 'location' and the 'rangeLoc' function. See its documentation for details.
+    template <class T, class S, class... Args>
+    DiagnosticsBuilder(const void* context, const Document& document, Severity severity, const T& location,
+                       const S& message, Args&&... args)
+        : m_messages{Message{severity,
+                             &document,
                              rangeLoc(location, context).first,
                              fmt::format(message, std::forward<Args>(args)...),
                              {}}},
@@ -226,103 +323,84 @@ public:
     {
     }
 
-    template <class T, class S, class... Args>
-    DiagnosticsBuilder(const Document& document, const T& location, const S& message, Args&&... args)
-        : m_messages{Message{&document, rangeLoc(location).first, fmt::format(message, std::forward<Args>(args)...), {}}}
+    /// Adds the effects denoted by the flags to the given source code ranging from 'start' until the very end of 'end'.
+    template <class T, class U, class... Flags>
+    auto addLabel(const T& start, const U& end, Flags&&... flags)
+        -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
+                            DiagnosticsBuilder&>
     {
-    }
-
-    template <class T, class U>
-    auto addLabel(const T& start, const U& end, std::optional<std::string>&& labelText = std::nullopt,
-                  std::optional<colour> colour = std::nullopt,
-                  std::optional<emphasis> emphasis =
-                      std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>,
-                                                          DiagnosticsBuilder&>
-    {
-        m_messages.back().labels.push_back(
-            {rangeLoc(start, m_context).first, rangeLoc(end, m_context).second, std::move(labelText), colour, emphasis});
+        verify<Flags...>();
+        m_messages.back().labels.push_back({rangeLoc(start, m_context).first, rangeLoc(end, m_context).second,
+                                            flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
+                                            getColour<Flags...>(), getEmphasis(flags...)});
         return *this;
     }
 
-    template <class T, class U>
-    [[nodiscard]] auto addLabel(const T& start, const U& end, std::optional<std::string>&& labelText = std::nullopt,
-                                std::optional<colour> colour = std::nullopt,
-                                std::optional<emphasis> emphasis = std::nullopt) && -> std::
-        enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>, DiagnosticsBuilder&&>
+    /// Adds the effects denoted by the flags to the given source code at 'pos'.
+    template <class T, class... Flags>
+    auto addLabel(const T& pos, Flags&&... flags)
+        -> std::enable_if_t<hasLocationProvider_v<T>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
+                            DiagnosticsBuilder&>
     {
-        return std::move(addLabel(start, end, std::move(labelText), colour, emphasis));
-    }
-
-    template <class T>
-    auto addLabel(const T& pos, std::optional<std::string>&& labelText = std::nullopt,
-                  std::optional<colour> colour = std::nullopt,
-                  std::optional<emphasis> emphasis =
-                      std::nullopt) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
-    {
+        verify<Flags...>();
         auto [start, end] = rangeLoc(pos, m_context);
-        m_messages.back().labels.push_back({start, end, std::move(labelText), colour, emphasis});
+        m_messages.back().labels.push_back({start, end,
+                                            flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
+                                            getColour<Flags...>(), getEmphasis(flags...)});
         return *this;
     }
 
-    template <class T>
-    [[nodiscard]] auto addLabel(const T& start, std::optional<std::string>&& labelText = std::nullopt,
-                                std::optional<colour> colour = std::nullopt,
-                                std::optional<emphasis> emphasis =
-                                    std::nullopt) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
+    /// Adds the effects denoted by the flags to the given source code ranging from 'start' until the very end of 'end'.
+    /// This overload has an explicit parm for the label as it is a commonly used option.
+    template <class T, class U, class... Flags>
+    auto addLabel(const T& start, const U& end, std::string label, Flags&&... flags)
+        -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
+                            DiagnosticsBuilder&>
     {
-        return std::move(addLabel(start, std::move(labelText), colour, emphasis));
+        return addLabel(start, end, flags::label = std::move(label), std::forward<Flags>(flags)...);
     }
 
-    template <class T, class S, class... Args>
-    auto addNote(const T& location, const S& message,
-                 Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
+    /// Adds the effects denoted by the flags to the given source code at 'pos'.
+    /// This overload has an explicit parm for the label as it is a commonly used option.
+    template <class T, class... Flags>
+    auto addLabel(const T& pos, std::string label, Flags&&... flags)
+        -> std::enable_if_t<hasLocationProvider_v<T>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
+                            DiagnosticsBuilder&>
     {
-        return addNote(*m_messages.back().document, rangeLoc(location, m_context).first,
-                       fmt::format(message, std::forward<Args>(args)...));
+        return addLabel(pos, flags::label = std::move(label), std::forward<Flags>(flags)...);
     }
 
+    /// Adds a new note to the diagnostic. 'location' as well as 'message' and its 'args' serve the same purpose as in
+    /// the constructor. The 'document' and 'context' parameters from the constructor are additionally used for this
+    /// note as well.
     template <class T, class S, class... Args>
-    auto addNote(const Document& document, const T& location, const S& message,
-                 Args&&... args) & -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
+    auto addNote(const T& location, const S& message, Args&&... args)
+        -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
     {
-        m_messages.push_back(
-            {&document, rangeLoc(location, m_context).first, fmt::format(message, std::forward<Args>(args)...), {}});
+        m_messages.push_back({Severity::Note,
+                              m_messages.back().document,
+                              rangeLoc(location, m_context).first,
+                              fmt::format(message, std::forward<Args>(args)...),
+                              {}});
         return *this;
     }
 
-    template <class T, class S, class... Args>
-    [[nodiscard]] auto addNote(const T& location, const S& message,
-                               Args&&... args) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
-    {
-        return std::move(addNote(*m_messages.back().document, location, message, std::forward<Args>(args)...));
-    }
-
-    template <class T, class S, class... Args>
-    [[nodiscard]] auto addNote(const Document& document, const T& location, const S& message,
-                               Args&&... args) && -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&&>
-    {
-        return std::move(addNote(document, location, message, std::forward<Args>(args)...));
-    }
-
-    [[nodiscard]] std::string emit(Severity severity) const
+    /// Emits the diagnostic by converting it to a string.
+    [[nodiscard]] std::string emit() const
     {
         auto begin = m_messages.begin();
-        std::string result = emitMessage(*begin++, severity);
-        std::for_each(begin, m_messages.end(), [&](auto& message) { result += emitMessage(message, Severity::Note); });
+        std::string result = emitMessage(*begin++);
+        std::for_each(begin, m_messages.end(), [&](auto& message) { result += emitMessage(message); });
         return result;
-    }
-
-    [[nodiscard]] std::string emitError() const
-    {
-        return emit(Severity::Error);
-    }
-
-    [[nodiscard]] std::string emitWarning() const
-    {
-        return emit(Severity::Warning);
     }
 };
 
+/// Does the header formatting of a diagnostic as done in 'DiagnosticBuilder'. This is simply the prefix as determined
+/// by 'severity' with the given message.
 std::string formatLine(Severity severity, std::string_view message);
 
 } // namespace pylir::Diag
