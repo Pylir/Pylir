@@ -14,7 +14,8 @@ tl::expected<pylir::Syntax::Yield, std::string> pylir::Parser::parseYieldExpress
 {
     if (!m_inFunc)
     {
-        return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION)
+        return tl::unexpected{
+            createError(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION)
                                   .addLabel(*m_current)
                                   .emit()};
     }
@@ -51,7 +52,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     if (m_current == m_lexer.end())
     {
         return tl::unexpected{
-            createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, "identifier, number or enclosure")
+            createError(m_document->getText().size(), Diag::EXPECTED_N, "identifier, number or enclosure")
                 .addLabel(m_document->getText().size())
                 .emit()};
     }
@@ -82,8 +83,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         case TokenType::OpenBrace:
         case TokenType::OpenSquareBracket: return parseEnclosure();
         default:
-            return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                                           "identifier, number or enclosure", m_current->getTokenType())
+            return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
+                                              "identifier, number or enclosure", m_current->getTokenType())
                                       .addLabel(*m_current, Diag::flags::strikethrough)
                                       .emit()};
     }
@@ -93,9 +94,9 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N,
-                                                       fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses,
-                                                                   TokenType::OpenSquareBracket, TokenType::OpenBrace))
+        return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N,
+                                          fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses,
+                                                      TokenType::OpenSquareBracket, TokenType::OpenBrace))
                                   .addLabel(m_document->getText().size())
                                   .emit()};
     }
@@ -384,11 +385,10 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         }
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         default:
-            return tl::unexpected{
-                createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                         fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses,
-                                                     TokenType::OpenSquareBracket, TokenType::OpenBrace),
-                                         m_current->getTokenType())
+            return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
+                                              fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses,
+                                                          TokenType::OpenSquareBracket, TokenType::OpenBrace),
+                                              m_current->getTokenType())
                     .addLabel(*m_current, Diag::flags::strikethrough)
                     .emit()};
     }
@@ -558,8 +558,7 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
             if (!firstMappingExpansionIndex || (firstKeywordIndex && firstKeywordIndex < firstMappingExpansionIndex))
             {
                 return tl::unexpected{
-                    createDiagnosticsBuilder(**expression,
-                                             Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS)
+                    createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS)
                         .addLabel(**expression)
                         .addNote(*arguments[*firstKeywordIndex].maybeName, Diag::FIRST_KEYWORD_ARGUMENT_N_HERE,
                                  arguments[*firstKeywordIndex].maybeName->getValue())
@@ -567,8 +566,7 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
                         .emit()};
             }
             return tl::unexpected{
-                createDiagnosticsBuilder(**expression,
-                                         Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
+                createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
                     .addLabel(**expression)
                     .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
                     .addLabel(arguments[*firstMappingExpansionIndex])
@@ -578,8 +576,7 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
         if (expansionOrEqual && expansionOrEqual->getTokenType() == TokenType::Star && firstMappingExpansionIndex)
         {
             return tl::unexpected{
-                createDiagnosticsBuilder(**expression,
-                                         Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
+                createError(**expression, Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
                     .addLabel(**expression)
                     .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
                     .addLabel(arguments[*firstMappingExpansionIndex])

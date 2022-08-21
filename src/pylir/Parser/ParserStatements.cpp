@@ -94,8 +94,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
         case TokenType::ContinueKeyword:
             if (!m_inLoop)
             {
-                return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP,
-                                                               m_current->getTokenType())
+                return tl::unexpected{
+                    createError(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, m_current->getTokenType())
                                           .addLabel(*m_current)
                                           .emit()};
             }
@@ -115,8 +115,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
         {
             if (!m_inFunc)
             {
-                return tl::unexpected{
-                    createDiagnosticsBuilder(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION)
+                return tl::unexpected{createError(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION)
                         .addLabel(*m_current)
                         .emit()};
             }
@@ -200,26 +199,25 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                             case Syntax::Scope::Kind::Local:
                             case Syntax::Scope::Kind::Cell:
                                 return tl::unexpected{
-                                    createDiagnosticsBuilder(
-                                        nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
-                                        nonLocal.getValue())
+                                    createError(nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
+                                                nonLocal.getValue())
                                         .addLabel(nonLocal)
                                         .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
                                         .addLabel(result->first)
                                         .emit()};
                             case Syntax::Scope::Kind::Global:
                                 return tl::unexpected{
-                                    createDiagnosticsBuilder(
-                                        nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
-                                        nonLocal.getValue())
+                                    createError(nonLocal,
+                                                Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
+                                                nonLocal.getValue())
                                         .addLabel(nonLocal)
                                         .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
                                         .addLabel(result->first)
                                         .emit()};
                             case Syntax::Scope::Kind::Unknown:
                                 return tl::unexpected{
-                                    createDiagnosticsBuilder(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION,
-                                                             nonLocal.getValue())
+                                    createError(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION,
+                                                nonLocal.getValue())
                                         .addLabel(nonLocal)
                                         .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
                                         .addLabel(result->first)
@@ -256,26 +254,23 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
                             case Syntax::Scope::Kind::Local:
                             case Syntax::Scope::Kind::Cell:
                                 return tl::unexpected{
-                                    createDiagnosticsBuilder(
-                                        global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
-                                        global.getValue())
+                                    createError(global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
+                                                global.getValue())
                                         .addLabel(global)
                                         .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
                                         .addLabel(result->first)
                                         .emit()};
                             case Syntax::Scope::Kind::NonLocal:
                                 return tl::unexpected{
-                                    createDiagnosticsBuilder(
-                                        global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE,
-                                        global.getValue())
+                                    createError(global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE,
+                                                global.getValue())
                                         .addLabel(global)
                                         .addNote(result->first, Diag::NONLOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
                                         .addLabel(result->first)
                                         .emit()};
                             case Syntax::Scope::Kind::Unknown:
-                                return tl::unexpected{createDiagnosticsBuilder(global,
-                                                                               Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION,
-                                                                               global.getValue())
+                                return tl::unexpected{
+                                    createError(global, Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION, global.getValue())
                                                           .addLabel(global)
                                                           .addNote(result->first, Diag::N_USED_HERE, global.getValue())
                                                           .addLabel(result->first)
@@ -332,7 +327,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>, std::string> pylir::P
     }
 #include "Features.def"
                     return tl::unexpected{
-                        createDiagnosticsBuilder(identifierToken, Diag::UNKNOWN_FEATURE_N, identifierToken.getValue())
+                        createError(identifierToken, Diag::UNKNOWN_FEATURE_N, identifierToken.getValue())
                             .addLabel(identifierToken)
                             .emit()};
                 };
@@ -525,23 +520,22 @@ struct Visitor
             {
                 case 0:
                     return parser
-                        .createDiagnosticsBuilder(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_EMPTY_TUPLE,
-                                                  assignOp.getTokenType())
+                        .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_EMPTY_TUPLE,
+                                     assignOp.getTokenType())
                         .addLabel(tupleConstruct)
                         .addLabel(assignOp, Diag::flags::secondaryColour)
                         .emit();
                 case 1:
                     return parser
-                        .createDiagnosticsBuilder(tupleConstruct,
-                                                  Diag::OPERATOR_N_CANNOT_ASSIGN_TO_SINGLE_TUPLE_ELEMENT,
-                                                  assignOp.getTokenType())
+                        .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_SINGLE_TUPLE_ELEMENT,
+                                     assignOp.getTokenType())
                         .addLabel(tupleConstruct)
                         .addLabel(assignOp, Diag::flags::secondaryColour)
                         .emit();
                 default:
                     return parser
-                        .createDiagnosticsBuilder(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
-                                                  assignOp.getTokenType())
+                        .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
+                                     assignOp.getTokenType())
                         .addLabel(tupleConstruct)
                         .addLabel(assignOp, Diag::flags::secondaryColour)
                         .emit();
@@ -559,7 +553,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::DictDisplay& expression)
     {
-        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
+        return parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
             .addLabel(expression)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -567,7 +561,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::SetDisplay& expression)
     {
-        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
+        return parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
             .addLabel(expression)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -577,7 +571,7 @@ struct Visitor
     {
         if (std::holds_alternative<Syntax::Comprehension>(expression.variant) || augmented)
         {
-            return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
+            return parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
                 .addLabel(expression)
                 .addLabel(assignOp, Diag::flags::secondaryColour)
                 .emit();
@@ -594,7 +588,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::Yield& expression)
     {
-        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
+        return parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
             .addLabel(expression)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -602,7 +596,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::Generator& expression)
     {
-        return parser.createDiagnosticsBuilder(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
+        return parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
             .addLabel(expression)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -611,8 +605,7 @@ struct Visitor
     std::optional<std::string> visit(const Syntax::BinOp& binOp)
     {
         return parser
-            .createDiagnosticsBuilder(binOp.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
-                                      binOp.operation.getTokenType())
+            .createError(binOp.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, binOp.operation.getTokenType())
             .addLabel(binOp.operation)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -620,7 +613,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::Lambda& lambda)
     {
-        return parser.createDiagnosticsBuilder(lambda, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression")
+        return parser.createError(lambda, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression")
             .addLabel(lambda)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -638,7 +631,7 @@ struct Visitor
             case TokenType::TrueKeyword:
             case TokenType::ByteLiteral:
             case TokenType::ComplexLiteral:
-                return parser.createDiagnosticsBuilder(expression.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
+                return parser.createError(expression.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
                     .addLabel(expression.token)
                     .addLabel(assignOp, Diag::flags::secondaryColour)
                     .emit();
@@ -648,7 +641,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::Call& call)
     {
-        return parser.createDiagnosticsBuilder(call.openParenth, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
+        return parser.createError(call.openParenth, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
             .addLabel(call.openParenth, call)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -657,8 +650,8 @@ struct Visitor
     std::optional<std::string> visit(const Syntax::UnaryOp& expression)
     {
         return parser
-            .createDiagnosticsBuilder(expression.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
-                                      expression.operation.getTokenType())
+            .createError(expression.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
+                         expression.operation.getTokenType())
             .addLabel(expression.operation)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -672,17 +665,16 @@ struct Visitor
         if (back.secondToken)
         {
             return parser
-                .createDiagnosticsBuilder(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
-                                          fmt::format(FMT_STRING("'{} {}'"), back.firstToken.getTokenType(),
-                                                      back.secondToken->getTokenType()))
+                .createError(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
+                             fmt::format(FMT_STRING("'{} {}'"), back.firstToken.getTokenType(),
+                                         back.secondToken->getTokenType()))
                 .addLabel(back.firstToken, *back.secondToken)
                 .addLabel(assignOp, Diag::flags::secondaryColour)
                 .emit();
         }
 
         return parser
-            .createDiagnosticsBuilder(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N,
-                                      back.firstToken.getTokenType())
+            .createError(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, back.firstToken.getTokenType())
             .addLabel(back.firstToken)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -690,8 +682,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::Conditional& expression)
     {
-        return parser
-            .createDiagnosticsBuilder(expression.ifToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression")
+        return parser.createError(expression.ifToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression")
             .addLabel(expression.ifToken, *expression.elseValue)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -699,8 +690,7 @@ struct Visitor
 
     std::optional<std::string> visit(const Syntax::Assignment& assignment)
     {
-        return parser
-            .createDiagnosticsBuilder(assignment.walrus, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
+        return parser.createError(assignment.walrus, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
             .addLabel(assignment.walrus)
             .addLabel(assignOp, Diag::flags::secondaryColour)
             .emit();
@@ -837,9 +827,8 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
     };
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{
-            createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N,
-                                     fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword))
+        return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N,
+                                          fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword))
                 .addLabel(m_document->getText().size())
                 .emit()};
     }
@@ -940,9 +929,9 @@ tl::expected<Syntax::ImportStmt, std::string> pylir::Parser::parseImportStmt()
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         default:
             return tl::unexpected{
-                createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                         fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword),
-                                         m_current->getTokenType())
+                createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
+                            fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword),
+                            m_current->getTokenType())
                     .addLabel(*m_current)
                     .emit()};
     }

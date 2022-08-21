@@ -141,7 +141,7 @@ tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType t
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, tokenType)
+        return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N, tokenType)
                                   .addLabel(m_document->getText().size(), fmt::format("{}", tokenType))
                                   .emit()};
     }
@@ -152,7 +152,7 @@ tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType t
     if (m_current->getTokenType() != tokenType)
     {
         return tl::unexpected{
-            createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, tokenType, m_current->getTokenType())
+            createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, tokenType, m_current->getTokenType())
                 .addLabel(*m_current, fmt::format("{}", tokenType), Diag::flags::strikethrough)
                 .emit()};
     }

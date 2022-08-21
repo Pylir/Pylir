@@ -353,8 +353,7 @@ bool pylir::Lexer::parseNext()
                 m_current++;
                 if (m_current == m_document->end())
                 {
-                    auto builder =
-                        createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
+                    auto builder = createError(m_current - m_document->begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
                             .addLabel(m_current - m_document->begin(), "\\n", Diag::flags::insertColour);
                     m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(),
                                           TokenType::SyntaxError, builder.emit());
@@ -362,9 +361,8 @@ bool pylir::Lexer::parseNext()
                 }
                 if (*m_current != U'\n')
                 {
-                    auto builder =
-                        createDiagnosticsBuilder(m_current - m_document->begin(),
-                                                 Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
+                    auto builder = createError(m_current - m_document->begin(),
+                                               Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
                             .addLabel(m_current - m_document->begin(), "\\n", Diag::flags::insertColour,
                                       Diag::flags::strikethrough);
                     m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(),
@@ -755,8 +753,8 @@ void pylir::Lexer::parseIdentifier()
     static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
     if (!initialCharacterSet.contains(*m_current))
     {
-        auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::UNEXPECTED_CHARACTER_N,
-                                                Text::toUTF8String({&*m_current, 1}))
+        auto builder = createError(m_current - m_document->begin(), Diag::UNEXPECTED_CHARACTER_N,
+                                   Text::toUTF8String({&*m_current, 1}))
                            .addLabel(m_current - m_document->begin());
         m_tokens.emplace_back(m_current - m_document->begin(), 1, TokenType::SyntaxError, builder.emit());
         m_current++;
@@ -903,7 +901,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
         {
             if (m_current == m_document->end())
             {
-                auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
+                auto builder = createError(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
                                    .addLabel(m_current - m_document->begin(), std::string(1, character));
                 return tl::unexpected{builder.emit()};
             }
@@ -921,7 +919,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
             {
                 m_current = std::next(m_current);
             }
-            auto builder = createDiagnosticsBuilder(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
+            auto builder = createError(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
                                .addLabel(m_current - m_document->begin(), std::string(3, character));
             return tl::unexpected{builder.emit()};
         }
@@ -938,8 +936,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
 
     auto diagnoseNonAscii = [&]
     {
-        auto builder = createDiagnosticsBuilder(m_current - m_document->begin(),
-                                                Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS)
+        auto builder =
+            createError(m_current - m_document->begin(), Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS)
                            .addLabel(m_current - m_document->begin());
         if (!raw)
         {
@@ -1101,8 +1099,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         }
                         if (count != size)
                         {
-                            auto builder = createDiagnosticsBuilder(m_current - m_document->begin() - count,
-                                                                    Diag::EXPECTED_N_MORE_HEX_CHARACTERS, size - count)
+                            auto builder = createError(m_current - m_document->begin() - count,
+                                                       Diag::EXPECTED_N_MORE_HEX_CHARACTERS, size - count)
                                                .addLabel(m_current - m_document->begin() - count,
                                                          m_current - m_document->begin() - 1)
                                                .addLabel(m_current - m_document->begin() - count - 2,
@@ -1112,9 +1110,9 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         }
                         if (!Text::isValidCodepoint(value))
                         {
-                            auto builder = createDiagnosticsBuilder(m_current - m_document->begin() - count,
-                                                                    Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
-                                                                    static_cast<std::uint32_t>(value))
+                            auto builder = createError(m_current - m_document->begin() - count,
+                                                       Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
+                                                       static_cast<std::uint32_t>(value))
                                                .addLabel(m_current - m_document->begin() - count,
                                                          m_current - m_document->begin() - 1)
                                                .addLabel(m_current - m_document->begin() - count - 2,
@@ -1136,8 +1134,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         m_current++;
                         if (m_current == m_document->end() || *m_current != '{')
                         {
-                            auto builder = createDiagnosticsBuilder(m_current - m_document->begin(),
-                                                                    Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N);
+                            auto builder = createError(m_current - m_document->begin(),
+                                                       Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N);
                             if (m_current != m_document->end())
                             {
                                 builder.addLabel(m_current - m_document->begin(), "{", Diag::flags::insertColour,
@@ -1155,8 +1153,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         if (!codepoint)
                         {
                             auto builder =
-                                createDiagnosticsBuilder(m_current - m_document->begin(),
-                                                         Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
+                                createError(m_current - m_document->begin(), Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
                                     .addLabel(m_current - m_document->begin(), closing - m_document->begin() - 1)
                                     .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin() - 1,
                                               Diag::flags::secondaryColour);
@@ -1193,8 +1190,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
             {
                 if (!longString)
                 {
-                    auto builder =
-                        createDiagnosticsBuilder(m_current - m_document->begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
+                    auto builder = createError(m_current - m_document->begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
                             .addLabel(m_current - m_document->begin());
                     return tl::unexpected{builder.emit()};
                 }
@@ -1307,7 +1303,7 @@ void pylir::Lexer::parseNumber()
     if (*std::prev(end) == U'_')
     {
         auto builder =
-            createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
+            createError(end - m_document->begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
                 .addLabel(end - 1 - m_document->begin())
                 .addLabel(start - m_document->begin(), end - m_document->begin() - 2, Diag::flags::secondaryColour);
         m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError, builder.emit());
@@ -1328,9 +1324,8 @@ void pylir::Lexer::parseNumber()
                                           [&](char32_t value) { return legalIdentifierSet.contains(value); });
         if (suffixEnd != m_current)
         {
-            auto builder = createDiagnosticsBuilder(
-                               m_current - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
-                               Text::toUTF8String({m_current, static_cast<std::size_t>(suffixEnd - m_current)}))
+            auto builder = createError(m_current - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
+                                       Text::toUTF8String({m_current, static_cast<std::size_t>(suffixEnd - m_current)}))
                                .addLabel(start - m_document->begin(), m_current - m_document->begin() - 1,
                                          Diag::flags::secondaryColour)
                                .addLabel(m_current - m_document->begin(), suffixEnd - m_document->begin() - 1,
@@ -1357,8 +1352,7 @@ void pylir::Lexer::parseNumber()
         {
             const auto* leadingEnd =
                 std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
-            auto builder =
-                createDiagnosticsBuilder(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
+            auto builder = createError(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
                     .addLabel(leadingEnd - m_document->begin(), end - m_document->begin() - 1,
                               Diag::flags::secondaryColour)
                     .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin() - 1)
@@ -1404,7 +1398,7 @@ void pylir::Lexer::parseNumber()
         if (newEnd == end)
         {
             auto builder =
-                createDiagnosticsBuilder(end - m_document->begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
+                createError(end - m_document->begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
                     .addLabel(start - m_document->begin(), end - m_document->begin() - 1, Diag::flags::secondaryColour)
                     .addLabel(end - m_document->begin());
             m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError, builder.emit());
@@ -1493,8 +1487,7 @@ void pylir::Lexer::parseIndent()
         } while (indent < m_indentation.top().first);
         if (m_indentation.top().first != indent)
         {
-            auto builder =
-                createDiagnosticsBuilder(m_current - m_document->begin(), Diag::INVALID_INDENTATION_N, indent)
+            auto builder = createError(m_current - m_document->begin(), Diag::INVALID_INDENTATION_N, indent)
                     .addLabel(start - m_document->begin(), m_current - m_document->begin() - 1);
             if (previous.first - indent < indent - m_indentation.top().first)
             {

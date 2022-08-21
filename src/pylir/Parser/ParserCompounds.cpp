@@ -94,7 +94,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, "statement")
+        return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N, "statement")
                                   .addLabel(m_document->getText().size())
                                   .emit()};
     }
@@ -192,8 +192,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             }
             if (m_current == m_lexer.end())
             {
-                return tl::unexpected{
-                    createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N, "class or function")
+                return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N, "class or function")
                         .addLabel(m_document->getText().size())
                         .emit()};
             }
@@ -220,8 +219,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                 case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
                 default:
                 {
-                    return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                                                   "class or function", m_current->getTokenType())
+                    return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "class or function",
+                                                      m_current->getTokenType())
                                               .addLabel(*m_current)
                                               .emit()};
                 }
@@ -232,8 +231,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto async = *m_current++;
             if (m_current == m_lexer.end())
             {
-                return tl::unexpected{createDiagnosticsBuilder(m_document->getText().size(), Diag::EXPECTED_N,
-                                                               "'for', 'with' or function")
+                return tl::unexpected{
+                    createError(m_document->getText().size(), Diag::EXPECTED_N, "'for', 'with' or function")
                                           .addLabel(m_document->getText().size())
                                           .emit()};
             }
@@ -271,9 +270,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                 case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
                 default:
                 {
-                    return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                                                   "'for', 'with' or function",
-                                                                   m_current->getTokenType())
+                    return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
+                                                      "'for', 'with' or function", m_current->getTokenType())
                                               .addLabel(*m_current)
                                               .emit()};
                 }
@@ -282,8 +280,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
         case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
         default:
         {
-            return tl::unexpected{createDiagnosticsBuilder(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "statement",
-                                                           m_current->getTokenType())
+            return tl::unexpected{
+                createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "statement", m_current->getTokenType())
                                       .addLabel(*m_current)
                                       .emit()};
         }
@@ -520,7 +518,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         if (catchAll)
         {
             return tl::unexpected{
-                createDiagnosticsBuilder(catchAll->exceptKeyword, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
+                createError(catchAll->exceptKeyword, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
                     .addLabel(catchAll->exceptKeyword, Diag::flags::bold)
                     .emit()};
         }
@@ -716,8 +714,7 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
                 if (parameters.empty())
                 {
                     return tl::unexpected{
-                        createDiagnosticsBuilder(*m_current,
-                                                 Diag::AT_LEAST_ONE_PARAMETER_REQUIRED_BEFORE_POSITIONAL_ONLY_INDICATOR)
+                        createError(*m_current, Diag::AT_LEAST_ONE_PARAMETER_REQUIRED_BEFORE_POSITIONAL_ONLY_INDICATOR)
                             .addLabel(*m_current)
                             .emit()};
                 }
@@ -730,8 +727,7 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
                     }
                     continue;
                 }
-                return tl::unexpected{
-                    createDiagnosticsBuilder(*m_current, Diag::POSITIONAL_ONLY_INDICATOR_MAY_ONLY_APPEAR_ONCE)
+                return tl::unexpected{createError(*m_current, Diag::POSITIONAL_ONLY_INDICATOR_MAY_ONLY_APPEAR_ONCE)
                         .addLabel(*m_current)
                         .addNote(*seenPositionalOnly, Diag::PREVIOUS_OCCURRENCE_HERE)
                         .addLabel(*seenPositionalOnly)
@@ -787,9 +783,9 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
         if (!maybeDefault && seenDefaultParam)
         {
             return tl::unexpected{
-                createDiagnosticsBuilder(
-                    *identifier, Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
-                    pylir::get<std::string>(identifier->getValue()))
+                createError(*identifier,
+                            Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
+                            pylir::get<std::string>(identifier->getValue()))
                     .addLabel(*identifier)
                     .addNote(parameters[*seenDefaultParam], Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
                              parameters[*seenDefaultParam].name.getValue())
@@ -803,9 +799,8 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
         if (seenKwRest)
         {
             return tl::unexpected{
-                createDiagnosticsBuilder(*identifier, Diag::NO_MORE_PARAMETERS_ALLOWED_AFTER_EXCESS_KEYWORD_PARAMETER_N,
-                                         pylir::get<std::string>(identifier->getValue()),
-                                         parameters[*seenKwRest].name.getValue())
+                createError(*identifier, Diag::NO_MORE_PARAMETERS_ALLOWED_AFTER_EXCESS_KEYWORD_PARAMETER_N,
+                            pylir::get<std::string>(identifier->getValue()), parameters[*seenKwRest].name.getValue())
                     .addLabel(*identifier)
                     .addNote(parameters[*seenKwRest], Diag::EXCESS_KEYWORD_PARAMETER_N_HERE,
                              parameters[*seenKwRest].name.getValue())
@@ -824,8 +819,8 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
         {
             if (auto* token = std::get_if<BaseToken>(&seenPosRest))
             {
-                return tl::unexpected{createDiagnosticsBuilder(
-                                          *identifier, Diag::STARRED_PARAMETER_NOT_ALLOWED_AFTER_KEYWORD_ONLY_INDICATOR)
+                return tl::unexpected{
+                    createError(*identifier, Diag::STARRED_PARAMETER_NOT_ALLOWED_AFTER_KEYWORD_ONLY_INDICATOR)
                                           .addLabel(*identifier)
                                           .addNote(*token, Diag::KEYWORD_ONLY_INDICATOR_HERE)
                                           .addLabel(*token)
@@ -834,7 +829,7 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
             if (auto* index = std::get_if<std::size_t>(&seenPosRest))
             {
                 return tl::unexpected{
-                    createDiagnosticsBuilder(*identifier, Diag::ONLY_ONE_STARRED_PARAMETER_ALLOWED)
+                    createError(*identifier, Diag::ONLY_ONE_STARRED_PARAMETER_ALLOWED)
                         .addLabel(*identifier)
                         .addNote(parameters[*index], Diag::STARRED_PARAMETER_N_HERE, parameters[*index].name.getValue())
                         .addLabel(parameters[*index])
@@ -998,8 +993,8 @@ tl::expected<void, std::string> pylir::Parser::finishNamespace(Syntax::Suite& su
     NamespaceVisitor visitor(maybeScope,
                              [&](const IdentifierToken& token)
                              {
-                                 return createDiagnosticsBuilder(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
-                                                                 token.getValue())
+                                 return createError(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
+                                                    token.getValue())
                                      .addLabel(token)
                                      .emit();
                              });
@@ -1092,8 +1087,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
             {
                 continue;
             }
-            return tl::unexpected{
-                createDiagnosticsBuilder(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
+            return tl::unexpected{createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
                     .addLabel(iter)
                     .emit()};
         }
@@ -1180,8 +1174,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
             {
                 continue;
             }
-            return tl::unexpected{
-                createDiagnosticsBuilder(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
+            return tl::unexpected{createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
                     .addLabel(iter)
                     .emit()};
         }

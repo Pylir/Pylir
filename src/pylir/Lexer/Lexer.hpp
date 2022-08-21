@@ -85,8 +85,7 @@ public:
     }
 
     template <class T, class S, class... Args>
-    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message,
-                                                                    Args&&... args) const
+    [[nodiscard]] Diag::DiagnosticsBuilder createError(const T& location, const S& message, Args&&... args) const
     {
         return Diag::DiagnosticsBuilder(*m_document, Diag::Severity::Error, location, message,
                                         std::forward<Args>(args)...);
