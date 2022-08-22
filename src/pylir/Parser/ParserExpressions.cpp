@@ -14,7 +14,7 @@ std::optional<pylir::Syntax::Yield> pylir::Parser::parseYieldExpression()
 {
     if (!m_inFunc)
     {
-        createError(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION).addLabel(*m_current);
+        createError(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION).addHighlight(*m_current);
         return std::nullopt;
     }
     auto yield = expect(TokenType::YieldKeyword);
@@ -49,7 +49,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
 {
     if (m_current == m_lexer.end())
     {
-        createError(endOfFileLoc(), Diag::EXPECTED_N, "identifier, number or enclosure").addLabel(endOfFileLoc());
+        createError(endOfFileLoc(), Diag::EXPECTED_N, "identifier, number or enclosure").addHighlight(endOfFileLoc());
         return std::nullopt;
     }
 
@@ -81,7 +81,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
         default:
             createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "identifier, number or enclosure",
                         m_current->getTokenType())
-                .addLabel(*m_current, Diag::flags::strikethrough);
+                .addHighlight(*m_current, Diag::flags::strikethrough);
             return std::nullopt;
     }
 }
@@ -93,7 +93,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
         createError(endOfFileLoc(), Diag::EXPECTED_N,
                     fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses, TokenType::OpenSquareBracket,
                                 TokenType::OpenBrace))
-            .addLabel(endOfFileLoc());
+            .addHighlight(endOfFileLoc());
         return std::nullopt;
     }
     switch (m_current->getTokenType())
@@ -385,7 +385,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                         fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses, TokenType::OpenSquareBracket,
                                     TokenType::OpenBrace),
                         m_current->getTokenType())
-                .addLabel(*m_current, Diag::flags::strikethrough);
+                .addHighlight(*m_current, Diag::flags::strikethrough);
             return std::nullopt;
     }
 }
@@ -553,25 +553,25 @@ std::optional<std::vector<pylir::Syntax::Argument>>
             if (!firstMappingExpansionIndex || (firstKeywordIndex && firstKeywordIndex < firstMappingExpansionIndex))
             {
                 createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS)
-                    .addLabel(**expression)
+                    .addHighlight(**expression)
                     .addNote(*arguments[*firstKeywordIndex].maybeName, Diag::FIRST_KEYWORD_ARGUMENT_N_HERE,
                              arguments[*firstKeywordIndex].maybeName->getValue())
-                    .addLabel(*arguments[*firstKeywordIndex].maybeName);
+                    .addHighlight(*arguments[*firstKeywordIndex].maybeName);
                 return std::nullopt;
             }
             createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
-                .addLabel(**expression)
+                .addHighlight(**expression)
                 .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
-                .addLabel(arguments[*firstMappingExpansionIndex]);
+                .addHighlight(arguments[*firstMappingExpansionIndex]);
             return std::nullopt;
         }
 
         if (expansionOrEqual && expansionOrEqual->getTokenType() == TokenType::Star && firstMappingExpansionIndex)
         {
             createError(**expression, Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
-                .addLabel(**expression)
+                .addHighlight(**expression)
                 .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
-                .addLabel(arguments[*firstMappingExpansionIndex]);
+                .addHighlight(arguments[*firstMappingExpansionIndex]);
             return std::nullopt;
         }
         arguments.push_back({std::move(keywordName), std::move(expansionOrEqual), std::move(*expression)});

@@ -17,11 +17,11 @@
 #include <fmt/format.h>
 
 void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::size_t width, std::size_t lineNumber,
-                                                    const Document& document, std::vector<Label> labels)
+                                                    const Document& document, std::vector<Highlight> highlights)
 {
     os << fmt::format("{1: >{0}} | ", width, lineNumber);
     auto line = document.getLine(lineNumber);
-    if (labels.empty())
+    if (highlights.empty())
     {
         os << Text::toUTF8String(line) << "\n";
         return;
@@ -29,7 +29,7 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
     auto offset = line.data() - document.getText().data();
     {
         std::size_t lastEnd = 0;
-        for (auto& iter : labels)
+        for (auto& iter : highlights)
         {
             os << Text::toUTF8String(line.substr(lastEnd, iter.start - offset - lastEnd));
             fmt::text_style style;
@@ -61,7 +61,7 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
         std::size_t lastEnd = 0;
         std::u32string underlines;
         underlines.reserve(line.size());
-        for (auto& iter : labels)
+        for (auto& iter : highlights)
         {
             for (auto codepoint : line.substr(lastEnd, iter.start - offset - lastEnd))
             {
@@ -101,9 +101,10 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
     }
     os << '\n';
 
-    labels.erase(std::remove_if(labels.begin(), labels.end(), [](const Label& label) { return !label.labelText; }),
-                 labels.end());
-    if (labels.empty())
+    highlights.erase(std::remove_if(highlights.begin(), highlights.end(),
+                                    [](const Highlight& label) { return !label.highlightText; }),
+                     highlights.end());
+    if (highlights.empty())
     {
         return;
     }
@@ -113,7 +114,7 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
         std::size_t lastEnd = 0;
         std::u32string underlines;
         underlines.reserve(line.size());
-        for (auto& iter : labels)
+        for (auto& iter : highlights)
         {
             fmt::text_style style;
             if (iter.optionalColour && os.has_colors())
@@ -139,13 +140,13 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
     }
 
     {
-        while (!labels.empty())
+        while (!highlights.empty())
         {
             os << fmt::format("{1: >{0}} | ", width, "");
             std::size_t lastEnd = 0;
             std::u32string underlines;
             underlines.reserve(line.size());
-            for (auto iter = labels.begin(); iter != labels.end();)
+            for (auto iter = highlights.begin(); iter != highlights.end();)
             {
                 fmt::text_style style;
                 if (iter->optionalColour && os.has_colors())
@@ -163,11 +164,11 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
                     auto consoleWidth = Text::consoleWidth(codepoint);
                     underlines.insert(underlines.end(), consoleWidth, U' ');
                 }
-                auto text = Text::toUTF32String(*iter->labelText);
+                auto text = Text::toUTF32String(*iter->highlightText);
                 std::size_t textWidth = std::accumulate(text.begin(), text.end(), (std::size_t)0,
                                                         [](std::size_t width, char32_t codepoint)
                                                         { return width + Text::consoleWidth(codepoint); });
-                if (auto next = iter + 1; next != labels.end())
+                if (auto next = iter + 1; next != highlights.end())
                 {
                     std::size_t widthTillNext = 0;
                     auto nextMid = (next->end - next->start) / 2 + next->start - offset;
@@ -193,7 +194,7 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
                     widthTillEnd += Text::consoleWidth(line[i]);
                 }
                 lastEnd = i;
-                iter = labels.erase(iter);
+                iter = highlights.erase(iter);
             }
             os << Text::toUTF8String(underlines);
             os << '\n';
@@ -241,24 +242,24 @@ void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, con
     os << fmt::format(boldWithFgStyle, "{}:", severityStr);
     os << fmt::format(boldTextStyle, " {}\n", message.message);
 
-    struct LabelCompare
+    struct HighlightCompare
     {
-        bool operator()(const Label& lhs, const Label& rhs) const noexcept
+        bool operator()(const Highlight& lhs, const Highlight& rhs) const noexcept
         {
             return lhs.start < rhs.start;
         }
     };
 
-    std::unordered_map<std::size_t, std::set<Label, LabelCompare>> labeled;
+    std::unordered_map<std::size_t, std::set<Highlight, HighlightCompare>> highlighted;
     std::set<std::size_t> neededLines;
     neededLines.insert(lineNumber);
-    for (const auto& iter : message.labels)
+    for (const auto& iter : message.highlights)
     {
         auto end = document.getLineNumber(iter.end - 1);
         auto start = document.getLineNumber(iter.start);
         if (start == end)
         {
-            labeled[start].insert(iter);
+            highlighted[start].insert(iter);
             neededLines.insert(start);
             continue;
         }
@@ -268,38 +269,38 @@ void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, con
         {
             auto line = document.getLine(start);
             neededLines.insert(start);
-            std::optional<std::string> labelText;
+            std::optional<std::string> highlightText;
             if (textLine == start)
             {
-                labelText = iter.labelText;
+                highlightText = iter.highlightText;
             }
-            labeled[start].insert({iter.start,
-                                   static_cast<std::size_t>(line.data() + line.size() - document.getText().data()),
-                                   std::move(labelText), iter.optionalColour, iter.optionalEmphasis});
+            highlighted[start].insert({iter.start,
+                                       static_cast<std::size_t>(line.data() + line.size() - document.getText().data()),
+                                       std::move(highlightText), iter.optionalColour, iter.optionalEmphasis});
         }
         for (std::size_t i = start + 1; i < end; i++)
         {
             neededLines.insert(i);
-            std::optional<std::string> labelText;
+            std::optional<std::string> highlightText;
             if (textLine == i)
             {
-                labelText = iter.labelText;
+                highlightText = iter.highlightText;
             }
             auto line = document.getLine(i);
-            labeled[i].insert({static_cast<std::size_t>(line.data() - document.getText().data()),
-                               static_cast<std::size_t>(line.data() + line.size() - document.getText().data()),
-                               std::move(labelText), iter.optionalColour, iter.optionalEmphasis});
+            highlighted[i].insert({static_cast<std::size_t>(line.data() - document.getText().data()),
+                                   static_cast<std::size_t>(line.data() + line.size() - document.getText().data()),
+                                   std::move(highlightText), iter.optionalColour, iter.optionalEmphasis});
         }
         {
             auto line = document.getLine(end);
             neededLines.insert(end);
-            std::optional<std::string> labelText;
+            std::optional<std::string> highlightText;
             if (textLine == end)
             {
-                labelText = iter.labelText;
+                highlightText = iter.highlightText;
             }
-            labeled[end].insert({static_cast<std::size_t>(line.data() - document.getText().data()), iter.end,
-                                 std::move(labelText), iter.optionalColour, iter.optionalEmphasis});
+            highlighted[end].insert({static_cast<std::size_t>(line.data() - document.getText().data()), iter.end,
+                                     std::move(highlightText), iter.optionalColour, iter.optionalEmphasis});
         }
     }
     auto largestLine = *std::prev(neededLines.end());
@@ -313,7 +314,7 @@ void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, con
     }
     for (std::size_t i : neededLines)
     {
-        auto& set = labeled[i];
+        auto& set = highlighted[i];
         printLine(os, width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
     }
     for (std::size_t i = largestLine + 1; i < largestLine + MARGIN + 1 && document.hasLine(i); i++)

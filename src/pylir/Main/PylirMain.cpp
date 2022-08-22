@@ -105,7 +105,7 @@ int pylir::main(int argc, char** argv)
             commandLine.createError(pylir::Diag::UNSUPPORTED_TARGET_N, triple);
             return -1;
         }
-        commandLine.createError(arg, pylir::Diag::UNSUPPORTED_TARGET_N, triple).addLabel(arg);
+        commandLine.createError(arg, pylir::Diag::UNSUPPORTED_TARGET_N, triple).addHighlight(arg);
         return -1;
     }
 
@@ -118,8 +118,8 @@ int pylir::main(int argc, char** argv)
         auto diagActionWithIR = [&](llvm::opt::Arg* actionArg, std::string_view name)
         {
             commandLine.createWarning(actionArg, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, name)
-                .addLabel(actionArg)
-                .addLabel(syntaxOnly, Diag::flags::secondaryColour);
+                .addHighlight(actionArg)
+                .addHighlight(syntaxOnly, Diag::flags::secondaryColour);
         };
 
         if (auto* lastIR = args.getLastArg(OPT_emit_llvm, OPT_emit_mlir, OPT_emit_pylir))
@@ -157,7 +157,7 @@ int pylir::main(int argc, char** argv)
         commandLine
             .createWarning(opt, pylir::Diag::O4_MAY_ENABLE_LTO_COMPILER_MIGHT_OUTPUT_LLVM_IR,
                            action == pylir::CompilerInvocation::Assembly ? "Assembly file" : "Object file")
-            .addLabel(opt);
+            .addHighlight(opt);
     }
 
     if (auto* opt = args.getLastArg(OPT_flto, OPT_fno_lto);
@@ -167,13 +167,13 @@ int pylir::main(int argc, char** argv)
         commandLine
             .createWarning(opt, pylir::Diag::LTO_ENABLED_COMPILER_WILL_OUTPUT_LLVM_IR,
                            action == pylir::CompilerInvocation::Assembly ? "Assembly file" : "Object file")
-            .addLabel(opt);
+            .addHighlight(opt);
     }
 
     if (args.hasMultipleArgs(OPT_INPUT))
     {
         auto* second = *std::next(args.filtered(OPT_INPUT).begin());
-        commandLine.createError(second, pylir::Diag::EXPECTED_ONLY_ONE_INPUT_FILE).addLabel(second);
+        commandLine.createError(second, pylir::Diag::EXPECTED_ONLY_ONE_INPUT_FILE).addHighlight(second);
         return -1;
     }
 

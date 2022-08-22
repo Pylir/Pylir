@@ -92,7 +92,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
             if (!m_inLoop)
             {
                 createError(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, m_current->getTokenType())
-                    .addLabel(*m_current);
+                    .addHighlight(*m_current);
                 return std::nullopt;
             }
             return make_node<Syntax::SingleTokenStmt>(*m_current++);
@@ -111,7 +111,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
         {
             if (!m_inFunc)
             {
-                createError(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION).addLabel(*m_current);
+                createError(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION).addHighlight(*m_current);
                 return std::nullopt;
             }
             auto returnKeyword = *m_current++;
@@ -195,22 +195,22 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
                             case Syntax::Scope::Kind::Cell:
                                 createError(nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
                                             nonLocal.getValue())
-                                    .addLabel(nonLocal)
+                                    .addHighlight(nonLocal)
                                     .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
-                                    .addLabel(result->first);
+                                    .addHighlight(result->first);
                                 break;
                             case Syntax::Scope::Kind::Global:
                                 createError(nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
                                             nonLocal.getValue())
-                                    .addLabel(nonLocal)
+                                    .addHighlight(nonLocal)
                                     .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
-                                    .addLabel(result->first);
+                                    .addHighlight(result->first);
                                 break;
                             case Syntax::Scope::Kind::Unknown:
                                 createError(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION, nonLocal.getValue())
-                                    .addLabel(nonLocal)
+                                    .addHighlight(nonLocal)
                                     .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
-                                    .addLabel(result->first);
+                                    .addHighlight(result->first);
                                 break;
                             case Syntax::Scope::Kind::NonLocal: break;
                         }
@@ -241,22 +241,22 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
                             case Syntax::Scope::Kind::Cell:
                                 createError(global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
                                             global.getValue())
-                                    .addLabel(global)
+                                    .addHighlight(global)
                                     .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
-                                    .addLabel(result->first);
+                                    .addHighlight(result->first);
                                 break;
                             case Syntax::Scope::Kind::NonLocal:
                                 createError(global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE,
                                             global.getValue())
-                                    .addLabel(global)
+                                    .addHighlight(global)
                                     .addNote(result->first, Diag::NONLOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
-                                    .addLabel(result->first);
+                                    .addHighlight(result->first);
                                 break;
                             case Syntax::Scope::Kind::Unknown:
                                 createError(global, Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION, global.getValue())
-                                    .addLabel(global)
+                                    .addHighlight(global)
                                     .addNote(result->first, Diag::N_USED_HERE, global.getValue())
-                                    .addLabel(result->first);
+                                    .addHighlight(result->first);
                                 break;
                             case Syntax::Scope::Kind::Global: break;
                         }
@@ -306,7 +306,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
     }
 #include "Features.def"
                     createError(identifierToken, Diag::UNKNOWN_FEATURE_N, identifierToken.getValue())
-                        .addLabel(identifierToken);
+                        .addHighlight(identifierToken);
                 };
                 llvm::for_each(llvm::make_first_range(fromImportAs->imports), check);
                 return make_node<Syntax::FutureStmt>(fromImportAs->from,
@@ -491,20 +491,20 @@ struct Visitor
                     parser
                         .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_EMPTY_TUPLE,
                                      assignOp.getTokenType())
-                        .addLabel(tupleConstruct)
-                        .addLabel(assignOp, Diag::flags::secondaryColour);
+                        .addHighlight(tupleConstruct)
+                        .addHighlight(assignOp, Diag::flags::secondaryColour);
                 case 1:
                     parser
                         .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_SINGLE_TUPLE_ELEMENT,
                                      assignOp.getTokenType())
-                        .addLabel(tupleConstruct)
-                        .addLabel(assignOp, Diag::flags::secondaryColour);
+                        .addHighlight(tupleConstruct)
+                        .addHighlight(assignOp, Diag::flags::secondaryColour);
                 default:
                     parser
                         .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
                                      assignOp.getTokenType())
-                        .addLabel(tupleConstruct)
-                        .addLabel(assignOp, Diag::flags::secondaryColour);
+                        .addHighlight(tupleConstruct)
+                        .addHighlight(assignOp, Diag::flags::secondaryColour);
             }
             return false;
         }
@@ -519,16 +519,16 @@ struct Visitor
     bool visit(const Syntax::DictDisplay& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
-            .addLabel(expression)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(expression)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
     bool visit(const Syntax::SetDisplay& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
-            .addLabel(expression)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(expression)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
@@ -537,8 +537,8 @@ struct Visitor
         if (std::holds_alternative<Syntax::Comprehension>(expression.variant) || augmented)
         {
             parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
-                .addLabel(expression)
-                .addLabel(assignOp, Diag::flags::secondaryColour);
+                .addHighlight(expression)
+                .addHighlight(assignOp, Diag::flags::secondaryColour);
             return false;
         }
         bool success = true;
@@ -552,32 +552,32 @@ struct Visitor
     bool visit(const Syntax::Yield& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
-            .addLabel(expression)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(expression)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
     bool visit(const Syntax::Generator& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
-            .addLabel(expression)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(expression)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
     bool visit(const Syntax::BinOp& binOp)
     {
         parser.createError(binOp.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, binOp.operation.getTokenType())
-            .addLabel(binOp.operation)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(binOp.operation)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
     bool visit(const Syntax::Lambda& lambda)
     {
         parser.createError(lambda, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression")
-            .addLabel(lambda)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(lambda)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
@@ -594,8 +594,8 @@ struct Visitor
             case TokenType::ByteLiteral:
             case TokenType::ComplexLiteral:
                 parser.createError(expression.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
-                    .addLabel(expression.token)
-                    .addLabel(assignOp, Diag::flags::secondaryColour);
+                    .addHighlight(expression.token)
+                    .addHighlight(assignOp, Diag::flags::secondaryColour);
                 return true;
             default: return true;
         }
@@ -604,8 +604,8 @@ struct Visitor
     bool visit(const Syntax::Call& call)
     {
         parser.createError(call.openParenth, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
-            .addLabel(call.openParenth, call)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(call.openParenth, call)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
@@ -614,8 +614,8 @@ struct Visitor
         parser
             .createError(expression.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
                          expression.operation.getTokenType())
-            .addLabel(expression.operation)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(expression.operation)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
@@ -630,30 +630,30 @@ struct Visitor
                 .createError(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N,
                              fmt::format(FMT_STRING("'{} {}'"), back.firstToken.getTokenType(),
                                          back.secondToken->getTokenType()))
-                .addLabel(back.firstToken, *back.secondToken)
-                .addLabel(assignOp, Diag::flags::secondaryColour);
+                .addHighlight(back.firstToken, *back.secondToken)
+                .addHighlight(assignOp, Diag::flags::secondaryColour);
             return false;
         }
 
         parser.createError(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, back.firstToken.getTokenType())
-            .addLabel(back.firstToken)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(back.firstToken)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
     bool visit(const Syntax::Conditional& expression)
     {
         parser.createError(expression.ifToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression")
-            .addLabel(expression.ifToken, *expression.elseValue)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(expression.ifToken, *expression.elseValue)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 
     bool visit(const Syntax::Assignment& assignment)
     {
         parser.createError(assignment.walrus, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
-            .addLabel(assignment.walrus)
-            .addLabel(assignOp, Diag::flags::secondaryColour);
+            .addHighlight(assignment.walrus)
+            .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
     }
 };
@@ -775,7 +775,7 @@ std::optional<Syntax::ImportStmt> pylir::Parser::parseImportStmt()
     {
         createError(endOfFileLoc(), Diag::EXPECTED_N,
                     fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword))
-            .addLabel(endOfFileLoc());
+            .addHighlight(endOfFileLoc());
         return std::nullopt;
     }
     switch (m_current->getTokenType())
@@ -877,7 +877,7 @@ std::optional<Syntax::ImportStmt> pylir::Parser::parseImportStmt()
             createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
                         fmt::format("{:q} or {:q}", TokenType::ImportKeyword, TokenType::FromKeyword),
                         m_current->getTokenType())
-                .addLabel(*m_current);
+                .addHighlight(*m_current);
             return std::nullopt;
     }
 }

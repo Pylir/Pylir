@@ -139,7 +139,8 @@ std::optional<pylir::Token> pylir::Parser::expect(pylir::TokenType tokenType)
 {
     if (m_current == m_lexer.end())
     {
-        createError(endOfFileLoc(), Diag::EXPECTED_N, tokenType).addLabel(endOfFileLoc(), fmt::format("{}", tokenType));
+        createError(endOfFileLoc(), Diag::EXPECTED_N, tokenType)
+            .addHighlight(endOfFileLoc(), fmt::format("{}", tokenType));
         return std::nullopt;
     }
     if (m_current->getTokenType() == TokenType::SyntaxError)
@@ -149,7 +150,7 @@ std::optional<pylir::Token> pylir::Parser::expect(pylir::TokenType tokenType)
     if (m_current->getTokenType() != tokenType)
     {
         createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, tokenType, m_current->getTokenType())
-            .addLabel(*m_current, fmt::format("{}", tokenType), Diag::flags::strikethrough);
+            .addHighlight(*m_current, fmt::format("{}", tokenType), Diag::flags::strikethrough);
         return std::nullopt;
     }
 

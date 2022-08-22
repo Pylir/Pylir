@@ -20,7 +20,7 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     {
         Document document("A normal text", "filename");
         auto docManager = manager.createSubDiagnosticManager(document);
-        DiagnosticsBuilder(docManager, Severity::Error, 2, "A message").addLabel(2, 7, "Label");
+        DiagnosticsBuilder(docManager, Severity::Error, 2, "A message").addHighlight(2, 7, "Label");
         CHECK(docManager.errorsOccurred());
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     |   ~~~~~~\n"
@@ -32,7 +32,7 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     {
         Document document("A normal text", "filename");
         auto docManager = manager.createSubDiagnosticManager(document);
-        DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addLabel(0, "Label");
+        DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addHighlight(0, "Label");
         CHECK(docManager.errorsOccurred());
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     | ^\n"
@@ -44,7 +44,7 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     {
         Document document("A normal text", "filename");
         auto docManager = manager.createSubDiagnosticManager(document);
-        DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addLabel(0);
+        DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addHighlight(0);
         CHECK(docManager.errorsOccurred());
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     | ^\n"));
@@ -59,7 +59,9 @@ TEST_CASE("Diagnostics labels", "[Diag]")
         {
             Document document("A normal text", "filename");
             auto docManager = manager.createSubDiagnosticManager(document);
-            DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addLabel(2, 7, "Label").addLabel(0, "kek");
+            DiagnosticsBuilder(docManager, Severity::Error, 0, "A message")
+                .addHighlight(2, 7, "Label")
+                .addHighlight(0, "kek");
             CHECK(docManager.errorsOccurred());
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                                "     | ^ ~~~~~~\n"
@@ -72,8 +74,8 @@ TEST_CASE("Diagnostics labels", "[Diag]")
             Document document("A normal text", "filename");
             auto docManager = manager.createSubDiagnosticManager(document);
             DiagnosticsBuilder(docManager, Severity::Error, 0, "A message")
-                .addLabel(2, 7, "Label")
-                .addLabel(0, "other");
+                .addHighlight(2, 7, "Label")
+                .addHighlight(0, "other");
             CHECK(docManager.errorsOccurred());
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                                "     | ^ ~~~~~~\n"

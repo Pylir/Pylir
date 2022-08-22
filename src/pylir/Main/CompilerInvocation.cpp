@@ -134,12 +134,13 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             outputFile.emplace(arg->getValue(), ec, llvm::sys::fs::OF_Text);
             if (ec)
             {
-                commandLine.createError(arg, Diag::FAILED_TO_OPEN_FILE_N, arg->getValue()).addLabel(arg);
+                commandLine.createError(arg, Diag::FAILED_TO_OPEN_FILE_N, arg->getValue()).addHighlight(arg);
                 return mlir::failure();
             }
             if (arg = args.getLastArg(OPT_o); arg && arg->getValue() == llvm::StringRef{"-"})
             {
-                commandLine.createError(arg, Diag::OUTPUT_CANNOT_BE_STDOUT_WHEN_WRITING_DEPENDENCY_FILE).addLabel(arg);
+                commandLine.createError(arg, Diag::OUTPUT_CANNOT_BE_STDOUT_WHEN_WRITING_DEPENDENCY_FILE)
+                    .addHighlight(arg);
                 return mlir::failure();
             }
         }
@@ -216,7 +217,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 llvm::consumeError(fd.takeError());
                 commandLine.createError(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N, inputFile->getValue())
-                    .addLabel(inputFile);
+                    .addHighlight(inputFile);
                 return mlir::failure();
             }
             std::optional exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
@@ -226,7 +227,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 if (error)
                 {
                     commandLine.createError(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N, inputFile->getValue())
-                        .addLabel(inputFile);
+                        .addHighlight(inputFile);
                     return mlir::failure();
                 }
             }
@@ -236,7 +237,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 llvm::consumeError(fd.takeError());
                 commandLine.createError(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N, inputFile->getValue())
-                    .addLabel(inputFile);
+                    .addHighlight(inputFile);
                 return mlir::failure();
             }
             exit.reset();
@@ -499,7 +500,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                     commandLine
                         .createError(arg, pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N,
                                      m_targetMachine->getTargetTriple().str(), format)
-                        .addLabel(arg);
+                        .addHighlight(arg);
                     return finalizeOutputStream(mlir::failure(), commandLine);
                 }
                 commandLine.createError(pylir::Diag::TARGET_N_DOES_NOT_SUPPORT_COMPILING_TO_N,
@@ -690,7 +691,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
             commandLine.createError(pylir::Diag::COULD_NOT_FIND_TARGET_N, triple->str());
             return mlir::failure();
         }
-        commandLine.createError(outputArg, pylir::Diag::COULD_NOT_FIND_TARGET_N, triple->str()).addLabel(outputArg);
+        commandLine.createError(outputArg, pylir::Diag::COULD_NOT_FIND_TARGET_N, triple->str()).addHighlight(outputArg);
         return mlir::failure();
     }
 
@@ -707,7 +708,7 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::o
     {
         auto* optArg = args.getLastArg(OPT_O);
         commandLine.createError(optArg, pylir::Diag::INVALID_OPTIMIZATION_LEVEL_N, optArg->getAsString(args))
-            .addLabel(optArg);
+            .addHighlight(optArg);
         return mlir::failure();
     }
 
@@ -831,7 +832,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
                 {
                     Diag::DiagnosticsBuilder(*request.diagnosticsDocManager, Diag::Severity::Error, request.location,
                                              pylir::Diag::FAILED_TO_ACCESS_FILE_N, request.filePath)
-                        .addLabel(request.location);
+                        .addHighlight(request.location);
                     return nullptr;
                 }
             }
@@ -841,7 +842,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
             {
                 Diag::DiagnosticsBuilder(*request.diagnosticsDocManager, Diag::Severity::Error, request.location,
                                          pylir::Diag::FAILED_TO_READ_FILE_N, request.filePath)
-                    .addLabel(request.location);
+                    .addHighlight(request.location);
                 return nullptr;
             }
             exit.reset();

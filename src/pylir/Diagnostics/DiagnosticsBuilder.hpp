@@ -138,18 +138,18 @@ constexpr bool hasFlag()
 
 } // namespace detail
 
-/// Flags used to customize the effect of 'addLabel' in DiagnosticBuilder. A flag may also carry a value of the type
+/// Flags used to customize the effect of 'addHighlight' in DiagnosticBuilder. A flag may also carry a value of the type
 /// specified in 'std::in_place_type', in which case it is required to set a value via assignment.
 /// Example:
-///         builder.addLabel(0, 1, flags::label = "text", flags::bold);
+///         builder.addHighlight(0, 1, flags::label = "text", flags::bold);
 
 /// Label to be used when printing. This is plain text which appears underneath the highlight markers.
 constexpr auto label = detail::FlagParam(std::in_place_type<std::string>, [] {});
 /// Indicates that no colour should be used when printing the source code. By default 'primaryColour' is used to
-/// highlight the source code denoted by the location given to 'addLabel'.
+/// highlight the source code denoted by the location given to 'addHighlight'.
 constexpr auto noColour = detail::FlagParam([] {});
 /// Use the primary colour to highlight the source code. The precise colour is determined by the kind of message the
-/// 'addLabel' call is being attached to.
+/// 'addHighlight' call is being attached to.
 /// This is the default.
 constexpr auto primaryColour = detail::FlagParam([] {});
 /// Use the secondary colour to highlight the source code. This colour is meant to complement the primary colour and
@@ -188,11 +188,11 @@ public:
     constexpr static auto NOTE_COLOUR = fmt::color::cyan;
 
 protected:
-    struct Label
+    struct Highlight
     {
         std::size_t start;
         std::size_t end;
-        std::optional<std::string> labelText;
+        std::optional<std::string> highlightText;
         std::optional<fmt::color> optionalColour;
         std::optional<fmt::emphasis> optionalEmphasis;
     };
@@ -202,12 +202,12 @@ protected:
         Severity severity;
         std::size_t location;
         std::string message;
-        std::vector<Label> labels;
+        std::vector<Highlight> highlights;
     };
     std::vector<Message> m_messages;
 
     static void printLine(llvm::raw_ostream& os, std::size_t width, std::size_t lineNumber,
-                          const pylir::Diag::Document& document, std::vector<Label> labels);
+                          const pylir::Diag::Document& document, std::vector<Highlight> highlights);
 
     void emitMessage(llvm::raw_ostream& os, const Message& message,
                      Diag::DiagnosticsDocManager* diagnosticDocManager) const;
@@ -245,12 +245,12 @@ public:
 ///
 /// While building a diagnostic in a document it consists of the initial header message set in the constructor, its
 /// severity and is then followed by output of source code. The printing of the source code can further be customized
-/// via calls to 'addLabel' which allow to underline, colour, label as well as modify the character style used to print
-/// portions of the source code. The source code to be printed is determined via the locations passed to the constructor
-/// as well as any locations passed to 'addLabel'.
+/// via calls to 'addHighlight' which allow to underline, colour, label as well as modify the character style used to
+/// print portions of the source code. The source code to be printed is determined via the locations passed to the
+/// constructor as well as any locations passed to 'addHighlight'.
 ///
 /// Following the initial diagnostic, one can also attach additional notes via 'addNote'. These follow the same
-/// formatting as errors and warnings described above. 'addLabel' calls always affect the last diagnostic added,
+/// formatting as errors and warnings described above. 'addHighlight' calls always affect the last diagnostic added,
 /// including notes.
 template <class Manager>
 class DiagnosticsBuilder : public DiagnosticsBuilderBase
@@ -387,25 +387,34 @@ public:
         return *this;
     }
 
-    /// Adds the effects denoted by the flags to the given source code ranging from 'start' until the very end of 'end'.
+    /// Highlights the given source code ranging from 'start' until the very end of 'end' and applies the effects
+    /// denoted by the flags. Highlighting causes the given source code to be underlined with '~' if more than one
+    /// character wide, or a single '^' if just a single character.
+    /// Example:
+    ///
+    /// <stdin>:1:1: note: highlighting example:
+    ///   1 | start to end dot
+    ///     | ~~~~~~~~~~~~  ^
+    ///
+    /// where the range was 'start' token to 'end' token respectively and just the 'o' character in 'dot'.
     template <class T, class U, class... Flags, class M = Manager>
-    auto addLabel(const T& start, const U& end, Flags&&... flags)
+    auto addHighlight(const T& start, const U& end, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>
                                 && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
                                 && std::is_same_v<M, DiagnosticsDocManager>,
                             DiagnosticsBuilder&&>
     {
         verify<Flags...>();
-        m_messages.back().labels.push_back({rangeLoc(start, m_diagnosticManagerBase->getContext()).first,
-                                            rangeLoc(end, m_diagnosticManagerBase->getContext()).second,
-                                            flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
-                                            getColour<Flags...>(), getEmphasis(flags...)});
+        m_messages.back().highlights.push_back({rangeLoc(start, m_diagnosticManagerBase->getContext()).first,
+                                                rangeLoc(end, m_diagnosticManagerBase->getContext()).second,
+                                                flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
+                                                getColour<Flags...>(), getEmphasis(flags...)});
         return std::move(*this);
     }
 
-    /// Adds the effects denoted by the flags to the given source code at 'pos'.
+    /// Overload of the above but with a single position instead of a range.
     template <class T, class... Flags, class M = Manager>
-    auto addLabel(const T& pos, Flags&&... flags)
+    auto addHighlight(const T& pos, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T>
                                 && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
                                 && std::is_same_v<M, DiagnosticsDocManager>,
@@ -413,34 +422,33 @@ public:
     {
         verify<Flags...>();
         auto [start, end] = rangeLoc(pos, m_diagnosticManagerBase->getContext());
-        m_messages.back().labels.push_back({start, end,
-                                            flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
-                                            getColour<Flags...>(), getEmphasis(flags...)});
+        m_messages.back().highlights.push_back({start, end,
+                                                flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
+                                                getColour<Flags...>(), getEmphasis(flags...)});
         return std::move(*this);
     }
 
-    /// Adds the effects denoted by the flags to the given source code ranging from 'start' until the very end of 'end'.
-    /// This overload has an explicit parm for the label as it is a commonly used option.
+    /// Overload of the above but with a 'label' parameter passed to the 'label' flag for convenience.
     template <class T, class U, class... Flags, class M = Manager>
-    auto addLabel(const T& start, const U& end, std::string label, Flags&&... flags)
+    auto addHighlight(const T& start, const U& end, std::string label, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>
                                 && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
                                 && std::is_same_v<M, DiagnosticsDocManager>,
                             DiagnosticsBuilder&&>
     {
-        return addLabel(start, end, flags::label = std::move(label), std::forward<Flags>(flags)...);
+        return addHighlight(start, end, flags::label = std::move(label), std::forward<Flags>(flags)...);
     }
 
-    /// Adds the effects denoted by the flags to the given source code at 'pos'.
-    /// This overload has an explicit parm for the label as it is a commonly used option.
+    /// Overload of the above but with a single positon and a 'label' parameter passed to the 'label' flag for
+    /// convenience.
     template <class T, class... Flags, class M = Manager>
-    auto addLabel(const T& pos, std::string label, Flags&&... flags)
+    auto addHighlight(const T& pos, std::string label, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T>
                                 && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
                                 && std::is_same_v<M, DiagnosticsDocManager>,
                             DiagnosticsBuilder&&>
     {
-        return addLabel(pos, flags::label = std::move(label), std::forward<Flags>(flags)...);
+        return addHighlight(pos, flags::label = std::move(label), std::forward<Flags>(flags)...);
     }
 
     /// Adds a new note to the diagnostic. 'location' as well as 'message' and its 'args' serve the same purpose as in

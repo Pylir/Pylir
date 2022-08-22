@@ -94,7 +94,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>> pylir::Parser::par
 {
     if (m_current == m_lexer.end())
     {
-        createError(endOfFileLoc(), Diag::EXPECTED_N, "statement").addLabel(endOfFileLoc());
+        createError(endOfFileLoc(), Diag::EXPECTED_N, "statement").addHighlight(endOfFileLoc());
         return std::nullopt;
     }
     switch (m_current->getTokenType())
@@ -191,7 +191,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>> pylir::Parser::par
             }
             if (m_current == m_lexer.end())
             {
-                createError(endOfFileLoc(), Diag::EXPECTED_N, "class or function").addLabel(endOfFileLoc());
+                createError(endOfFileLoc(), Diag::EXPECTED_N, "class or function").addHighlight(endOfFileLoc());
                 return std::nullopt;
             }
             switch (m_current->getTokenType())
@@ -219,7 +219,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>> pylir::Parser::par
                 {
                     createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "class or function",
                                 m_current->getTokenType())
-                        .addLabel(*m_current);
+                        .addHighlight(*m_current);
                     return std::nullopt;
                 }
             }
@@ -229,7 +229,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>> pylir::Parser::par
             auto async = *m_current++;
             if (m_current == m_lexer.end())
             {
-                createError(endOfFileLoc(), Diag::EXPECTED_N, "'for', 'with' or function").addLabel(endOfFileLoc());
+                createError(endOfFileLoc(), Diag::EXPECTED_N, "'for', 'with' or function").addHighlight(endOfFileLoc());
                 return std::nullopt;
             }
             switch (m_current->getTokenType())
@@ -268,7 +268,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>> pylir::Parser::par
                 {
                     createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "'for', 'with' or function",
                                 m_current->getTokenType())
-                        .addLabel(*m_current);
+                        .addHighlight(*m_current);
                     return std::nullopt;
                 }
             }
@@ -277,7 +277,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>> pylir::Parser::par
         default:
         {
             createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "statement", m_current->getTokenType())
-                .addLabel(*m_current);
+                .addHighlight(*m_current);
             return std::nullopt;
         }
     }
@@ -513,7 +513,7 @@ std::optional<pylir::Syntax::TryStmt> pylir::Parser::parseTryStmt()
         if (catchAll)
         {
             createError(catchAll->exceptKeyword, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
-                .addLabel(catchAll->exceptKeyword, Diag::flags::bold);
+                .addHighlight(catchAll->exceptKeyword, Diag::flags::bold);
             return std::nullopt;
         }
         if (auto exceptColon = maybeConsume(TokenType::Colon))
@@ -708,7 +708,7 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
                 if (parameters.empty())
                 {
                     createError(*m_current, Diag::AT_LEAST_ONE_PARAMETER_REQUIRED_BEFORE_POSITIONAL_ONLY_INDICATOR)
-                        .addLabel(*m_current);
+                        .addHighlight(*m_current);
                     return std::nullopt;
                 }
                 if (!seenPositionalOnly)
@@ -721,9 +721,9 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
                     continue;
                 }
                 createError(*m_current, Diag::POSITIONAL_ONLY_INDICATOR_MAY_ONLY_APPEAR_ONCE)
-                    .addLabel(*m_current)
+                    .addHighlight(*m_current)
                     .addNote(*seenPositionalOnly, Diag::PREVIOUS_OCCURRENCE_HERE)
-                    .addLabel(*seenPositionalOnly);
+                    .addHighlight(*seenPositionalOnly);
                 return std::nullopt;
             }
             case TokenType::Star:
@@ -778,10 +778,10 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
             createError(*identifier,
                         Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
                         pylir::get<std::string>(identifier->getValue()))
-                .addLabel(*identifier)
+                .addHighlight(*identifier)
                 .addNote(parameters[*seenDefaultParam], Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
                          parameters[*seenDefaultParam].name.getValue())
-                .addLabel(parameters[*seenDefaultParam]);
+                .addHighlight(parameters[*seenDefaultParam]);
             return std::nullopt;
         }
         if (maybeDefault)
@@ -792,10 +792,10 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
         {
             createError(*identifier, Diag::NO_MORE_PARAMETERS_ALLOWED_AFTER_EXCESS_KEYWORD_PARAMETER_N,
                         pylir::get<std::string>(identifier->getValue()), parameters[*seenKwRest].name.getValue())
-                .addLabel(*identifier)
+                .addHighlight(*identifier)
                 .addNote(parameters[*seenKwRest], Diag::EXCESS_KEYWORD_PARAMETER_N_HERE,
                          parameters[*seenKwRest].name.getValue())
-                .addLabel(parameters[*seenKwRest]);
+                .addHighlight(parameters[*seenKwRest]);
             return std::nullopt;
         }
 
@@ -811,17 +811,17 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
             if (auto* token = std::get_if<BaseToken>(&seenPosRest))
             {
                 createError(*identifier, Diag::STARRED_PARAMETER_NOT_ALLOWED_AFTER_KEYWORD_ONLY_INDICATOR)
-                    .addLabel(*identifier)
+                    .addHighlight(*identifier)
                     .addNote(*token, Diag::KEYWORD_ONLY_INDICATOR_HERE)
-                    .addLabel(*token);
+                    .addHighlight(*token);
                 return std::nullopt;
             }
             if (auto* index = std::get_if<std::size_t>(&seenPosRest))
             {
                 createError(*identifier, Diag::ONLY_ONE_STARRED_PARAMETER_ALLOWED)
-                    .addLabel(*identifier)
+                    .addHighlight(*identifier)
                     .addNote(parameters[*index], Diag::STARRED_PARAMETER_N_HERE, parameters[*index].name.getValue())
-                    .addLabel(parameters[*index]);
+                    .addHighlight(parameters[*index]);
                 return std::nullopt;
             }
 
@@ -973,7 +973,7 @@ void pylir::Parser::finishNamespace(Syntax::Suite& suite, Syntax::Scope* maybeSc
 {
     NamespaceVisitor visitor(
         maybeScope, [&](const IdentifierToken& token)
-        { createError(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, token.getValue()).addLabel(token); });
+        { createError(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, token.getValue()).addHighlight(token); });
     visitor.visit(suite);
 }
 
@@ -1058,7 +1058,7 @@ std::optional<pylir::Syntax::FuncDef> pylir::Parser::parseFuncDef(std::vector<Sy
             {
                 continue;
             }
-            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addLabel(iter);
+            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addHighlight(iter);
         }
         finishNamespace(*suite, &scope);
     }
@@ -1137,7 +1137,7 @@ std::optional<pylir::Syntax::ClassDef> pylir::Parser::parseClassDef(std::vector<
             {
                 continue;
             }
-            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addLabel(iter);
+            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addHighlight(iter);
         }
         finishNamespace(*suite);
     }

@@ -354,7 +354,8 @@ bool pylir::Lexer::parseNext()
                 if (m_current == m_diagManager->getDocument().end())
                 {
                     createError(m_current - m_diagManager->getDocument().begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
-                        .addLabel(m_current - m_diagManager->getDocument().begin(), "\\n", Diag::flags::insertColour);
+                        .addHighlight(m_current - m_diagManager->getDocument().begin(), "\\n",
+                                      Diag::flags::insertColour);
                     m_tokens.emplace_back(start - m_diagManager->getDocument().begin(),
                                           m_current - m_diagManager->getDocument().begin(), TokenType::SyntaxError);
                     return true;
@@ -363,8 +364,8 @@ bool pylir::Lexer::parseNext()
                 {
                     createError(m_current - m_diagManager->getDocument().begin(),
                                 Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
-                        .addLabel(m_current - m_diagManager->getDocument().begin(), "\\n", Diag::flags::insertColour,
-                                  Diag::flags::strikethrough);
+                        .addHighlight(m_current - m_diagManager->getDocument().begin(), "\\n",
+                                      Diag::flags::insertColour, Diag::flags::strikethrough);
                     m_tokens.emplace_back(start - m_diagManager->getDocument().begin(),
                                           m_current - m_diagManager->getDocument().begin(), TokenType::SyntaxError);
                     return true;
@@ -756,7 +757,7 @@ void pylir::Lexer::parseIdentifier()
     {
         createError(m_current - m_diagManager->getDocument().begin(), Diag::UNEXPECTED_CHARACTER_N,
                     Text::toUTF8String({&*m_current, 1}))
-            .addLabel(m_current - m_diagManager->getDocument().begin());
+            .addHighlight(m_current - m_diagManager->getDocument().begin());
         m_tokens.emplace_back(m_current - m_diagManager->getDocument().begin(), 1, TokenType::SyntaxError);
         m_current++;
         return;
@@ -904,7 +905,7 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
             if (m_current == m_diagManager->getDocument().end())
             {
                 createError(m_current - m_diagManager->getDocument().begin(), Diag::EXPECTED_END_OF_LITERAL)
-                    .addLabel(m_current - m_diagManager->getDocument().begin(), std::string(1, character));
+                    .addHighlight(m_current - m_diagManager->getDocument().begin(), std::string(1, character));
                 return std::nullopt;
             }
             if (*m_current == character)
@@ -923,7 +924,7 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
                 m_current = std::next(m_current);
             }
             createError(m_current - m_diagManager->getDocument().begin(), Diag::EXPECTED_END_OF_LITERAL)
-                .addLabel(m_current - m_diagManager->getDocument().begin(), std::string(3, character));
+                .addHighlight(m_current - m_diagManager->getDocument().begin(), std::string(3, character));
             return std::nullopt;
         }
         if (std::array{*m_current, *std::next(m_current), *std::next(m_current, 2)}
@@ -941,7 +942,7 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
     {
         auto builder = createError(m_current - m_diagManager->getDocument().begin(),
                                    Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS)
-                           .addLabel(m_current - m_diagManager->getDocument().begin());
+                           .addHighlight(m_current - m_diagManager->getDocument().begin());
         if (!raw)
         {
             std::string utf8Bytes = Text::toUTF8(*m_current).data();
@@ -952,8 +953,8 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
                     fmt::format(FMT_STRING("\\x{:0^2X}"), static_cast<std::uint32_t>(static_cast<std::uint8_t>(iter)));
             }
             builder.addNote(m_current - m_diagManager->getDocument().begin(), Diag::USE_HEX_OR_OCTAL_ESCAPES_INSTEAD)
-                .addLabel(m_current - m_diagManager->getDocument().begin(), hexEscape, Diag::flags::insertColour,
-                          Diag::flags::strikethrough);
+                .addHighlight(m_current - m_diagManager->getDocument().begin(), hexEscape, Diag::flags::insertColour,
+                              Diag::flags::strikethrough);
         }
     };
 
@@ -1105,11 +1106,11 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
                         {
                             createError(m_current - m_diagManager->getDocument().begin() - count,
                                         Diag::EXPECTED_N_MORE_HEX_CHARACTERS, size - count)
-                                .addLabel(m_current - m_diagManager->getDocument().begin() - count,
-                                          m_current - m_diagManager->getDocument().begin() - 1)
-                                .addLabel(m_current - m_diagManager->getDocument().begin() - count - 2,
-                                          m_current - m_diagManager->getDocument().begin() - count - 1,
-                                          Diag::flags::secondaryColour);
+                                .addHighlight(m_current - m_diagManager->getDocument().begin() - count,
+                                              m_current - m_diagManager->getDocument().begin() - 1)
+                                .addHighlight(m_current - m_diagManager->getDocument().begin() - count - 2,
+                                              m_current - m_diagManager->getDocument().begin() - count - 1,
+                                              Diag::flags::secondaryColour);
                             return std::nullopt;
                         }
                         if (!Text::isValidCodepoint(value))
@@ -1117,11 +1118,11 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
                             createError(m_current - m_diagManager->getDocument().begin() - count,
                                         Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
                                         static_cast<std::uint32_t>(value))
-                                .addLabel(m_current - m_diagManager->getDocument().begin() - count,
-                                          m_current - m_diagManager->getDocument().begin() - 1)
-                                .addLabel(m_current - m_diagManager->getDocument().begin() - count - 2,
-                                          m_current - m_diagManager->getDocument().begin() - count - 1,
-                                          Diag::flags::secondaryColour);
+                                .addHighlight(m_current - m_diagManager->getDocument().begin() - count,
+                                              m_current - m_diagManager->getDocument().begin() - 1)
+                                .addHighlight(m_current - m_diagManager->getDocument().begin() - count - 2,
+                                              m_current - m_diagManager->getDocument().begin() - count - 1,
+                                              Diag::flags::secondaryColour);
                             return std::nullopt;
                         }
                         result += value;
@@ -1142,12 +1143,12 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
                                                        Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N);
                             if (m_current != m_diagManager->getDocument().end())
                             {
-                                builder.addLabel(m_current - m_diagManager->getDocument().begin(), "{",
-                                                 Diag::flags::insertColour, Diag::flags::strikethrough);
+                                builder.addHighlight(m_current - m_diagManager->getDocument().begin(), "{",
+                                                     Diag::flags::insertColour, Diag::flags::strikethrough);
                             }
-                            builder.addLabel(m_current - m_diagManager->getDocument().begin() - 2,
-                                             m_current - m_diagManager->getDocument().begin() - 1,
-                                             Diag::flags::secondaryColour);
+                            builder.addHighlight(m_current - m_diagManager->getDocument().begin() - 2,
+                                                 m_current - m_diagManager->getDocument().begin() - 1,
+                                                 Diag::flags::secondaryColour);
                             return std::nullopt;
                         }
                         m_current++;
@@ -1159,15 +1160,15 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
                         {
                             auto builder = createError(m_current - m_diagManager->getDocument().begin(),
                                                        Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
-                                               .addLabel(m_current - m_diagManager->getDocument().begin(),
-                                                         closing - m_diagManager->getDocument().begin() - 1)
-                                               .addLabel(m_current - m_diagManager->getDocument().begin() - 2,
-                                                         m_current - m_diagManager->getDocument().begin() - 1,
-                                                         Diag::flags::secondaryColour);
+                                               .addHighlight(m_current - m_diagManager->getDocument().begin(),
+                                                             closing - m_diagManager->getDocument().begin() - 1)
+                                               .addHighlight(m_current - m_diagManager->getDocument().begin() - 2,
+                                                             m_current - m_diagManager->getDocument().begin() - 1,
+                                                             Diag::flags::secondaryColour);
                             if (closing != m_diagManager->getDocument().end())
                             {
-                                builder.addLabel(closing - m_diagManager->getDocument().begin(),
-                                                 Diag::flags::secondaryColour);
+                                builder.addHighlight(closing - m_diagManager->getDocument().begin(),
+                                                     Diag::flags::secondaryColour);
                             }
                             return std::nullopt;
                         }
@@ -1200,7 +1201,7 @@ std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
                 if (!longString)
                 {
                     createError(m_current - m_diagManager->getDocument().begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
-                        .addLabel(m_current - m_diagManager->getDocument().begin());
+                        .addHighlight(m_current - m_diagManager->getDocument().begin());
                     return std::nullopt;
                 }
                 result += *m_current;
@@ -1313,9 +1314,9 @@ void pylir::Lexer::parseNumber()
     if (*std::prev(end) == U'_')
     {
         createError(end - m_diagManager->getDocument().begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
-            .addLabel(end - 1 - m_diagManager->getDocument().begin())
-            .addLabel(start - m_diagManager->getDocument().begin(), end - m_diagManager->getDocument().begin() - 2,
-                      Diag::flags::secondaryColour);
+            .addHighlight(end - 1 - m_diagManager->getDocument().begin())
+            .addHighlight(start - m_diagManager->getDocument().begin(), end - m_diagManager->getDocument().begin() - 2,
+                          Diag::flags::secondaryColour);
         m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), end - start, TokenType::SyntaxError);
         return;
     }
@@ -1336,10 +1337,10 @@ void pylir::Lexer::parseNumber()
         {
             createError(m_current - m_diagManager->getDocument().begin(), Diag::INVALID_INTEGER_SUFFIX,
                         Text::toUTF8String({m_current, static_cast<std::size_t>(suffixEnd - m_current)}))
-                .addLabel(start - m_diagManager->getDocument().begin(),
-                          m_current - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour)
-                .addLabel(m_current - m_diagManager->getDocument().begin(),
-                          suffixEnd - m_diagManager->getDocument().begin() - 1, Diag::flags::strikethrough);
+                .addHighlight(start - m_diagManager->getDocument().begin(),
+                              m_current - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour)
+                .addHighlight(m_current - m_diagManager->getDocument().begin(),
+                              suffixEnd - m_diagManager->getDocument().begin() - 1, Diag::flags::strikethrough);
             m_tokens.emplace_back(m_current - m_diagManager->getDocument().begin(), suffixEnd - m_current,
                                   TokenType::SyntaxError);
             m_current = suffixEnd;
@@ -1365,14 +1366,14 @@ void pylir::Lexer::parseNumber()
                 std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
 
             createError(end - m_diagManager->getDocument().begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
-                .addLabel(leadingEnd - m_diagManager->getDocument().begin(),
-                          end - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour)
-                .addLabel(numberStart - m_diagManager->getDocument().begin(),
-                          leadingEnd - m_diagManager->getDocument().begin() - 1)
+                .addHighlight(leadingEnd - m_diagManager->getDocument().begin(),
+                              end - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour)
+                .addHighlight(numberStart - m_diagManager->getDocument().begin(),
+                              leadingEnd - m_diagManager->getDocument().begin() - 1)
                 .addNote(numberStart - m_diagManager->getDocument().begin(), Diag::REMOVE_LEADING_ZEROS)
-                .addLabel(numberStart - m_diagManager->getDocument().begin(),
-                          leadingEnd - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour,
-                          Diag::flags::strikethrough);
+                .addHighlight(numberStart - m_diagManager->getDocument().begin(),
+                              leadingEnd - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour,
+                              Diag::flags::strikethrough);
             m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), end - start, TokenType::SyntaxError);
             return;
         }
@@ -1413,9 +1414,9 @@ void pylir::Lexer::parseNumber()
         if (newEnd == end)
         {
             createError(end - m_diagManager->getDocument().begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
-                .addLabel(start - m_diagManager->getDocument().begin(), end - m_diagManager->getDocument().begin() - 1,
-                          Diag::flags::secondaryColour)
-                .addLabel(end - m_diagManager->getDocument().begin());
+                .addHighlight(start - m_diagManager->getDocument().begin(),
+                              end - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour)
+                .addHighlight(end - m_diagManager->getDocument().begin());
             m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), end - start, TokenType::SyntaxError);
             return;
         }
@@ -1506,19 +1507,19 @@ void pylir::Lexer::parseIndent()
         {
             auto builder =
                 createError(m_current - m_diagManager->getDocument().begin(), Diag::INVALID_INDENTATION_N, indent)
-                    .addLabel(start - m_diagManager->getDocument().begin(),
-                              m_current - m_diagManager->getDocument().begin() - 1);
+                    .addHighlight(start - m_diagManager->getDocument().begin(),
+                                  m_current - m_diagManager->getDocument().begin() - 1);
             if (previous.first - indent < indent - m_indentation.top().first)
             {
                 builder.addNote(m_tokens[previous.second], Diag::NEXT_CLOSEST_INDENTATION_N, previous.first)
-                    .addLabel(m_tokens[previous.second]);
+                    .addHighlight(m_tokens[previous.second]);
             }
             else if (m_indentation.top().first != 0)
             {
                 builder
                     .addNote(m_tokens[m_indentation.top().second], Diag::NEXT_CLOSEST_INDENTATION_N,
                              m_indentation.top().first)
-                    .addLabel(m_tokens[m_indentation.top().second]);
+                    .addHighlight(m_tokens[m_indentation.top().second]);
             }
             m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
                                   TokenType::SyntaxError);

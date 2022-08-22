@@ -90,7 +90,7 @@ public:
 
 /// Subclass of 'SubDiagnosticsManagerBase' for diagnostics without any file location. This can be used for
 /// environmental errors or similar for example. When used with 'DiagnosticsBuilder', locations can therefore not be
-/// specified, and calls to 'addLabel' are not possible.
+/// specified, and calls to 'addHighlight' are not possible.
 class DiagnosticsNoDocManager final : public SubDiagnosticsManagerBase
 {
 public:
