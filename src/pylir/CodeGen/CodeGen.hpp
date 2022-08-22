@@ -32,14 +32,13 @@ namespace pylir
 struct CodeGenOptions
 {
     std::vector<std::string> importPaths;
-    std::function<void(Diag::DiagnosticsBuilder&&)> warningCallback;
 
     struct LoadRequest
     {
         llvm::sys::fs::file_t handle;
         std::string qualifier;
         std::pair<std::size_t, std::size_t> location;
-        Diag::Document* document;
+        Diag::DiagnosticsDocManager* diagnosticsDocManager;
         std::string filePath;
     };
     std::function<void(LoadRequest&&)> moduleLoadCallback;
@@ -53,7 +52,7 @@ class CodeGen
     mlir::ModuleOp m_module;
     mlir::func::FuncOp m_currentFunc;
     mlir::Region* m_currentRegion{};
-    Diag::Document* m_document;
+    Diag::DiagnosticsDocManager* m_docManager;
     mlir::Value m_classNamespace{};
     std::unordered_map<std::string, std::size_t> m_implNames;
     std::unordered_map<std::string_view, mlir::FlatSymbolRefAttr> m_builtinNamespace;
@@ -310,17 +309,19 @@ class CodeGen
     template <class AST>
     mlir::Location getLoc(const AST& astObject)
     {
-        auto [line, col] = m_document->getLineCol(Diag::pointLoc(astObject));
+        auto [line, col] = m_docManager->getDocument().getLineCol(Diag::pointLoc(astObject));
         return mlir::OpaqueLoc::get(
-            &astObject, mlir::FileLineColLoc::get(m_builder.getStringAttr(m_document->getFilename()), line, col));
+            &astObject,
+            mlir::FileLineColLoc::get(m_builder.getStringAttr(m_docManager->getDocument().getFilename()), line, col));
     }
 
     template <class AST, class LineLoc>
     mlir::Location getLoc(const AST& astObject, const LineLoc& lineLoc)
     {
-        auto [line, col] = m_document->getLineCol(Diag::pointLoc(lineLoc));
+        auto [line, col] = m_docManager->getDocument().getLineCol(Diag::pointLoc(lineLoc));
         return mlir::OpaqueLoc::get(
-            &astObject, mlir::FileLineColLoc::get(m_builder.getStringAttr(m_document->getFilename()), line, col));
+            &astObject,
+            mlir::FileLineColLoc::get(m_builder.getStringAttr(m_docManager->getDocument().getFilename()), line, col));
     }
 
     std::string formImplName(std::string_view symbol);
@@ -437,15 +438,8 @@ class CodeGen
         return tuple;
     }
 
-    template <class T, class S, class... Args>
-    [[nodiscard]] Diag::DiagnosticsBuilder createDiagnosticsBuilder(const T& location, const S& message,
-                                                                    Args&&... args) const
-    {
-        return Diag::DiagnosticsBuilder(*m_document, location, message, std::forward<Args>(args)...);
-    }
-
 public:
-    CodeGen(mlir::MLIRContext* context, Diag::Document& document, CodeGenOptions&& options);
+    CodeGen(mlir::MLIRContext* context, Diag::DiagnosticsDocManager& docManager, CodeGenOptions&& options);
 
     mlir::ModuleOp visit(const Syntax::FileInput& fileInput);
 
@@ -545,9 +539,9 @@ mlir::Value buildException(mlir::Location loc, PyBuilder& builder, std::string_v
                            mlir::Block* PYLIR_NULLABLE exceptionHandler);
 
 inline mlir::OwningOpRef<mlir::ModuleOp> codegen(mlir::MLIRContext* context, const Syntax::FileInput& input,
-                                                 Diag::Document& document, CodeGenOptions options)
+                                                 Diag::DiagnosticsDocManager& docManager, CodeGenOptions options)
 {
-    CodeGen codegen(context, document, std::move(options));
+    CodeGen codegen(context, docManager, std::move(options));
     return codegen.visit(input);
 }
 

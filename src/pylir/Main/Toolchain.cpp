@@ -14,7 +14,7 @@
     #include <lld/Common/Driver.h>
 #endif
 
-bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, pylir::Toolchain::LinkerStyle style,
+bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle style,
                                   llvm::ArrayRef<std::string> arguments) const
 {
     const auto& args = commandLine.getArgs();
@@ -72,10 +72,8 @@ bool pylir::Toolchain::callLinker(const pylir::cli::CommandLine& commandLine, py
         }
         if (linkerPath.empty())
         {
-            llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error,
-                                                    fmt::format(pylir::Diag::FAILED_TO_FIND_LINKER))
-                         << pylir::Diag::formatLine(Diag::Severity::Note,
-                                                    fmt::format(pylir::Diag::ATTEMPTED_N, fmt::join(attempts, ", ")));
+            commandLine.createError(pylir::Diag::FAILED_TO_FIND_LINKER)
+                .addNote(pylir::Diag::ATTEMPTED_N, fmt::join(attempts, ", "));
             return false;
         }
     }

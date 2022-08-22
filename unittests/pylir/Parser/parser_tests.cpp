@@ -12,20 +12,20 @@
 
 #include <iostream>
 
-#define PARSER_EMITS(source, ...)                                         \
-    [](std::string str)                                                   \
-    {                                                                     \
-        pylir::Diag::Document document(std::move(str));                   \
-        pylir::Parser parser(document);                                   \
-        auto fileInput = parser.parseFileInput();                         \
-        if (!fileInput)                                                   \
-        {                                                                 \
-            auto& error = fileInput.error();                              \
-            std::cerr << error;                                           \
-            CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__))); \
-            return;                                                       \
-        }                                                                 \
-        FAIL_CHECK("No error emitted");                                   \
+#define PARSER_EMITS(source, ...)                                       \
+    [](std::string str)                                                 \
+    {                                                                   \
+        std::string error;                                              \
+        pylir::Diag::DiagnosticsManager manager(                        \
+            [&error](pylir::Diag::DiagnosticsBuilderBase&& base)        \
+            {                                                           \
+                llvm::errs() << base;                                   \
+                llvm::raw_string_ostream(error) << base;                \
+            });                                                         \
+        pylir::Diag::Document document(std::move(str));                 \
+        auto docManager = manager.createSubDiagnosticManager(document); \
+        pylir::Parser(docManager).parseFileInput();                     \
+        CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__)));   \
     }(source)
 
 using namespace Catch::Matchers;
@@ -219,14 +219,12 @@ namespace
 {
 void parse(std::string_view source)
 {
+    pylir::Diag::DiagnosticsManager manager;
     pylir::Diag::Document document(std::string{source});
-    pylir::Parser parser(document);
+    auto docManager = manager.createSubDiagnosticManager(document);
+    pylir::Parser parser(docManager);
 
-    auto expected = parser.parseFileInput();
-    if (!expected)
-    {
-        std::cerr << expected.error();
-    }
+    parser.parseFileInput();
 }
 } // namespace
 

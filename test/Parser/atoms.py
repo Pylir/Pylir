@@ -1,4 +1,4 @@
-# RUN: pylir %s -fsyntax-only -dump-ast --match-full-lines | FileCheck %s
+# RUN: pylir %s -fsyntax-only -dump-ast | FileCheck %s --match-full-lines
 
 test
 'dwadw\\nwdawdw'

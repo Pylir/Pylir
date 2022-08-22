@@ -14,12 +14,14 @@ using namespace pylir::Diag;
 
 TEST_CASE("Diagnostics labels", "[Diag]")
 {
+    std::string result;
+    DiagnosticsManager manager([&](auto&& base) { llvm::raw_string_ostream(result) << base; });
     SECTION("Simple")
     {
         Document document("A normal text", "filename");
-        auto result = DiagnosticsBuilder(document, Severity::Error, 2, "A message")
-                          .addLabel(2, 7, "Label", flags::noColour)
-                          .emit();
+        auto docManager = manager.createSubDiagnosticManager(document);
+        DiagnosticsBuilder(docManager, Severity::Error, 2, "A message").addLabel(2, 7, "Label");
+        CHECK(docManager.errorsOccurred());
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     |   ~~~~~~\n"
                                            "     |      |\n"
@@ -29,8 +31,9 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     SECTION("Arrow")
     {
         Document document("A normal text", "filename");
-        auto result =
-            DiagnosticsBuilder(document, Severity::Error, 0, "A message").addLabel(0, "Label", flags::noColour).emit();
+        auto docManager = manager.createSubDiagnosticManager(document);
+        DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addLabel(0, "Label");
+        CHECK(docManager.errorsOccurred());
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     | ^\n"
                                            "     | |\n"
@@ -40,7 +43,9 @@ TEST_CASE("Diagnostics labels", "[Diag]")
     SECTION("Without text")
     {
         Document document("A normal text", "filename");
-        auto result = DiagnosticsBuilder(document, Severity::Error, 0, "A message").addLabel(0, flags::noColour).emit();
+        auto docManager = manager.createSubDiagnosticManager(document);
+        DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addLabel(0);
+        CHECK(docManager.errorsOccurred());
         CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                            "     | ^\n"));
         CHECK_THAT(result, !Catch::Contains("   1 | A normal text\n"
@@ -53,10 +58,9 @@ TEST_CASE("Diagnostics labels", "[Diag]")
         SECTION("Same line")
         {
             Document document("A normal text", "filename");
-            auto result = DiagnosticsBuilder(document, Severity::Error, 0, "A message")
-                              .addLabel(2, 7, "Label", flags::noColour)
-                              .addLabel(0, "kek", flags::noColour)
-                              .emit();
+            auto docManager = manager.createSubDiagnosticManager(document);
+            DiagnosticsBuilder(docManager, Severity::Error, 0, "A message").addLabel(2, 7, "Label").addLabel(0, "kek");
+            CHECK(docManager.errorsOccurred());
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                                "     | ^ ~~~~~~\n"
                                                "     | |    |\n"
@@ -66,10 +70,11 @@ TEST_CASE("Diagnostics labels", "[Diag]")
         SECTION("Too close")
         {
             Document document("A normal text", "filename");
-            auto result = DiagnosticsBuilder(document, Severity::Error, 0, "A message")
-                              .addLabel(2, 7, "Label", flags::noColour)
-                              .addLabel(0, "other", flags::noColour)
-                              .emit();
+            auto docManager = manager.createSubDiagnosticManager(document);
+            DiagnosticsBuilder(docManager, Severity::Error, 0, "A message")
+                .addLabel(2, 7, "Label")
+                .addLabel(0, "other");
+            CHECK(docManager.errorsOccurred());
             CHECK_THAT(result, Catch::Contains("   1 | A normal text\n"
                                                "     | ^ ~~~~~~\n"
                                                "     | |    |\n"
@@ -82,8 +87,12 @@ TEST_CASE("Diagnostics labels", "[Diag]")
 
 TEST_CASE("Diagnostics margins", "[Diag]")
 {
+    std::string result;
+    DiagnosticsManager manager([&](auto&& base) { llvm::raw_string_ostream(result) << base; });
     Document document("Multi\nLine\nText", "filename");
-    auto result = DiagnosticsBuilder(document, Severity::Error, 6, "A message").emit();
+    auto docManager = manager.createSubDiagnosticManager(document);
+    DiagnosticsBuilder(docManager, Severity::Error, 6, "A message"); // NOLINT(bugprone-unused-raii)
+    CHECK(docManager.errorsOccurred());
     CHECK_THAT(result, Catch::Contains("   1 | Multi\n"
                                        "   2 | Line\n"
                                        "   3 | Text\n",

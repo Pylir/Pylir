@@ -14,7 +14,6 @@
 #include <unordered_set>
 
 #include <tcb/span.hpp>
-#include <tl/expected.hpp>
 
 #include "Syntax.hpp"
 
@@ -22,13 +21,11 @@ namespace pylir
 {
 class Parser
 {
-    Lexer m_lexer;
-    Lexer::iterator m_current;
-
 #define HANDLE_FEATURE(x)
 #define HANDLE_REQUIRED_FEATURE(x) bool m_##x : 1;
 #include "Features.def"
-    const Diag::Document* m_document;
+    Lexer m_lexer;
+    Lexer::iterator m_current;
 
     std::vector<Syntax::Scope> m_namespace;
     IdentifierSet m_globals;
@@ -138,7 +135,12 @@ class Parser
         return result;
     }
 
-    [[nodiscard]] tl::expected<Token, std::string> expect(TokenType tokenType);
+    std::pair<std::size_t, std::size_t> endOfFileLoc() const
+    {
+        return m_lexer.getDiagManager().getDocument().getEndOfFileLoc();
+    }
+
+    std::optional<Token> expect(TokenType tokenType);
 
     void addToNamespace(const Token& token);
 
@@ -152,8 +154,7 @@ class Parser
         return std::unique_ptr<T>(new T{{}, std::forward<Args>(args)...});
     }
 
-    tl::expected<void, std::string> finishNamespace(pylir::Syntax::Suite& suite,
-                                                             pylir::Syntax::Scope* maybeScope = nullptr) const;
+    void finishNamespace(pylir::Syntax::Suite& suite, pylir::Syntax::Scope* maybeScope = nullptr) const;
 
     bool lookaheadEquals(tcb::span<const TokenType> tokens);
 
@@ -162,7 +163,7 @@ class Parser
         ParseFunc parseFunc, CheckFunc checkFunc,
         std::optional<typename std::invoke_result_t<ParseFunc>::value_type>&& optionalFirst = std::nullopt,
         TokenType tokenType = TokenType::Comma)
-        -> tl::expected<std::vector<typename std::invoke_result_t<ParseFunc>::value_type>, std::string>
+        -> std::optional<std::vector<typename std::invoke_result_t<ParseFunc>::value_type>>
     {
         using T = typename std::invoke_result_t<ParseFunc>::value_type;
         if (!optionalFirst)
@@ -170,7 +171,7 @@ class Parser
             auto first = parseFunc();
             if (!first)
             {
-                return tl::unexpected{std::move(first).error()};
+                return std::nullopt;
             }
             optionalFirst = std::move(*first);
         }
@@ -185,7 +186,7 @@ class Parser
             auto other = parseFunc();
             if (!other)
             {
-                return tl::unexpected{std::move(other).error()};
+                return std::nullopt;
             }
             rest.emplace_back(std::move(*other));
         }
@@ -193,12 +194,12 @@ class Parser
     }
 
     template <auto parseLesser, TokenType... allowed>
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseGenericBinOp()
+    std::optional<IntrVarPtr<Syntax::Expression>> parseGenericBinOp()
     {
         auto first = (this->*parseLesser)();
         if (!first)
         {
-            return tl::unexpected{std::move(first).error()};
+            return std::nullopt;
         }
         IntrVarPtr<Syntax::Expression> current{std::move(*first)};
         while (auto op = maybeConsume({allowed...}))
@@ -206,16 +207,16 @@ class Parser
             auto rhs = (this->*parseLesser)();
             if (!rhs)
             {
-                return tl::unexpected{std::move(rhs).error()};
+                return std::nullopt;
             }
             current = make_node<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
         }
         return std::move(current);
     }
 
-    tl::expected<void, std::string> checkAug(const Syntax::Expression& expression, const Token& assignOp);
+    [[nodiscard]] bool checkAug(const Syntax::Expression& expression, const Token& assignOp);
 
-    tl::expected<void, std::string> checkTarget(const Syntax::Expression& expression, const Token& assignOp);
+    [[nodiscard]] bool checkTarget(const Syntax::Expression& expression, const Token& assignOp);
 
     static bool firstInAssignmentExpression(TokenType tokenType)
     {
@@ -251,41 +252,39 @@ class Parser
     static bool firstInCompoundStmt(TokenType tokenType);
 
 public:
-    explicit Parser(
-        const Diag::Document& document,
-        std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> callBack = [](auto&&) {})
-        : m_lexer(document, std::move(callBack)),
-          m_current(m_lexer.begin()),
+    explicit Parser(Diag::DiagnosticsDocManager& diagManager)
+        :
 #define HANDLE_FEATURE(x)
 #define HANDLE_REQUIRED_FEATURE(x) m_##x{true},
 #include "Features.def"
-          m_document(&document)
+          m_lexer(diagManager),
+          m_current(m_lexer.begin())
     {
     }
 
     template <class T, class S, class... Args>
-    [[nodiscard]] Diag::DiagnosticsBuilder createError(const T& location, const S& message, Args&&... args) const
+    auto createError(const T& location, const S& message, Args&&... args) const
     {
-        return Diag::DiagnosticsBuilder(*m_document, Diag::Severity::Error, location, message,
+        return Diag::DiagnosticsBuilder(m_lexer.getDiagManager(), Diag::Severity::Error, location, message,
                                         std::forward<Args>(args)...);
     }
 
     /**
      * yield_expression ::=  "yield" [expression_list | "from" expression]
      */
-    tl::expected<Syntax::Yield, std::string> parseYieldExpression();
+    std::optional<Syntax::Yield> parseYieldExpression();
 
     /**
      * atom ::=  identifier | literal | enclosure
      *
      * literal ::=  stringliteral | bytesliteral | integer | floatnumber | imagnumber | None | True | False
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAtom();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseAtom();
 
     /**
      * attributeref ::=  primary "." identifier
      */
-    tl::expected<Syntax::AttributeRef, std::string> parseAttributeRef(IntrVarPtr<Syntax::Expression>&& expression);
+    std::optional<Syntax::AttributeRef> parseAttributeRef(IntrVarPtr<Syntax::Expression>&& expression);
 
     /**
      * argument_list        ::=  positional_arguments ["," starred_and_keywords] ["," keywords_arguments]
@@ -297,18 +296,18 @@ public:
      * keywords_arguments   ::=  (keyword_item | "**" expression) { "," keyword_item | "," "**" expression }
      * keyword_item         ::=  identifier "=" expression
      */
-    tl::expected<std::vector<Syntax::Argument>, std::string>
+    std::optional<std::vector<Syntax::Argument>>
         parseArgumentList(IntrVarPtr<Syntax::Expression>&& firstAssignment = nullptr);
 
     /**
      * call ::=  primary "(" [argument_list [","] | comprehension] ")"
      */
-    tl::expected<Syntax::Call, std::string> parseCall(IntrVarPtr<Syntax::Expression>&& expression);
+    std::optional<Syntax::Call> parseCall(IntrVarPtr<Syntax::Expression>&& expression);
 
     /**
      * primary ::=  atom | attributeref | subscription | slicing | call
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parsePrimary();
+    std::optional<IntrVarPtr<Syntax::Expression>> parsePrimary();
 
     /**
      * subscription ::=  primary "[" expression_list "]"
@@ -320,18 +319,18 @@ public:
      * upper_bound  ::=  expression
      * stride       ::=  expression
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string>
+    std::optional<IntrVarPtr<Syntax::Expression>>
         parseSlicingOrSubscription(IntrVarPtr<Syntax::Expression>&& expression);
 
     /**
      * await_expr ::=  "await" primary
      */
-    tl::expected<Syntax::UnaryOp, std::string> parseAwaitExpr();
+    std::optional<Syntax::UnaryOp> parseAwaitExpr();
 
     /**
      * power ::= (await_expr | primary) ["**" u_expr]
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parsePower();
+    std::optional<IntrVarPtr<Syntax::Expression>> parsePower();
 
     /**
      * u_expr ::=  power
@@ -339,7 +338,7 @@ public:
      *          |  "+" u_expr
      *          |  "~" u_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseUExpr();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseUExpr();
 
     /**
      * m_expr ::=  u_expr
@@ -349,88 +348,88 @@ public:
      *          |  m_expr "/" u_expr
      *          |  m_expr "%" u_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseMExpr();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseMExpr();
 
     /**
      * a_expr ::=  m_expr
      *          |  a_expr "+" m_expr
      *          |  a_expr "-" m_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAExpr();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseAExpr();
 
     /**
      * shift_expr ::=  a_expr
      *              |  shift_expr ("<<" | ">>") a_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseShiftExpr();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseShiftExpr();
 
     /**
      * and_expr ::=  shift_expr
      *            |  and_expr "&" shift_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAndExpr();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseAndExpr();
 
     /**
      * xor_expr ::=  and_expr
      *            |  xor_expr "^" and_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseXorExpr();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseXorExpr();
 
     /**
      * or_expr  ::=  xor_expr
      *            | or_expr "|" xor_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseOrExpr();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseOrExpr();
 
     /**
      * comparison    ::=  or_expr { comp_operator or_expr }
      * comp_operator ::=  "<" | ">" | "==" | ">=" | "<=" | "!=" | "is" ["not"] | ["not"] "in"
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseComparison();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseComparison();
 
     /**
      * not_test ::=  comparison
      *            |  "not" not_test
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseNotTest();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseNotTest();
 
     /**
      * and_test ::=  not_test
      *            |  and_test "and" not_test
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAndTest();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseAndTest();
 
     /**
      * or_test  ::=  and_test
      *            |  or_test "or" and_test
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseOrTest();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseOrTest();
 
     /**
      * assignment_expression ::=  [identifier ":="] expression
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseAssignmentExpression();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseAssignmentExpression();
 
     /**
      * conditional_expression ::=  or_test ["if" or_test "else" expression]
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseConditionalExpression();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseConditionalExpression();
 
     /**
      * expression ::=  conditional_expression
      *              |  lambda_expr
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseExpression();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseExpression();
 
     /**
      * expression_list ::=  expression { "," expression } [","]
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseExpressionList();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseExpressionList();
 
     /**
      * lambda_expr ::=  "lambda" [parameter_list] ":" expression
      */
-    tl::expected<Syntax::Lambda, std::string> parseLambdaExpression();
+    std::optional<Syntax::Lambda> parseLambdaExpression();
 
     /**
      * starred_expression ::=  expression
@@ -440,33 +439,32 @@ public:
      *       last item not being optional unless at least one comma has been parsed. Empty starred_expressions are
      *       instead handled at it's uses grammar rules.
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string>
+    std::optional<IntrVarPtr<Syntax::Expression>>
         parseStarredExpression(IntrVarPtr<Syntax::Expression>&& firstItem = nullptr);
 
     /**
      * starred_item ::=  assignment_expression
      *                |  "*" or_expr
      */
-    tl::expected<Syntax::StarredItem, std::string> parseStarredItem();
+    std::optional<Syntax::StarredItem> parseStarredItem();
 
-    tl::expected<std::vector<Syntax::StarredItem>, std::string>
+    std::optional<std::vector<Syntax::StarredItem>>
         parseStarredList(std::optional<Syntax::StarredItem>&& firstItem = std::nullopt);
 
     /**
      * comp_for ::=  ["async"] "for" target_list "in" or_test [comp_iter]
      */
-    tl::expected<Syntax::CompFor, std::string> parseCompFor();
+    std::optional<Syntax::CompFor> parseCompFor();
 
     /**
      * comp_if ::=  "if" or_test [comp_iter]
      */
-    tl::expected<Syntax::CompIf, std::string> parseCompIf();
+    std::optional<Syntax::CompIf> parseCompIf();
 
     /**
      * comprehension ::=  assignment_expression comp_for
      */
-    tl::expected<Syntax::Comprehension, std::string>
-        parseComprehension(IntrVarPtr<Syntax::Expression>&& assignmentExpression);
+    std::optional<Syntax::Comprehension> parseComprehension(IntrVarPtr<Syntax::Expression>&& assignmentExpression);
 
     /**
      * enclosure            ::=  parenth_form | list_display | dict_display | set_display
@@ -488,7 +486,7 @@ public:
      *
      * yield_atom           ::=  "(" yield_expression ")"
      */
-    tl::expected<IntrVarPtr<Syntax::Expression>, std::string> parseEnclosure();
+    std::optional<IntrVarPtr<Syntax::Expression>> parseEnclosure();
 
     /**
      * target      ::=  identifier
@@ -504,20 +502,19 @@ public:
      * Undocumented, but CPython seems to only allow "*" target once. Any further stars as prefix are rejected.
      * This makes target a strict subset of starred_expression.
      */
-    tl::expected<IntrVarPtr<Syntax::Target>, std::string> parseTarget(const Token& assignmentLikeToken);
+    std::optional<IntrVarPtr<Syntax::Target>> parseTarget(const Token& assignmentLikeToken);
 
-    tl::expected<IntrVarPtr<Syntax::Target>, std::string> parseTargetList(const Token& assignmentLikeToken);
+    std::optional<IntrVarPtr<Syntax::Target>> parseTargetList(const Token& assignmentLikeToken);
 
     /**
      * assignment_stmt ::=  target_list "=" { target_list "=" } (starred_expression | yield_expression)
      */
-    tl::expected<Syntax::AssignmentStmt, std::string>
-        parseAssignmentStmt(IntrVarPtr<Syntax::Target>&& firstItem = nullptr);
+    std::optional<Syntax::AssignmentStmt> parseAssignmentStmt(IntrVarPtr<Syntax::Target>&& firstItem = nullptr);
 
     /**
      * assert_stmt ::=  "assert" expression ["," expression]
      */
-    tl::expected<Syntax::AssertStmt, std::string> parseAssertStmt();
+    std::optional<Syntax::AssertStmt> parseAssertStmt();
 
     /**
      * import_stmt     ::=  "import" module ["as" identifier] { "," module ["as" identifier] }
@@ -530,7 +527,7 @@ public:
      * relative_module ::=  { "." } module
      *                   |  "." { "." }
      */
-    tl::expected<Syntax::ImportStmt, std::string> parseImportStmt();
+    std::optional<Syntax::ImportStmt> parseImportStmt();
 
     /**
      * simple_stmt               ::=  expression_stmt
@@ -583,7 +580,7 @@ public:
      *                             |  ">>=" | "<<=" | "&=" | "^=" | "|="
      * augtarget                 ::=  identifier | attributeref | subscription | slicing
      */
-    tl::expected<IntrVarPtr<Syntax::SimpleStmt>, std::string> parseSimpleStmt();
+    std::optional<IntrVarPtr<Syntax::SimpleStmt>> parseSimpleStmt();
 
     /**
      * compound_stmt ::=  if_stmt
@@ -601,7 +598,7 @@ public:
      *
      * async_for_stmt ::=  "async" for_stmt
      */
-    tl::expected<IntrVarPtr<Syntax::CompoundStmt>, std::string> parseCompoundStmt();
+    std::optional<IntrVarPtr<Syntax::CompoundStmt>> parseCompoundStmt();
 
     /**
      * stmt_list ::=  simple_stmt { ";" simple_stmt } [";"]
@@ -609,39 +606,39 @@ public:
      *                Note: we parse this as [simple_stmt] { ";" [simple_stmt] } [";"].
      *                      That way the expression statement inside of simple_stmt can never be empty.
      */
-    tl::expected<std::vector<IntrVarPtr<Syntax::SimpleStmt>>, std::string> parseStmtList();
+    std::optional<std::vector<IntrVarPtr<Syntax::SimpleStmt>>> parseStmtList();
 
     /**
      * statement ::=  stmt_list NEWLINE | compound_stmt
      */
-    tl::expected<decltype(Syntax::Suite::statements), std::string> parseStatement();
+    std::optional<decltype(Syntax::Suite::statements)> parseStatement();
 
     /**
      * suite ::=  stmt_list NEWLINE | NEWLINE INDENT statement { statement } DEDENT
      */
-    tl::expected<Syntax::Suite, std::string> parseSuite();
+    std::optional<Syntax::Suite> parseSuite();
 
     /**
      * file_input ::=  { NEWLINE | statement }
      */
-    tl::expected<Syntax::FileInput, std::string> parseFileInput();
+    std::optional<Syntax::FileInput> parseFileInput();
 
-    tl::expected<Syntax::IfStmt::Else, std::string> parseElse();
+    std::optional<Syntax::IfStmt::Else> parseElse();
 
     /**
      * if_stmt ::=  "if" assignment_expression ":" suite ("elif" assignment_expression ":" suite)* ["else" ":" suite]
      */
-    tl::expected<Syntax::IfStmt, std::string> parseIfStmt();
+    std::optional<Syntax::IfStmt> parseIfStmt();
 
     /**
      * while_stmt ::=  "while" assignment_expression ":" suite ["else" ":" suite]
      */
-    tl::expected<Syntax::WhileStmt, std::string> parseWhileStmt();
+    std::optional<Syntax::WhileStmt> parseWhileStmt();
 
     /**
      * for_stmt ::=  "for" target_list "in" expression_list ":" suite ["else" ":" suite]
      */
-    tl::expected<Syntax::ForStmt, std::string> parseForStmt();
+    std::optional<Syntax::ForStmt> parseForStmt();
 
     /**
      * try_stmt  ::=  try1_stmt | try2_stmt
@@ -652,13 +649,13 @@ public:
      *                ["finally" ":" suite]
      * try2_stmt ::=  "try" ":" suite "finally" ":" suite
      */
-    tl::expected<Syntax::TryStmt, std::string> parseTryStmt();
+    std::optional<Syntax::TryStmt> parseTryStmt();
 
     /**
      * with_stmt ::=  "with" with_item { "," with_item } ":" suite
      * with_item ::=  expression ["as" target]
      */
-    tl::expected<Syntax::WithStmt, std::string> parseWithStmt();
+    std::optional<Syntax::WithStmt> parseWithStmt();
 
     /**
      * parameter_list            ::=  defparameter { "," defparameter } "," "/" ["," [parameter_list_no_posonly]]
@@ -670,7 +667,7 @@ public:
      * parameter                 ::=  identifier [":" expression]
      * defparameter              ::=  parameter ["=" expression]
      */
-    tl::expected<std::vector<Syntax::Parameter>, std::string> parseParameterList();
+    std::optional<std::vector<Syntax::Parameter>> parseParameterList();
 
     /**
      * decorator     ::=  "@" assignment_expression NEWLINE
@@ -680,14 +677,14 @@ public:
      *
      * async_funcdef ::=  [decorators] "async" "def" funcname "(" [parameter_list] ")" ["->" expression] ":" suite
      */
-    tl::expected<Syntax::FuncDef, std::string> parseFuncDef(std::vector<Syntax::Decorator>&& decorators,
-                                                            std::optional<BaseToken>&& asyncKeyword);
+    std::optional<Syntax::FuncDef> parseFuncDef(std::vector<Syntax::Decorator>&& decorators,
+                                                std::optional<BaseToken>&& asyncKeyword);
 
     /**
      * classdef    ::=  [decorators] "class" classname [inheritance] ":" suite
      * inheritance ::=  "(" [argument_list] ")"
      * classname   ::=  identifier
      */
-    tl::expected<Syntax::ClassDef, std::string> parseClassDef(std::vector<Syntax::Decorator>&& decorators);
+    std::optional<Syntax::ClassDef> parseClassDef(std::vector<Syntax::Decorator>&& decorators);
 };
 } // namespace pylir

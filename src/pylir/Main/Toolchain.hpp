@@ -26,7 +26,7 @@ protected:
         Wasm,
     };
 
-    [[nodiscard]] bool callLinker(const pylir::cli::CommandLine& commandLine, LinkerStyle style,
+    [[nodiscard]] bool callLinker(cli::CommandLine& commandLine, LinkerStyle style,
                                   llvm::ArrayRef<std::string> arguments) const;
 
     enum class Stdlib
@@ -66,7 +66,7 @@ public:
 
     [[nodiscard]] std::vector<std::string> getLLVMOptions(const llvm::opt::InputArgList& args) const;
 
-    [[nodiscard]] virtual bool link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const = 0;
+    [[nodiscard]] virtual bool link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const = 0;
 
     [[nodiscard]] bool isPIE(const pylir::cli::CommandLine& commandLine) const;
 

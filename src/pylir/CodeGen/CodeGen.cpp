@@ -25,7 +25,7 @@
 
 #include <unordered_set>
 
-pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document, CodeGenOptions&& options)
+pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::DiagnosticsDocManager& docManager, CodeGenOptions&& options)
     : m_options(std::move(options)),
       m_builder(
           [&]
@@ -35,7 +35,7 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::Document& document, Co
               return context;
           }()),
       m_module(mlir::ModuleOp::create(m_builder.getUnknownLoc())),
-      m_document(&document),
+      m_docManager(&docManager),
       m_qualifiers(m_options.qualifier)
 {
     if (!m_qualifiers.empty())
@@ -63,7 +63,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_builder.setInsertionPointToEnd(m_module.getBody());
     {
-        auto moduleBeginLoc = changeLoc(fileInput, m_document->getStartOfFileLoc());
+        auto moduleBeginLoc = changeLoc(fileInput, m_docManager->getDocument().getStartOfFileLoc());
         for (const auto& token : fileInput.globals)
         {
             auto locExit = changeLoc(token);
@@ -100,7 +100,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 
     if (m_qualifiers == "builtins.")
     {
-        auto locExit = changeLoc(fileInput, m_document->getEndOfFileLoc());
+        auto locExit = changeLoc(fileInput, m_docManager->getDocument().getEndOfFileLoc());
         createCompilerBuiltinsImpl();
     }
 
@@ -1947,8 +1947,7 @@ void pylir::CodeGen::raiseException(mlir::Value exceptionObject)
     m_builder.clearInsertionPoint();
 }
 
-std::vector<pylir::CodeGen::UnpackResults>
-    pylir::CodeGen::unpackArgsKeywords(
+std::vector<pylir::CodeGen::UnpackResults> pylir::CodeGen::unpackArgsKeywords(
     mlir::Value tuple, mlir::Value dict, const std::vector<FunctionParameter>& parameters,
     llvm::function_ref<mlir::Value(std::size_t)> posDefault, llvm::function_ref<mlir::Value(llvm::StringRef)> kwDefault)
 {
@@ -2098,7 +2097,7 @@ std::vector<pylir::CodeGen::UnpackResults>
 }
 
 mlir::func::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
-                                             const std::vector<FunctionParameter>& parameters)
+                                                   const std::vector<FunctionParameter>& parameters)
 {
     auto cc = mlir::func::FuncOp::create(
         m_builder.getCurrentLoc(), name.str(),
@@ -2375,7 +2374,7 @@ std::vector<pylir::CodeGen::ModuleImport> pylir::CodeGen::importModules(llvm::Ar
     std::vector<pylir::CodeGen::ModuleImport> imports;
     for (const auto& iter : specs)
     {
-        llvm::SmallString<100> relativePathSS(m_document->getFilename());
+        llvm::SmallString<100> relativePathSS(m_docManager->getDocument().getFilename());
         llvm::sys::fs::make_absolute(relativePathSS);
         for (std::size_t i = 0; i < iter.dots; i++)
         {
@@ -2457,7 +2456,7 @@ std::vector<pylir::CodeGen::ModuleImport> pylir::CodeGen::importModules(llvm::Ar
             if (auto opt = testPathForImport(successPath))
             {
                 auto [fs, filePath] = std::move(*opt);
-                m_options.moduleLoadCallback({fs, moduleQualifier, location, m_document, std::move(filePath)});
+                m_options.moduleLoadCallback({fs, moduleQualifier, location, m_docManager, std::move(filePath)});
                 imports.push_back({moduleQualifier, true, location});
                 success = true;
                 break;
@@ -2490,7 +2489,7 @@ std::vector<pylir::CodeGen::ModuleImport> pylir::CodeGen::importModules(llvm::Ar
             if (auto opt = testPathForImport(successPath))
             {
                 auto [fs, filePath] = std::move(*opt);
-                m_options.moduleLoadCallback({fs, moduleQualifier, location, m_document, std::move(filePath)});
+                m_options.moduleLoadCallback({fs, moduleQualifier, location, m_docManager, std::move(filePath)});
                 imports.push_back({moduleQualifier, true, location});
                 continue;
             }

@@ -67,27 +67,31 @@ private:
 
     mlir::LogicalResult ensureLLVMInit(const llvm::opt::InputArgList& args, const pylir::Toolchain& toolchain);
 
-    mlir::LogicalResult ensureOutputStream(const llvm::opt::InputArgList& args, Action action);
+    mlir::LogicalResult ensureOutputStream(const llvm::opt::InputArgList& args, Action action,
+                                           cli::CommandLine& commandLine);
 
-    mlir::LogicalResult finalizeOutputStream(mlir::LogicalResult result);
+    mlir::LogicalResult finalizeOutputStream(mlir::LogicalResult result, cli::CommandLine& commandLine);
 
     void addOptimizationPasses(llvm::StringRef level, mlir::OpPassManager& manager);
 
-    mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> codegenPythonToMLIR(const llvm::opt::InputArgList& args,
-                                                                           const cli::CommandLine& commandLine);
+    mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
+        codegenPythonToMLIR(const llvm::opt::InputArgList& args, const cli::CommandLine& commandLine,
+                            Diag::DiagnosticsManager& diagManager, Diag::DiagnosticsDocManager& mainModuleDiagManager);
 
-    mlir::LogicalResult ensureTargetMachine(const llvm::opt::InputArgList& args, const cli::CommandLine& commandLine,
+    mlir::LogicalResult ensureTargetMachine(const llvm::opt::InputArgList& args, cli::CommandLine& commandLine,
                                             const pylir::Toolchain& toolchain,
                                             llvm::Optional<llvm::Triple> triple = {});
 
-    mlir::LogicalResult compilation(llvm::opt::Arg* inputFile, const cli::CommandLine& commandLine,
-                                    const pylir::Toolchain& toolchain, Action action);
+    mlir::LogicalResult compilation(llvm::opt::Arg* inputFile, cli::CommandLine& commandLine,
+                                    const pylir::Toolchain& toolchain, CompilerInvocation::Action action,
+                                    Diag::DiagnosticsManager& diagManager);
 
 public:
     CompilerInvocation() = default;
 
-    mlir::LogicalResult executeAction(llvm::opt::Arg* inputFile, const cli::CommandLine& commandLine,
-                                      const pylir::Toolchain& toolchain, Action action);
+    mlir::LogicalResult executeAction(llvm::opt::Arg* inputFile, cli::CommandLine& commandLine,
+                                      const pylir::Toolchain& toolchain, CompilerInvocation::Action action,
+                                      Diag::DiagnosticsManager& diagManager);
 };
 
 } // namespace pylir

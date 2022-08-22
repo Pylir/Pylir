@@ -14,7 +14,7 @@
 
 #include "Visitor.hpp"
 
-tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInput()
+std::optional<pylir::Syntax::FileInput> pylir::Parser::parseFileInput()
 {
     decltype(Syntax::Suite::statements) vector;
     while (true)
@@ -29,14 +29,14 @@ tl::expected<pylir::Syntax::FileInput, std::string> pylir::Parser::parseFileInpu
         auto statement = parseStatement();
         if (!statement)
         {
-            return tl::unexpected{std::move(statement).error()};
+            return std::nullopt;
         }
         vector.insert(vector.end(), std::move_iterator(statement->begin()), std::move_iterator(statement->end()));
     }
     return Syntax::FileInput{{std::move(vector)}, {m_globals.begin(), m_globals.end()}};
 }
 
-tl::expected<decltype(pylir::Syntax::Suite::statements), std::string> pylir::Parser::parseStatement()
+std::optional<decltype(pylir::Syntax::Suite::statements)> pylir::Parser::parseStatement()
 {
     decltype(pylir::Syntax::Suite::statements) result;
     if (peekedIs(firstInCompoundStmt))
@@ -44,7 +44,7 @@ tl::expected<decltype(pylir::Syntax::Suite::statements), std::string> pylir::Par
         auto compound = parseCompoundStmt();
         if (!compound)
         {
-            return tl::unexpected{std::move(compound).error()};
+            return std::nullopt;
         }
         result.emplace_back(std::move(*compound));
         return result;
@@ -53,18 +53,18 @@ tl::expected<decltype(pylir::Syntax::Suite::statements), std::string> pylir::Par
     auto stmtList = parseStmtList();
     if (!stmtList)
     {
-        return tl::unexpected{std::move(stmtList).error()};
+        return std::nullopt;
     }
     auto newLine = expect(TokenType::Newline);
     if (!newLine)
     {
-        return tl::unexpected{std::move(newLine).error()};
+        return std::nullopt;
     }
     result.insert(result.end(), std::move_iterator(stmtList->begin()), std::move_iterator(stmtList->end()));
     return result;
 }
 
-tl::expected<std::vector<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>>, std::string> pylir::Parser::parseStmtList()
+std::optional<std::vector<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>>> pylir::Parser::parseStmtList()
 {
     std::vector<IntrVarPtr<Syntax::SimpleStmt>> statements;
     while (peekedIs(TokenType::SemiColon) || peekedIs(firstInSimpleStmt))
@@ -79,7 +79,7 @@ tl::expected<std::vector<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>>, std::str
         auto simpleStmt = parseSimpleStmt();
         if (!simpleStmt)
         {
-            return tl::unexpected{std::move(simpleStmt).error()};
+            return std::nullopt;
         }
         statements.push_back(std::move(*simpleStmt));
         if (!peekedIs(TokenType::SemiColon))
@@ -90,13 +90,12 @@ tl::expected<std::vector<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>>, std::str
     return statements;
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir::Parser::parseCompoundStmt()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>> pylir::Parser::parseCompoundStmt()
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N, "statement")
-                                  .addLabel(m_document->getText().size())
-                                  .emit()};
+        createError(endOfFileLoc(), Diag::EXPECTED_N, "statement").addLabel(endOfFileLoc());
+        return std::nullopt;
     }
     switch (m_current->getTokenType())
     {
@@ -105,7 +104,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto ifStmt = parseIfStmt();
             if (!ifStmt)
             {
-                return tl::unexpected{std::move(ifStmt).error()};
+                return std::nullopt;
             }
             return std::make_unique<Syntax::IfStmt>(std::move(*ifStmt));
         }
@@ -114,7 +113,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto forStmt = parseForStmt();
             if (!forStmt)
             {
-                return tl::unexpected{std::move(forStmt).error()};
+                return std::nullopt;
             }
             return std::make_unique<Syntax::ForStmt>(std::move(*forStmt));
         }
@@ -123,7 +122,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto tryStmt = parseTryStmt();
             if (!tryStmt)
             {
-                return tl::unexpected{std::move(tryStmt).error()};
+                return std::nullopt;
             }
             return std::make_unique<Syntax::TryStmt>(std::move(*tryStmt));
         }
@@ -132,7 +131,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto withStmt = parseWithStmt();
             if (!withStmt)
             {
-                return tl::unexpected{std::move(withStmt).error()};
+                return std::nullopt;
             }
             return std::make_unique<Syntax::WithStmt>(std::move(*withStmt));
         }
@@ -141,7 +140,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto whileStmt = parseWhileStmt();
             if (!whileStmt)
             {
-                return tl::unexpected{std::move(whileStmt).error()};
+                return std::nullopt;
             }
             return std::make_unique<Syntax::WhileStmt>(std::move(*whileStmt));
         }
@@ -150,7 +149,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto funcDef = parseFuncDef({}, std::nullopt);
             if (!funcDef)
             {
-                return tl::unexpected{std::move(funcDef).error()};
+                return std::nullopt;
             }
             return std::make_unique<Syntax::FuncDef>(std::move(*funcDef));
         }
@@ -159,7 +158,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto classDef = parseClassDef({});
             if (!classDef)
             {
-                return tl::unexpected{std::move(classDef).error()};
+                return std::nullopt;
             }
             return std::make_unique<Syntax::ClassDef>(std::move(*classDef));
         }
@@ -172,12 +171,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                 auto assignment = parseAssignmentExpression();
                 if (!assignment)
                 {
-                    return tl::unexpected{std::move(assignment).error()};
+                    return std::nullopt;
                 }
                 auto newline = expect(TokenType::Newline);
                 if (!newline)
                 {
-                    return tl::unexpected{std::move(newline).error()};
+                    return std::nullopt;
                 }
                 decorators.push_back({at, std::move(*assignment), *newline});
             } while (peekedIs(TokenType::AtSign));
@@ -186,15 +185,14 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                 auto func = parseFuncDef(std::move(decorators), std::move(*async));
                 if (!func)
                 {
-                    return tl::unexpected{std::move(func).error()};
+                    return std::nullopt;
                 }
                 return std::make_unique<Syntax::FuncDef>(std::move(*func));
             }
             if (m_current == m_lexer.end())
             {
-                return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N, "class or function")
-                        .addLabel(m_document->getText().size())
-                        .emit()};
+                createError(endOfFileLoc(), Diag::EXPECTED_N, "class or function").addLabel(endOfFileLoc());
+                return std::nullopt;
             }
             switch (m_current->getTokenType())
             {
@@ -203,7 +201,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                     auto func = parseFuncDef(std::move(decorators), std::nullopt);
                     if (!func)
                     {
-                        return tl::unexpected{std::move(func).error()};
+                        return std::nullopt;
                     }
                     return std::make_unique<Syntax::FuncDef>(std::move(*func));
                 }
@@ -212,17 +210,17 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                     auto clazz = parseClassDef(std::move(decorators));
                     if (!clazz)
                     {
-                        return tl::unexpected{std::move(clazz).error()};
+                        return std::nullopt;
                     }
                     return std::make_unique<Syntax::ClassDef>(std::move(*clazz));
                 }
-                case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
+                case TokenType::SyntaxError: return std::nullopt;
                 default:
                 {
-                    return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "class or function",
-                                                      m_current->getTokenType())
-                                              .addLabel(*m_current)
-                                              .emit()};
+                    createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "class or function",
+                                m_current->getTokenType())
+                        .addLabel(*m_current);
+                    return std::nullopt;
                 }
             }
         }
@@ -231,10 +229,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
             auto async = *m_current++;
             if (m_current == m_lexer.end())
             {
-                return tl::unexpected{
-                    createError(m_document->getText().size(), Diag::EXPECTED_N, "'for', 'with' or function")
-                                          .addLabel(m_document->getText().size())
-                                          .emit()};
+                createError(endOfFileLoc(), Diag::EXPECTED_N, "'for', 'with' or function").addLabel(endOfFileLoc());
+                return std::nullopt;
             }
             switch (m_current->getTokenType())
             {
@@ -243,7 +239,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                     auto func = parseFuncDef({}, async);
                     if (!func)
                     {
-                        return tl::unexpected{std::move(func).error()};
+                        return std::nullopt;
                     }
                     return std::make_unique<Syntax::FuncDef>(std::move(*func));
                 }
@@ -252,7 +248,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                     auto forStmt = parseForStmt();
                     if (!forStmt)
                     {
-                        return tl::unexpected{std::move(forStmt).error()};
+                        return std::nullopt;
                     }
                     forStmt->maybeAsyncKeyword = async;
                     return std::make_unique<Syntax::ForStmt>(std::move(*forStmt));
@@ -262,69 +258,68 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::CompoundStmt>, std::string> pylir:
                     auto withStmt = parseWithStmt();
                     if (!withStmt)
                     {
-                        return tl::unexpected{std::move(withStmt).error()};
+                        return std::nullopt;
                     }
                     withStmt->maybeAsyncKeyword = async;
                     return std::make_unique<Syntax::WithStmt>(std::move(*withStmt));
                 }
-                case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
+                case TokenType::SyntaxError: return std::nullopt;
                 default:
                 {
-                    return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                                      "'for', 'with' or function", m_current->getTokenType())
-                                              .addLabel(*m_current)
-                                              .emit()};
+                    createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "'for', 'with' or function",
+                                m_current->getTokenType())
+                        .addLabel(*m_current);
+                    return std::nullopt;
                 }
             }
         }
-        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
+        case TokenType::SyntaxError: return std::nullopt;
         default:
         {
-            return tl::unexpected{
-                createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "statement", m_current->getTokenType())
-                                      .addLabel(*m_current)
-                                      .emit()};
+            createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "statement", m_current->getTokenType())
+                .addLabel(*m_current);
+            return std::nullopt;
         }
     }
 }
 
-tl::expected<pylir::Syntax::IfStmt::Else, std::string> pylir::Parser::parseElse()
+std::optional<pylir::Syntax::IfStmt::Else> pylir::Parser::parseElse()
 {
     auto elseKeyowrd = *m_current++;
     auto elseColon = expect(TokenType::Colon);
     if (!elseColon)
     {
-        return tl::unexpected{std::move(elseColon).error()};
+        return std::nullopt;
     }
     auto elseSuite = parseSuite();
     if (!elseSuite)
     {
-        return tl::unexpected{std::move(elseSuite).error()};
+        return std::nullopt;
     }
     return Syntax::IfStmt::Else{elseKeyowrd, *elseColon, std::make_unique<Syntax::Suite>(std::move(*elseSuite))};
 }
 
-tl::expected<pylir::Syntax::IfStmt, std::string> pylir::Parser::parseIfStmt()
+std::optional<pylir::Syntax::IfStmt> pylir::Parser::parseIfStmt()
 {
     auto ifKeyword = expect(TokenType::IfKeyword);
     if (!ifKeyword)
     {
-        return tl::unexpected{std::move(ifKeyword).error()};
+        return std::nullopt;
     }
     auto assignment = parseAssignmentExpression();
     if (!assignment)
     {
-        return tl::unexpected{std::move(assignment).error()};
+        return std::nullopt;
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     auto suite = parseSuite();
     if (!suite)
     {
-        return tl::unexpected{std::move(suite).error()};
+        return std::nullopt;
     }
     std::vector<Syntax::IfStmt::Elif> elifs;
     while (auto elif = maybeConsume(TokenType::ElifKeyword))
@@ -332,17 +327,17 @@ tl::expected<pylir::Syntax::IfStmt, std::string> pylir::Parser::parseIfStmt()
         auto condition = parseAssignmentExpression();
         if (!condition)
         {
-            return tl::unexpected{std::move(condition).error()};
+            return std::nullopt;
         }
         auto elifColon = expect(TokenType::Colon);
         if (!elifColon)
         {
-            return tl::unexpected{std::move(elifColon).error()};
+            return std::nullopt;
         }
         auto elIfSuite = parseSuite();
         if (!elIfSuite)
         {
-            return tl::unexpected{std::move(elIfSuite).error()};
+            return std::nullopt;
         }
         elifs.push_back(
             {*elif, std::move(*condition), *elifColon, std::make_unique<Syntax::Suite>(std::move(*elIfSuite))});
@@ -353,7 +348,7 @@ tl::expected<pylir::Syntax::IfStmt, std::string> pylir::Parser::parseIfStmt()
         auto parsedElse = parseElse();
         if (!parsedElse)
         {
-            return tl::unexpected{std::move(parsedElse).error()};
+            return std::nullopt;
         }
         elseSection = std::move(*parsedElse);
     }
@@ -366,29 +361,29 @@ tl::expected<pylir::Syntax::IfStmt, std::string> pylir::Parser::parseIfStmt()
                           std::move(elseSection)};
 }
 
-tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStmt()
+std::optional<pylir::Syntax::WhileStmt> pylir::Parser::parseWhileStmt()
 {
     auto whileKeyword = expect(TokenType::WhileKeyword);
     if (!whileKeyword)
     {
-        return tl::unexpected{std::move(whileKeyword).error()};
+        return std::nullopt;
     }
     auto condition = parseAssignmentExpression();
     if (!condition)
     {
-        return tl::unexpected{std::move(condition).error()};
+        return std::nullopt;
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     std::optional reset = pylir::ValueReset(m_inLoop);
     m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
     {
-        return tl::unexpected{std::move(suite).error()};
+        return std::nullopt;
     }
     std::optional<Syntax::IfStmt::Else> elseSection;
     if (peekedIs(TokenType::ElseKeyword))
@@ -397,7 +392,7 @@ tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStm
         auto parsedElse = parseElse();
         if (!parsedElse)
         {
-            return tl::unexpected{std::move(parsedElse).error()};
+            return std::nullopt;
         }
         elseSection = std::move(*parsedElse);
     }
@@ -409,40 +404,40 @@ tl::expected<pylir::Syntax::WhileStmt, std::string> pylir::Parser::parseWhileStm
                              std::move(elseSection)};
 }
 
-tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
+std::optional<pylir::Syntax::ForStmt> pylir::Parser::parseForStmt()
 {
     auto forKeyword = expect(TokenType::ForKeyword);
     if (!forKeyword)
     {
-        return tl::unexpected{std::move(forKeyword).error()};
+        return std::nullopt;
     }
     auto targetList = parseTargetList(*forKeyword);
     if (!targetList)
     {
-        return tl::unexpected{std::move(targetList).error()};
+        return std::nullopt;
     }
     addToNamespace(**targetList);
     auto inKeyword = expect(TokenType::InKeyword);
     if (!inKeyword)
     {
-        return tl::unexpected{std::move(inKeyword).error()};
+        return std::nullopt;
     }
     auto expressionList = parseExpressionList();
     if (!expressionList)
     {
-        return tl::unexpected{std::move(expressionList).error()};
+        return std::nullopt;
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     std::optional reset = pylir::ValueReset(m_inLoop);
     m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
     {
-        return tl::unexpected{std::move(suite).error()};
+        return std::nullopt;
     }
     std::optional<Syntax::IfStmt::Else> elseSection;
     if (peekedIs(TokenType::ElseKeyword))
@@ -451,7 +446,7 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
         auto parsedElse = parseElse();
         if (!parsedElse)
         {
-            return tl::unexpected{std::move(parsedElse).error()};
+            return std::nullopt;
         }
         elseSection = std::move(*parsedElse);
     }
@@ -466,34 +461,34 @@ tl::expected<pylir::Syntax::ForStmt, std::string> pylir::Parser::parseForStmt()
                            std::move(elseSection)};
 }
 
-tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
+std::optional<pylir::Syntax::TryStmt> pylir::Parser::parseTryStmt()
 {
     auto tryKeyword = expect(TokenType::TryKeyword);
     if (!tryKeyword)
     {
-        return tl::unexpected{std::move(tryKeyword).error()};
+        return std::nullopt;
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     auto suite = parseSuite();
     if (!suite)
     {
-        return tl::unexpected{std::move(suite).error()};
+        return std::nullopt;
     }
     if (auto finallyKeyword = maybeConsume(TokenType::FinallyKeyword))
     {
         auto finallyColon = expect(TokenType::Colon);
         if (!finallyColon)
         {
-            return tl::unexpected{std::move(finallyColon).error()};
+            return std::nullopt;
         }
         auto finallySuite = parseSuite();
         if (!finallySuite)
         {
-            return tl::unexpected{std::move(finallySuite).error()};
+            return std::nullopt;
         }
         return Syntax::TryStmt{{},
                                *tryKeyword,
@@ -513,21 +508,20 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         auto exceptKeyword = expect(TokenType::ExceptKeyword);
         if (!exceptKeyword)
         {
-            return tl::unexpected{std::move(exceptKeyword).error()};
+            return std::nullopt;
         }
         if (catchAll)
         {
-            return tl::unexpected{
-                createError(catchAll->exceptKeyword, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
-                    .addLabel(catchAll->exceptKeyword, Diag::flags::bold)
-                    .emit()};
+            createError(catchAll->exceptKeyword, Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST)
+                .addLabel(catchAll->exceptKeyword, Diag::flags::bold);
+            return std::nullopt;
         }
         if (auto exceptColon = maybeConsume(TokenType::Colon))
         {
             auto exceptSuite = parseSuite();
             if (!exceptSuite)
             {
-                return tl::unexpected{std::move(exceptSuite).error()};
+                return std::nullopt;
             }
             catchAll = {*exceptKeyword, *exceptColon, std::make_unique<Syntax::Suite>(std::move(*exceptSuite))};
             continue;
@@ -535,7 +529,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         auto expression = parseExpression();
         if (!expression)
         {
-            return tl::unexpected{std::move(expression).error()};
+            return std::nullopt;
         }
         std::optional<IdentifierToken> name;
         if (maybeConsume(TokenType::AsKeyword))
@@ -543,7 +537,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
             auto id = expect(TokenType::Identifier);
             if (!id)
             {
-                return tl::unexpected{std::move(id).error()};
+                return std::nullopt;
             }
             addToNamespace(*id);
             name.emplace(std::move(*id));
@@ -551,12 +545,12 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         auto exceptColon = expect(TokenType::Colon);
         if (!exceptColon)
         {
-            return tl::unexpected{std::move(exceptColon).error()};
+            return std::nullopt;
         }
         auto exceptSuite = parseSuite();
         if (!exceptSuite)
         {
-            return tl::unexpected{std::move(exceptSuite).error()};
+            return std::nullopt;
         }
         exceptSections.push_back({*exceptKeyword, std::move(*expression), std::move(name), *exceptColon,
                                   std::make_unique<Syntax::Suite>(std::move(*exceptSuite))});
@@ -568,7 +562,7 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         auto parsedElse = parseElse();
         if (!parsedElse)
         {
-            return tl::unexpected{std::move(parsedElse).error()};
+            return std::nullopt;
         }
         elseSection = std::move(*parsedElse);
     }
@@ -579,12 +573,12 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
         auto finallyColon = expect(TokenType::Colon);
         if (!finallyColon)
         {
-            return tl::unexpected{std::move(finallyColon).error()};
+            return std::nullopt;
         }
         auto finallySuite = parseSuite();
         if (!finallySuite)
         {
-            return tl::unexpected{std::move(finallySuite).error()};
+            return std::nullopt;
         }
         finally = Syntax::TryStmt::Finally{*finallyKeyword, *finallyColon,
                                            std::make_unique<Syntax::Suite>(std::move(*finallySuite))};
@@ -599,12 +593,12 @@ tl::expected<pylir::Syntax::TryStmt, std::string> pylir::Parser::parseTryStmt()
                            std::move(finally)};
 }
 
-tl::expected<pylir::Syntax::WithStmt, std::string> pylir::Parser::parseWithStmt()
+std::optional<pylir::Syntax::WithStmt> pylir::Parser::parseWithStmt()
 {
     auto withKeyword = expect(TokenType::WithKeyword);
     if (!withKeyword)
     {
-        return tl::unexpected{std::move(withKeyword).error()};
+        return std::nullopt;
     }
 
     std::vector<Syntax::WithStmt::WithItem> withItems;
@@ -613,7 +607,7 @@ tl::expected<pylir::Syntax::WithStmt, std::string> pylir::Parser::parseWithStmt(
         auto expression = parseExpression();
         if (!expression)
         {
-            return tl::unexpected{std::move(expression).error()};
+            return std::nullopt;
         }
         IntrVarPtr<Syntax::Target> name;
         if (auto asKeyword = maybeConsume(TokenType::AsKeyword))
@@ -621,7 +615,7 @@ tl::expected<pylir::Syntax::WithStmt, std::string> pylir::Parser::parseWithStmt(
             auto target = parseTarget(*asKeyword);
             if (!target)
             {
-                return tl::unexpected{std::move(target).error()};
+                return std::nullopt;
             }
             name = std::move(*target);
         }
@@ -631,19 +625,19 @@ tl::expected<pylir::Syntax::WithStmt, std::string> pylir::Parser::parseWithStmt(
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     auto suite = parseSuite();
     if (!suite)
     {
-        return tl::unexpected{std::move(suite).error()};
+        return std::nullopt;
     }
     return Syntax::WithStmt{{},           std::nullopt,
                             *withKeyword, std::move(withItems),
                             *colon,       std::make_unique<Syntax::Suite>(std::move(*suite))};
 }
 
-tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
+std::optional<pylir::Syntax::Suite> pylir::Parser::parseSuite()
 {
     decltype(Syntax::Suite::statements) statements;
     if (maybeConsume(TokenType::Newline))
@@ -659,7 +653,7 @@ tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
             auto statement = parseStatement();
             if (!statement)
             {
-                return tl::unexpected{std::move(statement).error()};
+                return std::nullopt;
             }
             statements.insert(statements.end(), std::move_iterator(statement->begin()),
                               std::move_iterator(statement->end()));
@@ -667,7 +661,7 @@ tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
         auto dedent = expect(TokenType::Dedent);
         if (!dedent)
         {
-            return tl::unexpected{std::move(dedent).error()};
+            return std::nullopt;
         }
         return Syntax::Suite{std::move(statements)};
     }
@@ -675,19 +669,19 @@ tl::expected<pylir::Syntax::Suite, std::string> pylir::Parser::parseSuite()
     auto statementList = parseStmtList();
     if (!statementList)
     {
-        return tl::unexpected{std::move(statementList).error()};
+        return std::nullopt;
     }
     auto newline = expect(TokenType::Newline);
     if (!newline)
     {
-        return tl::unexpected{std::move(newline).error()};
+        return std::nullopt;
     }
     statements.insert(statements.end(), std::move_iterator(statementList->begin()),
                       std::move_iterator(statementList->end()));
     return Syntax::Suite{std::move(statements)};
 }
 
-tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::parseParameterList()
+std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParameterList()
 {
     std::vector<pylir::Syntax::Parameter> parameters;
     Syntax::Parameter::Kind currentKind = Syntax::Parameter::Normal;
@@ -713,10 +707,9 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
             {
                 if (parameters.empty())
                 {
-                    return tl::unexpected{
-                        createError(*m_current, Diag::AT_LEAST_ONE_PARAMETER_REQUIRED_BEFORE_POSITIONAL_ONLY_INDICATOR)
-                            .addLabel(*m_current)
-                            .emit()};
+                    createError(*m_current, Diag::AT_LEAST_ONE_PARAMETER_REQUIRED_BEFORE_POSITIONAL_ONLY_INDICATOR)
+                        .addLabel(*m_current);
+                    return std::nullopt;
                 }
                 if (!seenPositionalOnly)
                 {
@@ -727,11 +720,11 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
                     }
                     continue;
                 }
-                return tl::unexpected{createError(*m_current, Diag::POSITIONAL_ONLY_INDICATOR_MAY_ONLY_APPEAR_ONCE)
-                        .addLabel(*m_current)
-                        .addNote(*seenPositionalOnly, Diag::PREVIOUS_OCCURRENCE_HERE)
-                        .addLabel(*seenPositionalOnly)
-                        .emit()};
+                createError(*m_current, Diag::POSITIONAL_ONLY_INDICATOR_MAY_ONLY_APPEAR_ONCE)
+                    .addLabel(*m_current)
+                    .addNote(*seenPositionalOnly, Diag::PREVIOUS_OCCURRENCE_HERE)
+                    .addLabel(*seenPositionalOnly);
+                return std::nullopt;
             }
             case TokenType::Star:
                 stars = *m_current++;
@@ -757,7 +750,7 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
         auto identifier = expect(TokenType::Identifier);
         if (!identifier)
         {
-            return tl::unexpected{std::move(identifier).error()};
+            return std::nullopt;
         }
 
         IntrVarPtr<Syntax::Expression> maybeType;
@@ -767,7 +760,7 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
             auto type = parseExpression();
             if (!type)
             {
-                return tl::unexpected{std::move(type).error()};
+                return std::nullopt;
             }
             maybeType = std::move(*type);
         }
@@ -776,21 +769,20 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
             auto defaultVal = parseExpression();
             if (!defaultVal)
             {
-                return tl::unexpected{std::move(defaultVal).error()};
+                return std::nullopt;
             }
             maybeDefault = std::move(*defaultVal);
         }
         if (!maybeDefault && seenDefaultParam)
         {
-            return tl::unexpected{
-                createError(*identifier,
-                            Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
-                            pylir::get<std::string>(identifier->getValue()))
-                    .addLabel(*identifier)
-                    .addNote(parameters[*seenDefaultParam], Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
-                             parameters[*seenDefaultParam].name.getValue())
-                    .addLabel(parameters[*seenDefaultParam])
-                    .emit()};
+            createError(*identifier,
+                        Diag::NO_DEFAULT_ARGUMENT_FOR_PARAMETER_N_FOLLOWING_PARAMETERS_WITH_DEFAULT_ARGUMENTS,
+                        pylir::get<std::string>(identifier->getValue()))
+                .addLabel(*identifier)
+                .addNote(parameters[*seenDefaultParam], Diag::PARAMETER_N_WITH_DEFAULT_ARGUMENT_HERE,
+                         parameters[*seenDefaultParam].name.getValue())
+                .addLabel(parameters[*seenDefaultParam]);
+            return std::nullopt;
         }
         if (maybeDefault)
         {
@@ -798,14 +790,13 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
         }
         if (seenKwRest)
         {
-            return tl::unexpected{
-                createError(*identifier, Diag::NO_MORE_PARAMETERS_ALLOWED_AFTER_EXCESS_KEYWORD_PARAMETER_N,
-                            pylir::get<std::string>(identifier->getValue()), parameters[*seenKwRest].name.getValue())
-                    .addLabel(*identifier)
-                    .addNote(parameters[*seenKwRest], Diag::EXCESS_KEYWORD_PARAMETER_N_HERE,
-                             parameters[*seenKwRest].name.getValue())
-                    .addLabel(parameters[*seenKwRest])
-                    .emit()};
+            createError(*identifier, Diag::NO_MORE_PARAMETERS_ALLOWED_AFTER_EXCESS_KEYWORD_PARAMETER_N,
+                        pylir::get<std::string>(identifier->getValue()), parameters[*seenKwRest].name.getValue())
+                .addLabel(*identifier)
+                .addNote(parameters[*seenKwRest], Diag::EXCESS_KEYWORD_PARAMETER_N_HERE,
+                         parameters[*seenKwRest].name.getValue())
+                .addLabel(parameters[*seenKwRest]);
+            return std::nullopt;
         }
 
         if (!stars)
@@ -819,21 +810,19 @@ tl::expected<std::vector<pylir::Syntax::Parameter>, std::string> pylir::Parser::
         {
             if (auto* token = std::get_if<BaseToken>(&seenPosRest))
             {
-                return tl::unexpected{
-                    createError(*identifier, Diag::STARRED_PARAMETER_NOT_ALLOWED_AFTER_KEYWORD_ONLY_INDICATOR)
-                                          .addLabel(*identifier)
-                                          .addNote(*token, Diag::KEYWORD_ONLY_INDICATOR_HERE)
-                                          .addLabel(*token)
-                                          .emit()};
+                createError(*identifier, Diag::STARRED_PARAMETER_NOT_ALLOWED_AFTER_KEYWORD_ONLY_INDICATOR)
+                    .addLabel(*identifier)
+                    .addNote(*token, Diag::KEYWORD_ONLY_INDICATOR_HERE)
+                    .addLabel(*token);
+                return std::nullopt;
             }
             if (auto* index = std::get_if<std::size_t>(&seenPosRest))
             {
-                return tl::unexpected{
-                    createError(*identifier, Diag::ONLY_ONE_STARRED_PARAMETER_ALLOWED)
-                        .addLabel(*identifier)
-                        .addNote(parameters[*index], Diag::STARRED_PARAMETER_N_HERE, parameters[*index].name.getValue())
-                        .addLabel(parameters[*index])
-                        .emit()};
+                createError(*identifier, Diag::ONLY_ONE_STARRED_PARAMETER_ALLOWED)
+                    .addLabel(*identifier)
+                    .addNote(parameters[*index], Diag::STARRED_PARAMETER_N_HERE, parameters[*index].name.getValue())
+                    .addLabel(parameters[*index]);
+                return std::nullopt;
             }
 
             seenPosRest = parameters.size();
@@ -856,11 +845,6 @@ class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
     template <class T>
     void finishNamespace(T& def)
     {
-        if (error)
-        {
-            return;
-        }
-
         for (auto& [id, kind] : def.scope.identifiers)
         {
             switch (kind)
@@ -871,7 +855,7 @@ class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
                                      [&id = id](const pylir::Syntax::Scope* scope) -> bool
                                      { return scope->identifiers.count(id); }))
                     {
-                        error = onError(id);
+                        onError(id);
                         break;
                     }
                     break;
@@ -940,14 +924,11 @@ class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
 
     pylir::Syntax::Scope* maybeTopLevelFunction;
     std::vector<const pylir::Syntax::Scope*> scopes;
-    std::function<std::string(const pylir::IdentifierToken&)> onError;
+    std::function<void(const pylir::IdentifierToken&)> onError;
     std::variant<std::monostate, pylir::Syntax::FuncDef*, pylir::Syntax::ClassDef*> parentDef;
 
 public:
-    std::optional<std::string> error;
-
-    NamespaceVisitor(pylir::Syntax::Scope* maybeScope,
-                     std::function<std::string(const pylir::IdentifierToken&)>&& onError)
+    NamespaceVisitor(pylir::Syntax::Scope* maybeScope, std::function<void(const pylir::IdentifierToken&)>&& onError)
         : maybeTopLevelFunction(maybeScope), onError(std::move(onError))
     {
         if (maybeScope)
@@ -988,42 +969,32 @@ public:
 
 } // namespace
 
-tl::expected<void, std::string> pylir::Parser::finishNamespace(Syntax::Suite& suite, Syntax::Scope* maybeScope) const
+void pylir::Parser::finishNamespace(Syntax::Suite& suite, Syntax::Scope* maybeScope) const
 {
-    NamespaceVisitor visitor(maybeScope,
-                             [&](const IdentifierToken& token)
-                             {
-                                 return createError(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES,
-                                                    token.getValue())
-                                     .addLabel(token)
-                                     .emit();
-                             });
+    NamespaceVisitor visitor(
+        maybeScope, [&](const IdentifierToken& token)
+        { createError(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, token.getValue()).addLabel(token); });
     visitor.visit(suite);
-    if (visitor.error)
-    {
-        return tl::unexpected{std::move(*visitor.error)};
-    }
-    return {};
 }
 
-tl::expected<pylir::Syntax::FuncDef, std::string>
-    pylir::Parser::parseFuncDef(std::vector<Syntax::Decorator>&& decorators, std::optional<BaseToken>&& asyncKeyword)
+std::optional<pylir::Syntax::FuncDef> pylir::Parser::parseFuncDef(std::vector<Syntax::Decorator>&& decorators,
+                                                                  std::optional<BaseToken>&& asyncKeyword)
 {
     auto defKeyword = expect(TokenType::DefKeyword);
     if (!defKeyword)
     {
-        return tl::unexpected{std::move(defKeyword).error()};
+        return std::nullopt;
     }
     auto funcName = expect(TokenType::Identifier);
     if (!funcName)
     {
-        return tl::unexpected{std::move(funcName).error()};
+        return std::nullopt;
     }
     addToNamespace(*funcName);
     auto openParenth = expect(TokenType::OpenParentheses);
     if (!openParenth)
     {
-        return tl::unexpected{std::move(openParenth).error()};
+        return std::nullopt;
     }
     std::vector<Syntax::Parameter> parameterList;
     if (peekedIsNot(TokenType::CloseParentheses))
@@ -1031,14 +1002,14 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
         auto parsedParameterList = parseParameterList();
         if (!parsedParameterList)
         {
-            return tl::unexpected{std::move(parsedParameterList).error()};
+            return std::nullopt;
         }
         parameterList = std::move(*parsedParameterList);
     }
     auto closeParenth = expect(TokenType::CloseParentheses);
     if (!closeParenth)
     {
-        return tl::unexpected{std::move(closeParenth).error()};
+        return std::nullopt;
     }
     IntrVarPtr<Syntax::Expression> suffix;
     if (maybeConsume(TokenType::Arrow))
@@ -1046,14 +1017,14 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
         auto expression = parseExpression();
         if (!expression)
         {
-            return tl::unexpected{std::move(expression).error()};
+            return std::nullopt;
         }
         suffix = std::move(*expression);
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     m_namespace.emplace_back();
     std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
@@ -1071,7 +1042,7 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
     auto suite = parseSuite();
     if (!suite)
     {
-        return tl::unexpected{std::move(suite).error()};
+        return std::nullopt;
     }
 
     auto scope = std::move(m_namespace.back());
@@ -1087,16 +1058,9 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
             {
                 continue;
             }
-            return tl::unexpected{createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
-                    .addLabel(iter)
-                    .emit()};
+            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addLabel(iter);
         }
-
-        auto error = finishNamespace(*suite, &scope);
-        if (!error)
-        {
-            return tl::unexpected{std::move(error.error())};
-        }
+        finishNamespace(*suite, &scope);
     }
 
     return Syntax::FuncDef{{},
@@ -1113,18 +1077,17 @@ tl::expected<pylir::Syntax::FuncDef, std::string>
                            std::move(scope)};
 }
 
-tl::expected<pylir::Syntax::ClassDef, std::string>
-    pylir::Parser::parseClassDef(std::vector<Syntax::Decorator>&& decorators)
+std::optional<pylir::Syntax::ClassDef> pylir::Parser::parseClassDef(std::vector<Syntax::Decorator>&& decorators)
 {
     auto classKeyword = expect(TokenType::ClassKeyword);
     if (!classKeyword)
     {
-        return tl::unexpected{std::move(classKeyword).error()};
+        return std::nullopt;
     }
     auto className = expect(TokenType::Identifier);
     if (!className)
     {
-        return tl::unexpected{std::move(className).error()};
+        return std::nullopt;
     }
     addToNamespace(*className);
     std::optional<Syntax::ClassDef::Inheritance> inheritance;
@@ -1136,21 +1099,21 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
             auto parsedArgumentList = parseArgumentList();
             if (!parsedArgumentList)
             {
-                return tl::unexpected{std::move(parsedArgumentList).error()};
+                return std::nullopt;
             }
             argumentList = std::move(*parsedArgumentList);
         }
         auto close = expect(TokenType::CloseParentheses);
         if (!close)
         {
-            return tl::unexpected{std::move(close).error()};
+            return std::nullopt;
         }
         inheritance = Syntax::ClassDef::Inheritance{*open, std::move(argumentList), *close};
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     m_namespace.emplace_back();
     std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
@@ -1161,7 +1124,7 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
     auto suite = parseSuite();
     if (!suite)
     {
-        return tl::unexpected{std::move(suite).error()};
+        return std::nullopt;
     }
 
     auto scope = std::move(m_namespace.back());
@@ -1174,14 +1137,9 @@ tl::expected<pylir::Syntax::ClassDef, std::string>
             {
                 continue;
             }
-            return tl::unexpected{createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue())
-                    .addLabel(iter)
-                    .emit()};
+            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addLabel(iter);
         }
-        if (auto error = finishNamespace(*suite); !error)
-        {
-            return tl::unexpected{std::move(error.error())};
-        }
+        finishNamespace(*suite);
     }
     return Syntax::ClassDef{{},
                             std::move(decorators),

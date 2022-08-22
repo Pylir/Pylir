@@ -145,7 +145,7 @@ std::optional<std::string> findClangResourceDir(const llvm::Triple& triple, llvm
 
 } // namespace
 
-bool pylir::MinGWToolchain::link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const
+bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
     std::vector<std::string> arguments;

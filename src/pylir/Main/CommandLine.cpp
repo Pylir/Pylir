@@ -39,13 +39,13 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 
 pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(InfoTable) {}
 
-pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv)
-    : m_saver(m_allocator),
+pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv,
+                                     pylir::Diag::DiagnosticsManager& diagnosticsManager)
+    : m_locLessDM(diagnosticsManager.createSubDiagnosticManager()),
+      m_saver(m_allocator),
       m_args(m_table.parseArgs(argc, argv, OPT_UNKNOWN, m_saver,
-                               [this](llvm::StringRef msg)
-                               {
-                                   m_errorsOccurred = true;
-                                   llvm::errs() << pylir::Diag::formatLine(pylir::Diag::Severity::Error, msg);
+                               [this](llvm::StringRef msg) {
+                                   Diag::DiagnosticsBuilder(m_locLessDM, Diag::Severity::Error, std::string_view{msg});
                                })),
       m_exe(std::move(exe)),
       m_rendered(
@@ -61,7 +61,8 @@ pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv)
               }
               return rendered;
           }(),
-          "<command-line>")
+          "<command-line>"),
+      m_commandLineDM(diagnosticsManager.createSubDiagnosticManager(m_rendered, this))
 {
 }
 

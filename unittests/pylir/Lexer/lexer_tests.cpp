@@ -9,34 +9,33 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Lexer/Lexer.hpp>
 
-#include <iostream>
-
 #include <fmt/format.h>
 
-#define LEXER_EMITS(source, ...)                                              \
-    [](std::string str)                                                       \
-    {                                                                         \
-        pylir::Diag::Document document(std::move(str));                       \
-        pylir::Lexer lexer(document);                                         \
-        for (auto& token : lexer)                                             \
-        {                                                                     \
-            if (token.getTokenType() == pylir::TokenType::SyntaxError)        \
-            {                                                                 \
-                auto& error = std::get<std::string>(token.getValue());        \
-                std::cerr << error;                                           \
-                CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__))); \
-                return;                                                       \
-            }                                                                 \
-        }                                                                     \
-        FAIL("No error emitted");                                             \
+#define LEXER_EMITS(source, ...)                                        \
+    [](std::string str)                                                 \
+    {                                                                   \
+        std::string error;                                              \
+        pylir::Diag::DiagnosticsManager manager(                        \
+            [&error](pylir::Diag::DiagnosticsBuilderBase&& base)        \
+            {                                                           \
+                llvm::errs() << base;                                   \
+                llvm::raw_string_ostream(error) << base;                \
+            });                                                         \
+        pylir::Diag::Document document(std::move(str));                 \
+        auto docManager = manager.createSubDiagnosticManager(document); \
+        pylir::Lexer lexer(docManager);                                 \
+        std::for_each(lexer.begin(), lexer.end(), [](auto&&) {});       \
+        CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__)));   \
     }(source)
 
 TEST_CASE("Lex comments", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Comment to end of line")
     {
         pylir::Diag::Document document("# comment\n");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         auto& token = result.front();
@@ -47,7 +46,8 @@ TEST_CASE("Lex comments", "[Lexer]")
     SECTION("Comment to end of file")
     {
         pylir::Diag::Document document("# comment");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         auto& token = result.front();
@@ -59,13 +59,15 @@ TEST_CASE("Lex comments", "[Lexer]")
 
 TEST_CASE("Lex newlines", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Variations")
     {
         pylir::Diag::Document document("Windows\r\n"
                                        "Unix\n"
                                        "OldMac\r"
                                        "");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 7);
         CHECK(result[0].getTokenType() == pylir::TokenType::Identifier);
@@ -90,7 +92,8 @@ TEST_CASE("Lex newlines", "[Lexer]")
     SECTION("Implicit continuation")
     {
         pylir::Diag::Document document("(\n5\n)");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const auto& token) { return token.getTokenType(); });
@@ -104,11 +107,13 @@ TEST_CASE("Lex newlines", "[Lexer]")
 
 TEST_CASE("Lex line continuation", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Correct")
     {
         pylir::Diag::Document document("\\\n"
                                        "");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 1);
         CHECK(result.front().getOffset() == 2); // It should be the EOF newline, not the one after the backslash
@@ -123,10 +128,12 @@ TEST_CASE("Lex line continuation", "[Lexer]")
 
 TEST_CASE("Lex identifiers", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Unicode")
     {
         pylir::Diag::Document document("株式会社");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
@@ -138,7 +145,8 @@ TEST_CASE("Lex identifiers", "[Lexer]")
     SECTION("Normalized")
     {
         pylir::Diag::Document document("ＫＡＤＯＫＡＷＡ");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& identifier = result[0];
@@ -151,9 +159,11 @@ TEST_CASE("Lex identifiers", "[Lexer]")
 
 TEST_CASE("Lex keywords", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     pylir::Diag::Document document(
         "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield");
-    pylir::Lexer lexer(document);
+    auto docManager = manager.createSubDiagnosticManager(document);
+    pylir::Lexer lexer(docManager);
     std::vector<pylir::TokenType> result;
     std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                    [](const pylir::Token& token) { return token.getTokenType(); });
@@ -175,12 +185,14 @@ TEST_CASE("Lex keywords", "[Lexer]")
 
 TEST_CASE("Lex string literals", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Normal")
     {
         SECTION("Quote")
         {
             pylir::Diag::Document document("'a text'");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -192,7 +204,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Double quote")
         {
             pylir::Diag::Document document("\"a text\"");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -204,7 +217,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Triple quote")
         {
             pylir::Diag::Document document("'''a text'''");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -216,7 +230,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Triple double quote")
         {
             pylir::Diag::Document document(R"("""a text""")");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -233,7 +248,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         pylir::Diag::Document document("'''\n"
                                        "a text\n"
                                        "'''");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::Token> result(lexer.begin(), lexer.end());
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
@@ -246,7 +262,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
     SECTION("Simple escapes")
     {
         pylir::Diag::Document document(R"('\\\'\"\a\b\f\n\r\t\v\newline')");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::Token> result(lexer.begin(), lexer.end());
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
@@ -258,7 +275,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
     SECTION("Unicode name")
     {
         pylir::Diag::Document document("'\\N{Man in Business Suit Levitating}'");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::Token> result(lexer.begin(), lexer.end());
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
@@ -272,7 +290,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
     SECTION("Hex characters")
     {
         pylir::Diag::Document document("'\\xA7'");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::Token> result(lexer.begin(), lexer.end());
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
@@ -284,7 +303,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
     SECTION("Octal characters")
     {
         pylir::Diag::Document document("'\\247'");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::Token> result(lexer.begin(), lexer.end());
         REQUIRE_FALSE(result.empty());
         auto& first = result[0];
@@ -298,7 +318,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Small")
         {
             pylir::Diag::Document document("'\\u00A7'");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -310,7 +331,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Big")
         {
             pylir::Diag::Document document("'\\U0001F574'");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -327,7 +349,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Immediately before")
         {
             pylir::Diag::Document document(R"(r'\\\"\a\b\f\n\r\t\v\newline\u343\N')");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -339,7 +362,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Not immediately before")
         {
             pylir::Diag::Document document("r '\\n'");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE(result.size() >= 2);
             auto& first = result[0];
@@ -359,7 +383,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Normal")
         {
             pylir::Diag::Document document("b'\\xC2\\xA7'");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -371,7 +396,8 @@ TEST_CASE("Lex string literals", "[Lexer]")
         SECTION("Raw")
         {
             pylir::Diag::Document document("rb'\\xC2\\xA7'");
-            pylir::Lexer lexer(document);
+            auto docManager = manager.createSubDiagnosticManager(document);
+            pylir::Lexer lexer(docManager);
             std::vector<pylir::Token> result(lexer.begin(), lexer.end());
             REQUIRE_FALSE(result.empty());
             auto& first = result[0];
@@ -388,10 +414,12 @@ TEST_CASE("Lex string literals", "[Lexer]")
 
 TEST_CASE("Lex integers", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Decimal")
     {
         pylir::Diag::Document document("30");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -403,7 +431,8 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Binary")
     {
         pylir::Diag::Document document("0b10");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -415,7 +444,8 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Octal")
     {
         pylir::Diag::Document document("0o30");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -427,7 +457,8 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Hex")
     {
         pylir::Diag::Document document("0x30");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -439,7 +470,8 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Underline")
     {
         pylir::Diag::Document document("0x_3_0");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -452,7 +484,8 @@ TEST_CASE("Lex integers", "[Lexer]")
     SECTION("Null")
     {
         pylir::Diag::Document document("0000000000000");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -467,10 +500,12 @@ TEST_CASE("Lex integers", "[Lexer]")
 
 TEST_CASE("Lex floats", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Normal")
     {
         pylir::Diag::Document document("3.14");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -482,7 +517,8 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Trailing dot")
     {
         pylir::Diag::Document document("10.");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -494,7 +530,8 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Leading dot")
     {
         pylir::Diag::Document document(".001");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -506,7 +543,8 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Exponent")
     {
         pylir::Diag::Document document("1e100");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -518,7 +556,8 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Neg exponent")
     {
         pylir::Diag::Document document("3.14e-10");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -530,7 +569,8 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("0")
     {
         pylir::Diag::Document document("0e0");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -542,7 +582,8 @@ TEST_CASE("Lex floats", "[Lexer]")
     SECTION("Underlines")
     {
         pylir::Diag::Document document("3.14_15_93");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -556,10 +597,12 @@ TEST_CASE("Lex floats", "[Lexer]")
 
 TEST_CASE("Lex complex literals", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("Normal")
     {
         pylir::Diag::Document document("3.14j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -571,7 +614,8 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Trailing dot")
     {
         pylir::Diag::Document document("10.j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -583,7 +627,8 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Integer")
     {
         pylir::Diag::Document document("10j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -595,7 +640,8 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Leading dot")
     {
         pylir::Diag::Document document(".001j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -607,7 +653,8 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Exponent")
     {
         pylir::Diag::Document document("1e100j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -619,7 +666,8 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Neg exponent")
     {
         pylir::Diag::Document document("3.14e-10j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -631,7 +679,8 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("0")
     {
         pylir::Diag::Document document("0e0j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -643,7 +692,8 @@ TEST_CASE("Lex complex literals", "[Lexer]")
     SECTION("Underlines")
     {
         pylir::Diag::Document document("3.14_15_93j");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector result(lexer.begin(), lexer.end());
         REQUIRE(result.size() == 2);
         auto& number = result[0];
@@ -656,9 +706,11 @@ TEST_CASE("Lex complex literals", "[Lexer]")
 
 TEST_CASE("Lex operators and delimiters", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     pylir::Diag::Document document(
         "+ - * ** / // % @ << >> & | ^ ~ := < > <= >= == != ( ) [ ] { } , : . ; @ = -> += -= *= /= //= %= @= &= |= ^= >>= <<= **=");
-    pylir::Lexer lexer(document);
+    auto docManager = manager.createSubDiagnosticManager(document);
+    pylir::Lexer lexer(docManager);
     std::vector<pylir::TokenType> result;
     std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                    [](const pylir::Token& token) { return token.getTokenType(); });
@@ -716,11 +768,13 @@ TEST_CASE("Lex operators and delimiters", "[Lexer]")
 
 TEST_CASE("Lex indentation", "[Lexer]")
 {
+    pylir::Diag::DiagnosticsManager manager;
     SECTION("EOF")
     {
         pylir::Diag::Document document("foo\n"
                                        "    bar");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -737,7 +791,8 @@ TEST_CASE("Lex indentation", "[Lexer]")
         pylir::Diag::Document document("foo\n"
                                        "    bar\n"
                                        "foobar");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -756,7 +811,8 @@ TEST_CASE("Lex indentation", "[Lexer]")
         pylir::Diag::Document document("foo\n"
                                        "    bar\n"
                                        "    foobar");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -776,7 +832,8 @@ TEST_CASE("Lex indentation", "[Lexer]")
                                        "    bar\n"
                                        " \tfoobar\n"
                                        "        barfoo");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -799,7 +856,8 @@ TEST_CASE("Lex indentation", "[Lexer]")
         pylir::Diag::Document document("foo\n"
                                        "\tbar\n"
                                        "\tfoobar");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -823,7 +881,8 @@ TEST_CASE("Lex indentation", "[Lexer]")
                                        "# a comment\n"
                                        "3\n"
                                        "]");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -844,7 +903,8 @@ TEST_CASE("Lex indentation", "[Lexer]")
         pylir::Diag::Document document("class bool(int):\n"
                                        "\n"
                                        "\tpass");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -866,7 +926,8 @@ TEST_CASE("Lex indentation", "[Lexer]")
         pylir::Diag::Document document("[\n"
                                        "\t3\n"
                                        "]");
-        pylir::Lexer lexer(document);
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
         std::vector<pylir::TokenType> result;
         std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                        [](const pylir::Token& token) { return token.getTokenType(); });
@@ -890,16 +951,11 @@ namespace
 {
 void lex(std::string_view source)
 {
+    pylir::Diag::DiagnosticsManager manager;
     pylir::Diag::Document document(std::string{source});
-    pylir::Lexer lexer(document);
-    std::for_each(lexer.begin(), lexer.end(),
-                  [](const pylir::Token& token)
-                  {
-                      if (token.getTokenType() == pylir::TokenType::SyntaxError)
-                      {
-                          std::cerr << pylir::get<std::string>(token.getValue());
-                      }
-                  });
+    auto docManager = manager.createSubDiagnosticManager(document);
+    pylir::Lexer lexer(docManager);
+    std::for_each(lexer.begin(), lexer.end(), [](auto&&) {});
 }
 } // namespace
 

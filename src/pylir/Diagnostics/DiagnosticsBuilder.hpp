@@ -6,11 +6,14 @@
 
 #pragma once
 
+#include <llvm/Support/raw_ostream.h>
+
 #include <variant>
 
 #include <fmt/color.h>
 #include <fmt/format.h>
 
+#include "DiagnosticsManager.hpp"
 #include "Document.hpp"
 #include "LocationProvider.hpp"
 
@@ -173,27 +176,18 @@ enum class Severity
     Note
 };
 
-/// Class used to build a compiler diagnostic. It makes use of the builder pattern to be able to conveniently chain
-/// a series of method calls, modifying the result. The final diagnostic can then be converted to a std::string via
-/// 'emit'.
-///
-/// While building, the diagnostic consists of the initial header message set in the constructor, its severity and
-/// is then followed by output of source code. The printing of the source code can further be customized via calls to
-/// 'addLabel' which allow to underline, colour, label as well as modify the character style used to print portions of
-/// the source code. The source code to be printed is determined via the locations passed to the constructor as well as
-/// any locations passed to 'addLabel'.
-///
-/// Following the initial diagnostic, one can also attach additional notes via 'addNote'. These follow the same
-/// formatting as errors and warnings described above. 'addLabel' calls always affect the last diagnostic added,
-/// including notes.
-class DiagnosticsBuilder
+/// Base class for 'DiagnosticsBuilder' containing data and methods that are independent of the diagnostics manager
+/// used.
+class DiagnosticsBuilderBase
 {
+    llvm::raw_ostream& (*m_emitFn)(llvm::raw_ostream&, const DiagnosticsBuilderBase&);
+
 public:
     constexpr static auto ERROR_COLOUR = fmt::color::red;
     constexpr static auto WARNING_COLOUR = fmt::color::magenta;
     constexpr static auto NOTE_COLOUR = fmt::color::cyan;
 
-private:
+protected:
     struct Label
     {
         std::size_t start;
@@ -206,19 +200,62 @@ private:
     struct Message
     {
         Severity severity;
-        const Document* document;
         std::size_t location;
         std::string message;
         std::vector<Label> labels;
     };
     std::vector<Message> m_messages;
-    const void* m_context{};
 
-    static std::string printLine(std::size_t width, std::size_t lineNumber, const pylir::Diag::Document& document,
-                                 std::vector<Label> labels);
+    static void printLine(llvm::raw_ostream& os, std::size_t width, std::size_t lineNumber,
+                          const pylir::Diag::Document& document, std::vector<Label> labels);
 
-    [[nodiscard]] std::string emitMessage(const Message& message) const;
+    void emitMessage(llvm::raw_ostream& os, const Message& message,
+                     Diag::DiagnosticsDocManager* diagnosticDocManager) const;
 
+    template <class T>
+    explicit DiagnosticsBuilderBase(Message&& message, std::in_place_type_t<T>)
+        : m_emitFn(+[](llvm::raw_ostream& os, const DiagnosticsBuilderBase& ptr) -> llvm::raw_ostream&
+                   { return os << static_cast<const T&>(ptr); })
+    {
+        m_messages.push_back(std::move(message));
+    }
+
+public:
+    /// Returns the main message of the diagnostic. This is the message that is initialized in the constructor of
+    /// 'DiagnosticsBuilder' and is the only one that may be a warning or error.
+    [[nodiscard]] const Message& getMainDiagnostic() const
+    {
+        return m_messages.front();
+    }
+
+    /// Outputs this diagnostic to an output stream. Uses ASCII escape for printing colour and emphasis if the output
+    /// stream supports it.
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const DiagnosticsBuilderBase& base)
+    {
+        return base.m_emitFn(os, base);
+    }
+};
+
+/// Class used to build a compiler diagnostic. It makes use of the builder pattern to be able to conveniently chain
+/// a series of method calls, modifying the result. The final diagnostic is the emitted upon destruction.
+///
+/// A diagnostic builder may either be instantiated with a 'DiagnosticsDocManager' in which case it requires the use of
+/// locations into the document for source file location, or with a 'DiagnosticsNoDocManager', in which case it only
+/// supports the output of the messages and severity set in the the constructor and 'addNote'.
+///
+/// While building a diagnostic in a document it consists of the initial header message set in the constructor, its
+/// severity and is then followed by output of source code. The printing of the source code can further be customized
+/// via calls to 'addLabel' which allow to underline, colour, label as well as modify the character style used to print
+/// portions of the source code. The source code to be printed is determined via the locations passed to the constructor
+/// as well as any locations passed to 'addLabel'.
+///
+/// Following the initial diagnostic, one can also attach additional notes via 'addNote'. These follow the same
+/// formatting as errors and warnings described above. 'addLabel' calls always affect the last diagnostic added,
+/// including notes.
+template <class Manager>
+class DiagnosticsBuilder : public DiagnosticsBuilderBase
+{
+    Manager* m_diagnosticManagerBase = nullptr;
     template <class... Args>
     static void verify()
     {
@@ -292,115 +329,165 @@ private:
 
 public:
     /// Creates a new DiagnosticBuilder for a message with the given 'severity' with a diagnostic at 'location' within
-    /// 'document'. 'location' may be any type that can be used as a location via 'rangeLoc'. See its documentation
-    /// for details.
+    /// the document of 'subDiagnosticManager'. 'location' may be any type that can be used as a location via
+    /// 'rangeLoc' with the context in 'subDiagnosticManager'. See its documentation for details.
     ///
     /// The severity specifies the kind of message this diagnostic is producing. This is used as prefix when printing
     /// and for the colours to use as primary and secondary colours.
     /// The actual text message printed is produced via 'message', which may use 'fmt::format' style formatting options
     /// with 'args' as extra arguments.
     template <class T, class S, class... Args>
-    DiagnosticsBuilder(const Document& document, Severity severity, const T& location, const S& message, Args&&... args)
-        : m_messages{Message{severity,
-                             &document,
-                             rangeLoc(location).first,
-                             fmt::format(message, std::forward<Args>(args)...),
-                             {}}}
+    DiagnosticsBuilder(DiagnosticsDocManager& subDiagnosticManager, Severity severity, const T& location,
+                       const S& message, Args&&... args)
+        : DiagnosticsBuilderBase({severity,
+                                  rangeLoc(location, subDiagnosticManager.getContext()).first,
+                                  fmt::format(message, std::forward<Args>(args)...),
+                                  {}},
+                                 std::in_place_type<std::decay_t<decltype(*this)>>),
+          m_diagnosticManagerBase(&subDiagnosticManager)
     {
     }
 
-    /// Same as the previous constructor but with a context parameter used to gather the precise location within the
-    /// document using 'location' and the 'rangeLoc' function. See its documentation for details.
-    template <class T, class S, class... Args>
-    DiagnosticsBuilder(const void* context, const Document& document, Severity severity, const T& location,
-                       const S& message, Args&&... args)
-        : m_messages{Message{severity,
-                             &document,
-                             rangeLoc(location, context).first,
-                             fmt::format(message, std::forward<Args>(args)...),
-                             {}}},
-          m_context(context)
+    /// Creates a new DiagnosticBuilder for a message with the given 'severity'.
+    /// The severity specifies the kind of message this diagnostic is producing. This is used as prefix when printing
+    /// and for the colours to use. The actual text message printed is produced via 'message', which may use
+    /// 'fmt::format' style formatting options with 'args' as extra arguments.
+    template <class S, class... Args>
+    DiagnosticsBuilder(DiagnosticsNoDocManager& subDiagnosticManager, Severity severity, const S& message,
+                       Args&&... args)
+        : DiagnosticsBuilderBase({severity, 0, fmt::format(message, std::forward<Args>(args)...), {}},
+                                 std::in_place_type<std::decay_t<decltype(*this)>>),
+          m_diagnosticManagerBase(&subDiagnosticManager)
     {
+    }
+
+    /// Emits the final diagnostic by reporting it to the 'subDiagnosticManager' it was constructed with.
+    ~DiagnosticsBuilder()
+    {
+        if (!m_diagnosticManagerBase)
+        {
+            return;
+        }
+        m_diagnosticManagerBase->report(std::move(*this));
+    }
+
+    DiagnosticsBuilder(const DiagnosticsBuilder&) = delete;
+    DiagnosticsBuilder& operator=(const DiagnosticsBuilder&) = delete;
+
+    DiagnosticsBuilder(DiagnosticsBuilder&& rhs) noexcept
+        : DiagnosticsBuilderBase(std::move(rhs)),
+          m_diagnosticManagerBase(std::exchange(rhs.m_diagnosticManagerBase, nullptr))
+    {
+    }
+
+    DiagnosticsBuilder& operator=(DiagnosticsBuilder&& rhs) noexcept
+    {
+        *this = static_cast<DiagnosticsBuilderBase&&>(rhs);
+        m_diagnosticManagerBase = std::exchange(rhs.m_diagnosticManagerBase, nullptr);
+        return *this;
     }
 
     /// Adds the effects denoted by the flags to the given source code ranging from 'start' until the very end of 'end'.
-    template <class T, class U, class... Flags>
+    template <class T, class U, class... Flags, class M = Manager>
     auto addLabel(const T& start, const U& end, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>
-                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
-                            DiagnosticsBuilder&>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
+                                && std::is_same_v<M, DiagnosticsDocManager>,
+                            DiagnosticsBuilder&&>
     {
         verify<Flags...>();
-        m_messages.back().labels.push_back({rangeLoc(start, m_context).first, rangeLoc(end, m_context).second,
+        m_messages.back().labels.push_back({rangeLoc(start, m_diagnosticManagerBase->getContext()).first,
+                                            rangeLoc(end, m_diagnosticManagerBase->getContext()).second,
                                             flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
                                             getColour<Flags...>(), getEmphasis(flags...)});
-        return *this;
+        return std::move(*this);
     }
 
     /// Adds the effects denoted by the flags to the given source code at 'pos'.
-    template <class T, class... Flags>
+    template <class T, class... Flags, class M = Manager>
     auto addLabel(const T& pos, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T>
-                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
-                            DiagnosticsBuilder&>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
+                                && std::is_same_v<M, DiagnosticsDocManager>,
+                            DiagnosticsBuilder&&>
     {
         verify<Flags...>();
-        auto [start, end] = rangeLoc(pos, m_context);
+        auto [start, end] = rangeLoc(pos, m_diagnosticManagerBase->getContext());
         m_messages.back().labels.push_back({start, end,
                                             flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
                                             getColour<Flags...>(), getEmphasis(flags...)});
-        return *this;
+        return std::move(*this);
     }
 
     /// Adds the effects denoted by the flags to the given source code ranging from 'start' until the very end of 'end'.
     /// This overload has an explicit parm for the label as it is a commonly used option.
-    template <class T, class U, class... Flags>
+    template <class T, class U, class... Flags, class M = Manager>
     auto addLabel(const T& start, const U& end, std::string label, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T> && hasLocationProvider_v<U>
-                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
-                            DiagnosticsBuilder&>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
+                                && std::is_same_v<M, DiagnosticsDocManager>,
+                            DiagnosticsBuilder&&>
     {
         return addLabel(start, end, flags::label = std::move(label), std::forward<Flags>(flags)...);
     }
 
     /// Adds the effects denoted by the flags to the given source code at 'pos'.
     /// This overload has an explicit parm for the label as it is a commonly used option.
-    template <class T, class... Flags>
+    template <class T, class... Flags, class M = Manager>
     auto addLabel(const T& pos, std::string label, Flags&&... flags)
         -> std::enable_if_t<hasLocationProvider_v<T>
-                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>,
-                            DiagnosticsBuilder&>
+                                && std::conjunction_v<flags::detail::IsFlag<std::decay_t<Flags>>...>
+                                && std::is_same_v<M, DiagnosticsDocManager>,
+                            DiagnosticsBuilder&&>
     {
         return addLabel(pos, flags::label = std::move(label), std::forward<Flags>(flags)...);
     }
 
     /// Adds a new note to the diagnostic. 'location' as well as 'message' and its 'args' serve the same purpose as in
-    /// the constructor. The 'document' and 'context' parameters from the constructor are additionally used for this
-    /// note as well.
-    template <class T, class S, class... Args>
+    /// the constructor. The document and context are taken from the 'DiagnosticsDocManager' it was initially
+    /// constructed with.
+    template <class T, class S, class... Args, class M = Manager>
     auto addNote(const T& location, const S& message, Args&&... args)
-        -> std::enable_if_t<hasLocationProvider_v<T>, DiagnosticsBuilder&>
+        -> std::enable_if_t<hasLocationProvider_v<T> && std::is_same_v<M, DiagnosticsDocManager>, DiagnosticsBuilder&&>
     {
         m_messages.push_back({Severity::Note,
-                              m_messages.back().document,
-                              rangeLoc(location, m_context).first,
+                              rangeLoc(location, m_diagnosticManagerBase->getContext()).first,
                               fmt::format(message, std::forward<Args>(args)...),
                               {}});
-        return *this;
+        return std::move(*this);
     }
 
-    /// Emits the diagnostic by converting it to a string.
-    [[nodiscard]] std::string emit() const
+    /// Adds a new note to the diagnostic. 'message' and its 'args' serve the same purpose as in
+    /// the constructor.
+    template <class S, class... Args, class M = Manager>
+    auto addNote(const S& message, Args&&... args)
+        -> std::enable_if_t<std::is_same_v<M, DiagnosticsNoDocManager>, DiagnosticsBuilder&&>
     {
-        auto begin = m_messages.begin();
-        std::string result = emitMessage(*begin++);
-        std::for_each(begin, m_messages.end(), [&](auto& message) { result += emitMessage(message); });
-        return result;
+        m_messages.push_back({Severity::Note, 0, fmt::format(message, std::forward<Args>(args)...), {}});
+        return std::move(*this);
+    }
+
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const DiagnosticsBuilder& rhs)
+    {
+        DiagnosticsDocManager* docManager = nullptr;
+        if constexpr (std::is_same_v<Manager, DiagnosticsDocManager>)
+        {
+            docManager = rhs.m_diagnosticManagerBase;
+        }
+        for (auto& iter : rhs.m_messages)
+        {
+            rhs.emitMessage(os, iter, docManager);
+        }
+        return os;
     }
 };
 
-/// Does the header formatting of a diagnostic as done in 'DiagnosticBuilder'. This is simply the prefix as determined
-/// by 'severity' with the given message.
-std::string formatLine(Severity severity, std::string_view message);
+template <class T, class S, class... Args>
+DiagnosticsBuilder(DiagnosticsDocManager&, Severity, const T&, const S&, Args&&...)
+    -> DiagnosticsBuilder<DiagnosticsDocManager>;
+
+template <class S, class... Args>
+DiagnosticsBuilder(DiagnosticsNoDocManager&, Severity, const S&, Args&&...)
+    -> DiagnosticsBuilder<DiagnosticsNoDocManager>;
 
 } // namespace pylir::Diag

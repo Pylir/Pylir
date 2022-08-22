@@ -13,6 +13,7 @@
 #include <llvm/Support/TargetSelect.h>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
+#include <pylir/Diagnostics/DiagnosticsManager.hpp>
 #include <pylir/Main/Opts.inc>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
@@ -73,8 +74,10 @@ int pylir::main(int argc, char** argv)
     pylir::registerTransformPasses();
     pylir::Py::registerTransformPasses();
 
+    pylir::Diag::DiagnosticsManager diagnosticManager;
+
     pylir::cli::CommandLine commandLine(llvm::sys::fs::getMainExecutable(argv[0], reinterpret_cast<void*>(&main)), argc,
-                                        argv);
+                                        argv, diagnosticManager);
     if (!commandLine)
     {
         return -1;
@@ -99,11 +102,10 @@ int pylir::main(int argc, char** argv)
         auto* arg = args.getLastArg(OPT_target_EQ);
         if (!arg)
         {
-            llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error,
-                                                    fmt::format(pylir::Diag::UNSUPPORTED_TARGET_N, triple));
+            commandLine.createError(pylir::Diag::UNSUPPORTED_TARGET_N, triple);
             return -1;
         }
-        llvm::errs() << commandLine.createError(arg, pylir::Diag::UNSUPPORTED_TARGET_N, triple).addLabel(arg).emit();
+        commandLine.createError(arg, pylir::Diag::UNSUPPORTED_TARGET_N, triple).addLabel(arg);
         return -1;
     }
 
@@ -115,12 +117,9 @@ int pylir::main(int argc, char** argv)
 
         auto diagActionWithIR = [&](llvm::opt::Arg* actionArg, std::string_view name)
         {
-            llvm::errs() << commandLine
-                                .createWarning(actionArg, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX,
-                                               name)
-                                .addLabel(actionArg)
-                                .addLabel(syntaxOnly, Diag::flags::secondaryColour)
-                                .emit();
+            commandLine.createWarning(actionArg, pylir::Diag::N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX, name)
+                .addLabel(actionArg)
+                .addLabel(syntaxOnly, Diag::flags::secondaryColour);
         };
 
         if (auto* lastIR = args.getLastArg(OPT_emit_llvm, OPT_emit_mlir, OPT_emit_pylir))
@@ -155,41 +154,38 @@ int pylir::main(int argc, char** argv)
         && (action == pylir::CompilerInvocation::Assembly || action == pylir::CompilerInvocation::ObjectFile)
         && !args.hasArg(OPT_flto, OPT_fno_lto))
     {
-        llvm::errs() << commandLine
-                            .createWarning(opt, pylir::Diag::O4_MAY_ENABLE_LTO_COMPILER_MIGHT_OUTPUT_LLVM_IR,
-                                           action == pylir::CompilerInvocation::Assembly ? "Assembly file" :
-                                                                                           "Object file")
-                            .addLabel(opt)
-                            .emit();
+        commandLine
+            .createWarning(opt, pylir::Diag::O4_MAY_ENABLE_LTO_COMPILER_MIGHT_OUTPUT_LLVM_IR,
+                           action == pylir::CompilerInvocation::Assembly ? "Assembly file" : "Object file")
+            .addLabel(opt);
     }
 
     if (auto* opt = args.getLastArg(OPT_flto, OPT_fno_lto);
         opt && opt->getOption().matches(OPT_flto) && !args.hasArg(OPT_emit_mlir, OPT_emit_pylir, OPT_emit_llvm)
         && (action == pylir::CompilerInvocation::Assembly || action == pylir::CompilerInvocation::ObjectFile))
     {
-        llvm::errs() << commandLine
-                            .createWarning(opt, pylir::Diag::LTO_ENABLED_COMPILER_WILL_OUTPUT_LLVM_IR,
-                                           action == pylir::CompilerInvocation::Assembly ? "Assembly file" :
-                                                                                           "Object file")
-                            .addLabel(opt)
-                            .emit();
+        commandLine
+            .createWarning(opt, pylir::Diag::LTO_ENABLED_COMPILER_WILL_OUTPUT_LLVM_IR,
+                           action == pylir::CompilerInvocation::Assembly ? "Assembly file" : "Object file")
+            .addLabel(opt);
     }
 
     if (args.hasMultipleArgs(OPT_INPUT))
     {
         auto* second = *std::next(args.filtered(OPT_INPUT).begin());
-        llvm::errs()
-            << commandLine.createError(second, pylir::Diag::EXPECTED_ONLY_ONE_INPUT_FILE).addLabel(second).emit();
+        commandLine.createError(second, pylir::Diag::EXPECTED_ONLY_ONE_INPUT_FILE).addLabel(second);
         return -1;
     }
 
     auto* inputFile = args.getLastArg(OPT_INPUT);
     if (!inputFile)
     {
-        llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error, fmt::format(pylir::Diag::NO_INPUT_FILE));
+        commandLine.createError(pylir::Diag::NO_INPUT_FILE);
         return -1;
     }
 
     pylir::CompilerInvocation invocation;
-    return mlir::succeeded(invocation.executeAction(inputFile, commandLine, *toolchain, action)) ? 0 : -1;
+    return mlir::succeeded(invocation.executeAction(inputFile, commandLine, *toolchain, action, diagnosticManager)) ?
+               0 :
+               -1;
 }

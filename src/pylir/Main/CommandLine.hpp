@@ -12,6 +12,7 @@
 #include <llvm/Support/StringSaver.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
+#include <pylir/Diagnostics/DiagnosticsManager.hpp>
 #include <pylir/Diagnostics/Document.hpp>
 
 namespace pylir::cli
@@ -25,23 +26,24 @@ public:
 
 class CommandLine
 {
+    pylir::Diag::DiagnosticsNoDocManager m_locLessDM;
     llvm::BumpPtrAllocator m_allocator;
     llvm::StringSaver m_saver;
     PylirOptTable m_table;
     llvm::opt::InputArgList m_args;
-    bool m_errorsOccurred = false;
     std::string m_exe;
     llvm::DenseMap<llvm::opt::Arg*, std::pair<std::size_t, std::size_t>> m_argRanges;
     pylir::Diag::Document m_rendered;
+    pylir::Diag::DiagnosticsDocManager m_commandLineDM;
 
-    friend struct pylir::Diag::LocationProvider<llvm::opt::Arg*, void>;
+    friend struct pylir::Diag::LocationProvider<llvm::opt::Arg*>;
 
 public:
-    explicit CommandLine(std::string exe, int argc, char** argv);
+    explicit CommandLine(std::string exe, int argc, char** argv, pylir::Diag::DiagnosticsManager& diagnosticsManager);
 
     explicit operator bool() const
     {
-        return !m_errorsOccurred;
+        return !m_locLessDM.errorsOccurred() && !m_commandLineDM.errorsOccurred();
     }
 
     const llvm::opt::InputArgList& getArgs() const
@@ -62,19 +64,30 @@ public:
 
     void printVersion(llvm::raw_ostream& out) const;
 
-    template <class T, class S, class... Args>
-    [[nodiscard]] pylir::Diag::DiagnosticsBuilder createError(const T& location, const S& message, Args&&... args) const
+    template <class T, class S, class... Args, std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+    auto createError(const T& location, const S& message, Args&&... args)
     {
-        return pylir::Diag::DiagnosticsBuilder(this, m_rendered, Diag::Severity::Error, location, message,
-                                               std::forward<Args>(args)...);
+        return Diag::DiagnosticsBuilder(m_commandLineDM, Diag::Severity::Error, location, message,
+                                        std::forward<Args>(args)...);
     }
 
-    template <class T, class S, class... Args>
-    [[nodiscard]] pylir::Diag::DiagnosticsBuilder createWarning(const T& location, const S& message,
-                                                                Args&&... args) const
+    template <class T, class S, class... Args, std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+    auto createWarning(const T& location, const S& message, Args&&... args)
     {
-        return pylir::Diag::DiagnosticsBuilder(this, m_rendered, Diag::Severity::Warning, location, message,
-                                               std::forward<Args>(args)...);
+        return Diag::DiagnosticsBuilder(m_commandLineDM, Diag::Severity::Warning, location, message,
+                                        std::forward<Args>(args)...);
+    }
+
+    template <class S, class... Args>
+    auto createError(const S& message, Args&&... args)
+    {
+        return Diag::DiagnosticsBuilder(m_locLessDM, Diag::Severity::Error, message, std::forward<Args>(args)...);
+    }
+
+    template <class S, class... Args>
+    auto createWarning(const S& message, Args&&... args)
+    {
+        return Diag::DiagnosticsBuilder(m_locLessDM, Diag::Severity::Warning, message, std::forward<Args>(args)...);
     }
 };
 
@@ -91,7 +104,7 @@ enum ID
 namespace pylir::Diag
 {
 template <>
-struct LocationProvider<llvm::opt::Arg*, void>
+struct LocationProvider<llvm::opt::Arg*>
 {
     static std::pair<std::size_t, std::size_t> getRange(llvm::opt::Arg* value, const void* context) noexcept
     {

@@ -146,13 +146,13 @@ const char* getDynamicLinker(const llvm::Triple& triple, const pylir::cli::Comma
 
 pylir::LinuxToolchain::LinuxToolchain(const llvm::Triple& triple, const cli::CommandLine&) : Toolchain(triple) {}
 
-bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const
+bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
     auto gccInstall = findGCCInstallation(m_triple, commandLine);
     if (!gccInstall)
     {
-        llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error, "Failed to find a GCC installation");
+        commandLine.createError("Failed to find a GCC installation");
         return false;
     }
     std::vector<std::string> arguments;
@@ -198,8 +198,7 @@ bool pylir::LinuxToolchain::link(const pylir::cli::CommandLine& commandLine, llv
     const auto* emulation = getEmulation(m_triple, commandLine);
     if (!emulation)
     {
-        llvm::errs() << pylir::Diag::formatLine(Diag::Severity::Error,
-                                                fmt::format("Missing emulation for target '{}'", m_triple.str()));
+        commandLine.createError("Missing emulation for target '{}'", m_triple.str());
         return false;
     }
     arguments.emplace_back("-m");

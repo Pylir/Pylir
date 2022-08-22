@@ -18,9 +18,8 @@
 #include <locale>
 #include <unordered_map>
 
-pylir::Lexer::Lexer(const Diag::Document& document,
-                    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback)
-    : m_document(&document), m_current(m_document->begin()), m_warningCallback(std::move(warningCallback))
+pylir::Lexer::Lexer(Diag::DiagnosticsDocManager& diagManager)
+    : m_current(diagManager.getDocument().begin()), m_diagManager(&diagManager)
 {
 }
 
@@ -313,20 +312,21 @@ bool isBlankLineSoFar(llvm::ArrayRef<pylir::Token> tokens)
 
 bool pylir::Lexer::parseNext()
 {
-    if (m_current == m_document->end())
+    if (m_current == m_diagManager->getDocument().end())
     {
         return false;
     }
     std::size_t startSize = m_tokens.size();
     do
     {
-        const auto *start = m_current;
+        const auto* start = m_current;
         switch (*m_current)
         {
             case U'#':
             {
-                m_current = std::find_if(m_current, m_document->end(), [](char32_t value) { return value == '\n'; });
-                if (m_current == m_document->end())
+                m_current = std::find_if(m_current, m_diagManager->getDocument().end(),
+                                         [](char32_t value) { return value == '\n'; });
+                if (m_current == m_diagManager->getDocument().end())
                 {
                     break;
                 }
@@ -334,7 +334,7 @@ bool pylir::Lexer::parseNext()
                 [[fallthrough]];
             case U'\n':
             {
-                auto offset = m_current - m_document->begin();
+                auto offset = m_current - m_diagManager->getDocument().begin();
                 m_current++;
                 if (m_depth == 0)
                 {
@@ -351,22 +351,22 @@ bool pylir::Lexer::parseNext()
             case U'\\':
             {
                 m_current++;
-                if (m_current == m_document->end())
+                if (m_current == m_diagManager->getDocument().end())
                 {
-                    auto builder = createError(m_current - m_document->begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
-                            .addLabel(m_current - m_document->begin(), "\\n", Diag::flags::insertColour);
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(),
-                                          TokenType::SyntaxError, builder.emit());
+                    createError(m_current - m_diagManager->getDocument().begin(), Diag::UNEXPECTED_EOF_WHILE_PARSING)
+                        .addLabel(m_current - m_diagManager->getDocument().begin(), "\\n", Diag::flags::insertColour);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(),
+                                          m_current - m_diagManager->getDocument().begin(), TokenType::SyntaxError);
                     return true;
                 }
                 if (*m_current != U'\n')
                 {
-                    auto builder = createError(m_current - m_document->begin(),
-                                               Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
-                            .addLabel(m_current - m_document->begin(), "\\n", Diag::flags::insertColour,
-                                      Diag::flags::strikethrough);
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - m_document->begin(),
-                                          TokenType::SyntaxError, builder.emit());
+                    createError(m_current - m_diagManager->getDocument().begin(),
+                                Diag::UNEXPECTED_CHARACTER_AFTER_LINE_CONTINUATION_CHARACTER)
+                        .addLabel(m_current - m_diagManager->getDocument().begin(), "\\n", Diag::flags::insertColour,
+                                  Diag::flags::strikethrough);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(),
+                                          m_current - m_diagManager->getDocument().begin(), TokenType::SyntaxError);
                     return true;
                 }
                 m_current++;
@@ -376,17 +376,17 @@ bool pylir::Lexer::parseNext()
             case U'U':
             {
                 m_current++;
-                if (m_current != m_document->end() && (*m_current == '\'' || *m_current == '"'))
+                if (m_current != m_diagManager->getDocument().end() && (*m_current == '\'' || *m_current == '"'))
                 {
                     if (auto opt = parseLiteral(false, false))
                     {
-                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::StringLiteral,
-                                              std::move(*opt));
+                        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                              TokenType::StringLiteral, std::move(*opt));
                     }
                     else
                     {
-                        m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
-                                              std::move(opt).error());
+                        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                              TokenType::SyntaxError);
                     }
                 }
                 else
@@ -401,20 +401,20 @@ bool pylir::Lexer::parseNext()
             {
                 if (auto opt = parseLiteral(false, false))
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::StringLiteral,
-                                          std::move(*opt));
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                          TokenType::StringLiteral, std::move(*opt));
                 }
                 else
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
-                                          std::move(opt).error());
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                          TokenType::SyntaxError);
                 }
                 break;
             }
             case U'r':
             case U'R':
             {
-                if (std::next(m_current) == m_document->end())
+                if (std::next(m_current) == m_diagManager->getDocument().end())
                 {
                     parseIdentifier();
                     break;
@@ -426,7 +426,8 @@ bool pylir::Lexer::parseNext()
                     case U'F':
                     {
                         auto maybeLiteral = std::next(m_current, 2);
-                        if (maybeLiteral == m_document->end() || (*maybeLiteral != U'\'' && *maybeLiteral != U'"'))
+                        if (maybeLiteral == m_diagManager->getDocument().end() || (*maybeLiteral != U'\'' &&
+                    *maybeLiteral != U'"'))
                         {
                             parseIdentifier();
                             break;
@@ -441,20 +442,20 @@ bool pylir::Lexer::parseNext()
                         m_current = std::next(m_current);
                         if (auto opt = parseLiteral(true, false))
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
+                            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
                                                   TokenType::StringLiteral, std::move(*opt));
                         }
                         else
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
-                                                  TokenType::SyntaxError, std::move(opt).error());
+                            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                                  TokenType::SyntaxError);
                         }
                         break;
                     }
                     case 'b':
                     case 'B':
                     {
-                        if (std::next(m_current, 2) == m_document->end())
+                        if (std::next(m_current, 2) == m_diagManager->getDocument().end())
                         {
                             parseIdentifier();
                             break;
@@ -470,13 +471,13 @@ bool pylir::Lexer::parseNext()
                         }
                         if (auto opt = parseLiteral(true, true))
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
+                            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
                                                   TokenType::ByteLiteral, std::move(*opt));
                         }
                         else
                         {
-                            m_tokens.emplace_back(start - m_document->begin(), m_current - start,
-                                                  TokenType::SyntaxError, std::move(opt).error());
+                            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                                  TokenType::SyntaxError);
                         }
                         break;
                     }
@@ -487,7 +488,7 @@ bool pylir::Lexer::parseNext()
             case U'b':
             case U'B':
             {
-                if (std::next(m_current) == m_document->end())
+                if (std::next(m_current) == m_diagManager->getDocument().end())
                 {
                     parseIdentifier();
                     break;
@@ -514,20 +515,20 @@ bool pylir::Lexer::parseNext()
                 }
                 if (auto opt = parseLiteral(raw, true))
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::ByteLiteral,
-                                          std::move(*opt));
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                          TokenType::ByteLiteral, std::move(*opt));
                 }
                 else
                 {
-                    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
-                                          std::move(opt).error());
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                          TokenType::SyntaxError);
                 }
                 break;
             }
                 //            case U'f':
                 //            case U'F':
                 //            {
-                //                if (std::next(m_current) != m_document->end()
+                //                if (std::next(m_current) != m_diagManager->getDocument().end()
                 //                    && (*std::next(m_current) == '"' || *std::next(m_current) == '\''))
                 //                {
                 //                    // TODO: parse format string
@@ -541,11 +542,11 @@ bool pylir::Lexer::parseNext()
                 //            }
             case U'.':
             {
-                if (std::next(m_current) == m_document->end() || *std::next(m_current) < U'0'
-                   || *std::next(m_current) > U'9')
+                if (std::next(m_current) == m_diagManager->getDocument().end() || *std::next(m_current) < U'0'
+                    || *std::next(m_current) > U'9')
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::Dot);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::Dot);
                     break;
                 }
                 [[fallthrough]];
@@ -566,20 +567,20 @@ bool pylir::Lexer::parseNext()
             }
             case U'-':
             {
-                if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                if (std::next(m_current) != m_diagManager->getDocument().end() && *std::next(m_current) == U'=')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, TokenType::MinusAssignment);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 2, TokenType::MinusAssignment);
                 }
-                else if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'>')
+                else if (std::next(m_current) != m_diagManager->getDocument().end() && *std::next(m_current) == U'>')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, TokenType::Arrow);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 2, TokenType::Arrow);
                 }
                 else
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::Minus);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::Minus);
                 }
                 break;
             }
@@ -607,15 +608,15 @@ bool pylir::Lexer::parseNext()
                         default: PYLIR_UNREACHABLE;
                     }
                 }();
-                if (std::next(m_current) == m_document->end() || *std::next(m_current) != U'=')
+                if (std::next(m_current) == m_diagManager->getDocument().end() || *std::next(m_current) != U'=')
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, normal);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, normal);
                 }
-                else if (std::next(m_current) != m_document->end())
+                else if (std::next(m_current) != m_diagManager->getDocument().end())
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, assignment);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 2, assignment);
                 }
                 break;
             }
@@ -643,40 +644,40 @@ bool pylir::Lexer::parseNext()
                         default: PYLIR_UNREACHABLE;
                     }
                 }();
-                if (std::next(m_current) != m_document->end() && *std::next(m_current) == *m_current)
+                if (std::next(m_current) != m_diagManager->getDocument().end() && *std::next(m_current) == *m_current)
                 {
                     m_current++;
-                    if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                    if (std::next(m_current) != m_diagManager->getDocument().end() && *std::next(m_current) == U'=')
                     {
                         std::advance(m_current, 2);
-                        m_tokens.emplace_back(start - m_document->begin(), 3, twiceAss);
+                        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 3, twiceAss);
                     }
                     else
                     {
                         m_current++;
-                        m_tokens.emplace_back(start - m_document->begin(), 2, twice);
+                        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 2, twice);
                     }
                 }
-                else if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                else if (std::next(m_current) != m_diagManager->getDocument().end() && *std::next(m_current) == U'=')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, singleAss);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 2, singleAss);
                 }
                 else
                 {
                     m_current++;
-                    m_tokens.emplace_back(start - m_document->begin(), 1, single);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, single);
                 }
                 break;
             }
             case U'~':
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::BitNegate);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::BitNegate);
                 break;
             case U'(':
                 m_depth++;
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::OpenParentheses);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::OpenParentheses);
                 break;
             case U')':
                 if (m_depth != 0)
@@ -684,12 +685,12 @@ bool pylir::Lexer::parseNext()
                     m_depth--;
                 }
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::CloseParentheses);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::CloseParentheses);
                 break;
             case U'[':
                 m_depth++;
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::OpenSquareBracket);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::OpenSquareBracket);
                 break;
             case U']':
                 if (m_depth != 0)
@@ -697,12 +698,12 @@ bool pylir::Lexer::parseNext()
                     m_depth--;
                 }
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::CloseSquareBracket);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::CloseSquareBracket);
                 break;
             case U'{':
                 m_depth++;
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::OpenBrace);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::OpenBrace);
                 break;
             case U'}':
                 if (m_depth != 0)
@@ -710,21 +711,21 @@ bool pylir::Lexer::parseNext()
                     m_depth--;
                 }
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::CloseBrace);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::CloseBrace);
                 break;
             case U',':
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::Comma);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::Comma);
                 break;
             case U';':
                 m_current++;
-                m_tokens.emplace_back(start - m_document->begin(), 1, TokenType::SemiColon);
+                m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 1, TokenType::SemiColon);
                 break;
             case U'!':
-                if (std::next(m_current) != m_document->end() && *std::next(m_current) == U'=')
+                if (std::next(m_current) != m_diagManager->getDocument().end() && *std::next(m_current) == U'=')
                 {
                     std::advance(m_current, 2);
-                    m_tokens.emplace_back(start - m_document->begin(), 2, TokenType::NotEqual);
+                    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), 2, TokenType::NotEqual);
                     break;
                 }
                 [[fallthrough]];
@@ -732,17 +733,17 @@ bool pylir::Lexer::parseNext()
             {
                 if (Text::isWhitespace(*m_current))
                 {
-                    m_current = std::find_if_not(m_current, m_document->end(), Text::isWhitespace);
+                    m_current = std::find_if_not(m_current, m_diagManager->getDocument().end(), Text::isWhitespace);
                     continue;
                 }
                 parseIdentifier();
                 break;
             }
         }
-    } while (m_current != m_document->end() && startSize == m_tokens.size());
-    if (m_current == m_document->end())
+    } while (m_current != m_diagManager->getDocument().end() && startSize == m_tokens.size());
+    if (m_current == m_diagManager->getDocument().end())
     {
-        m_tokens.emplace_back(m_current - m_document->begin(), 0, TokenType::Newline);
+        m_tokens.emplace_back(m_current - m_diagManager->getDocument().begin(), 0, TokenType::Newline);
         parseIndent();
     }
     return true;
@@ -753,16 +754,16 @@ void pylir::Lexer::parseIdentifier()
     static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
     if (!initialCharacterSet.contains(*m_current))
     {
-        auto builder = createError(m_current - m_document->begin(), Diag::UNEXPECTED_CHARACTER_N,
-                                   Text::toUTF8String({&*m_current, 1}))
-                           .addLabel(m_current - m_document->begin());
-        m_tokens.emplace_back(m_current - m_document->begin(), 1, TokenType::SyntaxError, builder.emit());
+        createError(m_current - m_diagManager->getDocument().begin(), Diag::UNEXPECTED_CHARACTER_N,
+                    Text::toUTF8String({&*m_current, 1}))
+            .addLabel(m_current - m_diagManager->getDocument().begin());
+        m_tokens.emplace_back(m_current - m_diagManager->getDocument().begin(), 1, TokenType::SyntaxError);
         m_current++;
         return;
     }
     static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-    const auto *start = m_current;
-    m_current = std::find_if_not(m_current, m_document->end(),
+    const auto* start = m_current;
+    m_current = std::find_if_not(m_current, m_diagManager->getDocument().end(),
                                  [&](char32_t value) { return legalIdentifierSet.contains(value); });
     auto utf32 = std::u32string_view{start, static_cast<std::size_t>(m_current - start)};
     static std::unordered_map<std::u32string_view, TokenType> keywords = {
@@ -804,7 +805,7 @@ void pylir::Lexer::parseIdentifier()
     };
     if (auto result = keywords.find(utf32); result != keywords.end())
     {
-        m_tokens.emplace_back(start - m_document->begin(), m_current - start, result->second);
+        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start, result->second);
         return;
     }
 
@@ -812,7 +813,8 @@ void pylir::Lexer::parseIdentifier()
     [[maybe_unused]] bool ok;
     auto utf8 = Text::toUTF8String(normalized, &ok);
     PYLIR_ASSERT(ok);
-    m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::Identifier, std::move(utf8));
+    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start, TokenType::Identifier,
+                          std::move(utf8));
 }
 
 namespace
@@ -882,11 +884,11 @@ bool isHex(char32_t value)
 }
 } // namespace
 
-tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
+std::optional<std::string> pylir::Lexer::parseLiteral(bool raw, bool bytes)
 {
     bool longString = false;
     auto character = *m_current++;
-    if (m_current != m_document->end() && std::next(m_current) != m_document->end())
+    if (m_current != m_diagManager->getDocument().end() && std::next(m_current) != m_diagManager->getDocument().end())
     {
         if (std::array{*m_current, *std::next(m_current)} == std::array{character, character})
         {
@@ -895,15 +897,15 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
         }
     }
 
-    auto end = [&]() -> tl::expected<bool, std::string>
+    auto end = [&]() -> std::optional<bool>
     {
         if (!longString)
         {
-            if (m_current == m_document->end())
+            if (m_current == m_diagManager->getDocument().end())
             {
-                auto builder = createError(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
-                                   .addLabel(m_current - m_document->begin(), std::string(1, character));
-                return tl::unexpected{builder.emit()};
+                createError(m_current - m_diagManager->getDocument().begin(), Diag::EXPECTED_END_OF_LITERAL)
+                    .addLabel(m_current - m_diagManager->getDocument().begin(), std::string(1, character));
+                return std::nullopt;
             }
             if (*m_current == character)
             {
@@ -912,16 +914,17 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
             }
             return false;
         }
-        if (m_current == m_document->end() || std::next(m_current) == m_document->end()
-            || std::next(m_current, 2) == m_document->end())
+        if (m_current == m_diagManager->getDocument().end()
+            || std::next(m_current) == m_diagManager->getDocument().end()
+            || std::next(m_current, 2) == m_diagManager->getDocument().end())
         {
-            while (m_current != m_document->end())
+            while (m_current != m_diagManager->getDocument().end())
             {
                 m_current = std::next(m_current);
             }
-            auto builder = createError(m_current - m_document->begin(), Diag::EXPECTED_END_OF_LITERAL)
-                               .addLabel(m_current - m_document->begin(), std::string(3, character));
-            return tl::unexpected{builder.emit()};
+            createError(m_current - m_diagManager->getDocument().begin(), Diag::EXPECTED_END_OF_LITERAL)
+                .addLabel(m_current - m_diagManager->getDocument().begin(), std::string(3, character));
+            return std::nullopt;
         }
         if (std::array{*m_current, *std::next(m_current), *std::next(m_current, 2)}
             == std::array{character, character, character})
@@ -932,13 +935,13 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
         return false;
     };
     std::u32string result;
-    tl::expected<bool, std::string> success;
+    std::optional<bool> success;
 
     auto diagnoseNonAscii = [&]
     {
-        auto builder =
-            createError(m_current - m_document->begin(), Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS)
-                           .addLabel(m_current - m_document->begin());
+        auto builder = createError(m_current - m_diagManager->getDocument().begin(),
+                                   Diag::ONLY_ASCII_VALUES_ARE_ALLOWED_IN_BYTE_LITERALS)
+                           .addLabel(m_current - m_diagManager->getDocument().begin());
         if (!raw)
         {
             std::string utf8Bytes = Text::toUTF8(*m_current).data();
@@ -948,11 +951,10 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                 hexEscape +=
                     fmt::format(FMT_STRING("\\x{:0^2X}"), static_cast<std::uint32_t>(static_cast<std::uint8_t>(iter)));
             }
-            builder.addNote(m_current - m_document->begin(), Diag::USE_HEX_OR_OCTAL_ESCAPES_INSTEAD)
-                .addLabel(m_current - m_document->begin(), hexEscape, Diag::flags::insertColour,
+            builder.addNote(m_current - m_diagManager->getDocument().begin(), Diag::USE_HEX_OR_OCTAL_ESCAPES_INSTEAD)
+                .addLabel(m_current - m_diagManager->getDocument().begin(), hexEscape, Diag::flags::insertColour,
                           Diag::flags::strikethrough);
         }
-        return tl::unexpected{builder.emit()};
     };
 
     for (success = end(); success && !*success; success = end())
@@ -968,7 +970,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                     break;
                 }
                 m_current++;
-                if (m_current == m_document->end())
+                if (m_current == m_diagManager->getDocument().end())
                 {
                     continue;
                 }
@@ -1009,7 +1011,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         m_current++;
                         result += '\n';
                         std::size_t count = 0;
-                        while (std::next(m_current, count) != m_document->end() && count != sizeof("ewline") - 1)
+                        while (std::next(m_current, count) != m_diagManager->getDocument().end()
+                               && count != sizeof("ewline") - 1)
                         {
                             count++;
                         }
@@ -1022,7 +1025,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                     case 'x':
                     {
                         m_current++;
-                        if (m_current == m_document->end())
+                        if (m_current == m_diagManager->getDocument().end())
                         {
                             // TODO deprecation
                             result += U"\\x";
@@ -1036,7 +1039,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                             break;
                         }
                         m_current++;
-                        if (m_current == m_document->end())
+                        if (m_current == m_diagManager->getDocument().end())
                         {
                             // TODO deprecation
                             result += U"\\x";
@@ -1067,7 +1070,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                     {
                         char32_t value = 0;
                         std::size_t count = 0;
-                        while (count < 3 && m_current != m_document->end() && *m_current >= '0' && *m_current <= '7')
+                        while (count < 3 && m_current != m_diagManager->getDocument().end() && *m_current >= '0'
+                               && *m_current <= '7')
                         {
                             value = value * 8 + *m_current - U'0';
                             m_current++;
@@ -1091,7 +1095,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         std::size_t size = big ? 8 : 4;
                         std::size_t count = 0;
                         char32_t value = 0;
-                        while (count < size && m_current != m_document->end() && isHex(*m_current))
+                        while (count < size && m_current != m_diagManager->getDocument().end() && isHex(*m_current))
                         {
                             value = value * 16 + fromHex(*m_current);
                             m_current++;
@@ -1099,26 +1103,26 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                         }
                         if (count != size)
                         {
-                            auto builder = createError(m_current - m_document->begin() - count,
-                                                       Diag::EXPECTED_N_MORE_HEX_CHARACTERS, size - count)
-                                               .addLabel(m_current - m_document->begin() - count,
-                                                         m_current - m_document->begin() - 1)
-                                               .addLabel(m_current - m_document->begin() - count - 2,
-                                                         m_current - m_document->begin() - count - 1,
-                                                         Diag::flags::secondaryColour);
-                            return tl::unexpected{builder.emit()};
+                            createError(m_current - m_diagManager->getDocument().begin() - count,
+                                        Diag::EXPECTED_N_MORE_HEX_CHARACTERS, size - count)
+                                .addLabel(m_current - m_diagManager->getDocument().begin() - count,
+                                          m_current - m_diagManager->getDocument().begin() - 1)
+                                .addLabel(m_current - m_diagManager->getDocument().begin() - count - 2,
+                                          m_current - m_diagManager->getDocument().begin() - count - 1,
+                                          Diag::flags::secondaryColour);
+                            return std::nullopt;
                         }
                         if (!Text::isValidCodepoint(value))
                         {
-                            auto builder = createError(m_current - m_document->begin() - count,
-                                                       Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
-                                                       static_cast<std::uint32_t>(value))
-                                               .addLabel(m_current - m_document->begin() - count,
-                                                         m_current - m_document->begin() - 1)
-                                               .addLabel(m_current - m_document->begin() - count - 2,
-                                                         m_current - m_document->begin() - count - 1,
-                                                         Diag::flags::secondaryColour);
-                            return tl::unexpected{builder.emit()};
+                            createError(m_current - m_diagManager->getDocument().begin() - count,
+                                        Diag::U_PLUS_N_IS_NOT_A_VALID_UNICODE_CODEPOINT,
+                                        static_cast<std::uint32_t>(value))
+                                .addLabel(m_current - m_diagManager->getDocument().begin() - count,
+                                          m_current - m_diagManager->getDocument().begin() - 1)
+                                .addLabel(m_current - m_diagManager->getDocument().begin() - count - 2,
+                                          m_current - m_diagManager->getDocument().begin() - count - 1,
+                                          Diag::flags::secondaryColour);
+                            return std::nullopt;
                         }
                         result += value;
                         break;
@@ -1132,38 +1136,42 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                             break;
                         }
                         m_current++;
-                        if (m_current == m_document->end() || *m_current != '{')
+                        if (m_current == m_diagManager->getDocument().end() || *m_current != '{')
                         {
-                            auto builder = createError(m_current - m_document->begin(),
+                            auto builder = createError(m_current - m_diagManager->getDocument().begin(),
                                                        Diag::EXPECTED_OPEN_BRACE_AFTER_BACKSLASH_N);
-                            if (m_current != m_document->end())
+                            if (m_current != m_diagManager->getDocument().end())
                             {
-                                builder.addLabel(m_current - m_document->begin(), "{", Diag::flags::insertColour,
-                                                 Diag::flags::strikethrough);
+                                builder.addLabel(m_current - m_diagManager->getDocument().begin(), "{",
+                                                 Diag::flags::insertColour, Diag::flags::strikethrough);
                             }
-                            builder.addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin() - 1,
+                            builder.addLabel(m_current - m_diagManager->getDocument().begin() - 2,
+                                             m_current - m_diagManager->getDocument().begin() - 1,
                                              Diag::flags::secondaryColour);
-                            return tl::unexpected{builder.emit()};
+                            return std::nullopt;
                         }
                         m_current++;
-                        const auto *closing = std::find(m_current, m_document->end(), U'}');
+                        const auto* closing = std::find(m_current, m_diagManager->getDocument().end(), U'}');
                         auto utf8Name = Text::toUTF8String(
                             std::u32string_view{m_current, static_cast<std::size_t>(closing - m_current)});
                         auto codepoint = Text::fromName(utf8Name);
                         if (!codepoint)
                         {
-                            auto builder =
-                                createError(m_current - m_document->begin(), Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
-                                    .addLabel(m_current - m_document->begin(), closing - m_document->begin() - 1)
-                                    .addLabel(m_current - m_document->begin() - 2, m_current - m_document->begin() - 1,
-                                              Diag::flags::secondaryColour);
-                            if (closing != m_document->end())
+                            auto builder = createError(m_current - m_diagManager->getDocument().begin(),
+                                                       Diag::UNICODE_NAME_N_NOT_FOUND, utf8Name)
+                                               .addLabel(m_current - m_diagManager->getDocument().begin(),
+                                                         closing - m_diagManager->getDocument().begin() - 1)
+                                               .addLabel(m_current - m_diagManager->getDocument().begin() - 2,
+                                                         m_current - m_diagManager->getDocument().begin() - 1,
+                                                         Diag::flags::secondaryColour);
+                            if (closing != m_diagManager->getDocument().end())
                             {
-                                builder.addLabel(closing - m_document->begin(), Diag::flags::secondaryColour);
+                                builder.addLabel(closing - m_diagManager->getDocument().begin(),
+                                                 Diag::flags::secondaryColour);
                             }
-                            return tl::unexpected{builder.emit()};
+                            return std::nullopt;
                         }
-                        if (closing != m_document->end())
+                        if (closing != m_diagManager->getDocument().end())
                         {
                             closing++;
                         }
@@ -1175,7 +1183,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
                     {
                         if (bytes && *m_current > 127)
                         {
-                            return diagnoseNonAscii();
+                            diagnoseNonAscii();
+                            return std::nullopt;
                         }
                         result += '\\';
                         result += *m_current;
@@ -1190,9 +1199,9 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
             {
                 if (!longString)
                 {
-                    auto builder = createError(m_current - m_document->begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
-                            .addLabel(m_current - m_document->begin());
-                    return tl::unexpected{builder.emit()};
+                    createError(m_current - m_diagManager->getDocument().begin(), Diag::NEWLINE_NOT_ALLOWED_IN_LITERAL)
+                        .addLabel(m_current - m_diagManager->getDocument().begin());
+                    return std::nullopt;
                 }
                 result += *m_current;
                 m_current++;
@@ -1201,7 +1210,8 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
             default:
                 if (bytes && *m_current > 127)
                 {
-                    return diagnoseNonAscii();
+                    diagnoseNonAscii();
+                    return std::nullopt;
                 }
                 result += *m_current;
                 m_current++;
@@ -1210,7 +1220,7 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
     }
     if (!success)
     {
-        return tl::unexpected{std::move(success).error()};
+        return std::nullopt;
     }
     if (bytes)
     {
@@ -1222,12 +1232,12 @@ tl::expected<std::string, std::string> pylir::Lexer::parseLiteral(bool raw, bool
 
 void pylir::Lexer::parseNumber()
 {
-    const auto *start = m_current;
-    PYLIR_ASSERT(m_current != m_document->end());
+    const auto* start = m_current;
+    PYLIR_ASSERT(m_current != m_diagManager->getDocument().end());
     bool (*allowedDigits)(char32_t) = +[](char32_t value) { return value >= U'0' && value <= U'9'; };
     unsigned radix = 10;
     bool isFloat = false;
-    if (*m_current == U'0' && std::next(m_current) != m_document->end())
+    if (*m_current == U'0' && std::next(m_current) != m_diagManager->getDocument().end())
     {
         switch (*std::next(m_current))
         {
@@ -1274,39 +1284,39 @@ void pylir::Lexer::parseNumber()
             default: break;
         }
     }
-    const auto *numberStart = m_current;
-    const auto *end = std::find_if_not(m_current, m_document->end(),
-                                [allowedDigits, previous = U'\0', &isFloat, radix](char32_t value) mutable
-                                {
-                                    if (value == U'.' && radix == 10)
-                                    {
-                                        previous = U'.';
-                                        if (!isFloat)
-                                        {
-                                            isFloat = true;
-                                            return true;
-                                        }
-                                        return false;
-                                    }
-                                    if (value == U'_')
-                                    {
-                                        if (previous == U'_' || previous == U'.')
-                                        {
-                                            return false;
-                                        }
-                                        previous = value;
-                                        return true;
-                                    }
-                                    return allowedDigits(previous = value);
-                                });
+    const auto* numberStart = m_current;
+    const auto* end = std::find_if_not(m_current, m_diagManager->getDocument().end(),
+                                       [allowedDigits, previous = U'\0', &isFloat, radix](char32_t value) mutable
+                                       {
+                                           if (value == U'.' && radix == 10)
+                                           {
+                                               previous = U'.';
+                                               if (!isFloat)
+                                               {
+                                                   isFloat = true;
+                                                   return true;
+                                               }
+                                               return false;
+                                           }
+                                           if (value == U'_')
+                                           {
+                                               if (previous == U'_' || previous == U'.')
+                                               {
+                                                   return false;
+                                               }
+                                               previous = value;
+                                               return true;
+                                           }
+                                           return allowedDigits(previous = value);
+                                       });
     m_current = end;
     if (*std::prev(end) == U'_')
     {
-        auto builder =
-            createError(end - m_document->begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
-                .addLabel(end - 1 - m_document->begin())
-                .addLabel(start - m_document->begin(), end - m_document->begin() - 2, Diag::flags::secondaryColour);
-        m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError, builder.emit());
+        createError(end - m_diagManager->getDocument().begin() - 1, Diag::UNDERSCORE_ONLY_ALLOWED_BETWEEN_DIGITS)
+            .addLabel(end - 1 - m_diagManager->getDocument().begin())
+            .addLabel(start - m_diagManager->getDocument().begin(), end - m_diagManager->getDocument().begin() - 2,
+                      Diag::flags::secondaryColour);
+        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), end - start, TokenType::SyntaxError);
         return;
     }
     std::string text;
@@ -1320,31 +1330,32 @@ void pylir::Lexer::parseNumber()
     auto checkSuffix = [&]
     {
         static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
-        const auto *suffixEnd = std::find_if_not(m_current, m_document->end(),
-                                          [&](char32_t value) { return legalIdentifierSet.contains(value); });
+        const auto* suffixEnd = std::find_if_not(m_current, m_diagManager->getDocument().end(),
+                                                 [&](char32_t value) { return legalIdentifierSet.contains(value); });
         if (suffixEnd != m_current)
         {
-            auto builder = createError(m_current - m_document->begin(), Diag::INVALID_INTEGER_SUFFIX,
-                                       Text::toUTF8String({m_current, static_cast<std::size_t>(suffixEnd - m_current)}))
-                               .addLabel(start - m_document->begin(), m_current - m_document->begin() - 1,
-                                         Diag::flags::secondaryColour)
-                               .addLabel(m_current - m_document->begin(), suffixEnd - m_document->begin() - 1,
-                                         Diag::flags::strikethrough);
-            m_tokens.emplace_back(m_current - m_document->begin(), suffixEnd - m_current, TokenType::SyntaxError,
-                                  builder.emit());
+            createError(m_current - m_diagManager->getDocument().begin(), Diag::INVALID_INTEGER_SUFFIX,
+                        Text::toUTF8String({m_current, static_cast<std::size_t>(suffixEnd - m_current)}))
+                .addLabel(start - m_diagManager->getDocument().begin(),
+                          m_current - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour)
+                .addLabel(m_current - m_diagManager->getDocument().begin(),
+                          suffixEnd - m_diagManager->getDocument().begin() - 1, Diag::flags::strikethrough);
+            m_tokens.emplace_back(m_current - m_diagManager->getDocument().begin(), suffixEnd - m_current,
+                                  TokenType::SyntaxError);
             m_current = suffixEnd;
             return;
         }
     };
-    isFloat = isFloat || (end != m_document->end() && (*end == U'e' || *end == U'E'));
+    isFloat = isFloat || (end != m_diagManager->getDocument().end() && (*end == U'e' || *end == U'E'));
     if (!isFloat)
     {
         BigInt integer(text, radix);
-        if (radix == 10 && m_current != m_document->end() && (*m_current == U'j' || *m_current == U'J'))
+        if (radix == 10 && m_current != m_diagManager->getDocument().end()
+            && (*m_current == U'j' || *m_current == U'J'))
         {
             m_current++;
-            m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::ComplexLiteral,
-                                  integer.roundToDouble());
+            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                  TokenType::ComplexLiteral, integer.roundToDouble());
             checkSuffix();
             return;
         }
@@ -1352,17 +1363,21 @@ void pylir::Lexer::parseNumber()
         {
             const auto* leadingEnd =
                 std::find_if_not(numberStart, end, [](char32_t value) { return value == U'_' || value == U'0'; });
-            auto builder = createError(end - m_document->begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
-                    .addLabel(leadingEnd - m_document->begin(), end - m_document->begin() - 1,
-                              Diag::flags::secondaryColour)
-                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin() - 1)
-                    .addNote(numberStart - m_document->begin(), Diag::REMOVE_LEADING_ZEROS)
-                    .addLabel(numberStart - m_document->begin(), leadingEnd - m_document->begin() - 1,
-                              Diag::flags::secondaryColour, Diag::flags::strikethrough);
-            m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError, builder.emit());
+
+            createError(end - m_diagManager->getDocument().begin() - 1, Diag::NUMBER_WITH_LEADING_ZEROS_NOT_ALLOWED)
+                .addLabel(leadingEnd - m_diagManager->getDocument().begin(),
+                          end - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour)
+                .addLabel(numberStart - m_diagManager->getDocument().begin(),
+                          leadingEnd - m_diagManager->getDocument().begin() - 1)
+                .addNote(numberStart - m_diagManager->getDocument().begin(), Diag::REMOVE_LEADING_ZEROS)
+                .addLabel(numberStart - m_diagManager->getDocument().begin(),
+                          leadingEnd - m_diagManager->getDocument().begin() - 1, Diag::flags::secondaryColour,
+                          Diag::flags::strikethrough);
+            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), end - start, TokenType::SyntaxError);
             return;
         }
-        m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::IntegerLiteral, std::move(integer));
+        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), end - start, TokenType::IntegerLiteral,
+                              std::move(integer));
         checkSuffix();
         return;
     }
@@ -1371,37 +1386,37 @@ void pylir::Lexer::parseNumber()
     {
         text.insert(text.begin(), '0');
     }
-    if (end != m_document->end() && (*end == U'e' || *end == U'E'))
+    if (end != m_diagManager->getDocument().end() && (*end == U'e' || *end == U'E'))
     {
         text += U'e';
         end++;
-        if (end != m_document->end() && (*end == U'+' || *end == U'-'))
+        if (end != m_diagManager->getDocument().end() && (*end == U'+' || *end == U'-'))
         {
             text += *end;
             end++;
         }
-        const auto *newEnd = std::find_if_not(end, m_document->end(),
-                                       [previous = U'\0', allowedDigits](char32_t value) mutable
-                                       {
-                                           if (value == U'_')
-                                           {
-                                               if (previous == U'_' || previous == U'\0')
-                                               {
-                                                   return false;
-                                               }
-                                               previous = value;
-                                               return true;
-                                           }
-                                           return allowedDigits(previous = value);
-                                       });
+        const auto* newEnd = std::find_if_not(end, m_diagManager->getDocument().end(),
+                                              [previous = U'\0', allowedDigits](char32_t value) mutable
+                                              {
+                                                  if (value == U'_')
+                                                  {
+                                                      if (previous == U'_' || previous == U'\0')
+                                                      {
+                                                          return false;
+                                                      }
+                                                      previous = value;
+                                                      return true;
+                                                  }
+                                                  return allowedDigits(previous = value);
+                                              });
         m_current = newEnd;
         if (newEnd == end)
         {
-            auto builder =
-                createError(end - m_document->begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
-                    .addLabel(start - m_document->begin(), end - m_document->begin() - 1, Diag::flags::secondaryColour)
-                    .addLabel(end - m_document->begin());
-            m_tokens.emplace_back(start - m_document->begin(), end - start, TokenType::SyntaxError, builder.emit());
+            createError(end - m_diagManager->getDocument().begin(), Diag::EXPECTED_DIGITS_FOR_THE_EXPONENT)
+                .addLabel(start - m_diagManager->getDocument().begin(), end - m_diagManager->getDocument().begin() - 1,
+                          Diag::flags::secondaryColour)
+                .addLabel(end - m_diagManager->getDocument().begin());
+            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), end - start, TokenType::SyntaxError);
             return;
         }
         for (auto codepoint : std::u32string_view{end, static_cast<std::size_t>(newEnd - end)})
@@ -1444,12 +1459,12 @@ void pylir::Lexer::parseNumber()
     reset.reset();
 #endif
     auto tokenType = TokenType::FloatingPointLiteral;
-    if (m_current != m_document->end() && (*m_current == U'j' || *m_current == U'J'))
+    if (m_current != m_diagManager->getDocument().end() && (*m_current == U'j' || *m_current == U'J'))
     {
         m_current++;
         tokenType = TokenType::ComplexLiteral;
     }
-    m_tokens.emplace_back(start - m_document->begin(), m_current - start, tokenType, number);
+    m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start, tokenType, number);
     checkSuffix();
 }
 
@@ -1457,7 +1472,8 @@ void pylir::Lexer::parseIndent()
 {
     const auto* start = m_current;
     std::size_t indent = 0;
-    for (; m_current != m_document->end() && (Text::isWhitespace(*m_current) || *m_current == U'#'); m_current++)
+    for (; m_current != m_diagManager->getDocument().end() && (Text::isWhitespace(*m_current) || *m_current == U'#');
+         m_current++)
     {
         switch (*m_current)
         {
@@ -1481,14 +1497,17 @@ void pylir::Lexer::parseIndent()
         std::pair<std::size_t, std::size_t> previous;
         do
         {
-            m_tokens.emplace_back(start - m_document->begin(), start - m_document->begin(), TokenType::Dedent);
+            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(),
+                                  start - m_diagManager->getDocument().begin(), TokenType::Dedent);
             previous = m_indentation.top();
             m_indentation.pop();
         } while (indent < m_indentation.top().first);
         if (m_indentation.top().first != indent)
         {
-            auto builder = createError(m_current - m_document->begin(), Diag::INVALID_INDENTATION_N, indent)
-                    .addLabel(start - m_document->begin(), m_current - m_document->begin() - 1);
+            auto builder =
+                createError(m_current - m_diagManager->getDocument().begin(), Diag::INVALID_INDENTATION_N, indent)
+                    .addLabel(start - m_diagManager->getDocument().begin(),
+                              m_current - m_diagManager->getDocument().begin() - 1);
             if (previous.first - indent < indent - m_indentation.top().first)
             {
                 builder.addNote(m_tokens[previous.second], Diag::NEXT_CLOSEST_INDENTATION_N, previous.first)
@@ -1501,13 +1520,13 @@ void pylir::Lexer::parseIndent()
                              m_indentation.top().first)
                     .addLabel(m_tokens[m_indentation.top().second]);
             }
-            m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::SyntaxError,
-                                  builder.emit());
+            m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start,
+                                  TokenType::SyntaxError);
         }
     }
     else if (indent > m_indentation.top().first)
     {
-        m_tokens.emplace_back(start - m_document->begin(), m_current - start, TokenType::Indent);
+        m_tokens.emplace_back(start - m_diagManager->getDocument().begin(), m_current - start, TokenType::Indent);
         m_indentation.emplace(indent, m_tokens.size() - 1);
     }
 }

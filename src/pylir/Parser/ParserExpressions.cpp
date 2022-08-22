@@ -10,19 +10,17 @@
 #include <pylir/Support/Functional.hpp>
 #include <pylir/Support/Variant.hpp>
 
-tl::expected<pylir::Syntax::Yield, std::string> pylir::Parser::parseYieldExpression()
+std::optional<pylir::Syntax::Yield> pylir::Parser::parseYieldExpression()
 {
     if (!m_inFunc)
     {
-        return tl::unexpected{
-            createError(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION)
-                                  .addLabel(*m_current)
-                                  .emit()};
+        createError(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION).addLabel(*m_current);
+        return std::nullopt;
     }
     auto yield = expect(TokenType::YieldKeyword);
     if (!yield)
     {
-        return tl::unexpected{std::move(yield).error()};
+        return std::nullopt;
     }
 
     if (!peekedIs(TokenType::FromKeyword) && !peekedIs(firstInExpression))
@@ -35,31 +33,29 @@ tl::expected<pylir::Syntax::Yield, std::string> pylir::Parser::parseYieldExpress
         auto expression = parseExpression();
         if (!expression)
         {
-            return tl::unexpected{std::move(expression).error()};
+            return std::nullopt;
         }
         return Syntax::Yield{{}, std::move(*yield), std::move(from), std::move(*expression)};
     }
     auto list = parseExpressionList();
     if (!list)
     {
-        return tl::unexpected{std::move(list).error()};
+        return std::nullopt;
     }
     return Syntax::Yield{{}, std::move(*yield), std::nullopt, std::move(*list)};
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseAtom()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseAtom()
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{
-            createError(m_document->getText().size(), Diag::EXPECTED_N, "identifier, number or enclosure")
-                .addLabel(m_document->getText().size())
-                .emit()};
+        createError(endOfFileLoc(), Diag::EXPECTED_N, "identifier, number or enclosure").addLabel(endOfFileLoc());
+        return std::nullopt;
     }
 
     switch (m_current->getTokenType())
     {
-        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>((*m_current++).getValue())};
+        case TokenType::SyntaxError: return std::nullopt;
         case TokenType::Identifier:
         {
             auto token = *m_current++;
@@ -83,22 +79,22 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         case TokenType::OpenBrace:
         case TokenType::OpenSquareBracket: return parseEnclosure();
         default:
-            return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                              "identifier, number or enclosure", m_current->getTokenType())
-                                      .addLabel(*m_current, Diag::flags::strikethrough)
-                                      .emit()};
+            createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, "identifier, number or enclosure",
+                        m_current->getTokenType())
+                .addLabel(*m_current, Diag::flags::strikethrough);
+            return std::nullopt;
     }
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseEnclosure()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseEnclosure()
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N,
-                                          fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses,
-                                                      TokenType::OpenSquareBracket, TokenType::OpenBrace))
-                                  .addLabel(m_document->getText().size())
-                                  .emit()};
+        createError(endOfFileLoc(), Diag::EXPECTED_N,
+                    fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses, TokenType::OpenSquareBracket,
+                                TokenType::OpenBrace))
+            .addLabel(endOfFileLoc());
+        return std::nullopt;
     }
     switch (m_current->getTokenType())
     {
@@ -110,7 +106,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto closeParentheses = expect(TokenType::CloseParentheses);
                 if (!closeParentheses)
                 {
-                    return tl::unexpected{std::move(closeParentheses).error()};
+                    return std::nullopt;
                 }
                 return make_node<Syntax::TupleConstruct>(openParenth, std::vector<Syntax::StarredItem>{},
                                                          *closeParentheses);
@@ -120,12 +116,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto yield = parseYieldExpression();
                 if (!yield)
                 {
-                    return tl::unexpected{std::move(yield).error()};
+                    return std::nullopt;
                 }
                 auto closeParentheses = expect(TokenType::CloseParentheses);
                 if (!closeParentheses)
                 {
-                    return tl::unexpected{std::move(closeParentheses).error()};
+                    return std::nullopt;
                 }
                 return std::make_unique<Syntax::Yield>(std::move(*yield));
             }
@@ -137,12 +133,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto starredExpression = parseStarredExpression();
                 if (!starredExpression)
                 {
-                    return tl::unexpected{std::move(starredExpression).error()};
+                    return std::nullopt;
                 }
                 auto closeParentheses = expect(TokenType::CloseParentheses);
                 if (!closeParentheses)
                 {
-                    return tl::unexpected{std::move(closeParentheses).error()};
+                    return std::nullopt;
                 }
                 return starredExpression;
             }
@@ -150,19 +146,19 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
             auto expression = parseExpression();
             if (!expression)
             {
-                return tl::unexpected{std::move(expression).error()};
+                return std::nullopt;
             }
             if (!peekedIs(firstInCompFor))
             {
                 auto starredExpression = parseStarredExpression(std::move(*expression));
                 if (!starredExpression)
                 {
-                    return tl::unexpected{std::move(starredExpression).error()};
+                    return std::nullopt;
                 }
                 auto closeParentheses = expect(TokenType::CloseParentheses);
                 if (!closeParentheses)
                 {
-                    return tl::unexpected{std::move(closeParentheses).error()};
+                    return std::nullopt;
                 }
                 return starredExpression;
             }
@@ -170,12 +166,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
             auto compFor = parseCompFor();
             if (!compFor)
             {
-                return tl::unexpected{std::move(compFor).error()};
+                return std::nullopt;
             }
             auto closeParentheses = expect(TokenType::CloseParentheses);
             if (!closeParentheses)
             {
-                return tl::unexpected{std::move(closeParentheses).error()};
+                return std::nullopt;
             }
             return make_node<Syntax::Generator>(std::move(openParenth), std::move(*expression), std::move(*compFor),
                                                 std::move(*closeParentheses));
@@ -188,7 +184,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto closeBrace = expect(TokenType::CloseBrace);
                 if (!closeBrace)
                 {
-                    return tl::unexpected{std::move(closeBrace).error()};
+                    return std::nullopt;
                 }
                 return make_node<Syntax::DictDisplay>(
                     std::move(openBrace), std::vector<Syntax::DictDisplay::KeyDatum>{}, std::move(*closeBrace));
@@ -199,12 +195,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto starredList = parseStarredList();
                 if (!starredList)
                 {
-                    return tl::unexpected{std::move(starredList).error()};
+                    return std::nullopt;
                 }
                 auto closeBrace = expect(TokenType::CloseBrace);
                 if (!closeBrace)
                 {
-                    return tl::unexpected{std::move(closeBrace).error()};
+                    return std::nullopt;
                 }
                 return make_node<Syntax::SetDisplay>(std::move(openBrace), std::move(*starredList),
                                                      std::move(*closeBrace));
@@ -216,7 +212,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto expression = parseExpression();
                 if (!expression)
                 {
-                    return tl::unexpected{std::move(expression).error()};
+                    return std::nullopt;
                 }
                 if (!peekedIs(TokenType::Colon))
                 {
@@ -226,12 +222,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                         auto comprehension = parseComprehension(std::move(*expression));
                         if (!comprehension)
                         {
-                            return tl::unexpected{std::move(comprehension).error()};
+                            return std::nullopt;
                         }
                         auto closeBrace = expect(TokenType::CloseBrace);
                         if (!closeBrace)
                         {
-                            return tl::unexpected{std::move(closeBrace).error()};
+                            return std::nullopt;
                         }
                         return make_node<Syntax::SetDisplay>(std::move(openBrace), std::move(*comprehension),
                                                              std::move(*closeBrace));
@@ -239,12 +235,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                     auto starredList = parseStarredList(Syntax::StarredItem{std::nullopt, std::move(*expression)});
                     if (!starredList)
                     {
-                        return tl::unexpected{std::move(starredList).error()};
+                        return std::nullopt;
                     }
                     auto closeBrace = expect(TokenType::CloseBrace);
                     if (!closeBrace)
                     {
-                        return tl::unexpected{std::move(closeBrace).error()};
+                        return std::nullopt;
                     }
                     return make_node<Syntax::SetDisplay>(std::move(openBrace), std::move(*starredList),
                                                          std::move(*closeBrace));
@@ -253,19 +249,19 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto secondExpression = parseExpression();
                 if (!secondExpression)
                 {
-                    return tl::unexpected{std::move(secondExpression).error()};
+                    return std::nullopt;
                 }
                 if (peekedIs(firstInCompFor))
                 {
                     auto compFor = parseCompFor();
                     if (!compFor)
                     {
-                        return tl::unexpected{std::move(compFor).error()};
+                        return std::nullopt;
                     }
                     auto closeBrace = expect(TokenType::CloseBrace);
                     if (!closeBrace)
                     {
-                        return tl::unexpected{std::move(closeBrace).error()};
+                        return std::nullopt;
                     }
                     return make_node<Syntax::DictDisplay>(
                         std::move(openBrace),
@@ -278,31 +274,31 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
             }
 
             auto keyDatumList = parseCommaList(
-                [&]() -> tl::expected<Syntax::DictDisplay::KeyDatum, std::string>
+                [&]() -> std::optional<Syntax::DictDisplay::KeyDatum>
                 {
                     if (auto powerOf = maybeConsume(TokenType::PowerOf))
                     {
                         auto orExpr = parseOrExpr();
                         if (!orExpr)
                         {
-                            return tl::unexpected{std::move(orExpr).error()};
+                            return std::nullopt;
                         }
                         return Syntax::DictDisplay::KeyDatum{std::move(*orExpr), std::move(*powerOf), nullptr};
                     }
                     auto first = parseExpression();
                     if (!first)
                     {
-                        return tl::unexpected{std::move(first).error()};
+                        return std::nullopt;
                     }
                     auto colon = expect(TokenType::Colon);
                     if (!colon)
                     {
-                        return tl::unexpected{std::move(colon).error()};
+                        return std::nullopt;
                     }
                     auto second = parseExpression();
                     if (!second)
                     {
-                        return tl::unexpected{std::move(second).error()};
+                        return std::nullopt;
                     }
                     return Syntax::DictDisplay::KeyDatum{std::move(*first), std::move(*colon), std::move(*second)};
                 },
@@ -310,12 +306,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 std::move(keyDatum));
             if (!keyDatumList)
             {
-                return tl::unexpected{std::move(keyDatumList).error()};
+                return std::nullopt;
             }
             auto closeBrace = expect(TokenType::CloseBrace);
             if (!closeBrace)
             {
-                return tl::unexpected{std::move(closeBrace).error()};
+                return std::nullopt;
             }
             return make_node<Syntax::DictDisplay>(std::move(openBrace), std::move(*keyDatumList),
                                                   std::move(*closeBrace));
@@ -328,7 +324,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto closeSquare = expect(TokenType::CloseSquareBracket);
                 if (!closeSquare)
                 {
-                    return tl::unexpected{std::move(closeSquare).error()};
+                    return std::nullopt;
                 }
                 return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::vector<Syntax::StarredItem>{},
                                                       std::move(*closeSquare));
@@ -338,12 +334,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto starredList = parseStarredList();
                 if (!starredList)
                 {
-                    return tl::unexpected{std::move(starredList).error()};
+                    return std::nullopt;
                 }
                 auto closeSquare = expect(TokenType::CloseSquareBracket);
                 if (!closeSquare)
                 {
-                    return tl::unexpected{std::move(closeSquare).error()};
+                    return std::nullopt;
                 }
                 return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*starredList),
                                                       std::move(*closeSquare));
@@ -352,19 +348,19 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
             auto assignment = parseAssignmentExpression();
             if (!assignment)
             {
-                return tl::unexpected{std::move(assignment).error()};
+                return std::nullopt;
             }
             if (!peekedIs(firstInCompFor))
             {
                 auto starredList = parseStarredList(Syntax::StarredItem{std::nullopt, std::move(*assignment)});
                 if (!starredList)
                 {
-                    return tl::unexpected{std::move(starredList).error()};
+                    return std::nullopt;
                 }
                 auto closeSquare = expect(TokenType::CloseSquareBracket);
                 if (!closeSquare)
                 {
-                    return tl::unexpected{std::move(closeSquare).error()};
+                    return std::nullopt;
                 }
                 return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*starredList),
                                                       std::move(*closeSquare));
@@ -373,53 +369,52 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
             auto comprehension = parseComprehension(std::move(*assignment));
             if (!comprehension)
             {
-                return tl::unexpected{std::move(comprehension).error()};
+                return std::nullopt;
             }
             auto closeSquare = expect(TokenType::CloseSquareBracket);
             if (!closeSquare)
             {
-                return tl::unexpected{std::move(closeSquare).error()};
+                return std::nullopt;
             }
             return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*comprehension),
                                                   std::move(*closeSquare));
         }
-        case TokenType::SyntaxError: return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
+        case TokenType::SyntaxError: return std::nullopt;
         default:
-            return tl::unexpected{createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
-                                              fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses,
-                                                          TokenType::OpenSquareBracket, TokenType::OpenBrace),
-                                              m_current->getTokenType())
-                    .addLabel(*m_current, Diag::flags::strikethrough)
-                    .emit()};
+            createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N,
+                        fmt::format("{:q}, {:q} or {:q}", TokenType::OpenParentheses, TokenType::OpenSquareBracket,
+                                    TokenType::OpenBrace),
+                        m_current->getTokenType())
+                .addLabel(*m_current, Diag::flags::strikethrough);
+            return std::nullopt;
     }
 }
 
-tl::expected<pylir::Syntax::AttributeRef, std::string>
-    pylir::Parser::parseAttributeRef(IntrVarPtr<Syntax::Expression>&& expression)
+std::optional<pylir::Syntax::AttributeRef> pylir::Parser::parseAttributeRef(IntrVarPtr<Syntax::Expression>&& expression)
 {
     auto dot = expect(TokenType::Dot);
     if (!dot)
     {
-        return tl::unexpected{std::move(dot).error()};
+        return std::nullopt;
     }
     auto identifier = expect(TokenType::Identifier);
     if (!identifier)
     {
-        return tl::unexpected{std::move(identifier).error()};
+        return std::nullopt;
     }
     return Syntax::AttributeRef{{}, std::move(expression), *std::move(dot), IdentifierToken{*std::move(identifier)}};
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>>
     pylir::Parser::parseSlicingOrSubscription(IntrVarPtr<Syntax::Expression>&& expression)
 {
     auto squareBracket = expect(TokenType::OpenSquareBracket);
     if (!squareBracket)
     {
-        return tl::unexpected{std::move(squareBracket).error()};
+        return std::nullopt;
     }
     auto list = parseCommaList(
-        [&]() -> tl::expected<IntrVarPtr<Syntax::Expression>, std::string>
+        [&]() -> std::optional<IntrVarPtr<Syntax::Expression>>
         {
             IntrVarPtr<Syntax::Expression> lowerBound;
             if (m_current->getTokenType() != TokenType::Colon)
@@ -427,7 +422,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
                 auto first = parseExpression();
                 if (!first)
                 {
-                    return tl::unexpected{std::move(first).error()};
+                    return std::nullopt;
                 }
                 if (m_current == m_lexer.end() || m_current->getTokenType() != TokenType::Colon)
                 {
@@ -442,14 +437,14 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
                 auto temp = parseExpression();
                 if (!temp)
                 {
-                    return tl::unexpected{std::move(temp).error()};
+                    return std::nullopt;
                 }
                 upperBound = std::move(*temp);
             }
             auto secondColumn = expect(TokenType::Colon);
             if (!secondColumn)
             {
-                return tl::unexpected{std::move(secondColumn).error()};
+                return std::nullopt;
             }
             IntrVarPtr<Syntax::Expression> stride;
             if (peekedIs(firstInExpression))
@@ -457,7 +452,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
                 auto temp = parseExpression();
                 if (!temp)
                 {
-                    return tl::unexpected{std::move(temp).error()};
+                    return std::nullopt;
                 }
                 stride = std::move(*temp);
             }
@@ -467,12 +462,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
         &firstInExpression);
     if (!list)
     {
-        return tl::unexpected{std::move(list).error()};
+        return std::nullopt;
     }
     auto closeSquareBracket = expect(TokenType::CloseSquareBracket);
     if (!closeSquareBracket)
     {
-        return tl::unexpected{std::move(closeSquareBracket).error()};
+        return std::nullopt;
     }
     if (list->size() != 1)
     {
@@ -491,7 +486,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
                                            std::move(*closeSquareBracket));
 }
 
-tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
+std::optional<std::vector<pylir::Syntax::Argument>>
     pylir::Parser::parseArgumentList(IntrVarPtr<Syntax::Expression>&& firstAssignment)
 {
     std::vector<pylir::Syntax::Argument> arguments;
@@ -538,7 +533,7 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
         auto expression = !expansionOrEqual ? parseAssignmentExpression() : parseExpression();
         if (!expression)
         {
-            return tl::unexpected{std::move(expression).error()};
+            return std::nullopt;
         }
 
         // Remember the indices of both the first keyword argument and the first mapping expansion.
@@ -557,49 +552,46 @@ tl::expected<std::vector<pylir::Syntax::Argument>, std::string>
             // We diagnose whichever one of the two cases happened first.
             if (!firstMappingExpansionIndex || (firstKeywordIndex && firstKeywordIndex < firstMappingExpansionIndex))
             {
-                return tl::unexpected{
-                    createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS)
-                        .addLabel(**expression)
-                        .addNote(*arguments[*firstKeywordIndex].maybeName, Diag::FIRST_KEYWORD_ARGUMENT_N_HERE,
-                                 arguments[*firstKeywordIndex].maybeName->getValue())
-                        .addLabel(*arguments[*firstKeywordIndex].maybeName)
-                        .emit()};
-            }
-            return tl::unexpected{
-                createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
+                createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_KEYWORD_ARGUMENTS)
                     .addLabel(**expression)
-                    .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
-                    .addLabel(arguments[*firstMappingExpansionIndex])
-                    .emit()};
+                    .addNote(*arguments[*firstKeywordIndex].maybeName, Diag::FIRST_KEYWORD_ARGUMENT_N_HERE,
+                             arguments[*firstKeywordIndex].maybeName->getValue())
+                    .addLabel(*arguments[*firstKeywordIndex].maybeName);
+                return std::nullopt;
+            }
+            createError(**expression, Diag::POSITIONAL_ARGUMENT_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
+                .addLabel(**expression)
+                .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
+                .addLabel(arguments[*firstMappingExpansionIndex]);
+            return std::nullopt;
         }
 
         if (expansionOrEqual && expansionOrEqual->getTokenType() == TokenType::Star && firstMappingExpansionIndex)
         {
-            return tl::unexpected{
-                createError(**expression, Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
-                    .addLabel(**expression)
-                    .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
-                    .addLabel(arguments[*firstMappingExpansionIndex])
-                    .emit()};
+            createError(**expression, Diag::ITERABLE_UNPACKING_NOT_ALLOWED_FOLLOWING_DICTIONARY_UNPACKING)
+                .addLabel(**expression)
+                .addNote(arguments[*firstMappingExpansionIndex], Diag::FIRST_DICTIONARY_UNPACKING_HERE)
+                .addLabel(arguments[*firstMappingExpansionIndex]);
+            return std::nullopt;
         }
         arguments.push_back({std::move(keywordName), std::move(expansionOrEqual), std::move(*expression)});
     }
     return arguments;
 }
 
-tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(IntrVarPtr<Syntax::Expression>&& expression)
+std::optional<pylir::Syntax::Call> pylir::Parser::parseCall(IntrVarPtr<Syntax::Expression>&& expression)
 {
     auto openParenth = expect(TokenType::OpenParentheses);
     if (!openParenth)
     {
-        return tl::unexpected{std::move(openParenth).error()};
+        return std::nullopt;
     }
     if (m_current == m_lexer.end() || peekedIs(TokenType::CloseParentheses))
     {
         auto closeParenth = expect(TokenType::CloseParentheses);
         if (!closeParenth)
         {
-            return tl::unexpected{std::move(closeParenth).error()};
+            return std::nullopt;
         }
         return Syntax::Call{{},
                             std::move(expression),
@@ -616,7 +608,7 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(IntrVarP
         auto assignment = parseAssignmentExpression();
         if (!assignment)
         {
-            return tl::unexpected{std::move(assignment).error()};
+            return std::nullopt;
         }
         if (peekedIs(firstInCompFor))
         {
@@ -624,12 +616,12 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(IntrVarP
             auto comprehension = parseComprehension(std::move(*assignment));
             if (!comprehension)
             {
-                return tl::unexpected{std::move(comprehension).error()};
+                return std::nullopt;
             }
             auto closeParenth = expect(TokenType::CloseParentheses);
             if (!closeParenth)
             {
-                return tl::unexpected{std::move(closeParenth).error()};
+                return std::nullopt;
             }
             return Syntax::Call{{},
                                 std::move(expression),
@@ -643,26 +635,26 @@ tl::expected<pylir::Syntax::Call, std::string> pylir::Parser::parseCall(IntrVarP
     auto argumentList = parseArgumentList(std::move(firstAssignment));
     if (!argumentList)
     {
-        return tl::unexpected{std::move(argumentList).error()};
+        return std::nullopt;
     }
     maybeConsume(TokenType::Comma);
 
     auto closeParenth = expect(TokenType::CloseParentheses);
     if (!closeParenth)
     {
-        return tl::unexpected{std::move(closeParenth).error()};
+        return std::nullopt;
     }
     return Syntax::Call{
         {}, std::move(expression), std::move(*openParenth), std::move(*argumentList), std::move(*closeParenth)};
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parsePrimary()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parsePrimary()
 {
     // First must always be an atom, all others are left recursive
     auto atom = parseAtom();
     if (!atom)
     {
-        return tl::unexpected{std::move(atom).error()};
+        return std::nullopt;
     }
     IntrVarPtr<Syntax::Expression> current{std::move(*atom)};
     if (m_current == m_lexer.end())
@@ -678,7 +670,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto attributeRef = parseAttributeRef(std::move(current));
                 if (!attributeRef)
                 {
-                    return tl::unexpected{std::move(attributeRef).error()};
+                    return std::nullopt;
                 }
                 current = std::make_unique<Syntax::AttributeRef>(std::move(*attributeRef));
                 break;
@@ -688,7 +680,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto newCurrent = parseSlicingOrSubscription(std::move(current));
                 if (!newCurrent)
                 {
-                    return tl::unexpected{std::move(newCurrent).error()};
+                    return std::nullopt;
                 }
                 current = std::move(*newCurrent);
                 break;
@@ -698,7 +690,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto call = parseCall(std::move(current));
                 if (!call)
                 {
-                    return tl::unexpected{std::move(call).error()};
+                    return std::nullopt;
                 }
                 current = std::make_unique<Syntax::Call>(std::move(*call));
                 break;
@@ -709,7 +701,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     return {std::move(current)};
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseExpressionList()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseExpressionList()
 {
     std::vector<IntrVarPtr<Syntax::Expression>> expression;
     bool lastWasComma = true;
@@ -718,7 +710,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         auto expr = parseExpression();
         if (!expr)
         {
-            return tl::unexpected{std::move(expr).error()};
+            return std::nullopt;
         }
         expression.push_back(std::move(*expr));
         if (!maybeConsume(TokenType::Comma))
@@ -739,7 +731,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     return make_node<Syntax::TupleConstruct>(std::nullopt, std::move(items), std::nullopt);
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseAssignmentExpression()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseAssignmentExpression()
 {
     if (!lookaheadEquals(std::array{TokenType::Identifier, TokenType::Walrus}))
     {
@@ -752,27 +744,27 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     auto expression = parseExpression();
     if (!expression)
     {
-        return tl::unexpected{std::move(expression).error()};
+        return std::nullopt;
     }
     return make_node<Syntax::Assignment>(std::move(variable), walrus, std::move(*expression));
 }
 
-tl::expected<pylir::Syntax::UnaryOp, std::string> pylir::Parser::parseAwaitExpr()
+std::optional<pylir::Syntax::UnaryOp> pylir::Parser::parseAwaitExpr()
 {
     auto await = expect(TokenType::AwaitKeyword);
     if (!await)
     {
-        return tl::unexpected{std::move(await).error()};
+        return std::nullopt;
     }
     auto primary = parsePrimary();
     if (!primary)
     {
-        return tl::unexpected{std::move(primary).error()};
+        return std::nullopt;
     }
     return Syntax::UnaryOp{{}, std::move(*await), std::move(*primary)};
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parsePower()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parsePower()
 {
     IntrVarPtr<Syntax::Expression> expression;
     if (peekedIs(TokenType::AwaitKeyword))
@@ -780,7 +772,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         auto await = parseAwaitExpr();
         if (!await)
         {
-            return tl::unexpected{std::move(await).error()};
+            return std::nullopt;
         }
         expression = std::make_unique<Syntax::UnaryOp>(std::move(*await));
     }
@@ -789,7 +781,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         auto primary = parsePrimary();
         if (!primary)
         {
-            return tl::unexpected{std::move(primary).error()};
+            return std::nullopt;
         }
         expression = std::move(*primary);
     }
@@ -801,12 +793,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     auto uExpr = parseUExpr();
     if (!uExpr)
     {
-        return tl::unexpected{std::move(uExpr).error()};
+        return std::nullopt;
     }
     return make_node<Syntax::BinOp>(std::move(expression), std::move(*powerOf), std::move(*uExpr));
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseUExpr()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseUExpr()
 {
     std::vector<Token> unaries;
     while (auto unary = maybeConsume({TokenType::Minus, TokenType::Plus, TokenType::BitNegate}))
@@ -816,7 +808,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     auto power = parsePower();
     if (!power)
     {
-        return tl::unexpected{std::move(power).error()};
+        return std::nullopt;
     }
     IntrVarPtr<Syntax::Expression> current{std::move(*power)};
     std::reverse(unaries.begin(), unaries.end());
@@ -827,12 +819,12 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     return current;
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseMExpr()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseMExpr()
 {
     auto first = parseUExpr();
     if (!first)
     {
-        return tl::unexpected{std::move(first).error()};
+        return std::nullopt;
     }
     IntrVarPtr<Syntax::Expression> current{std::move(*first)};
     while (auto op = maybeConsume(
@@ -843,7 +835,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
             auto rhs = parseMExpr();
             if (!rhs)
             {
-                return tl::unexpected{std::move(rhs).error()};
+                return std::nullopt;
             }
             current = make_node<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
             continue;
@@ -852,44 +844,44 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         auto rhs = parseUExpr();
         if (!rhs)
         {
-            return tl::unexpected{std::move(rhs).error()};
+            return std::nullopt;
         }
         current = make_node<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
     }
     return current;
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseAExpr()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseAExpr()
 {
     return parseGenericBinOp<&Parser::parseMExpr, TokenType::Minus, TokenType::Plus>();
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseShiftExpr()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseShiftExpr()
 {
     return parseGenericBinOp<&Parser::parseAExpr, TokenType::ShiftLeft, TokenType::ShiftRight>();
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseAndExpr()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseAndExpr()
 {
     return parseGenericBinOp<&Parser::parseShiftExpr, TokenType::BitAnd>();
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseXorExpr()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseXorExpr()
 {
     return parseGenericBinOp<&Parser::parseAndExpr, TokenType::BitXor>();
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseOrExpr()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseOrExpr()
 {
     return parseGenericBinOp<&Parser::parseXorExpr, TokenType::BitOr>();
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseComparison()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseComparison()
 {
     auto first = parseOrExpr();
     if (!first)
     {
-        return tl::unexpected{std::move(first).error()};
+        return std::nullopt;
     }
     IntrVarPtr<Syntax::Expression> current{std::move(*first)};
     std::vector<std::pair<Syntax::Comparison::Operator, IntrVarPtr<Syntax::Expression>>> rest;
@@ -906,7 +898,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
                 auto in = expect(TokenType::InKeyword);
                 if (!in)
                 {
-                    return tl::unexpected{std::move(in).error()};
+                    return std::nullopt;
                 }
                 second = std::move(*in);
                 break;
@@ -916,7 +908,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
         auto rhs = parseOrExpr();
         if (!rhs)
         {
-            return tl::unexpected{std::move(rhs).error()};
+            return std::nullopt;
         }
         rest.emplace_back(Syntax::Comparison::Operator{std::move(*op), std::move(second)}, std::move(*rhs));
     }
@@ -927,7 +919,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     return make_node<Syntax::Comparison>(std::move(current), std::move(rest));
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseNotTest()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseNotTest()
 {
     auto end = std::find_if_not(m_current, m_lexer.end(),
                                 [](const Token& token) { return token.getTokenType() == TokenType::NotKeyword; });
@@ -937,7 +929,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     auto comp = parseComparison();
     if (!comp)
     {
-        return tl::unexpected{std::move(comp).error()};
+        return std::nullopt;
     }
     IntrVarPtr<Syntax::Expression> current{std::move(*comp)};
     for (Token& token : nots)
@@ -947,22 +939,22 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     return {std::move(current)};
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseAndTest()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseAndTest()
 {
     return parseGenericBinOp<&Parser::parseNotTest, TokenType::AndKeyword>();
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseOrTest()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseOrTest()
 {
     return parseGenericBinOp<&Parser::parseAndTest, TokenType::OrKeyword>();
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseConditionalExpression()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseConditionalExpression()
 {
     auto orTest = parseOrTest();
     if (!orTest)
     {
-        return tl::unexpected{std::move(orTest).error()};
+        return std::nullopt;
     }
     auto ifKeyword = maybeConsume(TokenType::IfKeyword);
     if (!ifKeyword)
@@ -972,23 +964,23 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     auto condition = parseOrTest();
     if (!condition)
     {
-        return tl::unexpected{std::move(condition).error()};
+        return std::nullopt;
     }
     auto elseKeyword = expect(TokenType::ElseKeyword);
     if (!elseKeyword)
     {
-        return tl::unexpected{std::move(elseKeyword).error()};
+        return std::nullopt;
     }
     auto other = parseExpression();
     if (!other)
     {
-        return tl::unexpected{std::move(other).error()};
+        return std::nullopt;
     }
     return make_node<Syntax::Conditional>(std::move(*orTest), std::move(*ifKeyword), std::move(*condition),
                                           std::move(*elseKeyword), std::move(*other));
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::Parser::parseExpression()
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseExpression()
 {
     if (!peekedIs(TokenType::LambdaKeyword))
     {
@@ -998,17 +990,17 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string> pylir::P
     auto lambda = parseLambdaExpression();
     if (!lambda)
     {
-        return tl::unexpected{std::move(lambda).error()};
+        return std::nullopt;
     }
     return std::make_unique<Syntax::Lambda>(std::move(*lambda));
 }
 
-tl::expected<pylir::Syntax::Lambda, std::string> pylir::Parser::parseLambdaExpression()
+std::optional<pylir::Syntax::Lambda> pylir::Parser::parseLambdaExpression()
 {
     auto keyword = expect(TokenType::LambdaKeyword);
     if (!keyword)
     {
-        return tl::unexpected{std::move(keyword).error()};
+        return std::nullopt;
     }
     std::vector<Syntax::Parameter> parameterList;
     if (peekedIsNot(TokenType::Colon))
@@ -1016,57 +1008,57 @@ tl::expected<pylir::Syntax::Lambda, std::string> pylir::Parser::parseLambdaExpre
         auto parsedParameterList = parseParameterList();
         if (!parsedParameterList)
         {
-            return tl::unexpected{std::move(parsedParameterList).error()};
+            return std::nullopt;
         }
         parameterList = std::move(*parsedParameterList);
     }
     auto colon = expect(TokenType::Colon);
     if (!colon)
     {
-        return tl::unexpected{std::move(colon).error()};
+        return std::nullopt;
     }
     auto expression = parseExpression();
     if (!expression)
     {
-        return tl::unexpected{std::move(expression).error()};
+        return std::nullopt;
     }
     return Syntax::Lambda{{}, std::move(*keyword), std::move(parameterList), std::move(*colon), std::move(*expression)};
 }
 
-tl::expected<pylir::Syntax::Comprehension, std::string>
+std::optional<pylir::Syntax::Comprehension>
     pylir::Parser::parseComprehension(IntrVarPtr<Syntax::Expression>&& assignmentExpression)
 {
     auto compFor = parseCompFor();
     if (!compFor)
     {
-        return tl::unexpected{std::move(compFor).error()};
+        return std::nullopt;
     }
     return Syntax::Comprehension{std::move(assignmentExpression), std::move(*compFor)};
 }
 
-tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
+std::optional<pylir::Syntax::CompFor> pylir::Parser::parseCompFor()
 {
     std::optional<Token> awaitToken = maybeConsume(TokenType::AwaitKeyword);
     auto forToken = expect(TokenType::ForKeyword);
     if (!forToken)
     {
-        return tl::unexpected{std::move(forToken).error()};
+        return std::nullopt;
     }
     auto targetList = parseTargetList(*forToken);
     if (!targetList)
     {
-        return tl::unexpected{std::move(targetList).error()};
+        return std::nullopt;
     }
     addToNamespace(**targetList);
     auto inToken = expect(TokenType::InKeyword);
     if (!inToken)
     {
-        return tl::unexpected{std::move(inToken).error()};
+        return std::nullopt;
     }
     auto orTest = parseOrTest();
     if (!orTest)
     {
-        return tl::unexpected{std::move(orTest).error()};
+        return std::nullopt;
     }
     if (!peekedIs({TokenType::ForKeyword, TokenType::IfKeyword, TokenType::AwaitKeyword}))
     {
@@ -1079,7 +1071,7 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
         auto compIf = parseCompIf();
         if (!compIf)
         {
-            return tl::unexpected{std::move(compIf).error()};
+            return std::nullopt;
         }
         trail = std::make_unique<Syntax::CompIf>(std::move(*compIf));
     }
@@ -1088,7 +1080,7 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
         auto compFor = parseCompFor();
         if (!compFor)
         {
-            return tl::unexpected{std::move(compFor).error()};
+            return std::nullopt;
         }
         trail = std::make_unique<Syntax::CompFor>(std::move(*compFor));
     }
@@ -1096,17 +1088,17 @@ tl::expected<pylir::Syntax::CompFor, std::string> pylir::Parser::parseCompFor()
                            std::move(*inToken),   std::move(*orTest),   std::move(trail)};
 }
 
-tl::expected<pylir::Syntax::CompIf, std::string> pylir::Parser::parseCompIf()
+std::optional<pylir::Syntax::CompIf> pylir::Parser::parseCompIf()
 {
     auto ifToken = expect(TokenType::IfKeyword);
     if (!ifToken)
     {
-        return tl::unexpected{std::move(ifToken).error()};
+        return std::nullopt;
     }
     auto orTest = parseOrTest();
     if (!orTest)
     {
-        return tl::unexpected{std::move(orTest).error()};
+        return std::nullopt;
     }
     if (!peekedIs({TokenType::ForKeyword, TokenType::IfKeyword, TokenType::AwaitKeyword}))
     {
@@ -1118,7 +1110,7 @@ tl::expected<pylir::Syntax::CompIf, std::string> pylir::Parser::parseCompIf()
         auto compIf = parseCompIf();
         if (!compIf)
         {
-            return tl::unexpected{std::move(compIf).error()};
+            return std::nullopt;
         }
         trail = std::make_unique<Syntax::CompIf>(std::move(*compIf));
     }
@@ -1127,14 +1119,14 @@ tl::expected<pylir::Syntax::CompIf, std::string> pylir::Parser::parseCompIf()
         auto compFor = parseCompFor();
         if (!compFor)
         {
-            return tl::unexpected{std::move(compFor).error()};
+            return std::nullopt;
         }
         trail = std::make_unique<Syntax::CompFor>(std::move(*compFor));
     }
     return Syntax::CompIf{std::move(*ifToken), std::move(*orTest), std::move(trail)};
 }
 
-tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
+std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>>
     pylir::Parser::parseStarredExpression(IntrVarPtr<Syntax::Expression>&& firstItem)
 {
     if (peekedIsNot(TokenType::Star) && !firstItem)
@@ -1142,7 +1134,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
         auto expression = parseAssignmentExpression();
         if (!expression)
         {
-            return tl::unexpected{std::move(expression).error()};
+            return std::nullopt;
         }
         firstItem = std::move(*expression);
     }
@@ -1160,7 +1152,7 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
         auto item = parseStarredItem();
         if (!item)
         {
-            return tl::unexpected{std::move(item).error()};
+            return std::nullopt;
         }
         // If a comma doesn't follow, then it's the last optional trailing starred_item
         items.emplace_back(std::move(*item));
@@ -1171,7 +1163,8 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
             // TODO: Better error message
             if (items.size() == 1 && item->maybeStar)
             {
-                return tl::unexpected{expect(TokenType::Comma).error()};
+                expect(TokenType::Comma);
+                return std::nullopt;
             }
             break;
         }
@@ -1179,26 +1172,26 @@ tl::expected<pylir::IntrVarPtr<pylir::Syntax::Expression>, std::string>
     return make_node<Syntax::TupleConstruct>(std::nullopt, std::move(items), std::nullopt);
 }
 
-tl::expected<pylir::Syntax::StarredItem, std::string> pylir::Parser::parseStarredItem()
+std::optional<pylir::Syntax::StarredItem> pylir::Parser::parseStarredItem()
 {
     if (auto star = maybeConsume(TokenType::Star))
     {
         auto expression = parseOrExpr();
         if (!expression)
         {
-            return tl::unexpected{std::move(expression).error()};
+            return std::nullopt;
         }
         return Syntax::StarredItem{std::move(star), std::move(*expression)};
     }
     auto assignment = parseAssignmentExpression();
     if (!assignment)
     {
-        return tl::unexpected{std::move(assignment).error()};
+        return std::nullopt;
     }
     return Syntax::StarredItem{std::nullopt, std::move(*assignment)};
 }
 
-tl::expected<std::vector<pylir::Syntax::StarredItem>, std::string>
+std::optional<std::vector<pylir::Syntax::StarredItem>>
     pylir::Parser::parseStarredList(std::optional<Syntax::StarredItem>&& firstItem)
 {
     return parseCommaList(pylir::bind_front(&Parser::parseStarredItem, this), &firstInStarredItem,

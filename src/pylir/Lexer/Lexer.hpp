@@ -18,8 +18,6 @@
 #include <string_view>
 #include <vector>
 
-#include <tl/expected.hpp>
-
 #include "Token.hpp"
 
 namespace pylir
@@ -27,9 +25,8 @@ namespace pylir
 class Lexer
 {
     std::vector<Token> m_tokens;
-    const Diag::Document* m_document;
     Diag::Document::const_iterator m_current;
-    std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> m_warningCallback;
+    Diag::DiagnosticsDocManager* m_diagManager;
     std::size_t m_depth = 0;
     std::stack<std::pair<std::size_t, std::size_t>> m_indentation{{{0, static_cast<std::size_t>(-1)}}};
 
@@ -37,7 +34,7 @@ class Lexer
 
     void parseIdentifier();
 
-    tl::expected<std::string, std::string> parseLiteral(bool raw, bool bytes);
+    std::optional<std::string> parseLiteral(bool raw, bool bytes);
 
     void parseNumber();
 
@@ -52,9 +49,7 @@ public:
     using difference_type = iterator::difference_type;
     using size_type = std::size_t;
 
-    explicit Lexer(
-        const Diag::Document& document,
-        std::function<void(Diag::DiagnosticsBuilder&& diagnosticsBuilder)> warningCallback = [](auto&&) {});
+    explicit Lexer(Diag::DiagnosticsDocManager& diagManager);
 
     ~Lexer() = default;
 
@@ -85,10 +80,15 @@ public:
     }
 
     template <class T, class S, class... Args>
-    [[nodiscard]] Diag::DiagnosticsBuilder createError(const T& location, const S& message, Args&&... args) const
+    [[nodiscard]] auto createError(const T& location, const S& message, Args&&... args) const
     {
-        return Diag::DiagnosticsBuilder(*m_document, Diag::Severity::Error, location, message,
+        return Diag::DiagnosticsBuilder(*m_diagManager, Diag::Severity::Error, location, message,
                                         std::forward<Args>(args)...);
+    }
+
+    Diag::DiagnosticsDocManager& getDiagManager() const
+    {
+        return *m_diagManager;
     }
 };
 } // namespace pylir

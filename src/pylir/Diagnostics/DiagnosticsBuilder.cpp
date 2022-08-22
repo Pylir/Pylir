@@ -16,47 +16,47 @@
 #include <fmt/color.h>
 #include <fmt/format.h>
 
-std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::size_t lineNumber,
-                                                       const Document& document, std::vector<Label> labels)
+void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::size_t width, std::size_t lineNumber,
+                                                    const Document& document, std::vector<Label> labels)
 {
-    std::string result = fmt::format("{1: >{0}} | ", width, lineNumber);
+    os << fmt::format("{1: >{0}} | ", width, lineNumber);
     auto line = document.getLine(lineNumber);
     if (labels.empty())
     {
-        result += Text::toUTF8String(line) + "\n";
-        return result;
+        os << Text::toUTF8String(line) << "\n";
+        return;
     }
     auto offset = line.data() - document.getText().data();
     {
         std::size_t lastEnd = 0;
         for (auto& iter : labels)
         {
-            result += Text::toUTF8String(line.substr(lastEnd, iter.start - offset - lastEnd));
+            os << Text::toUTF8String(line.substr(lastEnd, iter.start - offset - lastEnd));
             fmt::text_style style;
-            if (iter.optionalColour)
+            if (iter.optionalColour && os.has_colors())
             {
                 style |= fmt::fg(*iter.optionalColour);
             }
-            if (iter.optionalEmphasis)
+            if (iter.optionalEmphasis && os.has_colors())
             {
                 style |= *iter.optionalEmphasis;
             }
             // If not pointing at newline
             if (iter.start - offset != line.size())
             {
-                result += fmt::format(style, "{}",
-                                      Text::toUTF8String(line.substr(iter.start - offset, iter.end - iter.start)));
+                os << fmt::format(style, "{}",
+                                  Text::toUTF8String(line.substr(iter.start - offset, iter.end - iter.start)));
             }
             lastEnd = iter.end - offset;
         }
         if (lastEnd <= line.size())
         {
-            result += Text::toUTF8String(line.substr(lastEnd));
+            os << Text::toUTF8String(line.substr(lastEnd));
         }
     }
-    result += '\n';
+    os << '\n';
 
-    result += fmt::format("{1: >{0}} | ", width, "");
+    os << fmt::format("{1: >{0}} | ", width, "");
     {
         std::size_t lastEnd = 0;
         std::u32string underlines;
@@ -75,7 +75,7 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             }
             lastEnd = iter.end - offset;
             fmt::text_style style;
-            if (iter.optionalColour)
+            if (iter.optionalColour && os.has_colors())
             {
                 style = fmt::fg(*iter.optionalColour);
             }
@@ -97,26 +97,26 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
                 underlines += fmt::format(style, U"{0:~^{1}}", U"", consoleWidth);
             }
         }
-        result += Text::toUTF8String(underlines);
+        os << Text::toUTF8String(underlines);
     }
-    result += '\n';
+    os << '\n';
 
     labels.erase(std::remove_if(labels.begin(), labels.end(), [](const Label& label) { return !label.labelText; }),
                  labels.end());
     if (labels.empty())
     {
-        return result;
+        return;
     }
 
     {
-        result += fmt::format("{1: >{0}} | ", width, "");
+        os << fmt::format("{1: >{0}} | ", width, "");
         std::size_t lastEnd = 0;
         std::u32string underlines;
         underlines.reserve(line.size());
         for (auto& iter : labels)
         {
             fmt::text_style style;
-            if (iter.optionalColour)
+            if (iter.optionalColour && os.has_colors())
             {
                 style = fmt::fg(*iter.optionalColour);
             }
@@ -134,21 +134,21 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
             underlines += fmt::format(style, U"|");
             lastEnd = thisMid + 1;
         }
-        result += Text::toUTF8String(underlines);
-        result += '\n';
+        os << Text::toUTF8String(underlines);
+        os << '\n';
     }
 
     {
         while (!labels.empty())
         {
-            result += fmt::format("{1: >{0}} | ", width, "");
+            os << fmt::format("{1: >{0}} | ", width, "");
             std::size_t lastEnd = 0;
             std::u32string underlines;
             underlines.reserve(line.size());
             for (auto iter = labels.begin(); iter != labels.end();)
             {
                 fmt::text_style style;
-                if (iter->optionalColour)
+                if (iter->optionalColour && os.has_colors())
                 {
                     style = fmt::fg(*iter->optionalColour);
                 }
@@ -195,18 +195,15 @@ std::string pylir::Diag::DiagnosticsBuilder::printLine(std::size_t width, std::s
                 lastEnd = i;
                 iter = labels.erase(iter);
             }
-            result += Text::toUTF8String(underlines);
-            result += '\n';
+            os << Text::toUTF8String(underlines);
+            os << '\n';
         }
     }
-
-    return result;
 }
 
-std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message) const
+void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, const Message& message,
+                                                      Diag::DiagnosticsDocManager* diagnosticDocManager) const
 {
-    const auto& document = *message.document;
-    auto [lineNumber, colNumber] = document.getLineCol(message.location);
     std::string_view severityStr;
     fmt::color colour;
     switch (message.severity)
@@ -225,9 +222,24 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message)
             break;
         default: PYLIR_UNREACHABLE;
     }
-    auto result = fmt::format(fmt::emphasis::bold, "{}:{}:{}: ", document.getFilename(), lineNumber, colNumber);
-    result += fmt::format(fmt::emphasis::bold | fmt::fg(colour), "{}:", severityStr);
-    result += fmt::format(fmt::emphasis::bold, " {}\n", message.message);
+    fmt::text_style boldTextStyle;
+    fmt::text_style boldWithFgStyle;
+    if (os.has_colors())
+    {
+        boldTextStyle = fmt::emphasis::bold;
+        boldWithFgStyle = boldTextStyle | fmt::fg(colour);
+    }
+    if (!diagnosticDocManager)
+    {
+        os << fmt::format(boldWithFgStyle, "{}:", severityStr) << fmt::format(boldTextStyle, " {}\n", message.message);
+        return;
+    }
+
+    const auto& document = diagnosticDocManager->getDocument();
+    auto [lineNumber, colNumber] = document.getLineCol(message.location);
+    os << fmt::format(boldTextStyle, "{}:{}:{}: ", document.getFilename(), lineNumber, colNumber);
+    os << fmt::format(boldWithFgStyle, "{}:", severityStr);
+    os << fmt::format(boldTextStyle, " {}\n", message.message);
 
     struct LabelCompare
     {
@@ -297,41 +309,15 @@ std::string pylir::Diag::DiagnosticsBuilder::emitMessage(const Message& message)
     for (std::size_t i = std::max<std::ptrdiff_t>(1, static_cast<std::ptrdiff_t>(*neededLines.begin()) - MARGIN);
          i < *neededLines.begin(); i++)
     {
-        result += fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
+        os << fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
     }
     for (std::size_t i : neededLines)
     {
         auto& set = labeled[i];
-        result += printLine(width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
+        printLine(os, width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
     }
     for (std::size_t i = largestLine + 1; i < largestLine + MARGIN + 1 && document.hasLine(i); i++)
     {
-        result += fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
+        os << fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
     }
-
-    return result;
-}
-
-std::string pylir::Diag::formatLine(Severity severity, std::string_view message)
-{
-    std::string_view severityStr;
-    fmt::color colour;
-    switch (severity)
-    {
-        case Severity::Warning:
-            severityStr = "warning";
-            colour = DiagnosticsBuilder::WARNING_COLOUR;
-            break;
-        case Severity::Error:
-            severityStr = "error";
-            colour = DiagnosticsBuilder::ERROR_COLOUR;
-            break;
-        case Severity::Note:
-            severityStr = "note";
-            colour = DiagnosticsBuilder::NOTE_COLOUR;
-            break;
-        default: PYLIR_UNREACHABLE;
-    }
-    return fmt::format(fmt::emphasis::bold | fmt::fg(colour), "{}:", severityStr)
-           + fmt::format(fmt::emphasis::bold, " {}\n", message);
 }

@@ -131,30 +131,26 @@ void pylir::Parser::addToNamespace(const Syntax::Target& target)
             }
             Visitor::visit(atom);
         }
-    } visitor{{},
-              [&](const IdentifierToken& token)
-              { addToNamespace(token); }};
+    } visitor{{}, [&](const IdentifierToken& token) { addToNamespace(token); }};
     visitor.visit(target);
 }
 
-tl::expected<pylir::Token, std::string> pylir::Parser::expect(pylir::TokenType tokenType)
+std::optional<pylir::Token> pylir::Parser::expect(pylir::TokenType tokenType)
 {
     if (m_current == m_lexer.end())
     {
-        return tl::unexpected{createError(m_document->getText().size(), Diag::EXPECTED_N, tokenType)
-                                  .addLabel(m_document->getText().size(), fmt::format("{}", tokenType))
-                                  .emit()};
+        createError(endOfFileLoc(), Diag::EXPECTED_N, tokenType).addLabel(endOfFileLoc(), fmt::format("{}", tokenType));
+        return std::nullopt;
     }
     if (m_current->getTokenType() == TokenType::SyntaxError)
     {
-        return tl::unexpected{pylir::get<std::string>(m_current->getValue())};
+        return std::nullopt;
     }
     if (m_current->getTokenType() != tokenType)
     {
-        return tl::unexpected{
-            createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, tokenType, m_current->getTokenType())
-                .addLabel(*m_current, fmt::format("{}", tokenType), Diag::flags::strikethrough)
-                .emit()};
+        createError(*m_current, Diag::EXPECTED_N_INSTEAD_OF_N, tokenType, m_current->getTokenType())
+            .addLabel(*m_current, fmt::format("{}", tokenType), Diag::flags::strikethrough);
+        return std::nullopt;
     }
 
     return *m_current++;

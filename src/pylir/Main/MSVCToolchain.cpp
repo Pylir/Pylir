@@ -16,7 +16,7 @@ pylir::MSVCToolchain::MSVCToolchain(const llvm::Triple& triple, const cli::Comma
     m_programPaths.emplace_back(executablePath);
 }
 
-bool pylir::MSVCToolchain::link(const pylir::cli::CommandLine& commandLine, llvm::StringRef objectFile) const
+bool pylir::MSVCToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
 
