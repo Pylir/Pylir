@@ -21,12 +21,13 @@
 #include <pylir/Diagnostics/Document.hpp>
 #include <pylir/Parser/Syntax.hpp>
 
-#include <memory>
 #include <list>
+#include <memory>
 #include <mutex>
 #include <optional>
 
 #include "CommandLine.hpp"
+#include "DiagnosticsVerifier.hpp"
 #include "Toolchain.hpp"
 
 namespace pylir
@@ -45,6 +46,7 @@ class CompilerInvocation
     std::optional<llvm::raw_fd_ostream> m_outFileStream;
     std::string m_compileStepOutputFilename;
     std::string m_actionOutputFilename;
+    DiagnosticsVerifier* m_verifier;
 
     enum FileType
     {
@@ -86,8 +88,10 @@ private:
                                     const pylir::Toolchain& toolchain, CompilerInvocation::Action action,
                                     Diag::DiagnosticsManager& diagManager);
 
+    Diag::Document& addDocument(std::string&& content, std::string filename);
+
 public:
-    CompilerInvocation() = default;
+    explicit CompilerInvocation(DiagnosticsVerifier* verifier) : m_verifier(verifier) {}
 
     mlir::LogicalResult executeAction(llvm::opt::Arg* inputFile, cli::CommandLine& commandLine,
                                       const pylir::Toolchain& toolchain, CompilerInvocation::Action action,

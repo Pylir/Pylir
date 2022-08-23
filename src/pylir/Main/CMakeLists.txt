@@ -20,7 +20,7 @@ add_library(PylirMain
         LinuxToolchain.cpp
         Version.cpp
         Distro.cpp
-        CompilerInvocation.cpp)
+        CompilerInvocation.cpp DiagnosticsVerifier.cpp DiagnosticsVerifier.hpp)
 target_link_libraries(PylirMain
         PUBLIC Diagnostics ${llvm_options} MLIRPass
         PRIVATE

@@ -241,7 +241,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             exit.reset();
-            auto& document = m_documents.emplace_back(std::move(content), inputFile->getValue());
+            auto& document = addDocument(std::move(content), inputFile->getValue());
             auto subDiagManager = diagManager.createSubDiagnosticManager(document);
             Syntax::FileInput* fileInput;
             {
@@ -848,7 +848,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
             exit.reset();
 
             std::unique_lock sourceLock{sourceDSMutex};
-            auto& document = m_documents.emplace_back(std::move(content), request.filePath);
+            auto& document = addDocument(std::move(content), request.filePath);
             sourceLock.unlock();
 
             auto docManager = diagManager.createSubDiagnosticManager(document);
@@ -907,4 +907,14 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
                    std::back_inserter(importedModules), [](auto&& pair) { return std::move(pair.first); });
 
     return linkModules(importedModules);
+}
+
+pylir::Diag::Document& pylir::CompilerInvocation::addDocument(std::string&& content, std::string filename)
+{
+    auto& doc = m_documents.emplace_back(std::move(content), std::move(filename));
+    if (m_verifier)
+    {
+        m_verifier->addDocument(doc);
+    }
+    return doc;
 }

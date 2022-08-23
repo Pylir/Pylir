@@ -17,7 +17,7 @@
     {                                                                   \
         std::string error;                                              \
         pylir::Diag::DiagnosticsManager manager(                        \
-            [&error](pylir::Diag::DiagnosticsBuilderBase&& base)        \
+            [&error](pylir::Diag::Diagnostic&& base)                    \
             {                                                           \
                 llvm::errs() << base;                                   \
                 llvm::raw_string_ostream(error) << base;                \

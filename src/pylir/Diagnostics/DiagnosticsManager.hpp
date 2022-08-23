@@ -19,10 +19,7 @@ namespace pylir::Diag
 
 class DiagnosticsManager;
 
-class DiagnosticsBuilderBase;
-
-template <class T>
-class DiagnosticsBuilder;
+struct Diagnostic;
 
 /// Struct returned by `getWarning` of the various kinds of diagnostics managers.
 struct Warning
@@ -47,7 +44,7 @@ class SubDiagnosticsManagerBase
     template <class T>
     friend class DiagnosticsBuilder;
 
-    void report(DiagnosticsBuilderBase&& builder);
+    void report(Diagnostic&& diag);
 
 protected:
     SubDiagnosticsManagerBase(DiagnosticsManager* parent) : m_parent(parent) {}
@@ -106,7 +103,7 @@ class DiagnosticsManager
     llvm::StringMap<Warning> m_warnings;
 
     std::mutex m_diagCallbackMutex;
-    std::function<void(DiagnosticsBuilderBase&&)> m_diagnosticCallback;
+    std::function<void(Diagnostic&&)> m_diagnosticCallback;
     std::atomic_bool m_errorsOccurred = false;
 
 public:
@@ -114,12 +111,12 @@ public:
     /// is provided, diagnostics are simply streamed to llvm::errs() by default.
     /// Callbacks are executed under the lock of a mutex and hence do not need to take care of being threadsafe
     /// themselves.
-    DiagnosticsManager(std::function<void(DiagnosticsBuilderBase&&)> diagnosticCallback = {});
+    DiagnosticsManager(std::function<void(Diagnostic&&)> diag = {});
 
     /// Sets the callback for how to handle diagnostics.
     /// Callbacks are executed under the lock of a mutex and hence do not need to take care of being threadsafe
     /// themselves.
-    void setDiagnosticCallback(std::function<void(DiagnosticsBuilderBase&&)> diagnosticCallback)
+    void setDiagnosticCallback(std::function<void(Diagnostic&&)> diagnosticCallback)
     {
         m_diagnosticCallback = std::move(diagnosticCallback);
     }

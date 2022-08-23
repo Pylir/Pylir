@@ -20,6 +20,7 @@
 
 #include "CommandLine.hpp"
 #include "CompilerInvocation.hpp"
+#include "DiagnosticsVerifier.hpp"
 #include "LinuxToolchain.hpp"
 #include "MSVCToolchain.hpp"
 #include "MinGWToolchain.hpp"
@@ -75,7 +76,6 @@ int pylir::main(int argc, char** argv)
     pylir::Py::registerTransformPasses();
 
     pylir::Diag::DiagnosticsManager diagnosticManager;
-
     pylir::cli::CommandLine commandLine(llvm::sys::fs::getMainExecutable(argv[0], reinterpret_cast<void*>(&main)), argc,
                                         argv, diagnosticManager);
     if (!commandLine)
@@ -184,8 +184,17 @@ int pylir::main(int argc, char** argv)
         return -1;
     }
 
-    pylir::CompilerInvocation invocation;
-    return mlir::succeeded(invocation.executeAction(inputFile, commandLine, *toolchain, action, diagnosticManager)) ?
-               0 :
-               -1;
+    std::optional<pylir::DiagnosticsVerifier> verifier;
+    if (args.hasArg(OPT_verify))
+    {
+        verifier.emplace(diagnosticManager);
+    }
+
+    pylir::CompilerInvocation invocation(verifier ? &*verifier : nullptr);
+    auto result = invocation.executeAction(inputFile, commandLine, *toolchain, action, diagnosticManager);
+    if (verifier)
+    {
+        result = verifier->verify();
+    }
+    return mlir::succeeded(result) ? 0 : -1;
 }

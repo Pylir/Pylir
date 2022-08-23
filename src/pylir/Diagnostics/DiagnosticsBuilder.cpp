@@ -16,8 +16,8 @@
 #include <fmt/color.h>
 #include <fmt/format.h>
 
-void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::size_t width, std::size_t lineNumber,
-                                                    const Document& document, std::vector<Highlight> highlights)
+void pylir::Diag::Diagnostic::printLine(llvm::raw_ostream& os, std::size_t width, std::size_t lineNumber,
+                                        const Document& document, std::vector<Highlight> highlights)
 {
     os << fmt::format("{1: >{0}} | ", width, lineNumber);
     auto line = document.getLine(lineNumber);
@@ -202,8 +202,7 @@ void pylir::Diag::DiagnosticsBuilderBase::printLine(llvm::raw_ostream& os, std::
     }
 }
 
-void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, const Message& message,
-                                                      Diag::DiagnosticsDocManager* diagnosticDocManager) const
+llvm::raw_ostream& pylir::Diag::operator<<(llvm::raw_ostream& os, const Diagnostic::Message& message)
 {
     std::string_view severityStr;
     fmt::color colour;
@@ -211,15 +210,15 @@ void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, con
     {
         case Severity::Warning:
             severityStr = "warning";
-            colour = WARNING_COLOUR;
+            colour = Diagnostic::WARNING_COLOUR;
             break;
         case Severity::Error:
             severityStr = "error";
-            colour = ERROR_COLOUR;
+            colour = Diagnostic::ERROR_COLOUR;
             break;
         case Severity::Note:
             severityStr = "note";
-            colour = NOTE_COLOUR;
+            colour = Diagnostic::NOTE_COLOUR;
             break;
         default: PYLIR_UNREACHABLE;
     }
@@ -230,13 +229,13 @@ void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, con
         boldTextStyle = fmt::emphasis::bold;
         boldWithFgStyle = boldTextStyle | fmt::fg(colour);
     }
-    if (!diagnosticDocManager)
+    if (!message.document)
     {
         os << fmt::format(boldWithFgStyle, "{}:", severityStr) << fmt::format(boldTextStyle, " {}\n", message.message);
-        return;
+        return os;
     }
 
-    const auto& document = diagnosticDocManager->getDocument();
+    const auto& document = *message.document;
     auto [lineNumber, colNumber] = document.getLineCol(message.location);
     os << fmt::format(boldTextStyle, "{}:{}:{}: ", document.getFilename(), lineNumber, colNumber);
     os << fmt::format(boldWithFgStyle, "{}:", severityStr);
@@ -244,13 +243,13 @@ void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, con
 
     struct HighlightCompare
     {
-        bool operator()(const Highlight& lhs, const Highlight& rhs) const noexcept
+        bool operator()(const Diagnostic::Highlight& lhs, const Diagnostic::Highlight& rhs) const noexcept
         {
             return lhs.start < rhs.start;
         }
     };
 
-    std::unordered_map<std::size_t, std::set<Highlight, HighlightCompare>> highlighted;
+    std::unordered_map<std::size_t, std::set<Diagnostic::Highlight, HighlightCompare>> highlighted;
     std::set<std::size_t> neededLines;
     neededLines.insert(lineNumber);
     for (const auto& iter : message.highlights)
@@ -315,10 +314,11 @@ void pylir::Diag::DiagnosticsBuilderBase::emitMessage(llvm::raw_ostream& os, con
     for (std::size_t i : neededLines)
     {
         auto& set = highlighted[i];
-        printLine(os, width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
+        Diagnostic::printLine(os, width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
     }
     for (std::size_t i = largestLine + 1; i < largestLine + MARGIN + 1 && document.hasLine(i); i++)
     {
         os << fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
     }
+    return os;
 }

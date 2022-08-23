@@ -6,7 +6,10 @@
 
 #pragma once
 
+#include <llvm/ADT/ArrayRef.h>
 #include <llvm/Support/raw_ostream.h>
+
+#include <pylir/Support/AbstractIntrusiveVariant.hpp>
 
 #include <variant>
 
@@ -176,18 +179,14 @@ enum class Severity
     Note
 };
 
-/// Base class for 'DiagnosticsBuilder' containing data and methods that are independent of the diagnostics manager
-/// used.
-class DiagnosticsBuilderBase
+/// Container struct containing all info related to a single diagnostic. Consists of multiple messages, which usually
+/// is one warning or error, possibly followed by more notes.
+struct Diagnostic
 {
-    llvm::raw_ostream& (*m_emitFn)(llvm::raw_ostream&, const DiagnosticsBuilderBase&);
-
-public:
     constexpr static auto ERROR_COLOUR = fmt::color::red;
     constexpr static auto WARNING_COLOUR = fmt::color::magenta;
     constexpr static auto NOTE_COLOUR = fmt::color::cyan;
 
-protected:
     struct Highlight
     {
         std::size_t start;
@@ -200,44 +199,32 @@ protected:
     struct Message
     {
         Severity severity;
-        std::size_t location;
+        const Document* document; // may be null if there is no proper location
+        std::size_t location;     // meaningless if document is null
         std::string message;
         std::vector<Highlight> highlights;
     };
-    std::vector<Message> m_messages;
 
+    std::vector<Message> messages;
+
+private:
     static void printLine(llvm::raw_ostream& os, std::size_t width, std::size_t lineNumber,
                           const pylir::Diag::Document& document, std::vector<Highlight> highlights);
 
-    void emitMessage(llvm::raw_ostream& os, const Message& message,
-                     Diag::DiagnosticsDocManager* diagnosticDocManager) const;
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Message& message);
 
-    template <class T>
-    explicit DiagnosticsBuilderBase(Message&& message, std::in_place_type_t<T>)
-        : m_emitFn(+[](llvm::raw_ostream& os, const DiagnosticsBuilderBase& ptr) -> llvm::raw_ostream&
-                   { return os << static_cast<const T&>(ptr); })
+    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Diagnostic& rhs)
     {
-        m_messages.push_back(std::move(message));
-    }
-
-public:
-    /// Returns the main message of the diagnostic. This is the message that is initialized in the constructor of
-    /// 'DiagnosticsBuilder' and is the only one that may be a warning or error.
-    [[nodiscard]] const Message& getMainDiagnostic() const
-    {
-        return m_messages.front();
-    }
-
-    /// Outputs this diagnostic to an output stream. Uses ASCII escape for printing colour and emphasis if the output
-    /// stream supports it.
-    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const DiagnosticsBuilderBase& base)
-    {
-        return base.m_emitFn(os, base);
+        for (auto& iter : rhs.messages)
+        {
+            os << iter;
+        }
+        return os;
     }
 };
 
 /// Class used to build a compiler diagnostic. It makes use of the builder pattern to be able to conveniently chain
-/// a series of method calls, modifying the result. The final diagnostic is the emitted upon destruction.
+/// a series of method calls, modifying the result. The final diagnostic may then be emitted upon destruction.
 ///
 /// A diagnostic builder may either be instantiated with a 'DiagnosticsDocManager' in which case it requires the use of
 /// locations into the document for source file location, or with a 'DiagnosticsNoDocManager', in which case it only
@@ -253,8 +240,9 @@ public:
 /// formatting as errors and warnings described above. 'addHighlight' calls always affect the last diagnostic added,
 /// including notes.
 template <class Manager>
-class DiagnosticsBuilder : public DiagnosticsBuilderBase
+class DiagnosticsBuilder
 {
+    Diagnostic m_diagnostic;
     Manager* m_diagnosticManagerBase = nullptr;
     template <class... Args>
     static void verify()
@@ -278,7 +266,7 @@ class DiagnosticsBuilder : public DiagnosticsBuilderBase
     {
         if constexpr (flags::detail::hasFlag<flags::secondaryColour, Args...>())
         {
-            switch (m_messages.back().severity)
+            switch (m_diagnostic.messages.back().severity)
             {
                 case Severity::Error: return fmt::color::orange;
                 case Severity::Warning: return fmt::color::plum;
@@ -293,11 +281,11 @@ class DiagnosticsBuilder : public DiagnosticsBuilderBase
         {
             return std::nullopt;
         }
-        switch (m_messages.back().severity)
+        switch (m_diagnostic.messages.back().severity)
         {
-            case Severity::Error: return ERROR_COLOUR;
-            case Severity::Warning: return WARNING_COLOUR;
-            case Severity::Note: return NOTE_COLOUR;
+            case Severity::Error: return Diagnostic::ERROR_COLOUR;
+            case Severity::Warning: return Diagnostic::WARNING_COLOUR;
+            case Severity::Note: return Diagnostic::NOTE_COLOUR;
         }
         PYLIR_UNREACHABLE;
     }
@@ -330,21 +318,35 @@ class DiagnosticsBuilder : public DiagnosticsBuilderBase
 public:
     /// Creates a new DiagnosticBuilder for a message with the given 'severity' with a diagnostic at 'location' within
     /// the document of 'subDiagnosticManager'. 'location' may be any type that can be used as a location via
-    /// 'rangeLoc' with the context in 'subDiagnosticManager'. See its documentation for details.
+    /// 'rangeLoc' with the context in 'subDiagnosticManager'. See 'rangeLoc's documentation for details.
     ///
     /// The severity specifies the kind of message this diagnostic is producing. This is used as prefix when printing
     /// and for the colours to use as primary and secondary colours.
     /// The actual text message printed is produced via 'message', which may use 'fmt::format' style formatting options
     /// with 'args' as extra arguments.
+    ///
+    /// Upon destruction, the final 'Diagnostic' will be reported to 'subDiagnosticManager'.
     template <class T, class S, class... Args>
     DiagnosticsBuilder(DiagnosticsDocManager& subDiagnosticManager, Severity severity, const T& location,
                        const S& message, Args&&... args)
-        : DiagnosticsBuilderBase({severity,
-                                  rangeLoc(location, subDiagnosticManager.getContext()).first,
-                                  fmt::format(message, std::forward<Args>(args)...),
-                                  {}},
-                                 std::in_place_type<std::decay_t<decltype(*this)>>),
+        : m_diagnostic{{Diagnostic::Message{severity,
+                                            &subDiagnosticManager.getDocument(),
+                                            rangeLoc(location, subDiagnosticManager.getContext()).first,
+                                            fmt::format(message, std::forward<Args>(args)...),
+                                            {}}}},
           m_diagnosticManagerBase(&subDiagnosticManager)
+    {
+    }
+
+    /// Like the constructor above, but does not report any diagnostic upon destruction.
+    template <class T, class S, class... Args>
+    DiagnosticsBuilder(const Document& doc, Severity severity, const T& location, const S& message, Args&&... args)
+        : m_diagnostic{{Diagnostic::Message{severity,
+                                            &doc,
+                                            rangeLoc(location, nullptr).first,
+                                            fmt::format(message, std::forward<Args>(args)...),
+                                            {}}}},
+          m_diagnosticManagerBase(nullptr)
     {
     }
 
@@ -352,11 +354,16 @@ public:
     /// The severity specifies the kind of message this diagnostic is producing. This is used as prefix when printing
     /// and for the colours to use. The actual text message printed is produced via 'message', which may use
     /// 'fmt::format' style formatting options with 'args' as extra arguments.
+    ///
+    /// Upon destruction, the final 'Diagnostic' will be reported to 'subDiagnosticManager'.
     template <class S, class... Args>
     DiagnosticsBuilder(DiagnosticsNoDocManager& subDiagnosticManager, Severity severity, const S& message,
                        Args&&... args)
-        : DiagnosticsBuilderBase({severity, 0, fmt::format(message, std::forward<Args>(args)...), {}},
-                                 std::in_place_type<std::decay_t<decltype(*this)>>),
+        : m_diagnostic{{Diagnostic::Message{severity,
+                                            nullptr,
+                                            0,
+                                            fmt::format(message, std::forward<Args>(args)...),
+                                            {}}}},
           m_diagnosticManagerBase(&subDiagnosticManager)
     {
     }
@@ -368,21 +375,27 @@ public:
         {
             return;
         }
-        m_diagnosticManagerBase->report(std::move(*this));
+        m_diagnosticManagerBase->report(std::move(m_diagnostic));
+    }
+
+    /// Moves the 'Diagnostic' that was built out of the builder.
+    Diagnostic&& getDiagnostic() &&
+    {
+        return std::move(m_diagnostic);
     }
 
     DiagnosticsBuilder(const DiagnosticsBuilder&) = delete;
     DiagnosticsBuilder& operator=(const DiagnosticsBuilder&) = delete;
 
     DiagnosticsBuilder(DiagnosticsBuilder&& rhs) noexcept
-        : DiagnosticsBuilderBase(std::move(rhs)),
+        : m_diagnostic(std::move(rhs.m_diagnostic)),
           m_diagnosticManagerBase(std::exchange(rhs.m_diagnosticManagerBase, nullptr))
     {
     }
 
     DiagnosticsBuilder& operator=(DiagnosticsBuilder&& rhs) noexcept
     {
-        *this = static_cast<DiagnosticsBuilderBase&&>(rhs);
+        m_diagnostic = std::move(rhs.m_diagnostic);
         m_diagnosticManagerBase = std::exchange(rhs.m_diagnosticManagerBase, nullptr);
         return *this;
     }
@@ -405,10 +418,11 @@ public:
                             DiagnosticsBuilder&&>
     {
         verify<Flags...>();
-        m_messages.back().highlights.push_back({rangeLoc(start, m_diagnosticManagerBase->getContext()).first,
-                                                rangeLoc(end, m_diagnosticManagerBase->getContext()).second,
-                                                flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
-                                                getColour<Flags...>(), getEmphasis(flags...)});
+        m_diagnostic.messages.back().highlights.push_back(
+            {rangeLoc(start, m_diagnosticManagerBase ? m_diagnosticManagerBase->getContext() : nullptr).first,
+             rangeLoc(end, m_diagnosticManagerBase ? m_diagnosticManagerBase->getContext() : nullptr).second,
+             flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...), getColour<Flags...>(),
+             getEmphasis(flags...)});
         return std::move(*this);
     }
 
@@ -421,10 +435,10 @@ public:
                             DiagnosticsBuilder&&>
     {
         verify<Flags...>();
-        auto [start, end] = rangeLoc(pos, m_diagnosticManagerBase->getContext());
-        m_messages.back().highlights.push_back({start, end,
-                                                flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...),
-                                                getColour<Flags...>(), getEmphasis(flags...)});
+        auto [start, end] = rangeLoc(pos, m_diagnosticManagerBase ? m_diagnosticManagerBase->getContext() : nullptr);
+        m_diagnostic.messages.back().highlights.push_back(
+            {start, end, flags::detail::getFlag<flags::label>(std::forward<Flags>(flags)...), getColour<Flags...>(),
+             getEmphasis(flags...)});
         return std::move(*this);
     }
 
@@ -458,10 +472,12 @@ public:
     auto addNote(const T& location, const S& message, Args&&... args)
         -> std::enable_if_t<hasLocationProvider_v<T> && std::is_same_v<M, DiagnosticsDocManager>, DiagnosticsBuilder&&>
     {
-        m_messages.push_back({Severity::Note,
-                              rangeLoc(location, m_diagnosticManagerBase->getContext()).first,
-                              fmt::format(message, std::forward<Args>(args)...),
-                              {}});
+        m_diagnostic.messages.push_back(
+            {Severity::Note,
+             m_diagnostic.messages.back().document,
+             rangeLoc(location, m_diagnosticManagerBase ? m_diagnosticManagerBase->getContext() : nullptr).first,
+             fmt::format(message, std::forward<Args>(args)...),
+             {}});
         return std::move(*this);
     }
 
@@ -471,27 +487,18 @@ public:
     auto addNote(const S& message, Args&&... args)
         -> std::enable_if_t<std::is_same_v<M, DiagnosticsNoDocManager>, DiagnosticsBuilder&&>
     {
-        m_messages.push_back({Severity::Note, 0, fmt::format(message, std::forward<Args>(args)...), {}});
+        m_diagnostic.messages.push_back(
+            {Severity::Note, nullptr, 0, fmt::format(message, std::forward<Args>(args)...), {}});
         return std::move(*this);
-    }
-
-    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const DiagnosticsBuilder& rhs)
-    {
-        DiagnosticsDocManager* docManager = nullptr;
-        if constexpr (std::is_same_v<Manager, DiagnosticsDocManager>)
-        {
-            docManager = rhs.m_diagnosticManagerBase;
-        }
-        for (auto& iter : rhs.m_messages)
-        {
-            rhs.emitMessage(os, iter, docManager);
-        }
-        return os;
     }
 };
 
 template <class T, class S, class... Args>
 DiagnosticsBuilder(DiagnosticsDocManager&, Severity, const T&, const S&, Args&&...)
+    -> DiagnosticsBuilder<DiagnosticsDocManager>;
+
+template <class T, class S, class... Args>
+DiagnosticsBuilder(const Document&, Severity, const T&, const S&, Args&&...)
     -> DiagnosticsBuilder<DiagnosticsDocManager>;
 
 template <class S, class... Args>
