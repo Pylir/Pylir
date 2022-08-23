@@ -255,7 +255,8 @@ class CodeGen
 
     std::optional<Intrinsic> checkForIntrinsic(const Syntax::Expression& expression);
 
-    mlir::Value callIntrinsic(Intrinsic&& intrinsic, llvm::ArrayRef<Syntax::Argument> arguments);
+    mlir::Value callIntrinsic(Intrinsic&& intrinsic, llvm::ArrayRef<Syntax::Argument> arguments,
+                              const Syntax::Call& call);
 
     mlir::Value intrinsicConstant(Intrinsic&& intrinsic);
 
@@ -440,6 +441,20 @@ class CodeGen
 
 public:
     CodeGen(mlir::MLIRContext* context, Diag::DiagnosticsDocManager& docManager, CodeGenOptions&& options);
+
+    template <class T, class S, class... Args, std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+    auto createError(const T& location, const S& message, Args&&... args)
+    {
+        return Diag::DiagnosticsBuilder(*m_docManager, Diag::Severity::Error, location, message,
+                                        std::forward<Args>(args)...);
+    }
+
+    template <class T, class S, class... Args, std::enable_if_t<Diag::hasLocationProvider_v<T>>* = nullptr>
+    auto createWarning(const T& location, const S& message, Args&&... args)
+    {
+        return Diag::DiagnosticsBuilder(*m_docManager, Diag::Severity::Warning, location, message,
+                                        std::forward<Args>(args)...);
+    }
 
     mlir::ModuleOp visit(const Syntax::FileInput& fileInput);
 

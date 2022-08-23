@@ -15,6 +15,7 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Path.h>
 
+#include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
@@ -592,10 +593,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Call& call)
         const auto* args = std::get_if<std::vector<Syntax::Argument>>(&call.variant);
         if (!args)
         {
-            // TODO: error/warning
+            const auto& compr = pylir::get<Syntax::Comprehension>(call.variant);
+            createError(compr, Diag::INTRINSICS_DO_NOT_SUPPORT_COMPREHENSION_ARGUMENTS)
+                .addHighlight(compr)
+                .addHighlight(intr->identifiers.front(), intr->identifiers.back(), Diag::flags::secondaryColour);
             return {};
         }
-        return callIntrinsic(std::move(*intr), *args);
+        return callIntrinsic(std::move(*intr), *args, call);
     }
 
     auto callable = visit(*call.expression);
@@ -2550,24 +2554,63 @@ std::optional<pylir::CodeGen::Intrinsic> pylir::CodeGen::checkForIntrinsic(const
     return Intrinsic{std::move(name), std::move(identifiers)};
 }
 
-mlir::Value pylir::CodeGen::callIntrinsic(Intrinsic&& intrinsic, llvm::ArrayRef<Syntax::Argument> arguments)
+mlir::Value pylir::CodeGen::callIntrinsic(Intrinsic&& intrinsic, llvm::ArrayRef<Syntax::Argument> arguments,
+                                          const Syntax::Call& call)
 {
     std::string_view intrName = intrinsic.name;
     llvm::SmallVector<mlir::Value> args;
+    bool errorsOccurred = false;
     for (const auto& iter : arguments)
     {
-        // TODO: diagnose expansion, keyword etc.
+        if (iter.maybeName)
+        {
+            createError(iter, Diag::INTRINSICS_DO_NOT_SUPPORT_KEYWORD_ARGUMENTS)
+                .addHighlight(iter)
+                .addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(),
+                              Diag::flags::secondaryColour);
+            errorsOccurred = true;
+            continue;
+        }
+        if (iter.maybeExpansionsOrEqual)
+        {
+            if (iter.maybeExpansionsOrEqual->getTokenType() == TokenType::PowerOf)
+            {
+                createError(iter, Diag::INTRINSICS_DO_NOT_SUPPORT_DICTIONARY_UNPACKING_ARGUMENTS)
+                    .addHighlight(iter)
+                    .addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(),
+                                  Diag::flags::secondaryColour);
+            }
+            else
+            {
+                createError(iter, Diag::INTRINSICS_DO_NOT_SUPPORT_ITERABLE_UNPACKING_ARGUMENTS)
+                    .addHighlight(iter)
+                    .addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(),
+                                  Diag::flags::secondaryColour);
+            }
+            errorsOccurred = true;
+            continue;
+        }
+        if (errorsOccurred)
+        {
+            continue;
+        }
         auto arg = visit(*iter.expression);
         if (!arg)
         {
-            return {};
+            errorsOccurred = true;
+            continue;
         }
         args.push_back(arg);
+    }
+    if (errorsOccurred)
+    {
+        return {};
     }
 
 #include <pylir/CodeGen/CodeGenIntr.cpp.inc>
 
-    // TODO: diagnose unknown intr
+    createError(intrinsic.identifiers.front(), Diag::UNKNOWN_INTRINSIC_N, intrName)
+        .addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back());
     return {};
 }
 
@@ -2596,8 +2639,9 @@ mlir::Value pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrin
         return m_builder.createConstant(m_builder.getTupleAttr(attrs));
     }
 
-    // TODO: diagnose unknown intr
-    PYLIR_UNREACHABLE;
+    createError(intrinsic.identifiers.front(), Diag::UNKNOWN_INTRINSIC_N, intrName)
+        .addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back());
+    return {};
 }
 
 mlir::Value pylir::buildException(mlir::Location loc, PyBuilder& builder, std::string_view kind,

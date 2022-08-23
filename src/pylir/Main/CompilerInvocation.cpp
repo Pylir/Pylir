@@ -822,6 +822,9 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
             return;
         }
 
+        // NOTE: we can't return a mlir::OwningOpRef<mlir::ModuleOp> here, because LLVMs threadpool uses
+        // 'std::shared_future's which do not have a non-const 'get' method that we could use to move it out of the
+        // future.
         auto action = [&, request = std::move(request)]() mutable -> mlir::ModuleOp
         {
             std::optional exit = llvm::make_scope_exit([&] { llvm::sys::fs::closeFile(request.handle); });
@@ -884,12 +887,24 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
     };
 
     auto mainModule = pylir::codegen(&*m_mlirContext, m_fileInputs.front(), mainModuleDiagManager, options);
-    std::vector<mlir::OwningOpRef<mlir::ModuleOp>> importedModules;
-    importedModules.push_back(std::move(mainModule));
     if (mainModuleDiagManager.errorsOccurred())
     {
-        importedModules.front() = nullptr;
+        // Despite the errors that occurred in the main module, we still want to codegen and wait for all imports
+        // to occur to emit as many helpful errors as possible. This is also necessary to not leak the memory of the
+        // modules they're creating.
+        llvm::for_each(llvm::make_first_range(futures),
+                       [](auto&& future)
+                       {
+                           if (auto module = future.get())
+                           {
+                               module.erase();
+                           }
+                       });
+        return mlir::failure();
     }
+    std::vector<mlir::OwningOpRef<mlir::ModuleOp>> importedModules;
+    importedModules.push_back(std::move(mainModule));
+
     // The real size of `futures` is unknown as it grows while we are iterating through here. Hence, we NEED to use
     // a back inserter.
     std::vector<std::pair<mlir::OwningOpRef<mlir::ModuleOp>, std::string>> calculatedImports;

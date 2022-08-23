@@ -190,4 +190,28 @@ constexpr auto STARRED_PARAMETER_N_HERE = FMT_STRING("starred parameter '{}' her
 constexpr auto EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST =
     FMT_STRING("except clause without expression must come last");
 
+// CodeGen
+
+constexpr auto UNKNOWN_INTRINSIC_N = FMT_STRING("unknown intrinsic '{}'");
+
+constexpr auto INTRINSICS_DO_NOT_SUPPORT_KEYWORD_ARGUMENTS = FMT_STRING("intrinsics do not support keyword arguments");
+
+constexpr auto INTRINSICS_DO_NOT_SUPPORT_ITERABLE_UNPACKING_ARGUMENTS =
+    FMT_STRING("intrinsics do not support iterable unpacking arguments");
+
+constexpr auto INTRINSICS_DO_NOT_SUPPORT_DICTIONARY_UNPACKING_ARGUMENTS =
+    FMT_STRING("intrinsics do not support dictionary unpacking arguments");
+
+constexpr auto INTRINSICS_DO_NOT_SUPPORT_COMPREHENSION_ARGUMENTS =
+    FMT_STRING("intrinsics do not support comprehension arguments");
+
+constexpr auto INTRINSIC_N_EXPECTS_N_ARGUMENTS_NOT_N = FMT_STRING("intrinsic '{}' expects {} argument(s) not {}");
+
+constexpr auto ARGUMENT_N_OF_INTRINSIC_N_HAS_TO_BE_A_CONSTANT_STRING =
+    FMT_STRING("argument {} of intrinsic '{}' has to be a constant string");
+
+constexpr auto INVALID_ENUM_VALUE_N_FOR_ENUM_N_ARGUMENT = FMT_STRING("invalid enum value '{}' for enum '{}' argument");
+
+constexpr auto VALID_VALUES_ARE_N = FMT_STRING("valid values are: {}");
+
 } // namespace pylir::Diag

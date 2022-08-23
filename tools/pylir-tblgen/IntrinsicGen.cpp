@@ -10,11 +10,20 @@
 
 #include <llvm/ADT/Sequence.h>
 #include <llvm/Support/FormatVariadic.h>
+#include <llvm/TableGen/Error.h>
 #include <llvm/TableGen/Record.h>
 #include <llvm/TableGen/TableGenBackend.h>
 
 namespace
 {
+
+std::string stringify(llvm::StringRef ref)
+{
+    std::string result = "\"";
+    llvm::raw_string_ostream ss(result);
+    ss.write_escaped(ref);
+    return result + '"';
+}
 
 bool typeIsCompatible(const mlir::tblgen::TypeConstraint& type)
 {
@@ -83,14 +92,18 @@ std::string genInputTypeConversion(std::string inputValue, const mlir::tblgen::T
 }
 
 std::string genAttrConversion(mlir::raw_indented_ostream& os, std::string inputValue,
-                              const mlir::tblgen::Attribute& attr)
+                              const mlir::tblgen::Attribute& attr, std::size_t cppArgIndex)
 {
     os << "::pylir::Py::StrAttr attr;\n";
     os << llvm::formatv("if (!mlir::matchPattern({0}, mlir::m_Constant(&attr)))\n", inputValue);
     {
         auto failureScope = os.scope("{\n", "}\n");
-        // TODO: actual diagnostic
-        os << "PYLIR_UNREACHABLE;\n";
+        os << llvm::formatv(
+            "createError(arguments[{0}], Diag::ARGUMENT_N_OF_INTRINSIC_N_HAS_TO_BE_A_CONSTANT_STRING, {0}, intrName)\n"
+            ".addHighlight(arguments[{0}])\n"
+            ".addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(), Diag::flags::secondaryColour);\n",
+            cppArgIndex);
+        os << "return {};\n";
     }
     if (attr.getDefName() == "StrAttr")
     {
@@ -101,9 +114,19 @@ std::string genAttrConversion(mlir::raw_indented_ostream& os, std::string inputV
                         enumAttr.getCppNamespace());
     os << "if(!value)\n";
     {
+        std::string validEnumValues;
+        llvm::raw_string_ostream ss(validEnumValues);
+        llvm::interleaveComma(enumAttr.getAllCases(), ss,
+                              [&](const mlir::tblgen::EnumAttrCase& attrCase) { ss << attrCase.getSymbol(); });
+
         auto failureScope = os.scope("{\n", "}\n");
-        // TODO: actual diagnostic
-        os << "PYLIR_UNREACHABLE;\n";
+        os << llvm::formatv(
+            "createError(arguments[{0}], Diag::INVALID_ENUM_VALUE_N_FOR_ENUM_N_ARGUMENT, attr.getValue(), {1})\n"
+            ".addHighlight(arguments[{0}])\n"
+            ".addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(), Diag::flags::secondaryColour)"
+            ".addNote(arguments[{0}], Diag::VALID_VALUES_ARE_N, {2});\n",
+            cppArgIndex, stringify(enumAttr.getEnumClassName()), stringify(validEnumValues));
+        os << "return {};\n";
     }
     return llvm::formatv("{0}::get(m_builder.getContext(), *value)", enumAttr.getStorageType());
 }
@@ -117,6 +140,7 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
     // * intrName is a string containing the intrinsic name
     // * args is a random access container containing mlir::Value arguments
     // * m_builder is the pylir::Py::PyBuilder
+    // * call is a Syntax::Call
 
     for (auto& def : records.getAllDerivedDefinitions("Op"))
     {
@@ -127,15 +151,19 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
         }
 
         auto opName = op.getOperationName().substr(op.getDialectName().size() + 1);
-        os << llvm::formatv("if(intrName == \"pylir.intr.{0}\")\n", opName);
+        os << llvm::formatv("if(intrName == {0})\n", stringify("pylir.intr." + opName));
         auto isOpScope = os.scope("{\n", "}\n");
         if (op.getNumVariableLengthOperands() == 0)
         {
             os << llvm::formatv("if(args.size() != {0})\n", op.getNumArgs());
             {
                 auto ifScope = os.scope("{\n", "}\n");
-                // TODO: emit proper diagnostic
-                os << "PYLIR_UNREACHABLE;\n";
+                os << llvm::formatv(
+                    "createError(call.openParenth, Diag::INTRINSIC_N_EXPECTS_N_ARGUMENTS_NOT_N, intrName, {0}, args.size())\n"
+                    ".addHighlight(call.openParenth, call.closeParenth)\n"
+                    ".addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(), Diag::flags::secondaryColour);\n",
+                    op.getNumArgs());
+                os << "return {};\n";
             }
         }
         os << "::llvm::SmallVector<::mlir::Value> operands;\n";
@@ -165,9 +193,9 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
             }
             auto scope = os.scope("{\n", "}\n");
             auto* attr = iter.value().get<mlir::tblgen::NamedAttribute*>();
-            os << llvm::formatv(
-                "attributes.emplace_back(m_builder.getStringAttr(\"{0}\"), {1});\n", attr->name,
-                genAttrConversion(os, llvm::formatv("args[{0} + {1}]", iter.index(), argOffset), attr->attr));
+            os << llvm::formatv("attributes.emplace_back(m_builder.getStringAttr({0}), {1});\n", stringify(attr->name),
+                                genAttrConversion(os, llvm::formatv("args[{0} + {1}]", iter.index(), argOffset),
+                                                  attr->attr, iter.index()));
         }
         os << llvm::formatv("auto op = m_builder.create<{0}>({1}operands, attributes);\n", op.getQualCppClassName(),
                             op.getNumResults() == 0 ? "::mlir::TypeRange{}, " : "");
