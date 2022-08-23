@@ -67,7 +67,7 @@ using Target = Expression;
 template <class T>
 constexpr bool validTargetType()
 {
-    return llvm::is_one_of<T, Atom, Subscription, AttributeRef, TupleConstruct, ListDisplay>{};
+    return llvm::is_one_of<T, Atom, Subscription, Slice, AttributeRef, TupleConstruct, ListDisplay>{};
 }
 
 struct AttributeRef : Expression::Base<AttributeRef>

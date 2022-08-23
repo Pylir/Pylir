@@ -498,6 +498,8 @@ public:
 
     void assignTarget(const Syntax::Subscription& subscription, mlir::Value value);
 
+    void assignTarget(const Syntax::Slice& slice, mlir::Value value);
+
     void assignTarget(const Syntax::AttributeRef& attributeRef, mlir::Value value);
 
     void assignTarget(const Syntax::TupleConstruct& tupleConstruct, mlir::Value value);

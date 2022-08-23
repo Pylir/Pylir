@@ -250,6 +250,12 @@ void pylir::CodeGen::assignTarget(const Syntax::Subscription& subscription, mlir
     m_builder.createPylirSetItemIntrinsic(container, indices, value, m_currentExceptBlock);
 }
 
+void pylir::CodeGen::assignTarget(const Syntax::Slice& slice, mlir::Value value)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
 void pylir::CodeGen::assignTarget(const Syntax::AttributeRef& attributeRef, mlir::Value value)
 {
     // TODO:
