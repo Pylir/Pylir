@@ -63,7 +63,7 @@ endif ()
 
 if (PYLIR_USE_PCH)
     add_library(COMMON_PCH INTERFACE)
-    target_precompile_headers(COMMON_PCH INTERFACE <type_traits> <functional> <tuple> <optional> <variant> <memory> <string> <string_view> <charconv> <array> <vector> <set> <map> <unordered_set> <unordered_map> <iterator> <algorithm> <numeric> <tl/expected.hpp> <tcb/span.hpp>)
+    target_precompile_headers(COMMON_PCH INTERFACE <type_traits> <functional> <tuple> <optional> <variant> <memory> <string> <string_view> <charconv> <array> <vector> <set> <map> <unordered_set> <unordered_map> <iterator> <algorithm> <numeric> <tcb/span.hpp>)
 endif ()
 
 if (POLICY CMP0116)
