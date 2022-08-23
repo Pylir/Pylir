@@ -21,7 +21,6 @@ class Document
 {
     std::string m_filename;
     Text::Encoding m_encoding;
-    std::string m_input;
     std::u32string m_text;
     std::vector<std::size_t> m_lineStarts{0};
 
@@ -34,7 +33,7 @@ public:
     using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
 
-    explicit Document(std::string input, std::string filename = "<stdin>",
+    explicit Document(const std::string& input, std::string filename = "<stdin>",
                       Text::Encoding encoding = Text::Encoding::UTF8);
 
     [[nodiscard]] iterator begin() const

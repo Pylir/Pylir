@@ -6,10 +6,10 @@
 
 #include "Document.hpp"
 
-pylir::Diag::Document::Document(std::string input, std::string filename, pylir::Text::Encoding encoding)
-    : m_filename(std::move(filename)), m_input(std::move(input))
+pylir::Diag::Document::Document(const std::string& input, std::string filename, pylir::Text::Encoding encoding)
+    : m_filename(std::move(filename))
 {
-    std::string_view view = m_input;
+    std::string_view view = input;
     m_encoding = Text::readBOM(view).value_or(encoding);
     m_text.reserve(view.size());
     auto transcoder = Text::Transcoder<void, char32_t>(view, m_encoding);
