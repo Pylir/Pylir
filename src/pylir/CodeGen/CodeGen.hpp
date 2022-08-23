@@ -504,8 +504,8 @@ public:
 
     void assignTarget(const Syntax::ListDisplay& listDisplay, mlir::Value value);
 
-    template <class T,
-              std::enable_if_t<std::is_base_of_v<Syntax::Target, T> && !std::is_same_v<Syntax::Target, T>>* = nullptr>
+    template <class T, std::enable_if_t<std::is_base_of_v<Syntax::Target, T> && !std::is_same_v<Syntax::Target, T>
+                                        && !Syntax::validTargetType<T>()>* = nullptr>
     void assignTarget(const T&, mlir::Value)
     {
         PYLIR_UNREACHABLE;

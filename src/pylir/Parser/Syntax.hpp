@@ -52,7 +52,23 @@ struct Comparison : Expression::Base<Comparison>
     std::vector<std::pair<Operator, IntrVarPtr<Expression>>> rest;
 };
 
+/// While this reuses the structs defined for 'Expression', due to semantic and syntactic restriction for the target
+/// grammar it may only be one of:
+/// * TupleConstruct
+/// * ListDisplay without comprehension
+/// * Atom but only an Identifier token
+/// * Slice
+/// * Subscription
+/// * AttributeRef
+///
+/// defined recursively.
 using Target = Expression;
+
+template <class T>
+constexpr bool validTargetType()
+{
+    return llvm::is_one_of<T, Atom, Subscription, AttributeRef, TupleConstruct, ListDisplay>{};
+}
 
 struct AttributeRef : Expression::Base<AttributeRef>
 {
