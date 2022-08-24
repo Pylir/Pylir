@@ -40,10 +40,8 @@ std::optional<pylir::Syntax::AssignmentStmt> pylir::Parser::parseAssignmentStmt(
             leftOverStarredExpression = std::move(*starredExpression);
             break;
         }
-        if (checkTarget(**starredExpression, *assignment))
-        {
-            addToNamespace(**starredExpression);
-        }
+        checkTarget(**starredExpression, *assignment);
+        addToNamespace(**starredExpression);
         targets.emplace_back(std::move(*starredExpression), *assignment);
     } while (peekedIs(firstInTarget));
     if (leftOverStarredExpression)
@@ -98,7 +96,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
         case TokenType::DelKeyword:
         {
             auto delKeyword = *m_current++;
-            auto targetList = parseTargetList(delKeyword);
+            auto targetList = parseTargetList(delKeyword, true);
             if (!targetList)
             {
                 return std::nullopt;
@@ -332,10 +330,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
                 case TokenType::Assignment:
                 {
                     // If an assignment follows, check whether the starred expression could be a target list
-                    if (checkTarget(**starredExpression, *m_current))
-                    {
-                        addToNamespace(**starredExpression);
-                    }
+                    checkTarget(**starredExpression, *m_current);
+                    addToNamespace(**starredExpression);
                     auto assignmentStmt = parseAssignmentStmt(std::move(*starredExpression));
                     if (!assignmentStmt)
                     {
@@ -359,11 +355,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
                 case TokenType::BitOrAssignment:
                 {
                     // needs to be an augtarget then
-                    auto augTarget = checkAug(**starredExpression, *m_current);
-                    if (!augTarget)
-                    {
-                        return std::nullopt;
-                    }
+                    checkAug(**starredExpression, *m_current);
                     addToNamespace(**starredExpression);
                     if (auto colon = maybeConsume(TokenType::Colon))
                     {
@@ -455,33 +447,66 @@ struct Visitor
 {
     Parser& parser;
     const Token& assignOp;
-    bool augmented;
+    enum Mode
+    {
+        Augmented,
+        Assignment,
+        Del
+    } mode;
 
     // Disallows implicit conversions
     template <class T, std::enable_if_t<std::is_same_v<T, Syntax::Expression>>* = nullptr>
-    bool visit(const T& expression)
+    void visit(const T& expression)
     {
         return expression.match([&](const auto& sub) { return visit(sub); });
     }
 
-    bool visit(const Syntax::AttributeRef&)
+    void visit(const Syntax::AttributeRef&) {}
+
+    void visit(const Syntax::Subscription&) {}
+
+    void visit(const Syntax::Slice&) {}
+
+    void visit(llvm::ArrayRef<Syntax::StarredItem> starredItems)
     {
-        return true;
+        PYLIR_ASSERT(mode != Augmented);
+        const Syntax::StarredItem* prevStar = nullptr;
+        bool multipleIterableErrorTriggered = false;
+        for (const auto& iter : starredItems)
+        {
+            if (iter.maybeStar)
+            {
+                if (mode == Del)
+                {
+                    parser.createError(*iter.maybeStar, Diag::CANNOT_DELETE_ITERABLE_UNPACKING)
+                        .addHighlight(*iter.maybeStar, *iter.expression)
+                        .addHighlight(assignOp, Diag::flags::secondaryColour);
+                }
+                else if (prevStar)
+                {
+                    // No need to emit this error more than once.
+                    if (!multipleIterableErrorTriggered)
+                    {
+                        multipleIterableErrorTriggered = true;
+                        parser.createError(*iter.maybeStar, Diag::ONLY_ONE_ITERABLE_UNPACKING_POSSIBLE_IN_ASSIGNMENT)
+                            .addHighlight(*iter.maybeStar, *iter.expression)
+                            .addHighlight(assignOp, Diag::flags::secondaryColour)
+                            .addNote(*prevStar->maybeStar, Diag::PREVIOUS_OCCURRENCE_HERE)
+                            .addHighlight(*prevStar);
+                    }
+                }
+                else
+                {
+                    prevStar = &iter;
+                }
+            }
+            visit(*iter.expression);
+        }
     }
 
-    bool visit(const Syntax::Subscription&)
+    void visit(const Syntax::TupleConstruct& tupleConstruct)
     {
-        return true;
-    }
-
-    bool visit(const Syntax::Slice&)
-    {
-        return true;
-    }
-
-    bool visit(const Syntax::TupleConstruct& tupleConstruct)
-    {
-        if (augmented)
+        if (mode == Augmented)
         {
             switch (tupleConstruct.items.size())
             {
@@ -504,82 +529,66 @@ struct Visitor
                         .addHighlight(tupleConstruct)
                         .addHighlight(assignOp, Diag::flags::secondaryColour);
             }
-            return false;
+            return;
         }
-        bool success = true;
-        for (const auto& iter : tupleConstruct.items)
-        {
-            success &= visit(*iter.expression);
-        }
-        return success;
+        visit(tupleConstruct.items);
     }
 
-    bool visit(const Syntax::DictDisplay& expression)
+    void visit(const Syntax::DictDisplay& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary")
             .addHighlight(expression)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::SetDisplay& expression)
+    void visit(const Syntax::SetDisplay& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "set")
             .addHighlight(expression)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::ListDisplay& expression)
+    void visit(const Syntax::ListDisplay& expression)
     {
-        if (std::holds_alternative<Syntax::Comprehension>(expression.variant) || augmented)
+        if (std::holds_alternative<Syntax::Comprehension>(expression.variant) || mode == Augmented)
         {
             parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "list comprehension")
                 .addHighlight(expression)
                 .addHighlight(assignOp, Diag::flags::secondaryColour);
-            return false;
+            return;
         }
-        bool success = true;
-        for (const auto& iter : pylir::get<std::vector<Syntax::StarredItem>>(expression.variant))
-        {
-            success &= !visit(*iter.expression);
-        }
-        return success;
+        visit(pylir::get<std::vector<Syntax::StarredItem>>(expression.variant));
     }
 
-    bool visit(const Syntax::Yield& expression)
+    void visit(const Syntax::Yield& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "yield expression")
             .addHighlight(expression)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::Generator& expression)
+    void visit(const Syntax::Generator& expression)
     {
         parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "generator expression")
             .addHighlight(expression)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::BinOp& binOp)
+    void visit(const Syntax::BinOp& binOp)
     {
         parser.createError(binOp.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, binOp.operation.getTokenType())
             .addHighlight(binOp.operation)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::Lambda& lambda)
+    void visit(const Syntax::Lambda& lambda)
     {
         parser.createError(lambda, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression")
             .addHighlight(lambda)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::Atom& expression)
+    void visit(const Syntax::Atom& expression)
     {
         switch (expression.token.getTokenType())
         {
@@ -594,30 +603,27 @@ struct Visitor
                 parser.createError(expression.token, Diag::CANNOT_ASSIGN_TO_N, "literal")
                     .addHighlight(expression.token)
                     .addHighlight(assignOp, Diag::flags::secondaryColour);
-                return true;
-            default: return true;
+            default: break;
         }
     }
 
-    bool visit(const Syntax::Call& call)
+    void visit(const Syntax::Call& call)
     {
         parser.createError(call.openParenth, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call")
             .addHighlight(call.openParenth, call)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::UnaryOp& expression)
+    void visit(const Syntax::UnaryOp& expression)
     {
         parser
             .createError(expression.operation, Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
                          expression.operation.getTokenType())
             .addHighlight(expression.operation)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::Comparison& comparison)
+    void visit(const Syntax::Comparison& comparison)
     {
         // It's better looking, but still a technically arbitrary decision, but we'll emit the diagnostic only once
         // for the very last use of a comparison operator.
@@ -630,29 +636,26 @@ struct Visitor
                                          back.secondToken->getTokenType()))
                 .addHighlight(back.firstToken, *back.secondToken)
                 .addHighlight(assignOp, Diag::flags::secondaryColour);
-            return false;
+            return;
         }
 
         parser.createError(back.firstToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, back.firstToken.getTokenType())
             .addHighlight(back.firstToken)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::Conditional& expression)
+    void visit(const Syntax::Conditional& expression)
     {
         parser.createError(expression.ifToken, Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression")
             .addHighlight(expression.ifToken, *expression.elseValue)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 
-    bool visit(const Syntax::Assignment& assignment)
+    void visit(const Syntax::Assignment& assignment)
     {
         parser.createError(assignment.walrus, Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, TokenType::Walrus)
             .addHighlight(assignment.walrus)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
-        return false;
     }
 };
 } // namespace
@@ -664,16 +667,12 @@ std::optional<pylir::IntrVarPtr<Syntax::Target>> pylir::Parser::parseTarget(cons
     {
         return std::nullopt;
     }
-    auto error = checkTarget(**expression, assignmentLikeToken);
-    if (!error)
-    {
-        return std::nullopt;
-    }
+    checkTarget(**expression, assignmentLikeToken);
     return expression;
 }
 
 std::optional<pylir::IntrVarPtr<pylir::Syntax::Target>>
-    pylir::Parser::parseTargetList(const pylir::Token& assignmentLikeToken)
+    pylir::Parser::parseTargetList(const pylir::Token& assignmentLikeToken, bool delStmt)
 {
     IntrVarPtr<Syntax::Target> target;
     {
@@ -713,22 +712,18 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Target>>
         }
     }
 
-    auto error = checkTarget(*target, assignmentLikeToken);
-    if (!error)
-    {
-        return std::nullopt;
-    }
+    checkTarget(*target, assignmentLikeToken, delStmt);
     return target;
 }
 
-bool pylir::Parser::checkAug(const Syntax::Expression& starredExpression, const Token& assignOp)
+void pylir::Parser::checkAug(const Syntax::Expression& starredExpression, const Token& assignOp)
 {
-    return Visitor{*this, assignOp, true}.visit(starredExpression);
+    Visitor{*this, assignOp, Visitor::Augmented}.visit(starredExpression);
 }
 
-bool pylir::Parser::checkTarget(const Syntax::Expression& starredExpression, const Token& assignOp)
+void pylir::Parser::checkTarget(const Syntax::Expression& starredExpression, const Token& assignOp, bool deleteStmt)
 {
-    return Visitor{*this, assignOp, false}.visit(starredExpression);
+    Visitor{*this, assignOp, deleteStmt ? Visitor::Del : Visitor::Assignment}.visit(starredExpression);
 }
 
 std::optional<Syntax::ImportStmt> pylir::Parser::parseImportStmt()

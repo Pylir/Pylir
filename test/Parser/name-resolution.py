@@ -176,3 +176,10 @@ def del_too():
 
 # CHECK-LABEL: function del_too
 # CHECK-NEXT: locals: a
+
+def in_sub():
+    x[0] = 3
+
+# CHECK-LABEL: function in_sub
+# CHECK-NOT: locals: x
+

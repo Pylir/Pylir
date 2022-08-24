@@ -129,8 +129,44 @@ void pylir::Parser::addToNamespace(const Syntax::Target& target)
             {
                 callback(IdentifierToken(atom.token));
             }
-            Visitor::visit(atom);
         }
+
+        void visit(const Syntax::AttributeRef&) {}
+
+        void visit(const Syntax::Subscription&) {}
+
+        void visit(const Syntax::Slice&) {}
+
+        void visit(const Syntax::DictDisplay&) {}
+
+        void visit(const Syntax::SetDisplay&) {}
+
+        void visit(const Syntax::ListDisplay& listDisplay)
+        {
+            if (std::holds_alternative<Syntax::Comprehension>(listDisplay.variant))
+            {
+                return;
+            }
+            Visitor::visit(listDisplay);
+        }
+
+        void visit(const Syntax::Yield&) {}
+
+        void visit(const Syntax::Generator&) {}
+
+        void visit(const Syntax::BinOp&) {}
+
+        void visit(const Syntax::Lambda&) {}
+
+        void visit(const Syntax::Call&) {}
+
+        void visit(const Syntax::UnaryOp&) {}
+
+        void visit(const Syntax::Comparison&) {}
+
+        void visit(const Syntax::Conditional&) {}
+
+        void visit(const Syntax::Assignment&) {}
     } visitor{{}, [&](const IdentifierToken& token) { addToNamespace(token); }};
     visitor.visit(target);
 }

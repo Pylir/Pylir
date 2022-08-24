@@ -71,6 +71,11 @@ constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N = FMT_STRING("cannot assign
 constexpr auto CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N =
     FMT_STRING("cannot assign to result of unary operator {:q^}");
 
+constexpr auto CANNOT_DELETE_ITERABLE_UNPACKING = FMT_STRING("cannot delete iterable unpacking");
+
+constexpr auto ONLY_ONE_ITERABLE_UNPACKING_POSSIBLE_IN_ASSIGNMENT =
+    FMT_STRING("only one iterable unpacking possible in assignment");
+
 constexpr auto UNKNOWN_FEATURE_N = FMT_STRING("unknown feature '{}'");
 
 constexpr auto N_WONT_BE_EMITTED_WHEN_ONLY_CHECKING_SYNTAX =

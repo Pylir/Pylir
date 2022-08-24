@@ -214,9 +214,9 @@ class Parser
         return std::move(current);
     }
 
-    [[nodiscard]] bool checkAug(const Syntax::Expression& expression, const Token& assignOp);
+    void checkAug(const Syntax::Expression& expression, const Token& assignOp);
 
-    [[nodiscard]] bool checkTarget(const Syntax::Expression& expression, const Token& assignOp);
+    void checkTarget(const Syntax::Expression& expression, const Token& assignOp, bool deleteStmt = false);
 
     static bool firstInAssignmentExpression(TokenType tokenType)
     {
@@ -504,7 +504,7 @@ public:
      */
     std::optional<IntrVarPtr<Syntax::Target>> parseTarget(const Token& assignmentLikeToken);
 
-    std::optional<IntrVarPtr<Syntax::Target>> parseTargetList(const Token& assignmentLikeToken);
+    std::optional<IntrVarPtr<Syntax::Target>> parseTargetList(const Token& assignmentLikeToken, bool deleteStmt = false);
 
     /**
      * assignment_stmt ::=  target_list "=" { target_list "=" } (starred_expression | yield_expression)

@@ -22,7 +22,7 @@
 (-3) = 3
 
 # expected-error@below {{cannot assign to result of operator '**'}}
-(2**8) = 3
+(2 ** 8) = 3
 
 # expected-error@below {{cannot assign to result of unary operator 'await'}}
 (await foo()) = 3
@@ -45,11 +45,23 @@
 # expected-error@below {{cannot assign to literal}}
 [5] = 3
 
+
 # expected-error@below {{cannot assign to yield expression}}
-def foo():(yield 5) = 3
+def foo(): (yield 5) = 3
+
 
 # expected-error@below {{cannot assign to generator expression}}
 (c for c in f) = 3
 
 # expected-error@below {{operator '+=' cannot assign to multiple variables}}
-a,b += 3
+a, b += 3
+
+# expected-error@below {{cannot delete iterable unpacking}}
+del (*a,)
+
+# expected-error@below {{cannot delete iterable unpacking}}
+del [*a]
+
+# expected-error@below {{only one iterable unpacking possible in assignment}}
+*a, b, *c = 3
+# expected-note@above {{previous occurrence here}}
