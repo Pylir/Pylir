@@ -1,4 +1,5 @@
-// RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
+// RUN: pylir-opt %s -convert-pylir-to-llvm='target-triple=x86_64-unknown-linux-gnu' --split-input-file | FileCheck %s --check-prefixes=CHECK,SECTION_COFF
+// RUN: pylir-opt %s -convert-pylir-to-llvm='target-triple=x86_64-apple-darwin21.6.0' --split-input-file | FileCheck %s --check-prefixes=CHECK,SECTION_MACHO
 
 py.globalValue @builtins.tuple = #py.tuple<()>
 
@@ -12,6 +13,8 @@ func.func @test() -> !py.dynamic {
 }
 
 // CHECK: llvm.mlir.global external @handle()
+// SECTION_COFF-SAME: section = "py_root"
+// SECTION_MACHO-SAME: section = "__DATA,py_root"
 // CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
 // CHECK-NEXT: llvm.return %[[NULL]]
 

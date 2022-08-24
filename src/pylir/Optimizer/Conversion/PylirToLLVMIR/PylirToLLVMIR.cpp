@@ -127,9 +127,22 @@ public:
             }
             default: llvm::errs() << triple.str() << " not yet implemented"; std::abort();
         }
-        m_rootSection = mlir::StringAttr::get(context, "py_root");
-        m_collectionSection = mlir::StringAttr::get(context, "py_coll");
-        m_constantSection = mlir::StringAttr::get(context, "py_const");
+
+        llvm::StringRef constSectionPrefix;
+        llvm::StringRef dataSectionPrefix;
+        // MachO requires a segment prefix in front of sections to denote their permissions. constants go into
+        // __TEXT, which is read-only, while __DATA, has read-write permission.
+        // See
+        // https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html
+        if (triple.isOSBinFormatMachO())
+        {
+            constSectionPrefix = "__TEXT,";
+            dataSectionPrefix = "__DATA,";
+        }
+
+        m_rootSection = mlir::StringAttr::get(context, dataSectionPrefix + "py_root");
+        m_collectionSection = mlir::StringAttr::get(context, dataSectionPrefix + "py_coll");
+        m_constantSection = mlir::StringAttr::get(context, constSectionPrefix + "py_const");
 
         for (const auto& iter : {pylir::Builtins::Object, pylir::Builtins::Tuple, pylir::Builtins::List,
                                  pylir::Builtins::Type, pylir::Builtins::Function, pylir::Builtins::Str,
