@@ -30,97 +30,14 @@
 
 using namespace Catch::Matchers;
 
-TEST_CASE("Parse try statement", "[Parser]")
-{
-    PARSER_EMITS("try:\n"
-                 "    pass\n"
-                 "except:\n"
-                 "    pass\n"
-                 "except int:\n"
-                 "    pass\n",
-                 pylir::Diag::EXCEPT_CLAUSE_WITHOUT_EXPRESSION_MUST_COME_LAST);
-}
-
-TEST_CASE("Parse break continue statement", "[Parser")
-{
-    PARSER_EMITS("break", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
-    PARSER_EMITS("continue", pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
-    PARSER_EMITS("while True:\n    def foo():\n        break\n"
-                 "",
-                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
-    PARSER_EMITS("while True:\n    def foo():\n        continue\n"
-                 "",
-                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
-    PARSER_EMITS("while True:\n    class Foo:\n        break\n"
-                 "",
-                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
-    PARSER_EMITS("while True:\n    class Foo:\n        continue\n"
-                 "",
-                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
-    PARSER_EMITS("while True:\n"
-                 "  pass\n"
-                 "else:\n"
-                 "  break\n",
-                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'break'");
-    PARSER_EMITS("while True:\n"
-                 "  pass\n"
-                 "else:\n"
-                 "  continue\n",
-                 pylir::Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, "'continue'");
-}
-
-TEST_CASE("Parse return statement", "[Parser]")
-{
-    PARSER_EMITS("return", pylir::Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION);
-    PARSER_EMITS("class Foo:\n"
-                 "    return",
-                 pylir::Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION);
-    PARSER_EMITS("def foo():\n"
-                 "    class Foo:\n"
-                 "        return",
-                 pylir::Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION);
-}
-
-TEST_CASE("Parse yield expression", "[Parser]")
-{
-    PARSER_EMITS("yield 5", pylir::Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION);
-    PARSER_EMITS("class Foo:\n"
-                 "    yield 5",
-                 pylir::Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION);
-    PARSER_EMITS("def foo():\n"
-                 "    class Foo:\n"
-                 "        yield 5",
-                 pylir::Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION);
-}
-
 TEST_CASE("Parse assignment statement", "[Parser]")
 {
     PARSER_EMITS("= 3", pylir::Diag::EXPECTED_N_INSTEAD_OF_N, "newline", "'='");
-    PARSER_EMITS("(a := 3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::Walrus);
-    PARSER_EMITS("(lambda: 3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "lambda expression");
-    PARSER_EMITS("(3 if True else 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "conditional expression");
-    PARSER_EMITS("(3 and 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::AndKeyword);
-    PARSER_EMITS("(not 3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N, pylir::TokenType::NotKeyword);
-    PARSER_EMITS("(3 != 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::NotEqual);
-    PARSER_EMITS("(-3) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N, pylir::TokenType::Minus);
-    PARSER_EMITS("(2**8) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_OPERATOR_N, pylir::TokenType::PowerOf);
-    PARSER_EMITS("(await foo()) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_UNARY_OPERATOR_N,
-                 pylir::TokenType::AwaitKeyword);
-    PARSER_EMITS("(foo()) = 3", pylir::Diag::CANNOT_ASSIGN_TO_RESULT_OF_N, "call");
-    PARSER_EMITS("5 = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "literal");
-    PARSER_EMITS("{} = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "dictionary display");
-    PARSER_EMITS("{5} = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "set display");
-    PARSER_EMITS("[5 for c in f] = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "list display");
-    PARSER_EMITS("[5] = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "literal");
-    PARSER_EMITS("def foo():(yield 5) = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "yield expression");
-    PARSER_EMITS("(c for c in f) = 3", pylir::Diag::CANNOT_ASSIGN_TO_N, "generator expression");
 }
 
 TEST_CASE("Parse augmented assignment statement", "[Parser]")
 {
     PARSER_EMITS("+= 3", pylir::Diag::EXPECTED_N_INSTEAD_OF_N, pylir::TokenType::Newline,
-                 pylir::TokenType::PlusAssignment);
-    PARSER_EMITS("a,b += 3", pylir::Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
                  pylir::TokenType::PlusAssignment);
     PARSER_EMITS("*b += 3", pylir::Diag::EXPECTED_N_INSTEAD_OF_N, pylir::TokenType::Comma,
                  pylir::TokenType::PlusAssignment);

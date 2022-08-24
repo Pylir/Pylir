@@ -12,15 +12,15 @@
 
 std::optional<pylir::Syntax::Yield> pylir::Parser::parseYieldExpression()
 {
-    if (!m_inFunc)
-    {
-        createError(*m_current, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION).addHighlight(*m_current);
-        return std::nullopt;
-    }
     auto yield = expect(TokenType::YieldKeyword);
     if (!yield)
     {
         return std::nullopt;
+    }
+
+    if (!m_inFunc)
+    {
+        createError(*yield, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION).addHighlight(*yield);
     }
 
     if (!peekedIs(TokenType::FromKeyword) && !peekedIs(firstInExpression))

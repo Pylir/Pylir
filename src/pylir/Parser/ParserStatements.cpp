@@ -93,7 +93,6 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
             {
                 createError(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, m_current->getTokenType())
                     .addHighlight(*m_current);
-                return std::nullopt;
             }
             return make_node<Syntax::SingleTokenStmt>(*m_current++);
         case TokenType::DelKeyword:
@@ -112,7 +111,6 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
             if (!m_inFunc)
             {
                 createError(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION).addHighlight(*m_current);
-                return std::nullopt;
             }
             auto returnKeyword = *m_current++;
             if (!peekedIs(firstInExpression))
@@ -518,7 +516,7 @@ struct Visitor
 
     bool visit(const Syntax::DictDisplay& expression)
     {
-        parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary display")
+        parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "dictionary")
             .addHighlight(expression)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
@@ -526,7 +524,7 @@ struct Visitor
 
     bool visit(const Syntax::SetDisplay& expression)
     {
-        parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "set display")
+        parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "set")
             .addHighlight(expression)
             .addHighlight(assignOp, Diag::flags::secondaryColour);
         return false;
@@ -536,7 +534,7 @@ struct Visitor
     {
         if (std::holds_alternative<Syntax::Comprehension>(expression.variant) || augmented)
         {
-            parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "list display")
+            parser.createError(expression, Diag::CANNOT_ASSIGN_TO_N, "list comprehension")
                 .addHighlight(expression)
                 .addHighlight(assignOp, Diag::flags::secondaryColour);
             return false;
