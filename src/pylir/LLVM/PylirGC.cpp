@@ -68,7 +68,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
         llvm::MCContext& context = printer.OutContext;
         auto& os = *printer.OutStreamer;
 
-        auto* symbol = context.getOrCreateSymbol("pylir_stack_map");
+        auto* symbol = printer.GetExternalSymbolSymbol("pylir_stack_map");
         os.emitSymbolAttribute(symbol, llvm::MCSA_Global);
         switchToPointerAlignedReadOnly(os, printer);
         os.emitLabel(symbol);
@@ -190,7 +190,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
 
         auto emitMap = [&](const std::vector<llvm::MCSymbol*>& values, llvm::Twine name)
         {
-            auto* symbol = context.getOrCreateSymbol("pylir$" + name);
+            auto* symbol = printer.GetExternalSymbolSymbol(("pylir$" + name).str());
             os.emitSymbolAttribute(symbol, llvm::MCSA_Internal);
             os.emitLabel(symbol);
             for (const auto& iter : values)
@@ -198,13 +198,13 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
                 os.emitSymbolValue(iter, pointerSize);
             }
             {
-                auto* rootsStart = context.getOrCreateSymbol("pylir_" + name + "_start");
+                auto* rootsStart = printer.GetExternalSymbolSymbol(("pylir_" + name + "_start").str());
                 os.emitSymbolAttribute(rootsStart, llvm::MCSA_Global);
                 os.emitLabel(rootsStart);
                 os.emitSymbolValue(symbol, pointerSize);
             }
             {
-                auto* rootsEnd = context.getOrCreateSymbol("pylir_" + name + "_end");
+                auto* rootsEnd = printer.GetExternalSymbolSymbol(("pylir_" + name + "_end").str());
                 os.emitSymbolAttribute(rootsEnd, llvm::MCSA_Global);
                 os.emitLabel(rootsEnd);
                 os.emitValue(llvm::MCBinaryExpr::createAdd(
