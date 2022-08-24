@@ -197,7 +197,7 @@ class CodeGen
 
     mlir::Value toBool(mlir::Value value);
 
-    mlir::Value readIdentifier(const IdentifierToken& token);
+    mlir::Value readIdentifier(std::string_view name);
 
     void writeIdentifier(std::string_view name, mlir::Value value);
 
@@ -331,6 +331,12 @@ class CodeGen
     void assignTarget(const T& variant, mlir::Value value)
     {
         variant.match([=](const auto& sub) { assignTarget(sub, value); });
+    }
+
+    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    void delTarget(const T& variant)
+    {
+        variant.match([=](const auto& sub) { delTarget(sub); });
     }
 
     void visit(llvm::function_ref<void(mlir::Value)> insertOperation, const Syntax::Expression& iteration,
@@ -509,6 +515,25 @@ public:
     template <class T, std::enable_if_t<std::is_base_of_v<Syntax::Target, T> && !std::is_same_v<Syntax::Target, T>
                                         && !Syntax::validTargetType<T>()>* = nullptr>
     void assignTarget(const T&, mlir::Value)
+    {
+        PYLIR_UNREACHABLE;
+    }
+
+    void delTarget(const Syntax::Atom& atom);
+
+    void delTarget(const Syntax::Subscription& subscription);
+
+    void delTarget(const Syntax::Slice& slice);
+
+    void delTarget(const Syntax::AttributeRef& attributeRef);
+
+    void delTarget(const Syntax::TupleConstruct& tupleConstruct);
+
+    void delTarget(const Syntax::ListDisplay& listDisplay);
+
+    template <class T, std::enable_if_t<std::is_base_of_v<Syntax::Target, T> && !std::is_same_v<Syntax::Target, T>
+                                        && !Syntax::validTargetType<T>()>* = nullptr>
+    void delTarget(const T&)
     {
         PYLIR_UNREACHABLE;
     }

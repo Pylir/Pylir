@@ -167,5 +167,12 @@ def foo():
 def bar():
     x: 3
 
+
 # CHECK-LABEL: function bar
 # CHECK-NEXT: locals: x
+
+def del_too():
+    del a
+
+# CHECK-LABEL: function del_too
+# CHECK-NEXT: locals: a

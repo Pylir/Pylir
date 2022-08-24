@@ -274,6 +274,73 @@ void pylir::CodeGen::assignTarget(const Syntax::ListDisplay& listDisplay, mlir::
     PYLIR_UNREACHABLE;
 }
 
+void pylir::CodeGen::delTarget(const Syntax::Atom& atom)
+{
+    auto locExit = changeLoc(atom);
+    // Deleting a variable from a class namespace is different from doing so outside. Outside a class namespace it is
+    // essentially equal to readIdentifier (to generate a NameError or UnboundLocalError), followed by writeIdentifier
+    // with an unbound constant. In a class namespace however, it unconditionally attempts to delete it from the class
+    // namespace.
+    // Reference: https://github.com/python/cpython/blob/4296396db017d782d3aa16100b366748c9ea4a04/Python/ceval.c#L2367
+    // Note: CPython always generates DELETE_NAME within a class body. Outside a class body, DELETE_FAST or
+    // DELETE_GLOBAL would be generated instead.
+    std::string_view variableName = pylir::get<std::string>(atom.token.getValue());
+    if (m_classNamespace)
+    {
+        auto str = m_builder.createConstant(variableName);
+        auto existed = m_builder.createDictDelItem(m_classNamespace, str);
+        BlockPtr existedBlock;
+        BlockPtr raiseBlock;
+        m_builder.create<mlir::cf::CondBranchOp>(existed, existedBlock, raiseBlock);
+
+        implementBlock(raiseBlock);
+        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
+                                        /*TODO: string arg*/ {}, m_currentExceptBlock);
+        raiseException(exception);
+
+        implementBlock(existedBlock);
+        return;
+    }
+    (void)readIdentifier(pylir::get<std::string>(atom.token.getValue()));
+    writeIdentifier(variableName, m_builder.createConstant(m_builder.getUnboundAttr()));
+}
+
+void pylir::CodeGen::delTarget(const Syntax::Subscription& subscription)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::delTarget(const Syntax::Slice& slice)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::delTarget(const Syntax::AttributeRef& attributeRef)
+{
+    // TODO:
+    PYLIR_UNREACHABLE;
+}
+
+void pylir::CodeGen::delTarget(const Syntax::TupleConstruct& tupleConstruct)
+{
+    for (const auto& iter : tupleConstruct.items)
+    {
+        PYLIR_ASSERT(!iter.maybeStar);
+        delTarget(*iter.expression);
+    }
+}
+
+void pylir::CodeGen::delTarget(const Syntax::ListDisplay& listDisplay)
+{
+    for (const auto& iter : pylir::get<std::vector<Syntax::StarredItem>>(listDisplay.variant))
+    {
+        PYLIR_ASSERT(!iter.maybeStar);
+        delTarget(*iter.expression);
+    }
+}
+
 void pylir::CodeGen::visit(const Syntax::AssignmentStmt& assignmentStmt)
 {
     auto locExit = changeLoc(assignmentStmt);
@@ -672,15 +739,14 @@ void pylir::CodeGen::writeIdentifier(std::string_view text, mlir::Value value)
         [&](SSABuilder::DefinitionsMap& localMap) { localMap[m_builder.getBlock()] = value; });
 }
 
-mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToken)
+mlir::Value pylir::CodeGen::readIdentifier(std::string_view name)
 {
-    auto locExit = changeLoc(identifierToken);
     BlockPtr classNamespaceFound;
     Scope* scope;
     if (m_classNamespace)
     {
         classNamespaceFound->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
-        auto str = m_builder.createConstant(identifierToken.getValue());
+        auto str = m_builder.createConstant(name);
         auto tryGet = m_builder.createDictTryGetItem(m_classNamespace, str);
         auto isUnbound = m_builder.createIsUnboundValue(tryGet);
         auto elseBlock = BlockPtr{};
@@ -694,16 +760,16 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
     {
         scope = &getCurrentScope();
     }
-    auto result = scope->identifiers.find(identifierToken.getValue());
+    auto result = scope->identifiers.find(name);
     if (result == scope->identifiers.end() && scope != &m_globalScope)
     {
         // Try the global namespace
-        result = m_globalScope.identifiers.find(identifierToken.getValue());
+        result = m_globalScope.identifiers.find(name);
         scope = &m_globalScope;
     }
     if (result == scope->identifiers.end())
     {
-        if (auto builtin = m_builtinNamespace.find(identifierToken.getValue()); builtin != m_builtinNamespace.end())
+        if (auto builtin = m_builtinNamespace.find(name); builtin != m_builtinNamespace.end())
         {
             auto builtinValue = m_builder.createConstant(builtin->second);
             if (!m_classNamespace)
@@ -787,6 +853,7 @@ mlir::Value pylir::CodeGen::readIdentifier(const IdentifierToken& identifierToke
 
 mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
 {
+    auto locExit = changeLoc(atom);
     switch (atom.token.getTokenType())
     {
         case TokenType::IntegerLiteral: return m_builder.createConstant(pylir::get<BigInt>(atom.token.getValue()));
@@ -802,7 +869,7 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Atom& atom)
         case TokenType::TrueKeyword: return m_builder.createConstant(true);
         case TokenType::FalseKeyword: return m_builder.createConstant(false);
         case TokenType::NoneKeyword: return m_builder.createNoneRef();
-        case TokenType::Identifier: return readIdentifier(IdentifierToken{atom.token});
+        case TokenType::Identifier: return readIdentifier(pylir::get<std::string>(atom.token.getValue()));
         default: PYLIR_UNREACHABLE;
     }
 }
@@ -2325,8 +2392,7 @@ void pylir::CodeGen::visit(const Syntax::AssertStmt& assertStmt)
 
 void pylir::CodeGen::visit(const Syntax::DelStmt& delStmt)
 {
-    // TODO:
-    PYLIR_UNREACHABLE;
+    delTarget(*delStmt.targetList);
 }
 
 void pylir::CodeGen::visit(const Syntax::ImportStmt& importStmt)
