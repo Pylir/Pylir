@@ -13,7 +13,7 @@
 #include <iostream>
 
 #define PARSER_EMITS(source, ...)                                       \
-    [](std::string str)                                                 \
+    [](std::string_view str)                                            \
     {                                                                   \
         std::string error;                                              \
         pylir::Diag::DiagnosticsManager manager(                        \
@@ -22,7 +22,7 @@
                 llvm::errs() << base;                                   \
                 llvm::raw_string_ostream(error) << base;                \
             });                                                         \
-        pylir::Diag::Document document(std::move(str));                 \
+        pylir::Diag::Document document(str);                            \
         auto docManager = manager.createSubDiagnosticManager(document); \
         pylir::Parser(docManager).parseFileInput();                     \
         CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__)));   \
@@ -220,7 +220,7 @@ namespace
 void parse(std::string_view source)
 {
     pylir::Diag::DiagnosticsManager manager;
-    pylir::Diag::Document document(std::string{source});
+    pylir::Diag::Document document(source);
     auto docManager = manager.createSubDiagnosticManager(document);
     pylir::Parser parser(docManager);
 

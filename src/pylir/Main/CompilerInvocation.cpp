@@ -924,7 +924,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
     return linkModules(importedModules);
 }
 
-pylir::Diag::Document& pylir::CompilerInvocation::addDocument(const std::string& content, std::string filename)
+pylir::Diag::Document& pylir::CompilerInvocation::addDocument(std::string_view content, std::string filename)
 {
     auto& doc = m_documents.emplace_back(content, std::move(filename));
     if (m_verifier)

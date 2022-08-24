@@ -952,7 +952,7 @@ namespace
 void lex(std::string_view source)
 {
     pylir::Diag::DiagnosticsManager manager;
-    pylir::Diag::Document document(std::string{source});
+    pylir::Diag::Document document(source);
     auto docManager = manager.createSubDiagnosticManager(document);
     pylir::Lexer lexer(docManager);
     std::for_each(lexer.begin(), lexer.end(), [](auto&&) {});

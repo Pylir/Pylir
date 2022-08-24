@@ -88,7 +88,7 @@ private:
                                     const pylir::Toolchain& toolchain, CompilerInvocation::Action action,
                                     Diag::DiagnosticsManager& diagManager);
 
-    Diag::Document& addDocument(const std::string& content, std::string filename);
+    Diag::Document& addDocument(std::string_view content, std::string filename);
 
 public:
     explicit CompilerInvocation(DiagnosticsVerifier* verifier) : m_verifier(verifier) {}
