@@ -1,13 +1,110 @@
-name: Test run v1
+name: Linux
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
 
 jobs:
-  test:
+  linux-build:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        sanitizer: [ "address,undefined","thread" ]
+
     steps:
-      - name: Show environment v1
-        run: env | grep ^GITHUB
-      - name: Show ref v1
-        run: echo "===============> Version from $GITHUB_REF"
+
+      - name: Add libunwind
+        run: |
+          sudo apt update
+          sudo apt install libunwind-dev
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install Ninja
+        uses: ashutoshvarma/setup-ninja@v1.1
+
+      - name: Checkout Pylir
+        uses: actions/checkout@v3
+        with:
+          path: Pylir
+
+      - name: Install Python depends
+        run: |
+          python -m pip install -r $GITHUB_WORKSPACE/Pylir/test/requirements.txt
+
+      # See https://github.com/actions/cache/issues/53
+      - name: Sanitize key
+        id: sanitize-key
+        run: echo "::set-output name=key::$(echo ${{matrix.sanitizer}} | sed 's/,/_and_/g')"
+
+      - name: Install CCache
+        uses: hendrikmuhs/ccache-action@v1.2.2
+        with:
+          max-size: 2G
+          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}
+
+      - name: Checkout LLVM
+        uses: actions/checkout@v3
+        with:
+          repository: llvm/llvm-project
+          ref: 74b5dad5e944db21e56e6d81eb14f11891a741ab
+          path: llvm-project
+
+      - name: Sanitizers name to LLVM
+        id: sanitize-llvm-name
+        run: |
+          echo "::set-output name=llvm_sanitizer::$(echo ${{matrix.sanitizer}} |\
+          sed 's/,/;/g' |\
+          python3 -c 'import sys; print(sys.stdin.read().title())' )"
+
+      - name: Configure LLVM
+        run: |
+          cmake -GNinja -Bllvm-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DLLVM_CCACHE_BUILD=ON \
+            -DLLVM_ENABLE_ASSERTIONS=ON \
+            -DLLVM_ENABLE_PROJECTS="mlir;lld" \
+            -DLLVM_TARGETS_TO_BUILD=host \
+            -DCMAKE_LINKER=lld \
+            -DPython3_EXECUTABLE="$(which python)" \
+            -DLLVM_USE_SANITIZER="${{steps.sanitize-llvm-name.outputs.llvm_sanitizer}}" \
+            -S $GITHUB_WORKSPACE/llvm-project/llvm
+
+      - name: Build LLVM
+        run: |
+          cmake --build llvm-build
+
+      - name: Configure Pylir
+        run: |
+          cmake -GNinja -Bpylir-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPYLIR_EMBED_LLD=ON \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DPYLIR_SANITIZER=${{matrix.sanitizer}} \
+            -DPython3_EXECUTABLE="$(which python)" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_LINKER=lld \
+            -DCMAKE_CXX_FLAGS="-g1" \
+            -DPYLIR_ENABLE_ASSERTIONS=ON \
+            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
+            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
+            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" \
+            -S $GITHUB_WORKSPACE/Pylir
+
+      - name: Build Pylir
+        run: |
+          cmake --build pylir-build
+
+      - name: Test
+        working-directory: ${{github.workspace}}/pylir-build
+        run: ctest --extra-verbose
+
