@@ -8,6 +8,7 @@ add_mlir_conversion_library(PylirToLLVMIR
         PylirToLLVMIR.cpp
         WinX64.cpp
         X86_64.cpp
+        ARM64.cpp
         PlatformABI.cpp
 
         DEPENDS

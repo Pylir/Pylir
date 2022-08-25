@@ -29,6 +29,7 @@
 
 #include "WinX64.hpp"
 #include "X86_64.hpp"
+#include "ARM64.hpp"
 
 namespace
 {
@@ -123,6 +124,12 @@ public:
                     m_cabi = std::make_unique<pylir::X86_64>(mlir::DataLayout{moduleOp});
                     m_exceptionModel = ExceptionModel::Dwarf;
                 }
+                break;
+            }
+            case llvm::Triple::aarch64:
+            {
+                m_cabi = std::make_unique<pylir::ARM64>(mlir::DataLayout{moduleOp});
+                m_exceptionModel = ExceptionModel::Dwarf;
                 break;
             }
             default: llvm::errs() << triple.str() << " not yet implemented"; std::abort();
