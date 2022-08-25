@@ -150,12 +150,12 @@ pylir::DarwinToolchain::DarwinToolchain(const llvm::Triple& triple, const cli::C
 bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
-    auto gccInstall = findGCCInstallation(m_triple, commandLine);
-    if (!gccInstall)
-    {
-        commandLine.createError("Failed to find a GCC installation");
-        return false;
-    }
+    // auto gccInstall = findGCCInstallation(m_triple, commandLine);
+    // if (!gccInstall)
+    // {
+    //     commandLine.createError("Failed to find a GCC installation");
+    //     return false;
+    // }
     std::vector<std::string> arguments;
     auto sysroot = commandLine.getArgs().getLastArgValue(pylir::cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
     if (!sysroot.empty())
@@ -167,23 +167,25 @@ bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef
         arguments.emplace_back("-pie");
     }
 
-    arguments.emplace_back("--eh-frame-hdr");
-    const auto* emulation = getEmulation(m_triple, commandLine);
-    if (!emulation)
-    {
-        commandLine.createError("Missing emulation for target '{}'", m_triple.str());
-        return false;
-    }
-    arguments.emplace_back("-m");
-    arguments.emplace_back(emulation);
+    arguments.emplace_back("-arch arm64 -platform_version macos 12.0 13.0");
 
-    arguments.emplace_back("-dynamic-linker");
-    arguments.emplace_back(getDynamicLinker(m_triple, commandLine));
+    // arguments.emplace_back("--eh-frame-hdr");
+    // const auto* emulation = getEmulation(m_triple, commandLine);
+    // if (!emulation)
+    // {
+    //     commandLine.createError("Missing emulation for target '{}'", m_triple.str());
+    //     return false;
+    // }
+    // arguments.emplace_back("-m");
+    // arguments.emplace_back(emulation);
 
-    for (auto& iter : getLLVMOptions(args))
-    {
-        arguments.push_back("--mllvm=" + iter);
-    }
+    // arguments.emplace_back("-dynamic-linker");
+    // arguments.emplace_back(getDynamicLinker(m_triple, commandLine));
+
+    // for (auto& iter : getLLVMOptions(args))
+    // {
+    //     arguments.push_back("--mllvm=" + iter);
+    // }
 
     if (auto* output = args.getLastArg(pylir::cli::OPT_o))
     {
@@ -199,44 +201,44 @@ bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef
     }
     auto sep = llvm::sys::path::get_separator();
     std::vector<llvm::SmallString<32>> builtinPaths;
-    builtinPaths.emplace_back(gccInstall->libPath);
-    builtinPaths.emplace_back(gccInstall->gccLibPath);
-    if (m_triple.isArch64Bit())
-    {
-        if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + "lib64"))
-        {
-            builtinPaths.emplace_back((gccInstall->libPath + sep + ".." + sep + "lib64").str());
-        }
-        if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64"))
-        {
-            builtinPaths.emplace_back(
-                (gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64").str());
-        }
-    }
-    if (llvm::sys::fs::exists("/lib/" + gccInstall->gccTriple.str()))
-    {
-        builtinPaths.emplace_back("/lib/" + gccInstall->gccTriple.str());
-    }
-    if (llvm::sys::fs::exists("/usr/lib/" + gccInstall->gccTriple.str()))
-    {
-        builtinPaths.emplace_back("/usr/lib/" + gccInstall->gccTriple.str());
-    }
+    // builtinPaths.emplace_back(gccInstall->libPath);
+    // builtinPaths.emplace_back(gccInstall->gccLibPath);
+    // if (m_triple.isArch64Bit())
+    // {
+    //     if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + "lib64"))
+    //     {
+    //         builtinPaths.emplace_back((gccInstall->libPath + sep + ".." + sep + "lib64").str());
+    //     }
+    //     if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64"))
+    //     {
+    //         builtinPaths.emplace_back(
+    //             (gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64").str());
+    //     }
+    // }
+    // if (llvm::sys::fs::exists("/lib/" + gccInstall->gccTriple.str()))
+    // {
+    //     builtinPaths.emplace_back("/lib/" + gccInstall->gccTriple.str());
+    // }
+    // if (llvm::sys::fs::exists("/usr/lib/" + gccInstall->gccTriple.str()))
+    // {
+    //     builtinPaths.emplace_back("/usr/lib/" + gccInstall->gccTriple.str());
+    // }
 
-    auto findOnBuiltinPath = [&](llvm::StringRef builtin) -> std::string
-    {
-        for (auto& iter : builtinPaths)
-        {
-            if (llvm::sys::fs::exists(iter + sep + builtin))
-            {
-                return (iter + sep + builtin).str();
-            }
-        }
-        return builtin.str();
-    };
+    // auto findOnBuiltinPath = [&](llvm::StringRef builtin) -> std::string
+    // {
+    //     for (auto& iter : builtinPaths)
+    //     {
+    //         if (llvm::sys::fs::exists(iter + sep + builtin))
+    //         {
+    //             return (iter + sep + builtin).str();
+    //         }
+    //     }
+    //     return builtin.str();
+    // };
 
-    arguments.push_back(findOnBuiltinPath("crt1.o"));
-    arguments.push_back(findOnBuiltinPath("crti.o"));
-    arguments.push_back(findOnBuiltinPath("crtbegin.o"));
+    // arguments.push_back(findOnBuiltinPath("crt1.o"));
+    // arguments.push_back(findOnBuiltinPath("crti.o"));
+    // arguments.push_back(findOnBuiltinPath("crtbegin.o"));
 
     for (auto& iter : args.getAllArgValues(pylir::cli::OPT_L))
     {
@@ -267,18 +269,18 @@ bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef
     llvm::sys::path::remove_filename(executablePath);
     llvm::sys::path::append(executablePath, "..", "lib", "pylir", m_triple.str());
     llvm::sys::path::append(executablePath, "libPylirRuntime.a");
-    arguments.emplace_back("--start-group");
-    arguments.emplace_back(executablePath);
+    // arguments.emplace_back("--start-group");
+    // arguments.emplace_back(executablePath);
     llvm::sys::path::remove_filename(executablePath);
     // TODO: Change to respect the command line option
     llvm::sys::path::append(executablePath, "libPylirMarkAndSweep.a");
     arguments.emplace_back(executablePath);
     llvm::sys::path::remove_filename(executablePath);
     llvm::sys::path::append(executablePath, "libPylirRuntimeMain.a");
-    arguments.emplace_back("--whole-archive");
-    arguments.emplace_back(executablePath);
-    arguments.emplace_back("--no-whole-archive");
-    arguments.emplace_back("--end-group");
+    // arguments.emplace_back("--whole-archive");
+    // arguments.emplace_back(executablePath);
+    // arguments.emplace_back("--no-whole-archive");
+    // arguments.emplace_back("--end-group");
     arguments.emplace_back("-lunwind");
 
     switch (getStdlib(commandLine))
@@ -287,16 +289,17 @@ bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef
         case Stdlib::libcpp: arguments.emplace_back("-lc++"); break;
     }
 
-    arguments.emplace_back("-lm");
+    // arguments.emplace_back("-lm");
 
-    arguments.emplace_back("-lgcc_s");
-    arguments.emplace_back("-lgcc");
-    arguments.emplace_back("-lc");
+    // arguments.emplace_back("-lgcc_s");
+    // arguments.emplace_back("-lgcc");
+    arguments.emplace_back("-lSystem");
+    arguments.emplace_back("-L/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib");
     //    arguments.emplace_back("-lgcc_s");
     //    arguments.emplace_back("-lgcc");
 
-    arguments.push_back(findOnBuiltinPath("crtend.o"));
-    arguments.push_back(findOnBuiltinPath("crtn.o"));
+    // arguments.push_back(findOnBuiltinPath("crtend.o"));
+    // arguments.push_back(findOnBuiltinPath("crtn.o"));
 
-    return callLinker(commandLine, Toolchain::LinkerStyle::GNU, arguments);
+    return callLinker(commandLine, Toolchain::LinkerStyle::Mac, arguments);
 }

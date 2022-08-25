@@ -58,8 +58,8 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
             default: kind = llvm::SectionKind::getReadOnlyWithRel(); break;
         }
         auto alignment = printer.getDataLayout().getPointerABIAlignment(0);
-        os.switchSection(
-            printer.getObjFileLowering().getSectionForConstant(printer.getDataLayout(), kind, nullptr, alignment));
+        // os.switchSection(
+        //     printer.getObjFileLowering().getSectionForConstant(printer.getDataLayout(), kind, nullptr, alignment));
         os.emitValueToAlignment(alignment.value());
     }
 

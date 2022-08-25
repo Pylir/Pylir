@@ -20,7 +20,12 @@ class PyBaseException;
 
 namespace Builtins
 {
-#define BUILTIN(name, symbol, _, Type, ...) extern Type name asm(symbol);
+#ifdef __APPLE__
+    #define MANGLING "_"
+#else
+    #define MANGLING ""
+#endif
+#define BUILTIN(name, symbol, _, Type, ...) extern Type name asm(MANGLING symbol);
 #include <pylir/Interfaces/BuiltinsModule.def>
 } // namespace Builtins
 
