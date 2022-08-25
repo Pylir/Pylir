@@ -162,7 +162,10 @@ std::vector<std::string> pylir::Toolchain::getLLVMOptions(const llvm::opt::Input
     std::vector<std::string> result;
     // Allow callee saved registers for live-through and GC ptr values
     result.emplace_back("-fixup-allow-gcptr-in-csr");
-    result.emplace_back("-aarch64-enable-global-isel-at-O=-1");
+    if (m_triple.isAArch64())
+    {
+        result.emplace_back("-aarch64-enable-global-isel-at-O=-1");
+    }
     if (args.getLastArgValue(pylir::cli::OPT_O, "0") != "0")
     {
         // No restrictions on how many registers its allowed to use
