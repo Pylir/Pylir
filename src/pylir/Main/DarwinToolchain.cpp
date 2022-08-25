@@ -9,7 +9,6 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Path.h>
 
-#include "Distro.hpp"
 #include "Version.hpp"
 
 namespace
@@ -45,10 +44,12 @@ void collectLibDirsAndTriples(const llvm::Triple& triple, llvm::SmallVectorImpl<
     {
         case llvm::Triple::x86_64:
         {
-            triples.append({"x86_64-linux-gnu", "x86_64-unknown-linux-gnu", "x86_64-pc-linux-gnu",
-                            "x86_64-redhat-linux6E", "x86_64-redhat-linux", "x86_64-suse-linux",
-                            "x86_64-manbo-linux-gnu", "x86_64-linux-gnu", "x86_64-slackware-linux",
-                            "x86_64-unknown-linux", "x86_64-amazon-linux"});
+            triples.append({"x86_64-apple-darwin"});
+            break;
+        }
+        case llvm::Triple::aarch64:
+        {
+            triples.append({"arm64-apple-darwin"});
             break;
         }
         default: break;
@@ -128,7 +129,7 @@ const char* getEmulation(const llvm::Triple& triple, const pylir::cli::CommandLi
 {
     switch (triple.getArch())
     {
-        case llvm::Triple::x86_64: return "elf_x86_64";
+        case llvm::Triple::aarch64: return "arm64pe";
         default: return nullptr;
     }
 }
@@ -137,7 +138,7 @@ const char* getDynamicLinker(const llvm::Triple& triple, const pylir::cli::Comma
 {
     switch (triple.getArch())
     {
-        case llvm::Triple::x86_64: return "/lib64/ld-linux-x86-64.so.2";
+        case llvm::Triple::aarch64: return "/usr/bin/ld";
         default: return nullptr;
     }
 }
@@ -164,34 +165,6 @@ bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef
     if (isPIE(commandLine))
     {
         arguments.emplace_back("-pie");
-    }
-    Distro distro(m_triple);
-    if (distro.IsAlpineLinux())
-    {
-        arguments.emplace_back("-z");
-        arguments.emplace_back("now");
-    }
-    if (distro.IsOpenSUSE() || distro.IsUbuntu() || distro.IsAlpineLinux())
-    {
-        arguments.emplace_back("-z");
-        arguments.emplace_back("relro");
-    }
-
-    if (distro.IsRedhat() || distro.IsOpenSUSE() || distro.IsAlpineLinux()
-        || (distro.IsUbuntu() && distro >= Distro::UbuntuMaverick))
-    {
-        arguments.emplace_back("--hash-style=gnu");
-    }
-
-    if (distro.IsDebian() || distro.IsOpenSUSE() || distro == Distro::UbuntuLucid || distro == Distro::UbuntuJaunty
-        || distro == Distro::UbuntuKarmic)
-    {
-        arguments.emplace_back("--hash-style=both");
-    }
-
-    if (distro.IsOpenSUSE())
-    {
-        arguments.emplace_back("--enable-new-dtags");
     }
 
     arguments.emplace_back("--eh-frame-hdr");
