@@ -109,7 +109,7 @@ public:
         return {0, 1};
     }
 
-    constexpr std::pair<std::size_t, std::size_t> getEndOfFileLoc() const
+    std::pair<std::size_t, std::size_t> getEndOfFileLoc() const
     {
         return {m_text.size(), m_text.size() + 1};
     }
