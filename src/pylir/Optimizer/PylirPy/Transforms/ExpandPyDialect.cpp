@@ -21,12 +21,24 @@ namespace
 
 mlir::Value callOrInvoke(mlir::Location loc, mlir::OpBuilder& builder, mlir::Block* dest,
                          const pylir::Builtins::Builtin& callable, llvm::ArrayRef<pylir::Py::IterArg> args,
-                         mlir::Block* exceptionHandlerBlock)
+                         llvm::PointerUnion<pylir::Py::ExceptionHandlingInterface, mlir::Block*> exceptionHandler)
 {
     mlir::Value result;
-    if (exceptionHandlerBlock)
+    if (exceptionHandler)
     {
         auto* happyPath = new mlir::Block;
+        mlir::Block* exceptionPath;
+        mlir::ValueRange unwindOperands;
+        if (auto interface = exceptionHandler.dyn_cast<pylir::Py::ExceptionHandlingInterface>())
+        {
+            exceptionPath = interface.getExceptionPath();
+            unwindOperands = static_cast<mlir::OperandRange>(interface.getUnwindDestOperandsMutable());
+        }
+        else
+        {
+            exceptionPath = exceptionHandler.get<mlir::Block*>();
+        }
+
         result = builder
                      .create<pylir::Py::InvokeOp>(
                          loc, builder.getType<pylir::Py::DynamicType>(), pylir::Builtins::PylirCall.name,
@@ -36,7 +48,7 @@ mlir::Value callOrInvoke(mlir::Location loc, mlir::OpBuilder& builder, mlir::Blo
                              builder.create<pylir::Py::MakeTupleOp>(loc, args),
                              builder.create<pylir::Py::ConstantOp>(loc, pylir::Py::DictAttr::get(builder.getContext())),
                          },
-                         mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptionHandlerBlock)
+                         mlir::ValueRange{}, unwindOperands, happyPath, exceptionPath)
                      .getResult(0);
         happyPath->insertBefore(dest);
         builder.setInsertionPointToStart(happyPath);
@@ -143,6 +155,77 @@ struct TupleExUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleExOp>
     }
 };
 
+void raiseException(mlir::Value exception, pylir::Py::ExceptionHandlingInterface exceptionHandler,
+                    mlir::PatternRewriter& rewriter, mlir::Location loc)
+{
+    if (!exceptionHandler)
+    {
+        rewriter.create<pylir::Py::RaiseOp>(loc, exception);
+    }
+    else
+    {
+        llvm::SmallVector<mlir::Value> args = {exception};
+        mlir::OperandRange unwindArgs = exceptionHandler.getUnwindDestOperandsMutable();
+        args.append(unwindArgs.begin(), unwindArgs.end());
+        rewriter.create<mlir::cf::BranchOp>(loc, exceptionHandler.getExceptionPath(), args);
+    }
+}
+
+void restIterIntoList(mlir::Block* dest, mlir::Location loc, mlir::Value iterObject, mlir::Block* conditionBlock,
+                      mlir::PatternRewriter& rewriter, mlir::Value list,
+                      pylir::Py::ExceptionHandlingInterface exceptionHandler)
+{
+    conditionBlock->insertBefore(dest);
+    rewriter.setInsertionPointToStart(conditionBlock);
+    auto one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
+    auto* stopIterationHandler = new mlir::Block;
+    stopIterationHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
+
+    auto next = callOrInvoke(loc, rewriter, dest, pylir::Builtins::Next, {iterObject}, stopIterationHandler);
+
+    auto len = rewriter.create<pylir::Py::ListLenOp>(loc, list);
+    auto newLen = rewriter.create<mlir::arith::AddIOp>(loc, len, one);
+    rewriter.create<pylir::Py::ListResizeOp>(loc, list, newLen);
+    rewriter.create<pylir::Py::ListSetItemOp>(loc, list, len, next);
+    rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock);
+
+    stopIterationHandler->insertBefore(dest);
+    rewriter.setInsertionPointToStart(stopIterationHandler);
+    auto stopIterationType = rewriter.create<pylir::Py::ConstantOp>(
+        loc, mlir::FlatSymbolRefAttr::get(loc.getContext(), pylir::Builtins::StopIteration.name));
+    auto typeOf = rewriter.create<pylir::Py::TypeOfOp>(loc, stopIterationHandler->getArgument(0));
+    auto isStopIteration = rewriter.create<pylir::Py::IsOp>(loc, stopIterationType, typeOf);
+    auto* continueBlock = new mlir::Block;
+    auto* reraiseBlock = new mlir::Block;
+    rewriter.create<mlir::cf::CondBranchOp>(loc, isStopIteration, continueBlock, reraiseBlock);
+
+    reraiseBlock->insertBefore(dest);
+    rewriter.setInsertionPointToStart(reraiseBlock);
+    raiseException(stopIterationHandler->getArgument(0), exceptionHandler, rewriter, loc);
+
+    continueBlock->insertBefore(dest);
+    rewriter.setInsertionPointToStart(continueBlock);
+}
+
+void continueOntoHappyPath(pylir::Py::ExceptionHandlingInterface interface, mlir::PatternRewriter& rewriter)
+{
+    if (!interface)
+    {
+        return;
+    }
+    rewriter.setInsertionPointAfter(interface);
+    mlir::Block* happyPath = interface.getHappyPath();
+    if (!happyPath->getSinglePredecessor())
+    {
+        rewriter.template create<mlir::cf::BranchOp>(interface.getLoc(), happyPath);
+    }
+    else
+    {
+        rewriter.mergeBlocks(happyPath, interface->getBlock(),
+                             static_cast<mlir::OperandRange>(interface.getNormalDestOperandsMutable()));
+    }
+}
+
 template <class TargetOp>
 struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
 {
@@ -150,12 +233,8 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
 
     void rewrite(TargetOp op, mlir::PatternRewriter& rewriter) const override
     {
-        mlir::Block* exceptionHandlerBlock = nullptr;
         auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*op);
-        if (exceptionHandler)
-        {
-            exceptionHandlerBlock = exceptionHandler.getExceptionPath();
-        }
+
         auto block = op->getBlock();
         auto dest = block->splitBlock(op);
         rewriter.setInsertionPointToEnd(block);
@@ -178,62 +257,133 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
             }
             begin++;
             auto iterObject =
-                callOrInvoke(loc, rewriter, dest, pylir::Builtins::Iter, {iter.value()}, exceptionHandlerBlock);
+                callOrInvoke(loc, rewriter, dest, pylir::Builtins::Iter, {iter.value()}, exceptionHandler);
             auto* condition = new mlir::Block;
             rewriter.create<mlir::cf::BranchOp>(loc, condition);
 
-            condition->insertBefore(dest);
-            rewriter.setInsertionPointToStart(condition);
-            auto* stopIterationHandler = new mlir::Block;
-            stopIterationHandler->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
-
-            auto next = callOrInvoke(loc, rewriter, dest, pylir::Builtins::Next, {iterObject}, stopIterationHandler);
-
-            auto len = rewriter.create<pylir::Py::ListLenOp>(loc, list);
-            auto newLen = rewriter.create<mlir::arith::AddIOp>(loc, len, one);
-            rewriter.create<pylir::Py::ListResizeOp>(loc, list, newLen);
-            rewriter.create<pylir::Py::ListSetItemOp>(loc, list, len, next);
-            rewriter.create<mlir::cf::BranchOp>(loc, condition);
-
-            stopIterationHandler->insertBefore(dest);
-            rewriter.setInsertionPointToStart(stopIterationHandler);
-            auto stopIterationType = rewriter.create<pylir::Py::ConstantOp>(
-                loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Builtins::StopIteration.name));
-            auto typeOf = rewriter.create<pylir::Py::TypeOfOp>(loc, stopIterationHandler->getArgument(0));
-            auto isStopIteration = rewriter.create<pylir::Py::IsOp>(loc, stopIterationType, typeOf);
-            auto* continueBlock = new mlir::Block;
-            auto* reraiseBlock = new mlir::Block;
-            rewriter.create<mlir::cf::CondBranchOp>(loc, isStopIteration, continueBlock, reraiseBlock);
-
-            reraiseBlock->insertBefore(dest);
-            rewriter.setInsertionPointToStart(reraiseBlock);
-            rewriter.create<pylir::Py::RaiseOp>(loc, stopIterationHandler->getArgument(0));
-
-            continueBlock->insertBefore(dest);
-            rewriter.setInsertionPointToStart(continueBlock);
+            restIterIntoList(dest, loc, iterObject, condition, rewriter, list, exceptionHandler);
         }
         rewriter.mergeBlocks(dest, rewriter.getBlock());
 
-        if (exceptionHandlerBlock)
-        {
-            rewriter.setInsertionPointAfter(op);
-            mlir::Block* happyPath = exceptionHandler.getHappyPath();
-            if (!happyPath->getSinglePredecessor())
-            {
-                rewriter.template create<mlir::cf::BranchOp>(loc, happyPath);
-            }
-            else
-            {
-                rewriter.mergeBlocks(happyPath, op->getBlock(),
-                                     static_cast<mlir::OperandRange>(exceptionHandler.getNormalDestOperandsMutable()));
-            }
-        }
+        continueOntoHappyPath(exceptionHandler, rewriter);
         rewriter.replaceOp(op, {list});
     }
 
     mlir::LogicalResult match(TargetOp op) const override
     {
         return mlir::success(!op.getIterExpansion().empty());
+    }
+};
+
+template <class TargetOp>
+struct UnpackOpPattern : mlir::OpRewritePattern<TargetOp>
+{
+    using mlir::OpRewritePattern<TargetOp>::OpRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(TargetOp op, mlir::PatternRewriter& rewriter) const override
+    {
+        llvm::SmallVector<mlir::Value> replacementValues;
+
+        auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*op);
+
+        mlir::Block* block = op->getBlock();
+        auto* dest = block->splitBlock(op);
+        rewriter.setInsertionPointToEnd(block);
+        mlir::Location loc = op.getLoc();
+        auto stopIterationType = rewriter.create<pylir::Py::ConstantOp>(
+            loc, mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Builtins::StopIteration.name));
+
+        auto iterObject =
+            callOrInvoke(loc, rewriter, dest, pylir::Builtins::Iter, {op.getIterable()}, exceptionHandler);
+
+        auto* valueError = new mlir::Block;
+        valueError->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
+        for (mlir::Value iter : op.getBefore())
+        {
+            (void)iter;
+            auto next = callOrInvoke(loc, rewriter, dest, pylir::Builtins::Next, {iterObject}, valueError);
+            replacementValues.push_back(next);
+        }
+
+        auto* afterBeforeBlock = rewriter.getBlock();
+
+        valueError->insertBefore(dest);
+        rewriter.setInsertionPointToStart(valueError);
+        // If the iterator is exhausted we need to raise a ValueError, not a StopIteration exception. Check if it's
+        // StopIteration, to raise a ValueError, if not reraise.
+        auto exc = valueError->getArgument(0);
+        auto exceptionType = rewriter.create<pylir::Py::TypeOfOp>(loc, exc);
+        auto isStopIteration = rewriter.create<pylir::Py::IsOp>(loc, exceptionType, stopIterationType);
+        auto* reraiseBlock = new mlir::Block;
+        auto* valueErrorBlock = new mlir::Block;
+        rewriter.create<mlir::cf::CondBranchOp>(loc, isStopIteration, valueErrorBlock, reraiseBlock);
+
+        reraiseBlock->insertBefore(dest);
+        rewriter.setInsertionPointToStart(reraiseBlock);
+        raiseException(exc, exceptionHandler, rewriter, loc);
+
+        valueErrorBlock->insertBefore(dest);
+        rewriter.setInsertionPointToStart(valueErrorBlock);
+        auto valueErrorExc = callOrInvoke(loc, rewriter, dest, pylir::Builtins::ValueError, {}, exceptionHandler);
+        raiseException(valueErrorExc, exceptionHandler, rewriter, loc);
+
+        rewriter.setInsertionPointToEnd(afterBeforeBlock);
+        if (!op.getRest())
+        {
+            // There are no rest args. We have to raise a ValueError if the iterator is not exhausted. In other words,
+            // if it has more elements than we unpacked into.
+            auto* emptyIterCheck = new mlir::Block;
+            emptyIterCheck->addArgument(rewriter.getType<pylir::Py::DynamicType>(), loc);
+            callOrInvoke(loc, rewriter, dest, pylir::Builtins::Next, {iterObject}, emptyIterCheck);
+            // If it was not exhausted we are continuing from the above call. Branch to the valueErrorBlock to raise
+            // the value error.
+            rewriter.create<mlir::cf::BranchOp>(loc, valueErrorBlock);
+
+            emptyIterCheck->insertBefore(dest);
+            rewriter.setInsertionPointToStart(emptyIterCheck);
+            exc = emptyIterCheck->getArgument(0);
+            exceptionType = rewriter.create<pylir::Py::TypeOfOp>(loc, exc);
+            isStopIteration = rewriter.create<pylir::Py::IsOp>(loc, exceptionType, stopIterationType);
+            reraiseBlock = new mlir::Block;
+            rewriter.create<mlir::cf::CondBranchOp>(loc, isStopIteration, dest, reraiseBlock);
+
+            reraiseBlock->insertBefore(dest);
+            rewriter.setInsertionPointToStart(reraiseBlock);
+            raiseException(exc, exceptionHandler, rewriter, loc);
+
+            continueOntoHappyPath(exceptionHandler, rewriter);
+            rewriter.replaceOp(op, replacementValues);
+            return mlir::success();
+        }
+
+        auto list = rewriter.create<pylir::Py::MakeListOp>(loc);
+        replacementValues.push_back(list);
+        auto* conditionBlock = new mlir::Block;
+        rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock);
+
+        // All elements following the before elements get inserted into the list. We then pop the after elements from
+        // the list.
+        restIterIntoList(dest, loc, iterObject, conditionBlock, rewriter, list, exceptionHandler);
+
+        auto listSize = rewriter.create<pylir::Py::ListLenOp>(loc, list);
+        auto argAfterSize = rewriter.create<mlir::arith::ConstantIndexOp>(loc, op.getAfter().size());
+        auto tooFew =
+            rewriter.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult, listSize, argAfterSize);
+        rewriter.create<mlir::cf::CondBranchOp>(loc, tooFew, valueErrorBlock, dest);
+
+        rewriter.setInsertionPointToStart(dest);
+        for (std::size_t index : llvm::reverse(llvm::seq_inclusive<std::size_t>(1, op.getAfter().size())))
+        {
+            auto calcIndex = rewriter.create<mlir::arith::SubIOp>(
+                loc, listSize, rewriter.create<mlir::arith::ConstantIndexOp>(loc, index));
+            replacementValues.emplace_back(rewriter.create<pylir::Py::ListGetItemOp>(loc, list, calcIndex));
+        }
+        auto newSize = rewriter.create<mlir::arith::SubIOp>(loc, listSize, argAfterSize);
+        rewriter.create<pylir::Py::ListResizeOp>(loc, list, newSize);
+
+        continueOntoHappyPath(exceptionHandler, rewriter);
+        rewriter.replaceOp(op, replacementValues);
+        return mlir::success();
     }
 };
 
@@ -256,7 +406,7 @@ void ExpandPyDialectPass::runOnOperation()
                 .Default(false);
         });
     target.addIllegalOp<pylir::Py::MROLookupOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp,
-                        pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp>();
+                        pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp, pylir::Py::UnpackOp, pylir::Py::UnpackExOp>();
     target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
     mlir::RewritePatternSet patterns(&getContext());
@@ -265,6 +415,8 @@ void ExpandPyDialectPass::runOnOperation()
     patterns.add<TupleExUnrollPattern>(&getContext());
     patterns.add<ListUnrollPattern<pylir::Py::MakeListOp>>(&getContext());
     patterns.add<ListUnrollPattern<pylir::Py::MakeListExOp>>(&getContext());
+    patterns.add<UnpackOpPattern<pylir::Py::UnpackOp>>(&getContext());
+    patterns.add<UnpackOpPattern<pylir::Py::UnpackExOp>>(&getContext());
     if (mlir::failed(mlir::applyPartialConversion(getOperation(), target, std::move(patterns))))
     {
         signalPassFailure();

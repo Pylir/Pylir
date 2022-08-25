@@ -833,6 +833,24 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::verify()
     return mlir::success();
 }
 
+mlir::LogicalResult pylir::Py::UnpackOp::verify()
+{
+    if (!getAfter().empty() && !getRest())
+    {
+        return emitOpError("'after_rest' results specified, without a rest argument");
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::UnpackExOp::verify()
+{
+    if (!getAfter().empty() && !getRest())
+    {
+        return emitOpError("'after_rest' results specified, without a rest argument");
+    }
+    return mlir::success();
+}
+
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
 
 #define GET_OP_CLASSES
