@@ -161,6 +161,31 @@ class KeyError(LookupError):
 
 
 @pylir.intr.const_export
+class ValueError(Exception):
+    pass
+
+
+@pylir.intr.const_export
+class UnicodeError(ValueError):
+    pass
+
+
+@pylir.intr.const_export
+class AssertionError(Exception):
+    pass
+
+
+@pylir.intr.const_export
+class AttributeError(Exception):
+    pass
+
+
+@pylir.intr.const_export
+class NotImplementedError(Exception):
+    pass
+
+
+@pylir.intr.const_export
 class NameError(Exception):
     pass
 
