@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
 
 jobs:
-  linux-build:
+  windows-build:
     runs-on: windows-2022
 
     steps:
@@ -27,7 +27,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          python -m pip install -r $GITHUB_WORKSPACE/Pylir/test/requirements.txt
+          python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
       - name: Install CCache
         uses: hendrikmuhs/ccache-action@v1.2.2
@@ -50,7 +50,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE=$python \
-            -S $GITHUB_WORKSPACE/llvm-project/llvm
+            -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM Optimized TableGen
         run: |
@@ -74,7 +74,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE=$python \
-            -S $GITHUB_WORKSPACE/llvm-project/llvm
+            -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
         run: |
@@ -96,7 +96,7 @@ jobs:
             -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
             -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
             -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" \
-            -S $GITHUB_WORKSPACE/Pylir
+            -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
         run: |
