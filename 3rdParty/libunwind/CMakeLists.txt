@@ -41,7 +41,7 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR LIBUNWIND_STANDALONE_B
   # Find the LLVM sources and simulate LLVM CMake options.
   include(HandleOutOfTreeLLVM)
 else()
-  enable_language(C ASM)
+  enable_language(C CXX ASM)
   set(LLVM_LIT "${CMAKE_SOURCE_DIR}/utils/lit/lit.py")
 endif()
 
