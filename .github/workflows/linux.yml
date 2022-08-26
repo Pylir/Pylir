@@ -73,8 +73,8 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir;lld" \
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
-            -DCMAKE_AR=llvm-ar \
-            -DCMAKE_RANLIB=llvm-ranlib \
+            -DCMAKE_AR=/usr/bin/llvm-ar \
+            -DCMAKE_RANLIB=/usr/bin/llvm-ranlib \
             -DPython3_EXECUTABLE="$(which python)" \
             -DLLVM_USE_SANITIZER="${{steps.sanitize-llvm-name.outputs.llvm_sanitizer}}" \
             -S $GITHUB_WORKSPACE/llvm-project/llvm
@@ -96,8 +96,8 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_CXX_FLAGS="-g1" \
-            -DCMAKE_AR=llvm-ar \
-            -DCMAKE_RANLIB=llvm-ranlib \
+            -DCMAKE_AR=/usr/bin/llvm-ar \
+            -DCMAKE_RANLIB=/usr/bin/llvm-ranlib \
             -DPYLIR_ENABLE_ASSERTIONS=ON \
             -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
             -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
