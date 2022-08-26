@@ -15,10 +15,10 @@ jobs:
 
     steps:
 
-      - name: Add libunwind
+      - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libunwind-dev
+          sudo apt install libunwind-dev llvm
 
       - name: Set up Python
         uses: actions/setup-python@v2
