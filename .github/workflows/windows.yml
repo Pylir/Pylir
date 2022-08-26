@@ -29,6 +29,9 @@ jobs:
         run: |
           python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
+      - name: Use developer command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
@@ -39,9 +42,6 @@ jobs:
 
       - name: Checkout LLVM
         uses: ./Pylir/.github/actions/llvm-checkout
-
-      - name: Use developer command prompt
-        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configure LLVM Optimized TableGen
         run: |
@@ -65,9 +65,9 @@ jobs:
         run: |
           $python = (Get-Command python).Source
           cmake -GNinja -Bllvm-build `
-            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
-            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
-            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
+            -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
+            -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
+            -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
             -DCMAKE_BUILD_TYPE=Release `
             -DLLVM_USE_CRT_RELEASE=MTd `
             -DCMAKE_CXX_COMPILER=clang-cl `
@@ -97,9 +97,9 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug `
-            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" `
-            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" `
-            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" `
+            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
+            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
+            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" `
             -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
