@@ -15,7 +15,7 @@ jobs:
 
     steps:
 
-      - name: Add libunwind
+      - name: Install dependencies
         run: |
           sudo apt update
           sudo apt install libunwind-dev
@@ -55,6 +55,23 @@ jobs:
           ref: 74b5dad5e944db21e56e6d81eb14f11891a741ab
           path: llvm-project
 
+      - name: Configure LLVM Optimized TableGen
+        run: |
+          cmake -GNinja -Bllvm-optimized-tblgen \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DLLVM_CCACHE_BUILD=ON \
+            -DLLVM_ENABLE_PROJECTS="mlir" \
+            -DLLVM_TARGETS_TO_BUILD=host \
+            -DLLVM_ENABLE_LLD=ON \
+            -DPython3_EXECUTABLE="$(which python)" \
+            -S $GITHUB_WORKSPACE/llvm-project/llvm
+
+      - name: Build LLVM Optimized TableGen
+        run: |
+          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
+
       - name: Sanitizers name to LLVM
         id: sanitize-llvm-name
         run: |
@@ -65,6 +82,9 @@ jobs:
       - name: Configure LLVM
         run: |
           cmake -GNinja -Bllvm-build \
+            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" \
+            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" \
+            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
