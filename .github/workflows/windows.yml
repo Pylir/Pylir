@@ -29,12 +29,13 @@ jobs:
         run: |
           python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
-      - name: Install SCCache
-        uses: hendrikmuhs/ccache-action@v1.2.2
+      - name: Install CCache
+        uses: Chocobo1/setup-ccache-action@v1
         with:
-          variant: SCCache
-          max-size: 2G
-          key: ${{runner.os}}
+          ccache_options: |
+            max_size: 2G
+          override_cache_key: ${{runner.os}}
+          windows_compile_environment: msvc
 
       - name: Checkout LLVM
         uses: ./Pylir/.github/actions/llvm-checkout
@@ -71,8 +72,7 @@ jobs:
             -DLLVM_USE_CRT_RELEASE=MTd `
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_C_COMPILER=clang-cl `
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+            -DLLVM_CCACHE_BUILD=ON `
             -DLLVM_ENABLE_ASSERTIONS=ON `
             -DLLVM_ENABLE_PROJECTS="mlir;lld" `
             -DLLVM_TARGETS_TO_BUILD=host `
@@ -93,8 +93,8 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_C_COMPILER=clang-cl `
             -DPython3_EXECUTABLE=$python `
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug `
             -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" `
