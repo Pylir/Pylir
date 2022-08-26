@@ -48,8 +48,8 @@ jobs:
           $python = (Get-Command python).Source
           cmake -GNinja -Bllvm-optimized-tblgen `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_CXX_COMPILER=clang-cl `
-            -DCMAKE_C_COMPILER=clang-cl `
+            -DCMAKE_CXX_COMPILER=cl `
+            -DCMAKE_C_COMPILER=cl `
             -DLLVM_CCACHE_BUILD=ON `
             -DLLVM_ENABLE_PROJECTS="mlir" `
             -DLLVM_TARGETS_TO_BUILD=host `
@@ -70,8 +70,8 @@ jobs:
             -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
             -DCMAKE_BUILD_TYPE=Release `
             -DLLVM_USE_CRT_RELEASE=MTd `
-            -DCMAKE_CXX_COMPILER=clang-cl `
-            -DCMAKE_C_COMPILER=clang-cl `
+            -DCMAKE_CXX_COMPILER=cl `
+            -DCMAKE_C_COMPILER=cl `
             -DLLVM_CCACHE_BUILD=ON `
             -DLLVM_ENABLE_ASSERTIONS=ON `
             -DLLVM_ENABLE_PROJECTS="mlir;lld" `
@@ -93,8 +93,6 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_C_COMPILER=clang-cl `
             -DPython3_EXECUTABLE=$python `
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug `
             -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
