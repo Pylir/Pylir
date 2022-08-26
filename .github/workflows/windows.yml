@@ -41,15 +41,15 @@ jobs:
       - name: Configure LLVM Optimized TableGen
         run: |
           $python = (Get-Command python).Source
-          cmake -GNinja -Bllvm-optimized-tblgen \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang-cl \
-            -DCMAKE_C_COMPILER=clang-cl \
-            -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_TARGETS_TO_BUILD=host \
-            -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE=$python \
+          cmake -GNinja -Bllvm-optimized-tblgen `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_CXX_COMPILER=clang-cl `
+            -DCMAKE_C_COMPILER=clang-cl `
+            -DLLVM_CCACHE_BUILD=ON `
+            -DLLVM_ENABLE_PROJECTS="mlir" `
+            -DLLVM_TARGETS_TO_BUILD=host `
+            -DLLVM_ENABLE_LLD=ON `
+            -DPython3_EXECUTABLE=$python `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM Optimized TableGen
@@ -60,20 +60,20 @@ jobs:
       - name: Configure LLVM
         run: |
           $python = (Get-Command python).Source
-          cmake -GNinja -Bllvm-build \
-            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" \
-            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" \
-            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DLLVM_USE_CRT_RELEASE=MTd \
-            -DCMAKE_CXX_COMPILER=clang-cl \
-            -DCMAKE_C_COMPILER=clang-cl \
-            -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DLLVM_ENABLE_PROJECTS="mlir;lld" \
-            -DLLVM_TARGETS_TO_BUILD=host \
-            -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE=$python \
+          cmake -GNinja -Bllvm-build `
+            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" `
+            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" `
+            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DLLVM_USE_CRT_RELEASE=MTd `
+            -DCMAKE_CXX_COMPILER=clang-cl `
+            -DCMAKE_C_COMPILER=clang-cl `
+            -DLLVM_CCACHE_BUILD=ON `
+            -DLLVM_ENABLE_ASSERTIONS=ON `
+            -DLLVM_ENABLE_PROJECTS="mlir;lld" `
+            -DLLVM_TARGETS_TO_BUILD=host `
+            -DLLVM_ENABLE_LLD=ON `
+            -DPython3_EXECUTABLE=$python `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
@@ -84,18 +84,18 @@ jobs:
       - name: Configure Pylir
         run: |
           $python = (Get-Command python).Source
-          cmake -GNinja -Bpylir-build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DPYLIR_EMBED_LLD=ON \
-            -DCMAKE_CXX_COMPILER=clang-cl \
-            -DCMAKE_C_COMPILER=clang-cl \
-            -DPython3_EXECUTABLE=$python \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DPYLIR_ENABLE_ASSERTIONS=ON \
-            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
-            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
-            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" \
+          cmake -GNinja -Bpylir-build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DPYLIR_EMBED_LLD=ON `
+            -DCMAKE_CXX_COMPILER=clang-cl `
+            -DCMAKE_C_COMPILER=clang-cl `
+            -DPython3_EXECUTABLE=$python `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DPYLIR_ENABLE_ASSERTIONS=ON `
+            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" `
+            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" `
+            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" `
             -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
