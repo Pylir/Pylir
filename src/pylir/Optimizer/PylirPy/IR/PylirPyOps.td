@@ -560,7 +560,7 @@ def PylirPy_UnpackOp : PylirPy_Op<"unpack", [AlwaysBound, AddableExceptionHandli
     ];
 
     let assemblyFormat = [{
-            $iterable `:` custom<VarTypeList>(type($before)) (`,` type($rest)^ (`,` `(` type($after)^ `)`)?)? attr-dict
+            $iterable `:` `(` type($before) `)` (`,` type($rest)^ (`,` `(` type($after)^ `)`)?)? attr-dict
     }];
 
     let description = [{

@@ -314,17 +314,6 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
     printer << ')';
 }
 
-bool parseVarTypeList(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::Type>& types)
-{
-    return mlir::failed(parser.parseCommaSeparatedList(mlir::OpAsmParser::Delimiter::Paren,
-                                                       [&] { return parser.parseType(types.emplace_back()); }));
-}
-
-void printVarTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::TypeRange types)
-{
-    printer << '(' << types << ')';
-}
-
 } // namespace
 
 void pylir::Py::MakeTupleOp::getEffects(
