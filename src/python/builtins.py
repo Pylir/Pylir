@@ -371,6 +371,10 @@ class list:
     def __len__(self):
         return pylir.intr.list.len(self)
 
+    def __getitem__(self, item):
+        # TODO: negative indices, use index etc.
+        return pylir.intr.list.getItem(self, item)
+
 
 @pylir.intr.const_export
 class str:
