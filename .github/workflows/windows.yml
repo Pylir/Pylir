@@ -36,7 +36,7 @@ jobs:
           key: ${{runner.os}}
 
       - name: Checkout LLVM
-        uses: ./.github/actions/llvm-checkout
+        uses: ./Pylir/.github/actions/llvm-checkout
 
       - name: Configure LLVM Optimized TableGen
         run: |
