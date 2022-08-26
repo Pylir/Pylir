@@ -508,6 +508,8 @@ public:
 
     void assignTarget(const Syntax::AttributeRef& attributeRef, mlir::Value value);
 
+    void assignTarget(llvm::ArrayRef<Syntax::StarredItem> starredItems, mlir::Value value);
+
     void assignTarget(const Syntax::TupleConstruct& tupleConstruct, mlir::Value value);
 
     void assignTarget(const Syntax::ListDisplay& listDisplay, mlir::Value value);

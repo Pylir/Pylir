@@ -609,6 +609,53 @@ void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
           unwindDestOperands, happyPath, unwindPath);
 }
 
+void pylir::Py::UnpackOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, std::size_t count,
+                                std::optional<std::size_t> restIndex, mlir::Value iterable)
+{
+    std::size_t beforeCount;
+    std::size_t afterCount;
+    if (!restIndex)
+    {
+        beforeCount = count;
+        afterCount = 0;
+    }
+    else
+    {
+        beforeCount = *restIndex;
+        afterCount = count - beforeCount - 1;
+    }
+    mlir::Type dynamicType = odsBuilder.getType<pylir::Py::DynamicType>();
+    build(odsBuilder, odsState, llvm::SmallVector(beforeCount, dynamicType), restIndex ? dynamicType : nullptr,
+          llvm::SmallVector(afterCount, dynamicType), iterable,
+          odsBuilder.getDenseI32ArrayAttr(
+              {static_cast<int32_t>(beforeCount), (restIndex ? 1 : 0), static_cast<int32_t>(afterCount)}));
+}
+
+void pylir::Py::UnpackExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, std::size_t count,
+                                  std::optional<std::size_t> restIndex, mlir::Value iterable, mlir::Block* happy_path,
+                                  mlir::ValueRange normal_dest_operands, mlir::Block* unwindPath,
+                                  mlir::ValueRange unwind_dest_operands)
+{
+    std::size_t beforeCount;
+    std::size_t afterCount;
+    if (!restIndex)
+    {
+        beforeCount = count;
+        afterCount = 0;
+    }
+    else
+    {
+        beforeCount = *restIndex;
+        afterCount = count - beforeCount - 1;
+    }
+    mlir::Type dynamicType = odsBuilder.getType<pylir::Py::DynamicType>();
+    build(odsBuilder, odsState, llvm::SmallVector(beforeCount, dynamicType), restIndex ? dynamicType : nullptr,
+          llvm::SmallVector(afterCount, dynamicType), iterable,
+          odsBuilder.getDenseI32ArrayAttr(
+              {static_cast<int32_t>(beforeCount), (restIndex ? 1 : 0), static_cast<int32_t>(afterCount)}),
+          normal_dest_operands, unwind_dest_operands, happy_path, unwindPath);
+}
+
 namespace
 {
 template <class T>

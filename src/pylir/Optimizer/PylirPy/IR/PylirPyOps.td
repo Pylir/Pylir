@@ -555,6 +555,10 @@ def PylirPy_UnpackOp : PylirPy_Op<"unpack", [AlwaysBound, AddableExceptionHandli
     let results = (outs Variadic<DynamicType>:$before, Optional<DynamicType>:$rest,
                         Variadic<DynamicType>:$after);
 
+    let builders = [
+        OpBuilder<(ins "std::size_t":$count, "std::optional<std::size_t>":$restIndex, "mlir::Value":$iterable)>
+    ];
+
     let assemblyFormat = [{
             $iterable `:` `(` type($before) `)` (`,` type($rest)^ (`,` `(` type($after)^ `)`)?)? attr-dict
     }];
@@ -589,6 +593,14 @@ def PylirPy_UnpackOp : PylirPy_Op<"unpack", [AlwaysBound, AddableExceptionHandli
 
 def PylirPy_UnpackExOp : AddExceptionHandling<PylirPy_UnpackOp> {
     let hasVerifier = 1;
+
+    let builders = [
+        OpBuilder<(ins "std::size_t":$count, "std::optional<std::size_t>":$restIndex, "mlir::Value":$iterable,
+                        "mlir::Block*":$happy_path,
+                        "mlir::ValueRange":$normal_dest_operands,
+                        "mlir::Block*":$unwindPath,
+                        "mlir::ValueRange":$unwind_dest_operands)>
+    ];
 }
 
 // linear searches

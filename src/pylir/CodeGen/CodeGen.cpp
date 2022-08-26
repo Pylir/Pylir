@@ -262,16 +262,30 @@ void pylir::CodeGen::assignTarget(const Syntax::AttributeRef& attributeRef, mlir
     PYLIR_UNREACHABLE;
 }
 
+void pylir::CodeGen::assignTarget(llvm::ArrayRef<Syntax::StarredItem> starredItems, mlir::Value value)
+{
+    const auto* iter =
+        llvm::find_if(starredItems, [](const Syntax::StarredItem& starredItem) { return starredItem.maybeStar; });
+    std::optional<size_t> index;
+    if (iter != starredItems.end())
+    {
+        index = iter - starredItems.begin();
+    }
+    auto* unpacked = m_builder.createUnpack(starredItems.size(), index, value, m_currentExceptBlock);
+    for (auto [item, unpackedVal] : llvm::zip(starredItems, unpacked->getResults()))
+    {
+        assignTarget(*item.expression, unpackedVal);
+    }
+}
+
 void pylir::CodeGen::assignTarget(const Syntax::TupleConstruct& tupleConstruct, mlir::Value value)
 {
-    // TODO:
-    PYLIR_UNREACHABLE;
+    assignTarget(tupleConstruct.items, value);
 }
 
 void pylir::CodeGen::assignTarget(const Syntax::ListDisplay& listDisplay, mlir::Value value)
 {
-    // TODO:
-    PYLIR_UNREACHABLE;
+    assignTarget(pylir::get<std::vector<Syntax::StarredItem>>(listDisplay.variant), value);
 }
 
 void pylir::CodeGen::delTarget(const Syntax::Atom& atom)

@@ -512,6 +512,20 @@ public:
         return create<Py::MakeObjectOp>(typeObject);
     }
 
+    mlir::Operation* createUnpack(std::size_t count, std::optional<std::size_t> restIndex, mlir::Value iterable,
+                                  mlir::Block* unwindPath)
+    {
+        if (!unwindPath)
+        {
+            return create<Py::UnpackOp>(count, restIndex, iterable);
+        }
+        auto* happyPath = new mlir::Block;
+        auto op = create<Py::UnpackExOp>(count, restIndex, iterable, happyPath, mlir::ValueRange{}, unwindPath,
+                                         mlir::ValueRange{});
+        implementBlock(happyPath);
+        return op;
+    }
+
     Py::IsOp createIs(mlir::Value lhs, mlir::Value rhs)
     {
         return create<Py::IsOp>(lhs, rhs);
