@@ -237,6 +237,11 @@ public:
 
     constexpr static auto& layoutTypeObject = Builtins::List;
 
+    PyTuple* getTuple()
+    {
+        return m_tuple;
+    }
+
     PyObject** begin()
     {
         return m_tuple->begin();
