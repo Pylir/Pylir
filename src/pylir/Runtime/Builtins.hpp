@@ -20,7 +20,9 @@ class PyBaseException;
 
 namespace Builtins
 {
-#ifdef __APPLE__
+// 'asm' directive takes the name very literally, going as far as ignoring the platform mangling. We'll therefore have
+// to do it manually.
+#if defined(__APPLE__) || (defined(__i386__) && defined(_WIN32))
     #define MANGLING "_"
 #else
     #define MANGLING ""

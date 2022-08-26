@@ -547,6 +547,62 @@ def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCapture]> {
     let assemblyFormat = "$string attr-dict";
 }
 
+def PylirPy_UnpackOp : PylirPy_Op<"unpack", [AlwaysBound, AddableExceptionHandling<"UnpackExOp">,
+                                             AttrSizedResultSegments]> {
+
+    let arguments = (ins DynamicType:$iterable, DenseI32ArrayAttr:$result_segment_sizes);
+
+    let results = (outs Variadic<DynamicType>:$before, Optional<DynamicType>:$rest,
+                        Variadic<DynamicType>:$after);
+
+    let builders = [
+        OpBuilder<(ins "std::size_t":$count, "std::optional<std::size_t>":$restIndex, "mlir::Value":$iterable)>
+    ];
+
+    let assemblyFormat = [{
+            $iterable `:` custom<VarTypeList>(type($before)) (`,` type($rest)^ (`,` `(` type($after)^ `)`)?)? attr-dict
+    }];
+
+    let description = [{
+        Takes an iterable object and unpacks it into multiple values. The results of this operation may consist of
+        one or three result parts.
+
+        One part form example:
+        ```
+        %before:3 = unpack %iterable : (!py.dynamic, !py.dynamic, !py.dynamic)
+        ```
+        This expects the iterable to contain 3 elements to unpack them into %before:0 to 2 respectively.
+
+        Three part form example:
+        ```
+        %before:3, %rest, %after:2 = unpack %iterable : (!py.dynamic, !py.dynamic, !py.dynamic), !py.dynamic, (!py.dynamic, !py.dynamic)
+        ```
+
+        This expects the iterable to contain at least 5 elements. The first 3 elements are unpacked into %before:0 to 2,
+        and the last 2 elements of the iterable into %after:0 to 1. All other left over elements will form a list that
+        is assigned to %rest.
+
+        The iterable's iterator is created via a call to pythons builtin `iter` function, and the elements extracted
+        via pythons builtin `next` function. Exceptions emitted by either of these methods, with the exception of
+        `StopIteration`, are propagated as is.
+        If the iterable contains too few or too many elements, a `ValueError` is raised.
+    }];
+
+    let hasVerifier = 1;
+}
+
+def PylirPy_UnpackExOp : AddExceptionHandling<PylirPy_UnpackOp> {
+    let hasVerifier = 1;
+
+    let builders = [
+        OpBuilder<(ins "std::size_t":$count, "std::optional<std::size_t>":$restIndex, "mlir::Value":$iterable,
+                        "mlir::Block*":$happy_path,
+                        "mlir::ValueRange":$normal_dest_operands,
+                        "mlir::Block*":$unwindPath,
+                        "mlir::ValueRange":$unwind_dest_operands)>
+    ];
+}
+
 // linear searches
 
 def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {

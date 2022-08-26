@@ -15,6 +15,35 @@ option(PYLIR_COVERAGE "Compile with coverage" OFF)
 option(PYLIR_EMBED_LLD "Embed lld into pylir" OFF)
 set(PYLIR_DEFAULT_SYSROOT "" CACHE STRING "Default sysroot to find system libraries")
 
+if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
+    option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" OFF)
+else()
+    option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" ON)
+endif()
+
+if (PYLIR_ENABLE_ASSERTIONS)
+    # On non-Debug builds cmake automatically defines NDEBUG, so we
+    # explicitly undefine it:
+    if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
+        # NOTE: use `add_compile_options` rather than `add_definitions` since
+        # `add_definitions` does not support generator expressions.
+        add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-UNDEBUG>)
+        if (MSVC)
+            # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
+            foreach (flags_var_to_scrub
+              CMAKE_CXX_FLAGS_RELEASE
+              CMAKE_CXX_FLAGS_RELWITHDEBINFO
+              CMAKE_CXX_FLAGS_MINSIZEREL
+              CMAKE_C_FLAGS_RELEASE
+              CMAKE_C_FLAGS_RELWITHDEBINFO
+              CMAKE_C_FLAGS_MINSIZEREL)
+                string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
+                  "${flags_var_to_scrub}" "${${flags_var_to_scrub}}")
+            endforeach()
+        endif()
+    endif()
+endif ()
+
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND MSVC AND (PYLIR_COVERAGE OR PYLIR_SANITIZER OR PYLIR_FUZZER))
     execute_process(
             COMMAND ${CMAKE_CXX_COMPILER} /clang:-print-libgcc-file-name /clang:--rtlib=compiler-rt

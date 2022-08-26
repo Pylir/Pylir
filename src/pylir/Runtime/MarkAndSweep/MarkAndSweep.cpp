@@ -45,28 +45,29 @@ void introspectObject(pylir::rt::PyObject* object, F f)
     {
         for (auto* iter : *tuple)
         {
-            //TODO: Remove/reconsider this if tuple are supposed to be able to have unbound elements
-            if (!iter)
+            if (iter)
             {
-                continue;
+                f(iter);
             }
-            f(iter);
         }
         return;
     }
     if (auto* list = object->dyn_cast<pylir::rt::PyList>())
     {
-        for (auto* iter : *list)
-        {
-            f(iter);
-        }
+        f(list->getTuple());
     }
     else if (auto* dict = object->dyn_cast<pylir::rt::PyDict>())
     {
         for (auto& [key, value] : *dict)
         {
-            f(key);
-            f(value);
+            if (key)
+            {
+                f(key);
+            }
+            if (value)
+            {
+                f(value);
+            }
         }
     }
     auto* slots = type(*object).getSlot(pylir::rt::PyTypeObject::Slots);
