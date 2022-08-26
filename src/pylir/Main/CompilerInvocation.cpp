@@ -665,7 +665,10 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
         nested->addPass(pylir::createLoadForwardingPass());
         nested->addPass(mlir::createSCCPPass());
     }
+    nested->addPass(mlir::createCanonicalizerPass());
     manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
+    nested = &manager.nestAny();
+    nested->addPass(mlir::createCanonicalizerPass());
 }
 
 mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::opt::InputArgList& args,
