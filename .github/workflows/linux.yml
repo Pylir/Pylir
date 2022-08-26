@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libunwind-dev llvm
+          sudo apt install libunwind-dev
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -55,6 +55,23 @@ jobs:
           ref: 74b5dad5e944db21e56e6d81eb14f11891a741ab
           path: llvm-project
 
+      - name: Configure LLVM Optimized TableGen
+        run: |
+          cmake -GNinja -Bllvm-optimized-tblgen \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DLLVM_CCACHE_BUILD=ON \
+            -DLLVM_ENABLE_PROJECTS="mlir" \
+            -DLLVM_TARGETS_TO_BUILD=host \
+            -DLLVM_ENABLE_LLD=ON \
+            -DPython3_EXECUTABLE="$(which python)" \
+            -S $GITHUB_WORKSPACE/llvm-project/llvm
+
+      - name: Build LLVM Optimized TableGen
+        run: |
+          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
+
       - name: Sanitizers name to LLVM
         id: sanitize-llvm-name
         run: |
@@ -65,6 +82,9 @@ jobs:
       - name: Configure LLVM
         run: |
           cmake -GNinja -Bllvm-build \
+            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen"
+            -DMLIR_TABLEGEN_EXE="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen"
+            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen"
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
@@ -73,8 +93,6 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir;lld" \
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
-            -DCMAKE_AR=/usr/bin/llvm-ar \
-            -DCMAKE_RANLIB=/usr/bin/llvm-ranlib \
             -DPython3_EXECUTABLE="$(which python)" \
             -DLLVM_USE_SANITIZER="${{steps.sanitize-llvm-name.outputs.llvm_sanitizer}}" \
             -S $GITHUB_WORKSPACE/llvm-project/llvm
@@ -96,8 +114,6 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_CXX_FLAGS="-g1" \
-            -DCMAKE_AR=/usr/bin/llvm-ar \
-            -DCMAKE_RANLIB=/usr/bin/llvm-ranlib \
             -DPYLIR_ENABLE_ASSERTIONS=ON \
             -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
             -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
