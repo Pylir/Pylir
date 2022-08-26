@@ -38,6 +38,8 @@ jobs:
       - name: Checkout LLVM
         uses: ./Pylir/.github/actions/llvm-checkout
 
+      - uses: ilammy/msvc-dev-cmd@v1
+
       - name: Configure LLVM Optimized TableGen
         run: |
           $python = (Get-Command python).Source
