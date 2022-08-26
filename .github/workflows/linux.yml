@@ -82,9 +82,9 @@ jobs:
       - name: Configure LLVM
         run: |
           cmake -GNinja -Bllvm-build \
-            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen"
-            -DMLIR_TABLEGEN_EXE="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen"
-            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen"
+            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" \
+            -DMLIR_TABLEGEN_EXE="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" \
+            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
