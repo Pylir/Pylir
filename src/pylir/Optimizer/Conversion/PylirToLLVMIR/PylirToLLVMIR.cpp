@@ -1728,8 +1728,6 @@ struct ListLenOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::ListL
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         rewriter.replaceOp(op, pyListModel(op.getLoc(), rewriter, adaptor.getList())
-                                   .tuplePtr(op.getLoc())
-                                   .load(op.getLoc())
                                    .sizePtr(op.getLoc())
                                    .load(op.getLoc()));
         return mlir::success();
