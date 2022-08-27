@@ -30,7 +30,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          Start-Process $Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
+          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
