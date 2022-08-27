@@ -64,10 +64,11 @@ jobs:
       - name: Configure LLVM
         run: |
           $python = (Get-Command python).Source
+          $work_space = "${{github.workspace}}".replace('\', '/')
           cmake -GNinja -Bllvm-build `
-            -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
-            -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
-            -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
+            -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
+            -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
+            -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
             -DCMAKE_BUILD_TYPE=Release `
             -DLLVM_USE_CRT_RELEASE=MTd `
             -DCMAKE_CXX_COMPILER=cl `
