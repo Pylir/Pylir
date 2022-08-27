@@ -20,13 +20,13 @@ jobs:
         with:
           path: Pylir
 
+      - name: Use developer command prompt
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Install Python depends
         run: |
           $python = (Get-Command python3).Source
           $python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
-
-      - name: Use developer command prompt
-        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
