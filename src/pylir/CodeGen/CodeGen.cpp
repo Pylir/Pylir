@@ -1528,19 +1528,21 @@ std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(llvm::ArrayRef<Synt
     return constExport;
 }
 
-void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
+mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> decorators,
+                                          llvm::ArrayRef<Syntax::Parameter> parameterList, llvm::StringRef funcName,
+                                          const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody)
 {
-    auto constExport = checkDecoratorIntrinsics(funcDef.decorators, m_constantClass);
+    auto constExport = checkDecoratorIntrinsics(decorators, m_constantClass);
     if (!constExport)
     {
-        return;
+        return {};
     }
 
     std::vector<Py::IterArg> defaultParameters;
     std::vector<Py::DictArg> keywordOnlyDefaultParameters;
     std::vector<const IdentifierToken*> functionParametersTokens;
     std::vector<FunctionParameter> functionParameters;
-    for (const auto& iter : funcDef.parameterList)
+    for (const auto& iter : parameterList)
     {
         functionParametersTokens.push_back(&iter.name);
         functionParameters.push_back({std::string{iter.name.getValue()},
@@ -1552,7 +1554,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         auto value = visit(*iter.maybeDefault);
         if (!value)
         {
-            return;
+            return {};
         }
         if (iter.kind != Syntax::Parameter::KeywordOnly)
         {
@@ -1564,8 +1566,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         keywordOnlyDefaultParameters.push_back(std::pair{name, value});
     }
 
-    auto locExit = changeLoc(funcDef);
-    auto qualifiedName = m_qualifiers + std::string(funcDef.funcName.getValue());
+    auto qualifiedName = m_qualifiers + std::string(funcName);
     std::vector<IdentifierToken> usedCells;
     mlir::func::FuncOp func;
     {
@@ -1581,13 +1582,13 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         func.setPrivate();
         auto reset = implementFunction(func);
 
-        m_qualifiers.append(funcDef.funcName.getValue());
+        m_qualifiers.append(funcName);
         m_qualifiers += ".<locals>.";
         std::unordered_set<std::string_view> parameterSet(functionParametersTokens.size());
         for (auto [name, value] : llvm::zip(functionParametersTokens, llvm::drop_begin(func.getArguments())))
         {
             parameterSet.insert(name->getValue());
-            if (funcDef.scope.identifiers.find(*name)->second == Syntax::Scope::Cell)
+            if (scope.identifiers.find(*name)->second == Syntax::Scope::Cell)
             {
                 auto closureType = m_builder.createCellRef();
                 auto tuple = m_builder.createMakeTuple({closureType, value});
@@ -1611,7 +1612,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             closureTuple = m_builder.createGetSlot(self, metaType, "__closure__");
         }
 
-        for (const auto& [iter, kind] : funcDef.scope.identifiers)
+        for (const auto& [iter, kind] : scope.identifiers)
         {
             if (parameterSet.count(iter.getValue()))
             {
@@ -1645,7 +1646,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
             }
         }
 
-        visit(*funcDef.suite);
+        emitFunctionBody();
+
         if (needsTerminator())
         {
             m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
@@ -1701,8 +1703,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
                                           m_builder.getDictAttr(keywordDefaultParams)),
                 *constExport);
         }
-        writeIdentifier(funcDef.funcName.getValue(), m_builder.createConstant(mlir::FlatSymbolRefAttr::get(valueOp)));
-        return;
+        return m_builder.createConstant(mlir::FlatSymbolRefAttr::get(valueOp));
     }
 
     mlir::Value value = m_builder.createMakeFunc(mlir::FlatSymbolRefAttr::get(func));
@@ -1752,7 +1753,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         }
         m_builder.createSetSlot(value, type, "__closure__", closure);
     }
-    for (const auto& iter : llvm::reverse(funcDef.decorators))
+    for (const auto& iter : llvm::reverse(decorators))
     {
         if (checkForIntrinsic(*iter.expression))
         {
@@ -1762,13 +1763,25 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
         auto decorator = visit(*iter.expression);
         if (!decorator)
         {
-            return;
+            return {};
         }
         auto tuple = m_builder.createMakeTuple({value});
         auto dict = m_builder.createConstant(m_builder.getDictAttr());
         value = m_builder.createPylirCallIntrinsic(decorator, tuple, dict, m_currentExceptBlock);
     }
-    writeIdentifier(funcDef.funcName.getValue(), value);
+    return value;
+}
+
+void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
+{
+    auto locExit = changeLoc(funcDef);
+    auto function = visitFunction(funcDef.decorators, funcDef.parameterList, funcDef.funcName.getValue(), funcDef.scope,
+                                  [&] { visit(*funcDef.suite); });
+    if (!function)
+    {
+        return;
+    }
+    writeIdentifier(funcDef.funcName.getValue(), function);
 }
 
 void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
@@ -2378,8 +2391,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Slice& slice)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda)
 {
-    // TODO:
-    PYLIR_UNREACHABLE;
+    auto locExit = changeLoc(lambda);
+    return visitFunction({}, lambda.parameters, "<lambda>", lambda.scope,
+                         [&]
+                         {
+                             auto value = visit(*lambda.expression);
+                             m_builder.create<mlir::func::ReturnOp>(value);
+                         });
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef)

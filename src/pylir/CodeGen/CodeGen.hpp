@@ -370,6 +370,10 @@ class CodeGen
     void visitForConstruct(const Syntax::Target& targets, mlir::Value iterable, llvm::function_ref<void()> execSuite,
                            const std::optional<Syntax::IfStmt::Else>& elseSection = {});
 
+    mlir::Value visitFunction(llvm::ArrayRef<Syntax::Decorator> decorators,
+                              llvm::ArrayRef<Syntax::Parameter> parameterList, llvm::StringRef funcName,
+                              const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody);
+
     template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
     decltype(auto) visit(const T& variant)
     {
