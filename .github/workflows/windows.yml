@@ -133,7 +133,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
+          pip install -r $(cygpath -u ${{github.workspace}}/Pylir/test/requirements.txt)
           
       - name: Install CCache
         uses: hendrikmuhs/ccache-action@v1.2.2
