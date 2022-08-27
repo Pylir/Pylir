@@ -119,6 +119,8 @@ jobs:
           msystem: clang64
           install: >-
             git
+            python
+            python-pip
           pacboy: >-
             toolchain:p
             cmake:p
@@ -129,14 +131,9 @@ jobs:
         with:
           path: Pylir
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-
       - name: Install Python depends
         run: |
-          $pythonLocation/python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
+          python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
           
       - name: Install CCache
         uses: hendrikmuhs/ccache-action@v1.2.2
@@ -157,7 +154,7 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE="$pythonLocation/python" \
+            -DPython3_EXECUTABLE="$(which python)" \
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM Optimized TableGen
@@ -178,7 +175,7 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir;lld" \
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE="$pythonLocation/python" \
+            -DPython3_EXECUTABLE="$(which python)" \
             -DLLVM_USE_SANITIZER="Address;Undefined" \
             -S ${{github.workspace}}/llvm-project/llvm
 
@@ -194,7 +191,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
             -DPYLIR_SANITIZER="address,undefined" \
-            -DPython3_EXECUTABLE="$pythonLocation/python" \
+            -DPython3_EXECUTABLE="$(which python)" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
