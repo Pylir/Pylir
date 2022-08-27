@@ -133,7 +133,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
+          python -m pip install -r $GITHUB_WORKSPACE/Pylir/test/requirements.txt
           
       - name: Install CCache
         uses: hendrikmuhs/ccache-action@v1.2.2
@@ -155,7 +155,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE="$(which python)" \
-            -S ${{github.workspace}}/llvm-project/llvm
+            -S $GITHUB_WORKSPACE/llvm-project/llvm
 
       - name: Build LLVM Optimized TableGen
         run: |
@@ -164,9 +164,9 @@ jobs:
       - name: Configure LLVM
         run: |
           cmake -GNinja -Bllvm-build \
-            -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen" \
-            -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen" \
-            -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
+            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" \
+            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" \
+            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
@@ -177,7 +177,7 @@ jobs:
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE="$(which python)" \
             -DLLVM_USE_SANITIZER="Address;Undefined" \
-            -S ${{github.workspace}}/llvm-project/llvm
+            -S $GITHUB_WORKSPACE/llvm-project/llvm
 
       - name: Build LLVM
         run: |
@@ -197,15 +197,15 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_CXX_FLAGS="-g1" \
             -DPYLIR_ENABLE_ASSERTIONS=ON \
-            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" \
-            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" \
-            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" \
-            -S ${{github.workspace}}/Pylir
+            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
+            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
+            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" \
+            -S $GITHUB_WORKSPACE/Pylir
 
       - name: Build Pylir
         run: |
           cmake --build pylir-build
 
       - name: Test
-        working-directory: ${{github.workspace}}/pylir-build
+        working-directory: $GITHUB_WORKSPACE/pylir-build
         run: ctest --extra-verbose
