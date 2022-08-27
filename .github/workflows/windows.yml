@@ -25,7 +25,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          $python = (Get-Command python3).Source
+          $python = (Get-Command python).Source
           $python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
       - name: Install CCache
@@ -41,7 +41,7 @@ jobs:
 
       - name: Configure LLVM Optimized TableGen
         run: |
-          $python = (Get-Command python3).Source
+          $python = (Get-Command python).Source
           cmake -GNinja -Bllvm-optimized-tblgen `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_CXX_COMPILER=cl `
@@ -59,7 +59,7 @@ jobs:
 
       - name: Configure LLVM
         run: |
-          $python = (Get-Command python3).Source
+          $python = (Get-Command python).Source
           $work_space = "${{github.workspace}}".replace('\', '/')
           cmake -GNinja -Bllvm-build `
             -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
@@ -83,7 +83,7 @@ jobs:
 
       - name: Configure Pylir
         run: |
-          $python = (Get-Command python3).Source
+          $python = (Get-Command python).Source
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
             -DPYLIR_EMBED_LLD=ON `
