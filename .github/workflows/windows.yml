@@ -119,12 +119,12 @@ jobs:
           msystem: clang64
           install: >-
             git
-            python
-            python-pip
           pacboy: >-
             toolchain:p
             cmake:p
             ninja:p
+            python-pip:p
+            python:p
 
       - name: Checkout Pylir
         uses: actions/checkout@v3
@@ -133,7 +133,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          pip install -r $(cygpath -u ${{github.workspace}}/Pylir/test/requirements.txt)
+          pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
           
       - name: Install CCache
         uses: hendrikmuhs/ccache-action@v1.2.2
