@@ -95,6 +95,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang-cl `
             -DPython3_EXECUTABLE=$python `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
+            -DCMAKE_LINKER=link.exe `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug `
             -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
             -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
