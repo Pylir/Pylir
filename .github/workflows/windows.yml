@@ -22,7 +22,8 @@ jobs:
 
       - name: Install Python depends
         run: |
-          python3 -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
+          $python = (Get-Command python3).Source
+          $python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
       - name: Use developer command prompt
         uses: ilammy/msvc-dev-cmd@v1
@@ -40,6 +41,7 @@ jobs:
 
       - name: Configure LLVM Optimized TableGen
         run: |
+          $python = (Get-Command python3).Source
           cmake -GNinja -Bllvm-optimized-tblgen `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_CXX_COMPILER=cl `
@@ -48,6 +50,7 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir" `
             -DLLVM_TARGETS_TO_BUILD=host `
             -DLLVM_ENABLE_LLD=ON `
+            -DPython3_EXECUTABLE=$python `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM Optimized TableGen
@@ -56,6 +59,7 @@ jobs:
 
       - name: Configure LLVM
         run: |
+          $python = (Get-Command python3).Source
           $work_space = "${{github.workspace}}".replace('\', '/')
           cmake -GNinja -Bllvm-build `
             -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
@@ -70,6 +74,7 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir;lld" `
             -DLLVM_TARGETS_TO_BUILD=host `
             -DLLVM_ENABLE_LLD=ON `
+            -DPython3_EXECUTABLE=$python `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
@@ -78,12 +83,13 @@ jobs:
 
       - name: Configure Pylir
         run: |
-          $python = (Get-Command python).Source
+          $python = (Get-Command python3).Source
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
             -DPYLIR_EMBED_LLD=ON `
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_C_COMPILER=clang-cl `
+            -DPython3_EXECUTABLE=$python `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_LINKER=link `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug `
