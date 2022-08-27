@@ -132,7 +132,7 @@ jobs:
           location: D:\
             
       - name: Prepend Msys2 to path
-        run: $env:GITHUB_PATH = "D:\msys\msys64\mingw64\bin;$env:GITHUB_PATH"
+        run: $env:GITHUB_PATH = "D:\msys64\clang64\bin;$env:GITHUB_PATH"
 
       - name: Install Python depends
         run: |
