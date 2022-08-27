@@ -35,7 +35,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          python -m pip install -r $GITHUB_WORKSPACE/Pylir/test/requirements.txt
+          python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
       # See https://github.com/actions/cache/issues/53
       - name: Sanitize key
@@ -49,11 +49,7 @@ jobs:
           key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}
 
       - name: Checkout LLVM
-        uses: actions/checkout@v3
-        with:
-          repository: llvm/llvm-project
-          ref: 74b5dad5e944db21e56e6d81eb14f11891a741ab
-          path: llvm-project
+        uses: ./Pylir/.github/actions/llvm-checkout
 
       - name: Configure LLVM Optimized TableGen
         run: |
@@ -66,7 +62,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE="$(which python)" \
-            -S $GITHUB_WORKSPACE/llvm-project/llvm
+            -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM Optimized TableGen
         run: |
@@ -82,9 +78,9 @@ jobs:
       - name: Configure LLVM
         run: |
           cmake -GNinja -Bllvm-build \
-            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" \
-            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" \
-            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
+            -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen" \
+            -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen" \
+            -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
@@ -95,7 +91,7 @@ jobs:
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE="$(which python)" \
             -DLLVM_USE_SANITIZER="${{steps.sanitize-llvm-name.outputs.llvm_sanitizer}}" \
-            -S $GITHUB_WORKSPACE/llvm-project/llvm
+            -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
         run: |
@@ -115,10 +111,10 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_CXX_FLAGS="-g1" \
             -DPYLIR_ENABLE_ASSERTIONS=ON \
-            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
-            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
-            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" \
-            -S $GITHUB_WORKSPACE/Pylir
+            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" \
+            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" \
+            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" \
+            -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
         run: |
