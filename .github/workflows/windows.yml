@@ -53,7 +53,7 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir" `
             -DLLVM_TARGETS_TO_BUILD=host `
             -DLLVM_ENABLE_LLD=ON `
-            -DPython3_EXECUTABLE="$Env:pythonLocation/python" `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM Optimized TableGen
@@ -76,7 +76,7 @@ jobs:
             -DLLVM_ENABLE_PROJECTS="mlir;lld" `
             -DLLVM_TARGETS_TO_BUILD=host `
             -DLLVM_ENABLE_LLD=ON `
-            -DPython3_EXECUTABLE="$Env:pythonLocation/python" `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
@@ -90,7 +90,7 @@ jobs:
             -DPYLIR_EMBED_LLD=ON `
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_C_COMPILER=clang-cl `
-            -DPython3_EXECUTABLE="$Env:pythonLocation/python" `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_LINKER=link `
             -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug `
