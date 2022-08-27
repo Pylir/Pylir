@@ -128,8 +128,7 @@ jobs:
         with:
           msystem: clang64
           pacboy: >-
-            clang:p
-            libc++:p
+            toolchain:p
           location: D:\
             
       - name: Prepend Msys2 to path
