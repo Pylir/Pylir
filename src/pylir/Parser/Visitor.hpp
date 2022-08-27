@@ -20,37 +20,37 @@ class Visitor
 
 protected:
     template <class... Args>
-    void visit(const std::variant<Args...>& variant)
+    void visit(std::variant<Args...>& variant)
     {
-        pylir::match(variant, [this](const auto& value) { getImpl()->visit(value); });
+        pylir::match(variant, [this](auto& value) { getImpl()->visit(value); });
     }
 
     template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
-    void visit(const T& variant)
+    void visit(T& variant)
     {
-        variant.match([this](const auto& value) { getImpl()->visit(value); });
+        variant.match([this](auto& value) { getImpl()->visit(value); });
     }
 
 public:
-    void visit(const Atom&) {}
+    void visit(Atom&) {}
 
-    void visit(const AttributeRef& ref)
+    void visit(AttributeRef& ref)
     {
         getImpl()->visit(*ref.object);
     }
 
-    void visit(const Subscription& subscription)
+    void visit(Subscription& subscription)
     {
         getImpl()->visit(*subscription.object);
         getImpl()->visit(*subscription.index);
     }
 
-    void visit(const ExpressionStmt& expressionStmt)
+    void visit(ExpressionStmt& expressionStmt)
     {
         getImpl()->visit(*expressionStmt.expression);
     }
 
-    void visit(const Slice& slice)
+    void visit(Slice& slice)
     {
         if (slice.maybeLowerBound)
         {
@@ -66,80 +66,80 @@ public:
         }
     }
 
-    void visit(const Argument& argument)
+    void visit(Argument& argument)
     {
         getImpl()->visit(*argument.expression);
     }
 
-    void visit(const Call& call)
+    void visit(Call& call)
     {
         getImpl()->visit(*call.expression);
         pylir::match(
             call.variant,
-            [&](const std::vector<Argument>& arguments)
+            [&](std::vector<Argument>& arguments)
             {
                 for (auto& iter : arguments)
                 {
                     getImpl()->visit(iter);
                 }
             },
-            [&](const Comprehension& comprehension) { getImpl()->visit(comprehension); });
+            [&](Comprehension& comprehension) { getImpl()->visit(comprehension); });
     }
 
-    void visit(const Comparison& comparison)
+    void visit(Comparison& comparison)
     {
         getImpl()->visit(*comparison.first);
-        for (const auto& [op, expr] : comparison.rest)
+        for (auto& [op, expr] : comparison.rest)
         {
             (void)op;
             getImpl()->visit(*expr);
         }
     }
 
-    void visit(const BinOp& binOp)
+    void visit(BinOp& binOp)
     {
         getImpl()->visit(*binOp.lhs);
         getImpl()->visit(*binOp.rhs);
     }
 
-    void visit(const UnaryOp& unaryOp)
+    void visit(UnaryOp& unaryOp)
     {
         getImpl()->visit(*unaryOp.expression);
     }
 
-    void visit(const Generator& generator)
+    void visit(Generator& generator)
     {
         getImpl()->visit(*generator.expression);
         getImpl()->visit(generator.compFor);
     }
 
-    void visit(const ListDisplay& listDisplay)
+    void visit(ListDisplay& listDisplay)
     {
         if (auto* comprehension = std::get_if<Comprehension>(&listDisplay.variant))
         {
             getImpl()->visit(*comprehension);
             return;
         }
-        for (const auto& iter : pylir::get<std::vector<StarredItem>>(listDisplay.variant))
+        for (auto& iter : pylir::get<std::vector<StarredItem>>(listDisplay.variant))
         {
             getImpl()->visit(iter);
         }
     }
 
-    void visit(const SetDisplay& setDisplay)
+    void visit(SetDisplay& setDisplay)
     {
         if (auto* comprehension = std::get_if<Comprehension>(&setDisplay.variant))
         {
             getImpl()->visit(*comprehension);
             return;
         }
-        for (const auto& iter : pylir::get<std::vector<StarredItem>>(setDisplay.variant))
+        for (auto& iter : pylir::get<std::vector<StarredItem>>(setDisplay.variant))
         {
             getImpl()->visit(iter);
         }
     }
 
-    void visit(const DictDisplay& dictDisplay)
+    void visit(DictDisplay& dictDisplay)
     {
         if (auto* comprehension = std::get_if<DictDisplay::DictComprehension>(&dictDisplay.variant))
         {
@@ -148,7 +148,7 @@ public:
             getImpl()->visit(comprehension->compFor);
             return;
         }
-        for (const auto& iter : pylir::get<std::vector<DictDisplay::KeyDatum>>(dictDisplay.variant))
+        for (auto& iter : pylir::get<std::vector<DictDisplay::KeyDatum>>(dictDisplay.variant))
         {
             getImpl()->visit(*iter.key);
             if (iter.maybeValue)
@@ -158,19 +158,19 @@ public:
         }
     }
 
-    void visit(const Assignment& assignmentExpression)
+    void visit(Assignment& assignmentExpression)
     {
         getImpl()->visit(*assignmentExpression.expression);
     }
 
-    void visit(const Conditional& conditionalExpression)
+    void visit(Conditional& conditionalExpression)
     {
         getImpl()->visit(*conditionalExpression.trueValue);
         getImpl()->visit(*conditionalExpression.condition);
         getImpl()->visit(*conditionalExpression.elseValue);
     }
 
-    void visit(const Lambda& lambdaExpression)
+    void visit(Lambda& lambdaExpression)
     {
         for (auto& iter : lambdaExpression.parameters)
         {
@@ -179,12 +179,12 @@ public:
         getImpl()->visit(*lambdaExpression.expression);
     }
 
-    void visit(const StarredItem& starredItem)
+    void visit(StarredItem& starredItem)
     {
         getImpl()->visit(*starredItem.expression);
     }
 
-    void visit(const TupleConstruct& tuple)
+    void visit(TupleConstruct& tuple)
     {
         for (auto& iter : tuple.items)
         {
@@ -192,28 +192,28 @@ public:
         }
     }
 
-    void visit(const CompFor& compFor)
+    void visit(CompFor& compFor)
     {
         getImpl()->visit(*compFor.targets);
         getImpl()->visit(*compFor.test);
         pylir::match(
-            compFor.compIter, [](std::monostate) {}, [&](const auto& ptr) { getImpl()->visit(*ptr); });
+            compFor.compIter, [](std::monostate) {}, [&](auto& ptr) { getImpl()->visit(*ptr); });
     }
 
-    void visit(const CompIf& compIf)
+    void visit(CompIf& compIf)
     {
         getImpl()->visit(*compIf.test);
         pylir::match(
-            compIf.compIter, [](std::monostate) {}, [&](const auto& ptr) { getImpl()->visit(*ptr); });
+            compIf.compIter, [](std::monostate) {}, [&](auto& ptr) { getImpl()->visit(*ptr); });
     }
 
-    void visit(const Comprehension& comprehension)
+    void visit(Comprehension& comprehension)
     {
         getImpl()->visit(*comprehension.expression);
         getImpl()->visit(comprehension.compFor);
     }
 
-    void visit(const Yield& yieldExpression)
+    void visit(Yield& yieldExpression)
     {
         if (yieldExpression.maybeExpression)
         {
@@ -221,9 +221,9 @@ public:
         }
     }
 
-    void visit(const AssignmentStmt& assignmentStmt)
+    void visit(AssignmentStmt& assignmentStmt)
     {
-        for (const auto& [targetList, token] : assignmentStmt.targets)
+        for (auto& [targetList, token] : assignmentStmt.targets)
         {
             (void)token;
             getImpl()->visit(*targetList);
@@ -238,7 +238,7 @@ public:
         }
     }
 
-    void visit(const AssertStmt& assertStmt)
+    void visit(AssertStmt& assertStmt)
     {
         getImpl()->visit(*assertStmt.condition);
         if (assertStmt.maybeMessage)
@@ -247,14 +247,14 @@ public:
         }
     }
 
-    void visit(const SingleTokenStmt&) {}
+    void visit(SingleTokenStmt&) {}
 
-    void visit(const DelStmt& delStmt)
+    void visit(DelStmt& delStmt)
     {
         getImpl()->visit(*delStmt.targetList);
     }
 
-    void visit(const ReturnStmt& returnStmt)
+    void visit(ReturnStmt& returnStmt)
     {
         if (returnStmt.maybeExpression)
         {
@@ -262,7 +262,7 @@ public:
         }
     }
 
-    void visit(const RaiseStmt& raiseStmt)
+    void visit(RaiseStmt& raiseStmt)
     {
         if (raiseStmt.maybeException)
         {
@@ -274,17 +274,17 @@ public:
         }
     }
 
-    void visit(const ImportStmt&) {}
+    void visit(ImportStmt&) {}
 
-    void visit(const FutureStmt&) {}
+    void visit(FutureStmt&) {}
 
-    void visit(const GlobalOrNonLocalStmt&) {}
+    void visit(GlobalOrNonLocalStmt&) {}
 
-    void visit(const IfStmt& ifStmt)
+    void visit(IfStmt& ifStmt)
     {
         getImpl()->visit(*ifStmt.condition);
         getImpl()->visit(*ifStmt.suite);
-        for (const auto& elif : ifStmt.elifs)
+        for (auto& elif : ifStmt.elifs)
         {
             getImpl()->visit(*elif.condition);
             getImpl()->visit(*elif.suite);
@@ -295,7 +295,7 @@ public:
         }
     }
 
-    void visit(const WhileStmt& whileStmt)
+    void visit(WhileStmt& whileStmt)
     {
         getImpl()->visit(*whileStmt.condition);
         getImpl()->visit(*whileStmt.suite);
@@ -305,7 +305,7 @@ public:
         }
     }
 
-    void visit(const ForStmt& forStmt)
+    void visit(ForStmt& forStmt)
     {
         getImpl()->visit(*forStmt.targetList);
         getImpl()->visit(*forStmt.expression);
@@ -316,10 +316,10 @@ public:
         }
     }
 
-    void visit(const TryStmt& tryStmt)
+    void visit(TryStmt& tryStmt)
     {
         getImpl()->visit(*tryStmt.suite);
-        for (const auto& except : tryStmt.excepts)
+        for (auto& except : tryStmt.excepts)
         {
             getImpl()->visit(*except.filter);
             getImpl()->visit(*except.suite);
@@ -338,9 +338,9 @@ public:
         }
     }
 
-    void visit(const WithStmt& withStmt)
+    void visit(WithStmt& withStmt)
     {
-        for (const auto& withItem : withStmt.items)
+        for (auto& withItem : withStmt.items)
         {
             getImpl()->visit(*withItem.expression);
             if (withItem.maybeTarget)
@@ -351,7 +351,7 @@ public:
         getImpl()->visit(*withStmt.suite);
     }
 
-    void visit(const Parameter& parameter)
+    void visit(Parameter& parameter)
     {
         if (parameter.maybeDefault)
         {
@@ -363,12 +363,12 @@ public:
         }
     }
 
-    void visit(const Decorator& decorator)
+    void visit(Decorator& decorator)
     {
         getImpl()->visit(*decorator.expression);
     }
 
-    void visit(const FuncDef& funcDef)
+    void visit(FuncDef& funcDef)
     {
         for (auto& iter : funcDef.decorators)
         {
@@ -385,7 +385,7 @@ public:
         getImpl()->visit(*funcDef.suite);
     }
 
-    void visit(const ClassDef& classDef)
+    void visit(ClassDef& classDef)
     {
         for (auto& iter : classDef.decorators)
         {
@@ -401,15 +401,15 @@ public:
         getImpl()->visit(*classDef.suite);
     }
 
-    void visit(const Suite& suite)
+    void visit(Suite& suite)
     {
         for (auto& iter : suite.statements)
         {
-            pylir::match(iter, [&](const auto& stmt) { getImpl()->visit(*stmt); });
+            pylir::match(iter, [&](auto& stmt) { getImpl()->visit(*stmt); });
         }
     }
 
-    void visit(const FileInput& fileInput)
+    void visit(FileInput& fileInput)
     {
         getImpl()->visit(fileInput.input);
     }

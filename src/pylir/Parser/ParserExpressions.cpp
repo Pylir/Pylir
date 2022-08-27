@@ -6,6 +6,8 @@
 
 #include "Parser.hpp"
 
+#include <llvm/ADT/ScopeExit.h>
+
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Support/Functional.hpp>
 #include <pylir/Support/Variant.hpp>
@@ -16,11 +18,6 @@ std::optional<pylir::Syntax::Yield> pylir::Parser::parseYieldExpression()
     if (!yield)
     {
         return std::nullopt;
-    }
-
-    if (!m_inFunc)
-    {
-        createError(*yield, Diag::OCCURRENCE_OF_YIELD_OUTSIDE_OF_FUNCTION).addHighlight(*yield);
     }
 
     if (!peekedIs(TokenType::FromKeyword) && !peekedIs(firstInExpression))
@@ -59,12 +56,6 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
         case TokenType::Identifier:
         {
             auto token = *m_current++;
-            if (!m_namespace.empty())
-            {
-                // emplace will only insert if it is not already contained. So it will only be marked as unknown
-                // if we didn't know it's kind already
-                m_namespace.back().identifiers.insert({IdentifierToken{token}, Syntax::Scope::Kind::Unknown});
-            }
             return make_node<Syntax::Atom>(token);
         }
         case TokenType::StringLiteral:
@@ -739,7 +730,6 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
     }
 
     IdentifierToken variable{*m_current++};
-    addToNamespace(variable);
     BaseToken walrus = *m_current++;
     auto expression = parseExpression();
     if (!expression)
@@ -1012,17 +1002,47 @@ std::optional<pylir::Syntax::Lambda> pylir::Parser::parseLambdaExpression()
         }
         parameterList = std::move(*parsedParameterList);
     }
-    auto colon = expect(TokenType::Colon);
-    if (!colon)
+
+    // There is an ambiguity in the grammar here due to the parameter list before. In particular:
+    // `lambda x: int` could be parsed as either a lambda with a parameter x returning the value `int` or a lambda
+    // with parameter x of type `int`, but with the lambda missing a colon expression after.
+    // In short, we can't decide beforehand whether the `:` is part of the type of the last parameter or whether it is
+    // the lambda body. Since the parameter list parses eagerly we'll just have to detect that particular case by
+    // checking whether the last parameter had a type and no default arg, and then extract those from the param to use
+    // them as lambda bodies.
+    bool expressionIsInParameterList =
+        !parameterList.empty() && parameterList.back().maybeType && !parameterList.back().maybeDefault;
+    std::optional<BaseToken> colon;
+    if (!expressionIsInParameterList)
     {
-        return std::nullopt;
+        colon = expect(TokenType::Colon);
+        if (!colon)
+        {
+            return std::nullopt;
+        }
     }
-    auto expression = parseExpression();
-    if (!expression)
+    else
     {
-        return std::nullopt;
+        colon = parameterList.back().maybeColon;
+        parameterList.back().maybeColon.reset();
     }
-    return Syntax::Lambda{{}, std::move(*keyword), std::move(parameterList), std::move(*colon), std::move(*expression)};
+
+    IntrVarPtr<Syntax::Expression> expression;
+    if (!expressionIsInParameterList)
+    {
+        auto temp = parseExpression();
+        if (!temp)
+        {
+            return std::nullopt;
+        }
+        expression = std::move(*temp);
+    }
+    else
+    {
+        expression = std::move(parameterList.back().maybeType);
+    }
+
+    return Syntax::Lambda{{}, std::move(*keyword), std::move(parameterList), *colon, std::move(expression), {}};
 }
 
 std::optional<pylir::Syntax::Comprehension>
@@ -1049,7 +1069,6 @@ std::optional<pylir::Syntax::CompFor> pylir::Parser::parseCompFor()
     {
         return std::nullopt;
     }
-    addToNamespace(**targetList);
     auto inToken = expect(TokenType::InKeyword);
     if (!inToken)
     {

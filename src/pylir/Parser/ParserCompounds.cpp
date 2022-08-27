@@ -6,12 +6,10 @@
 
 #include "Parser.hpp"
 
-#include <llvm/ADT/ScopeExit.h>
-
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Support/Functional.hpp>
-#include <pylir/Support/ValueReset.hpp>
 
+#include "SemanticAnalysis.hpp"
 #include "Visitor.hpp"
 
 std::optional<pylir::Syntax::FileInput> pylir::Parser::parseFileInput()
@@ -33,7 +31,9 @@ std::optional<pylir::Syntax::FileInput> pylir::Parser::parseFileInput()
         }
         vector.insert(vector.end(), std::move_iterator(statement->begin()), std::move_iterator(statement->end()));
     }
-    return Syntax::FileInput{{std::move(vector)}, {m_globals.begin(), m_globals.end()}};
+    auto fileInput = Syntax::FileInput{{std::move(vector)}, {}};
+    SemanticAnalysis(m_lexer.getDiagManager()).visit(fileInput);
+    return fileInput;
 }
 
 std::optional<decltype(pylir::Syntax::Suite::statements)> pylir::Parser::parseStatement()
@@ -378,8 +378,6 @@ std::optional<pylir::Syntax::WhileStmt> pylir::Parser::parseWhileStmt()
     {
         return std::nullopt;
     }
-    std::optional reset = pylir::ValueReset(m_inLoop);
-    m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
     {
@@ -388,7 +386,6 @@ std::optional<pylir::Syntax::WhileStmt> pylir::Parser::parseWhileStmt()
     std::optional<Syntax::IfStmt::Else> elseSection;
     if (peekedIs(TokenType::ElseKeyword))
     {
-        reset.reset();
         auto parsedElse = parseElse();
         if (!parsedElse)
         {
@@ -416,7 +413,6 @@ std::optional<pylir::Syntax::ForStmt> pylir::Parser::parseForStmt()
     {
         return std::nullopt;
     }
-    addToNamespace(**targetList);
     auto inKeyword = expect(TokenType::InKeyword);
     if (!inKeyword)
     {
@@ -432,8 +428,6 @@ std::optional<pylir::Syntax::ForStmt> pylir::Parser::parseForStmt()
     {
         return std::nullopt;
     }
-    std::optional reset = pylir::ValueReset(m_inLoop);
-    m_inLoop = true;
     auto suite = parseSuite();
     if (!suite)
     {
@@ -442,7 +436,6 @@ std::optional<pylir::Syntax::ForStmt> pylir::Parser::parseForStmt()
     std::optional<Syntax::IfStmt::Else> elseSection;
     if (peekedIs(TokenType::ElseKeyword))
     {
-        reset.reset();
         auto parsedElse = parseElse();
         if (!parsedElse)
         {
@@ -539,7 +532,6 @@ std::optional<pylir::Syntax::TryStmt> pylir::Parser::parseTryStmt()
             {
                 return std::nullopt;
             }
-            addToNamespace(*id);
             name.emplace(std::move(*id));
         }
         auto exceptColon = expect(TokenType::Colon);
@@ -755,7 +747,8 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
 
         IntrVarPtr<Syntax::Expression> maybeType;
         IntrVarPtr<Syntax::Expression> maybeDefault;
-        if (maybeConsume(TokenType::Colon))
+        std::optional<BaseToken> maybeColon = maybeConsume(TokenType::Colon);
+        if (maybeColon)
         {
             auto type = parseExpression();
             if (!type)
@@ -801,8 +794,8 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
 
         if (!stars)
         {
-            parameters.push_back({currentKind, stars, IdentifierToken(std::move(*identifier)), std::move(maybeType),
-                                  std::move(maybeDefault)});
+            parameters.push_back({currentKind, stars, IdentifierToken(std::move(*identifier)), maybeColon,
+                                  std::move(maybeType), std::move(maybeDefault)});
             continue;
         }
 
@@ -827,154 +820,15 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
 
             seenPosRest = parameters.size();
             parameters.push_back({Syntax::Parameter::PosRest, stars, IdentifierToken(std::move(*identifier)),
-                                  std::move(maybeType), std::move(maybeDefault)});
+                                  maybeColon, std::move(maybeType), std::move(maybeDefault)});
             continue;
         }
 
         seenKwRest = parameters.size();
         parameters.push_back({Syntax::Parameter::KeywordRest, stars, IdentifierToken(std::move(*identifier)),
-                              std::move(maybeType), std::move(maybeDefault)});
+                              maybeColon, std::move(maybeType), std::move(maybeDefault)});
     }
     return parameters;
-}
-
-namespace
-{
-class NamespaceVisitor : public pylir::Syntax::Visitor<NamespaceVisitor>
-{
-    template <class T>
-    void finishNamespace(T& def)
-    {
-        for (auto& [id, kind] : def.scope.identifiers)
-        {
-            switch (kind)
-            {
-                case pylir::Syntax::Scope::NonLocal:
-                {
-                    if (std::none_of(scopes.begin(), scopes.end(),
-                                     [&id = id](const pylir::Syntax::Scope* scope) -> bool
-                                     { return scope->identifiers.count(id); }))
-                    {
-                        onError(id);
-                        break;
-                    }
-                    break;
-                }
-                case pylir::Syntax::Scope::Unknown:
-                {
-                    for (auto& iter : llvm::reverse(scopes))
-                    {
-                        auto res = iter->identifiers.find(id);
-                        if (res != iter->identifiers.end())
-                        {
-                            switch (res->second)
-                            {
-                                case pylir::Syntax::Scope::Global: kind = pylir::Syntax::Scope::Global; break;
-                                case pylir::Syntax::Scope::Unknown: continue;
-                                case pylir::Syntax::Scope::Cell:
-                                case pylir::Syntax::Scope::Local:
-                                case pylir::Syntax::Scope::NonLocal: kind = pylir::Syntax::Scope::NonLocal; break;
-                            }
-                            break;
-                        }
-                    }
-                    break;
-                }
-                default: break;
-            }
-        }
-
-        // add any non locals from nested functions except if they are local to this function aka the referred
-        // to local
-        for (auto& [id, kind] : def.scope.identifiers)
-        {
-            if (kind != pylir::Syntax::Scope::NonLocal)
-            {
-                continue;
-            }
-            pylir::match(
-                parentDef,
-                [&id = id, this](std::monostate)
-                {
-                    if (!maybeTopLevelFunction)
-                    {
-                        return;
-                    }
-                    // Special case for the very top level function that is finishing the namespace.
-                    // its scope is the very first one
-                    auto iter = maybeTopLevelFunction->identifiers.insert({id, pylir::Syntax::Scope::NonLocal}).first;
-                    if (iter->second == pylir::Syntax::Scope::Local)
-                    {
-                        iter->second = pylir::Syntax::Scope::Cell;
-                    }
-                },
-                [&id = id](pylir::Syntax::FuncDef* funcDef)
-                {
-                    auto iter = funcDef->scope.identifiers.insert({id, pylir::Syntax::Scope::NonLocal}).first;
-                    if (iter->second == pylir::Syntax::Scope::Local)
-                    {
-                        iter->second = pylir::Syntax::Scope::Cell;
-                    }
-                },
-                [&id = id](pylir::Syntax::ClassDef* classDef) {
-                    classDef->scope.identifiers.insert({id, pylir::Syntax::Scope::NonLocal});
-                });
-        }
-    }
-
-    pylir::Syntax::Scope* maybeTopLevelFunction;
-    std::vector<const pylir::Syntax::Scope*> scopes;
-    std::function<void(const pylir::IdentifierToken&)> onError;
-    std::variant<std::monostate, pylir::Syntax::FuncDef*, pylir::Syntax::ClassDef*> parentDef;
-
-public:
-    NamespaceVisitor(pylir::Syntax::Scope* maybeScope, std::function<void(const pylir::IdentifierToken&)>&& onError)
-        : maybeTopLevelFunction(maybeScope), onError(std::move(onError))
-    {
-        if (maybeScope)
-        {
-            scopes.push_back(maybeScope);
-        }
-    }
-
-    using Visitor::visit;
-
-    // TODO: consider having a non `const` version, using something different from Syntax::Visitor.
-    //       SOMETHING to get rid of const_cast here
-
-    void visit(const pylir::Syntax::ClassDef& classDef)
-    {
-        auto& def = const_cast<pylir::Syntax::ClassDef&>(classDef);
-        {
-            pylir::ValueReset reset(parentDef);
-            parentDef = &def;
-            Visitor::visit(classDef);
-        }
-        finishNamespace(def);
-    }
-
-    void visit(const pylir::Syntax::FuncDef& funcDef)
-    {
-        auto& def = const_cast<pylir::Syntax::FuncDef&>(funcDef);
-        {
-            scopes.push_back(&funcDef.scope);
-            auto exit = llvm::make_scope_exit([&] { scopes.pop_back(); });
-            pylir::ValueReset reset(parentDef);
-            parentDef = &def;
-            Visitor::visit(funcDef);
-        }
-        finishNamespace(def);
-    }
-};
-
-} // namespace
-
-void pylir::Parser::finishNamespace(Syntax::Suite& suite, Syntax::Scope* maybeScope) const
-{
-    NamespaceVisitor visitor(
-        maybeScope, [&](const IdentifierToken& token)
-        { createError(token, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, token.getValue()).addHighlight(token); });
-    visitor.visit(suite);
 }
 
 std::optional<pylir::Syntax::FuncDef> pylir::Parser::parseFuncDef(std::vector<Syntax::Decorator>&& decorators,
@@ -990,7 +844,6 @@ std::optional<pylir::Syntax::FuncDef> pylir::Parser::parseFuncDef(std::vector<Sy
     {
         return std::nullopt;
     }
-    addToNamespace(*funcName);
     auto openParenth = expect(TokenType::OpenParentheses);
     if (!openParenth)
     {
@@ -1026,41 +879,11 @@ std::optional<pylir::Syntax::FuncDef> pylir::Parser::parseFuncDef(std::vector<Sy
     {
         return std::nullopt;
     }
-    m_namespace.emplace_back();
-    std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
 
-    // add parameters to local variables
-    for (auto& iter : parameterList)
-    {
-        addToNamespace(iter.name);
-    }
-
-    pylir::ValueReset resetLoop(m_inLoop);
-    pylir::ValueReset resetFunc(m_inFunc);
-    m_inLoop = false;
-    m_inFunc = true;
     auto suite = parseSuite();
     if (!suite)
     {
         return std::nullopt;
-    }
-
-    auto scope = std::move(m_namespace.back());
-    exit.reset();
-    if (m_namespace.empty())
-    {
-        // this indicates that this funcdef is at global scope or only nested in classes. We now need to resolve any
-        // nonlocals inside any nested funcDefs and figure out whether any unknowns are nonlocal or global
-
-        for (auto& [iter, kind] : scope.identifiers)
-        {
-            if (kind != Syntax::Scope::NonLocal)
-            {
-                continue;
-            }
-            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addHighlight(iter);
-        }
-        finishNamespace(*suite, &scope);
     }
 
     return Syntax::FuncDef{{},
@@ -1074,7 +897,7 @@ std::optional<pylir::Syntax::FuncDef> pylir::Parser::parseFuncDef(std::vector<Sy
                            std::move(suffix),
                            *colon,
                            std::make_unique<Syntax::Suite>(std::move(*suite)),
-                           std::move(scope)};
+                           {}};
 }
 
 std::optional<pylir::Syntax::ClassDef> pylir::Parser::parseClassDef(std::vector<Syntax::Decorator>&& decorators)
@@ -1089,7 +912,6 @@ std::optional<pylir::Syntax::ClassDef> pylir::Parser::parseClassDef(std::vector<
     {
         return std::nullopt;
     }
-    addToNamespace(*className);
     std::optional<Syntax::ClassDef::Inheritance> inheritance;
     if (auto open = maybeConsume(TokenType::OpenParentheses))
     {
@@ -1115,32 +937,13 @@ std::optional<pylir::Syntax::ClassDef> pylir::Parser::parseClassDef(std::vector<
     {
         return std::nullopt;
     }
-    m_namespace.emplace_back();
-    std::optional exit = llvm::make_scope_exit([&] { m_namespace.pop_back(); });
-    pylir::ValueReset resetLoop(m_inLoop, m_inLoop);
-    pylir::ValueReset resetFunc(m_inFunc, m_inFunc);
-    m_inLoop = false;
-    m_inFunc = false;
+
     auto suite = parseSuite();
     if (!suite)
     {
         return std::nullopt;
     }
 
-    auto scope = std::move(m_namespace.back());
-    exit.reset();
-    if (m_namespace.empty())
-    {
-        for (auto& [iter, kind] : scope.identifiers)
-        {
-            if (kind != Syntax::Scope::NonLocal)
-            {
-                continue;
-            }
-            createError(iter, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, iter.getValue()).addHighlight(iter);
-        }
-        finishNamespace(*suite);
-    }
     return Syntax::ClassDef{{},
                             std::move(decorators),
                             *classKeyword,
@@ -1148,5 +951,5 @@ std::optional<pylir::Syntax::ClassDef> pylir::Parser::parseClassDef(std::vector<
                             std::move(inheritance),
                             *colon,
                             std::make_unique<Syntax::Suite>(std::move(*suite)),
-                            std::move(scope)};
+                            {}};
 }

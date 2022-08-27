@@ -29,6 +29,7 @@ class Dumper
     {
     };
 
+public:
     class Builder
     {
         Dumper* m_dumper;
@@ -70,6 +71,7 @@ class Dumper
         [[nodiscard]] std::string emit() const;
     };
 
+private:
     template <class S, class... Args>
     Builder createBuilder(const S& s, Args&&... args)
     {

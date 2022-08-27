@@ -27,11 +27,6 @@ class Parser
     Lexer m_lexer;
     Lexer::iterator m_current;
 
-    std::vector<Syntax::Scope> m_namespace;
-    IdentifierSet m_globals;
-    bool m_inLoop = false;
-    bool m_inFunc = false;
-
     /// Attempts to peek ahead in the token stream and returns the token if it matches the given predicate. If it does
     /// not match, or there are no more tokens it returns an empty optional.
     template <class P>
@@ -142,19 +137,11 @@ class Parser
 
     std::optional<Token> expect(TokenType tokenType);
 
-    void addToNamespace(const Token& token);
-
-    void addToNamespace(const IdentifierToken& token);
-
-    void addToNamespace(const Syntax::Target& target);
-
     template <class T, class... Args>
     static std::unique_ptr<T> make_node(Args&&... args)
     {
         return std::unique_ptr<T>(new T{{}, std::forward<Args>(args)...});
     }
-
-    void finishNamespace(pylir::Syntax::Suite& suite, pylir::Syntax::Scope* maybeScope = nullptr) const;
 
     bool lookaheadEquals(tcb::span<const TokenType> tokens);
 

@@ -188,7 +188,6 @@ not not 2
 
 lambda: 3
 # CHECK-NEXT: |-lambda expression
-# CHECK-NEXT: | |-parameters
 # CHECK-NEXT: | `-atom 3
 
 a = 3
