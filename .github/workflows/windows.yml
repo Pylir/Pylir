@@ -171,9 +171,9 @@ jobs:
         run: |
           $work_space = "${{github.workspace}}".replace('\', '/') 
           cmake -GNinja -Bllvm-build `
-            -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen" `
-            -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen" `
-            -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" `
+            -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
+            -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
+            -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_CXX_COMPILER=clang++ `
             -DCMAKE_C_COMPILER=clang `
