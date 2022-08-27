@@ -171,9 +171,9 @@ jobs:
         run: |
           $work_space = "${{github.workspace}}".replace('\', '/') 
           cmake -GNinja -Bllvm-build `
-            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" `
-            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" `
-            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" `
+            -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen" `
+            -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen" `
+            -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_CXX_COMPILER=clang++ `
             -DCMAKE_C_COMPILER=clang `
@@ -204,9 +204,9 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
             -DCMAKE_CXX_FLAGS="-g1" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
-            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" `
-            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" `
-            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" `
+            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
+            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
+            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" `
             -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
