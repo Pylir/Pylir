@@ -129,9 +129,9 @@ jobs:
           msystem: clang64
           pacboy: >-
             toolchain:p
-            cmake:p
+          location: D:\
             
-      - run: echo "${{ runner.temp }}/msys/msys64/mingw64/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - run: echo "D:\msys\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
 
       - name: Install Python depends
         run: |
