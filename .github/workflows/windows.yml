@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
 
 jobs:
-  windows-build:
+  msvc-build:
     runs-on: windows-2022
 
     steps:
@@ -37,7 +37,7 @@ jobs:
         with:
           ccache_options: |
             max_size: 2G
-          override_cache_key: ${{runner.os}}
+          override_cache_key: ${{runner.os}}-msvc
           windows_compile_environment: msvc
 
       - name: Checkout LLVM
@@ -107,3 +107,120 @@ jobs:
         working-directory: ${{github.workspace}}/pylir-build
         run: ctest --extra-verbose
 
+  mingw-build:
+    runs-on: windows-2022
+
+    steps:
+      - name: Install Ninja
+        uses: ashutoshvarma/setup-ninja@v1.1
+
+      - name: Checkout Pylir
+        uses: actions/checkout@v3
+        with:
+          path: Pylir
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: clang64
+          pacboy: >-
+            toolchain:p
+          location: D:\
+            
+      - name: Prepend Msys2 to path
+        run: echo "D:\msys64\clang64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+
+      - name: Install Python depends
+        run: |
+          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
+
+      - name: Install CCache
+        uses: Chocobo1/setup-ccache-action@v1
+        with:
+          ccache_options: |
+            max_size: 2G
+          override_cache_key: ${{runner.os}}-clang64
+          # Lying here because I am not running within msys2
+          windows_compile_environment: msvc
+
+      - name: Checkout LLVM
+        uses: ./Pylir/.github/actions/llvm-checkout
+
+      - name: Configure LLVM Optimized TableGen
+        run: |
+          cmake -GNinja -Bllvm-optimized-tblgen `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_CXX_COMPILER=clang++ `
+            -DCMAKE_C_COMPILER=clang `
+            -DLLVM_CCACHE_BUILD=ON `
+            -DLLVM_BUILD_TOOLS=OFF `
+            -DLLVM_BUILD_UTILS=ON `
+            -DLLVM_INCLUDE_TESTS=OFF `
+            -DLLVM_INSTALL_UTILS=ON `
+            -DLLVM_ENABLE_PROJECTS="mlir" `
+            -DLLVM_TARGETS_TO_BUILD=host `
+            -DLLVM_ENABLE_LLD=ON `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+            -S ${{github.workspace}}/llvm-project/llvm
+
+      - name: Build LLVM Optimized TableGen
+        run: |
+          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
+
+      - name: Configure LLVM
+        run: |
+          $work_space = "${{github.workspace}}".replace('\', '/') 
+          cmake -GNinja -Bllvm-build `
+            -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
+            -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
+            -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_CXX_COMPILER=clang++ `
+            -DCMAKE_C_COMPILER=clang `
+            -DLLVM_CCACHE_BUILD=ON `
+            -DLLVM_ENABLE_ASSERTIONS=ON `
+            -DLLVM_BUILD_TOOLS=OFF `
+            -DLLVM_BUILD_UTILS=ON `
+            -DLLVM_INCLUDE_TESTS=OFF `
+            -DLLVM_INSTALL_UTILS=ON `
+            -DLLVM_ENABLE_PROJECTS="mlir;lld" `
+            -DLLVM_TARGETS_TO_BUILD=host `
+            -DLLVM_ENABLE_LLD=ON `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" `
+            -S ${{github.workspace}}/llvm-project/llvm
+
+      - name: Build LLVM
+        run: |
+          cmake --build llvm-build
+
+      - name: Configure Pylir
+        run: |
+          cmake -GNinja -Bpylir-build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DPYLIR_EMBED_LLD=ON `
+            -DCMAKE_CXX_COMPILER=clang++ `
+            -DCMAKE_C_COMPILER=clang `
+            -DPYLIR_SANITIZER="address,undefined" `
+            -DPYLIR_DEFAULT_SYSROOT="D:/msys64/clang64" `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
+            -DPYLIR_ENABLE_ASSERTIONS=ON `
+            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
+            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
+            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" `
+            -S ${{github.workspace}}/Pylir
+
+      - name: Build Pylir
+        run: |
+          cmake --build pylir-build
+
+      - name: Test
+        working-directory: ${{github.workspace}}/pylir-build
+        run: ctest --extra-verbose
