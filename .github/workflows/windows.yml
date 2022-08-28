@@ -183,7 +183,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host `
             -DLLVM_ENABLE_LLD=ON `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -DLLVM_USE_SANITIZER="Address;Undefined" `
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
@@ -202,7 +202,6 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
-            -DCMAKE_CXX_FLAGS="-g1" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
             -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
