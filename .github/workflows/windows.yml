@@ -183,7 +183,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host `
             -DLLVM_ENABLE_LLD=ON `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
