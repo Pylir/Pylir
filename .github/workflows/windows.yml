@@ -37,7 +37,7 @@ jobs:
         with:
           ccache_options: |
             max_size: 2G
-          override_cache_key: ${{runner.os}}
+          override_cache_key: ${{runner.os}}-msvc
           windows_compile_environment: msvc
 
       - name: Checkout LLVM
