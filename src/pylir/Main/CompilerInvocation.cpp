@@ -11,6 +11,7 @@
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/Arithmetic/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
+#include <mlir/Dialect/DLTI/DLTI.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
@@ -116,6 +117,59 @@ void writeDependencyOutput(llvm::raw_ostream& ostream, llvm::StringRef outputFil
     ostream << escapeForMakefile(outputFilename) << ": ";
     llvm::interleave(llvm::map_range(additionalInputFiles, escapeForMakefile), ostream, " ");
     ostream << '\n';
+}
+
+void llvmDataLayoutToMLIRDataLayout(mlir::ModuleOp moduleOp, const llvm::DataLayout& dataLayout)
+{
+    moduleOp.getContext()->loadDialect<mlir::DLTIDialect>();
+    moduleOp.getContext()->loadDialect<mlir::LLVM::LLVMDialect>();
+    llvm::SmallVector<mlir::DataLayoutEntryInterface> entries;
+    // Endian.
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+        mlir::StringAttr::get(moduleOp.getContext(), mlir::DLTIDialect::kDataLayoutEndiannessKey),
+        mlir::StringAttr::get(moduleOp.getContext(), dataLayout.isBigEndian() ?
+                                                         mlir::DLTIDialect::kDataLayoutEndiannessBig :
+                                                         mlir::DLTIDialect::kDataLayoutEndiannessLittle)));
+    // Index size.
+    auto i32 = mlir::IntegerType::get(moduleOp.getContext(), 32);
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(mlir::IndexType::get(moduleOp.getContext()),
+                                                        mlir::IntegerAttr::get(i32, dataLayout.getIndexSizeInBits(0))));
+
+    // Only integer types we actually care about (probably even more than what we care about to be honest. We only
+    // really use whatever is index).
+    llvm::LLVMContext context;
+    for (std::size_t integerSize : {1, 8, 16, 32, 64})
+    {
+        auto* llvmIntegerType = llvm::IntegerType::get(context, integerSize);
+        auto mlirIntegerType = mlir::IntegerType::get(moduleOp.getContext(), integerSize);
+        auto abiAlign = dataLayout.getABITypeAlign(llvmIntegerType);
+        auto prefAlign = dataLayout.getPrefTypeAlign(llvmIntegerType);
+        entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+            mlirIntegerType, mlir::DenseIntElementsAttr::get(mlir::VectorType::get({2}, i32),
+                                                             {static_cast<std::int32_t>(abiAlign.value()) * 8,
+                                                              static_cast<std::int32_t>(prefAlign.value()) * 8})));
+    }
+
+    // Only really care about Double at the moment.
+    auto* llvm64 = llvm::Type::getFloatingPointTy(context, llvm::APFloat::IEEEdouble());
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+        mlir::FloatType::getF64(moduleOp->getContext()),
+        mlir::DenseIntElementsAttr::get(
+            mlir::VectorType::get({2}, i32),
+            llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(dataLayout.getABITypeAlign(llvm64).value()) * 8,
+                                         static_cast<std::int32_t>(dataLayout.getPrefTypeAlign(llvm64).value()) * 8})));
+
+    // Pointers
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+        mlir::LLVM::LLVMPointerType::get(moduleOp.getContext()),
+        mlir::DenseIntElementsAttr::get(
+            mlir::VectorType::get({3}, i32),
+            {static_cast<std::int32_t>(dataLayout.getPointerSizeInBits(0)),
+             static_cast<std::int32_t>(dataLayout.getPointerABIAlignment(0).value()) * 8,
+             static_cast<std::int32_t>(dataLayout.getPointerPrefAlignment(0).value()) * 8})));
+
+    moduleOp->setAttr(mlir::DLTIDialect::kDataLayoutAttrName,
+                      mlir::DataLayoutSpecAttr::get(moduleOp.getContext(), entries));
 }
 } // namespace
 
@@ -270,6 +324,11 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             mlirModule = std::move(*module);
+            if (mlir::failed(ensureTargetMachine(args, commandLine, toolchain)))
+            {
+                return mlir::failure();
+            }
+            llvmDataLayoutToMLIRDataLayout(*mlirModule, m_targetMachine->createDataLayout());
             [[fallthrough]];
         }
         case FileType::MLIR:
@@ -532,6 +591,7 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<mlir::LLVM::LLVMDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();
+    registry.insert<mlir::DLTIDialect>();
     m_mlirContext.emplace(registry);
     m_mlirContext->enableMultithreading(args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
     m_mlirContext->getDiagEngine().registerHandler(

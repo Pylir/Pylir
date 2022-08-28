@@ -23,8 +23,8 @@ std::optional<std::string> relativeSubdir(const llvm::Triple& triple, const pyli
     subdirs.emplace_back(triple.getArchName());
     subdirs[1] += "-w64-mingw32";
     llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
-    executablePath = llvm::sys::path::parent_path(executablePath);
-    executablePath = llvm::sys::path::parent_path(executablePath);
+    executablePath = llvm::sys::path::parent_path(executablePath).str();
+    executablePath = llvm::sys::path::parent_path(executablePath).str();
     for (auto& candidateSubdir : subdirs)
     {
         if (llvm::sys::fs::is_directory(executablePath + llvm::sys::path::get_separator() + candidateSubdir))

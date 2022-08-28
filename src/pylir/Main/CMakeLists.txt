@@ -29,6 +29,7 @@ target_link_libraries(PylirMain
         MLIRArithmeticTransforms
         MLIRArithmeticToLLVM
         MLIRToLLVMIRTranslationRegistration
+        MLIRDLTIDialect
         CodeGen
         PylirLinker
         PylirToLLVMIR

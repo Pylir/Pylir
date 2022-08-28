@@ -15,8 +15,7 @@ class PlatformABI
     mlir::DataLayout m_dataLayout;
 
 protected:
-    // TODO use DataLayout exclusively once LLVM Dialect makes use of it
-
+    
     explicit PlatformABI(mlir::DataLayout dataLayout) : m_dataLayout(std::move(dataLayout)) {}
 
 public:
