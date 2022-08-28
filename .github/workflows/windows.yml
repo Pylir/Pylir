@@ -206,6 +206,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++ `
             -DCMAKE_C_COMPILER=clang `
             -DPYLIR_SANITIZER="address,undefined" `
+            -DPYLIR_DEFAULT_SYSROOT="D:/msys64/clang64" `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `

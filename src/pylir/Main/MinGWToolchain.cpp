@@ -183,7 +183,16 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     }
     auto gccLib = findGCCLib(m_triple, m_sysroot);
     auto sep = llvm::sys::path::get_separator();
-    llvm::SmallString<20> path(gccLib.value_or((m_sysroot + sep + m_subdir + sep + "lib").str()));
+    llvm::SmallString<20> sysRootAndSubDir(m_sysroot);
+    if (!m_subdir.empty())
+    {
+        sysRootAndSubDir += sep;
+        sysRootAndSubDir += m_subdir;
+    }
+    sysRootAndSubDir += sep;
+    sysRootAndSubDir += "lib";
+
+    llvm::SmallString<20> path(gccLib.value_or(static_cast<std::string>(sysRootAndSubDir)));
     arguments.emplace_back((path + sep + "crt2.o").str());
     arguments.emplace_back((path + sep + "crtbegin.o").str());
 
@@ -195,7 +204,7 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     {
         arguments.push_back("-L" + *gccLib);
     }
-    arguments.push_back(("-L" + m_sysroot + sep + m_subdir + sep + "lib").str());
+    arguments.push_back(("-L" + sysRootAndSubDir).str());
     arguments.push_back(("-L" + m_sysroot + sep + "lib").str());
     arguments.push_back(("-L" + m_sysroot + sep + "lib" + sep + m_triple.str()).str());
     arguments.push_back(("-L" + m_sysroot + sep + "sys-root" + sep + "mingw" + sep + "lib").str());
