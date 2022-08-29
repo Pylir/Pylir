@@ -52,7 +52,7 @@ jobs:
         with:
           ccache_options: |
             max_size: 2G
-          override_cache_key: ${{runner.os}}-msvc
+          override_cache_key: ${{runner.os}}-${{matrix.runtime_lib_cmake}}-msvc
           windows_compile_environment: msvc
 
       - name: Checkout LLVM
@@ -161,7 +161,7 @@ jobs:
         with:
           ccache_options: |
             max_size: 2G
-          override_cache_key: ${{runner.os}}-clang64
+          override_cache_key: ${{runner.os}}-${{matrix.sanitizer}}-clang64
           # Lying here because I am not running within msys2
           windows_compile_environment: msvc
 
