@@ -17,13 +17,13 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        cxx_compiler: [ clang++, g++ ]
-        c_compiler: [ clang, gcc ]
+        cxx_compiler: [ clang++, g++-10 ]
+        c_compiler: [ clang, gcc-10 ]
         sanitizer: [ "address,undefined","thread" ]
         exclude:
           - cxx_compiler: clang++
-            c_compiler: gcc
-          - cxx_compiler: g++
+            c_compiler: gcc-10
+          - cxx_compiler: g++-10
             c_compiler: clang
 
     steps:
@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libunwind-dev
+          sudo apt install libunwind-dev g++-10
 
       - name: Set up Python
         uses: actions/setup-python@v2
