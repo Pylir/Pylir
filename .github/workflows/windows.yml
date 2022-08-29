@@ -15,6 +15,15 @@ on:
 jobs:
   msvc-build:
     runs-on: windows-2022
+    strategy:
+      matrix:
+        runtime_lib_llvm: [ "MTd", "MT" ]
+        runtime_lib_cmake: [ "MultiThreadedDebug", "MultiThreaded" ]
+        exclude:
+          - runtime_lib_llvm: "MTd"
+            runtime_lib_cmake: "MultiThreaded"
+          - runtime_lib_llvm: "MT"
+            runtime_lib_cmake: "MultiThreadedDebug"
 
     steps:
 
@@ -43,7 +52,7 @@ jobs:
         with:
           ccache_options: |
             max_size: 2G
-          override_cache_key: ${{runner.os}}-msvc
+          override_cache_key: ${{runner.os}}-${{matrix.runtime_lib_cmake}}-msvc
           windows_compile_environment: msvc
 
       - name: Checkout LLVM
@@ -74,7 +83,7 @@ jobs:
             -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
             -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
             -DCMAKE_BUILD_TYPE=Release `
-            -DLLVM_USE_CRT_RELEASE=MTd `
+            -DLLVM_USE_CRT_RELEASE=${{matrix.runtime_lib_llvm}} `
             -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_C_COMPILER=cl `
             -DLLVM_CCACHE_BUILD=ON `
@@ -99,7 +108,7 @@ jobs:
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_LINKER=link `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{matrix.runtime_lib_cmake}} `
             -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
             -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
             -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" `
@@ -115,6 +124,9 @@ jobs:
 
   mingw-build:
     runs-on: windows-2022
+    strategy:
+      matrix:
+        sanitizer: [ "address,undefined", "" ]
 
     steps:
       - name: Install Ninja
@@ -144,12 +156,17 @@ jobs:
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
+      # See https://github.com/actions/cache/issues/53
+      - name: Sanitize key
+        id: sanitize-key
+        run: echo "::set-output name=key::$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )"
+
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
             max_size: 2G
-          override_cache_key: ${{runner.os}}-clang64
+          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-clang64
           # Lying here because I am not running within msys2
           windows_compile_environment: msvc
 
@@ -180,6 +197,10 @@ jobs:
       - name: Configure LLVM
         run: |
           $work_space = "${{github.workspace}}".replace('\', '/') 
+          $cxx_flags = ''
+          if ('${{matrix.sanitizer}}') {
+            $cxx_flags = '-DCMAKE_CXX_FLAGS="-fsanitize=${{matrix.sanitizier}} -fno-omit-frame-pointer"'
+          }
           cmake -GNinja -Bllvm-build `
             -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
             -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
@@ -197,7 +218,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host `
             -DLLVM_ENABLE_LLD=ON `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" `
+            $cxx_flags `
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
@@ -206,12 +227,16 @@ jobs:
 
       - name: Configure Pylir
         run: |
+          $sanitizer_arg = ''
+          if ('${{matrix.sanitizer}}') {
+            $sanitizer_arg = '-DPYLIR_SANITIZER="${{matrix.sanitizier}}"'
+          }
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
             -DPYLIR_EMBED_LLD=ON `
             -DCMAKE_CXX_COMPILER=clang++ `
             -DCMAKE_C_COMPILER=clang `
-            -DPYLIR_SANITIZER="address,undefined" `
+            $sanitizer_arg `
             -DPYLIR_DEFAULT_SYSROOT="D:/msys64/clang64" `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
