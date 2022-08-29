@@ -599,7 +599,7 @@ mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(::llvm::ArrayRef<mlir::Attribut
     return Py::BoolAttr::get(getContext(), boolean.getValue());
 }
 
-mlir::OpFoldResult pylir::Py::IntFromIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Py::IntFromUnsignedOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     auto integer = operands[0].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!integer)
@@ -609,33 +609,54 @@ mlir::OpFoldResult pylir::Py::IntFromIntegerOp::fold(::llvm::ArrayRef<::mlir::At
     return Py::IntAttr::get(getContext(), BigInt(integer.getValue().getZExtValue()));
 }
 
-mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+mlir::OpFoldResult pylir::Py::IntFromSignedOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (auto op = getInput().getDefiningOp<IntToIndexOp>())
+    {
+        return op.getInput();
+    }
+    auto integer = operands[0].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!integer)
+    {
+        return nullptr;
+    }
+    return Py::IntAttr::get(getContext(), BigInt(integer.getValue().getSExtValue()));
+}
+
+mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (auto op = getInput().getDefiningOp<IntFromSignedOp>())
+    {
+        return op.getInput();
+    }
+    if (auto op = getInput().getDefiningOp<IntFromUnsignedOp>())
+    {
+        return op.getInput();
+    }
+
     auto integer = operands[0].dyn_cast_or_null<Py::IntAttrInterface>();
     if (!integer)
     {
-        return mlir::failure();
+        return nullptr;
     }
-    std::size_t bitWidth;
-    if (getResult().getType().isa<mlir::IndexType>())
+    std::size_t bitWidth = mlir::DataLayout::closest(*this).getTypeSizeInBits(getResult().getType());
+    if (integer.getIntegerValue() < BigInt(0))
     {
-        bitWidth = mlir::DataLayout::closest(*this).getTypeSizeInBits(getResult().getType());
-    }
-    else
-    {
-        bitWidth = getResult().getType().getIntOrFloatBitWidth();
+        auto optional = integer.getIntegerValue().tryGetInteger<std::intmax_t>();
+        if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, true).isSignedIntN(bitWidth))
+        {
+            // TODO: I will probably want a poison value here in the future.
+            return mlir::IntegerAttr::get(getType(), 0);
+        }
+        return mlir::IntegerAttr::get(getType(), *optional);
     }
     auto optional = integer.getIntegerValue().tryGetInteger<std::uintmax_t>();
-    if (!optional || *optional > (1uLL << (bitWidth - 1)))
+    if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, false).isIntN(bitWidth))
     {
-        results.emplace_back(mlir::IntegerAttr::get(getResult().getType(), 0));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
+        // TODO: I will probably want a poison value here in the future.
+        return mlir::IntegerAttr::get(getType(), 0);
     }
-    results.emplace_back(mlir::IntegerAttr::get(getResult().getType(), *optional));
-    results.emplace_back(mlir::BoolAttr::get(getContext(), true));
-    return mlir::success();
+    return mlir::IntegerAttr::get(getType(), *optional);
 }
 
 mlir::OpFoldResult pylir::Py::IntCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)

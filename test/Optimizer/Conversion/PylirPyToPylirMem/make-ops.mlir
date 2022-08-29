@@ -133,7 +133,9 @@ func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: %[[BOOL:.*]] = py.constant(@builtins.bool)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
-// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : i1
+// CHECK-NEXT: %[[EXT:.*]] = arith.extui %[[ARG]] : i1 to i{{[0-9]+}}
+// CHECK-NEXT: %[[INDEX:.*]] = arith.index_cast %[[EXT]]
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initIntUnsigned %[[MEM]] to %[[INDEX]]
 // CHECK-NEXT: return %[[RESULT]]
 
 // -----
@@ -141,8 +143,8 @@ func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_int_fromInteger(%arg0 : i32) -> !py.dynamic {
-    %0 = py.int.fromInteger %arg0 : i32
+func.func @make_int_fromInteger(%arg0 : index) -> !py.dynamic {
+    %0 = py.int.fromUnsigned %arg0
     return %0 : !py.dynamic
 }
 
@@ -150,7 +152,7 @@ func.func @make_int_fromInteger(%arg0 : i32) -> !py.dynamic {
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: %[[BOOL:.*]] = py.constant(@builtins.int)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
-// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initInt %[[MEM]] to %[[ARG]] : i32
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initIntUnsigned %[[MEM]] to %[[ARG]]
 // CHECK-NEXT: return %[[RESULT]]
 
 

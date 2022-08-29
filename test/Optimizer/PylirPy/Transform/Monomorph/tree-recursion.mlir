@@ -25,9 +25,9 @@ func.func private @"builtins.type.__call__$impl[0]"(%arg0: !py.dynamic, %arg1: !
   %8 = py.constant(@builtins.TypeError)
   %9 = py.constant(@builtins.type.__call__)
   %10 = py.tuple.len %arg2
-  %11 = py.int.fromInteger %10 : index
+  %11 = py.int.fromUnsigned %10
   %12 = py.dict.len %arg3
-  %13 = py.int.fromInteger %12 : index
+  %13 = py.int.fromUnsigned %12
   %14 = py.int.cmp eq %11, %2
   %15 = py.bool.fromI1 %14
   %16 = py.int.cmp eq %13, %3

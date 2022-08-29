@@ -464,29 +464,47 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
 
 // Int ops
 
-def PylirPy_IntFromIntegerOp : PylirPy_Op<"int.fromInteger", [NoCapture, AlwaysBound, RefinedType<"Int">,
-															  ReturnsImmutable, NoSideEffect]> {
-    let arguments = (ins IntegerLike:$input);
+def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned", [NoCapture, AlwaysBound, RefinedType<"Int">,
+															     ReturnsImmutable, NoSideEffect]> {
+    let arguments = (ins Index:$input);
     let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$input attr-dict `:` type($input)";
+    let assemblyFormat = "$input attr-dict";
 
     let description = [{
-        Converts an arbitrary integer-like into a python integer.
+        Interprets an index as signed and converts it into a python integer.
     }];
 
     let hasFolder = 1;
 }
 
-def PylirPy_IntToIntegerOp : PylirPy_Op<"int.toInteger", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$input);
-    let results = (outs IntegerLike:$result, I1:$success);
+def PylirPy_IntFromUnsignedOp : PylirPy_Op<"int.fromUnsigned", [NoCapture, AlwaysBound, RefinedType<"Int">,
+															         ReturnsImmutable, NoSideEffect]> {
+    let arguments = (ins Index:$input);
+    let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$input attr-dict `:` type($result)";
+    let assemblyFormat = "$input attr-dict";
 
     let description = [{
-        Converts a python integer into an arbitrary integer-like. If the result type is not capable of representing the
-        value, the conversion will fail, `$success` will be set to false and using `$result` is undefined behaviour.
+        Interprets an index as unsigned and converts it into a python integer.
+    }];
+
+    let hasFolder = 1;
+}
+
+def PylirPy_IntToIndexOp : PylirPy_Op<"int.toIndex", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$input);
+    let results = (outs Index:$result);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let description = [{
+        Converts the python integer `$input` into an index. The python integers value is interpreted as if encoded via
+        twos complement with the bit-width of the index type. That means any python integer created via
+        `py.fromUnsigned` or `py.int.fromSigned` can be converted back to the exact index value it was created with.
+
+        If `$input` is outside the range of values representable by `index`, that is less than `-2^(index_width-1)` or
+        larger than `2^(index_width)-1`, the behaviour is undefined.
         If `$input` is not really an int (or subclass of) the behaviour is undefined.
     }];
 

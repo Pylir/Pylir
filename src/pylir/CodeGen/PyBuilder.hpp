@@ -541,14 +541,19 @@ public:
         return create<Py::BoolFromI1Op>(input);
     }
 
-    Py::IntFromIntegerOp createIntFromInteger(mlir::Value integer)
+    Py::IntFromSignedOp createIntFromSigned(mlir::Value integer)
     {
-        return create<Py::IntFromIntegerOp>(integer);
+        return create<Py::IntFromSignedOp>(integer);
     }
 
-    Py::IntToIntegerOp createIntToInteger(mlir::Type integerLike, mlir::Value object)
+    Py::IntFromUnsignedOp createIntFromUnsigned(mlir::Value integer)
     {
-        return create<Py::IntToIntegerOp>(integerLike, getI1Type(), object);
+        return create<Py::IntFromUnsignedOp>(integer);
+    }
+
+    Py::IntToIndexOp createIntToIndex(mlir::Value object)
+    {
+        return create<Py::IntToIndexOp>(object);
     }
 
     Py::IntCmpOp createIntCmp(Py::IntCmpKind kind, mlir::Value lhs, mlir::Value rhs)

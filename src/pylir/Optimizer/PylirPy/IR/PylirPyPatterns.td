@@ -88,30 +88,6 @@ def : Pat<(Arith_CmpIOp Arith_CmpIEq, (PylirPy_ObjectIdOp $lhs), (PylirPy_Object
 def : Pat<(Arith_CmpIOp Arith_CmpINe, (PylirPy_ObjectIdOp $lhs), (PylirPy_ObjectIdOp $rhs)),
 			(Arith_XOrIOp (PylirPy_IsOp $lhs, $rhs), (Arith_ConstantOp ConstBoolAttrTrue))>;
 
-class IntegerWidthComp<string op> : Constraint<CPred<
-    "$0.getType().getIntOrFloatBitWidth() " # op # " $1.getType().getIntOrFloatBitWidth()">,
-     "integer width is " # op # " than the other">;
-
-def TypesMatch : Constraint<CPred<"$0.getType() == $1.getType()">, "has same type">;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp AnyInteger:$input)),
-                [(Arith_TruncIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(AnyInteger $result__0), (IntegerWidthComp<">"> $input, $result__0)]>;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp AnyInteger:$input)),
-                [(Arith_ExtSIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(AnyInteger $result__0), (IntegerWidthComp<"<"> $input, $result__0)]>;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp $input)),
-                [(replaceWithValue $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(TypesMatch $result__0, $input)]>;
-
-def OnlyOneIsIndex : Constraint<CPred<"$0.getType().isIndex() != $1.getType().isIndex()">, "only one is index">;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp $input)),
-                [(Arith_IndexCastOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(OnlyOneIsIndex $result__0, $input)]>;
-
 def IsConstant : Constraint<CPred<"::mlir::matchPattern($0, ::mlir::m_Constant())">, "is constant">;
 
 class NotConstraint<Constraint con> : Constraint<Neg<con.predicate>, "not " # con.summary>;

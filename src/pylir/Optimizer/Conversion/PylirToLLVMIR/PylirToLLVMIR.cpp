@@ -485,6 +485,8 @@ public:
         Memcmp,
         malloc,
         mp_init_u64,
+        mp_init_i64,
+        mp_get_i64,
         mp_init,
         mp_unpack,
         mp_radix_size_overestimate,
@@ -493,7 +495,6 @@ public:
         mp_add,
         pylir_gc_alloc,
         pylir_str_hash,
-        pylir_int_get,
         pylir_dict_lookup,
         pylir_dict_insert,
         pylir_dict_erase,
@@ -529,6 +530,18 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType, builder.getI64Type()};
                 functionName = "mp_init_u64";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                break;
+            case Runtime::mp_init_i64:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {m_objectPtrType, builder.getI64Type()};
+                functionName = "mp_init_i64";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                break;
+            case Runtime::mp_get_i64:
+                returnType = builder.getI64Type();
+                argumentTypes = {m_objectPtrType};
+                functionName = "mp_get_i64";
                 passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::pylir_str_hash:
@@ -591,13 +604,6 @@ public:
                 argumentTypes = {m_objectPtrType, m_objectPtrType, m_objectPtrType};
                 functionName = "mp_add";
                 passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
-                break;
-            case Runtime::pylir_int_get:
-                returnType = mlir::LLVM::LLVMStructType::getLiteral(
-                    &getContext(), {getIndexType(), mlir::IntegerType::get(&getContext(), 1)});
-                argumentTypes = {m_objectPtrType, getIndexType()};
-                functionName = "pylir_int_get";
-                passThroughAttributes = {"inaccessiblemem_or_argmemonly", "gc-leaf-function", "nounwind"};
                 break;
             case Runtime::pylir_dict_lookup:
                 returnType = m_objectPtrType;
@@ -1869,26 +1875,21 @@ struct DictDelItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::D
     }
 };
 
-struct IntGetIntegerOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::IntToIntegerOp>
+struct IntToIndexOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::IntToIndexOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::IntToIntegerOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::IntToIndexOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::IntToIntegerOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::IntToIndexOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto pyInt = pyIntModel(op.getLoc(), rewriter, adaptor.getInput());
-        auto mpInt = pyInt.mpIntPtr(op.getLoc());
-        auto converted = typeConverter->convertType(op.getResult().getType());
-        auto size = createIndexConstant(rewriter, op.getLoc(), sizeOf(converted));
-        auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_int_get,
-                                        {mlir::Value{mpInt}, size});
-        mlir::Value first = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), result, 0);
-        auto second = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), result, 1);
-        if (first.getType() != converted)
+        auto call =
+            createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_get_i64,
+                              mlir::Value{pyIntModel(op.getLoc(), rewriter, adaptor.getInput()).mpIntPtr(op.getLoc())});
+        if (call.getType() != typeConverter->convertType(op.getType()))
         {
-            first = rewriter.create<mlir::LLVM::TruncOp>(op.getLoc(), converted, first);
+            call = rewriter.create<mlir::LLVM::TruncOp>(op.getLoc(), typeConverter->convertType(op.getType()), call);
         }
-        rewriter.replaceOp(op, {first, second});
+        rewriter.replaceOp(op, call);
         return mlir::success();
     }
 };
@@ -2784,11 +2785,11 @@ struct InitTuplePrependOpConversion : public ConvertPylirOpToLLVMPattern<pylir::
     }
 };
 
-struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>
+struct InitIntUnsignedOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntUnsignedOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntUnsignedOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitIntOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitIntUnsignedOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto mpIntPointer = pyIntModel(op.getLoc(), rewriter, adaptor.getMemory()).mpIntPtr(op.getLoc());
@@ -2798,6 +2799,26 @@ struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
             value = rewriter.create<mlir::LLVM::ZExtOp>(op.getLoc(), rewriter.getI64Type(), value);
         }
         createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_init_u64,
+                          {mlir::Value{mpIntPointer}, value});
+        rewriter.replaceOp(op, adaptor.getMemory());
+        return mlir::success();
+    }
+};
+
+struct InitIntSignedOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntSignedOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntSignedOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitIntSignedOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto mpIntPointer = pyIntModel(op.getLoc(), rewriter, adaptor.getMemory()).mpIntPtr(op.getLoc());
+        auto value = adaptor.getInitializer();
+        if (value.getType() != rewriter.getI64Type())
+        {
+            value = rewriter.create<mlir::LLVM::ZExtOp>(op.getLoc(), rewriter.getI64Type(), value);
+        }
+        createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_init_i64,
                           {mlir::Value{mpIntPointer}, value});
         rewriter.replaceOp(op, adaptor.getMemory());
         return mlir::success();
@@ -2943,7 +2964,7 @@ protected:
 public:
     ConvertPylirToLLVMPass() = default;
 
-    ConvertPylirToLLVMPass(llvm::Triple triple, const llvm::DataLayout& dataLayout)
+    ConvertPylirToLLVMPass(const llvm::Triple& triple, const llvm::DataLayout& dataLayout)
     {
         m_targetTripleCLI = triple.str();
         m_dataLayoutCLI = dataLayout.getStringRepresentation();
@@ -3006,7 +3027,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<ListSetItemOpConversion>(converter);
     patternSet.insert<ListResizeOpConversion>(converter);
     patternSet.insert<RaiseOpConversion>(converter);
-    patternSet.insert<InitIntOpConversion>(converter);
+    patternSet.insert<InitIntUnsignedOpConversion>(converter);
+    patternSet.insert<InitIntSignedOpConversion>(converter);
     patternSet.insert<ObjectHashOpConversion>(converter);
     patternSet.insert<ObjectIdOpConversion>(converter);
     patternSet.insert<StrHashOpConversion>(converter);
@@ -3026,7 +3048,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<BoolToI1OpConversion>(converter);
     patternSet.insert<InitTuplePrependOpConversion>(converter);
     patternSet.insert<InitTupleDropFrontOpConversion>(converter);
-    patternSet.insert<IntGetIntegerOpConversion>(converter);
+    patternSet.insert<IntToIndexOpConversion>(converter);
     patternSet.insert<IntCmpOpConversion>(converter);
     patternSet.insert<InitIntAddOpConversion>(converter);
     patternSet.insert<UnreachableOpConversion>(converter);

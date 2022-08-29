@@ -76,12 +76,23 @@ def : Pat<(PylirPy_MakeFuncOp $symbol),
 
 defvar BoolRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.bool">;
 
-def : Pat<(PylirPy_BoolFromI1Op $input), (PylirMem_InitIntOp
-    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp BoolRef)), $input)>;
+defvar IndexSizedInteger = NativeCodeCall<[{
+    $_builder.getIntegerType(mlir::DataLayout::closest($0.getOwner()).getTypeSizeInBits($_builder.getIndexType()))
+}]>;
+
+def : Pattern<(PylirPy_BoolFromI1Op:$op $input), [
+    (PylirMem_GCAllocObjectOp:$boolMem (PylirPy_ConstantOp BoolRef)),
+    (Arith_ExtUIOp:$boolToInt $input, (returnType (IndexSizedInteger $op))),
+    (Arith_IndexCastOp:$intToIndex $boolToInt, (returnType "$_builder.getIndexType()")),
+    (PylirMem_InitIntUnsignedOp $boolMem, $intToIndex)
+]>;
 
 defvar IntRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.int">;
 
-def : Pat<(PylirPy_IntFromIntegerOp $input), (PylirMem_InitIntOp
+def : Pat<(PylirPy_IntFromSignedOp $input), (PylirMem_InitIntSignedOp
+    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef)), $input)>;
+
+def : Pat<(PylirPy_IntFromUnsignedOp $input), (PylirMem_InitIntUnsignedOp
     (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef)), $input)>;
 
 def : Pat<(PylirPy_IntAddOp $lhs, $rhs), (PylirMem_InitIntAddOp
