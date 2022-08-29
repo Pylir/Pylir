@@ -1,5 +1,11 @@
 name: Windows
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 on:
   push:
     branches: [ "master" ]
