@@ -159,7 +159,7 @@ jobs:
       # See https://github.com/actions/cache/issues/53
       - name: Sanitize key
         id: sanitize-key
-        run: echo ::set-output name=key::$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )
+        run: echo "::set-output name=key::$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )"
 
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
