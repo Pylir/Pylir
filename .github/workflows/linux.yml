@@ -17,14 +17,25 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        sanitizer: [ "address,undefined","thread" ]
+        cxx_compiler: [ clang++, g++-10 ]
+        c_compiler: [ clang, gcc-10 ]
+        sanitizer: [ "address,undefined", "thread", "" ]
+        exclude:
+          - cxx_compiler: clang++
+            c_compiler: gcc-10
+          - cxx_compiler: g++-10
+            c_compiler: clang
+          - cxx_compiler: g++-10
+            sanitizer: "address,undefined"
+          - cxx_compiler: g++-10
+            sanitizer: "thread"
 
     steps:
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libunwind-dev
+          sudo apt install libunwind-dev g++-10 lld
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -52,7 +63,7 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2.2
         with:
           max-size: 2G
-          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}
+          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
 
       - name: Checkout LLVM
         uses: ./Pylir/.github/actions/llvm-checkout
@@ -61,8 +72,8 @@ jobs:
         run: |
           cmake -GNinja -Bllvm-optimized-tblgen \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DLLVM_TARGETS_TO_BUILD=host \
@@ -74,29 +85,27 @@ jobs:
         run: |
           cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
 
-      - name: Sanitizers name to LLVM
-        id: sanitize-llvm-name
-        run: |
-          echo "::set-output name=llvm_sanitizer::$(echo ${{matrix.sanitizer}} |\
-          sed 's/,/;/g' |\
-          python3 -c 'import sys; print(sys.stdin.read().title())' )"
-
       - name: Configure LLVM
         run: |
+          if [[ ! -z "${{matrix.sanitizer}}" ]]
+          then
+            SAN_ARG=-DLLVM_USE_SANITIZER=$(echo ${{matrix.sanitizer}} | sed 's/,/;/g' | \
+                    python3 -c 'import sys; print(sys.stdin.read().title())' )
+          fi
           cmake -GNinja -Bllvm-build \
             -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen" \
             -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen" \
             -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_ASSERTIONS=ON \
             -DLLVM_ENABLE_PROJECTS="mlir;lld" \
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE="$(which python)" \
-            -DLLVM_USE_SANITIZER="${{steps.sanitize-llvm-name.outputs.llvm_sanitizer}}" \
+            $SAN_ARG \
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
@@ -105,12 +114,16 @@ jobs:
 
       - name: Configure Pylir
         run: |
+          if [[ ! -z "${{matrix.sanitizer}}" ]]
+          then
+            SAN_ARG=-DPYLIR_SANITIZER=${{matrix.sanitizer}}
+          fi
           cmake -GNinja -Bpylir-build \
             -DCMAKE_BUILD_TYPE=Release \
             -DPYLIR_EMBED_LLD=ON \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
-            -DPYLIR_SANITIZER=${{matrix.sanitizer}} \
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
+            $SAN_ARG \
             -DPython3_EXECUTABLE="$(which python)" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
