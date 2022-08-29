@@ -87,7 +87,7 @@ jobs:
 
       - name: Configure LLVM
         run: |
-          if [[ ! -z ${{matrix.sanitizer}} ]]
+          if [[ ! -z "${{matrix.sanitizer}}" ]]
           then
             SAN_ARG=-DLLVM_USE_SANITIZER=$(echo ${{matrix.sanitizer}} | sed 's/,/;/g' | \
                     python3 -c 'import sys; print(sys.stdin.read().title())' )
@@ -114,7 +114,7 @@ jobs:
 
       - name: Configure Pylir
         run: |
-          if [[ ! -z ${{matrix.sanitizer}} ]]
+          if [[ ! -z "${{matrix.sanitizer}}" ]]
           then
             SAN_ARG=-DPYLIR_SANITIZER=${{matrix.sanitizer}}
           fi
