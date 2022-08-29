@@ -85,18 +85,13 @@ jobs:
         run: |
           cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
 
-      - name: Sanitizers name to LLVM
-        id: sanitize-llvm-name
-        run: |
-          echo "::set-output name=llvm_sanitizer::$(echo ${{matrix.sanitizer}} |\
-          sed 's/,/;/g' |\
-          python3 -c 'import sys; print(sys.stdin.read().title())' )"
-
       - name: Configure LLVM
         run: |
-          export SAN_ARG=$(echo "${{matrix.sanitizer}}" | \
-            sed 's/,/;/g' | \
-          python3 -c 'import sys; print("\"-DLLVM_USE_SANITIZER=\"" + arg.title() + "\"") if len(arg := sys.stdin.read()) != 0 else print()')
+          if [[ ! -z ${{matrix.sanitizer}} ]]
+          then
+            SAN_ARG=-DLLVM_SANITIZER=$(echo ${{matrix.sanitizer}} | sed 's/,/;/g' | \
+                    python3 -c 'import sys; print(sys.stdin.read().title())' )
+          fi
           cmake -GNinja -Bllvm-build \
             -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen" \
             -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen" \
@@ -119,14 +114,16 @@ jobs:
 
       - name: Configure Pylir
         run: |
-          export SAN_ARG=$(echo "${{matrix.sanitizer}}" | \
-          python3 -c 'import sys; print("\"-DPYLIR_SANITIZER=\"" + arg + "\"") if len(arg := sys.stdin.read()) != 0 else print()')
+          if [[ ! -z ${{matrix.sanitizer}} ]]
+          then
+            SAN_ARG=-DPYLIR_SANITIZER=${{matrix.sanitizer}}
+          fi
           cmake -GNinja -Bpylir-build \
             -DCMAKE_BUILD_TYPE=Release \
             -DPYLIR_EMBED_LLD=ON \
             -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
             -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
-            -DPYLIR_SANITIZER=${{matrix.sanitizer}} \
+            $SAN_ARG \
             -DPython3_EXECUTABLE="$(which python)" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
