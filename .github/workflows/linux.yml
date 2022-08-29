@@ -19,12 +19,16 @@ jobs:
       matrix:
         cxx_compiler: [ clang++, g++-10 ]
         c_compiler: [ clang, gcc-10 ]
-        sanitizer: [ "address,undefined","thread" ]
+        sanitizer: [ "address,undefined", "thread", "" ]
         exclude:
           - cxx_compiler: clang++
             c_compiler: gcc-10
           - cxx_compiler: g++-10
             c_compiler: clang
+          - cxx_compiler: g++-10
+            sanitizer: "address,undefined"
+          - cxx_compiler: g++-10
+            sanitizer: "thread"
 
     steps:
 
@@ -90,6 +94,9 @@ jobs:
 
       - name: Configure LLVM
         run: |
+          $SAN_ARG = echo ${{matrix.sanitizer}} | \
+            sed 's/,/;/g' | \
+          python3 -c 'import sys; if len(arg := sys.stdin.read()) != 0: print("\"-DLLVM_USE_SANITIZER=\"" + arg.title() + "\"")'
           cmake -GNinja -Bllvm-build \
             -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen" \
             -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen" \
@@ -103,7 +110,7 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD=host \
             -DLLVM_ENABLE_LLD=ON \
             -DPython3_EXECUTABLE="$(which python)" \
-            -DLLVM_USE_SANITIZER="${{steps.sanitize-llvm-name.outputs.llvm_sanitizer}}" \
+            $SAN_ARG \
             -S ${{github.workspace}}/llvm-project/llvm
 
       - name: Build LLVM
@@ -112,6 +119,8 @@ jobs:
 
       - name: Configure Pylir
         run: |
+          $SAN_ARG = echo ${{matrix.sanitizer}} | \
+          python3 -c 'import sys; if len(arg := sys.stdin.read()) != 0: print("\"-DPYLIR_SANITIZER=\"" + arg + "\"")'
           cmake -GNinja -Bpylir-build \
             -DCMAKE_BUILD_TYPE=Release \
             -DPYLIR_EMBED_LLD=ON \
