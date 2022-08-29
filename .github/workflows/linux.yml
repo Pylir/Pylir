@@ -89,7 +89,7 @@ jobs:
         run: |
           if [[ ! -z ${{matrix.sanitizer}} ]]
           then
-            SAN_ARG=-DLLVM_SANITIZER=$(echo ${{matrix.sanitizer}} | sed 's/,/;/g' | \
+            SAN_ARG=-DLLVM_USE_SANITIZER=$(echo ${{matrix.sanitizer}} | sed 's/,/;/g' | \
                     python3 -c 'import sys; print(sys.stdin.read().title())' )
           fi
           cmake -GNinja -Bllvm-build \
