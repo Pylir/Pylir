@@ -17,7 +17,14 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
+        cxx_compiler: [ clang++, g++ ]
+        c_compiler: [ clang, gcc ]
         sanitizer: [ "address,undefined","thread" ]
+        exclude:
+          - cxx_compiler: clang++
+            c_compiler: gcc
+          - cxx_compiler: g++
+            c_compiler: clang
 
     steps:
 
@@ -52,7 +59,7 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2.2
         with:
           max-size: 2G
-          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}
+          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
 
       - name: Checkout LLVM
         uses: ./Pylir/.github/actions/llvm-checkout
@@ -61,8 +68,8 @@ jobs:
         run: |
           cmake -GNinja -Bllvm-optimized-tblgen \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DLLVM_TARGETS_TO_BUILD=host \
@@ -88,8 +95,8 @@ jobs:
             -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen" \
             -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_ASSERTIONS=ON \
             -DLLVM_ENABLE_PROJECTS="mlir;lld" \
@@ -108,8 +115,8 @@ jobs:
           cmake -GNinja -Bpylir-build \
             -DCMAKE_BUILD_TYPE=Release \
             -DPYLIR_EMBED_LLD=ON \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
             -DPYLIR_SANITIZER=${{matrix.sanitizer}} \
             -DPython3_EXECUTABLE="$(which python)" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
