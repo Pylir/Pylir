@@ -1033,17 +1033,17 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
                     {
                         return mlir::failure();
                     }
-                    auto [key, value] = pylir::get<std::pair<mlir::Value, mlir::Value>>(variant);
-                    if (key == getKey())
+                    auto& entry = pylir::get<DictEntry>(variant);
+                    if (entry.key == getKey())
                     {
-                        results.emplace_back(value);
+                        results.emplace_back(entry.value);
                         return mlir::success();
                     }
                     // TODO:
                     //  some more generic mechanism to not automatically fail if we know they are definitely NOT
                     //  equal (trivial for constants at least, except for references as they need to be resolved).
                     mlir::Attribute attr1, attr2;
-                    if (mlir::matchPattern(key, mlir::m_Constant(&attr1))
+                    if (mlir::matchPattern(entry.key, mlir::m_Constant(&attr1))
                         && mlir::matchPattern(getKey(), mlir::m_Constant(&attr2)) && attr1 != attr2
                         && !attr1.isa<mlir::SymbolRefAttr>())
                     {

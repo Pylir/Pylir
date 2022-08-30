@@ -111,11 +111,11 @@ func.func private @"builtins.type.__call__$cc[0]"(%arg0: !py.dynamic, %arg1: !py
   %9 = py.tuple.getItem %arg1[%c0]
   cf.br ^bb2(%9 : !py.dynamic)
 ^bb2(%10: !py.dynamic):  // 2 preds: ^bb0, ^bb1
-  %11 = py.dict.tryGetItem %arg2[%1]
+  %11 = py.dict.tryGetItem %arg2[%1 hash(%c0)]
   %12 = py.isUnboundValue %11
   cf.cond_br %12, ^bb5(%10 : !py.dynamic), ^bb3
 ^bb3:  // pred: ^bb2
-  %13 = py.dict.delItem %1 from %arg2
+  %13 = py.dict.delItem %1 hash(%c0) from %arg2
   %14 = py.isUnboundValue %10
   cf.cond_br %14, ^bb5(%11 : !py.dynamic), ^bb4
 ^bb4:  // 2 preds: ^bb3, ^bb5

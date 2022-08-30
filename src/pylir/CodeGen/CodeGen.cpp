@@ -302,7 +302,8 @@ void pylir::CodeGen::delTarget(const Syntax::Atom& atom)
     if (m_classNamespace)
     {
         auto str = m_builder.createConstant(variableName);
-        auto existed = m_builder.createDictDelItem(m_classNamespace, str);
+        auto hash = m_builder.createStrHash(str);
+        auto existed = m_builder.createDictDelItem(m_classNamespace, str, hash);
         BlockPtr existedBlock;
         BlockPtr raiseBlock;
         m_builder.create<mlir::cf::CondBranchOp>(existed, existedBlock, raiseBlock);
@@ -734,7 +735,8 @@ void pylir::CodeGen::writeIdentifier(std::string_view text, mlir::Value value)
     if (m_classNamespace)
     {
         auto str = m_builder.createConstant(text);
-        m_builder.createDictSetItem(m_classNamespace, str, value);
+        auto hash = m_builder.createStrHash(str);
+        m_builder.createDictSetItem(m_classNamespace, str, hash, value);
         return;
     }
 
@@ -761,7 +763,8 @@ mlir::Value pylir::CodeGen::readIdentifier(std::string_view name)
     {
         classNamespaceFound->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
         auto str = m_builder.createConstant(name);
-        auto tryGet = m_builder.createDictTryGetItem(m_classNamespace, str);
+        auto hash = m_builder.createStrHash(str);
+        auto tryGet = m_builder.createDictTryGetItem(m_classNamespace, str, hash);
         auto isUnbound = m_builder.createIsUnboundValue(tryGet);
         auto elseBlock = BlockPtr{};
         m_builder.create<mlir::cf::CondBranchOp>(isUnbound, elseBlock, classNamespaceFound, tryGet.getResult());
@@ -1004,7 +1007,11 @@ mlir::Value pylir::CodeGen::visit(const Syntax::DictDisplay& dictDisplay)
                 {
                     return {};
                 }
-                result.emplace_back(std::pair{key, value});
+                auto tuple = m_builder.createMakeTuple({key});
+                auto dict = m_builder.createConstant(m_builder.getDictAttr());
+                auto hash =
+                    m_builder.createPylirCallIntrinsic(m_builder.createHashRef(), tuple, dict, m_currentExceptBlock);
+                result.emplace_back(Py::DictEntry{key, m_builder.createIntToIndex(hash), value});
             }
             return m_builder.createMakeDict(result);
         },
@@ -1563,7 +1570,8 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
         }
         auto locExit = changeLoc(iter);
         auto name = m_builder.createConstant(iter.name.getValue());
-        keywordOnlyDefaultParameters.push_back(std::pair{name, value});
+        auto hash = m_builder.createStrHash(name);
+        keywordOnlyDefaultParameters.emplace_back(Py::DictEntry{name, hash, value});
     }
 
     auto qualifiedName = m_qualifiers + std::string(funcName);
@@ -1679,13 +1687,13 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                 // TODO: emit error as unsupported
                 PYLIR_UNREACHABLE;
             }
-            auto [key, value] = pylir::get<std::pair<mlir::Value, mlir::Value>>(iter);
-            if (!mlir::matchPattern(key, mlir::m_Constant(&keywordDefaultParams.emplace_back().first)))
+            auto& entry = pylir::get<Py::DictEntry>(iter);
+            if (!mlir::matchPattern(entry.key, mlir::m_Constant(&keywordDefaultParams.emplace_back().first)))
             {
                 // TODO: emit error as required
                 PYLIR_UNREACHABLE;
             }
-            if (!mlir::matchPattern(value, mlir::m_Constant(&keywordDefaultParams.back().second)))
+            if (!mlir::matchPattern(entry.value, mlir::m_Constant(&keywordDefaultParams.back().second)))
             {
                 // TODO: emit error as required
                 PYLIR_UNREACHABLE;
@@ -2009,7 +2017,8 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(llvm::ArrayRef<pylir::
         {
             auto locExit = changeLoc(iter);
             mlir::Value key = m_builder.createConstant(iter.maybeName->getValue());
-            dictArgs.push_back(std::pair{key, visit(*iter.expression)});
+            auto hash = m_builder.createStrHash(key);
+            dictArgs.emplace_back(Py::DictEntry{key, hash, visit(*iter.expression)});
             continue;
         }
         if (!iter.maybeExpansionsOrEqual)
@@ -2096,7 +2105,8 @@ std::vector<pylir::CodeGen::UnpackResults> pylir::CodeGen::unpackArgsKeywords(
             case FunctionParameter::KeywordOnly:
             {
                 auto constant = m_builder.createConstant(iter.name);
-                auto lookup = m_builder.createDictTryGetItem(dict, constant);
+                auto hash = m_builder.createStrHash(constant);
+                auto lookup = m_builder.createDictTryGetItem(dict, constant, hash);
                 auto lookupIsUnbound = m_builder.createIsUnboundValue(lookup);
                 auto foundBlock = BlockPtr{};
                 auto notFoundBlock = BlockPtr{};
@@ -2109,7 +2119,7 @@ std::vector<pylir::CodeGen::UnpackResults> pylir::CodeGen::unpackArgsKeywords(
                 m_builder.create<mlir::cf::BranchOp>(resultBlock, mlir::ValueRange{elseValue});
 
                 implementBlock(foundBlock);
-                m_builder.createDictDelItem(dict, constant);
+                m_builder.createDictDelItem(dict, constant, hash);
                 // value can't be assigned both through a positional argument as well as keyword argument
                 if (argValue)
                 {
@@ -2229,7 +2239,8 @@ mlir::func::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::func:
         [&](std::string_view keyword) -> mlir::Value
         {
             auto index = m_builder.createConstant(keyword);
-            auto lookup = m_builder.createDictTryGetItem(kwDefaultDict, index);
+            auto hash = m_builder.createStrHash(index);
+            auto lookup = m_builder.createDictTryGetItem(kwDefaultDict, index, hash);
             // TODO: __kwdefaults__ is writeable. This may not hold. I have no clue how and whether this
             // also
             //      affects __defaults__
@@ -2339,8 +2350,7 @@ mlir::Value pylir::CodeGen::makeDict(const std::vector<Py::DictArg>& args)
         return m_builder.createMakeDict(args);
     }
     if (std::all_of(args.begin(), args.end(),
-                    [](const Py::DictArg& arg)
-                    { return std::holds_alternative<std::pair<mlir::Value, mlir::Value>>(arg); }))
+                    [](const Py::DictArg& arg) { return std::holds_alternative<Py::DictEntry>(arg); }))
     {
         return m_builder.createMakeDict(args);
     }

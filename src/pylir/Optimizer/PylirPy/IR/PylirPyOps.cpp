@@ -130,7 +130,7 @@ pylir::Py::DictArg pylir::Py::DictArgsIterator::operator*()
     {
         return MappingExpansion{*m_keys};
     }
-    return std::pair{*m_keys, *m_values};
+    return DictEntry{*m_keys, *m_hashes, *m_values};
 }
 
 pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator++()
@@ -144,6 +144,7 @@ pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator++()
     if (!isCurrentlyExpansion())
     {
         m_values++;
+        m_hashes++;
     }
     return *this;
 }
@@ -163,6 +164,7 @@ pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator--()
     if (!isCurrentlyExpansion())
     {
         m_values--;
+        m_hashes--;
     }
     return *this;
 }
@@ -225,7 +227,7 @@ void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::Ope
 {
     printer << '(';
     auto ref = iterExpansion.asArrayRef();
-    llvm::DenseSet<std::uint32_t> iters(ref.begin(), ref.end());
+    llvm::SmallDenseSet<std::uint32_t> iters(ref.begin(), ref.end());
     int i = 0;
     llvm::interleaveComma(operands, printer,
                           [&](mlir::Value value)
@@ -244,6 +246,7 @@ void printIterArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::Ope
 }
 
 bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& keys,
+                           llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& hashes,
                            llvm::SmallVectorImpl<mlir::OpAsmParser::UnresolvedOperand>& values,
                            mlir::DenseI32ArrayAttr& mappingExpansion)
 {
@@ -273,7 +276,9 @@ bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir
             return parser.parseOperand(keys.emplace_back());
         }
         index++;
-        return mlir::failure(parser.parseOperand(keys.emplace_back()) || parser.parseColon()
+        return mlir::failure(parser.parseOperand(keys.emplace_back()) || parser.parseKeyword("hash")
+                             || parser.parseLParen() || parser.parseOperand(hashes.emplace_back())
+                             || parser.parseRParen() || parser.parseColon()
                              || parser.parseOperand(values.emplace_back()));
     };
     if (parseOnce())
@@ -292,11 +297,12 @@ bool parseMappingArguments(mlir::OpAsmParser& parser, llvm::SmallVectorImpl<mlir
 }
 
 void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::OperandRange keys,
-                           mlir::OperandRange values, mlir::DenseI32ArrayAttr mappingExpansion)
+                           mlir::OperandRange hashes, mlir::OperandRange values,
+                           mlir::DenseI32ArrayAttr mappingExpansion)
 {
     printer << '(';
     auto ref = mappingExpansion.asArrayRef();
-    llvm::DenseSet<std::uint32_t> iters(ref.begin(), ref.end());
+    llvm::SmallDenseSet<std::uint32_t> iters(ref.begin(), ref.end());
     int i = 0;
     std::size_t valueCounter = 0;
     llvm::interleaveComma(keys, printer,
@@ -308,7 +314,8 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
                                   i++;
                                   return;
                               }
-                              printer << key << " : " << values[valueCounter++];
+                              printer << key << " hash(" << hashes[valueCounter] << ") : " << values[valueCounter];
+                              valueCounter++;
                               i++;
                           });
     printer << ')';
@@ -437,16 +444,17 @@ void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operatio
 void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                   const std::vector<::pylir::Py::DictArg>& args)
 {
-    std::vector<mlir::Value> keys, values;
-    std::vector<std::int32_t> mappingExpansion;
+    llvm::SmallVector<mlir::Value> keys, hashes, values;
+    llvm::SmallVector<std::int32_t> mappingExpansion;
     for (const auto& iter : llvm::enumerate(args))
     {
         pylir::match(
             iter.value(),
-            [&](std::pair<mlir::Value, mlir::Value> pair)
+            [&](const DictEntry& entry)
             {
-                keys.push_back(pair.first);
-                values.push_back(pair.second);
+                keys.push_back(entry.key);
+                hashes.push_back(entry.hash);
+                values.push_back(entry.value);
             },
             [&](Py::MappingExpansion expansion)
             {
@@ -454,7 +462,7 @@ void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
                 mappingExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, keys, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion));
+    build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion));
 }
 
 namespace
@@ -599,16 +607,17 @@ void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
                                     mlir::ValueRange unwindDestOperands)
 {
-    std::vector<mlir::Value> keys, values;
-    std::vector<std::int32_t> mappingExpansion;
+    llvm::SmallVector<mlir::Value> keys, hashes, values;
+    llvm::SmallVector<std::int32_t> mappingExpansion;
     for (const auto& iter : llvm::enumerate(keyValues))
     {
         pylir::match(
             iter.value(),
-            [&](std::pair<mlir::Value, mlir::Value> pair)
+            [&](const DictEntry& entry)
             {
-                keys.push_back(pair.first);
-                values.push_back(pair.second);
+                keys.push_back(entry.key);
+                hashes.push_back(entry.hash);
+                values.push_back(entry.value);
             },
             [&](Py::MappingExpansion expansion)
             {
@@ -616,8 +625,8 @@ void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
                 mappingExpansion.push_back(iter.index());
             });
     }
-    build(odsBuilder, odsState, keys, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion), normalDestOperands,
-          unwindDestOperands, happyPath, unwindPath);
+    build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion),
+          normalDestOperands, unwindDestOperands, happyPath, unwindPath);
 }
 
 void pylir::Py::UnpackOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, std::size_t count,

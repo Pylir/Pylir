@@ -14,6 +14,7 @@
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Support/Variant.hpp>
 
 namespace
 {
@@ -28,9 +29,10 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
             op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Dict.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict);
         auto init = rewriter.replaceOpWithNewOp<pylir::Mem::InitDictOp>(op, op.getType(), mem);
-        for (auto [key, value] : llvm::zip(op.getKeys(), op.getValues()))
+        for (auto arg : op.getDictArgs())
         {
-            rewriter.create<pylir::Py::DictSetItemOp>(op.getLoc(), init, key, value);
+            auto& entry = pylir::get<pylir::Py::DictEntry>(arg);
+            rewriter.create<pylir::Py::DictSetItemOp>(op.getLoc(), init, entry.key, entry.hash, entry.value);
         }
         return mlir::success();
     }

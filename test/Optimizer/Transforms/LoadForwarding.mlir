@@ -68,10 +68,10 @@ func.func @test_dict_len() -> index {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
-    py.dict.setItem %arg0[%0] to %0
-    %result = py.dict.tryGetItem %arg0[%0]
+    py.dict.setItem %arg0[%0 hash(%hash)] to %0
+    %result = py.dict.tryGetItem %arg0[%0 hash(%hash)]
     return %result : !py.dynamic
 }
 
@@ -84,10 +84,10 @@ func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic, %hash: index) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
-    py.dict.delItem %0 from %arg0
-    %result = py.dict.tryGetItem %arg0[%0]
+    py.dict.delItem %0 hash(%hash) from %arg0
+    %result = py.dict.tryGetItem %arg0[%0 hash(%hash)]
     return %result : !py.dynamic
 }
 
@@ -100,12 +100,12 @@ func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test_dict_lookup_makeDict() -> (!py.dynamic, !py.dynamic) {
+func.func @test_dict_lookup_makeDict(%hash : index) -> (!py.dynamic, !py.dynamic) {
     %0 = py.constant(#py.str<"value">)
     %1 = py.makeDict ()
-    %result = py.dict.tryGetItem %1[%0]
-    %2 = py.makeDict (%0 : %0)
-    %res2 = py.dict.tryGetItem %2[%0]
+    %result = py.dict.tryGetItem %1[%0 hash(%hash)]
+    %2 = py.makeDict (%0 hash(%hash) : %0)
+    %res2 = py.dict.tryGetItem %2[%0 hash(%hash)]
     return %result, %res2 : !py.dynamic, !py.dynamic
 }
 

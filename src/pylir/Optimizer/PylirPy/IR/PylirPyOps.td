@@ -134,16 +134,16 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [NoCapture,
                                                               DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$dict, DynamicType:$key);
+    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$dict, DynamicType:$key, Index:$hash);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
-        $dict `[` $key `]` attr-dict
+        $dict `[` $key `hash` `(` $hash `)` `]` attr-dict
     }];
 
     let description = [{
-        This op looks up the value of `$key` in the dictionary `$dict`. If found it'll be returned in `$result`.
-        If not found, `$result` is an `unbound` value.
+        This op looks up the value of `$key` with the help of `$hash` in the dictionary `$dict`. If found it'll be
+        returned in `$result`. If not found, `$result` is an `unbound` value.
         If `$dict` is not really a dict (or a subclass of) the behaviour is undefined.
     }];
 
@@ -151,26 +151,27 @@ def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [NoCapture,
 }
 
 def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem"> {
-    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key, DynamicType:$value);
+    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key, Index:$hash, DynamicType:$value);
     let results = (outs);
 
-    let assemblyFormat = "$dict `[` $key `]` `to` $value attr-dict";
+    let assemblyFormat = "$dict `[` $key `hash` `(` $hash `)` `]` `to` $value attr-dict";
 
     let description = [{
-        This op inserts the value `$value` into the dictionary with the key `$key`. If `$key` already exists the
-        previous value gets overwritten. If `$dict` is not a dictionary (or a subclass of) the behaviour is undefined.
+        This op inserts the value `$value` into the dictionary with the key `$key` with the help of `$hash`. If `$key`
+        already exists the previous value gets overwritten. If `$dict` is not a dictionary (or a subclass of) the
+        behaviour is undefined.
     }];
 }
 
 def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [NoCapture]> {
-    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key);
+    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key, Index:$hash);
     let results = (outs I1:$existed);
 
-    let assemblyFormat = "$key `from` $dict attr-dict";
+    let assemblyFormat = "$key `hash` `(` $hash `)` `from` $dict attr-dict";
 
     let description = [{
-        This op deletes the entry identified by `$key` from the dictionary. If the dictionary did not contain an entry
-        with the given key the result is 0, otherwise 1.
+        This op deletes the entry identified by `$key` with the help of `$hash` from the dictionary. If the dictionary
+        did not contain an entry with the given key the result is 0, otherwise 1.
         If `$dict` is not a dictionary (or a subclass of) the behaviour is undefined.
     }];
 }
@@ -767,6 +768,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
 	AddableExceptionHandling<"MakeDictExOp">, RefinedType<"Dict">]> {
     let arguments = (ins
                         Variadic<DynamicType>:$keys,
+                        Variadic<Index>:$hashes,
                         Variadic<DynamicType>:$values,
                         DenseI32ArrayAttr:$mapping_expansion
                         );
@@ -778,7 +780,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     ];
 
     let assemblyFormat = [{
-            custom<MappingArguments>($keys, $values, $mapping_expansion) attr-dict
+            custom<MappingArguments>($keys, $hashes, $values, $mapping_expansion) attr-dict
     }];
 
     let extraClassDeclaration = [{
@@ -786,8 +788,8 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
         {
             auto expansion = getMappingExpansion();
             return llvm::make_range(
-                DictArgsIterator(getKeys().begin(), getValues().begin(), expansion.begin(), expansion, 0),
-                DictArgsIterator(getKeys().end(), getValues().end(), expansion.end(), expansion, getKeys().size())
+                DictArgsIterator(getKeys().begin(), getHashes().begin(), getValues().begin(),expansion.begin(), expansion, 0),
+                DictArgsIterator(getKeys().end(), getHashes().end(), getValues().end(), expansion.end(), expansion, getKeys().size())
             );
         }
     }];

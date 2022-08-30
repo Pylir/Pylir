@@ -85,7 +85,7 @@ std::string genInputTypeConversion(std::string inputValue, const mlir::tblgen::T
     }
     if (toType.getDefName() == "Index")
     {
-        return llvm::formatv("m_builder.createIntToIndex({0}).getResult()", inputValue);
+        return llvm::formatv("m_builder.createIntToIndex({0})", inputValue);
     }
     assert(toType.getDefName() == "I1");
     return llvm::formatv("m_builder.createBoolToI1({0})", inputValue);

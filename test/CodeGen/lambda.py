@@ -43,12 +43,13 @@ def foo():
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
 # CHECK: %[[ONE:.*]] = py.constant(#py.int<1>)
 # CHECK: %[[C:.*]] = py.constant(#py.str<"c">)
+# CHECK: %[[C_HASH:.*]] = py.str.hash %[[C]]
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo.<locals>.<lambda>$cc[0]"
 # CHECK: %[[NAME:.*]] = py.constant(#py.str<"foo.<locals>.<lambda>">)
 # CHECK: py.setSlot "__qualname__" of %[[RES]] : %{{.*}} to %[[NAME]]
 # CHECK: %[[DEFAULTS:.*]] = py.makeTuple (%[[THREE]])
 # CHECK: py.setSlot "__defaults__" of %[[RES]] : %{{.*}} to %[[DEFAULTS]]
-# CHECK: %[[KWDEFAULTS:.*]] = py.makeDict (%[[C]] : %[[ONE]])
+# CHECK: %[[KWDEFAULTS:.*]] = py.makeDict (%[[C]] hash(%[[C_HASH]]) : %[[ONE]])
 # CHECK: py.setSlot "__kwdefaults__" of %[[RES]] : %{{.*}} to %[[KWDEFAULTS]]
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[X]], %[[Y]])
 # CHECK: py.setSlot "__closure__" of %[[RES]] : %{{.*}} to %[[TUPLE]]

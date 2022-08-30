@@ -55,18 +55,19 @@ func.func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.dict = #py.type
 
-func.func @make_dict(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeDict (%arg0 : %arg1)
+func.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> !py.dynamic {
+    %0 = py.makeDict (%arg0 hash(%arg1) : %arg2)
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_dict
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
 // CHECK-NEXT: %[[DICT:.*]] = py.constant(@builtins.dict)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[DICT]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initDict %[[MEM]]
-// CHECK-NEXT: py.dict.setItem %[[RESULT]][%[[ARG0]]] to %[[ARG1]]
+// CHECK-NEXT: py.dict.setItem %[[RESULT]][%[[ARG0]] hash(%[[ARG1]])] to %[[ARG2]]
 // CHECK-NEXT: return %[[RESULT]]
 
 // -----

@@ -8,9 +8,9 @@ def len(dict):
     pass
 
 
-def tryGetItem(dict, key):
+def tryGetItem(dict, key, hash):
     pass
 
 
-def setItem(dict, key, value):
+def setItem(dict, key, hash, value):
     pass

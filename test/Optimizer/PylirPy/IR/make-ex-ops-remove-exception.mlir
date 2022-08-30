@@ -148,9 +148,9 @@ func.func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_dict_ex_op_unique(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %1 = py.constant(#py.int<3>)
-    %2 = py.makeDictEx (%1 : %arg0)
+    %2 = py.makeDictEx (%1 hash(%hash) : %arg0)
         label ^happy unwind ^failure
 
 ^happy:
@@ -162,8 +162,9 @@ func.func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_dict_ex_op_unique
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[HASH:[[:alnum:]]+]]
 // CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[DICT:.*]] = py.makeDict (%[[THREE]] : %[[ARG0]])
+// CHECK: %[[DICT:.*]] = py.makeDict (%[[THREE]] hash(%[[HASH]]) : %[[ARG0]])
 // CHECK: return %[[DICT]]
 
 // -----
@@ -171,9 +172,9 @@ func.func @make_dict_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+func.func @make_dict_ex_op(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %1 = py.constant(#py.int<3>)
-    %2 = py.makeDictEx (%1 : %arg0)
+    %2 = py.makeDictEx (%1 hash(%hash) : %arg0)
         label ^happy unwind ^failure
 
 ^happy:
@@ -185,8 +186,9 @@ func.func @make_dict_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_dict_ex_op
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-SAME: %[[HASH:[[:alnum:]]+]]
 // CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[DICT:.*]] = py.makeDict (%[[THREE]] : %[[ARG0]])
+// CHECK: %[[DICT:.*]] = py.makeDict (%[[THREE]] hash(%[[HASH]]) : %[[ARG0]])
 // CHECK: return %[[DICT]]
 
 // -----

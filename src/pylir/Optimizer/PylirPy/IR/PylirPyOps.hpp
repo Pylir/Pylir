@@ -40,7 +40,14 @@ struct MappingExpansion
     mlir::Value value;
 };
 
-using DictArg = std::variant<std::pair<mlir::Value, mlir::Value>, MappingExpansion>;
+struct DictEntry
+{
+    mlir::Value key;
+    mlir::Value hash;
+    mlir::Value value;
+};
+
+using DictArg = std::variant<DictEntry, MappingExpansion>;
 using IterArg = std::variant<mlir::Value, IterExpansion>;
 
 enum class OperandShape
@@ -136,6 +143,7 @@ struct AddableExceptionHandling
 class DictArgsIterator
 {
     mlir::OperandRange::iterator m_keys;
+    mlir::OperandRange::iterator m_hashes;
     mlir::OperandRange::iterator m_values;
     llvm::ArrayRef<std::int32_t> m_expansions;
     llvm::ArrayRef<std::int32_t>::iterator m_currExp;
@@ -150,10 +158,11 @@ public:
     using difference_type = std::ptrdiff_t;
     using iterator_category = std::bidirectional_iterator_tag;
 
-    DictArgsIterator(mlir::OperandRange::iterator keys, mlir::OperandRange::iterator values,
-                     llvm::ArrayRef<std::int32_t>::iterator expIterator, llvm::ArrayRef<std::int32_t> expansions,
-                     std::size_t index)
+    DictArgsIterator(mlir::OperandRange::iterator keys, mlir::OperandRange::iterator hashes,
+                     mlir::OperandRange::iterator values, llvm::ArrayRef<std::int32_t>::iterator expIterator,
+                     llvm::ArrayRef<std::int32_t> expansions, std::size_t index)
         : m_keys(keys),
+          m_hashes(hashes),
           m_values(values),
           m_expansions(expansions),
           m_currExp(expIterator),

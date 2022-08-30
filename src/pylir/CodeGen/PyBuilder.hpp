@@ -275,19 +275,19 @@ public:
         return create<Py::SetSlotOp>(object, typeObject, slot, value);
     }
 
-    Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index)
+    Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index, mlir::Value hash)
     {
-        return create<Py::DictTryGetItemOp>(dict, index);
+        return create<Py::DictTryGetItemOp>(dict, index, hash);
     }
 
-    Py::DictSetItemOp createDictSetItem(mlir::Value dict, mlir::Value key, mlir::Value value)
+    Py::DictSetItemOp createDictSetItem(mlir::Value dict, mlir::Value key, mlir::Value hash, mlir::Value value)
     {
-        return create<Py::DictSetItemOp>(dict, key, value);
+        return create<Py::DictSetItemOp>(dict, key, hash, value);
     }
 
-    Py::DictDelItemOp createDictDelItem(mlir::Value dict, mlir::Value key)
+    Py::DictDelItemOp createDictDelItem(mlir::Value dict, mlir::Value key, mlir::Value hash)
     {
-        return create<Py::DictDelItemOp>(dict, key);
+        return create<Py::DictDelItemOp>(dict, key, hash);
     }
 
     Py::DictLenOp createDictLen(mlir::Value dict)
@@ -477,14 +477,14 @@ public:
         return create<Py::MakeDictOp>(args);
     }
 
-    Py::MakeDictOp createMakeDict(llvm::ArrayRef<mlir::Value> keys, llvm::ArrayRef<mlir::Value> values,
-                                  mlir::DenseI32ArrayAttr mappingExpansion = {})
+    Py::MakeDictOp createMakeDict(llvm::ArrayRef<mlir::Value> keys, llvm::ArrayRef<mlir::Value> hashes,
+                                  llvm::ArrayRef<mlir::Value> values, mlir::DenseI32ArrayAttr mappingExpansion = {})
     {
         if (!mappingExpansion)
         {
             mappingExpansion = getDenseI32ArrayAttr({});
         }
-        return create<Py::MakeDictOp>(keys, values, mappingExpansion);
+        return create<Py::MakeDictOp>(keys, hashes, values, mappingExpansion);
     }
 
     Py::MakeDictExOp createMakeDictEx(llvm::ArrayRef<Py::DictArg> args, mlir::Block* happyPath, mlir::Block* unwindPath,

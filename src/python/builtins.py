@@ -270,13 +270,13 @@ class dict:
         # would not work in the case that 'tryGetItem' returns an unbound value.
         # This way we can pipe the result into both 'res' and the intrinsic
         success = pylir.intr.isUnboundValue(
-            res := pylir.intr.dict.tryGetItem(self, item))
+            res := pylir.intr.dict.tryGetItem(self, item, hash(item)))
         if not success:
             raise KeyError
         return res
 
     def __setitem__(self, key, value):
-        pylir.intr.dict.setItem(self, key, value)
+        pylir.intr.dict.setItem(self, key, hash(key), value)
 
     def __len__(self):
         return pylir.intr.dict.len(self)
