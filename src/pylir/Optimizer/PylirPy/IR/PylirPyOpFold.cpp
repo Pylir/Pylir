@@ -15,6 +15,7 @@
 
 #include "PylirPyDialect.hpp"
 #include "PylirPyOps.hpp"
+#include "Value.hpp"
 
 namespace
 {
@@ -384,22 +385,7 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     {
         return input.getTypeObject();
     }
-    if (auto op = getObject().getDefiningOp<pylir::Py::ObjectFromTypeObjectInterface>())
-    {
-        return op.getTypeObject();
-    }
-    if (auto refineable = getObject().getDefiningOp<Py::TypeRefineableInterface>())
-    {
-        llvm::SmallVector<Py::TypeAttrUnion> operandTypes(refineable->getNumOperands(), nullptr);
-        mlir::SymbolTableCollection collection;
-        llvm::SmallVector<Py::ObjectTypeInterface> res;
-        if (refineable.refineTypes(operandTypes, res, collection) == TypeRefineResult::Failure)
-        {
-            return nullptr;
-        }
-        return res[getObject().cast<mlir::OpResult>().getResultNumber()].getTypeObject();
-    }
-    return nullptr;
+    return getTypeOf(getObject());
 }
 
 mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -696,25 +682,9 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     {
         return mlir::BoolAttr::get(getContext(), operands[0].isa<Py::UnboundAttr>());
     }
-    if (auto blockArg = getValue().dyn_cast<mlir::BlockArgument>(); blockArg)
+    if (auto unboundRes = isUnbound(getValue()))
     {
-        if (mlir::isa_and_nonnull<mlir::FunctionOpInterface>(blockArg.getOwner()->getParentOp())
-            && blockArg.getOwner()->isEntryBlock())
-        {
-            return mlir::BoolAttr::get(getContext(), false);
-        }
-        return nullptr;
-    }
-    // If the defining op has the AlwaysBound trait then it is false. Also manually sanction some ops from other
-    // dialects
-    auto* op = getValue().getDefiningOp();
-    if (!op)
-    {
-        return nullptr;
-    }
-    if (op->hasTrait<Py::AlwaysBound>())
-    {
-        return mlir::BoolAttr::get(getContext(), false);
+        return mlir::BoolAttr::get(getContext(), *unboundRes);
     }
     return nullptr;
 }
