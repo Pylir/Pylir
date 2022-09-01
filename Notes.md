@@ -1,31 +1,19 @@
 # Getting & Setting Attributes
 
-## Getter:
+## object.__getattribute__:
 
-* Lookup `__getattribute__` in type
-    - Goes through MRO
-    - If found -> execute and return
 * Lookup attribute in type
-    - Goes through MRO
+    - Goes through each item in MRO tuple and looks it up in `__dict__`
     - If found && has `__get__` && `__set__` methods -> execute `__get__` and return
-* Lookup in `__dict__` if available
-* if type lookup result was successful && had `__get__` but not `__set__` -> execute `__get__` and return
-* if type lookup result was successful -> return it
-* Lookup `__getattr__` in type
-    - Goes through MRO
-    - If found -> execute and return Else:
-      raise AttributeError
+* if `__dict__` exists, do dictionary lookup into it, return if found, raise AttributeError if not. else:
+* if type lookup result was successful && had `__get__` but not `__set__` -> execute `__get__` and return; else:
+* if type lookup result was successful -> return it; else:
+* raise AttributeError
 
-Worst case unoptimized lookup count: len(MRO) (`__getattribute__`) + 1 (`__dict__`) + len(MRO) + (`__getattr__`)
-
-Lookup for `__getattribute__` and `__getattr__` could potentially be combined making it len(MRO) + 1.
-
-Would improve the worst case but potentially worsen the best case
-
-Setter:
+## object.__setattr__
 
 * Lookup attribute in type
-    - Goes through MRO
+    - Goes through each item in MRO tuple and looks it up in `__dict__`
     - If found && has `__set__` methods -> execute `__set__` and return
 * Set in `__dict__` if available Else:
   raise AttributeError
