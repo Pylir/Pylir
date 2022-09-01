@@ -8,12 +8,12 @@
 
 #include <mlir/IR/FunctionInterfaces.h>
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
-#include <pylir/Optimizer/PylirPy/IR/PylirPyTraits.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/ObjectFromTypeObjectInterface.hpp>
 #include <pylir/Support/Macros.hpp>
 
-#include "TypeRefineableInterface.hpp"
+#include "PylirPyAttributes.hpp"
+#include "PylirPyOps.hpp"
+#include "PylirPyTraits.hpp"
 
 mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value)
 {
@@ -59,4 +59,57 @@ llvm::Optional<bool> pylir::Py::isUnbound(mlir::Value value)
         return false;
     }
     return llvm::None;
+}
+
+pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInterface attribute,
+                                                        mlir::Operation* context)
+{
+    if (!attribute)
+    {
+        return BuiltinMethodKind::Unknown;
+    }
+
+    auto typeAttr = resolveValue<TypeAttr>(context, attribute.getTypeObject(), false);
+    if (!typeAttr)
+    {
+        return BuiltinMethodKind::Unknown;
+    }
+    auto mro = resolveValue<TupleAttr>(context, typeAttr.getMroTuple(), false);
+    if (!mro)
+    {
+        return BuiltinMethodKind::Unknown;
+    }
+    for (const auto& iter : mro.getValue())
+    {
+        if (!iter)
+        {
+            // This can probably only be a result of undefined behaviour.
+            continue;
+        }
+        if (auto ref = iter.dyn_cast<mlir::FlatSymbolRefAttr>())
+        {
+            auto opt = llvm::StringSwitch<std::optional<BuiltinMethodKind>>(ref.getValue())
+                           .Case(Builtins::Int.name, BuiltinMethodKind::Int)
+                           .Case(Builtins::Str.name, BuiltinMethodKind::Str)
+                           .Case(Builtins::Object.name, BuiltinMethodKind::Object)
+                           .Default(std::nullopt);
+            if (opt)
+            {
+                return *opt;
+            }
+        }
+        auto baseType = resolveValue<TypeAttr>(context, iter);
+        if (!baseType)
+        {
+            return BuiltinMethodKind::Unknown;
+        }
+        auto hashFunc = baseType.getSlots().get("__hash__");
+        if (!hashFunc)
+        {
+            continue;
+        }
+        return BuiltinMethodKind::Unknown;
+    }
+
+    return pylir::Py::BuiltinMethodKind::Object;
 }

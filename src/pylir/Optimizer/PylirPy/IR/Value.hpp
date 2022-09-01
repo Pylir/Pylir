@@ -50,4 +50,17 @@ T resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal =
     return value.getInitializerAttr().template dyn_cast_or_null<T>();
 }
 
+enum class BuiltinMethodKind
+{
+    Unknown,
+    Str,
+    Int,
+    Object
+};
+
+/// Given any kind of object, attempts to return the hash function used at runtime to hash that object. If the hash
+/// function may change at runtime or a custom one is used that is not known to the compiler, 'Unknown' is returned.
+/// 'context' is used for any symbol lookups to find the nearest symbol table.
+BuiltinMethodKind getHashFunction(ObjectAttrInterface attribute, mlir::Operation* context);
+
 } // namespace pylir::Py

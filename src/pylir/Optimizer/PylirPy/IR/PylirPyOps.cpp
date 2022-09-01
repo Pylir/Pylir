@@ -18,6 +18,7 @@
 #include <pylir/Support/Variant.hpp>
 
 #include "PylirPyAttributes.hpp"
+#include "Value.hpp"
 
 namespace
 {
@@ -779,7 +780,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                 return mlir::success();
             })
         .Case(
-            [&](pylir::Py::DictAttr dict)
+            [&](pylir::Py::DictAttr dict) -> mlir::LogicalResult
             {
                 for (auto [key, value] : dict.getValue())
                 {
@@ -790,6 +791,12 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute)
                     if (mlir::failed(verify(op, value)))
                     {
                         return mlir::failure();
+                    }
+                    if (pylir::Py::getHashFunction(pylir::Py::resolveValue(op, key, false), op)
+                        == pylir::Py::BuiltinMethodKind::Unknown)
+                    {
+                        return op->emitOpError(
+                            "Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.");
                     }
                 }
                 return mlir::success();
