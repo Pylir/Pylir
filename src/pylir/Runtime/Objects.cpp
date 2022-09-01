@@ -73,37 +73,5 @@ bool PyObject::operator==(PyObject& other)
     {
         return true;
     }
-    PyObject& eqFunc = *type(*this).methodLookup(PyTypeObject::Eq);
-    return Builtins::Bool(eqFunc(*this, other)).cast<PyInt>().boolean();
-}
-
-PyObject* PyObject::mroLookup(int index)
-{
-    auto& mro = type(*this).getMROTuple();
-    for (auto* iter : mro)
-    {
-        if (auto* slot = iter->getSlot(index))
-        {
-            return slot;
-        }
-    }
-    return nullptr;
-}
-
-PyObject* PyObject::methodLookup(int index)
-{
-    auto* overload = mroLookup(index);
-    if (!overload)
-    {
-        return nullptr;
-    }
-    if (overload->isa<PyFunction>())
-    {
-        return overload;
-    }
-    if (auto* getter = overload->mroLookup(PyTypeObject::Get))
-    {
-        overload = &(*getter)(*this, type(*this));
-    }
-    return overload;
+    return Builtins::Bool(Builtins::pylir__eq__(*this, other)).cast<PyInt>().boolean();
 }
