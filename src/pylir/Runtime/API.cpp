@@ -11,19 +11,24 @@
 
 using namespace pylir::rt;
 
-PyObject* pylir_dict_lookup(PyDict& dict, PyObject& key)
+PyObject* pylir_dict_lookup(PyDict& dict, PyObject& key, std::size_t hash)
 {
-    return dict.tryGetItem(key);
+    return dict.tryGetItem(key, hash);
 }
 
-void pylir_dict_insert(PyDict& dict, PyObject& key, PyObject& value)
+void pylir_dict_insert(PyDict& dict, PyObject& key, std::size_t hash, PyObject& value)
 {
-    dict.setItem(key, value);
+    dict.setItem(key, hash, value);
 }
 
-void pylir_dict_erase(PyDict& dict, PyObject& key)
+void pylir_dict_insert_unique(PyDict& dict, PyObject& key, std::size_t hash, PyObject& value)
 {
-    dict.delItem(key);
+    dict.setItemUnique(key, hash, value);
+}
+
+void pylir_dict_erase(PyDict& dict, PyObject& key, std::size_t hash)
+{
+    dict.delItem(key, hash);
 }
 
 std::size_t pylir_str_hash(PyString& string)

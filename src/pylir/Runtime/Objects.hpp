@@ -317,14 +317,39 @@ public:
         return result->value;
     }
 
+    PyObject* tryGetItem(PyObject& key, std::size_t hash)
+    {
+        auto* result = m_table.find_hash(hash, &key);
+        if (result == m_table.end())
+        {
+            return nullptr;
+        }
+        return result->value;
+    }
+
     void setItem(PyObject& key, PyObject& value)
     {
         m_table.insert_or_assign(&key, &value);
     }
 
+    void setItem(PyObject& key, std::size_t hash, PyObject& value)
+    {
+        m_table.insert_or_assign_hash(hash, &key, &value);
+    }
+
+    void setItemUnique(PyObject& key, std::size_t hash, PyObject& value)
+    {
+        m_table.insert_or_assign_hash<PyObject*, true>(hash, &key, &value);
+    }
+
     void delItem(PyObject& key)
     {
         m_table.erase(&key);
+    }
+
+    void delItem(PyObject& key, std::size_t hash)
+    {
+        m_table.erase_hash(hash, &key);
     }
 
     auto begin()

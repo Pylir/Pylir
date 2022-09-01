@@ -15,7 +15,7 @@ func.func @lookup(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 // CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 // CHECK-SAME: %[[HASH:[[:alnum:]]+]]
 // CHECK-NEXT: %[[KEY:.*]] = llvm.mlir.addressof
-// CHECK-NEXT: %[[RESULT:.*]] = llvm.call @pylir_dict_lookup(%[[DICT]], %[[KEY]])
+// CHECK-NEXT: %[[RESULT:.*]] = llvm.call @pylir_dict_lookup(%[[DICT]], %[[KEY]], %[[HASH]])
 // CHECK-NEXT: llvm.return %[[RESULT]]
 
 // -----
@@ -36,5 +36,5 @@ func.func @insert(%arg0 : !py.dynamic, %value : !py.dynamic, %hash : index) {
 // CHECK-SAME: %[[VALUE:[[:alnum:]]+]]
 // CHECK-SAME: %[[HASH:[[:alnum:]]+]]
 // CHECK-NEXT: %[[KEY:.*]] = llvm.mlir.addressof
-// CHECK-NEXT: llvm.call @pylir_dict_insert(%[[DICT]], %[[KEY]], %[[VALUE]])
+// CHECK-NEXT: llvm.call @pylir_dict_insert(%[[DICT]], %[[KEY]], %[[HASH]], %[[VALUE]])
 // CHECK-NEXT: llvm.return

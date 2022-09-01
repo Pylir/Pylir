@@ -26,6 +26,7 @@
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/IR/Value.hpp>
 
 #include "WinX64.hpp"
 #include "X86_64.hpp"
@@ -496,6 +497,7 @@ public:
         pylir_str_hash,
         pylir_dict_lookup,
         pylir_dict_insert,
+        pylir_dict_insert_unique,
         pylir_dict_erase,
         pylir_print,
         pylir_raise,
@@ -606,18 +608,23 @@ public:
                 break;
             case Runtime::pylir_dict_lookup:
                 returnType = m_objectPtrType;
-                argumentTypes = {m_objectPtrType, returnType};
+                argumentTypes = {m_objectPtrType, returnType, m_cabi->getSizeT(&getContext())};
                 functionName = "pylir_dict_lookup";
                 break;
             case Runtime::pylir_dict_erase:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
-                argumentTypes = {m_objectPtrType, m_objectPtrType};
+                argumentTypes = {m_objectPtrType, m_objectPtrType, m_cabi->getSizeT(&getContext())};
                 functionName = "pylir_dict_erase";
                 break;
             case Runtime::pylir_dict_insert:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
-                argumentTypes = {m_objectPtrType, m_objectPtrType, m_objectPtrType};
+                argumentTypes = {m_objectPtrType, m_objectPtrType, m_cabi->getSizeT(&getContext()), m_objectPtrType};
                 functionName = "pylir_dict_insert";
+                break;
+            case Runtime::pylir_dict_insert_unique:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {m_objectPtrType, m_objectPtrType, m_cabi->getSizeT(&getContext()), m_objectPtrType};
+                functionName = "pylir_dict_insert_unique";
                 break;
         }
         auto module = mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp());
@@ -817,19 +824,40 @@ public:
                     {
                         return;
                     }
-                    appendToGlobalInit(builder,
-                                       [&]
-                                       {
-                                           auto dictionary = builder.create<mlir::LLVM::AddressOfOp>(
-                                               global.getLoc(), m_objectPtrType, mlir::FlatSymbolRefAttr::get(global));
-                                           for (const auto& [key, value] : dict.getValue())
-                                           {
-                                               auto keyValue = getConstant(global.getLoc(), key, builder);
-                                               auto valueValue = getConstant(global.getLoc(), value, builder);
-                                               createRuntimeCall(global.getLoc(), builder, Runtime::pylir_dict_insert,
-                                                                 {dictionary, keyValue, valueValue});
-                                           }
-                                       });
+                    appendToGlobalInit(
+                        builder,
+                        [&]
+                        {
+                            auto dictionary = builder.create<mlir::LLVM::AddressOfOp>(
+                                global.getLoc(), m_objectPtrType, mlir::FlatSymbolRefAttr::get(global));
+                            for (const auto& [key, value] : dict.getValue())
+                            {
+                                auto keyValue = getConstant(global.getLoc(), key, builder);
+                                auto layoutType =
+                                    getLayoutType(dereference<pylir::Py::ObjectAttrInterface>(key).getTypeObject());
+                                mlir::Value hash;
+                                if (layoutType
+                                    == mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Str.name))
+                                {
+                                    hash = createRuntimeCall(global.getLoc(), builder, Runtime::pylir_str_hash,
+                                                             {keyValue});
+                                }
+                                else if (layoutType
+                                         == mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Object.name))
+                                {
+                                    hash = builder.create<mlir::LLVM::PtrToIntOp>(global.getLoc(), getIndexType(),
+                                                                                  keyValue);
+                                }
+                                else
+                                {
+                                    // TODO: Add more inline hash functions implementations.
+                                    PYLIR_UNREACHABLE;
+                                }
+                                auto valueValue = getConstant(global.getLoc(), value, builder);
+                                createRuntimeCall(global.getLoc(), builder, Runtime::pylir_dict_insert_unique,
+                                                  {dictionary, keyValue, hash, valueValue});
+                            }
+                        });
                 })
             .Case(
                 [&](pylir::Py::TypeAttr attr)
@@ -1838,7 +1866,7 @@ struct DictTryGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py
     {
         auto dict = pyDictModel(op.getLoc(), rewriter, adaptor.getDict());
         auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_lookup,
-                                        {mlir::Value{dict}, adaptor.getKey()});
+                                        {mlir::Value{dict}, adaptor.getKey(), adaptor.getHash()});
         rewriter.replaceOp(op, result);
         return mlir::success();
     }
@@ -1853,7 +1881,7 @@ struct DictSetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::D
     {
         auto dict = pyDictModel(op.getLoc(), rewriter, adaptor.getDict());
         createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_insert,
-                          {mlir::Value{dict}, adaptor.getKey(), adaptor.getValue()});
+                          {mlir::Value{dict}, adaptor.getKey(), adaptor.getHash(), adaptor.getValue()});
         rewriter.eraseOp(op);
         return mlir::success();
     }
@@ -1868,7 +1896,7 @@ struct DictDelItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::D
     {
         auto dict = pyDictModel(op.getLoc(), rewriter, adaptor.getDict());
         createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_erase,
-                          {mlir::Value{dict}, adaptor.getKey()});
+                          {mlir::Value{dict}, adaptor.getKey(), adaptor.getHash()});
         rewriter.eraseOp(op);
         return mlir::success();
     }
