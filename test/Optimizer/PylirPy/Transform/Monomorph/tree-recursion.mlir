@@ -64,11 +64,9 @@ func.func private @"builtins.type.__call__$impl[0]"(%arg0: !py.dynamic, %arg1: !
   return %36 : !py.dynamic
 ^bb7:  // pred: ^bb5
   %37 = py.type.mro %arg1
-  %result, %success = py.mroLookup "__new__" in %37
-  %38 = py.bool.fromI1 %success
-  %39 = py.makeTuple (%result, %38)
+  %result = py.mroLookup "__new__" in %37
   %40 = py.tuple.prepend %arg1, %arg2
-  %41 = py.function.call %39(%39, %40, %arg3)
+  %41 = py.function.call %result(%result, %40, %arg3)
   %42 = py.typeOf %41
   %43 = py.type.mro %42
   %44 = py.tuple.contains %arg1 in %43
@@ -77,11 +75,9 @@ func.func private @"builtins.type.__call__$impl[0]"(%arg0: !py.dynamic, %arg1: !
 ^bb8:  // 2 preds: ^bb7, ^bb9
   return %41 : !py.dynamic
 ^bb9:  // pred: ^bb7
-  %result_0, %success_1 = py.mroLookup "__init__" in %43
-  %46 = py.bool.fromI1 %success_1
-  %47 = py.makeTuple (%result_0, %46)
+  %result_0 = py.mroLookup "__init__" in %43
   %48 = py.tuple.prepend %41, %arg2
-  %49 = py.function.call %47(%47, %48, %arg3)
+  %49 = py.function.call %result_0(%result_0, %48, %arg3)
   %50 = py.is %49, %1
   %51 = test.random
   cf.cond_br %51, ^bb10, ^bb8

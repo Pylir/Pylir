@@ -35,17 +35,19 @@ mlir::Value buildTrySpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine met
     auto elementType = builder.createTypeOf(element);
     auto mroTuple = builder.createTypeMRO(elementType);
     auto lookup = builder.createMROLookup(mroTuple, methodName.str());
+    auto failure = builder.createIsUnboundValue(lookup);
     auto* exec = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(builder.getCurrentLoc(), lookup.getSuccess(), exec, notFoundPath);
+    builder.create<mlir::cf::CondBranchOp>(builder.getCurrentLoc(), failure, notFoundPath, exec);
 
     implementBlock(builder, exec);
     mroTuple = builder.createTypeMRO(builder.createTypeOf(lookup.getResult()));
     auto getMethod = builder.createMROLookup(mroTuple, "__get__");
+    failure = builder.createIsUnboundValue(getMethod);
     auto* isDescriptor = new mlir::Block;
     auto* mergeBlock = new mlir::Block;
     mergeBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
-    builder.create<mlir::cf::CondBranchOp>(builder.getCurrentLoc(), getMethod.getSuccess(), isDescriptor, mergeBlock,
-                                           mlir::ValueRange{lookup.getResult()});
+    builder.create<mlir::cf::CondBranchOp>(builder.getCurrentLoc(), failure, mergeBlock,
+                                           mlir::ValueRange{lookup.getResult()}, isDescriptor, mlir::ValueRange{});
 
     implementBlock(builder, isDescriptor);
     auto tuple = builder.createMakeTuple({element, elementType});
@@ -104,16 +106,18 @@ mlir::Value binOp(pylir::PyBuilder& builder, llvm::StringRef method, llvm::Strin
     implementBlock(builder, isSubclassBlock);
     auto rhsMroTuple = builder.createTypeMRO(rhsType);
     auto lookup = builder.createMROLookup(rhsMroTuple, revMethod);
+    auto failure = builder.createIsUnboundValue(lookup);
     auto* hasReversedBlock = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), hasReversedBlock, normalMethodBlock,
-                                           mlir::ValueRange{falseC});
+    builder.create<mlir::cf::CondBranchOp>(failure, normalMethodBlock, mlir::ValueRange{falseC}, hasReversedBlock,
+                                           mlir::ValueRange{});
 
     implementBlock(builder, hasReversedBlock);
     auto lhsMroTuple = builder.createTypeMRO(lhsType);
     auto lhsLookup = builder.createMROLookup(lhsMroTuple, revMethod);
+    failure = builder.createIsUnboundValue(lhsLookup);
     auto* callReversedBlock = new mlir::Block;
     auto* lhsHasReversedBlock = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(lhsLookup.getSuccess(), lhsHasReversedBlock, callReversedBlock);
+    builder.create<mlir::cf::CondBranchOp>(failure, callReversedBlock, lhsHasReversedBlock);
 
     implementBlock(builder, lhsHasReversedBlock);
     auto sameImplementation = builder.createIs(lookup.getResult(), lhsLookup.getResult());
@@ -265,9 +269,10 @@ void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functio
     auto lhsType = builder.createTypeOf(lhs);
     auto mro = builder.createTypeMRO(lhsType);
     auto lookup = builder.createMROLookup(mro, method);
+    auto failure = builder.createIsUnboundValue(lookup);
     auto* fallback = new mlir::Block;
     auto* callIOp = new mlir::Block;
-    builder.create<mlir::cf::CondBranchOp>(lookup.getSuccess(), callIOp, fallback);
+    builder.create<mlir::cf::CondBranchOp>(failure, fallback, callIOp);
 
     implementBlock(builder, callIOp);
     auto res = builder.createPylirCallIntrinsic(lookup.getResult(), builder.createMakeTuple({lhs, rhs}),

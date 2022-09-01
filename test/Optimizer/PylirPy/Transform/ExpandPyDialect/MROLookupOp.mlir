@@ -5,7 +5,7 @@ py.globalValue @builtins.function = #py.type
 py.globalValue @builtins.dict = #py.type
 
 func.func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
-    %0, %1 = py.mroLookup "__call__" in %tuple
+    %0 = py.mroLookup "__call__" in %tuple
     return %0 : !py.dynamic
 }
 
@@ -21,10 +21,8 @@ func.func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 
 // CHECK-NEXT: %[[LESS:.*]] = arith.cmpi ult, %[[INDEX]], %[[TUPLE_LEN]]
 // CHECK-NEXT: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-// CHECK-NEXT: %[[FALSE:.*]] = arith.constant false
 // CHECK-NEXT: cond_br %[[LESS]], ^[[BODY:[[:alnum:]]+]], ^[[END:[[:alnum:]]+]]
 // CHECK-SAME: %[[UNBOUND]]
-// CHECK-SAME: %[[FALSE]]
 
 // CHECK-NEXT: ^[[BODY]]:
 // CHECK-NEXT: %[[ENTRY:.*]] = py.tuple.getItem %[[TUPLE]]
@@ -32,10 +30,8 @@ func.func @linear_search(%tuple : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[METATYPE:.*]] = py.typeOf %[[ENTRY]]
 // CHECK-NEXT: %[[RESULT:.*]] = py.getSlot "__call__" from %[[ENTRY]] : %[[METATYPE]]
 // CHECK-NEXT: %[[FAILURE:.*]] = py.isUnboundValue %[[RESULT]]
-// CHECK-NEXT: %[[TRUE:.*]] = arith.constant true
 // CHECK-NEXT: cond_br %[[FAILURE]], ^[[NOT_FOUND:.*]], ^[[END]]
 // CHECK-SAME: %[[RESULT]]
-// CHECK-SAME: %[[TRUE]]
 
 // CHECK-NEXT: ^[[NOT_FOUND]]
 // CHECK-NEXT: %[[ONE:.*]] = arith.constant 1

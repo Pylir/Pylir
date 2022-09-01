@@ -5,36 +5,33 @@ py.globalValue const @builtins.type = #py.type<slots = {__slots__ = @tuple}>
 py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.str = #py.type
 
-func.func @test1() -> (!py.dynamic, i1) {
+func.func @test1() -> !py.dynamic {
     %0 = py.constant(#py.tuple<(@builtins.type)>)
-    %1, %found = py.mroLookup "__slots__" in %0
-    return %1, %found : !py.dynamic, i1
+    %1 = py.mroLookup "__slots__" in %0
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: func @test1
-// CHECK-DAG: %[[C1:.*]] = py.constant(@tuple)
-// CHECK-DAG: %[[C2:.*]] = arith.constant true
-// CHECK: return %[[C1]], %[[C2]]
+// CHECK: %[[C1:.*]] = py.constant(@tuple)
+// CHECK: return %[[C1]]
 
-func.func @test2() -> (!py.dynamic, i1) {
+func.func @test2() -> !py.dynamic {
     %0 = py.constant(#py.tuple<()>)
-    %1, %found = py.mroLookup "__slots__" in %0
-    return %1, %found : !py.dynamic, i1
+    %1 = py.mroLookup "__slots__" in %0
+    return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: func @test2
-// CHECK-DAG: %[[C1:.*]] = py.constant(#py.unbound)
-// CHECK-DAG: %[[C2:.*]] = arith.constant false
-// CHECK: return %[[C1]], %[[C2]]
+// CHECK: %[[C1:.*]] = py.constant(#py.unbound)
+// CHECK: return %[[C1]]
 
-func.func @test3(%arg0 : !py.dynamic) -> (!py.dynamic, i1) {
+func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(@builtins.type)
     %1 = py.makeTuple (%0, %arg0)
-    %2, %found = py.mroLookup "__slots__" in %1
-    return %2, %found : !py.dynamic, i1
+    %2 = py.mroLookup "__slots__" in %1
+    return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: func @test3
 // CHECK-DAG: %[[C1:.*]] = py.constant(@tuple)
-// CHECK-DAG: %[[C2:.*]] = arith.constant true
-// CHECK: return %[[C1]], %[[C2]]
+// CHECK: return %[[C1]]

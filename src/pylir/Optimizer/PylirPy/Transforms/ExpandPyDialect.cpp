@@ -93,20 +93,17 @@ struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
         auto isLess = rewriter.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
                                                            conditionBlock->getArgument(0), tupleSize);
         auto* body = new mlir::Block;
-        auto unbound = rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::UnboundAttr::get(getContext()));
-        auto falseConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
-        rewriter.create<mlir::cf::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{unbound, falseConstant});
+        mlir::Value unbound = rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::UnboundAttr::get(getContext()));
+        rewriter.create<mlir::cf::CondBranchOp>(loc, isLess, body, endBlock, unbound);
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
         auto entry = rewriter.create<pylir::Py::TupleGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
         auto entryType = rewriter.create<pylir::Py::TypeOfOp>(loc, entry);
-        auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.getSlotAttr());
+        mlir::Value fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.getSlotAttr());
         auto failure = rewriter.create<pylir::Py::IsUnboundValueOp>(loc, fetch);
-        auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
         auto* notFound = new mlir::Block;
-        rewriter.create<mlir::cf::CondBranchOp>(loc, failure, notFound, endBlock,
-                                                mlir::ValueRange{fetch, trueConstant});
+        rewriter.create<mlir::cf::CondBranchOp>(loc, failure, notFound, endBlock, fetch);
 
         notFound->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(notFound);

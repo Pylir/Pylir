@@ -720,8 +720,7 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
     return object.getMroTuple();
 }
 
-mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> constantOperands,
-                                                 ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+::mlir::OpFoldResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> constantOperands)
 {
     if (auto tuple = resolveValue<TupleAttr>(*this, constantOperands[0], false))
     {
@@ -730,44 +729,36 @@ mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attrib
             auto object = resolveValue(*this, iter);
             if (!object)
             {
-                return mlir::failure();
+                return nullptr;
             }
             const auto& map = object.getSlots();
             if (auto result = map.get(getSlotAttr()))
             {
-                results.emplace_back(result);
-                results.emplace_back(mlir::BoolAttr::get(getContext(), true));
-                return mlir::success();
+                return result;
             }
         }
-        results.emplace_back(Py::UnboundAttr::get(getContext()));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
+        return Py::UnboundAttr::get(getContext());
     }
     auto operands = resolveTupleOperands(*this, getMroTuple());
     for (auto& iter : operands)
     {
         if (!iter || !iter.is<mlir::Attribute>())
         {
-            return mlir::failure();
+            return nullptr;
         }
         auto object = resolveValue(*this, iter.get<mlir::Attribute>());
         if (!object)
         {
-            return mlir::failure();
+            return nullptr;
         }
         const auto& map = object.getSlots();
         auto result = map.get(getSlotAttr());
         if (result)
         {
-            results.emplace_back(result);
-            results.emplace_back(mlir::BoolAttr::get(getContext(), true));
-            return mlir::success();
+            return result;
         }
     }
-    results.emplace_back(Py::UnboundAttr::get(getContext()));
-    results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-    return mlir::success();
+    return Py::UnboundAttr::get(getContext());
 }
 
 mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)

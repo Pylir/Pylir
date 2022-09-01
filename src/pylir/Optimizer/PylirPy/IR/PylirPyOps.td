@@ -566,6 +566,23 @@ def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCapture]> {
     let assemblyFormat = "$string attr-dict";
 }
 
+// TODO: This should actually have `MemoryEffects<[MemRead]>` as it reads slots from the elements in $mro_tuple, but
+//       the current MemorySSA can't currently cope with that.
+def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoCapture]> {
+    let arguments = (ins DynamicType:$mro_tuple, StrAttr:$slot);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "$slot `in` $mro_tuple attr-dict";
+
+    let description = [{
+        This op does a linear search through the given tuple, accessing the slot on every element and returning the
+        first one bound. If `$mro_tuple` is not really a tuple (or subclass of) the behaviour is undefined.
+        If a bound slot was found it is returned to `$result`, else it is unbound.
+    }];
+
+    let hasFolder = 1;
+}
+
 def PylirPy_UnpackOp : PylirPy_Op<"unpack", [AlwaysBound, AddableExceptionHandling<"UnpackExOp">,
                                              AttrSizedResultSegments]> {
 
@@ -620,23 +637,6 @@ def PylirPy_UnpackExOp : AddExceptionHandling<PylirPy_UnpackOp> {
                         "mlir::Block*":$unwindPath,
                         "mlir::ValueRange":$unwind_dest_operands)>
     ];
-}
-
-// linear searches
-
-def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoSideEffect, AlwaysBound]> {
-    let arguments = (ins DynamicType:$mro_tuple, StrAttr:$slot);
-    let results = (outs DynamicType:$result, I1:$success);
-
-    let assemblyFormat = "$slot `in` $mro_tuple attr-dict";
-
-    let description = [{
-        This op does a linear search through the given tuple, returning the first element which contains the given
-        attribute. If `$mro_tuple` is not really a tuple (or subclass of) the behaviour is undefined. If the attribute
-        was found `$success` returns `true` and `false` otherwise. If `false`, using `$result` is undefined behaviour.
-    }];
-
-    let hasFolder = 1;
 }
 
 // Make ops
