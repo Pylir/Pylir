@@ -274,11 +274,10 @@ public:
         auto mpInt = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "mp_int");
         if (!mpInt.isInitialized())
         {
-            [[maybe_unused]] auto result = mpInt.setBody({mlir::IntegerType::get(&getContext(), 8 * sizeof(int)),
-                                                          mlir::IntegerType::get(&getContext(), 8 * sizeof(int)),
-                                                          mlir::LLVM::LLVMPointerType::get(&getContext()),
-                                                          mlir::IntegerType::get(&getContext(), 8 * sizeof(mp_sign))},
-                                                         false);
+            [[maybe_unused]] auto result =
+                mpInt.setBody({m_cabi->getInt(&getContext()), m_cabi->getInt(&getContext()),
+                               mlir::LLVM::LLVMPointerType::get(&getContext()), m_cabi->getInt(&getContext())},
+                              false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return mpInt;
