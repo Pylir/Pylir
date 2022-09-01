@@ -8,7 +8,9 @@ add_subdirectory(fmt-7.1.3 EXCLUDE_FROM_ALL)
 add_subdirectory(utf8proc EXCLUDE_FROM_ALL)
 add_subdirectory(libtommath EXCLUDE_FROM_ALL)
 if (MSVC)
-    # Workaround for cmake issue. TODO: create issue and link here
+    # Workaround for cmake issue:
+    # https://gitlab.kitware.com/cmake/cmake/-/commit/b41fab928551d5a71af2c16b34f9683d872818b0
+    # TODO: Remove below once CMake 3.24 or higher is the minimum required version.
     set(CMAKE_ASM-ATT_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreaded "")
     set(CMAKE_ASM-ATT_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "")
     set(CMAKE_ASM-ATT_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDebug "")
