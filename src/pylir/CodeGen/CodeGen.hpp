@@ -417,6 +417,11 @@ class CodeGen
         return exit;
     }
 
+    [[nodiscard]] mlir::Location synthesizedLoc()
+    {
+        return mlir::FileLineColLoc::get(m_builder.getStringAttr(m_docManager->getDocument().getFilename()), 0, 0);
+    }
+
     [[nodiscard]] auto changeLoc(mlir::Location loc)
     {
         auto currLoc = m_builder.getCurrentLoc();

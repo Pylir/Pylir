@@ -64,7 +64,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 {
     m_builder.setInsertionPointToEnd(m_module.getBody());
     {
-        auto moduleBeginLoc = changeLoc(fileInput, m_docManager->getDocument().getStartOfFileLoc());
+        auto moduleBeginLoc = changeLoc(synthesizedLoc());
         for (const auto& token : fileInput.globals)
         {
             auto locExit = changeLoc(token);
@@ -101,7 +101,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
 
     if (m_qualifiers == "builtins.")
     {
-        auto locExit = changeLoc(fileInput, m_docManager->getDocument().getEndOfFileLoc());
+        auto locExit = changeLoc(synthesizedLoc());
         createCompilerBuiltinsImpl();
     }
 
