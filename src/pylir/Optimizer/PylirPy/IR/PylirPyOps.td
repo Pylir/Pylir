@@ -586,7 +586,7 @@ def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoCapture]> {
 def PylirPy_UnpackOp : PylirPy_Op<"unpack", [AlwaysBound, AddableExceptionHandling<"UnpackExOp">,
                                              AttrSizedResultSegments]> {
 
-    let arguments = (ins DynamicType:$iterable, DenseI32ArrayAttr:$result_segment_sizes);
+    let arguments = (ins DynamicType:$iterable);
 
     let results = (outs Variadic<DynamicType>:$before, Optional<DynamicType>:$rest,
                         Variadic<DynamicType>:$after);

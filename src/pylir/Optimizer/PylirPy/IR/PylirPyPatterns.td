@@ -22,16 +22,13 @@ class DenseArrayCount<int n> : AttrConstraint<
     CPred<"$_self.cast<::mlir::ElementsAttr>().size() == " #n>,
     "with exactly " # n # " elements">;
 
-// TODO: Replace with ConstantAttr once supported.
-defvar EmptyI32Array = NativeCodeCall<"$_builder.getDenseI32ArrayAttr({})">;
-
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, DenseArrayCount<0>)),
           (PylirPy_MakeTupleOp
             (NativeCodeCall<[{ [&]{ auto vector = llvm::to_vector($1);
                                     vector.insert(vector.begin(), $0);
-                                    return vector; }() }]> $input, $args), (EmptyI32Array))>;
+                                    return vector; }() }]> $input, $args), ConstantAttr<DenseI32ArrayAttr, "{}">)>;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (ResolvesTo<0> PylirPy_TupleAttr:$args)),
           (prependTupleConst $input, $args)>;
@@ -51,7 +48,7 @@ def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
                                         vector.erase(vector.begin(), vector.begin() + value);
                                     }
                                     return vector;
-                                }() }]> $count, $args), (EmptyI32Array))>;
+                                }() }]> $count, $args), ConstantAttr<DenseI32ArrayAttr, "{}">)>;
 
 class BinOpAttrs<string op, Attr attrType, Attr resultAttr = attrType>
 	: NativeCodeCall<!subst("$0",

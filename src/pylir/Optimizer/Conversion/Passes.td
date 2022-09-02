@@ -9,9 +9,9 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ConvertPylirToLLVM : Pass<"convert-pylir-to-llvm", "::mlir::ModuleOp"> {
+def ConvertPylirToLLVMPass : Pass<"convert-pylir-to-llvm", "::mlir::ModuleOp"> {
     let summary = "Convert Pylir dialects to LLVM dialect";
-    let constructor = "::pylir::createConvertPylirToLLVMPass()";
+
     let dependentDialects = ["::mlir::LLVM::LLVMDialect",
                              "::pylir::Mem::PylirMemDialect",
                              "::pylir::Py::PylirPyDialect"];
@@ -23,9 +23,9 @@ def ConvertPylirToLLVM : Pass<"convert-pylir-to-llvm", "::mlir::ModuleOp"> {
     ];
 }
 
-def ConvertPylirPyToPylirMem : Pass<"convert-pylirPy-to-pylirMem", "::mlir::ModuleOp"> {
+def ConvertPylirPyToPylirMemPass : Pass<"convert-pylirPy-to-pylirMem", "::mlir::ModuleOp"> {
     let summary = "Convert Pylir Py dialect to Pylir Mem dialect";
-    let constructor = "::pylir::createConvertPylirPyToPylirMemPass()";
+
     let dependentDialects = ["::pylir::Mem::PylirMemDialect", "::mlir::arith::ArithmeticDialect"];
 }
 

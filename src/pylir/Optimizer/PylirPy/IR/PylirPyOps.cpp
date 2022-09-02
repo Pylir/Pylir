@@ -647,9 +647,7 @@ void pylir::Py::UnpackOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operation
     }
     mlir::Type dynamicType = odsBuilder.getType<pylir::Py::DynamicType>();
     build(odsBuilder, odsState, llvm::SmallVector(beforeCount, dynamicType), restIndex ? dynamicType : nullptr,
-          llvm::SmallVector(afterCount, dynamicType), iterable,
-          odsBuilder.getDenseI32ArrayAttr(
-              {static_cast<int32_t>(beforeCount), (restIndex ? 1 : 0), static_cast<int32_t>(afterCount)}));
+          llvm::SmallVector(afterCount, dynamicType), iterable);
 }
 
 void pylir::Py::UnpackExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, std::size_t count,
@@ -672,8 +670,6 @@ void pylir::Py::UnpackExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     mlir::Type dynamicType = odsBuilder.getType<pylir::Py::DynamicType>();
     build(odsBuilder, odsState, llvm::SmallVector(beforeCount, dynamicType), restIndex ? dynamicType : nullptr,
           llvm::SmallVector(afterCount, dynamicType), iterable,
-          odsBuilder.getDenseI32ArrayAttr(
-              {static_cast<int32_t>(beforeCount), (restIndex ? 1 : 0), static_cast<int32_t>(afterCount)}),
           normal_dest_operands, unwind_dest_operands, happy_path, unwindPath);
 }
 

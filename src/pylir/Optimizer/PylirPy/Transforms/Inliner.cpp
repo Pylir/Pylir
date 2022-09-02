@@ -11,17 +11,23 @@
 #include <llvm/ADT/STLExtras.h>
 
 #include <pylir/Optimizer/Analysis/BodySize.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 
 #include <numeric>
 #include <queue>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
 #include "Util/InlinerUtil.hpp"
 
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_INLINERPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
+
 namespace
 {
-class Inliner : public InlinerBase<Inliner>
+class Inliner : public pylir::Py::impl::InlinerPassBase<Inliner>
 {
     mlir::FrozenRewritePatternSet patterns;
 
@@ -187,11 +193,9 @@ protected:
         cost -= callOpInterface.getArgOperands().size(); // Call Arguments
         return cost;
     }
+
+public:
+    using Base::Base;
 };
 
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createInlinerPass()
-{
-    return std::make_unique<Inliner>();
-}

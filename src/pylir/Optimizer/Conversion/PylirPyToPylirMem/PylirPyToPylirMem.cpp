@@ -5,16 +5,23 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
+#include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/DenseMap.h>
 
-#include <pylir/Optimizer/Conversion/PassDetail.hpp>
+#include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Support/Variant.hpp>
+
+namespace pylir
+{
+#define GEN_PASS_DEF_CONVERTPYLIRPYTOPYLIRMEMPASS
+#include "pylir/Optimizer/Conversion/Passes.h.inc"
+} // namespace pylir
 
 namespace
 {
@@ -38,10 +45,13 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
     }
 };
 
-struct ConvertPylirPyToPylirMem : ConvertPylirPyToPylirMemBase<ConvertPylirPyToPylirMem>
+struct ConvertPylirPyToPylirMem : pylir::impl::ConvertPylirPyToPylirMemPassBase<ConvertPylirPyToPylirMem>
 {
 protected:
     void runOnOperation() override;
+
+public:
+    using Base::Base;
 };
 
 #include "pylir/Optimizer/Conversion/PylirPyToPylirMem/PylirPyToPylirMem.cpp.inc"
@@ -67,8 +77,3 @@ void ConvertPylirPyToPylirMem::runOnOperation()
     }
 }
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> pylir::createConvertPylirPyToPylirMemPass()
-{
-    return std::make_unique<ConvertPylirPyToPylirMem>();
-}

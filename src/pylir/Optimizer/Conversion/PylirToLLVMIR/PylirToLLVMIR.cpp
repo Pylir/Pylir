@@ -14,6 +14,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/IR/PatternMatch.h>
+#include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/ScopeExit.h>
@@ -21,7 +22,7 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/Conversion/PassDetail.hpp>
+#include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
@@ -30,6 +31,12 @@
 
 #include "WinX64.hpp"
 #include "X86_64.hpp"
+
+namespace pylir
+{
+#define GEN_PASS_DEF_CONVERTPYLIRTOLLVMPASS
+#include "pylir/Optimizer/Conversion/Passes.h.inc"
+} // namespace pylir
 
 namespace
 {
@@ -2983,19 +2990,13 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
     }
 };
 
-class ConvertPylirToLLVMPass : public ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
+class ConvertPylirToLLVMPass : public pylir::impl::ConvertPylirToLLVMPassBase<ConvertPylirToLLVMPass>
 {
 protected:
     void runOnOperation() override;
 
 public:
-    ConvertPylirToLLVMPass() = default;
-
-    ConvertPylirToLLVMPass(const llvm::Triple& triple, const llvm::DataLayout& dataLayout)
-    {
-        m_targetTripleCLI = triple.str();
-        m_dataLayoutCLI = dataLayout.getStringRepresentation();
-    }
+    using Base::Base;
 };
 
 void ConvertPylirToLLVMPass::runOnOperation()
@@ -3115,14 +3116,3 @@ void ConvertPylirToLLVMPass::runOnOperation()
     }
 }
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> pylir::createConvertPylirToLLVMPass()
-{
-    return std::make_unique<ConvertPylirToLLVMPass>();
-}
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-    pylir::createConvertPylirToLLVMPass(llvm::Triple targetTriple, const llvm::DataLayout& dataLayout)
-{
-    return std::make_unique<ConvertPylirToLLVMPass>(std::move(targetTriple), dataLayout);
-}

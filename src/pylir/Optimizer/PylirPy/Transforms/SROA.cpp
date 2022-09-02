@@ -4,16 +4,24 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
+#include <mlir/Pass/Pass.h>
+
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSAUpdater.hpp>
 
-#include "PassDetail.hpp"
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_SROAPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 namespace
 {
-class SROA : public SROABase<SROA>
+class SROA : public pylir::Py::impl::SROAPassBase<SROA>
 {
     llvm::DenseSet<mlir::Value> collectAggregates();
 
@@ -21,6 +29,9 @@ class SROA : public SROABase<SROA>
 
 protected:
     void runOnOperation() override;
+
+public:
+    using Base::Base;
 };
 
 llvm::DenseSet<mlir::Value> SROA::collectAggregates()
@@ -353,8 +364,3 @@ void SROA::runOnOperation()
 }
 
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createSROAPass()
-{
-    return std::make_unique<SROA>();
-}

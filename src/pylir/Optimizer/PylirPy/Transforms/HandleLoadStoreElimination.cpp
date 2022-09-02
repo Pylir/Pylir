@@ -6,6 +6,7 @@
 
 #include <mlir/IR/Dominance.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
+#include <mlir/Pass/Pass.h>
 
 #include <llvm/ADT/ScopeExit.h>
 
@@ -13,8 +14,13 @@
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSAUpdater.hpp>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_HANDLELOADSTOREELIMINATIONPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 namespace
 {
@@ -24,8 +30,11 @@ struct BlockData
     std::vector<std::pair<pylir::Py::LoadOp, pylir::ValueTracker>> candidates;
 };
 
-struct HandleLoadStoreEliminationPass : HandleLoadStoreEliminationBase<HandleLoadStoreEliminationPass>
+struct HandleLoadStoreEliminationPass
+    : pylir::Py::impl::HandleLoadStoreEliminationPassBase<HandleLoadStoreEliminationPass>
 {
+    using Base::Base;
+
 protected:
     void runOnOperation() override;
 
@@ -234,8 +243,3 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
 }
 
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createHandleLoadStoreEliminationPass()
-{
-    return std::make_unique<HandleLoadStoreEliminationPass>();
-}

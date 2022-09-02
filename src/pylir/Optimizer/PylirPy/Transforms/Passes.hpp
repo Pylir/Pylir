@@ -6,30 +6,19 @@
 
 #pragma once
 
-#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Pass/Pass.h>
 
 #include <memory>
 
 namespace pylir::Py
 {
-std::unique_ptr<mlir::Pass> createExpandPyDialectPass();
-
-std::unique_ptr<mlir::Pass> createFoldHandlesPass();
-
-std::unique_ptr<mlir::Pass> createHandleLoadStoreEliminationPass();
-
-std::unique_ptr<mlir::Pass> createMonomorphPass();
-
-std::unique_ptr<mlir::Pass> createTypeFlowMonomorphPass();
-
-std::unique_ptr<mlir::Pass> createInlinerPass();
-
-std::unique_ptr<mlir::Pass> createTrialInlinerPass();
-
-std::unique_ptr<mlir::Pass> createSROAPass();
-
 #define GEN_PASS_REGISTRATION
+#define GEN_PASS_DECL_EXPANDPYDIALECTPASS
+#define GEN_PASS_DECL_FOLDHANDLESPASS
+#define GEN_PASS_DECL_HANDLELOADSTOREELIMINATIONPASS
+#define GEN_PASS_DECL_INLINERPASS
+#define GEN_PASS_DECL_MONOMORPHPASS
+#define GEN_PASS_DECL_SROAPASS
+#define GEN_PASS_DECL_TRIALINLINERPASS
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
-
 } // namespace pylir::Py

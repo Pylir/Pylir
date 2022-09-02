@@ -4,17 +4,25 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Interfaces/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_EXPANDPYDIALECTPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 namespace
 {
@@ -384,8 +392,11 @@ struct UnpackOpPattern : mlir::OpRewritePattern<TargetOp>
     }
 };
 
-struct ExpandPyDialectPass : public ExpandPyDialectBase<ExpandPyDialectPass>
+struct ExpandPyDialectPass : public pylir::Py::impl::ExpandPyDialectPassBase<ExpandPyDialectPass>
 {
+    using Base::Base;
+
+protected:
     void runOnOperation() override;
 };
 
@@ -421,8 +432,3 @@ void ExpandPyDialectPass::runOnOperation()
     }
 }
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createExpandPyDialectPass()
-{
-    return std::make_unique<ExpandPyDialectPass>();
-}

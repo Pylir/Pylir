@@ -11,16 +11,24 @@
 #include <pylir/Optimizer/Analysis/MemorySSA.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+namespace pylir
+{
+#define GEN_PASS_DEF_LOADFORWARDINGPASS
+#include "pylir/Optimizer/Transforms/Passes.h.inc"
+} // namespace pylir
 
 namespace
 {
 
-struct LoadForwardingPass : LoadForwardingBase<LoadForwardingPass>
+struct LoadForwardingPass : pylir::impl::LoadForwardingPassBase<LoadForwardingPass>
 {
 protected:
     void runOnOperation() override;
+
+public:
+    using Base::Base;
 };
 
 void LoadForwardingPass::runOnOperation()
@@ -107,8 +115,3 @@ void LoadForwardingPass::runOnOperation()
 }
 
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::createLoadForwardingPass()
-{
-    return std::make_unique<LoadForwardingPass>();
-}

@@ -4,12 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/IR/Threading.h>
+#include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 
 #include <llvm/ADT/DenseMap.h>
 
 #include <pylir/Optimizer/Analysis/BodySize.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Util/InlinerUtil.hpp>
 #include <pylir/Support/Macros.hpp>
 #include <pylir/Support/Variant.hpp>
@@ -18,8 +22,13 @@
 #include <mutex>
 #include <variant>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_TRIALINLINERPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 namespace
 {
@@ -177,7 +186,7 @@ public:
     }
 };
 
-class TrialInliner : public TrialInlinerBase<TrialInliner>
+class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
 {
     mlir::OpPassManager m_passManager;
 
@@ -377,9 +386,11 @@ protected:
     }
 
 public:
+    using Base::Base;
+
     void getDependentDialects(mlir::DialectRegistry& registry) const override
     {
-        TrialInlinerBase::getDependentDialects(registry);
+        Base::getDependentDialects(registry);
         // Above initialize will signal the error properly. This also gets called before `initialize`, hence we can't
         // use m_passManager here.
         mlir::OpPassManager temp;
@@ -391,8 +402,3 @@ public:
     }
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createTrialInlinerPass()
-{
-    return std::make_unique<TrialInliner>();
-}

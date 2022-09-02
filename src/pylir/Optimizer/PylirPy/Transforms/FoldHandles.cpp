@@ -6,21 +6,32 @@
 
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/Matchers.h>
+#include <mlir/Pass/Pass.h>
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_FOLDHANDLESPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 namespace
 {
-struct FoldHandlesPass : public FoldHandlesBase<FoldHandlesPass>
+struct FoldHandlesPass : public pylir::Py::impl::FoldHandlesPassBase<FoldHandlesPass>
 {
+    using Base::Base;
+
+protected:
     void runOnOperation() override;
 
+private:
     pylir::Py::GlobalValueOp createGlobalValueFromHandle(pylir::Py::GlobalHandleOp handleOp,
                                                          pylir::Py::ObjectAttrInterface initializer, bool constant)
     {
@@ -171,8 +182,3 @@ void FoldHandlesPass::runOnOperation()
 }
 
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createFoldHandlesPass()
-{
-    return std::make_unique<FoldHandlesPass>();
-}
