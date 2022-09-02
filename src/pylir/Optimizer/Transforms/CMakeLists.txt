@@ -6,9 +6,7 @@
 
 add_subdirectory(Util)
 
-set(LLVM_TARGET_DEFINITIONS Passes.td)
-mlir_tablegen(Passes.h.inc -gen-pass-decls -name Transform)
-add_public_tablegen_target(PylirTransformPassIncGen)
+add_pylir_passes(Passes Transform PREFIX Pylir)
 
 add_library(PylirTransforms LoadForwardingPass.cpp)
 add_dependencies(PylirTransforms PylirTransformPassIncGen)

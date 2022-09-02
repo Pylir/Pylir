@@ -169,6 +169,8 @@ endif ()
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
+include(AddPylir)
+
 find_package(Python3 3.6 COMPONENTS Interpreter REQUIRED)
 
 include_directories(src)

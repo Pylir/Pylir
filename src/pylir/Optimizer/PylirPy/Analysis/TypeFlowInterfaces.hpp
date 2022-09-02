@@ -20,4 +20,4 @@ namespace pylir::TypeFlow
 using OpFoldResult = llvm::PointerUnion<Py::TypeAttrUnion, mlir::Value>;
 } // namespace pylir::TypeFlow
 
-#include "pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.h.inc"
+#include "pylir/Optimizer/PylirPy/Analysis/TypeFlowInterfaces.h.inc"

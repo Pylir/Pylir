@@ -8,6 +8,7 @@
 #define PYLIR_MEMORY_SSA_TABLEGEN
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/RegionKindInterface.td"
 include "mlir/IR/OpAsmInterface.td"

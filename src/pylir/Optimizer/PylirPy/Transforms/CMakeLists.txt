@@ -4,9 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(LLVM_TARGET_DEFINITIONS Passes.td)
-mlir_tablegen(Passes.h.inc -gen-pass-decls -name Transform)
-add_public_tablegen_target(PylirPyTransformPassIncGen)
+add_pylir_passes(Passes Transform PREFIX PylirPy)
 
 add_library(PylirPyTransforms ExpandPyDialect.cpp FoldHandles.cpp HandleLoadStoreElimination.cpp Monomorph.cpp Inliner.cpp TrialInlining.cpp Monomorph.cpp SROA.cpp)
 add_dependencies(PylirPyTransforms PylirPyTransformPassIncGen)

@@ -6,4 +6,4 @@
 
 #include "TypeFlowInterfaces.hpp"
 
-#include "pylir/Optimizer/PylirPy/Analysis/TypeFlowExecInterface.cpp.inc"
+#include "pylir/Optimizer/PylirPy/Analysis/TypeFlowInterfaces.cpp.inc"
