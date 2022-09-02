@@ -8,5 +8,5 @@ runs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: 74b5dad5e944db21e56e6d81eb14f11891a741ab
+        ref: 5cf510115afd54d0f45035957a9ad0e3425bee6c
         path: llvm-project
