@@ -13,7 +13,7 @@
 #include "ObjectTypeInterface.hpp"
 
 #define GET_TYPEDEF_CLASSES
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.h.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.h.inc"
 
 namespace pylir::Py
 {

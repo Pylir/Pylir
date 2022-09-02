@@ -8,4 +8,4 @@
 
 #include <mlir/IR/Dialect.h>
 
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsDialect.h.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyDialect.h.inc"

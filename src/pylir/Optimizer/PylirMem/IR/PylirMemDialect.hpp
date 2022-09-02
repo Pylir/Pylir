@@ -8,4 +8,4 @@
 
 #include <mlir/IR/Dialect.h>
 
-#include "pylir/Optimizer/PylirMem/IR/PylirMemOpsDialect.h.inc"
+#include "pylir/Optimizer/PylirMem/IR/PylirMemDialect.h.inc"

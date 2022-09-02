@@ -13,10 +13,10 @@
 #include "TestDialect.h.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "TestDialectAttributes.h.inc"
+#include "TestAttributes.h.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "TestDialectTypes.h.inc"
+#include "TestTypes.h.inc"
 
 #define GET_OP_CLASSES
-#include "TestDialectOps.h.inc"
+#include "TestOps.h.inc"

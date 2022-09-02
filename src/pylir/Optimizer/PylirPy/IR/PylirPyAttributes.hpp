@@ -19,4 +19,4 @@
 #include "ObjectAttrInterface.hpp"
 
 #define GET_ATTRDEF_CLASSES
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.h.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.h.inc"

@@ -15,7 +15,7 @@
 
 #include <pylir/Optimizer/Interfaces/DialectCostInterface.hpp>
 
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsDialect.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyDialect.cpp.inc"
 
 #include "PylirPyAttributes.hpp"
 #include "PylirPyOps.hpp"

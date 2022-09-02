@@ -921,7 +921,7 @@ mlir::LogicalResult pylir::Py::UnpackExOp::verify()
     return mlir::success();
 }
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.cpp.inc>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyEnums.cpp.inc>
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>

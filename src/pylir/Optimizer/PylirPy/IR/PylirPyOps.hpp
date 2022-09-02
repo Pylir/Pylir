@@ -203,7 +203,7 @@ public:
 
 } // namespace pylir::Py
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.h.inc>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyEnums.h.inc>
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.h.inc>

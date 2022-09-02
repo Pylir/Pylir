@@ -13,4 +13,4 @@
 #include <vector>
 
 #define GET_TYPEDEF_CLASSES
-#include "pylir/Optimizer/PylirMem/IR/PylirMemOpsTypes.h.inc"
+#include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.h.inc"

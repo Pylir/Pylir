@@ -4,10 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_pylir_dialect(PylirMemOps pyMem)
+add_pylir_dialect(PylirMem pyMem)
 
 add_library(PylirMemDialect PylirMemDialect.cpp PylirMemOps.cpp)
-add_dependencies(PylirMemDialect PylirMemOpsIncGen IntAttrInterfaceIncGen)
+add_dependencies(PylirMemDialect PylirMemIncGen IntAttrInterfaceIncGen)
 target_link_libraries(PylirMemDialect PUBLIC MLIRIR PylirPyDialect PylirSupport MLIRInferTypeOpInterface)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirMemDialect)
 

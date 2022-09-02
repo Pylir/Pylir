@@ -60,13 +60,13 @@ llvm::hash_code hash_value(const pylir::BigInt& bigInt)
 } // namespace pylir
 
 #define GET_ATTRDEF_CLASSES
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
 
 void pylir::Py::PylirPyDialect::initializeAttributes()
 {
     addAttributes<
 #define GET_ATTRDEF_LIST
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
         >();
 }
 

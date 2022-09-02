@@ -15,25 +15,25 @@ void pylir::test::TestDialect::initialize()
 {
     addOperations<
 #define GET_OP_LIST
-#include "TestDialectOps.cpp.inc"
+#include "TestOps.cpp.inc"
         >();
     addTypes<
 #define GET_TYPEDEF_LIST
-#include "TestDialectTypes.cpp.inc"
+#include "TestTypes.cpp.inc"
         >();
     addAttributes<
 #define GET_ATTRDEF_LIST
-#include "TestDialectAttributes.cpp.inc"
+#include "TestAttributes.cpp.inc"
         >();
 }
 
 #include "TestDialect.cpp.inc"
 
 #define GET_OP_CLASSES
-#include "TestDialectOps.cpp.inc"
+#include "TestOps.cpp.inc"
 
 #define GET_TYPEDEF_CLASSES
-#include "TestDialectTypes.cpp.inc"
+#include "TestTypes.cpp.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "TestDialectAttributes.cpp.inc"
+#include "TestAttributes.cpp.inc"
