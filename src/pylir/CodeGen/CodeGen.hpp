@@ -208,14 +208,6 @@ class CodeGen
     void buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,
                            llvm::function_ref<void(mlir::Value)> iterationCallback);
 
-    mlir::Value makeTuple(const std::vector<Py::IterArg>& args);
-
-    mlir::Value makeList(const std::vector<Py::IterArg>& args);
-
-    mlir::Value makeSet(const std::vector<Py::IterArg>& args);
-
-    mlir::Value makeDict(const std::vector<Py::DictArg>& args);
-
     struct ModuleSpec
     {
         std::size_t dots;

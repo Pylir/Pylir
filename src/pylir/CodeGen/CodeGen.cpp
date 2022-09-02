@@ -446,7 +446,7 @@ std::vector<pylir::Py::IterArg> pylir::CodeGen::visit(llvm::ArrayRef<Syntax::Sta
 mlir::Value pylir::CodeGen::visit(const Syntax::TupleConstruct& tupleConstruct)
 {
     auto locExit = changeLoc(tupleConstruct);
-    return makeTuple(visit(tupleConstruct.items));
+    return m_builder.createMakeTuple({visit(tupleConstruct.items)}, m_currentExceptBlock);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Yield&)
@@ -931,7 +931,7 @@ mlir::Value pylir::CodeGen::toBool(mlir::Value value)
     m_builder.create<mlir::cf::CondBranchOp>(isBool, continueBlock, value, boolCallBlock, mlir::ValueRange{});
 
     implementBlock(boolCallBlock);
-    auto tuple = m_builder.createMakeTuple({value});
+    auto tuple = m_builder.createMakeTuple({value}, m_currentExceptBlock);
     auto dict = m_builder.createConstant(m_builder.getDictAttr());
     auto result = m_builder.createPylirCallIntrinsic(boolRef, tuple, dict, m_currentExceptBlock);
     m_builder.create<mlir::cf::BranchOp>(continueBlock, result);
@@ -948,7 +948,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::ListDisplay& listDisplay)
         [&](const std::vector<Syntax::StarredItem>& list) -> mlir::Value
         {
             auto operands = visit(list);
-            return makeList(operands);
+            return m_builder.createMakeList(operands, m_currentExceptBlock);
         },
         [&](const Syntax::Comprehension& comprehension) -> mlir::Value
         {
@@ -979,7 +979,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::SetDisplay& setDisplay)
         [&](const std::vector<Syntax::StarredItem>& list) -> mlir::Value
         {
             auto operands = visit(list);
-            return makeSet(operands);
+            return m_builder.createMakeSet(operands, m_currentExceptBlock);
         },
         [&](const Syntax::Comprehension&) -> mlir::Value
         {
@@ -1013,13 +1013,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::DictDisplay& dictDisplay)
                 {
                     return {};
                 }
-                auto tuple = m_builder.createMakeTuple({key});
+                auto tuple = m_builder.createMakeTuple({key}, m_currentExceptBlock);
                 auto dict = m_builder.createConstant(m_builder.getDictAttr());
                 auto hash =
                     m_builder.createPylirCallIntrinsic(m_builder.createHashRef(), tuple, dict, m_currentExceptBlock);
                 result.emplace_back(Py::DictEntry{key, m_builder.createIntToIndex(hash), value});
             }
-            return m_builder.createMakeDict(result);
+            return m_builder.createMakeDict(result, m_currentExceptBlock);
         },
         [&](const Syntax::DictDisplay::DictComprehension&) -> mlir::Value
         {
@@ -1181,7 +1181,7 @@ void pylir::CodeGen::visitForConstruct(const Syntax::Target& targets, mlir::Valu
                                        const std::optional<Syntax::IfStmt::Else>& elseSection)
 {
     auto iterRef = m_builder.createIterRef();
-    auto tuple = m_builder.createMakeTuple({iterable});
+    auto tuple = m_builder.createMakeTuple({iterable}, m_currentExceptBlock);
     auto dict = m_builder.createConstant(m_builder.getDictAttr());
     auto iterObject = m_builder.createPylirCallIntrinsic(iterRef, tuple, dict, m_currentExceptBlock);
 
@@ -1203,7 +1203,7 @@ void pylir::CodeGen::visitForConstruct(const Syntax::Target& targets, mlir::Valu
     auto stopIterationSeal = markOpenBlock(stopIterationHandler);
     stopIterationHandler->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
     auto nextRef = m_builder.createNextRef();
-    tuple = m_builder.createMakeTuple({iterObject});
+    tuple = m_builder.createMakeTuple({iterObject}, m_currentExceptBlock);
     auto next = m_builder.createPylirCallIntrinsic(nextRef, tuple, dict, stopIterationHandler);
     assignTarget(targets, next);
     mlir::Block* elseBlock;
@@ -1605,7 +1605,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
             if (scope.identifiers.find(*name)->second == Syntax::Scope::Cell)
             {
                 auto closureType = m_builder.createCellRef();
-                auto tuple = m_builder.createMakeTuple({closureType, value});
+                auto tuple = m_builder.createMakeTuple({closureType, value}, m_currentExceptBlock);
                 auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
                 auto metaType = m_builder.createTypeOf(closureType);
                 auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
@@ -1640,7 +1640,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                 case Syntax::Scope::Cell:
                 {
                     auto closureType = m_builder.createCellRef();
-                    auto tuple = m_builder.createMakeTuple({closureType});
+                    auto tuple = m_builder.createMakeTuple({closureType}, m_currentExceptBlock);
                     auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
                     auto metaType = m_builder.createTypeOf(closureType);
                     auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
@@ -1731,7 +1731,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
         }
         else
         {
-            defaults = m_builder.createMakeTuple(defaultParameters);
+            defaults = m_builder.createMakeTuple(defaultParameters, m_currentExceptBlock);
         }
         m_builder.createSetSlot(value, type, "__defaults__", defaults);
     }
@@ -1743,7 +1743,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
         }
         else
         {
-            kwDefaults = m_builder.createMakeDict(keywordOnlyDefaultParameters);
+            kwDefaults = m_builder.createMakeDict(keywordOnlyDefaultParameters, m_currentExceptBlock);
         }
         m_builder.createSetSlot(value, type, "__kwdefaults__", kwDefaults);
     }
@@ -1763,7 +1763,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                                PYLIR_ASSERT(result != getCurrentScope().identifiers.end());
                                return pylir::get<mlir::Value>(result->second.kind);
                            });
-            closure = m_builder.createMakeTuple(args);
+            closure = m_builder.createMakeTuple(args, m_currentExceptBlock);
         }
         m_builder.createSetSlot(value, type, "__closure__", closure);
     }
@@ -1779,7 +1779,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
         {
             return {};
         }
-        auto tuple = m_builder.createMakeTuple({value});
+        auto tuple = m_builder.createMakeTuple({value}, m_currentExceptBlock);
         auto dict = m_builder.createConstant(m_builder.getDictAttr());
         value = m_builder.createPylirCallIntrinsic(decorator, tuple, dict, m_currentExceptBlock);
     }
@@ -2049,8 +2049,9 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(llvm::ArrayRef<pylir::
             default: PYLIR_UNREACHABLE;
         }
     }
-    auto tuple = makeTuple(iterArgs);
-    auto dict = dictArgs.empty() ? m_builder.createConstant(m_builder.getDictAttr()) : makeDict(dictArgs);
+    auto tuple = m_builder.createMakeTuple(iterArgs, m_currentExceptBlock);
+    auto dict = dictArgs.empty() ? m_builder.createConstant(m_builder.getDictAttr()) :
+                                   m_builder.createMakeDict(dictArgs, m_currentExceptBlock);
     return {tuple, dict};
 }
 
@@ -2315,62 +2316,6 @@ void pylir::CodeGen::executeFinallyBlocks(bool fullUnwind)
         m_finallyBlocks.pop_back();
         visit(*iter->finallySuite->suite);
     }
-}
-
-mlir::Value pylir::CodeGen::makeTuple(const std::vector<Py::IterArg>& args)
-{
-    if (!m_currentExceptBlock)
-    {
-        return m_builder.createMakeTuple(args);
-    }
-    if (std::all_of(args.begin(), args.end(),
-                    [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
-    {
-        return m_builder.createMakeTuple(args);
-    }
-    return m_builder.createMakeTupleEx(args, m_currentExceptBlock);
-}
-
-mlir::Value pylir::CodeGen::makeList(const std::vector<Py::IterArg>& args)
-{
-    if (!m_currentExceptBlock)
-    {
-        return m_builder.createMakeList(args);
-    }
-    if (std::all_of(args.begin(), args.end(),
-                    [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
-    {
-        return m_builder.createMakeList(args);
-    }
-    return m_builder.createMakeListEx(args, m_currentExceptBlock);
-}
-
-mlir::Value pylir::CodeGen::makeSet(const std::vector<Py::IterArg>& args)
-{
-    if (!m_currentExceptBlock)
-    {
-        return m_builder.createMakeSet(args);
-    }
-    if (std::all_of(args.begin(), args.end(),
-                    [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
-    {
-        return m_builder.createMakeSet(args);
-    }
-    return m_builder.createMakeSetEx(args, m_currentExceptBlock);
-}
-
-mlir::Value pylir::CodeGen::makeDict(const std::vector<Py::DictArg>& args)
-{
-    if (!m_currentExceptBlock)
-    {
-        return m_builder.createMakeDict(args);
-    }
-    if (std::all_of(args.begin(), args.end(),
-                    [](const Py::DictArg& arg) { return std::holds_alternative<Py::DictEntry>(arg); }))
-    {
-        return m_builder.createMakeDict(args);
-    }
-    return m_builder.createMakeDictEx(args, m_currentExceptBlock);
 }
 
 mlir::Value pylir::CodeGen::buildSubclassCheck(mlir::Value type, mlir::Value base)
@@ -2785,20 +2730,7 @@ mlir::Value pylir::buildException(mlir::Location loc, PyBuilder& builder, std::s
 {
     auto typeObj = builder.createConstant(mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
     args.emplace(args.begin(), typeObj);
-    mlir::Value tuple;
-    if (!exceptionHandler
-        || std::none_of(args.begin(), args.end(),
-                        [](const Py::IterArg& arg) { return std::holds_alternative<Py::IterExpansion>(arg); }))
-    {
-        tuple = builder.createMakeTuple(args);
-    }
-    else
-    {
-        auto* happyPath = new mlir::Block;
-        tuple = builder.createMakeTupleEx(args, happyPath, exceptionHandler);
-        builder.getBlock()->getParent()->push_back(happyPath);
-        builder.setInsertionPointToStart(happyPath);
-    }
+    mlir::Value tuple = builder.createMakeTuple(args, exceptionHandler);
     auto dict = builder.createConstant(builder.getDictAttr());
     auto mro = builder.createTypeMRO(typeObj);
     auto newMethod = builder.createMROLookup(mro, "__new__").getResult();

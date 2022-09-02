@@ -370,117 +370,72 @@ public:
         return create<Py::TupleContainsOp>(tuple, element);
     }
 
-    Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<Py::IterArg> args = {})
+    Py::MakeTupleOp createMakeTuple()
     {
-        return create<Py::MakeTupleOp>(args);
+        return create<Py::MakeTupleOp>(llvm::ArrayRef<Py::IterArg>{});
     }
 
-    Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
+    mlir::Value createMakeTuple(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
     {
-        if (!iterExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
         {
-            iterExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeTupleOp>(args);
         }
-        return create<Py::MakeTupleOp>(args, iterExpansion);
-    }
-
-    Py::MakeTupleExOp createMakeTupleEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* happyPath,
-                                        mlir::Block* unwindPath, llvm::ArrayRef<mlir::Value> normalOps = {},
-                                        llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeTupleExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeTupleExOp createMakeTupleEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeTupleExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
         return op;
     }
 
-    Py::MakeListOp createMakeList(llvm::ArrayRef<Py::IterArg> args = {})
+    Py::MakeListOp createMakeList()
     {
-        return create<Py::MakeListOp>(args);
+        return create<Py::MakeListOp>(llvm::ArrayRef<Py::IterArg>{});
     }
 
-    Py::MakeListOp createMakeList(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
+    mlir::Value createMakeList(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
     {
-        if (!iterExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
         {
-            iterExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeListOp>(args);
         }
-        return create<Py::MakeListOp>(args, iterExpansion);
-    }
-
-    Py::MakeListExOp createMakeListEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* happyPath, mlir::Block* unwindPath,
-                                      llvm::ArrayRef<mlir::Value> normalOps = {},
-                                      llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeListExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeListExOp createMakeListEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeListExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
         return op;
     }
 
-    Py::MakeSetOp createMakeSet(llvm::ArrayRef<Py::IterArg> args = {})
+    Py::MakeSetOp createMakeSet()
     {
-        return create<Py::MakeSetOp>(args);
+        return create<Py::MakeSetOp>(llvm::ArrayRef<Py::IterArg>{});
     }
 
-    Py::MakeSetOp createMakeSet(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
+    mlir::Value createMakeSet(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
     {
-        if (!iterExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
         {
-            iterExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeSetOp>(args);
         }
-        return create<Py::MakeSetOp>(args, iterExpansion);
-    }
-
-    Py::MakeSetExOp createMakeSetEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* happyPath, mlir::Block* unwindPath,
-                                    llvm::ArrayRef<mlir::Value> normalOps = {},
-                                    llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeSetExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeSetExOp createMakeSetEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeSetExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
         return op;
     }
 
-    Py::MakeDictOp createMakeDict(llvm::ArrayRef<Py::DictArg> args = {})
+    Py::MakeDictOp createMakeDict()
     {
-        return create<Py::MakeDictOp>(args);
+        return create<Py::MakeDictOp>(llvm::ArrayRef<Py::DictArg>{});
     }
 
-    Py::MakeDictOp createMakeDict(llvm::ArrayRef<mlir::Value> keys, llvm::ArrayRef<mlir::Value> hashes,
-                                  llvm::ArrayRef<mlir::Value> values, mlir::DenseI32ArrayAttr mappingExpansion = {})
+    mlir::Value createMakeDict(llvm::ArrayRef<Py::DictArg> args, mlir::Block* unwindPath)
     {
-        if (!mappingExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::DictArg& arg) { return std::holds_alternative<Py::DictEntry>(arg); }))
         {
-            mappingExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeDictOp>(args);
         }
-        return create<Py::MakeDictOp>(keys, hashes, values, mappingExpansion);
-    }
-
-    Py::MakeDictExOp createMakeDictEx(llvm::ArrayRef<Py::DictArg> args, mlir::Block* happyPath, mlir::Block* unwindPath,
-                                      llvm::ArrayRef<mlir::Value> normalOps = {},
-                                      llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeDictExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeDictExOp createMakeDictEx(llvm::ArrayRef<Py::DictArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeDictExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
