@@ -97,6 +97,9 @@ TYPE_SLOT_BIN_OP(__getitem__, GetItem)
 TYPE_SLOT_TERNARY_OP(__setitem__, SetItem)
 TYPE_SLOT_BIN_OP(__delitem__, DelItem)
 TYPE_SLOT_BIN_OP(__contains__, Contains)
+TYPE_SLOT_BIN_OP(__getattribute__, GetAttribute)
+TYPE_SLOT_BIN_OP(__getattr__, GetAttr)
+TYPE_SLOT_TERNARY_OP(__setattr__, SetAttr)
 TYPE_SLOT(__get__, Get)
 
 #undef TYPE_SLOT_IOP

@@ -258,8 +258,14 @@ void pylir::CodeGen::assignTarget(const Syntax::Slice& slice, mlir::Value value)
 
 void pylir::CodeGen::assignTarget(const Syntax::AttributeRef& attributeRef, mlir::Value value)
 {
-    // TODO:
-    PYLIR_UNREACHABLE;
+    auto object = visit(*attributeRef.object);
+    if (!object)
+    {
+        return;
+    }
+    auto locExit = changeLoc(attributeRef, attributeRef.identifier);
+    m_builder.createPylirSetAttrIntrinsic(object, m_builder.createConstant(attributeRef.identifier.getValue()), value,
+                                          m_currentExceptBlock);
 }
 
 void pylir::CodeGen::assignTarget(llvm::ArrayRef<Syntax::StarredItem> starredItems, mlir::Value value)
@@ -2412,12 +2418,18 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef)
 {
+    auto locExit = changeLoc(attributeRef, attributeRef.identifier);
     if (auto intr = checkForIntrinsic(attributeRef))
     {
         return intrinsicConstant(std::move(*intr));
     }
-    // TODO:
-    PYLIR_UNREACHABLE;
+    auto object = visit(*attributeRef.object);
+    if (!object)
+    {
+        return {};
+    }
+    return m_builder.createPylirGetAttributeIntrinsic(
+        object, m_builder.createConstant(attributeRef.identifier.getValue()), m_currentExceptBlock);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::Generator& generator)

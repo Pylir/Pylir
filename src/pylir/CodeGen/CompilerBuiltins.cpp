@@ -29,7 +29,8 @@ void implementBlock(mlir::OpBuilder& builder, mlir::Block* block)
 }
 
 mlir::Value buildTrySpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine methodName, mlir::Value args,
-                                      mlir::Value kws, mlir::Block* notFoundPath)
+                                      mlir::Value kws, mlir::Block* notFoundPath,
+                                      mlir::Block* callIntrException = nullptr)
 {
     auto element = builder.createTupleGetItem(args, builder.create<mlir::arith::ConstantIndexOp>(0));
     auto elementType = builder.createTypeOf(element);
@@ -51,19 +52,21 @@ mlir::Value buildTrySpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine met
 
     implementBlock(builder, isDescriptor);
     auto tuple = builder.createMakeTuple({element, elementType});
-    auto result = builder.createPylirCallIntrinsic(getMethod.getResult(), tuple, builder.createMakeDict());
+    auto result =
+        builder.createPylirCallIntrinsic(getMethod.getResult(), tuple, builder.createMakeDict(), callIntrException);
     builder.create<mlir::cf::BranchOp>(builder.getCurrentLoc(), mergeBlock, result);
 
     implementBlock(builder, mergeBlock);
     // TODO: This is incorrect. One should be passing all but args[0], as args[0] will already be bound by the __get__
     //       descriptor of function. We haven't yet implemented this however, hence this is the stop gap solution.
-    return builder.createPylirCallIntrinsic(mergeBlock->getArgument(0), args, kws);
+    return builder.createPylirCallIntrinsic(mergeBlock->getArgument(0), args, kws, callIntrException);
 }
 
-mlir::Value buildSpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine methodName, mlir::Value args, mlir::Value kws)
+mlir::Value buildSpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine methodName, mlir::Value args, mlir::Value kws,
+                                   mlir::Block* callIntrException = nullptr)
 {
     auto* notFound = new mlir::Block;
-    auto result = buildTrySpecialMethodCall(builder, methodName, args, kws, notFound);
+    auto result = buildTrySpecialMethodCall(builder, methodName, args, kws, notFound, callIntrException);
     mlir::OpBuilder::InsertionGuard guard{builder};
     implementBlock(builder, notFound);
     auto exception =
@@ -241,7 +244,7 @@ void buildCallOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef funct
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildSetItemOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildTernaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -297,6 +300,41 @@ void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functio
     builder.create<mlir::func::ReturnOp>(builder.getCurrentLoc(), returnBlock->getArgument(0));
 }
 
+void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+{
+    auto func = builder.create<mlir::func::FuncOp>(
+        functionName,
+        builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType()}, builder.getDynamicType()));
+    mlir::OpBuilder::InsertionGuard guard{builder};
+    builder.setInsertionPointToStart(func.addEntryBlock());
+    mlir::Value lhs = func.getArgument(0);
+    mlir::Value rhs = func.getArgument(1);
+
+    auto tuple = builder.createMakeTuple({lhs, rhs});
+    auto dict = builder.createMakeDict();
+    auto* attrError = new mlir::Block;
+    attrError->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
+    auto result = buildSpecialMethodCall(builder, method, tuple, dict, attrError);
+    builder.create<mlir::func::ReturnOp>(result);
+
+    // If __getattribute__ raises an AttributeError we have to automatically call __getattr__.
+    implementBlock(builder, attrError);
+    auto exception = attrError->getArgument(0);
+    auto ref = builder.createAttributeErrorRef();
+    auto exceptionType = builder.createTypeOf(exception);
+    auto isAttributeError = builder.createIs(exceptionType, ref);
+    auto* reraiseBlock = new mlir::Block;
+    auto* getattrBlock = new mlir::Block;
+    builder.create<mlir::cf::CondBranchOp>(isAttributeError, getattrBlock, reraiseBlock);
+
+    implementBlock(builder, reraiseBlock);
+    builder.createRaise(exception);
+
+    implementBlock(builder, getattrBlock);
+    result = builder.createPylirGetAttrIntrinsic(lhs, rhs);
+    builder.create<mlir::func::ReturnOp>(result);
+}
+
 } // namespace
 
 void pylir::CodeGen::createCompilerBuiltinsImpl()
@@ -308,18 +346,24 @@ void pylir::CodeGen::createCompilerBuiltinsImpl()
 
 #define COMPILER_BUILTIN_REV_BIN_OP(name, slotName, revSlotName) \
     buildRevBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName, #revSlotName);
-#define COMPILER_BUILTIN_BIN_OP(name, slotName) \
-    buildBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
+#define COMPILER_BUILTIN_BIN_OP(name, slotName)            \
+    if (#slotName != std::string_view{"__getattribute__"}) \
+        buildBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
 
 #define COMPILER_BUILTIN_UNARY_OP(name, slotName) \
     buildUnaryOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
 
 #define COMPILER_BUILTIN_TERNARY_OP(name, slotName) \
-    build##name##OpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
+    if (#slotName != std::string_view{"__call__"})  \
+        buildTernaryOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
+
+    buildCallOpCompilerBuiltin(m_builder, "pylir__call__", "__call__");
 
 #define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                                          \
     buildIOpCompilerBuiltins(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName, \
                              &::pylir::PyBuilder::createPylir##normalOp##Intrinsic);
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
+
+    buildGetAttributeOpCompilerBuiltin(m_builder, "pylir__getattribute__", "__getattribute__");
 }

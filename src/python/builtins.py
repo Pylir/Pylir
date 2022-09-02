@@ -109,6 +109,97 @@ class object:
     def __str__(self):
         return repr(self)
 
+    def __getattribute__(self, item):
+        if not isinstance(item, str):
+            raise TypeError
+
+        self_type = type(self)
+        mro = pylir.intr.type.mro(self_type)
+
+        NOT_FOUND_SENTINEL = object()
+
+        type_lookup = NOT_FOUND_SENTINEL
+        for i in mro:
+            # TODO: Remove below condition once __dict__ of types is properly
+            #       created.
+            if not pylir.intr.isUnboundValue(
+                    d := pylir.intr.getSlot(i, type(i), "__dict__")):
+                if not pylir.intr.isUnboundValue(
+                        attr_lookup := pylir.intr.dict.tryGetItem(d, item,
+                                                                  hash(item))
+                ):
+                    type_lookup = attr_lookup
+                    break
+
+        # Descriptor that has both __get__ and __set__ takes priority over
+        # __dict__. If it has just __get__ it will be called below if the
+        # object does not have a __dict__.
+        if type_lookup is not NOT_FOUND_SENTINEL:
+            type_lookup_mro = pylir.intr.type.mro(type(type_lookup))
+            if not pylir.intr.isUnboundValue(
+                    getter := pylir.intr.mroLookup(type_lookup_mro,
+                                                   "__get__")) and \
+                    not pylir.intr.isUnboundValue(
+                        pylir.intr.mroLookup(type_lookup_mro, "__set__")):
+                return getter(self, self_type)
+
+        if not pylir.intr.isUnboundValue(
+                d := pylir.intr.getSlot(self, self_type, "__dict__")):
+            try:
+                return d[item]
+            except KeyError:
+                raise AttributeError
+
+        if type_lookup is not NOT_FOUND_SENTINEL:
+            if not pylir.intr.isUnboundValue(
+                    getter := pylir.intr.mroLookup(mro,
+                                                   "__get__")):
+                return getter(self, self_type)
+
+            return type_lookup
+
+        raise AttributeError
+
+    def __getattr__(self, item):
+        # __getattr__ is called as a fallback when __getattribute__ fails with
+        # a AttributeError. The default fallback doesn't do anything but fail as
+        # well.
+        raise AttributeError
+
+    def __setattr__(self, key, value):
+        if not isinstance(key, str):
+            raise TypeError
+
+        self_type = type(self)
+        mro = pylir.intr.type.mro(self_type)
+
+        NOT_FOUND_SENTINEL = object()
+
+        type_lookup = NOT_FOUND_SENTINEL
+        for i in mro:
+            # TODO: Remove below condition once __dict__ of types is properly
+            #       created.
+            if not pylir.intr.isUnboundValue(
+                    d := pylir.intr.getSlot(i, type(i), "__dict__")):
+                if not pylir.intr.isUnboundValue(
+                        attr_lookup := pylir.intr.dict.tryGetItem(d, key,
+                                                                  hash(key))
+                ):
+                    type_lookup = attr_lookup
+                    break
+
+        if type_lookup is not NOT_FOUND_SENTINEL:
+            type_lookup_mro = pylir.intr.type.mro(type(type_lookup))
+            if not pylir.intr.isUnboundValue(
+                    setter := pylir.intr.mroLookup(type_lookup_mro, "__set__")):
+                return setter(self, value)
+
+        if not pylir.intr.isUnboundValue(
+                d := pylir.intr.getSlot(self, self_type, "__dict__")):
+            d[key] = value
+
+        raise AttributeError
+
 
 @pylir.intr.const_export
 class BaseException:
