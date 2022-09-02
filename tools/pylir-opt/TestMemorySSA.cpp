@@ -16,13 +16,23 @@
 
 #include "Passes.hpp"
 
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTMEMORYSSAPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
+
 namespace
 {
 
-class TestMemorySSA : public TestMemorySSABase<TestMemorySSA>
+class TestMemorySSA : public pylir::test::impl::TestMemorySSAPassBase<TestMemorySSA>
 {
 protected:
     void runOnOperation() override;
+
+public:
+
+    using Base::Base;
 };
 
 void TestMemorySSA::runOnOperation()
@@ -33,8 +43,3 @@ void TestMemorySSA::runOnOperation()
     }
 }
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestMemorySSA()
-{
-    return std::make_unique<TestMemorySSA>();
-}

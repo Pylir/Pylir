@@ -8,9 +8,15 @@
 
 #include "Passes.hpp"
 
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTLINKERPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
+
 namespace
 {
-class TestLinker : public TestLinkerBase<TestLinker>
+class TestLinker : public pylir::test::impl::TestLinkerPassBase<TestLinker>
 {
 protected:
     void runOnOperation() override
@@ -26,10 +32,8 @@ protected:
         auto linked = pylir::linkModules(modules);
         getOperation().push_back(linked.release());
     }
+
+public:
+    using Base::Base;
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestLinker()
-{
-    return std::make_unique<TestLinker>();
-}

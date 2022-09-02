@@ -17,10 +17,16 @@
 
 #include "Passes.hpp"
 
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTINLINERINTERFACEPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
+
 namespace
 {
 
-class TestInlinerInterface : public TestInlinerInterfaceBase<TestInlinerInterface>
+class TestInlinerInterface : public pylir::test::impl::TestInlinerInterfacePassBase<TestInlinerInterface>
 {
 protected:
     void runOnOperation() override
@@ -46,11 +52,10 @@ protected:
             pylir::Py::inlineCall(iter, func);
         }
     }
+
+public:
+
+    using Base::Base;
 };
 
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestInlinerInterface()
-{
-    return std::make_unique<TestInlinerInterface>();
-}

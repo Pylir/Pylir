@@ -4,17 +4,28 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "Passes.hpp"
-
-#include <pylir/Optimizer/Analysis/LoopInfo.hpp>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/FunctionInterfaces.h>
 
 #include <llvm/ADT/PostOrderIterator.h>
 
+#include <pylir/Optimizer/Analysis/LoopInfo.hpp>
+
+#include "Passes.hpp"
+
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTLOOPINFOPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
+
 namespace
 {
-class TestLoopInfo : public TestLoopInfoBase<TestLoopInfo>
+class TestLoopInfo : public pylir::test::impl::TestLoopInfoPassBase<TestLoopInfo>
 {
 public:
+    using Base::Base;
+
 protected:
     void runOnOperation() override
     {
@@ -25,8 +36,3 @@ protected:
     }
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestLoopInfo()
-{
-    return std::make_unique<TestLoopInfo>();
-}

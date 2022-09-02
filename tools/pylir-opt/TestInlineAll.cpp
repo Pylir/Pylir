@@ -4,14 +4,19 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/IR/BuiltinOps.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 #include <mlir/Pass/PassManager.h>
-
-#include <llvm/Support/Process.h>
 
 #include <pylir/Optimizer/PylirPy/Transforms/Util/InlinerUtil.hpp>
 
 #include "Passes.hpp"
+
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTINLINEALLPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
 
 namespace
 {
@@ -88,14 +93,16 @@ public:
     }
 };
 
-class TestInlineAll : public TestInlineAllBase<TestInlineAll>
+class TestInlineAll : public pylir::test::impl::TestInlineAllPassBase<TestInlineAll>
 {
     mlir::OpPassManager m_passManager;
 
 public:
+    using Base::Base;
+
     void getDependentDialects(mlir::DialectRegistry& registry) const override
     {
-        TestInlineAllBase::getDependentDialects(registry);
+        Base::getDependentDialects(registry);
         mlir::OpPassManager temp;
         if (mlir::failed(mlir::parsePassPipeline(m_optimizationPipeline, temp, llvm::nulls())))
         {
@@ -191,8 +198,3 @@ protected:
     }
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestInlineAll()
-{
-    return std::make_unique<TestInlineAll>();
-}

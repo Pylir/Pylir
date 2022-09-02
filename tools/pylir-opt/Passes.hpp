@@ -6,27 +6,20 @@
 
 #pragma once
 
-#include <mlir/IR/BuiltinOps.h>
-#include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
 
-namespace pylir::MemSSA
-{
-class MemorySSADialect;
-}
+#include <memory>
 
-namespace pylir::TypeFlow
+namespace pylir::test
 {
-class TypeFlowDialect;
-}
-
-namespace pylir::Py
-{
-class PylirPyDialect;
-}
-
-namespace
-{
-#define GEN_PASS_CLASSES
+#define GEN_PASS_REGISTRATION
+#define GEN_PASS_DECL_TESTALIASSETTRACKERPASS
+#define GEN_PASS_DECL_TESTHELLOWORLDPASS
+#define GEN_PASS_DECL_TESTINLINEALLPASS
+#define GEN_PASS_DECL_TESTINLINERINTERFACEPASS
+#define GEN_PASS_DECL_TESTLINKERPASS
+#define GEN_PASS_DECL_TESTLOOPINFOPASS
+#define GEN_PASS_DECL_TESTMEMORYSSAPASS
+#define GEN_PASS_DECL_TESTTYPEFLOWPASS
 #include "Passes.h.inc"
 } // namespace

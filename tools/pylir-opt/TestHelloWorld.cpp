@@ -1,10 +1,16 @@
+#include <iostream>
+
 #include "Passes.hpp"
 
-#include <iostream>
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTHELLOWORLDPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
 
 namespace
 {
-class TestHelloWorld : public TestHelloWorldBase<TestHelloWorld>
+class TestHelloWorld : public pylir::test::impl::TestHelloWorldPassBase<TestHelloWorld>
 {
 protected:
     void runOnOperation() override
@@ -12,10 +18,9 @@ protected:
         // Using cout here as it has an atomicity guarantee for single invocations of operator<<
         std::cout << "Hello World!\n";
     }
+
+public:
+
+    using Base::Base;
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestHelloWorld()
-{
-    return std::make_unique<TestHelloWorld>();
-}
