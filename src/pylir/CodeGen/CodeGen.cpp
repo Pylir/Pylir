@@ -1921,6 +1921,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         parentSlots = dereference<Py::TupleAttr>(typeAttr.getSlots().get("__slots__"));
     }
 
+    bool hadSlotsSlot = false;
     llvm::SmallVector<mlir::NamedAttribute> slots;
     for (auto& [key, value] : functionScope->identifiers)
     {
@@ -1974,6 +1975,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         }
         if (key != "__slots__" || !parentSlots)
         {
+            if (key == "__slots__")
+            {
+                hadSlotsSlot = true;
+            }
             slots.emplace_back(m_builder.getStringAttr(key), attr);
             continue;
         }
@@ -1987,10 +1992,15 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         vector.append(parentSlots.getValue().begin(), parentSlots.getValue().end());
         slots.emplace_back(m_builder.getStringAttr("__slots__"), m_builder.getTupleAttr(vector));
         parentSlots = nullptr;
+        hadSlotsSlot = true;
     }
     if (parentSlots)
     {
         slots.emplace_back(m_builder.getStringAttr("__slots__"), parentSlots);
+    }
+    else if (!hadSlotsSlot)
+    {
+        slots.emplace_back(m_builder.getStringAttr("__slots__"), m_builder.getTupleAttr());
     }
     slots.emplace_back(m_builder.getStringAttr("__name__"), m_builder.getStrAttr(classDef.className.getValue()));
 

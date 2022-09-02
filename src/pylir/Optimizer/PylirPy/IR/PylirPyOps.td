@@ -108,7 +108,7 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryF
 
     let description = [{
         Retrieves the value stored in the slot named `$slot` inside of `$object`. If `$slot` is not one of the slots
-        defined in `$type_object` the result is undefined. If `$object` is not of type `$type_object` the result is
+        defined in `$type_object` the result is always unbound. If `$object` is not of type `$type_object` the result is
         undefined. `$result` will contain the value in the slot, or unbound value if it was never assigned to.
     }];
 
