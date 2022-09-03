@@ -31,65 +31,6 @@ void replaceAllUsesWith(mlir::PatternRewriter& rewriter, mlir::Block* toReplace,
 }
 
 // bb0:
-// br ^bb1(%0, %1, ...)
-//
-// bb1(%a0, %a1, ...): //only-pred bb0
-// uses %a0, %a1, ...
-//
-// ->
-// bb0:
-// br ^bb1
-//
-// bb1:
-// uses %0, %1, ...
-struct NoopBlockArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>
-{
-    using mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>::OpInterfaceRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(mlir::BranchOpInterface op, mlir::PatternRewriter& rewriter) const override
-    {
-        bool changed = false;
-        for (const auto& [index, succ] : llvm::enumerate(op->getSuccessors()))
-        {
-            if (!succ->getSinglePredecessor())
-            {
-                continue;
-            }
-
-            auto succOps = op.getSuccessorOperands(index);
-            if (succ->getNumArguments() == succOps.getProducedOperandCount())
-            {
-                continue;
-            }
-
-            changed = true;
-            // Creating a new block here as modifying a blocks argument is not possible through the rewriter.
-            auto* newSucc = rewriter.splitBlock(succ, succ->begin());
-            auto nonProduced = succ->getArguments().drop_front(succOps.getProducedOperandCount());
-            newSucc->addArguments(
-                mlir::TypeRange(succ->getArgumentTypes()).drop_front(succOps.getProducedOperandCount()),
-                llvm::to_vector(llvm::map_range(nonProduced, std::mem_fn(&mlir::BlockArgument::getLoc))));
-
-            rewriter.updateRootInPlace(
-                op,
-                [&, succ = succ, index = index]
-                {
-                    for (auto [blockArg, repl] :
-                         llvm::zip(succ->getArguments().drop_front(succOps.getProducedOperandCount()),
-                                   succOps.getForwardedOperands()))
-                    {
-                        replaceAllUsesWith(rewriter, blockArg, repl);
-                    }
-                    op->setSuccessor(newSucc, index);
-                    succOps.erase(succOps.getProducedOperandCount(), succOps.getForwardedOperands().size());
-                });
-            rewriter.eraseBlock(succ);
-        }
-        return mlir::success(changed);
-    }
-};
-
-// bb0:
 // br ^bb1()
 //
 // bb1:
@@ -249,5 +190,5 @@ struct TrivialBlockArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInt
 
 void pylir::populateWithBranchOpInterfacePattern(mlir::RewritePatternSet& patterns)
 {
-    patterns.insert<PassthroughArgRemove, NoopBlockArgRemove, TrivialBlockArgRemove>(patterns.getContext());
+    patterns.insert<PassthroughArgRemove, TrivialBlockArgRemove>(patterns.getContext());
 }

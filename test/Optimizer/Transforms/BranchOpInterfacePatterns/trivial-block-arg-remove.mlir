@@ -27,3 +27,55 @@ func.func @test() -> !py.dynamic {
 
 // CHECK: ^[[BB2]]:
 // CHECK: return %[[C]]
+
+// -----
+
+func.func private @foo()
+
+func.func @test(%arg1 : i32) -> i32 {
+	py.invoke @foo() : () -> ()
+		label ^bb2 unwind ^bb1(%arg1 : i32)
+
+^bb1(%e : !py.dynamic, %b0 : i32):
+	return %b0 : i32
+
+^bb2:
+	test.use(%arg1) : i32
+	py.unreachable
+}
+
+// CHECK-LABEL: @test
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK-NEXT: py.invoke
+// CHECK-NEXT: label ^{{.*}} unwind ^[[BB1:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[BB1]]
+// CHECK-SAME: %{{[[:alnum:]]+}}
+// CHECK-NOT: %{{[[:alnum:]]+}}
+// CHECK-NEXT: return %[[ARG1]]
+
+// -----
+
+func.func private @foo()
+
+func.func @test(%arg1 : i32, %arg2 : i32) -> (i32, i32) {
+	py.invoke @foo() : () -> ()
+		label ^bb2 unwind ^bb1(%arg1, %arg2 : i32, i32)
+
+^bb1(%e : !py.dynamic, %b0 : i32, %b1 : i32):
+	return %b0, %b1 : i32,  i32
+
+^bb2:
+	test.use(%arg1) : i32
+	test.use(%arg2) : i32
+	py.unreachable
+}
+
+// CHECK-LABEL: @test
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
+// CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
+// CHECK-NEXT: py.invoke
+// CHECK-NEXT: label ^{{.*}} unwind ^[[BB1:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[BB1]]
+// CHECK-SAME: %{{[[:alnum:]]+}}
+// CHECK-NOT: %{{[[:alnum:]]+}}
+// CHECK-NEXT: return %[[ARG1]], %[[ARG2]]
