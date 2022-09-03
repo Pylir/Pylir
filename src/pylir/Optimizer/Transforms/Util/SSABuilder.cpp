@@ -67,6 +67,15 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
         }
         if (same)
         {
+            if (!m_blockArgMergeOptCallback)
+            {
+                return argument;
+            }
+            if (auto merge = m_blockArgMergeOptCallback(same, blockOperand))
+            {
+                same = merge;
+                continue;
+            }
             return argument;
         }
         same = blockOperand;

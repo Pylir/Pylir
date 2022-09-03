@@ -25,6 +25,7 @@ public:
 private:
     llvm::DenseMap<mlir::Block*, std::vector<DefinitionsMap*>> m_openBlocks;
     std::function<mlir::Value(mlir::BlockArgument)> m_undefinedCallback;
+    std::function<mlir::Value(mlir::Value, mlir::Value)> m_blockArgMergeOptCallback;
 
     mlir::Value tryRemoveTrivialBlockArgument(mlir::BlockArgument argument);
 
@@ -35,9 +36,12 @@ private:
     void removeBlockArgumentOperands(mlir::BlockArgument argument);
 
 public:
-    explicit SSABuilder(std::function<mlir::Value(mlir::BlockArgument)> undefinedCallback = [](auto) -> mlir::Value
-                        { PYLIR_UNREACHABLE; })
-        : m_undefinedCallback(std::move(undefinedCallback))
+    explicit SSABuilder(
+        std::function<mlir::Value(mlir::BlockArgument)> undefinedCallback = [](auto) -> mlir::Value
+        { PYLIR_UNREACHABLE; },
+        std::function<mlir::Value(mlir::Value, mlir::Value)> blockArgMergeOptCallback = {})
+        : m_undefinedCallback(std::move(undefinedCallback)),
+          m_blockArgMergeOptCallback(std::move(blockArgMergeOptCallback))
     {
     }
 

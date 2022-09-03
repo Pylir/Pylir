@@ -44,39 +44,6 @@ private:
                        pylir::SSABuilder& ssaBuilder);
 };
 
-// Does a recursive depth first walk of all block args that are transitive users of 'clobberValue'.
-void discoverDependsOnClobber(mlir::Value clobberValue, llvm::SmallDenseSet<mlir::BlockArgument>& seen)
-{
-    llvm::SmallVector<mlir::Value> stack{clobberValue};
-    while (!stack.empty())
-    {
-        auto value = stack.pop_back_val();
-        for (auto& iter : value.getUses())
-        {
-            // A lot of the uses are the ValueTrackers within the SSABuilders map. It's faster to just skip over them
-            // than do an interface lookup each time.
-            if (!iter.getOwner()->getBlock())
-            {
-                continue;
-            }
-            auto branch = mlir::dyn_cast<mlir::BranchOpInterface>(iter.getOwner());
-            if (!branch)
-            {
-                continue;
-            }
-            auto succBlockArg = branch.getSuccessorBlockArgument(iter.getOperandNumber());
-            if (!succBlockArg)
-            {
-                continue;
-            }
-            if (seen.insert(*succBlockArg).second)
-            {
-                stack.push_back(*succBlockArg);
-            }
-        }
-    }
-}
-
 void HandleLoadStoreEliminationPass::runOnOperation()
 {
     bool changed = false;
@@ -87,63 +54,40 @@ void HandleLoadStoreEliminationPass::runOnOperation()
         clobberTracker = builder.create<mlir::UnrealizedConversionCastOp>(
             builder.getUnknownLoc(), builder.getType<pylir::Py::DynamicType>(), mlir::ValueRange{});
     }
+    auto clobberValue = clobberTracker->getResult(0);
+
     for (auto& region : topLevel->getRegions())
     {
         BlockData blockArgUsages;
         llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap> definitions;
-        pylir::SSABuilder ssaBuilder([&clobberTracker](mlir::BlockArgument) -> mlir::Value
-                                     { return clobberTracker->getResult(0); });
+        pylir::SSABuilder ssaBuilder([clobberValue](mlir::BlockArgument) -> mlir::Value { return clobberValue; },
+                                     [clobberValue](mlir::Value lhs, mlir::Value rhs) -> mlir::Value
+                                     {
+                                         if (llvm::is_contained({lhs, rhs}, clobberValue))
+                                         {
+                                             return clobberValue;
+                                         }
+                                         return nullptr;
+                                     });
 
         pylir::updateSSAinRegion(ssaBuilder, region,
                                  [&](mlir::Block* block) {
-                                     changed |= optimizeBlock(*block, clobberTracker->getResult(0), blockArgUsages,
-                                                              definitions, ssaBuilder);
+                                     changed |=
+                                         optimizeBlock(*block, clobberValue, blockArgUsages, definitions, ssaBuilder);
                                  });
-
-        llvm::SmallDenseSet<mlir::BlockArgument> blockArgsClobber;
-        discoverDependsOnClobber(clobberTracker->getResult(0), blockArgsClobber);
 
         for (auto& [load, tracker] : blockArgUsages.candidates)
         {
             mlir::Value value = tracker;
-            if (value == clobberTracker->getResult(0))
+            if (value == clobberValue)
             {
                 continue;
             }
-            auto blockArg = value.dyn_cast<mlir::BlockArgument>();
-            if (!blockArg)
-            {
-                // Simplification has lead to the block argument being simplified to a single value which is not
-                // a clobber
-                load.replaceAllUsesWith(value);
-                load->erase();
-                changed = true;
-                continue;
-            }
-
-            // Only if the block argument does not depend on clobbers is it safe to replace the load with it. Otherwise,
-            // a re-load is required.
-            if (!blockArgsClobber.contains(blockArg))
-            {
-                changed = true;
-                load.replaceAllUsesWith(value);
-                load->erase();
-                continue;
-            }
-        }
-
-        // Any block args that depend on the clobberTracker, and hence are unused by normal IR, have to now be deleted.
-        for (auto& blockArg : blockArgsClobber)
-        {
-            for (auto pred = blockArg.getOwner()->pred_begin(); pred != blockArg.getOwner()->pred_end(); pred++)
-            {
-                auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
-                terminator.getSuccessorOperands(pred.getSuccessorIndex()).erase(blockArg.getArgNumber());
-            }
-            // Other block args that we will be deleting, but haven't yet, might still have a use of this block arg.
-            // Drop those.
-            blockArg.dropAllUses();
-            blockArg.getOwner()->eraseArgument(blockArg.getArgNumber());
+            // Simplification has lead to the block argument being simplified to a single value which is not
+            // a clobber
+            load.replaceAllUsesWith(value);
+            load->erase();
+            changed = true;
         }
     }
     if (!changed)
