@@ -11,6 +11,7 @@
 #include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/Transforms/Util/BranchOpInterfacePatterns.hpp>
 #include <pylir/Support/Variant.hpp>
 
 #include "PylirPyDialect.hpp"
@@ -148,86 +149,6 @@ struct MakeExOpExceptionSimplifier : mlir::OpRewritePattern<ExOp>
         auto newOp = op.cloneWithoutExceptionHandling(rewriter);
         rewriter.replaceOp(op, newOp->getResults());
         return mlir::success();
-    }
-};
-
-struct NoopBlockArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>
-{
-    using mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>::OpInterfaceRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(mlir::BranchOpInterface op, mlir::PatternRewriter& rewriter) const override
-    {
-        bool changed = false;
-        for (auto& iter : llvm::enumerate(op->getSuccessors()))
-        {
-            if (!iter.value()->getSinglePredecessor())
-            {
-                continue;
-            }
-            auto succOps = op.getSuccessorOperands(iter.index());
-            if (iter.value()->getNumArguments() == succOps.getProducedOperandCount())
-            {
-                continue;
-            }
-            changed = true;
-            auto* newSucc = rewriter.splitBlock(iter.value(), iter.value()->begin());
-            auto nonProduced = iter.value()->getArguments().take_front(succOps.getProducedOperandCount());
-            newSucc->addArguments(
-                llvm::to_vector(llvm::map_range(nonProduced, [](mlir::BlockArgument arg) { return arg.getType(); })),
-                llvm::to_vector(llvm::map_range(nonProduced, [](mlir::BlockArgument arg) { return arg.getLoc(); })));
-            rewriter.updateRootInPlace(
-                op,
-                [&]
-                {
-                    for (auto [blockArg, repl] :
-                         llvm::zip(iter.value()->getArguments().drop_front(succOps.getProducedOperandCount()),
-                                   succOps.getForwardedOperands()))
-                    {
-                        blockArg.replaceAllUsesWith(repl);
-                    }
-                    op->setSuccessor(newSucc, iter.index());
-                    succOps.erase(succOps.getProducedOperandCount(), succOps.getForwardedOperands().size());
-                });
-        }
-        return mlir::success(changed);
-    }
-};
-
-struct PassthroughArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>
-{
-    using mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>::OpInterfaceRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(mlir::BranchOpInterface op, mlir::PatternRewriter& rewriter) const override
-    {
-        bool changed = false;
-        for (auto& iter : llvm::enumerate(op->getSuccessors()))
-        {
-            if (iter.value()->getNumArguments() != 0)
-            {
-                continue;
-            }
-            auto brOp = mlir::dyn_cast_or_null<mlir::cf::BranchOp>(iter.value()->getTerminator());
-            if (!brOp)
-            {
-                continue;
-            }
-            if (&iter.value()->front() != brOp)
-            {
-                continue;
-            }
-            if (llvm::any_of(brOp.getDestOperands(), [op](mlir::Value value) { return value.getDefiningOp() == op; }))
-            {
-                continue;
-            }
-            changed = true;
-            rewriter.updateRootInPlace(op,
-                                       [&]
-                                       {
-                                           op->setSuccessor(brOp.getSuccessor(), iter.index());
-                                           op.getSuccessorOperands(iter.index()).append(brOp.getDestOperands());
-                                       });
-        }
-        return mlir::success(changed);
     }
 };
 
@@ -1343,8 +1264,7 @@ mlir::LogicalResult resolvesToPattern(mlir::Operation* operation, mlir::Attribut
 void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(::mlir::RewritePatternSet& results) const
 {
     populateWithGenerated(results);
-    results.insert<NoopBlockArgRemove>(getContext());
-    results.insert<PassthroughArgRemove>(getContext());
+    pylir::populateWithBranchOpInterfacePattern(results);
     results.insert<ArithSelectTransform>(getContext());
 }
 
