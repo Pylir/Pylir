@@ -60,7 +60,7 @@ void HandleLoadStoreEliminationPass::runOnOperation()
     {
         BlockData blockArgUsages;
         llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap> definitions;
-        pylir::SSABuilder ssaBuilder([clobberValue](mlir::BlockArgument) -> mlir::Value { return clobberValue; },
+        pylir::SSABuilder ssaBuilder([clobberValue](auto&&...) -> mlir::Value { return clobberValue; },
                                      [clobberValue](mlir::Value lhs, mlir::Value rhs) -> mlir::Value
                                      {
                                          if (llvm::is_contained({lhs, rhs}, clobberValue))

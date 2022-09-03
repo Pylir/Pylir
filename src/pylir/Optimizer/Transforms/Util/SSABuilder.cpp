@@ -32,14 +32,15 @@ void pylir::SSABuilder::sealBlock(mlir::Block* block)
     m_openBlocks.erase(result);
 }
 
-mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
-                                            mlir::Block* block)
+mlir::Value pylir::SSABuilder::addBlockArguments(DefinitionsMap& map, mlir::BlockArgument argument)
 {
-    if (auto result = map.find(block); result != map.end())
+    for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
-        return result->second;
+        auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
+        terminator.getSuccessorOperands(pred.getSuccessorIndex())
+            .append(readVariable(argument.getLoc(), argument.getType(), map, *pred));
     }
-    return readVariableRecursive(loc, type, map, block);
+    return tryRemoveTrivialBlockArgument(argument);
 }
 
 void pylir::SSABuilder::removeBlockArgumentOperands(mlir::BlockArgument argument)
@@ -53,39 +54,28 @@ void pylir::SSABuilder::removeBlockArgumentOperands(mlir::BlockArgument argument
 
 mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument argument)
 {
-    mlir::Value same;
+    llvm::SmallVector<mlir::Value> operands;
     for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
-        mlir::Value blockOperand;
         auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
         auto ops = terminator.getSuccessorOperands(pred.getSuccessorIndex());
-        blockOperand = ops[argument.getArgNumber()];
-
-        if (blockOperand == same || blockOperand == argument)
-        {
-            continue;
-        }
-        if (same)
-        {
-            if (!m_blockArgMergeOptCallback)
-            {
-                return argument;
-            }
-            if (auto merge = m_blockArgMergeOptCallback(same, blockOperand))
-            {
-                same = merge;
-                continue;
-            }
-            return argument;
-        }
-        same = blockOperand;
+        operands.push_back(ops[argument.getArgNumber()]);
     }
+    mlir::Value same = optimizeBlockArgsOperands(operands, argument, argument.getOwner(), argument.getLoc());
     if (!same)
     {
-        same = m_undefinedCallback(argument);
+        return argument;
     }
 
-    std::vector<mlir::BlockArgument> bas;
+    removeBlockArgumentOperands(argument);
+    same = replaceBlockArgument(argument, same);
+
+    return same;
+}
+
+mlir::Value pylir::SSABuilder::replaceBlockArgument(mlir::BlockArgument argument, mlir::Value replacement)
+{
+    llvm::SmallVector<mlir::BlockArgument> dependentBlockArgs;
     for (auto& user : argument.getUses())
     {
         auto branch = mlir::dyn_cast<mlir::BranchOpInterface>(user.getOwner());
@@ -94,63 +84,125 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
             continue;
         }
         auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber());
-        PYLIR_ASSERT(ops);
-        if (*ops == argument)
-        {
-            continue;
-        }
-        bas.emplace_back(*ops);
+        PYLIR_ASSERT(ops && *ops != argument);
+        dependentBlockArgs.emplace_back(*ops);
     }
 
-    removeBlockArgumentOperands(argument);
-    argument.replaceAllUsesWith(same);
+    argument.replaceAllUsesWith(replacement);
     argument.getOwner()->eraseArgument(argument.getArgNumber());
 
-    for (auto ba : bas)
+    for (auto ba : dependentBlockArgs)
     {
-        if (ba == same)
+        if (ba == replacement)
         {
-            same = tryRemoveTrivialBlockArgument(ba);
+            replacement = tryRemoveTrivialBlockArgument(ba);
         }
         else
         {
             tryRemoveTrivialBlockArgument(ba);
         }
     }
+    return replacement;
+}
 
+mlir::Value pylir::SSABuilder::optimizeBlockArgsOperands(llvm::ArrayRef<mlir::Value> operands,
+                                                         mlir::BlockArgument maybeArgument, mlir::Block* block,
+                                                         mlir::Location loc)
+{
+    mlir::Value same;
+    for (auto blockOperand : operands)
+    {
+        if (blockOperand == same || blockOperand == maybeArgument)
+        {
+            continue;
+        }
+        if (same)
+        {
+            if (!m_blockArgMergeOptCallback)
+            {
+                return nullptr;
+            }
+            if (auto merge = m_blockArgMergeOptCallback(same, blockOperand))
+            {
+                same = merge;
+                continue;
+            }
+            return nullptr;
+        }
+        same = blockOperand;
+    }
+    if (!same)
+    {
+        return m_undefinedCallback(block, loc);
+    }
     return same;
 }
 
-mlir::Value pylir::SSABuilder::addBlockArguments(DefinitionsMap& map, mlir::BlockArgument argument)
+mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
+                                            mlir::Block* block)
 {
-    for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
+    if (auto result = map.find(block); result != map.end())
     {
-        auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
-        terminator.getSuccessorOperands(pred.getSuccessorIndex())
-            .append(readVariable(argument.getLoc(), argument.getType(), map, *pred));
+        return result->second;
     }
-    return tryRemoveTrivialBlockArgument(argument);
+    if (auto result = m_marked.find(block); result != m_marked.end())
+    {
+        return map[block] = result->second = block->addArgument(type, loc);
+    }
+    return readVariableRecursive(loc, type, map, block);
 }
 
 mlir::Value pylir::SSABuilder::readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
                                                      mlir::Block* block)
 {
-    mlir::Value val;
     if (auto result = m_openBlocks.find(block); result != m_openBlocks.end())
     {
-        val = block->addArgument(type, loc);
+        mlir::Value val = block->addArgument(type, loc);
         result->second.emplace_back(&map);
+        return map[block] = val;
     }
-    else if (auto* pred = block->getUniquePredecessor())
+
+    // Single predecessor is trivial as no block arguments have to be created.
+    if (auto* uniquePredecessor = block->getUniquePredecessor())
     {
-        val = readVariable(loc, type, map, pred);
+        return map[block] = readVariable(loc, type, map, uniquePredecessor);
     }
-    else
+
+    // Mark the block to catch loops in 'readVariable' below. If marked and required, it'll create a BlockArgument.
+    m_marked[block] = nullptr;
+    llvm::SmallVector<mlir::Value> predArgs;
+    llvm::transform(block->getPredecessors(), std::back_inserter(predArgs),
+                    [&](mlir::Block* pred) { return readVariable(loc, type, map, pred); });
+
+    // Note: Have to use 'find' again and couldn't have done so above and saved a lookup, because DenseMap invalidates
+    // iterators and references on insert, which may have occurred in 'readVariable'.
+    auto iter = m_marked.find(block);
+    mlir::BlockArgument maybeArgument = iter->second;
+    m_marked.erase(iter);
+
+    if (auto val = optimizeBlockArgsOperands(predArgs, maybeArgument, block, loc))
     {
-        val = block->addArgument(type, loc);
-        map[block] = val;
-        val = addBlockArguments(map, val.cast<mlir::BlockArgument>());
+        if (maybeArgument)
+        {
+            // If we were in a loop and still managed to optimize it we have to replace the block argument with the
+            // single unique value. This may also trigger the possibility of optimizing more block arguments that used
+            // this block arg as operand.
+            val = replaceBlockArgument(maybeArgument, val);
+        }
+        return map[block] = val;
     }
-    map[block] = val;
-    return val;
+
+    // Create the block arg if that hasn't yet happened due to a loop.
+    if (!maybeArgument)
+    {
+        maybeArgument = block->addArgument(type, loc);
+    }
+
+    std::size_t counter = 0;
+    for (auto pred = block->pred_begin(); pred != block->pred_end(); pred++)
+    {
+        auto terminator = mlir::cast<mlir::BranchOpInterface>((*pred)->getTerminator());
+        terminator.getSuccessorOperands(pred.getSuccessorIndex()).append(predArgs[counter++]);
+    }
+    return map[block] = maybeArgument;
 }

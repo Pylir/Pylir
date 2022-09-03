@@ -147,10 +147,10 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
     for (auto& region : getOperation()->getRegions())
     {
         pylir::SSABuilder ssaBuilder(
-            [](mlir::BlockArgument arg)
+            [](mlir::Block* block, mlir::Location loc)
             {
-                return mlir::OpBuilder::atBlockBegin(arg.getOwner())
-                    .create<pylir::Py::ConstantOp>(arg.getLoc(), pylir::Py::UnboundAttr::get(arg.getContext()));
+                return mlir::OpBuilder::atBlockBegin(block).create<pylir::Py::ConstantOp>(
+                    loc, pylir::Py::UnboundAttr::get(loc.getContext()));
             });
         // The key is a pair consisting of the aggregate in the first position and the key/index/slot name denoting the
         // exact memory position in the second position. That way all slots in a dictionary, all indices in a list

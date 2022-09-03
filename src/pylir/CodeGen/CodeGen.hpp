@@ -436,11 +436,11 @@ class CodeGen
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
         m_functionScope.emplace(Scope{{},
                                       SSABuilder(
-                                          [this](mlir::BlockArgument arg) -> mlir::Value
+                                          [this](mlir::Block* block, mlir::Location loc) -> mlir::Value
                                           {
-                                              auto locExit = changeLoc(arg.getLoc());
+                                              auto locExit = changeLoc(loc);
                                               mlir::OpBuilder::InsertionGuard guard{m_builder};
-                                              m_builder.setInsertionPointToStart(arg.getOwner());
+                                              m_builder.setInsertionPointToStart(block);
                                               return m_builder.createConstant(m_builder.getUnboundAttr());
                                           })});
         return tuple;
