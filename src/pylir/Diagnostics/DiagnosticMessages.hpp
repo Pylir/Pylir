@@ -93,6 +93,8 @@ constexpr auto NO_INPUT_FILE = FMT_STRING("no input file");
 
 constexpr auto FAILED_TO_OPEN_FILE_N = FMT_STRING("failed to open file '{}'");
 
+constexpr auto FAILED_TO_OPEN_OUTPUT_FILE_N_FOR_WRITING = FMT_STRING("failed to open output file '{}' for writing");
+
 constexpr auto FAILED_TO_ACCESS_FILE_N = FMT_STRING("failed to access file '{}'");
 
 constexpr auto FAILED_TO_READ_FILE_N = FMT_STRING("failed to read file '{}'");

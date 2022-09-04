@@ -176,7 +176,7 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     }
     else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
-        llvm::SmallString<20> path(input->getValue());
+        llvm::SmallString<20> path(llvm::sys::path::stem(input->getValue()));
         llvm::sys::path::replace_extension(path, ".exe");
         arguments.emplace_back("-o");
         arguments.emplace_back(path);

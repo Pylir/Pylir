@@ -42,7 +42,7 @@ class CompilerInvocation
     std::list<Syntax::FileInput> m_fileInputs;
     std::unique_ptr<llvm::TargetMachine> m_targetMachine;
     llvm::raw_pwrite_stream* m_output = nullptr;
-    std::optional<llvm::sys::fs::TempFile> m_outputFile;
+    std::optional<llvm::sys::fs::TempFile> m_tempFile;
     std::optional<llvm::raw_fd_ostream> m_outFileStream;
     std::string m_compileStepOutputFilename;
     std::string m_actionOutputFilename;

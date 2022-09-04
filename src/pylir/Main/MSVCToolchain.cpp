@@ -39,7 +39,7 @@ bool pylir::MSVCToolchain::link(cli::CommandLine& commandLine, llvm::StringRef o
     }
     else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
-        llvm::SmallString<20> path(input->getValue());
+        llvm::SmallString<20> path(llvm::sys::path::stem(input->getValue()));
         llvm::sys::path::replace_extension(path, ".exe");
         arguments.push_back(("-out:" + path).str());
     }

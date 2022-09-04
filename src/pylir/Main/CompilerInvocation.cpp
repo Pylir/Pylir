@@ -230,12 +230,14 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             return mlir::failure();
         }
     }
-    auto fileName = m_outputFile->TmpName;
+
+    PYLIR_ASSERT(m_tempFile);
+    auto fileName = m_tempFile->TmpName;
     m_outFileStream.reset();
-    if (auto error = m_outputFile->keep())
+    if (auto error = m_tempFile->keep())
     {
         llvm::consumeError(std::move(error));
-        commandLine.createError(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_outputFile->TmpName);
+        commandLine.createError(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_tempFile->TmpName);
         return mlir::failure();
     }
     bool success = toolchain.link(commandLine, fileName);
@@ -647,6 +649,55 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
         });
 }
 
+namespace
+{
+std::string formDefaultOutputName(const llvm::opt::InputArgList& args, pylir::CompilerInvocation::Action action)
+{
+    std::string inputFilename = llvm::sys::path::filename(args.getLastArgValue(OPT_INPUT)).str();
+
+    auto extension = llvm::sys::path::extension(inputFilename);
+    bool isKnownFileExtension =
+        llvm::is_contained<llvm::StringRef>({".py", ".mlir", ".ll", ".bc", ".mlirbc"}, extension);
+    if (isKnownFileExtension)
+    {
+        inputFilename.resize(inputFilename.size() - extension.size());
+    }
+
+    std::string defaultName;
+    if (args.hasArg(OPT_emit_mlir, OPT_emit_pylir))
+    {
+        if (action == pylir::CompilerInvocation::ObjectFile)
+        {
+            defaultName = inputFilename + ".mlirbc";
+        }
+        else
+        {
+            defaultName = inputFilename + ".mlir";
+        }
+    }
+    else if (args.hasArg(OPT_emit_llvm))
+    {
+        if (action == pylir::CompilerInvocation::ObjectFile)
+        {
+            defaultName = inputFilename + ".bc";
+        }
+        else
+        {
+            defaultName = inputFilename + ".ll";
+        }
+    }
+    else if (action == pylir::CompilerInvocation::Assembly)
+    {
+        defaultName = inputFilename + ".s";
+    }
+    else if (action == pylir::CompilerInvocation::ObjectFile)
+    {
+        defaultName = inputFilename + ".o";
+    }
+    return defaultName;
+}
+} // namespace
+
 mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::opt::InputArgList& args, Action action,
                                                                   cli::CommandLine& commandLine)
 {
@@ -654,62 +705,63 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::op
     {
         return mlir::success();
     }
-    auto filename = llvm::sys::path::filename(args.getLastArgValue(OPT_INPUT)).str();
-    llvm::SmallString<20> realOutputFilename;
+
+    llvm::SmallString<20> compilerOutputFilepath;
     if (action == pylir::CompilerInvocation::Link)
     {
-        llvm::sys::path::system_temp_directory(true, realOutputFilename);
-        llvm::sys::path::append(realOutputFilename, "tmp.o");
+        llvm::sys::path::system_temp_directory(true, compilerOutputFilepath);
+        llvm::sys::path::append(compilerOutputFilepath, "tmp.o");
     }
     else
     {
-        std::string defaultName;
-        if (args.hasArg(OPT_emit_mlir))
-        {
-            defaultName = filename + ".mlir";
-        }
-        else if (args.hasArg(OPT_emit_llvm))
-        {
-            if (action == pylir::CompilerInvocation::ObjectFile)
-            {
-                defaultName = filename + ".bc";
-            }
-            else
-            {
-                defaultName = filename + ".ll";
-            }
-        }
-        else if (action == pylir::CompilerInvocation::Assembly)
-        {
-            defaultName = filename + ".s";
-        }
-        else if (action == pylir::CompilerInvocation::ObjectFile)
-        {
-            defaultName = filename + ".o";
-        }
-        realOutputFilename = args.getLastArgValue(OPT_o, defaultName);
+        compilerOutputFilepath = args.getLastArgValue(OPT_o, formDefaultOutputName(args, action));
     }
 
-    llvm::SmallString<20> tempFileName = realOutputFilename;
-    if (realOutputFilename == "-")
+    bool useTemporaryFile = true;
+    if (compilerOutputFilepath == "-")
     {
-        m_output = &llvm::outs();
-        return mlir::success();
+        useTemporaryFile = false;
     }
-    auto extension = llvm::sys::path::extension(realOutputFilename);
-    llvm::sys::path::remove_filename(tempFileName);
-    llvm::sys::path::append(tempFileName, llvm::sys::path::stem(realOutputFilename) + "-%%%%" + extension);
-    auto tempFile = llvm::sys::fs::TempFile::create(tempFileName);
-    if (!tempFile)
+    else
     {
-        llvm::consumeError(tempFile.takeError());
-        commandLine.createError(pylir::Diag::FAILED_TO_CREATE_TEMPORARY_FILE_N, tempFileName.str());
-        return mlir::failure();
+        llvm::sys::fs::file_status status;
+        llvm::sys::fs::status(compilerOutputFilepath, status);
+        if (llvm::sys::fs::exists(status) && !llvm::sys::fs::is_regular_file(status))
+        {
+            useTemporaryFile = false;
+        }
     }
-    m_outputFile = std::move(*tempFile);
-    m_outFileStream.emplace(m_outputFile->FD, false);
+
+    if (useTemporaryFile)
+    {
+        llvm::SmallString<20> tempFileName = compilerOutputFilepath;
+        auto extension = llvm::sys::path::extension(compilerOutputFilepath);
+        llvm::sys::path::remove_filename(tempFileName);
+        llvm::sys::path::append(tempFileName,
+                                llvm::sys::path::stem(compilerOutputFilepath) + "-%%%%%%%%%" + extension + ".tmp");
+        auto tempFile = llvm::sys::fs::TempFile::create(tempFileName);
+        if (!tempFile)
+        {
+            llvm::consumeError(tempFile.takeError());
+            commandLine.createError(pylir::Diag::FAILED_TO_CREATE_TEMPORARY_FILE_N, tempFileName.str());
+            return mlir::failure();
+        }
+        m_tempFile = std::move(*tempFile);
+        m_outFileStream.emplace(m_tempFile->FD, false);
+    }
+    else
+    {
+        std::error_code ec;
+        m_outFileStream.emplace(compilerOutputFilepath, ec, llvm::sys::fs::FileAccess::FA_Write);
+        if (ec)
+        {
+            commandLine.createError(Diag::FAILED_TO_OPEN_OUTPUT_FILE_N_FOR_WRITING, compilerOutputFilepath.str());
+            return mlir::failure();
+        }
+    }
+
     m_output = &*m_outFileStream;
-    m_compileStepOutputFilename = realOutputFilename.str();
+    m_compileStepOutputFilename = compilerOutputFilepath.str();
     m_actionOutputFilename = action == Link ? args.getLastArgValue(OPT_o) : m_compileStepOutputFilename;
     return mlir::success();
 }
@@ -717,30 +769,30 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::op
 mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::LogicalResult result,
                                                                     cli::CommandLine& commandLine)
 {
-    if (!m_outputFile)
+    m_outFileStream.reset();
+    m_output = nullptr;
+    if (!m_tempFile)
     {
         return result;
     }
-    m_outFileStream.reset();
-    m_output = nullptr;
-    auto exit = llvm::make_scope_exit([&] { m_outputFile.reset(); });
+    auto exit = llvm::make_scope_exit([&] { m_tempFile.reset(); });
     if (mlir::failed(result))
     {
-        if (auto error = m_outputFile->discard())
+        if (auto error = m_tempFile->discard())
         {
             llvm::consumeError(std::move(error));
-            commandLine.createError(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, m_outputFile->TmpName);
+            commandLine.createError(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, m_tempFile->TmpName);
         }
         return mlir::failure();
     }
-    if (auto error = m_outputFile->keep(m_compileStepOutputFilename))
+    if (auto error = m_tempFile->keep(m_compileStepOutputFilename))
     {
         llvm::consumeError(std::move(error));
-        commandLine.createError(pylir::Diag::FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N, m_outputFile->TmpName,
+        commandLine.createError(pylir::Diag::FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N, m_tempFile->TmpName,
                                 m_compileStepOutputFilename);
         return mlir::failure();
     }
-    return mlir::success();
+    return result;
 }
 
 void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mlir::OpPassManager& manager)
