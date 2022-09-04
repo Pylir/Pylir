@@ -6,6 +6,8 @@
 
 #include "CompilerInvocation.hpp"
 
+#include <mlir/Bytecode/BytecodeReader.h>
+#include <mlir/Bytecode/BytecodeWriter.h>
 #include <mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
@@ -241,6 +243,61 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
     return mlir::success(success);
 }
 
+namespace
+{
+mlir::FailureOr<std::string> readWholeFile(llvm::opt::Arg* inputFile, CommandLine& commandLine)
+{
+    auto fd = llvm::sys::fs::openNativeFileForRead(inputFile->getValue());
+    if (!fd)
+    {
+        llvm::consumeError(fd.takeError());
+        commandLine.createError(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N, inputFile->getValue())
+            .addHighlight(inputFile);
+        return mlir::failure();
+    }
+    std::optional exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
+    llvm::sys::fs::file_status status;
+    {
+        auto error = llvm::sys::fs::status(*fd, status);
+        if (error)
+        {
+            commandLine.createError(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N, inputFile->getValue())
+                .addHighlight(inputFile);
+            return mlir::failure();
+        }
+    }
+    std::string content(status.getSize(), '\0');
+    auto read = llvm::sys::fs::readNativeFile(*fd, {content.data(), content.size()});
+    if (!read)
+    {
+        llvm::consumeError(fd.takeError());
+        commandLine.createError(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N, inputFile->getValue())
+            .addHighlight(inputFile);
+        return mlir::failure();
+    }
+    return std::move(content);
+}
+
+mlir::ModuleOp buildModuleIfNecessary(std::unique_ptr<mlir::Block>&& block, mlir::MLIRContext* context)
+{
+    if (llvm::hasSingleElement(*block))
+    {
+        if (auto module = llvm::dyn_cast<mlir::ModuleOp>(&block->front()))
+        {
+            module->remove();
+            return module;
+        }
+    }
+
+    mlir::OpBuilder builder(context);
+    auto mlirModule = builder.create<mlir::ModuleOp>(builder.getUnknownLoc());
+    mlir::Block& moduleBody = mlirModule.getBodyRegion().front();
+    moduleBody.getOperations().splice(moduleBody.begin(), block->getOperations());
+    return mlirModule;
+}
+
+} // namespace
+
 mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* inputFile, CommandLine& commandLine,
                                                            const pylir::Toolchain& toolchain,
                                                            CompilerInvocation::Action action,
@@ -249,7 +306,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
     auto inputExtension = llvm::sys::path::extension(inputFile->getValue());
     auto type = llvm::StringSwitch<FileType>(inputExtension)
                     .Case(".py", FileType::Python)
-                    .Case(".mlir", FileType::MLIR)
+                    .Cases(".mlir", ".mlirbc", FileType::MLIR)
                     .Cases(".ll", ".bc", FileType::LLVM)
                     .Default(FileType::Python);
     const auto& args = commandLine.getArgs();
@@ -266,36 +323,12 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
     {
         case FileType::Python:
         {
-            auto fd = llvm::sys::fs::openNativeFileForRead(inputFile->getValue());
-            if (!fd)
+            auto content = readWholeFile(inputFile, commandLine);
+            if (mlir::failed(content))
             {
-                llvm::consumeError(fd.takeError());
-                commandLine.createError(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N, inputFile->getValue())
-                    .addHighlight(inputFile);
                 return mlir::failure();
             }
-            std::optional exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
-            llvm::sys::fs::file_status status;
-            {
-                auto error = llvm::sys::fs::status(*fd, status);
-                if (error)
-                {
-                    commandLine.createError(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N, inputFile->getValue())
-                        .addHighlight(inputFile);
-                    return mlir::failure();
-                }
-            }
-            std::string content(status.getSize(), '\0');
-            auto read = llvm::sys::fs::readNativeFile(*fd, {content.data(), content.size()});
-            if (!read)
-            {
-                llvm::consumeError(fd.takeError());
-                commandLine.createError(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N, inputFile->getValue())
-                    .addHighlight(inputFile);
-                return mlir::failure();
-            }
-            exit.reset();
-            auto& document = addDocument(std::move(content), inputFile->getValue());
+            auto& document = addDocument(std::move(*content), inputFile->getValue());
             auto subDiagManager = diagManager.createSubDiagnosticManager(document);
             Syntax::FileInput* fileInput;
             {
@@ -337,10 +370,23 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 ensureMLIRContext(args);
                 m_mlirContext->allowUnregisteredDialects(false);
-                mlirModule = mlir::parseSourceFile<mlir::ModuleOp>(inputFile->getValue(), &*m_mlirContext);
-                if (!mlirModule)
+                auto content = readWholeFile(inputFile, commandLine);
+                if (mlir::failed(content))
                 {
                     return mlir::failure();
+                }
+                if (auto buffer = llvm::MemoryBufferRef(*content, inputFile->getValue()); mlir::isBytecode(buffer))
+                {
+                    auto body = std::make_unique<mlir::Block>();
+                    if (mlir::failed(mlir::readBytecodeFile(buffer, body.get(), mlir::ParserConfig(&*m_mlirContext))))
+                    {
+                        return mlir::failure();
+                    }
+                    mlirModule = buildModuleIfNecessary(std::move(body), &*m_mlirContext);
+                }
+                else
+                {
+                    mlirModule = mlir::parseSourceString<mlir::ModuleOp>(*content, mlir::ParserConfig(&*m_mlirContext));
                 }
             }
             mlir::PassManager manager(&*m_mlirContext);

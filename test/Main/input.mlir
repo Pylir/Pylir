@@ -1,4 +1,6 @@
 // RUN: pylir %s -o - -S -emit-llvm | FileCheck %s
+// RUN: pylir-opt %s -o %t.mlirbc -emit-bytecode
+// RUN: pylir %t.mlirbc -o - -S -emit-llvm | FileCheck %s
 
 py.globalValue const @const$ = #py.tuple<(#py.str<"__slots__">)>
 py.globalValue @builtins.type = #py.type<slots = {__slots__ = @const$}>
