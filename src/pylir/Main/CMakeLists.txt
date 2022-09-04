@@ -30,6 +30,8 @@ target_link_libraries(PylirMain
         MLIRArithmeticToLLVM
         MLIRToLLVMIRTranslationRegistration
         MLIRDLTIDialect
+        MLIRBytecodeReader
+        MLIRBytecodeWriter
         CodeGen
         PylirLinker
         PylirToLLVMIR

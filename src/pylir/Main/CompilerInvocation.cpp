@@ -422,21 +422,11 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 manager.enableTiming();
             }
-            if (shouldOutput(OPT_emit_pylir))
+            if (!shouldOutput(OPT_emit_pylir))
             {
-                if (mlir::failed(manager.run(*mlirModule)))
-                {
-                    return mlir::failure();
-                }
-                if (mlir::failed(ensureOutputStream(args, action, commandLine)))
-                {
-                    return mlir::failure();
-                }
-                mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
-                return finalizeOutputStream(mlir::success(), commandLine);
+                addOptimizationPasses(args.getLastArgValue(OPT_O, "0"), manager);
             }
-            addOptimizationPasses(args.getLastArgValue(OPT_O, "0"), manager);
-            if (shouldOutput(OPT_emit_mlir))
+            if (shouldOutput(OPT_emit_mlir) || shouldOutput(OPT_emit_pylir))
             {
                 if (mlir::failed(manager.run(*mlirModule)))
                 {
@@ -446,7 +436,15 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 {
                     return mlir::failure();
                 }
-                mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
+
+                if (action == Assembly)
+                {
+                    mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
+                }
+                else
+                {
+                    mlir::writeBytecodeToFile(*mlirModule, *m_output, "Pylir " PYLIR_VERSION);
+                }
                 return finalizeOutputStream(mlir::success(), commandLine);
             }
             if (mlir::failed(ensureTargetMachine(args, commandLine, toolchain)))

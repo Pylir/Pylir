@@ -3,23 +3,31 @@
 # RUN: ls %t
 
 # RUN: rm -f %t
-# RUN: pylir %s -emit-mlir -o %t
+# RUN: pylir %s -emit-mlir -o %t -S
 # RUN: grep "func @__init__()" %t
 
 # RUN: rm -f %t
-# RUN: pylir %s -emit-pylir -o %t
+# RUN: pylir %s -emit-mlir -o %t -c
+# RUN: od -x -N 4 %t | grep "4c4d 52ef"
+
+# RUN: rm -f %t
+# RUN: pylir %s -emit-pylir -o %t -S
 # RUN: grep "func @__init__()" %t
+
+# RUN: rm -f %t
+# RUN: pylir %s -emit-pylir -o %t -c
+# RUN: od -x -N 4 %t | grep "4c4d 52ef"
 
 # RUN: rm -f %t
 # RUN: pylir %s -emit-llvm -c -o %t
-# RUN: ls %t
+# RUN: od -x -N 4 %t | grep "4342 dec0"
 
 # RUN: rm -f %t
 # RUN: pylir %s -S -o %t
 # RUN: ls %t
 
 # RUN: rm -f %t
-# RUN: pylir %s -emit-llvm -o %t
+# RUN: pylir %s -emit-llvm -o %t -S
 # RUN: grep "define void @__init__()" %t
 
 # Last of the `-emit-*` options is actually used
