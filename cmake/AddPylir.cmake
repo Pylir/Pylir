@@ -1,4 +1,6 @@
 
+include(PylirTablegen)
+
 function(add_pylir_dialect dialect dialect_namespace)
   set(td_file)
   if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/${dialect}.td)
@@ -14,6 +16,7 @@ function(add_pylir_dialect dialect dialect_namespace)
   set(LLVM_TARGET_DEFINITIONS ${td_file})
   mlir_tablegen(${dialect}Ops.h.inc -gen-op-decls)
   mlir_tablegen(${dialect}Ops.cpp.inc -gen-op-defs)
+  pylir_tablegen(${dialect}OpsExtra.cpp.inc -gen-op-variable-decorators)
   mlir_tablegen(${dialect}Types.h.inc -gen-typedef-decls --typedefs-dialect="${dialect_namespace}")
   mlir_tablegen(${dialect}Types.cpp.inc -gen-typedef-defs --typedefs-dialect="${dialect_namespace}")
   mlir_tablegen(${dialect}Attributes.h.inc -gen-attrdef-decls --attrdefs-dialect="${dialect_namespace}")

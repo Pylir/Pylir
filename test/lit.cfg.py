@@ -26,7 +26,7 @@ config.name = 'Pylir'
 config.test_format = lit.formats.ShTest(not llvm_config.use_lit_shell)
 
 # suffixes: A list of file extensions to treat as test files.
-config.suffixes = ['.mlir', '.ll', '.py']
+config.suffixes = ['.mlir', '.ll', '.py', '.td']
 
 # test_source_root: The root path where tests are located.
 config.test_source_root = os.path.dirname(__file__)
@@ -60,7 +60,11 @@ tool_dirs = [
     config.pylir_tools_dir, config.mlir_tools_dir, config.llvm_tools_dir
 ]
 tools = [
-    'pylir', 'pylir-opt', 'pylir-translate'
+    'pylir', 'pylir-opt', 'pylir-translate',
+    ToolSubst('pylir-tblgen',
+              extra_args=["-I" + config.mlir_include_dir,
+                          "-I" + config.pylir_src_root + "/src"],
+              unresolved='fatal')
 ]
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)

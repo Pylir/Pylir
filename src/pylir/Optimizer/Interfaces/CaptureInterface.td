@@ -8,12 +8,23 @@
 #define PYLIR_INTERFACES_CAPTURE_INTERFACE
 
 include "mlir/IR/OpBase.td"
+include "pylir/Optimizer/Util/OpVariableBase.td"
 
 def CaptureInterface : OpInterface<"CaptureInterface"> {
     let cppNamespace = "::pylir";
 
     let methods = [
-        InterfaceMethod<[{}], "bool", "capturesOperand", (ins "unsigned":$operandIndex)>
+        ExtendableInterfaceMethod<[{}], "bool", "capturesOperand", (ins "unsigned":$operandIndex), [{
+            bool isCaptured = false;
+        }], "return isCaptured;">
+    ];
+}
+
+def Captured : OpVariableGen<CaptureInterface> {
+    let methodGens = [
+        OpVariableMethodGen<"capturesOperand", [{
+            isCaptured = isCaptured || $_arg.getOperandNumber() == operandIndex;
+        }]>
     ];
 }
 

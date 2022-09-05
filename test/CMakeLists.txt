@@ -9,7 +9,8 @@ set(PYLIR_TEST_DEPENDS
         pylir-opt
         pylir-translate
         pylir
-        pylir-jit
+        pylir-tblgen
+        pylir-stdlib
         PylirRuntime
         PylirRuntimeMain
         )

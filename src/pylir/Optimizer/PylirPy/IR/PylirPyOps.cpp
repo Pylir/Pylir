@@ -170,16 +170,6 @@ pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator--()
     return *this;
 }
 
-bool pylir::Py::SetSlotOp::capturesOperand(unsigned int index)
-{
-    return static_cast<mlir::OperandRange>(getValueMutable()).getBeginOperandIndex() == index;
-}
-
-bool pylir::Py::ListSetItemOp::capturesOperand(unsigned int index)
-{
-    return static_cast<mlir::OperandRange>(getElementMutable()).getBeginOperandIndex() == index;
-}
-
 namespace
 {
 bool parseIterArguments(mlir::OpAsmParser& parser,
@@ -925,3 +915,4 @@ mlir::LogicalResult pylir::Py::UnpackExOp::verify()
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyOpsExtra.cpp.inc>

@@ -42,16 +42,6 @@ class ReturnsImmutable : public mlir::OpTrait::TraitBase<ConcreteType, ReturnsIm
     }
 };
 
-template <class ConcreteType>
-class NoCapture : public CaptureInterface::Trait<ConcreteType>
-{
-public:
-    bool capturesOperand(unsigned int)
-    {
-        return false;
-    }
-};
-
 #define BUILTIN_TYPE(x, ...)                                                                                   \
     template <class ConcreteType>                                                                              \
     class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                 \

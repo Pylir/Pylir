@@ -100,7 +100,8 @@ def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect, AlwaysBound]> {
     let hasFolder = 1;
 }
 
-def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryFoldInterface>, NoCapture]> {
+def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryFoldInterface>,
+                                               DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$object, DynamicType:$type_object, StrAttr:$slot);
     let results = (outs DynamicType:$result);
 
@@ -118,7 +119,7 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryF
 def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$object,
                          DynamicType:$type_object, StrAttr:$slot,
-                         DynamicType:$value);
+                         Arg<DynamicType, "", [Captured]>:$value);
     let results = (outs);
 
     let assemblyFormat = "$slot `of` $object `:` $type_object `to` $value attr-dict";
@@ -132,7 +133,7 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
 
 // Dict ops
 
-def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [NoCapture,
+def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [DeclareOpInterfaceMethods<CaptureInterface>,
                                                               DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead]>:$dict, DynamicType:$key, Index:$hash);
     let results = (outs DynamicType:$result);
@@ -163,7 +164,7 @@ def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem"> {
     }];
 }
 
-def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [NoCapture]> {
+def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key, Index:$hash);
     let results = (outs I1:$existed);
 
@@ -285,7 +286,7 @@ def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect]> {
 
 // List ops
 
-def PylirPy_ListResizeOp : PylirPy_Op<"list.resize", [NoCapture]> {
+def PylirPy_ListResizeOp : PylirPy_Op<"list.resize", [DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list, Index:$length);
     let results = (outs);
 
@@ -302,7 +303,10 @@ def PylirPy_ListResizeOp : PylirPy_Op<"list.resize", [NoCapture]> {
 }
 
 def PylirPy_ListSetItemOp : PylirPy_Op<"list.setItem", [DeclareOpInterfaceMethods<CaptureInterface>]> {
-    let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list, Index:$index, DynamicType:$element);
+    let arguments = (ins Arg<DynamicType, "",[MemWrite]>:$list,
+                         Index:$index,
+                         Arg<DynamicType, "", [Captured]>:$element);
+
     let results = (outs);
 
     let assemblyFormat = [{
@@ -316,7 +320,7 @@ def PylirPy_ListSetItemOp : PylirPy_Op<"list.setItem", [DeclareOpInterfaceMethod
     }];
 }
 
-def PylirPy_ListGetItemOp : PylirPy_Op<"list.getItem", [NoCapture, AlwaysBound]> {
+def PylirPy_ListGetItemOp : PylirPy_Op<"list.getItem", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound]> {
     let arguments = (ins Arg<DynamicType, "",[MemRead]>:$list, Index:$index);
     let results = (outs DynamicType:$result);
 
@@ -413,7 +417,8 @@ def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound, Retur
 
 // Str ops
 
-def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [NoCapture, RefinedObjectFromTypeObject, AlwaysBound]> {
+def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<CaptureInterface>,
+                                                RefinedObjectFromTypeObject, AlwaysBound]> {
     let arguments = (ins DynamicType:$string, DynamicType:$type_object);
     let results = (outs Arg<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
@@ -425,7 +430,8 @@ def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [NoCapture, RefinedObjectFromType
     }];
 }
 
-def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoCapture, AlwaysBound, RefinedType<"Str">, ReturnsImmutable]> {
+def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound,
+                                                    RefinedType<"Str">, ReturnsImmutable]> {
     let arguments = (ins Variadic<DynamicType>:$strings);
     let results = (outs DynamicType:$result);
 
@@ -465,8 +471,8 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
 
 // Int ops
 
-def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned", [NoCapture, AlwaysBound, RefinedType<"Int">,
-															     ReturnsImmutable, NoSideEffect]> {
+def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound,
+                                                            RefinedType<"Int">, ReturnsImmutable, NoSideEffect]> {
     let arguments = (ins Index:$input);
     let results = (outs DynamicType:$result);
 
@@ -479,8 +485,9 @@ def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned", [NoCapture, AlwaysBou
     let hasFolder = 1;
 }
 
-def PylirPy_IntFromUnsignedOp : PylirPy_Op<"int.fromUnsigned", [NoCapture, AlwaysBound, RefinedType<"Int">,
-															         ReturnsImmutable, NoSideEffect]> {
+def PylirPy_IntFromUnsignedOp : PylirPy_Op<"int.fromUnsigned", [DeclareOpInterfaceMethods<CaptureInterface>,
+                                                                AlwaysBound, RefinedType<"Int">, ReturnsImmutable,
+                                                                NoSideEffect]> {
     let arguments = (ins Index:$input);
     let results = (outs DynamicType:$result);
 
@@ -534,16 +541,16 @@ def PylirPy_IntCmpOp : PylirPy_Op<"int.cmp", [NoSideEffect]> {
     let hasFolder = 1;
 }
 
-def PylirPy_IntAddOp : PylirPy_Op<"int.add", [NoCapture, Commutative, AlwaysBound, NoSideEffect, RefinedType<"Int">,
-											  ReturnsImmutable]> {
+def PylirPy_IntAddOp : PylirPy_Op<"int.add", [DeclareOpInterfaceMethods<CaptureInterface>, Commutative, AlwaysBound,
+                                              NoSideEffect, RefinedType<"Int">, ReturnsImmutable]> {
     let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$lhs `,` $rhs attr-dict";
 }
 
-def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCapture, AlwaysBound, NoSideEffect, RefinedType<"Str">,
-												  ReturnsImmutable]> {
+def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound,
+                                                  NoSideEffect, RefinedType<"Str">, ReturnsImmutable]> {
     let arguments = (ins DynamicType:$input);
     let results = (outs DynamicType:$result);
 
@@ -559,7 +566,7 @@ def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCapture, AlwaysBound, NoSide
 
 // Intrinsics
 
-def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCapture]> {
+def PylirPy_PrintOp : PylirPy_Op<"intr.print", [DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins DynamicType:$string);
     let results = (outs);
 
@@ -568,7 +575,7 @@ def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCapture]> {
 
 // TODO: This should actually have `MemoryEffects<[MemRead]>` as it reads slots from the elements in $mro_tuple, but
 //       the current MemorySSA can't currently cope with that.
-def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [NoCapture]> {
+def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins DynamicType:$mro_tuple, StrAttr:$slot);
     let results = (outs DynamicType:$result);
 
