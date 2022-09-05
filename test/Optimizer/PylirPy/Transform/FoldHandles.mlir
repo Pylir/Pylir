@@ -194,3 +194,42 @@ func.func @test() -> !py.dynamic {
 
 // CHECK: ^[[BB3]](%[[ARG:.*]]: !py.dynamic):
 // CHECK-NEXT: return %[[ARG]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.globalHandle "private" @bar
+py.globalHandle "private" @foo
+
+func.func @test() {
+    %0 = py.constant(#py.int<5>)
+    py.store %0 into @foo
+    return
+}
+
+func.func @other() {
+    %0 = py.load @foo
+    py.store %0 into @bar
+    return
+}
+
+func.func @other2() -> !py.dynamic {
+    %0 = py.load @bar
+    return %0 : !py.dynamic
+}
+
+// CHECK-NOT: @bar
+// CHECK-LABEL: func.func @test
+// CHECK-NOT: py.store
+// CHECK: return
+
+// CHECK-LABEL: func.func @other
+// CHECK-NOT: py.load
+// CHECK-NOT: py.store
+// CHECK: return
+
+// CHECK-LABEL: func.func @other2
+// CHECK-NOT: py.load
+// CHECK: return

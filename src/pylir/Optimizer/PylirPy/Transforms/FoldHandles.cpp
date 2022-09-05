@@ -129,115 +129,127 @@ void FoldHandlesPass::runOnOperation()
 {
     auto module = getOperation();
     mlir::SymbolTableCollection collection;
-    mlir::SymbolUserMap userMap(collection, module);
     bool changed = false;
-    for (auto handle : llvm::make_early_inc_range(module.getOps<pylir::Py::GlobalHandleOp>()))
+    bool changedThisIteration = false;
+    do
     {
-        // If the globalHandle is not public and there is only a single store to it with a constant value,
-        // change it to a globalValueOp. If there are no loads, remove it entirely.
-        if (handle.isPublic())
+        mlir::SymbolUserMap userMap(collection, module);
+        changedThisIteration = false;
+        for (auto handle : llvm::make_early_inc_range(module.getOps<pylir::Py::GlobalHandleOp>()))
         {
-            continue;
-        }
-        pylir::Py::StoreOp singleStore;
-        bool hasSingleStore = false;
-        bool hasLoads = false;
-        bool hasSingleParent = false;
-        mlir::Region* singleParent = nullptr;
-
-        auto users = userMap.getUsers(handle);
-        for (auto* op : users)
-        {
-            if (!singleParent)
+            // If the globalHandle is not public and there is only a single store to it with a constant value,
+            // change it to a globalValueOp. If there are no loads, remove it entirely.
+            if (handle.isPublic())
             {
-                singleParent = op->getParentRegion();
-                hasSingleParent = true;
+                continue;
             }
-            else if (singleParent != op->getParentRegion())
-            {
-                hasSingleParent = false;
-            }
+            pylir::Py::StoreOp singleStore;
+            bool hasSingleStore = false;
+            bool hasLoads = false;
+            bool hasSingleParent = false;
+            mlir::Region* singleParent = nullptr;
 
-            if (auto storeOp = mlir::dyn_cast<pylir::Py::StoreOp>(op))
+            auto users = userMap.getUsers(handle);
+            for (auto* op : users)
             {
-                if (!singleStore)
+                if (!singleParent)
                 {
-                    hasSingleStore = true;
-                    singleStore = storeOp;
+                    singleParent = op->getParentRegion();
+                    hasSingleParent = true;
                 }
-                else
+                else if (singleParent != op->getParentRegion())
                 {
-                    hasSingleStore = false;
+                    hasSingleParent = false;
                 }
-            }
-            if (mlir::isa<pylir::Py::LoadOp>(op))
-            {
-                hasLoads = true;
-            }
-        }
-        // Remove if it has no loads
-        if (!hasLoads)
-        {
-            m_noLoadHandlesRemoved++;
-            std::for_each(users.begin(), users.end(), std::mem_fn(&mlir::Operation::erase));
-            handle->erase();
-            changed = true;
-            continue;
-        }
-        if (hasSingleParent)
-        {
-            m_singleRegionHandlesConverted++;
-            handleSingleFunctionHandle(*singleParent, handle);
-            handle->erase();
-            changed = true;
-            continue;
-        }
-        if (!hasSingleStore)
-        {
-            continue;
-        }
 
-        mlir::Attribute attr;
-        auto value = singleStore.getValue();
-        if (mlir::matchPattern(value, mlir::m_Constant(&attr)))
-        {
-            handleSingleStoreConstant(attr, singleStore, handle, users);
-            changed = true;
-            continue;
-        }
-        auto* op = value.getDefiningOp();
-        if (!op)
-        {
-            continue;
-        }
-        auto ref =
-            llvm::TypeSwitch<mlir::Operation*, mlir::FlatSymbolRefAttr>(op)
-                .Case(
-                    [&](pylir::Py::MakeFuncOp makeFuncOp)
+                if (auto storeOp = mlir::dyn_cast<pylir::Py::StoreOp>(op))
+                {
+                    if (!singleStore)
                     {
-                        auto value = createGlobalValueFromHandle(
-                            handle, pylir::Py::FunctionAttr::get(&getContext(), makeFuncOp.getFunctionAttr()), false);
-                        mlir::OpBuilder builder(makeFuncOp);
-                        auto ref = mlir::FlatSymbolRefAttr::get(value);
-                        auto c = builder.create<pylir::Py::ConstantOp>(makeFuncOp->getLoc(), ref);
-                        makeFuncOp->replaceAllUsesWith(c);
-                        makeFuncOp->erase();
-                        return ref;
-                    })
-                .Default({nullptr});
-        if (!ref)
-        {
-            continue;
+                        hasSingleStore = true;
+                        singleStore = storeOp;
+                    }
+                    else
+                    {
+                        hasSingleStore = false;
+                    }
+                }
+                if (mlir::isa<pylir::Py::LoadOp>(op))
+                {
+                    hasLoads = true;
+                }
+            }
+            // Remove if it has no loads
+            if (!hasLoads)
+            {
+                m_noLoadHandlesRemoved++;
+                std::for_each(users.begin(), users.end(), std::mem_fn(&mlir::Operation::erase));
+                collection.getSymbolTable(module).erase(handle);
+                changed = true;
+                changedThisIteration = true;
+                continue;
+            }
+            if (hasSingleParent)
+            {
+                m_singleRegionHandlesConverted++;
+                handleSingleFunctionHandle(*singleParent, handle);
+                collection.getSymbolTable(module).erase(handle);
+                changed = true;
+                changedThisIteration = true;
+                continue;
+            }
+            if (!hasSingleStore)
+            {
+                continue;
+            }
+
+            mlir::Attribute attr;
+            auto value = singleStore.getValue();
+            if (mlir::matchPattern(value, mlir::m_Constant(&attr)))
+            {
+                handleSingleStoreConstant(attr, singleStore, handle, users);
+                changed = true;
+                changedThisIteration = true;
+                continue;
+            }
+            auto* op = value.getDefiningOp();
+            if (!op)
+            {
+                continue;
+            }
+            auto ref =
+                llvm::TypeSwitch<mlir::Operation*, mlir::FlatSymbolRefAttr>(op)
+                    .Case(
+                        [&](pylir::Py::MakeFuncOp makeFuncOp)
+                        {
+                            auto value = createGlobalValueFromHandle(
+                                handle, pylir::Py::FunctionAttr::get(&getContext(), makeFuncOp.getFunctionAttr()),
+                                false);
+                            mlir::OpBuilder builder(makeFuncOp);
+                            auto ref = mlir::FlatSymbolRefAttr::get(value);
+                            auto c = builder.create<pylir::Py::ConstantOp>(makeFuncOp->getLoc(), ref);
+                            makeFuncOp->replaceAllUsesWith(c);
+                            makeFuncOp->erase();
+                            return ref;
+                        })
+                    .Default({nullptr});
+            if (!ref)
+            {
+                continue;
+            }
+            replaceLoadsWithAttr(users, ref);
+            singleStore->erase();
+            collection.getSymbolTable(module).erase(handle);
+            m_singleStoreHandlesConverted++;
+            changed = true;
+            changedThisIteration = true;
         }
-        replaceLoadsWithAttr(users, ref);
-        singleStore->erase();
-        handle->erase();
-        m_singleStoreHandlesConverted++;
-        changed = true;
-    }
+    } while (changedThisIteration);
+
     if (!changed)
     {
         markAllAnalysesPreserved();
+        return;
     }
     markAnalysesPreserved<mlir::DominanceInfo>();
 }
