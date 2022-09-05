@@ -13,6 +13,7 @@
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/Transforms/Util/SSAUpdater.hpp>
 
 #include "Passes.hpp"
 
@@ -83,6 +84,45 @@ private:
         handle->erase();
         m_singleStoreHandlesConverted++;
     }
+
+    void handleSingleFunctionHandle(mlir::Region& parent, pylir::Py::GlobalHandleOp handleOp)
+    {
+        pylir::SSABuilder builder(
+            [](mlir::Block* block, mlir::Location loc) -> mlir::Value
+            {
+                auto builder = mlir::OpBuilder::atBlockBegin(block);
+                return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());
+            });
+        pylir::SSABuilder::DefinitionsMap definitions;
+        pylir::updateSSAinRegion(builder, parent,
+                                 [&](mlir::Block* block)
+                                 {
+                                     for (auto& op : llvm::make_early_inc_range(*block))
+                                     {
+                                         if (auto store = mlir::dyn_cast<pylir::Py::StoreOp>(op))
+                                         {
+                                             if (store.getHandleAttr().getAttr() != handleOp.getSymNameAttr())
+                                             {
+                                                 continue;
+                                             }
+                                             definitions[block] = store.getValue();
+                                             store->erase();
+                                             continue;
+                                         }
+                                         if (auto load = mlir::dyn_cast<pylir::Py::LoadOp>(op))
+                                         {
+                                             if (load.getHandleAttr().getAttr() != handleOp.getSymNameAttr())
+                                             {
+                                                 continue;
+                                             }
+                                             load.replaceAllUsesWith(builder.readVariable(
+                                                 load->getLoc(), load.getType(), definitions, block));
+                                             load->erase();
+                                             continue;
+                                         }
+                                     }
+                                 });
+    }
 };
 
 void FoldHandlesPass::runOnOperation()
@@ -102,9 +142,22 @@ void FoldHandlesPass::runOnOperation()
         pylir::Py::StoreOp singleStore;
         bool hasSingleStore = false;
         bool hasLoads = false;
+        bool hasSingleParent = false;
+        mlir::Region* singleParent = nullptr;
+
         auto users = userMap.getUsers(handle);
         for (auto* op : users)
         {
+            if (!singleParent)
+            {
+                singleParent = op->getParentRegion();
+                hasSingleParent = true;
+            }
+            else if (singleParent != op->getParentRegion())
+            {
+                hasSingleParent = false;
+            }
+
             if (auto storeOp = mlir::dyn_cast<pylir::Py::StoreOp>(op))
             {
                 if (!singleStore)
@@ -127,6 +180,14 @@ void FoldHandlesPass::runOnOperation()
         {
             m_noLoadHandlesRemoved++;
             std::for_each(users.begin(), users.end(), std::mem_fn(&mlir::Operation::erase));
+            handle->erase();
+            changed = true;
+            continue;
+        }
+        if (hasSingleParent)
+        {
+            m_singleRegionHandlesConverted++;
+            handleSingleFunctionHandle(*singleParent, handle);
             handle->erase();
             changed = true;
             continue;

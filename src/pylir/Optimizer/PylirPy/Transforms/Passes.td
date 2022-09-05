@@ -26,7 +26,9 @@ def FoldHandlesPass : Pass<"pylir-fold-handles", "::mlir::ModuleOp"> {
         Statistic<"m_noLoadHandlesRemoved", "No-load Handles removed",
             "Amount of handles that were removed as they were never loaded">,
         Statistic<"m_singleStoreHandlesConverted", "Single-store Handles converted",
-            "Amount of handles converted to values as they only had a single constant store">
+            "Amount of handles converted to values as they only had a single constant store">,
+        Statistic<"m_singleRegionHandlesConverted", "Single-region Handles converted",
+                    "Amount of handles turned to SSA as they only occur in a single region">
     ];
 }
 
