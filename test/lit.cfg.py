@@ -62,8 +62,9 @@ tool_dirs = [
 tools = [
     'pylir', 'pylir-opt', 'pylir-translate',
     ToolSubst('pylir-tblgen',
-              extra_args=["-I" + config.mlir_include_dir,
-                          "-I" + config.pylir_src_root + "/src"],
+              extra_args=["-I" + x for x in
+                          config.mlir_include_dirs.split(';')] + [
+                             "-I" + config.pylir_src_root + "/src"],
               unresolved='fatal')
 ]
 
