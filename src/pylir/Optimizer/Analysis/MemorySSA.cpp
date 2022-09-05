@@ -68,7 +68,7 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
         {
             continue;
         }
-        if (capturing && !capturing.capturesOperand(operand.getOperandNumber()))
+        if (capturing && !capturing.capturesOperand(operand))
         {
             continue;
         }

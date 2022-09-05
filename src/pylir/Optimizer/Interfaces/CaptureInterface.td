@@ -14,7 +14,7 @@ def CaptureInterface : OpInterface<"CaptureInterface"> {
     let cppNamespace = "::pylir";
 
     let methods = [
-        ExtendableInterfaceMethod<[{}], "bool", "capturesOperand", (ins "unsigned":$operandIndex), [{
+        ExtendableInterfaceMethod<[{}], "bool", "capturesOperand", (ins "::mlir::OpOperand&":$operand), [{
             bool isCaptured = false;
         }], "return isCaptured;">
     ];
@@ -23,7 +23,7 @@ def CaptureInterface : OpInterface<"CaptureInterface"> {
 def Captured : OpVariableGen<CaptureInterface> {
     let methodGens = [
         OpVariableMethodGen<"capturesOperand", [{
-            isCaptured = isCaptured || $_arg.getOperandNumber() == operandIndex;
+            isCaptured = isCaptured || &$_arg == &operand;
         }]>
     ];
 }
