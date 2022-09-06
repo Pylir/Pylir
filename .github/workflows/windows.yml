@@ -17,13 +17,7 @@ jobs:
     runs-on: windows-2022
     strategy:
       matrix:
-        runtime_lib_llvm: [ "MTd", "MT" ]
-        runtime_lib_cmake: [ "MultiThreadedDebug", "MultiThreaded" ]
-        exclude:
-          - runtime_lib_llvm: "MTd"
-            runtime_lib_cmake: "MultiThreaded"
-          - runtime_lib_llvm: "MT"
-            runtime_lib_cmake: "MultiThreadedDebug"
+        runtime_lib: [ "MultiThreadedDebug", "MultiThreaded" ]
 
     steps:
 
@@ -55,48 +49,13 @@ jobs:
           override_cache_key: ${{runner.os}}-${{matrix.runtime_lib_cmake}}-msvc
           windows_compile_environment: msvc
 
-      - name: Checkout LLVM
-        uses: ./Pylir/.github/actions/llvm-checkout
-
-      - name: Configure LLVM Optimized TableGen
-        run: |
-          cmake -GNinja -Bllvm-optimized-tblgen `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_CXX_COMPILER=cl `
-            -DCMAKE_C_COMPILER=cl `
-            -DLLVM_CCACHE_BUILD=ON `
-            -DLLVM_ENABLE_PROJECTS="mlir" `
-            -DLLVM_TARGETS_TO_BUILD=host `
-            -DLLVM_ENABLE_LLD=ON `
-            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -S ${{github.workspace}}/llvm-project/llvm
-
-      - name: Build LLVM Optimized TableGen
-        run: |
-          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
-
-      - name: Configure LLVM
-        run: |
-          $work_space = "${{github.workspace}}".replace('\', '/')
-          cmake -GNinja -Bllvm-build `
-            -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
-            -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
-            -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DLLVM_USE_CRT_RELEASE=${{matrix.runtime_lib_llvm}} `
-            -DCMAKE_CXX_COMPILER=cl `
-            -DCMAKE_C_COMPILER=cl `
-            -DLLVM_CCACHE_BUILD=ON `
-            -DLLVM_ENABLE_ASSERTIONS=ON `
-            -DLLVM_ENABLE_PROJECTS="mlir;lld" `
-            -DLLVM_TARGETS_TO_BUILD=host `
-            -DLLVM_ENABLE_LLD=ON `
-            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -S ${{github.workspace}}/llvm-project/llvm
-
       - name: Build LLVM
-        run: |
-          cmake --build llvm-build
+        id: llvm-build
+        uses: ./Pylir/.github/actions/llvm-build
+        with:
+          c-compiler: cl
+          cpp-compiler: cl
+          runtime_lib: ${{matrix.runtime_lib}}
 
       - name: Configure Pylir
         run: |
@@ -108,10 +67,10 @@ jobs:
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_LINKER=link `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{matrix.runtime_lib_cmake}} `
-            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
-            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
-            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" `
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{matrix.runtime_lib}} `
+            -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
+            -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
+            -DLLD_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/lld/" `
             -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
@@ -170,60 +129,13 @@ jobs:
           # Lying here because I am not running within msys2
           windows_compile_environment: msvc
 
-      - name: Checkout LLVM
-        uses: ./Pylir/.github/actions/llvm-checkout
-
-      - name: Configure LLVM Optimized TableGen
-        run: |
-          cmake -GNinja -Bllvm-optimized-tblgen `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_CXX_COMPILER=clang++ `
-            -DCMAKE_C_COMPILER=clang `
-            -DLLVM_CCACHE_BUILD=ON `
-            -DLLVM_BUILD_TOOLS=OFF `
-            -DLLVM_BUILD_UTILS=ON `
-            -DLLVM_INCLUDE_TESTS=OFF `
-            -DLLVM_INSTALL_UTILS=ON `
-            -DLLVM_ENABLE_PROJECTS="mlir" `
-            -DLLVM_TARGETS_TO_BUILD=host `
-            -DLLVM_ENABLE_LLD=ON `
-            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -S ${{github.workspace}}/llvm-project/llvm
-
-      - name: Build LLVM Optimized TableGen
-        run: |
-          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
-
-      - name: Configure LLVM
-        run: |
-          $work_space = "${{github.workspace}}".replace('\', '/') 
-          $cxx_flags = ''
-          if ('${{matrix.sanitizer}}') {
-            $cxx_flags = '-DCMAKE_CXX_FLAGS="-fsanitize=${{matrix.sanitizier}} -fno-omit-frame-pointer"'
-          }
-          cmake -GNinja -Bllvm-build `
-            -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
-            -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
-            -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_CXX_COMPILER=clang++ `
-            -DCMAKE_C_COMPILER=clang `
-            -DLLVM_CCACHE_BUILD=ON `
-            -DLLVM_ENABLE_ASSERTIONS=ON `
-            -DLLVM_BUILD_TOOLS=OFF `
-            -DLLVM_BUILD_UTILS=ON `
-            -DLLVM_INCLUDE_TESTS=OFF `
-            -DLLVM_INSTALL_UTILS=ON `
-            -DLLVM_ENABLE_PROJECTS="mlir;lld" `
-            -DLLVM_TARGETS_TO_BUILD=host `
-            -DLLVM_ENABLE_LLD=ON `
-            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            $cxx_flags `
-            -S ${{github.workspace}}/llvm-project/llvm
-
       - name: Build LLVM
-        run: |
-          cmake --build llvm-build
+        id: llvm-build
+        uses: ./Pylir/.github/actions/llvm-build
+        with:
+          c-compiler: clang
+          cpp-compiler: clang++
+          sanitizers: ${{matrix.sanitizer}}
 
       - name: Configure Pylir
         run: |
@@ -243,9 +155,9 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
-            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" `
-            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" `
-            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" `
+            -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
+            -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
+            -DLLD_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/lld/" `
             -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
