@@ -61,8 +61,8 @@ runs:
         $cxx_flags = ''
         $c_flags = ''
         if ('${{inputs.sanitizers}}') {
-          $cxx_flags = '-DCMAKE_CXX_FLAGS="-fsanitize=${{inputs.sanitiziers}} -fno-omit-frame-pointer"'
-          $c_flags = '-DCMAKE_C_FLAGS="-fsanitize=${{inputs.sanitiziers}} -fno-omit-frame-pointer"'
+          $cxx_flags = '-DCMAKE_CXX_FLAGS="-fsanitize=${{inputs.sanitizers}} -fno-omit-frame-pointer"'
+          $c_flags = '-DCMAKE_C_FLAGS="-fsanitize=${{inputs.sanitizers}} -fno-omit-frame-pointer"'
         }
         $runtime_lib = ''
         switch ('${{inputs.runtime_lib}}') {
