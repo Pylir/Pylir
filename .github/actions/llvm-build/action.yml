@@ -82,10 +82,15 @@ runs:
           }
         }
         
+        $exe_suffix = ''
+        if ($IsWindows) {
+          $exe_suffix = '.exe'
+        }
+        
         cmake -GNinja -Bllvm-build `
-        -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen.exe" `
-        -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen.exe" `
-        -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen.exe" `
+        -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen$exe_suffix" `
+        -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen$exe_suffix" `
+        -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen$exe_suffix" `
         -DCMAKE_BUILD_TYPE=Release `
         -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
         -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
