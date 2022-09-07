@@ -106,8 +106,7 @@ runs:
         -DLLVM_ENABLE_LLD=ON `
         -DLLD_BUILD_TOOLS=OFF `
         -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-        $cxx_flags `
-        $c_flags `
+        $san_flag `
         $runtime_lib `
         -S ${{github.workspace}}/llvm-project/llvm
 
