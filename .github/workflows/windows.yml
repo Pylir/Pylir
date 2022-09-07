@@ -141,7 +141,7 @@ jobs:
         run: |
           $sanitizer_arg = ''
           if ('${{matrix.sanitizer}}') {
-            $sanitizer_arg = '-DPYLIR_SANITIZER="${{matrix.sanitizier}}"'
+            $sanitizer_arg = '-DPYLIR_SANITIZER="${{matrix.sanitizer}}"'
           }
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
