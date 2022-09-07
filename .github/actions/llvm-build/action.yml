@@ -58,11 +58,10 @@ runs:
       shell: pwsh
       run: |
         $work_space = "${{github.workspace}}".replace('\', '/') 
-        $cxx_flags = ''
-        $c_flags = ''
+        $san_flag = ''
         if ('${{inputs.sanitizers}}') {
-          $cxx_flags = '-DCMAKE_CXX_FLAGS="-fsanitize=${{inputs.sanitizers}} -fno-omit-frame-pointer"'
-          $c_flags = '-DCMAKE_C_FLAGS="-fsanitize=${{inputs.sanitizers}} -fno-omit-frame-pointer"'
+          $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inptuts.sanitizers}}'.replace(',', ';'))
+          $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
         }
         $runtime_lib = ''
         switch ('${{inputs.runtime_lib}}') {
@@ -105,6 +104,7 @@ runs:
         -DLLVM_ENABLE_PROJECTS="mlir;lld" `
         -DLLVM_TARGETS_TO_BUILD=host `
         -DLLVM_ENABLE_LLD=ON `
+        -DLLD_BUILD_TOOLS=OFF `
         -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
         $cxx_flags `
         $c_flags `
