@@ -65,52 +65,13 @@ jobs:
           max-size: 2G
           key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
 
-      - name: Checkout LLVM
-        uses: ./Pylir/.github/actions/llvm-checkout
-
-      - name: Configure LLVM Optimized TableGen
-        run: |
-          cmake -GNinja -Bllvm-optimized-tblgen \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
-            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
-            -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_TARGETS_TO_BUILD=host \
-            -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE="$(which python)" \
-            -S ${{github.workspace}}/llvm-project/llvm
-
-      - name: Build LLVM Optimized TableGen
-        run: |
-          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
-
-      - name: Configure LLVM
-        run: |
-          if [[ ! -z "${{matrix.sanitizer}}" ]]
-          then
-            SAN_ARG=-DLLVM_USE_SANITIZER=$(echo ${{matrix.sanitizer}} | sed 's/,/;/g' | \
-                    python3 -c 'import sys; print(sys.stdin.read().title())' )
-          fi
-          cmake -GNinja -Bllvm-build \
-            -DLLVM_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/llvm-tblgen" \
-            -DMLIR_TABLEGEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-tblgen" \
-            -DMLIR_LINALG_ODS_YAML_GEN="${{github.workspace}}/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
-            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
-            -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DLLVM_ENABLE_PROJECTS="mlir;lld" \
-            -DLLVM_TARGETS_TO_BUILD=host \
-            -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE="$(which python)" \
-            $SAN_ARG \
-            -S ${{github.workspace}}/llvm-project/llvm
-
       - name: Build LLVM
-        run: |
-          cmake --build llvm-build
+        id: llvm-build
+        uses: ./Pylir/.github/actions/llvm-build
+        with:
+          c-compiler: ${{matrix.c_compiler}}
+          cpp-compiler: ${{matrix.cxx_compiler}}
+          sanitizers: ${{matrix.sanitizer}}
 
       - name: Configure Pylir
         run: |
@@ -130,9 +91,9 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_CXX_FLAGS="-g1" \
             -DPYLIR_ENABLE_ASSERTIONS=ON \
-            -DLLVM_DIR="${{github.workspace}}/llvm-build/lib/cmake/llvm/" \
-            -DMLIR_DIR="${{github.workspace}}/llvm-build/lib/cmake/mlir/" \
-            -DLLD_DIR="${{github.workspace}}/llvm-build/lib/cmake/lld/" \
+            -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" \
+            -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" \
+            -DLLD_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/lld/" \
             -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
