@@ -6,7 +6,6 @@
 
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/FunctionInterfaces.h>
-#include <mlir/IR/Threading.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 
@@ -16,11 +15,6 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Util/InlinerUtil.hpp>
 #include <pylir/Support/Macros.hpp>
-#include <pylir/Support/Variant.hpp>
-
-#include <future>
-#include <mutex>
-#include <variant>
 
 #include "Passes.hpp"
 
@@ -93,23 +87,21 @@ namespace
 
 class TrialDataBase
 {
-    llvm::DenseMap<CallingContext, std::shared_future<bool>> m_decisions;
-    mutable std::mutex mutex;
+public:
+    enum class Result
+    {
+        NotComputed,
+        Profitable,
+        NotProfitable
+    };
+
+private:
+    llvm::DenseMap<CallingContext, Result> m_decisions;
 
 public:
-    std::variant<std::promise<bool>, bool> lookup(CallingContext context)
+    Result& lookup(CallingContext context)
     {
-        std::unique_lock lock{mutex};
-        auto [iter, inserted] = m_decisions.try_emplace(std::move(context), std::shared_future<bool>{});
-        if (!inserted)
-        {
-            auto copy = iter->second;
-            lock.unlock();
-            return copy.get();
-        }
-        std::promise<bool> promise;
-        iter->second = promise.get_future().share();
-        return promise;
+        return m_decisions.try_emplace(std::move(context), Result::NotComputed).first->second;
     }
 };
 
@@ -190,10 +182,10 @@ class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
 {
     mlir::OpPassManager m_passManager;
 
-    mlir::FailureOr<bool> performTrial(mlir::FunctionOpInterface functionOpInterface,
-                                       mlir::CallOpInterface callOpInterface,
-                                       mlir::CallableOpInterface callableOpInterface, std::size_t calleeSize,
-                                       mlir::OpPassManager& passManager)
+    mlir::FailureOr<TrialDataBase::Result> performTrial(mlir::FunctionOpInterface functionOpInterface,
+                                                        mlir::CallOpInterface callOpInterface,
+                                                        mlir::CallableOpInterface callableOpInterface,
+                                                        std::size_t calleeSize, mlir::OpPassManager& passManager)
     {
         mlir::OwningOpRef<mlir::FunctionOpInterface> rollback = functionOpInterface.clone();
         auto callerSize = pylir::BodySize(functionOpInterface).getSize();
@@ -211,10 +203,10 @@ class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
         if (reduction >= m_minCalleeSizeReduction / 100.0)
         {
             m_callsInlined++;
-            return true;
+            return TrialDataBase::Result::Profitable;
         }
         functionOpInterface.getBody().takeBody(rollback->getBody());
-        return false;
+        return TrialDataBase::Result::NotProfitable;
     }
 
     class Inlineable
@@ -295,11 +287,11 @@ class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
                     {
                         return mlir::WalkResult::advance();
                     }
-                    auto result = dataBase.lookup({ref.getAttr(), callOpInterface.getArgOperands()});
-                    if (auto* maybeBool = std::get_if<bool>(&result))
+                    TrialDataBase::Result& result = dataBase.lookup({ref.getAttr(), callOpInterface.getArgOperands()});
+                    if (result != TrialDataBase::Result::NotComputed)
                     {
                         m_cacheHits++;
-                        if (!*maybeBool)
+                        if (result == TrialDataBase::Result::NotProfitable)
                         {
                             return mlir::WalkResult::advance();
                         }
@@ -319,12 +311,10 @@ class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
                     if (mlir::failed(trialResult))
                     {
                         failed = true;
-                        // Unblock other threads
-                        pylir::get<std::promise<bool>>(result).set_value(false);
                         return mlir::WalkResult::interrupt();
                     }
-                    pylir::get<std::promise<bool>>(result).set_value(*trialResult);
-                    if (*trialResult)
+                    result = *trialResult;
+                    if (*trialResult == TrialDataBase::Result::Profitable)
                     {
                         // Add it to patterns afterwards. This is only really to add a new state machine for the
                         // callable. Any real patterns will be executed via cache hits. Since this was a cache miss
