@@ -60,7 +60,7 @@ runs:
         $work_space = "${{github.workspace}}".replace('\', '/') 
         $san_flag = ''
         if ('${{inputs.sanitizers}}') {
-          $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inptuts.sanitizers}}'.replace(',', ';'))
+          $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
           $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
         }
         $runtime_lib = ''
