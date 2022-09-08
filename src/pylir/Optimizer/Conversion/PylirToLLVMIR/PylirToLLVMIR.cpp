@@ -2990,6 +2990,59 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
     }
 };
 
+struct MROLookupOpConversion : ConvertPylirOpToLLVMPattern<pylir::Py::MROLookupOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::MROLookupOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::MROLookupOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto loc = op.getLoc();
+        auto tuple = adaptor.getMroTuple();
+        auto* block = op->getBlock();
+        auto* endBlock = block->splitBlock(op);
+        endBlock->addArguments(typeConverter->convertType(op.getType()), loc);
+
+        rewriter.setInsertionPointToEnd(block);
+        auto tupleSize = pyTupleModel(loc, rewriter, tuple).sizePtr(loc).load(loc);
+        auto startConstant = rewriter.create<mlir::LLVM::ConstantOp>(loc, getIndexType(), 0);
+        auto* conditionBlock = new mlir::Block;
+        conditionBlock->addArgument(getIndexType(), loc);
+        rewriter.create<mlir::LLVM::BrOp>(loc, mlir::ValueRange{startConstant}, conditionBlock);
+
+        conditionBlock->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(conditionBlock);
+        auto isLess = rewriter.create<mlir::LLVM::ICmpOp>(loc, mlir::LLVM::ICmpPredicate::ult,
+                                                          conditionBlock->getArgument(0), tupleSize);
+        auto* body = new mlir::Block;
+        mlir::Value unbound = rewriter.create<mlir::LLVM::NullOp>(loc, endBlock->getArgument(0).getType());
+        rewriter.create<mlir::LLVM::CondBrOp>(loc, isLess, body, endBlock, unbound);
+
+        body->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(body);
+        auto entry =
+            pyTupleModel(loc, rewriter, tuple).trailingPtr(loc).at(loc, conditionBlock->getArgument(0)).load(loc);
+        auto entryType = rewriter
+                             .create<mlir::UnrealizedConversionCastOp>(loc, rewriter.getType<pylir::Py::DynamicType>(),
+                                                                       mlir::Value(entry.typePtr(loc).load(loc)))
+                             ->getResult(0);
+        mlir::Value fetch = unrealizedConversion(
+            rewriter, rewriter.create<pylir::Py::GetSlotOp>(loc, mlir::Value(entry), entryType, adaptor.getSlotAttr()));
+        auto failure = rewriter.create<mlir::LLVM::ICmpOp>(loc, mlir::LLVM::ICmpPredicate::eq, fetch, unbound);
+        auto* notFound = new mlir::Block;
+        rewriter.create<mlir::LLVM::CondBrOp>(loc, failure, notFound, endBlock, fetch);
+
+        notFound->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(notFound);
+        auto one = rewriter.create<mlir::LLVM::ConstantOp>(loc, getIndexType(), 1);
+        auto nextIter = rewriter.create<mlir::LLVM::AddOp>(loc, conditionBlock->getArgument(0), one);
+        rewriter.create<mlir::LLVM::BrOp>(loc, mlir::ValueRange{nextIter}, conditionBlock);
+
+        rewriter.replaceOp(op, endBlock->getArguments());
+        return mlir::success();
+    }
+};
+
 class ConvertPylirToLLVMPass : public pylir::impl::ConvertPylirToLLVMPassBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -3084,6 +3137,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<ArithmeticSelectOpConversion>(converter);
     patternSet.insert<TupleContainsOpConversion>(converter);
     patternSet.insert<InitTupleCopyOpConversion>(converter);
+    patternSet.insert<MROLookupOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
