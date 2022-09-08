@@ -256,9 +256,9 @@ def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, Alwa
     let hasFolder = 1;
 }
 
-def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound, ObjectFromTypeObjectInterface,
-    DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
-    let arguments = (ins DynamicType:$tuple, DynamicType:$type_object);
+def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound,
+    ObjectFromTypeObjectInterface, DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
+    let arguments = (ins DynamicType:$tuple, Arg<DynamicType, "", [Captured]>:$type_object);
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
     let description = [{
@@ -428,7 +428,7 @@ def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound, Retur
 
 def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<CaptureInterface>,
                                                 RefinedObjectFromTypeObject, AlwaysBound]> {
-    let arguments = (ins DynamicType:$string, DynamicType:$type_object);
+    let arguments = (ins DynamicType:$string, Arg<DynamicType, "", [Captured]>:$type_object);
     let results = (outs Arg<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
     let assemblyFormat = "$string `:` $type_object attr-dict";
@@ -439,8 +439,7 @@ def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<Captur
     }];
 }
 
-def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound,
-                                                    RefinedType<"Str">, ReturnsImmutable]> {
+def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoSideEffect, AlwaysBound, RefinedType<"Str">, ReturnsImmutable]> {
     let arguments = (ins Variadic<DynamicType>:$strings);
     let results = (outs DynamicType:$result);
 
