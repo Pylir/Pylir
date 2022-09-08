@@ -406,9 +406,10 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
         return mlir::Value{*this};
     }
     auto type = operands[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-    if (type && type.getValue() == Builtins::Tuple.name
-        && mlir::isa_and_nonnull<Py::TupleDropFrontOp, Py::TuplePrependOp, Py::MakeTupleOp, Py::MakeTupleExOp>(
-            getTuple().getDefiningOp()))
+    // Forwarding it is safe in the case that the types of the input tuple as well as the resulting tuple are identical
+    // and that the type is fully immutable. In the future this may be computed, but for the time being, the
+    // `builtins.tuple` will be special cased as known immutable.
+    if (type && type.getValue() == Builtins::Tuple.name && getTypeOf(getTuple()) == mlir::OpFoldResult(type))
     {
         return getTuple();
     }

@@ -261,6 +261,15 @@ def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [NoSideEffect, AlwaysBound, O
     let arguments = (ins DynamicType:$tuple, DynamicType:$type_object);
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
+    let description = [{
+        Creates a new tuple object of type `$type_object` and initializes it by copying the tuple parts of `$tuple`.
+        This results in a copy of all references within `$tuple` as well as the size. No copy of any slots are
+        performed.
+
+        If `$tuple` is not a tuple or a subclass of the behaviour is undefined. If `$type_object` is not the tuple
+        type object or a type object deriving from tuple the behaviour is undefined.
+    }];
+
     let assemblyFormat = [{
         $tuple `:` $type_object attr-dict
     }];
