@@ -17,6 +17,7 @@ add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrIn
         ObjectTypeInterfaceIncGen TypeRefineableInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
         PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyObjectFromTypeObjectInterface
+        PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface
         PRIVATE MLIRArithmeticDialect MLIRControlFlowDialect PylirTransformsUtils)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)

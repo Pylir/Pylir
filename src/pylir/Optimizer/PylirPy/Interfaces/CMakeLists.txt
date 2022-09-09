@@ -6,3 +6,5 @@
 
 add_pylir_interface(OP ExceptionHandlingInterface LIBRARY LIB_PREFIX PylirPy)
 add_pylir_interface(OP ObjectFromTypeObjectInterface LIBRARY LIB_PREFIX PylirPy)
+add_pylir_interface(OP CopyObjectInterface LIBRARY LIB_PREFIX PylirPy)
+add_pylir_interface(OP OnlyReadsValueInterface LIBRARY LIB_PREFIX PylirPy)

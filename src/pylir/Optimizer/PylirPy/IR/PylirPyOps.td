@@ -13,6 +13,8 @@ include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
+include "pylir/Optimizer/PylirPy/Interfaces/CopyObjectInterface.td"
+include "pylir/Optimizer/PylirPy/Interfaces/OnlyReadsValueInterface.td"
 include "pylir/Optimizer/Interfaces/MemoryFoldInterface.td"
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -195,8 +197,9 @@ def PylirPy_DictLenOp : PylirPy_Op<"dict.len", [DeclareOpInterfaceMethods<Memory
 // Tuple ops
 
 def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoSideEffect, AlwaysBound,
-															DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
-    let arguments = (ins DynamicType:$tuple, Index:$index);
+														  DeclareOpInterfaceMethods<TypeRefineableInterface>,
+														  DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+    let arguments = (ins Arg<DynamicType, "", [OnlyReadsValue]>:$tuple, Index:$index);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -211,8 +214,8 @@ def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoSideEffect, AlwaysBo
     let hasFolder = 1;
 }
 
-def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$input);
+def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect, DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+    let arguments = (ins Arg<DynamicType, "", [OnlyReadsValue]>:$input);
     let results = (outs Index:$result);
 
     let assemblyFormat = [{
@@ -229,8 +232,9 @@ def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoSideEffect]> {
 
 // TODO: I don't think this should exist but don't have better option until iterators work
 def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBound, ReturnsImmutable,
-														  DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
-    let arguments = (ins DynamicType:$input, DynamicType:$tuple);
+														  DeclareOpInterfaceMethods<TypeRefineableInterface>,
+														  DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+    let arguments = (ins DynamicType:$input, Arg<DynamicType, "", [OnlyReadsValue]>:$tuple);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -245,8 +249,9 @@ def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoSideEffect, AlwaysBo
 }
 
 def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, AlwaysBound, ReturnsImmutable,
-    DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
-    let arguments = (ins Index:$count, DynamicType:$tuple);
+    DeclareOpInterfaceMethods<TypeRefineableInterface>, DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+
+    let arguments = (ins Index:$count, Arg<DynamicType, "", [OnlyReadsValue]>:$tuple);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -257,8 +262,12 @@ def PylirPy_TupleDropFrontOp : PylirPy_Op<"tuple.dropFront", [NoSideEffect, Alwa
 }
 
 def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound,
-    ObjectFromTypeObjectInterface, DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
-    let arguments = (ins DynamicType:$tuple, Arg<DynamicType, "", [Captured]>:$type_object);
+    ObjectFromTypeObjectInterface, DeclareOpInterfaceMethods<TypeRefineableInterface>,
+    DeclareOpInterfaceMethods<CopyObjectInterface>, DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+
+    let arguments = (ins Arg<DynamicType, "", [Copied, OnlyReadsValue]>:$tuple,
+                         Arg<DynamicType, "", [Captured]>:$type_object);
+
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
     let description = [{
@@ -277,8 +286,10 @@ def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [DeclareOpInterfaceMethods<Ca
     let hasFolder = 1;
 }
 
-def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$tuple, DynamicType:$element);
+def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect,
+    DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+
+    let arguments = (ins Arg<DynamicType, "", [OnlyReadsValue]>:$tuple, DynamicType:$element);
     let results = (outs I1:$success);
 
     let assemblyFormat = "$element `in` $tuple attr-dict";
@@ -427,8 +438,9 @@ def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound, Retur
 // Str ops
 
 def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<CaptureInterface>,
+                                                DeclareOpInterfaceMethods<CopyObjectInterface>,
                                                 RefinedObjectFromTypeObject, AlwaysBound]> {
-    let arguments = (ins DynamicType:$string, Arg<DynamicType, "", [Captured]>:$type_object);
+    let arguments = (ins Arg<DynamicType, "", [Copied]>:$string, Arg<DynamicType, "", [Captured]>:$type_object);
     let results = (outs Arg<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
     let assemblyFormat = "$string `:` $type_object attr-dict";

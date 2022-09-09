@@ -313,11 +313,6 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
 
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     auto indexAttr = operands[1].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!indexAttr)
     {
@@ -335,11 +330,6 @@ mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getInput().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getInputMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     if (auto makeTuple = getInput().getDefiningOp<Py::MakeTupleOp>();
         makeTuple && makeTuple.getIterExpansionAttr().empty())
     {
@@ -354,12 +344,6 @@ mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> o
 
 mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
-
     auto element = operands[0];
     if (!element)
     {
@@ -376,11 +360,6 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 ::mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     auto constant = resolveValue<TupleAttr>(*this, operands[1]);
     if (constant && constant.getValue().empty())
     {
@@ -400,11 +379,6 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 ::mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     auto type = operands[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
     // Forwarding it is safe in the case that the types of the input tuple as well as the resulting tuple are identical
     // and that the type is fully immutable. In the future this may be computed, but for the time being, the
@@ -1187,6 +1161,47 @@ struct ArithSelectTransform : mlir::OpRewritePattern<mlir::arith::SelectOp>
     }
 };
 
+struct FoldOnlyReadsValueOfCopy : mlir::OpInterfaceRewritePattern<pylir::Py::CopyObjectInterface>
+{
+    using mlir::OpInterfaceRewritePattern<pylir::Py::CopyObjectInterface>::OpInterfaceRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::CopyObjectInterface op,
+                                        mlir::PatternRewriter& rewriter) const override
+    {
+        bool removedAll = true;
+        bool changed = false;
+        rewriter.startRootUpdate(op);
+        for (mlir::OpResult iter : op->getResults())
+        {
+            bool replaced = false;
+            iter.replaceUsesWithIf(op.getCopiedOperand().get(),
+                                   [&](mlir::OpOperand& operand) -> bool
+                                   {
+                                       auto interface =
+                                           mlir::dyn_cast<pylir::Py::OnlyReadsValueInterface>(operand.getOwner());
+                                       replaced = interface && interface.onlyReadsValue(operand);
+                                       return replaced;
+                                   });
+            changed = changed || replaced;
+            removedAll = removedAll && replaced;
+        }
+        if (removedAll)
+        {
+            rewriter.eraseOp(op);
+        }
+
+        if (changed)
+        {
+            rewriter.finalizeRootUpdate(op);
+        }
+        else
+        {
+            rewriter.cancelRootUpdate(op);
+        }
+        return mlir::success(changed);
+    }
+};
+
 pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
                                          mlir::Attribute attr)
 {
@@ -1267,6 +1282,7 @@ void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(::mlir::RewritePatte
     populateWithGenerated(results);
     pylir::populateWithBranchOpInterfacePattern(results);
     results.insert<ArithSelectTransform>(getContext());
+    results.insert<FoldOnlyReadsValueOfCopy>(getContext());
 }
 
 void pylir::Py::PylirPyDialect::initializeExternalModels()
