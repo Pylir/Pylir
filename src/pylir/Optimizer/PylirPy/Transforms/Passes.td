@@ -71,6 +71,7 @@ def TrialInlinerPass : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
 		Statistic<"m_cacheHits", "Cache hits", "Amount of times an inlining trial did not have to be performed due to a cache hit">,
 		Statistic<"m_cacheMisses", "Caches misses", "Amount of times an inlining trial had to be performed as it was not in cache">,
 		Statistic<"m_recursionLimitReached", "Recursion limits reached", "Amount of times a recursion chain was disabled in a caller">,
+		Statistic<"m_optimizationRun", "Optimization pipeline run", "Amount of times the optimization pipeline had to be run">,
 	];
 
 	let options = [

@@ -191,6 +191,7 @@ class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
         auto callerSize = pylir::BodySize(functionOpInterface).getSize();
         pylir::Py::inlineCall(callOpInterface, callableOpInterface);
 
+        m_optimizationRun++;
         if (mlir::failed(runPipeline(passManager, functionOpInterface)))
         {
             return mlir::failure();
@@ -298,6 +299,7 @@ class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
                         recursivePattern(inlineable->second.getCallable());
                         m_callsInlined++;
                         pylir::Py::inlineCall(callOpInterface, inlineable->second.getCallable());
+                        m_optimizationRun++;
                         if (mlir::failed(runPipeline(passManager, functionOpInterface)))
                         {
                             failed = true;
