@@ -5,6 +5,8 @@ include "pylir/Optimizer/Util/OpVariableBase.td"
 
 def Test_Dialect : Dialect {
     let name = "test";
+
+    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 class Test_Op<string mnemonic, list<Trait> traits = []> : Op<Test_Dialect, mnemonic, traits>;
@@ -41,11 +43,27 @@ def Test_C : Test_Op<"c", [DeclareOpInterfaceMethods<TestInterface>]> {
 
 // CHECK-LABEL: int test::A::lol()
 // CHECK-NEXT: int i = 0;
-// CHECK-NEXT: i += ((*this)->getOpOperand(static_cast<::mlir::OperandRange>(test2Mutable()).getBeginOperandIndex())).getOperandNumber();
-// CHECK-NEXT: return i;
+// CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest2Mutable()).getBeginOperandIndex(), getTest2Mutable().size())) {
+// CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
+// CHECK-NEXT: }
+// CHECK: return i;
 
 // CHECK-NOT: test::B::lol
 
 // CHECK-LABEL: int test::C::lol()
 // CHECK-NEXT: int i = 0;
 // CHECK-NEXT: return i;
+
+def Test_D : Test_Op<"d", [DeclareOpInterfaceMethods<TestInterface>]> {
+    let arguments = (ins Arg<Variadic<I32>, "", [TestVariableGen]>:$test1, Arg<Optional<I32>, "", [TestVariableGen]>:$test2);
+}
+
+// CHECK-LABEL: int test::D::lol()
+// CHECK-NEXT: int i = 0;
+// CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest1Mutable()).getBeginOperandIndex(), getTest1Mutable().size())) {
+// CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
+// CHECK-NEXT: }
+// CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest2Mutable()).getBeginOperandIndex(), getTest2Mutable().size())) {
+// CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
+// CHECK-NEXT: }
+// CHECK: return i;

@@ -167,10 +167,6 @@ std::map<ExtendableInterfaceMethod, std::vector<std::string>>
                 continue;
             }
 
-            mlir::tblgen::FmtContext context;
-            context.addSubst("_arg", "((*this)->getOpOperand(static_cast<::mlir::OperandRange>("
-                                         + op.getGetterName(namedCons->name) + "Mutable()).getBeginOperandIndex()))");
-
             OpVariableGen gen(&dec.getDef());
             auto interface = gen.getInterface();
             for (auto methodGen : gen.getMethodGens())
@@ -181,7 +177,6 @@ std::map<ExtendableInterfaceMethod, std::vector<std::string>>
                     continue;
                 }
 
-                auto body = mlir::tblgen::tgfmt(methodGen.getBody(), &context);
                 auto res = result.find(*method);
                 if (res == result.end())
                 {
@@ -189,6 +184,17 @@ std::map<ExtendableInterfaceMethod, std::vector<std::string>>
                     // map so just skip it.
                     continue;
                 }
+
+                constexpr auto iterName = "tblGenOdsIter";
+                constexpr auto loop = R"(
+for (::mlir::OpOperand& {2} : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>({0}Mutable()).getBeginOperandIndex(), {0}Mutable().size())) {{
+    {1}
+}
+)";
+                mlir::tblgen::FmtContext context;
+                context.addSubst("_arg", iterName);
+                auto body = llvm::formatv(loop, op.getGetterName(namedCons->name),
+                                          mlir::tblgen::tgfmt(methodGen.getBody(), &context), iterName);
                 res->second.emplace_back(body);
             }
         }
