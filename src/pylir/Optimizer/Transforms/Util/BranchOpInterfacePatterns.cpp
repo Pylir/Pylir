@@ -53,8 +53,10 @@ struct PassthroughArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInte
                 continue;
             }
             auto brOp = mlir::dyn_cast_or_null<mlir::BranchOpInterface>(iter.value()->getTerminator());
+            // If the branch op has just a single successor, no side effects, and no operands, it can only be a simple
+            // branch op.
             if (!brOp || brOp->getNumSuccessors() != 1 || !mlir::MemoryEffectOpInterface::hasNoEffect(brOp)
-                || brOp->getNumSuccessors() != 0)
+                || brOp->getNumOperands() != 0)
             {
                 continue;
             }
