@@ -439,8 +439,12 @@ def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoSideEffect, AlwaysBound, Retur
 
 def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<CaptureInterface>,
                                                 DeclareOpInterfaceMethods<CopyObjectInterface>,
+                                                DeclareOpInterfaceMethods<OnlyReadsValueInterface>,
                                                 RefinedObjectFromTypeObject, AlwaysBound]> {
-    let arguments = (ins Arg<DynamicType, "", [Copied]>:$string, Arg<DynamicType, "", [Captured]>:$type_object);
+
+    let arguments = (ins Arg<DynamicType, "", [Copied, OnlyReadsValue]>:$string,
+                         Arg<DynamicType, "", [Captured]>:$type_object);
+
     let results = (outs Arg<DynamicType, "", [MemAlloc, MemWrite]>:$result);
 
     let assemblyFormat = "$string `:` $type_object attr-dict";
@@ -451,8 +455,11 @@ def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<Captur
     }];
 }
 
-def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoSideEffect, AlwaysBound, RefinedType<"Str">, ReturnsImmutable]> {
-    let arguments = (ins Variadic<DynamicType>:$strings);
+def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoSideEffect, AlwaysBound, RefinedType<"Str">, ReturnsImmutable,
+    DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+
+    let arguments = (ins Arg<Variadic<DynamicType>, "", [OnlyReadsValue]>:$strings);
+
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$strings attr-dict";
@@ -465,8 +472,10 @@ def PylirPy_StrConcatOp : PylirPy_Op<"str.concat", [NoSideEffect, AlwaysBound, R
     let hasFolder = 1;
 }
 
-def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$object);
+def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect, DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+
+    let arguments = (ins Arg<DynamicType, "", [OnlyReadsValue]>:$object);
+
     let results = (outs Index:$hash);
 
     let assemblyFormat = "$object attr-dict";
@@ -477,8 +486,10 @@ def PylirPy_StrHashOp : PylirPy_Op<"str.hash", [NoSideEffect]> {
     }];
 }
 
-def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
+def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect, DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+
+    let arguments = (ins Arg<DynamicType, "", [OnlyReadsValue]>:$lhs, Arg<DynamicType, "", [OnlyReadsValue]>:$rhs);
+
     let results = (outs I1:$result);
 
     let assemblyFormat = "$lhs `,` $rhs attr-dict";

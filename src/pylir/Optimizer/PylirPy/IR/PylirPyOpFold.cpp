@@ -666,11 +666,6 @@ mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Att
             return mlir::BoolAttr::get(getContext(), llvm::is_contained(tuple.getValue(), element));
         }
     }
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     auto tupleOperands = resolveTupleOperands(*this, getTuple());
     bool hadWildcard = false;
     for (auto& op : tupleOperands)
