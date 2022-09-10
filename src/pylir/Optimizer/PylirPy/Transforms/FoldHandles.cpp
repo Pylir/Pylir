@@ -88,7 +88,7 @@ private:
     void handleSingleFunctionHandle(mlir::Region& parent, pylir::Py::GlobalHandleOp handleOp)
     {
         pylir::SSABuilder builder(
-            [](mlir::Block* block, mlir::Location loc) -> mlir::Value
+            [](mlir::Block* block, mlir::Type, mlir::Location loc) -> mlir::Value
             {
                 auto builder = mlir::OpBuilder::atBlockBegin(block);
                 return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());

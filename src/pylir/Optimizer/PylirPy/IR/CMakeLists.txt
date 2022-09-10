@@ -12,12 +12,13 @@ add_pylir_interface(OP TypeRefineableInterface)
 add_pylir_rewriter(PylirPyPatterns)
 
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
-        ObjectAttrInterface.cpp IntAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp Value.cpp)
+        ObjectAttrInterface.cpp IntAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp Value.cpp
+        PylirPyOpSROA.cpp)
 add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen IntAttrInterfaceIncGen
         ObjectTypeInterfaceIncGen TypeRefineableInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
         PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyObjectFromTypeObjectInterface
-        PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface
+        PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface PylirSROAInterfaces
         PRIVATE MLIRArithmeticDialect MLIRControlFlowDialect PylirTransformsUtils)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)

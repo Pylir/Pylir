@@ -15,6 +15,7 @@ namespace pylir
 {
 #define GEN_PASS_REGISTRATION
 #define GEN_PASS_DECL_LOADFORWARDINGPASS
+#define GEN_PASS_DECL_SROAPASS
 #include "pylir/Optimizer/Transforms/Passes.h.inc"
 
 } // namespace pylir

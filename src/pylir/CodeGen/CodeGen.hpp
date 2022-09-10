@@ -436,7 +436,7 @@ class CodeGen
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
         m_functionScope.emplace(Scope{{},
                                       SSABuilder(
-                                          [this](mlir::Block* block, mlir::Location loc) -> mlir::Value
+                                          [this](mlir::Block* block, mlir::Type, mlir::Location loc) -> mlir::Value
                                           {
                                               auto locExit = changeLoc(loc);
                                               mlir::OpBuilder::InsertionGuard guard{m_builder};

@@ -19,4 +19,13 @@ def LoadForwardingPass : Pass<"pylir-load-forwarding"> {
     ];
 }
 
+def SROAPass  : Pass<"pylir-sroa"> {
+    let summary = "Scalar Replacement Of Aggregates";
+
+    let statistics = [
+        Statistic<"m_aggregatesRemoved", "Aggregates removed", "Amount of aggregates that were removed">,
+        Statistic<"m_readWriteOpsRemoved", "Aggregate read/write ops removed", "Amount of read/write ops of aggregates that were removed">,
+    ];
+}
+
 #endif

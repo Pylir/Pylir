@@ -17,7 +17,6 @@ namespace pylir::Py
 #define GEN_PASS_DECL_FOLDHANDLESPASS
 #define GEN_PASS_DECL_HANDLELOADSTOREELIMINATIONPASS
 #define GEN_PASS_DECL_MONOMORPHPASS
-#define GEN_PASS_DECL_SROAPASS
 #define GEN_PASS_DECL_TRIALINLINERPASS
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 } // namespace pylir::Py

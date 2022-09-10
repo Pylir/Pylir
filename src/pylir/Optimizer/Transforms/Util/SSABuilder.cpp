@@ -61,7 +61,8 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
         auto ops = terminator.getSuccessorOperands(pred.getSuccessorIndex());
         operands.push_back(ops[argument.getArgNumber()]);
     }
-    mlir::Value same = optimizeBlockArgsOperands(operands, argument, argument.getOwner(), argument.getLoc());
+    mlir::Value same =
+        optimizeBlockArgsOperands(operands, argument, argument.getOwner(), argument.getType(), argument.getLoc());
     if (!same)
     {
         return argument;
@@ -107,7 +108,7 @@ mlir::Value pylir::SSABuilder::replaceBlockArgument(mlir::BlockArgument argument
 
 mlir::Value pylir::SSABuilder::optimizeBlockArgsOperands(llvm::ArrayRef<mlir::Value> operands,
                                                          mlir::BlockArgument maybeArgument, mlir::Block* block,
-                                                         mlir::Location loc)
+                                                         mlir::Type type, mlir::Location loc)
 {
     mlir::Value same;
     for (auto blockOperand : operands)
@@ -133,7 +134,7 @@ mlir::Value pylir::SSABuilder::optimizeBlockArgsOperands(llvm::ArrayRef<mlir::Va
     }
     if (!same)
     {
-        return m_undefinedCallback(block, loc);
+        return m_undefinedCallback(block, type, loc);
     }
     return same;
 }
@@ -180,7 +181,7 @@ mlir::Value pylir::SSABuilder::readVariableRecursive(mlir::Location loc, mlir::T
     mlir::BlockArgument maybeArgument = iter->second;
     m_marked.erase(iter);
 
-    if (auto val = optimizeBlockArgsOperands(predArgs, maybeArgument, block, loc))
+    if (auto val = optimizeBlockArgsOperands(predArgs, maybeArgument, block, type, loc))
     {
         if (maybeArgument)
         {

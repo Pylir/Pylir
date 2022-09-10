@@ -53,15 +53,16 @@ public:
 
 private:
     llvm::DenseMap<mlir::Block*, std::vector<DefinitionsMap*>> m_openBlocks;
-    std::function<mlir::Value(mlir::Block*, mlir::Location)> m_undefinedCallback;
+    std::function<mlir::Value(mlir::Block*, mlir::Type, mlir::Location)> m_undefinedCallback;
     std::function<mlir::Value(mlir::Value, mlir::Value)> m_blockArgMergeOptCallback;
     llvm::DenseMap<mlir::Block*, mlir::BlockArgument> m_marked;
 
     // Checks if all the operands can be optimized to a single value (either because they're all the same value or equal
     // to 'maybeArgument' etc.) and if so returns it. Otherwise, returns nullptr. 'maybeArgument' is optional and if set
-    // is the block argument that has 'operands' as inputs. 'block' and 'loc' are used to call 'm_undefinedCallback'.
+    // is the block argument that has 'operands' as inputs. 'block', 'type' and 'loc' are used to call
+    // 'm_undefinedCallback'.
     mlir::Value optimizeBlockArgsOperands(llvm::ArrayRef<mlir::Value> operands, mlir::BlockArgument maybeArgument,
-                                          mlir::Block* block, mlir::Location loc);
+                                          mlir::Block* block, mlir::Type type, mlir::Location loc);
 
     mlir::Value tryRemoveTrivialBlockArgument(mlir::BlockArgument argument);
 
@@ -84,8 +85,8 @@ public:
     /// where 'curr' is the current fold result and 'argOp' is the next operand leading into the block argument.
     /// On first call 'curr' is initialized to the very first operand and 'argOp' will be the second.
     explicit SSABuilder(
-        std::function<mlir::Value(mlir::Block*, mlir::Location)> undefinedCallback = [](auto&&...) -> mlir::Value
-        { PYLIR_UNREACHABLE; },
+        std::function<mlir::Value(mlir::Block*, mlir::Type, mlir::Location)> undefinedCallback =
+            [](auto&&...) -> mlir::Value { PYLIR_UNREACHABLE; },
         std::function<mlir::Value(mlir::Value curr, mlir::Value argOp)> blockArgMergeOptCallback = {})
         : m_undefinedCallback(std::move(undefinedCallback)),
           m_blockArgMergeOptCallback(std::move(blockArgMergeOptCallback))
