@@ -96,6 +96,29 @@ def : Pat<(PylirPy_IntCmpOp $kind, $lhs, $rhs),
 def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
           (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
 
+// py.isUnboundValue (arith.select %cond, %lhs, %rhs) and %lhs and %rhs are either both definitely bound or definitely
+// not unbound -> replace with that result
+def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $_, $lhs, $rhs)),
+            (Arith_ConstantOp (NativeCodeCall<"$_builder.getBoolAttr(*::pylir::Py::isUnbound($0))"> $lhs)),
+            [(Constraint<CPred<[{
+                ::pylir::Py::isUnbound($0) && ::pylir::Py::isUnbound($0) == ::pylir::Py::isUnbound($1)
+            }]>> $lhs, $rhs)]>;
+
+// py.isUnboundValue (arith.select %cond, %lhs, %rhs) and %lhs unbound and %rhs not -> %cond
+def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $cond, $lhs, $rhs)), (replaceWithValue $cond),
+            [(Constraint<CPred<[{
+                ::pylir::Py::isUnbound($0) && ::pylir::Py::isUnbound($1)
+                    && *::pylir::Py::isUnbound($0) && !*::pylir::Py::isUnbound($1)
+            }]>> $lhs, $rhs)]>;
+
+// py.isUnboundValue (arith.select %cond, %lhs, %rhs) and %lhs unbound and %rhs not -> not %cond
+def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $cond, $lhs, $rhs)),
+            (Arith_XOrIOp $cond, (Arith_ConstantOp ConstBoolAttrTrue)),
+            [(Constraint<CPred<[{
+                ::pylir::Py::isUnbound($0) && ::pylir::Py::isUnbound($1)
+                    && !*::pylir::Py::isUnbound($0) && *::pylir::Py::isUnbound($1)
+            }]>> $lhs, $rhs)]>;
+
 multiclass IntCommAndAssocPattern<Op op, string operator> {
 	def : Pat<(op (op $op, (ResolvesTo<0> IntAttrInterface:$first)), (ResolvesTo<0> IntAttrInterface:$second)),
 			(op $op,
