@@ -36,15 +36,35 @@ void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface
 {
     auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*call);
 
+    mlir::BlockAndValueMapping mapping;
+    auto* callableRegion = callable.getCallableRegion();
+    mapping.map(callableRegion->getArguments(), call.getArgOperands());
+
+    // Special case for when inlining a region into itself. This is not supported by Regions 'cloneInto'. Instead, we
+    // will create a temporary region, clone into that and then splice it into the caller position.
+    // We have to do the clone here as the block split below would otherwise be cloned as well.
+    mlir::Region selfClone;
+    if (callableRegion == call->getParentRegion())
+    {
+        callableRegion->cloneInto(&selfClone, mapping);
+        callableRegion = &selfClone;
+    }
+
     auto* preBlock = call->getBlock();
     auto* postBlock = preBlock->splitBlock(call);
     postBlock->addArguments(
         callable.getCallableResults(),
         llvm::to_vector(llvm::map_range(call->getResults(), [](mlir::Value arg) { return arg.getLoc(); })));
 
-    mlir::BlockAndValueMapping mapping;
-    mapping.map(callable.getCallableRegion()->getArguments(), call.getArgOperands());
-    callable.getCallableRegion()->cloneInto(preBlock->getParent(), postBlock->getIterator(), mapping);
+    if (callableRegion == &selfClone)
+    {
+        // This is more efficient and straight up moves all the blocks into the right position.
+        preBlock->getParent()->getBlocks().splice(postBlock->getIterator(), callableRegion->getBlocks());
+    }
+    else
+    {
+        callableRegion->cloneInto(preBlock->getParent(), postBlock->getIterator(), mapping);
+    }
 
     auto* firstInlinedBlock = preBlock->getNextNode();
     auto inlineBlocksRange = llvm::make_range(firstInlinedBlock->getIterator(), postBlock->getIterator());
