@@ -185,8 +185,15 @@ def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem", [DeclareOpInterfaceMethod
     }];
 }
 
-def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [DeclareOpInterfaceMethods<CaptureInterface>]> {
-    let arguments = (ins Arg<DynamicType, "", [MemWrite]>:$dict, DynamicType:$key, Index:$hash);
+def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [DeclareOpInterfaceMethods<CaptureInterface>,
+                                                        DeclareOpInterfaceMethods<SROAReadWriteOpInterface,
+                                                          ["validateKey"]>,
+                                                       ]> {
+
+    let arguments = (ins Arg<DynamicType, "", [MemWrite, SROAAggregate]>:$dict,
+                         Arg<DynamicType, "", [Captured, SROAKey]>:$key,
+                         Index:$hash);
+
     let results = (outs I1:$existed);
 
     let assemblyFormat = "$key `hash` `(` $hash `)` `from` $dict attr-dict";

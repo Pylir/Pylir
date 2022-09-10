@@ -81,3 +81,37 @@ func.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 // CHECK-LABEL: func.func @test
 // CHECK: %[[U:.*]] = py.constant(#py.unbound)
 // CHECK: return %[[U]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+func.func @test(%arg0 : !py.dynamic, %hash : index) -> i1 {
+    %0 = py.makeDict ()
+    %1 = py.constant(#py.str<"Hello">)
+    %r = test.random
+    cf.cond_br %r, ^bb1, ^bb2
+
+^bb1:
+    py.dict.setItem %0[%1 hash(%hash)] to %arg0
+    cf.br ^bb2
+
+^bb2:
+    %res = py.dict.delItem %1 hash(%hash) from %0
+    return %res : i1
+}
+
+// CHECK-LABEL: @test
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-NEXT: %[[UNBOUND:.*]] = py.constant(#py.unbound)
+// CHECK-NEXT: %[[KEY:.*]] = py.constant(#py.str<"Hello">)
+// CHECK-NEXT: %[[R:.*]] = test.random
+// CHECK-NEXT: cf.cond_br %[[R]], ^[[BB1:.*]], ^[[BB2:.*]](%[[UNBOUND]] : !py.dynamic)
+// CHECK-NEXT: ^[[BB1]]:
+// CHECK-NEXT: cf.br ^[[BB2]](%[[ARG0]] : !py.dynamic)
+// CHECK-NEXT: ^[[BB2]](%[[ARG:.*]]: !py.dynamic):
+// CHECK: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[ARG]]
+// CHECK-NEXT: %[[TRUE:.*]] = arith.constant true
+// CHECK-NEXT: %[[EXISTED:.*]] = arith.xori %[[IS_UNBOUND]], %[[TRUE]]
+// CHECK-NEXT: return %[[EXISTED]]

@@ -32,6 +32,11 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::validateKey(::mlir::Attribute k
     return validateDictKey(key);
 }
 
+mlir::LogicalResult pylir::Py::DictDelItemOp::validateKey(::mlir::Attribute key)
+{
+    return validateDictKey(key);
+}
+
 namespace
 {
 template <class T>
@@ -196,6 +201,19 @@ void pylir::Py::DictTryGetItemOp::replaceAggregate(AggregateDefs& defs, SSABuild
 void pylir::Py::DictSetItemOp::replaceAggregate(AggregateDefs& defs, SSABuilder&, mlir::OpBuilder&, mlir::Attribute key)
 {
     defs[{getDict(), key}][(*this)->getBlock()] = getValue();
+}
+
+void pylir::Py::DictDelItemOp::replaceAggregate(::pylir::AggregateDefs& defs, ::pylir::SSABuilder& ssaBuilder,
+                                                ::mlir::OpBuilder& builder, ::mlir::Attribute key)
+{
+    auto value = ssaBuilder.readVariable(getLoc(), builder.getType<pylir::Py::DynamicType>(), defs[{getDict(), key}],
+                                         (*this)->getBlock());
+    auto unbound = builder.create<ConstantOp>(getLoc(), builder.getAttr<UnboundAttr>());
+    defs[{getDict(), key}][(*this)->getBlock()] = unbound;
+    auto didNotExist = builder.create<IsUnboundValueOp>(getLoc(), value);
+    auto one = builder.create<mlir::arith::ConstantIntOp>(getLoc(), true, 1);
+    mlir::Value existed = builder.create<mlir::arith::XOrIOp>(getLoc(), didNotExist, one);
+    replaceAllUsesWith(existed);
 }
 
 void pylir::Py::SetSlotOp::replaceAggregate(AggregateDefs& defs, SSABuilder&, mlir::OpBuilder&, mlir::Attribute)
