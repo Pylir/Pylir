@@ -44,4 +44,8 @@ def TestInlineAllPass : Pass<"test-inline-all", "::mlir::ModuleOp"> {
     ];
 }
 
+def TestAddChangePass : Pass<"test-add-change", "::mlir::ModuleOp"> {
+    let dependentDialects = ["::pylir::test::TestDialect"];
+}
+
 #endif

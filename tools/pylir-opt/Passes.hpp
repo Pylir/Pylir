@@ -19,5 +19,6 @@ namespace pylir::test
 #define GEN_PASS_DECL_TESTLOOPINFOPASS
 #define GEN_PASS_DECL_TESTMEMORYSSAPASS
 #define GEN_PASS_DECL_TESTTYPEFLOWPASS
+#define GEN_PASS_DECL_TESTADDCHANGEPASS
 #include "Passes.h.inc"
 } // namespace

@@ -34,4 +34,8 @@ def UseOp : Test_Op<"use"> {
 	let assemblyFormat = "`(` $arguments `)` attr-dict ( `:` type($arguments)^ )?";
 }
 
+def ChangeOp : Test_Op<"change"> {
+    let assemblyFormat = "attr-dict";
+}
+
 #endif

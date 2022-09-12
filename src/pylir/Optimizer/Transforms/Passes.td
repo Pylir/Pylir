@@ -28,4 +28,20 @@ def SROAPass  : Pass<"pylir-sroa"> {
     ];
 }
 
+def FixpointPass : Pass<"pylir-fixpoint"> {
+    let summary = "Run optimization pipeline until fixpoint";
+
+    let statistics = [
+        Statistic<"m_maxIterationReached", "Max iterations reached",
+            "Amount of times the maximum iteration count was reached before a fixpoint">,
+    ];
+
+    let options = [
+        Option<"m_optimizationPipeline", "optimization-pipeline", "std::string", [{""}],
+            "Optimization pipeline to run until fixpoint">,
+        Option<"m_maxIterationCount", "max-iteration-count", "std::size_t", "10",
+            "Maximum amount of iterations if no fixpoint is reached">,
+    ];
+}
+
 #endif
