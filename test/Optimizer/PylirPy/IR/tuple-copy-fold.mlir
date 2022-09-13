@@ -27,3 +27,15 @@ func.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[TUPLE:.*]] = py.makeTuple (%[[ARG0]])
 // CHECK-NEXT: return %[[TUPLE]]
+
+func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
+	%0 = py.list.toTuple %arg0
+	%1 = py.constant (@builtins.tuple)
+	%2 = py.tuple.copy %0 : %1
+	return %2 : !py.dynamic
+}
+
+// CHECK-LABEL: @test3
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-NEXT: %[[TUPLE:.*]] = py.list.toTuple %[[ARG0]]
+// CHECK-NEXT: return %[[TUPLE]]

@@ -1,20 +1,26 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Interfaces/Builtins.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_EXPANDPYDIALECTPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 namespace
 {
@@ -68,56 +74,6 @@ mlir::Value callOrInvoke(mlir::Location loc, mlir::OpBuilder& builder, mlir::Blo
     }
     return result;
 }
-
-struct MROLookupPattern : mlir::OpRewritePattern<pylir::Py::MROLookupOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::MROLookupOp>::OpRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(pylir::Py::MROLookupOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        auto loc = op.getLoc();
-        auto tuple = op.getMroTuple();
-        auto* block = op->getBlock();
-        auto* endBlock = block->splitBlock(op);
-        endBlock->addArguments(op->getResultTypes(), llvm::SmallVector(op->getNumResults(), loc));
-
-        rewriter.setInsertionPointToEnd(block);
-        auto tupleSize = rewriter.create<pylir::Py::TupleLenOp>(loc, rewriter.getIndexType(), tuple);
-        auto startConstant = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 0);
-        auto* conditionBlock = new mlir::Block;
-        conditionBlock->addArgument(rewriter.getIndexType(), loc);
-        rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock, mlir::ValueRange{startConstant});
-
-        conditionBlock->insertBefore(endBlock);
-        rewriter.setInsertionPointToStart(conditionBlock);
-        auto isLess = rewriter.create<mlir::arith::CmpIOp>(loc, mlir::arith::CmpIPredicate::ult,
-                                                           conditionBlock->getArgument(0), tupleSize);
-        auto* body = new mlir::Block;
-        auto unbound = rewriter.create<pylir::Py::ConstantOp>(loc, pylir::Py::UnboundAttr::get(getContext()));
-        auto falseConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(false));
-        rewriter.create<mlir::cf::CondBranchOp>(loc, isLess, body, endBlock, mlir::ValueRange{unbound, falseConstant});
-
-        body->insertBefore(endBlock);
-        rewriter.setInsertionPointToStart(body);
-        auto entry = rewriter.create<pylir::Py::TupleGetItemOp>(loc, tuple, conditionBlock->getArgument(0));
-        auto entryType = rewriter.create<pylir::Py::TypeOfOp>(loc, entry);
-        auto fetch = rewriter.create<pylir::Py::GetSlotOp>(loc, entry, entryType, op.getSlotAttr());
-        auto failure = rewriter.create<pylir::Py::IsUnboundValueOp>(loc, fetch);
-        auto trueConstant = rewriter.create<mlir::arith::ConstantOp>(loc, rewriter.getBoolAttr(true));
-        auto* notFound = new mlir::Block;
-        rewriter.create<mlir::cf::CondBranchOp>(loc, failure, notFound, endBlock,
-                                                mlir::ValueRange{fetch, trueConstant});
-
-        notFound->insertBefore(endBlock);
-        rewriter.setInsertionPointToStart(notFound);
-        auto one = rewriter.create<mlir::arith::ConstantIndexOp>(loc, 1);
-        auto nextIter = rewriter.create<mlir::arith::AddIOp>(loc, conditionBlock->getArgument(0), one);
-        rewriter.create<mlir::cf::BranchOp>(loc, conditionBlock, mlir::ValueRange{nextIter});
-
-        rewriter.replaceOp(op, endBlock->getArguments());
-        return mlir::success();
-    }
-};
 
 struct TupleUnrollPattern : mlir::OpRewritePattern<pylir::Py::MakeTupleOp>
 {
@@ -387,8 +343,11 @@ struct UnpackOpPattern : mlir::OpRewritePattern<TargetOp>
     }
 };
 
-struct ExpandPyDialectPass : public ExpandPyDialectBase<ExpandPyDialectPass>
+struct ExpandPyDialectPass : public pylir::Py::impl::ExpandPyDialectPassBase<ExpandPyDialectPass>
 {
+    using Base::Base;
+
+protected:
     void runOnOperation() override;
 };
 
@@ -405,12 +364,11 @@ void ExpandPyDialectPass::runOnOperation()
                     [](auto op) { return op.getIterExpansion().empty(); })
                 .Default(false);
         });
-    target.addIllegalOp<pylir::Py::MROLookupOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp,
-                        pylir::Py::MakeSetExOp, pylir::Py::MakeDictExOp, pylir::Py::UnpackOp, pylir::Py::UnpackExOp>();
+    target.addIllegalOp<pylir::Py::MakeTupleExOp, pylir::Py::MakeListExOp, pylir::Py::MakeSetExOp,
+                        pylir::Py::MakeDictExOp, pylir::Py::UnpackOp, pylir::Py::UnpackExOp>();
     target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
     mlir::RewritePatternSet patterns(&getContext());
-    patterns.add<MROLookupPattern>(&getContext());
     patterns.add<TupleUnrollPattern>(&getContext());
     patterns.add<TupleExUnrollPattern>(&getContext());
     patterns.add<ListUnrollPattern<pylir::Py::MakeListOp>>(&getContext());
@@ -424,8 +382,3 @@ void ExpandPyDialectPass::runOnOperation()
     }
 }
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createExpandPyDialectPass()
-{
-    return std::make_unique<ExpandPyDialectPass>();
-}

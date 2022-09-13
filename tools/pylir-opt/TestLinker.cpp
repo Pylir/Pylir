@@ -1,16 +1,20 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <pylir/Optimizer/Linker/Linker.hpp>
 
 #include "Passes.hpp"
 
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTLINKERPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
+
 namespace
 {
-class TestLinker : public TestLinkerBase<TestLinker>
+class TestLinker : public pylir::test::impl::TestLinkerPassBase<TestLinker>
 {
 protected:
     void runOnOperation() override
@@ -26,10 +30,8 @@ protected:
         auto linked = pylir::linkModules(modules);
         getOperation().push_back(linked.release());
     }
+
+public:
+    using Base::Base;
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestLinker()
-{
-    return std::make_unique<TestLinker>();
-}

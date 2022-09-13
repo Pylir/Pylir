@@ -22,16 +22,13 @@ class DenseArrayCount<int n> : AttrConstraint<
     CPred<"$_self.cast<::mlir::ElementsAttr>().size() == " #n>,
     "with exactly " # n # " elements">;
 
-// TODO: Replace with ConstantAttr once supported.
-defvar EmptyI32Array = NativeCodeCall<"$_builder.getDenseI32ArrayAttr({})">;
-
 defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, DenseArrayCount<0>)),
           (PylirPy_MakeTupleOp
             (NativeCodeCall<[{ [&]{ auto vector = llvm::to_vector($1);
                                     vector.insert(vector.begin(), $0);
-                                    return vector; }() }]> $input, $args), (EmptyI32Array))>;
+                                    return vector; }() }]> $input, $args), ConstantAttr<DenseI32ArrayAttr, "{}">)>;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (ResolvesTo<0> PylirPy_TupleAttr:$args)),
           (prependTupleConst $input, $args)>;
@@ -51,7 +48,7 @@ def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
                                         vector.erase(vector.begin(), vector.begin() + value);
                                     }
                                     return vector;
-                                }() }]> $count, $args), (EmptyI32Array))>;
+                                }() }]> $count, $args), ConstantAttr<DenseI32ArrayAttr, "{}">)>;
 
 class BinOpAttrs<string op, Attr attrType, Attr resultAttr = attrType>
 	: NativeCodeCall<!subst("$0",
@@ -88,30 +85,6 @@ def : Pat<(Arith_CmpIOp Arith_CmpIEq, (PylirPy_ObjectIdOp $lhs), (PylirPy_Object
 def : Pat<(Arith_CmpIOp Arith_CmpINe, (PylirPy_ObjectIdOp $lhs), (PylirPy_ObjectIdOp $rhs)),
 			(Arith_XOrIOp (PylirPy_IsOp $lhs, $rhs), (Arith_ConstantOp ConstBoolAttrTrue))>;
 
-class IntegerWidthComp<string op> : Constraint<CPred<
-    "$0.getType().getIntOrFloatBitWidth() " # op # " $1.getType().getIntOrFloatBitWidth()">,
-     "integer width is " # op # " than the other">;
-
-def TypesMatch : Constraint<CPred<"$0.getType() == $1.getType()">, "has same type">;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp AnyInteger:$input)),
-                [(Arith_TruncIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(AnyInteger $result__0), (IntegerWidthComp<">"> $input, $result__0)]>;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp AnyInteger:$input)),
-                [(Arith_ExtSIOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(AnyInteger $result__0), (IntegerWidthComp<"<"> $input, $result__0)]>;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp $input)),
-                [(replaceWithValue $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(TypesMatch $result__0, $input)]>;
-
-def OnlyOneIsIndex : Constraint<CPred<"$0.getType().isIndex() != $1.getType().isIndex()">, "only one is index">;
-
-def : Pattern<(PylirPy_IntToIntegerOp:$result (PylirPy_IntFromIntegerOp $input)),
-                [(Arith_IndexCastOp $input), (Arith_ConstantOp ConstBoolAttrTrue)],
-                [(OnlyOneIsIndex $result__0, $input)]>;
-
 def IsConstant : Constraint<CPred<"::mlir::matchPattern($0, ::mlir::m_Constant())">, "is constant">;
 
 class NotConstraint<Constraint con> : Constraint<Neg<con.predicate>, "not " # con.summary>;
@@ -122,6 +95,29 @@ def : Pat<(PylirPy_IntCmpOp $kind, $lhs, $rhs),
 
 def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
           (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
+
+// py.isUnboundValue (arith.select %cond, %lhs, %rhs) and %lhs and %rhs are either both definitely bound or definitely
+// not unbound -> replace with that result
+def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $_, $lhs, $rhs)),
+            (Arith_ConstantOp (NativeCodeCall<"$_builder.getBoolAttr(*::pylir::Py::isUnbound($0))"> $lhs)),
+            [(Constraint<CPred<[{
+                ::pylir::Py::isUnbound($0) && ::pylir::Py::isUnbound($0) == ::pylir::Py::isUnbound($1)
+            }]>> $lhs, $rhs)]>;
+
+// py.isUnboundValue (arith.select %cond, %lhs, %rhs) and %lhs unbound and %rhs not -> %cond
+def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $cond, $lhs, $rhs)), (replaceWithValue $cond),
+            [(Constraint<CPred<[{
+                ::pylir::Py::isUnbound($0) && ::pylir::Py::isUnbound($1)
+                    && *::pylir::Py::isUnbound($0) && !*::pylir::Py::isUnbound($1)
+            }]>> $lhs, $rhs)]>;
+
+// py.isUnboundValue (arith.select %cond, %lhs, %rhs) and %lhs unbound and %rhs not -> not %cond
+def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $cond, $lhs, $rhs)),
+            (Arith_XOrIOp $cond, (Arith_ConstantOp ConstBoolAttrTrue)),
+            [(Constraint<CPred<[{
+                ::pylir::Py::isUnbound($0) && ::pylir::Py::isUnbound($1)
+                    && !*::pylir::Py::isUnbound($0) && *::pylir::Py::isUnbound($1)
+            }]>> $lhs, $rhs)]>;
 
 multiclass IntCommAndAssocPattern<Op op, string operator> {
 	def : Pat<(op (op $op, (ResolvesTo<0> IntAttrInterface:$first)), (ResolvesTo<0> IntAttrInterface:$second)),

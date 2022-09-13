@@ -312,3 +312,73 @@ module {
 }
 
 // CHECK-LABEL:  func.func @__init__
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+py.globalHandle @foo
+
+func.func @test() -> !py.dynamic {
+    %0 = py.constant(#py.str<"value">)
+    py.store %0 into @foo
+    cf.br ^bb0
+
+^bb0:
+    %1 = py.load @foo
+    test.use(%1) : !py.dynamic // acts as a clobber because it has unknown side effects.
+    %2 = test.random
+    cf.cond_br %2, ^bb0, ^bb2
+
+^bb2:
+    %3 = py.load @foo
+    return %3 : !py.dynamic
+}
+
+// CHECK-LABEL:  func @test
+// CHECK: %[[C1:.*]] = py.constant(#py.str<"value">)
+// CHECK: py.store %[[C1]] into @foo
+// CHECK: cf.br ^[[BB0:[[:alnum:]]+]]
+
+// CHECK: ^[[BB0]]:
+// CHECK: py.load @foo
+// CHECK: cf.cond_br %{{.*}}, ^[[BB0]], ^[[BB2:[[:alnum:]]+]]
+
+// CHECK: ^[[BB2]]:
+// CHECK: %[[LOAD:.*]] = py.load @foo
+// CHECK: return %[[LOAD]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+py.globalHandle @foo
+
+func.func @test() -> !py.dynamic {
+    %0 = py.constant(#py.str<"value">)
+    py.store %0 into @foo
+    cf.br ^bb0
+
+^bb0:
+    %1 = py.load @foo
+    %2 = test.random
+    cf.cond_br %2, ^bb0, ^bb2
+
+^bb2:
+    %3 = py.load @foo
+    return %3 : !py.dynamic
+}
+
+// CHECK-LABEL:  func @test
+// CHECK: %[[C:.*]] = py.constant(#py.str<"value">)
+// CHECK: cf.br ^[[BB0:[[:alnum:]]+]](%[[C]] : !py.dynamic)
+
+// CHECK: ^[[BB0]](%[[ARG:.*]]: !py.dynamic):
+// CHECK-NOT: py.load
+// CHECK: cf.cond_br %{{.*}}, ^[[BB0]](%[[ARG]] : !py.dynamic), ^[[BB2:[[:alnum:]]+]]
+
+// CHECK: ^[[BB2]]:
+// CHECK-NOT: py.load
+// CHECK: return %[[ARG]]

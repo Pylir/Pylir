@@ -1,16 +1,17 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "CompilerInvocation.hpp"
 
+#include <mlir/Bytecode/BytecodeReader.h>
+#include <mlir/Bytecode/BytecodeWriter.h>
 #include <mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/Arithmetic/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
+#include <mlir/Dialect/DLTI/DLTI.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
@@ -117,6 +118,59 @@ void writeDependencyOutput(llvm::raw_ostream& ostream, llvm::StringRef outputFil
     llvm::interleave(llvm::map_range(additionalInputFiles, escapeForMakefile), ostream, " ");
     ostream << '\n';
 }
+
+void llvmDataLayoutToMLIRDataLayout(mlir::ModuleOp moduleOp, const llvm::DataLayout& dataLayout)
+{
+    moduleOp.getContext()->loadDialect<mlir::DLTIDialect>();
+    moduleOp.getContext()->loadDialect<mlir::LLVM::LLVMDialect>();
+    llvm::SmallVector<mlir::DataLayoutEntryInterface> entries;
+    // Endian.
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+        mlir::StringAttr::get(moduleOp.getContext(), mlir::DLTIDialect::kDataLayoutEndiannessKey),
+        mlir::StringAttr::get(moduleOp.getContext(), dataLayout.isBigEndian() ?
+                                                         mlir::DLTIDialect::kDataLayoutEndiannessBig :
+                                                         mlir::DLTIDialect::kDataLayoutEndiannessLittle)));
+    // Index size.
+    auto i32 = mlir::IntegerType::get(moduleOp.getContext(), 32);
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(mlir::IndexType::get(moduleOp.getContext()),
+                                                        mlir::IntegerAttr::get(i32, dataLayout.getIndexSizeInBits(0))));
+
+    // Only integer types we actually care about (probably even more than what we care about to be honest. We only
+    // really use whatever is index).
+    llvm::LLVMContext context;
+    for (std::size_t integerSize : {1, 8, 16, 32, 64})
+    {
+        auto* llvmIntegerType = llvm::IntegerType::get(context, integerSize);
+        auto mlirIntegerType = mlir::IntegerType::get(moduleOp.getContext(), integerSize);
+        auto abiAlign = dataLayout.getABITypeAlign(llvmIntegerType);
+        auto prefAlign = dataLayout.getPrefTypeAlign(llvmIntegerType);
+        entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+            mlirIntegerType, mlir::DenseIntElementsAttr::get(mlir::VectorType::get({2}, i32),
+                                                             {static_cast<std::int32_t>(abiAlign.value()) * 8,
+                                                              static_cast<std::int32_t>(prefAlign.value()) * 8})));
+    }
+
+    // Only really care about Double at the moment.
+    auto* llvm64 = llvm::Type::getFloatingPointTy(context, llvm::APFloat::IEEEdouble());
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+        mlir::FloatType::getF64(moduleOp->getContext()),
+        mlir::DenseIntElementsAttr::get(
+            mlir::VectorType::get({2}, i32),
+            llvm::ArrayRef<std::int32_t>{static_cast<std::int32_t>(dataLayout.getABITypeAlign(llvm64).value()) * 8,
+                                         static_cast<std::int32_t>(dataLayout.getPrefTypeAlign(llvm64).value()) * 8})));
+
+    // Pointers
+    entries.emplace_back(mlir::DataLayoutEntryAttr::get(
+        mlir::LLVM::LLVMPointerType::get(moduleOp.getContext()),
+        mlir::DenseIntElementsAttr::get(
+            mlir::VectorType::get({3}, i32),
+            {static_cast<std::int32_t>(dataLayout.getPointerSizeInBits(0)),
+             static_cast<std::int32_t>(dataLayout.getPointerABIAlignment(0).value()) * 8,
+             static_cast<std::int32_t>(dataLayout.getPointerPrefAlignment(0).value()) * 8})));
+
+    moduleOp->setAttr(mlir::DLTIDialect::kDataLayoutAttrName,
+                      mlir::DataLayoutSpecAttr::get(moduleOp.getContext(), entries));
+}
 } // namespace
 
 mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inputFile, CommandLine& commandLine,
@@ -174,18 +228,75 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
             return mlir::failure();
         }
     }
-    auto fileName = m_outputFile->TmpName;
+
+    PYLIR_ASSERT(m_tempFile);
+    auto fileName = m_tempFile->TmpName;
     m_outFileStream.reset();
-    if (auto error = m_outputFile->keep())
+    if (auto error = m_tempFile->keep())
     {
         llvm::consumeError(std::move(error));
-        commandLine.createError(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_outputFile->TmpName);
+        commandLine.createError(pylir::Diag::FAILED_TO_KEEP_TEMPORARY_FILE_N, m_tempFile->TmpName);
         return mlir::failure();
     }
     bool success = toolchain.link(commandLine, fileName);
     llvm::sys::fs::remove(fileName);
     return mlir::success(success);
 }
+
+namespace
+{
+mlir::FailureOr<std::string> readWholeFile(llvm::opt::Arg* inputFile, CommandLine& commandLine)
+{
+    auto fd = llvm::sys::fs::openNativeFileForRead(inputFile->getValue());
+    if (!fd)
+    {
+        llvm::consumeError(fd.takeError());
+        commandLine.createError(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N, inputFile->getValue())
+            .addHighlight(inputFile);
+        return mlir::failure();
+    }
+    std::optional exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
+    llvm::sys::fs::file_status status;
+    {
+        auto error = llvm::sys::fs::status(*fd, status);
+        if (error)
+        {
+            commandLine.createError(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N, inputFile->getValue())
+                .addHighlight(inputFile);
+            return mlir::failure();
+        }
+    }
+    std::string content(status.getSize(), '\0');
+    auto read = llvm::sys::fs::readNativeFile(*fd, {content.data(), content.size()});
+    if (!read)
+    {
+        llvm::consumeError(fd.takeError());
+        commandLine.createError(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N, inputFile->getValue())
+            .addHighlight(inputFile);
+        return mlir::failure();
+    }
+    return std::move(content);
+}
+
+mlir::ModuleOp buildModuleIfNecessary(std::unique_ptr<mlir::Block>&& block, mlir::MLIRContext* context)
+{
+    if (llvm::hasSingleElement(*block))
+    {
+        if (auto module = llvm::dyn_cast<mlir::ModuleOp>(&block->front()))
+        {
+            module->remove();
+            return module;
+        }
+    }
+
+    mlir::OpBuilder builder(context);
+    auto mlirModule = builder.create<mlir::ModuleOp>(builder.getUnknownLoc());
+    mlir::Block& moduleBody = mlirModule.getBodyRegion().front();
+    moduleBody.getOperations().splice(moduleBody.begin(), block->getOperations());
+    return mlirModule;
+}
+
+} // namespace
 
 mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* inputFile, CommandLine& commandLine,
                                                            const pylir::Toolchain& toolchain,
@@ -195,7 +306,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
     auto inputExtension = llvm::sys::path::extension(inputFile->getValue());
     auto type = llvm::StringSwitch<FileType>(inputExtension)
                     .Case(".py", FileType::Python)
-                    .Case(".mlir", FileType::MLIR)
+                    .Cases(".mlir", ".mlirbc", FileType::MLIR)
                     .Cases(".ll", ".bc", FileType::LLVM)
                     .Default(FileType::Python);
     const auto& args = commandLine.getArgs();
@@ -212,36 +323,12 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
     {
         case FileType::Python:
         {
-            auto fd = llvm::sys::fs::openNativeFileForRead(inputFile->getValue());
-            if (!fd)
+            auto content = readWholeFile(inputFile, commandLine);
+            if (mlir::failed(content))
             {
-                llvm::consumeError(fd.takeError());
-                commandLine.createError(inputFile, pylir::Diag::FAILED_TO_OPEN_FILE_N, inputFile->getValue())
-                    .addHighlight(inputFile);
                 return mlir::failure();
             }
-            std::optional exit = llvm::make_scope_exit([&fd] { llvm::sys::fs::closeFile(*fd); });
-            llvm::sys::fs::file_status status;
-            {
-                auto error = llvm::sys::fs::status(*fd, status);
-                if (error)
-                {
-                    commandLine.createError(inputFile, pylir::Diag::FAILED_TO_ACCESS_FILE_N, inputFile->getValue())
-                        .addHighlight(inputFile);
-                    return mlir::failure();
-                }
-            }
-            std::string content(status.getSize(), '\0');
-            auto read = llvm::sys::fs::readNativeFile(*fd, {content.data(), content.size()});
-            if (!read)
-            {
-                llvm::consumeError(fd.takeError());
-                commandLine.createError(inputFile, pylir::Diag::FAILED_TO_READ_FILE_N, inputFile->getValue())
-                    .addHighlight(inputFile);
-                return mlir::failure();
-            }
-            exit.reset();
-            auto& document = addDocument(std::move(content), inputFile->getValue());
+            auto& document = addDocument(std::move(*content), inputFile->getValue());
             auto subDiagManager = diagManager.createSubDiagnosticManager(document);
             Syntax::FileInput* fileInput;
             {
@@ -270,6 +357,11 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             mlirModule = std::move(*module);
+            if (mlir::failed(ensureTargetMachine(args, commandLine, toolchain)))
+            {
+                return mlir::failure();
+            }
+            llvmDataLayoutToMLIRDataLayout(*mlirModule, m_targetMachine->createDataLayout());
             [[fallthrough]];
         }
         case FileType::MLIR:
@@ -278,10 +370,23 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 ensureMLIRContext(args);
                 m_mlirContext->allowUnregisteredDialects(false);
-                mlirModule = mlir::parseSourceFile<mlir::ModuleOp>(inputFile->getValue(), &*m_mlirContext);
-                if (!mlirModule)
+                auto content = readWholeFile(inputFile, commandLine);
+                if (mlir::failed(content))
                 {
                     return mlir::failure();
+                }
+                if (auto buffer = llvm::MemoryBufferRef(*content, inputFile->getValue()); mlir::isBytecode(buffer))
+                {
+                    auto body = std::make_unique<mlir::Block>();
+                    if (mlir::failed(mlir::readBytecodeFile(buffer, body.get(), mlir::ParserConfig(&*m_mlirContext))))
+                    {
+                        return mlir::failure();
+                    }
+                    mlirModule = buildModuleIfNecessary(std::move(body), &*m_mlirContext);
+                }
+                else
+                {
+                    mlirModule = mlir::parseSourceString<mlir::ModuleOp>(*content, mlir::ParserConfig(&*m_mlirContext));
                 }
             }
             mlir::PassManager manager(&*m_mlirContext);
@@ -317,21 +422,11 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 manager.enableTiming();
             }
-            if (shouldOutput(OPT_emit_pylir))
+            if (!shouldOutput(OPT_emit_pylir))
             {
-                if (mlir::failed(manager.run(*mlirModule)))
-                {
-                    return mlir::failure();
-                }
-                if (mlir::failed(ensureOutputStream(args, action, commandLine)))
-                {
-                    return mlir::failure();
-                }
-                mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
-                return finalizeOutputStream(mlir::success(), commandLine);
+                addOptimizationPasses(args.getLastArgValue(OPT_O, "0"), manager);
             }
-            addOptimizationPasses(args.getLastArgValue(OPT_O, "0"), manager);
-            if (shouldOutput(OPT_emit_mlir))
+            if (shouldOutput(OPT_emit_mlir) || shouldOutput(OPT_emit_pylir))
             {
                 if (mlir::failed(manager.run(*mlirModule)))
                 {
@@ -341,7 +436,15 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 {
                     return mlir::failure();
                 }
-                mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
+
+                if (action == Assembly)
+                {
+                    mlirModule->print(*m_output, mlir::OpPrintingFlags{}.assumeVerified().enableDebugInfo());
+                }
+                else
+                {
+                    mlir::writeBytecodeToFile(*mlirModule, *m_output, "Pylir " PYLIR_VERSION);
+                }
                 return finalizeOutputStream(mlir::success(), commandLine);
             }
             if (mlir::failed(ensureTargetMachine(args, commandLine, toolchain)))
@@ -351,8 +454,9 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             auto* nested = &manager.nestAny();
             nested->addPass(mlir::arith::createArithmeticExpandOpsPass());
             nested->addPass(mlir::arith::createConvertArithmeticToLLVMPass());
-            manager.addPass(pylir::createConvertPylirToLLVMPass(m_targetMachine->getTargetTriple(),
-                                                                m_targetMachine->createDataLayout()));
+            manager.addPass(
+                pylir::createConvertPylirToLLVMPass({m_targetMachine->getTargetTriple().str(),
+                                                     m_targetMachine->createDataLayout().getStringRepresentation()}));
             nested = &manager.nestAny();
             nested->addPass(mlir::createReconcileUnrealizedCastsPass());
             nested->addPass(mlir::LLVM::createLegalizeForExportPass());
@@ -532,6 +636,7 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<mlir::LLVM::LLVMDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();
+    registry.insert<mlir::DLTIDialect>();
     m_mlirContext.emplace(registry);
     m_mlirContext->enableMultithreading(args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
     m_mlirContext->getDiagEngine().registerHandler(
@@ -542,6 +647,55 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
         });
 }
 
+namespace
+{
+std::string formDefaultOutputName(const llvm::opt::InputArgList& args, pylir::CompilerInvocation::Action action)
+{
+    std::string inputFilename = llvm::sys::path::filename(args.getLastArgValue(OPT_INPUT)).str();
+
+    auto extension = llvm::sys::path::extension(inputFilename);
+    bool isKnownFileExtension =
+        llvm::is_contained<llvm::StringRef>({".py", ".mlir", ".ll", ".bc", ".mlirbc"}, extension);
+    if (isKnownFileExtension)
+    {
+        inputFilename.resize(inputFilename.size() - extension.size());
+    }
+
+    std::string defaultName;
+    if (args.hasArg(OPT_emit_mlir, OPT_emit_pylir))
+    {
+        if (action == pylir::CompilerInvocation::ObjectFile)
+        {
+            defaultName = inputFilename + ".mlirbc";
+        }
+        else
+        {
+            defaultName = inputFilename + ".mlir";
+        }
+    }
+    else if (args.hasArg(OPT_emit_llvm))
+    {
+        if (action == pylir::CompilerInvocation::ObjectFile)
+        {
+            defaultName = inputFilename + ".bc";
+        }
+        else
+        {
+            defaultName = inputFilename + ".ll";
+        }
+    }
+    else if (action == pylir::CompilerInvocation::Assembly)
+    {
+        defaultName = inputFilename + ".s";
+    }
+    else if (action == pylir::CompilerInvocation::ObjectFile)
+    {
+        defaultName = inputFilename + ".o";
+    }
+    return defaultName;
+}
+} // namespace
+
 mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::opt::InputArgList& args, Action action,
                                                                   cli::CommandLine& commandLine)
 {
@@ -549,62 +703,63 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::op
     {
         return mlir::success();
     }
-    auto filename = llvm::sys::path::filename(args.getLastArgValue(OPT_INPUT)).str();
-    llvm::SmallString<20> realOutputFilename;
+
+    llvm::SmallString<20> compilerOutputFilepath;
     if (action == pylir::CompilerInvocation::Link)
     {
-        llvm::sys::path::system_temp_directory(true, realOutputFilename);
-        llvm::sys::path::append(realOutputFilename, "tmp.o");
+        llvm::sys::path::system_temp_directory(true, compilerOutputFilepath);
+        llvm::sys::path::append(compilerOutputFilepath, "tmp.o");
     }
     else
     {
-        std::string defaultName;
-        if (args.hasArg(OPT_emit_mlir))
-        {
-            defaultName = filename + ".mlir";
-        }
-        else if (args.hasArg(OPT_emit_llvm))
-        {
-            if (action == pylir::CompilerInvocation::ObjectFile)
-            {
-                defaultName = filename + ".bc";
-            }
-            else
-            {
-                defaultName = filename + ".ll";
-            }
-        }
-        else if (action == pylir::CompilerInvocation::Assembly)
-        {
-            defaultName = filename + ".s";
-        }
-        else if (action == pylir::CompilerInvocation::ObjectFile)
-        {
-            defaultName = filename + ".o";
-        }
-        realOutputFilename = args.getLastArgValue(OPT_o, defaultName);
+        compilerOutputFilepath = args.getLastArgValue(OPT_o, formDefaultOutputName(args, action));
     }
 
-    llvm::SmallString<20> tempFileName = realOutputFilename;
-    if (realOutputFilename == "-")
+    bool useTemporaryFile = true;
+    if (compilerOutputFilepath == "-")
     {
-        m_output = &llvm::outs();
-        return mlir::success();
+        useTemporaryFile = false;
     }
-    auto extension = llvm::sys::path::extension(realOutputFilename);
-    llvm::sys::path::remove_filename(tempFileName);
-    llvm::sys::path::append(tempFileName, llvm::sys::path::stem(realOutputFilename) + "-%%%%" + extension);
-    auto tempFile = llvm::sys::fs::TempFile::create(tempFileName);
-    if (!tempFile)
+    else
     {
-        llvm::consumeError(tempFile.takeError());
-        commandLine.createError(pylir::Diag::FAILED_TO_CREATE_TEMPORARY_FILE_N, tempFileName.str());
-        return mlir::failure();
+        llvm::sys::fs::file_status status;
+        llvm::sys::fs::status(compilerOutputFilepath, status);
+        if (llvm::sys::fs::exists(status) && !llvm::sys::fs::is_regular_file(status))
+        {
+            useTemporaryFile = false;
+        }
     }
-    m_outputFile = std::move(*tempFile);
-    m_outFileStream.emplace(m_outputFile->FD, false);
+
+    if (useTemporaryFile)
+    {
+        llvm::SmallString<20> tempFileName = compilerOutputFilepath;
+        auto extension = llvm::sys::path::extension(compilerOutputFilepath);
+        llvm::sys::path::remove_filename(tempFileName);
+        llvm::sys::path::append(tempFileName,
+                                llvm::sys::path::stem(compilerOutputFilepath) + "-%%%%%%%%%" + extension + ".tmp");
+        auto tempFile = llvm::sys::fs::TempFile::create(tempFileName);
+        if (!tempFile)
+        {
+            llvm::consumeError(tempFile.takeError());
+            commandLine.createError(pylir::Diag::FAILED_TO_CREATE_TEMPORARY_FILE_N, tempFileName.str());
+            return mlir::failure();
+        }
+        m_tempFile = std::move(*tempFile);
+        m_outFileStream.emplace(m_tempFile->FD, false);
+    }
+    else
+    {
+        std::error_code ec;
+        m_outFileStream.emplace(compilerOutputFilepath, ec, llvm::sys::fs::FileAccess::FA_Write);
+        if (ec)
+        {
+            commandLine.createError(Diag::FAILED_TO_OPEN_OUTPUT_FILE_N_FOR_WRITING, compilerOutputFilepath.str());
+            return mlir::failure();
+        }
+    }
+
     m_output = &*m_outFileStream;
-    m_compileStepOutputFilename = realOutputFilename.str();
+    m_compileStepOutputFilename = compilerOutputFilepath.str();
     m_actionOutputFilename = action == Link ? args.getLastArgValue(OPT_o) : m_compileStepOutputFilename;
     return mlir::success();
 }
@@ -612,30 +767,30 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureOutputStream(const llvm::op
 mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::LogicalResult result,
                                                                     cli::CommandLine& commandLine)
 {
-    if (!m_outputFile)
+    m_outFileStream.reset();
+    m_output = nullptr;
+    if (!m_tempFile)
     {
         return result;
     }
-    m_outFileStream.reset();
-    m_output = nullptr;
-    auto exit = llvm::make_scope_exit([&] { m_outputFile.reset(); });
+    auto exit = llvm::make_scope_exit([&] { m_tempFile.reset(); });
     if (mlir::failed(result))
     {
-        if (auto error = m_outputFile->discard())
+        if (auto error = m_tempFile->discard())
         {
             llvm::consumeError(std::move(error));
-            commandLine.createError(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, m_outputFile->TmpName);
+            commandLine.createError(pylir::Diag::FAILED_TO_DISCARD_TEMPORARY_FILE_N, m_tempFile->TmpName);
         }
         return mlir::failure();
     }
-    if (auto error = m_outputFile->keep(m_compileStepOutputFilename))
+    if (auto error = m_tempFile->keep(m_compileStepOutputFilename))
     {
         llvm::consumeError(std::move(error));
-        commandLine.createError(pylir::Diag::FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N, m_outputFile->TmpName,
+        commandLine.createError(pylir::Diag::FAILED_TO_RENAME_TEMPORARY_FILE_N_TO_N, m_tempFile->TmpName,
                                 m_compileStepOutputFilename);
         return mlir::failure();
     }
-    return mlir::success();
+    return result;
 }
 
 void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mlir::OpPassManager& manager)

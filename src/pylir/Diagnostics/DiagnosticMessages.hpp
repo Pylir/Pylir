@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -92,6 +90,8 @@ constexpr auto EXPECTED_ONLY_ONE_INPUT_FILE = FMT_STRING("expected only one inpu
 constexpr auto NO_INPUT_FILE = FMT_STRING("no input file");
 
 constexpr auto FAILED_TO_OPEN_FILE_N = FMT_STRING("failed to open file '{}'");
+
+constexpr auto FAILED_TO_OPEN_OUTPUT_FILE_N_FOR_WRITING = FMT_STRING("failed to open output file '{}' for writing");
 
 constexpr auto FAILED_TO_ACCESS_FILE_N = FMT_STRING("failed to access file '{}'");
 

@@ -9,7 +9,7 @@ func.func @indirect(%arg0 : i32) -> i32 {
 
 // CHECK-LABEL: func @indirect
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK-NEXT: %[[C:.*]] = arith.constant 5
+// CHECK-NEXT: %[[C:.*]] = arith.constant 16
 // CHECK-NEXT: %[[SUB:.*]] = arith.subi %[[ARG0]], %[[C]]
 // CHECK-NEXT: %[[CALL:.*]] = call @indirect(%[[SUB]])
 // CHECK-NEXT: return %[[CALL]]

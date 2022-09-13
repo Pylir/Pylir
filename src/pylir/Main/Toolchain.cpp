@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "Toolchain.hpp"
 
@@ -163,16 +161,6 @@ std::vector<std::string> pylir::Toolchain::getLLVMOptions(const llvm::opt::Input
 
     // Allow callee saved registers for live-through and GC ptr values
     result.emplace_back("-fixup-allow-gcptr-in-csr");
-
-    //TODO: Remove this when below bug is fixed or there is toolchain support for AArch64
-    llvm::StringSet<> set = {
-#define LLVM_TARGET(x) #x,
-#include <llvm/Config/Targets.def>
-    };
-    if (set.contains("AArch64"))
-    {
-        result.emplace_back("-aarch64-enable-global-isel-at-O=-1");
-    }
     if (args.getLastArgValue(pylir::cli::OPT_O, "0") != "0")
     {
         // No restrictions on how many registers its allowed to use

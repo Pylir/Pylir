@@ -25,9 +25,9 @@ func.func private @"builtins.type.__call__$impl[0]"(%arg0: !py.dynamic, %arg1: !
   %8 = py.constant(@builtins.TypeError)
   %9 = py.constant(@builtins.type.__call__)
   %10 = py.tuple.len %arg2
-  %11 = py.int.fromInteger %10 : index
+  %11 = py.int.fromUnsigned %10
   %12 = py.dict.len %arg3
-  %13 = py.int.fromInteger %12 : index
+  %13 = py.int.fromUnsigned %12
   %14 = py.int.cmp eq %11, %2
   %15 = py.bool.fromI1 %14
   %16 = py.int.cmp eq %13, %3
@@ -64,11 +64,9 @@ func.func private @"builtins.type.__call__$impl[0]"(%arg0: !py.dynamic, %arg1: !
   return %36 : !py.dynamic
 ^bb7:  // pred: ^bb5
   %37 = py.type.mro %arg1
-  %result, %success = py.mroLookup "__new__" in %37
-  %38 = py.bool.fromI1 %success
-  %39 = py.makeTuple (%result, %38)
+  %result = py.mroLookup "__new__" in %37
   %40 = py.tuple.prepend %arg1, %arg2
-  %41 = py.function.call %39(%39, %40, %arg3)
+  %41 = py.function.call %result(%result, %40, %arg3)
   %42 = py.typeOf %41
   %43 = py.type.mro %42
   %44 = py.tuple.contains %arg1 in %43
@@ -77,11 +75,9 @@ func.func private @"builtins.type.__call__$impl[0]"(%arg0: !py.dynamic, %arg1: !
 ^bb8:  // 2 preds: ^bb7, ^bb9
   return %41 : !py.dynamic
 ^bb9:  // pred: ^bb7
-  %result_0, %success_1 = py.mroLookup "__init__" in %43
-  %46 = py.bool.fromI1 %success_1
-  %47 = py.makeTuple (%result_0, %46)
+  %result_0 = py.mroLookup "__init__" in %43
   %48 = py.tuple.prepend %41, %arg2
-  %49 = py.function.call %47(%47, %48, %arg3)
+  %49 = py.function.call %result_0(%result_0, %48, %arg3)
   %50 = py.is %49, %1
   %51 = test.random
   cf.cond_br %51, ^bb10, ^bb8
@@ -111,11 +107,11 @@ func.func private @"builtins.type.__call__$cc[0]"(%arg0: !py.dynamic, %arg1: !py
   %9 = py.tuple.getItem %arg1[%c0]
   cf.br ^bb2(%9 : !py.dynamic)
 ^bb2(%10: !py.dynamic):  // 2 preds: ^bb0, ^bb1
-  %11 = py.dict.tryGetItem %arg2[%1]
+  %11 = py.dict.tryGetItem %arg2[%1 hash(%c0)]
   %12 = py.isUnboundValue %11
   cf.cond_br %12, ^bb5(%10 : !py.dynamic), ^bb3
 ^bb3:  // pred: ^bb2
-  %13 = py.dict.delItem %1 from %arg2
+  %13 = py.dict.delItem %1 hash(%c0) from %arg2
   %14 = py.isUnboundValue %10
   cf.cond_br %14, ^bb5(%11 : !py.dynamic), ^bb4
 ^bb4:  // 2 preds: ^bb3, ^bb5

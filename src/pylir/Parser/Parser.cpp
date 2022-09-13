@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "Parser.hpp"
 
@@ -91,84 +89,6 @@ bool pylir::Parser::firstInCompoundStmt(TokenType tokenType)
         case TokenType::ClassKeyword: return true;
         default: return false;
     }
-}
-
-void pylir::Parser::addToNamespace(const pylir::Token& token)
-{
-    PYLIR_ASSERT(token.getTokenType() == TokenType::Identifier);
-    auto identifierToken = IdentifierToken{token};
-    addToNamespace(identifierToken);
-}
-
-void pylir::Parser::addToNamespace(const IdentifierToken& token)
-{
-    if (m_namespace.empty())
-    {
-        m_globals.insert(token);
-        return;
-    }
-    auto result = m_namespace.back().identifiers.insert({token, Syntax::Scope::Local}).first;
-    if (result->second == Syntax::Scope::Unknown)
-    {
-        result->second = Syntax::Scope::Local;
-    }
-}
-
-void pylir::Parser::addToNamespace(const Syntax::Target& target)
-{
-    class TargetVisitor : public Syntax::Visitor<TargetVisitor>
-    {
-    public:
-        std::function<void(const pylir::IdentifierToken&)> callback;
-
-        using Visitor::visit;
-
-        void visit(const Syntax::Atom& atom)
-        {
-            if (atom.token.getTokenType() == TokenType::Identifier)
-            {
-                callback(IdentifierToken(atom.token));
-            }
-        }
-
-        void visit(const Syntax::AttributeRef&) {}
-
-        void visit(const Syntax::Subscription&) {}
-
-        void visit(const Syntax::Slice&) {}
-
-        void visit(const Syntax::DictDisplay&) {}
-
-        void visit(const Syntax::SetDisplay&) {}
-
-        void visit(const Syntax::ListDisplay& listDisplay)
-        {
-            if (std::holds_alternative<Syntax::Comprehension>(listDisplay.variant))
-            {
-                return;
-            }
-            Visitor::visit(listDisplay);
-        }
-
-        void visit(const Syntax::Yield&) {}
-
-        void visit(const Syntax::Generator&) {}
-
-        void visit(const Syntax::BinOp&) {}
-
-        void visit(const Syntax::Lambda&) {}
-
-        void visit(const Syntax::Call&) {}
-
-        void visit(const Syntax::UnaryOp&) {}
-
-        void visit(const Syntax::Comparison&) {}
-
-        void visit(const Syntax::Conditional&) {}
-
-        void visit(const Syntax::Assignment&) {}
-    } visitor{{}, [&](const IdentifierToken& token) { addToNamespace(token); }};
-    visitor.visit(target);
 }
 
 std::optional<pylir::Token> pylir::Parser::expect(pylir::TokenType tokenType)

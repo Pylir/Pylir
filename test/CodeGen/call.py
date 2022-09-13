@@ -22,11 +22,12 @@ x(5, k=3)
 # CHECK: cond_br %[[IS_UNBOUND]], ^{{[[:alnum:]]+}}, ^[[HAPPY_PATH:[[:alnum:]]+]]
 
 # CHECK: ^[[HAPPY_PATH]]:
-# CHECK-DAG: %[[FIVE:.*]] = py.constant(#py.int<5>)
-# CHECK-DAG: %[[NAME:.*]] = py.constant(#py.str<"k">)
-# CHECK-DAG: %[[THREE:.*]] = py.constant(#py.int<3>)
+# CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
+# CHECK: %[[NAME:.*]] = py.constant(#py.str<"k">)
+# CHECK: %[[HASH:.*]] = py.str.hash %[[NAME]]
+# CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[FIVE]])
-# CHECK: %[[DICT:.*]] = py.makeDict (%[[NAME]] : %[[THREE]])
+# CHECK: %[[DICT:.*]] = py.makeDict (%[[NAME]] hash(%[[HASH]]) : %[[THREE]])
 # CHECK: py.call @pylir__call__(%[[X_LOADED]], %[[TUPLE]], %[[DICT]])
 
 x(*(), **{})

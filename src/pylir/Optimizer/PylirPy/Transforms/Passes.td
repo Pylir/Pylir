@@ -9,30 +9,31 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ExpandPyDialect : Pass<"pylir-expand-py-dialect"> {
+def ExpandPyDialectPass : Pass<"pylir-expand-py-dialect"> {
     let summary = "Expands ops of the Py dialect to operations that can be lowered";
-    let constructor = "::pylir::Py::createExpandPyDialectPass()";
+
     let dependentDialects = ["::pylir::Py::PylirPyDialect",
                              "::mlir::arith::ArithmeticDialect",
                              "::mlir::cf::ControlFlowDialect"];
 }
 
-def FoldHandles : Pass<"pylir-fold-handles", "::mlir::ModuleOp"> {
+def FoldHandlesPass : Pass<"pylir-fold-handles", "::mlir::ModuleOp"> {
     let summary = "Fold py.globalHandle";
-    let constructor = "::pylir::Py::createFoldHandlesPass()";
+
     let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
     let statistics = [
         Statistic<"m_noLoadHandlesRemoved", "No-load Handles removed",
             "Amount of handles that were removed as they were never loaded">,
         Statistic<"m_singleStoreHandlesConverted", "Single-store Handles converted",
-            "Amount of handles converted to values as they only had a single constant store">
+            "Amount of handles converted to values as they only had a single constant store">,
+        Statistic<"m_singleRegionHandlesConverted", "Single-region Handles converted",
+                    "Amount of handles turned to SSA as they only occur in a single region">
     ];
 }
 
-def HandleLoadStoreElimination : Pass<"pylir-handle-load-store-elimination"> {
+def HandleLoadStoreEliminationPass : Pass<"pylir-handle-load-store-elimination"> {
     let summary = "Eliminate loads and stores of handles";
-    let constructor = "::pylir::Py::createHandleLoadStoreEliminationPass()";
 
     let statistics = [
         Statistic<"m_loadRemoved", "handle loads removed",
@@ -42,9 +43,9 @@ def HandleLoadStoreElimination : Pass<"pylir-handle-load-store-elimination"> {
     ];
 }
 
-def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
+def MonomorphPass : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 	let summary = "Monomorph module";
-	let constructor = "::pylir::Py::createMonomorphPass()";
+
 	let dependentDialects = ["::pylir::Py::PylirPyDialect", "::pylir::TypeFlow::TypeFlowDialect"];
 
 	let statistics = [
@@ -60,25 +61,9 @@ def Monomorph : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
     ];
 }
 
-def Inliner : Pass<"pylir-inliner", "::mlir::ModuleOp"> {
-	let summary = "Inline functions";
-	let constructor = "::pylir::Py::createInlinerPass()";
-	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
-
-	let statistics = [
-        Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
-	];
-
-	let options = [
-		Option<"m_maxFuncGrowth", "max-func-growth", "std::uint32_t", "150", "Percent a function is allowed to grow">,
-		Option<"m_maxModuleGrowth", "max-module-growth", "std::uint32_t", "200", "Percent the module is allowed to grow">,
-		Option<"m_maxRecursiveInlines", "max-recursive-inlines", "std::uint32_t", "4", "Amount of times a recursive function might be recursively inlined">,
-	];
-}
-
-def TrialInliner : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
+def TrialInlinerPass : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
 	let summary = "Inline functions using trials";
-	let constructor = "::pylir::Py::createTrialInlinerPass()";
+
 	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
 	let statistics = [
@@ -86,6 +71,7 @@ def TrialInliner : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
 		Statistic<"m_cacheHits", "Cache hits", "Amount of times an inlining trial did not have to be performed due to a cache hit">,
 		Statistic<"m_cacheMisses", "Caches misses", "Amount of times an inlining trial had to be performed as it was not in cache">,
 		Statistic<"m_recursionLimitReached", "Recursion limits reached", "Amount of times a recursion chain was disabled in a caller">,
+		Statistic<"m_optimizationRun", "Optimization pipeline run", "Amount of times the optimization pipeline had to be run">,
 	];
 
 	let options = [
@@ -97,18 +83,6 @@ def TrialInliner : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
                [{"canonicalize,pylir-sroa,canonicalize"}],
                "Optimization pipeline used to perform the inlining trials">,
 	];
-}
-
-def SROA  : Pass<"pylir-sroa"> {
-    let summary = "Scalar Replacement Of Aggregates";
-    let constructor = "::pylir::Py::createSROAPass()";
-    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
-
-    let statistics = [
-        Statistic<"m_aggregatesRemoved", "Aggregates removed", "Amount of aggregates that were removed">,
-        Statistic<"m_readOpsRemoved", "Aggregate reads removed", "Amount of reads from aggregates that were removed">,
-        Statistic<"m_writeOpsRemoved", "Aggregate writes removed", "Amount of writes to aggregates that were removed">,
-    ];
 }
 
 #endif

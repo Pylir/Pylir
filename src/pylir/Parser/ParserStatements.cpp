@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "Parser.hpp"
 
@@ -41,7 +39,6 @@ std::optional<pylir::Syntax::AssignmentStmt> pylir::Parser::parseAssignmentStmt(
             break;
         }
         checkTarget(**starredExpression, *assignment);
-        addToNamespace(**starredExpression);
         targets.emplace_back(std::move(*starredExpression), *assignment);
     } while (peekedIs(firstInTarget));
     if (leftOverStarredExpression)
@@ -84,15 +81,9 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
             }
             return std::make_unique<Syntax::AssertStmt>(std::move(*assertStmt));
         }
-        case TokenType::PassKeyword: return make_node<Syntax::SingleTokenStmt>(*m_current++);
+        case TokenType::PassKeyword:
         case TokenType::BreakKeyword:
-        case TokenType::ContinueKeyword:
-            if (!m_inLoop)
-            {
-                createError(*m_current, Diag::OCCURRENCE_OF_N_OUTSIDE_OF_LOOP, m_current->getTokenType())
-                    .addHighlight(*m_current);
-            }
-            return make_node<Syntax::SingleTokenStmt>(*m_current++);
+        case TokenType::ContinueKeyword: return make_node<Syntax::SingleTokenStmt>(*m_current++);
         case TokenType::DelKeyword:
         {
             auto delKeyword = *m_current++;
@@ -101,15 +92,10 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
             {
                 return std::nullopt;
             }
-            addToNamespace(**targetList);
             return make_node<Syntax::DelStmt>(delKeyword, std::move(*targetList));
         }
         case TokenType::ReturnKeyword:
         {
-            if (!m_inFunc)
-            {
-                createError(*m_current, Diag::OCCURRENCE_OF_RETURN_OUTSIDE_OF_FUNCTION).addHighlight(*m_current);
-            }
             auto returnKeyword = *m_current++;
             if (!peekedIs(firstInExpression))
             {
@@ -176,101 +162,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
             }
             if (keyword.getTokenType() == TokenType::NonlocalKeyword)
             {
-                auto handleToken = [&](const IdentifierToken& nonLocal)
-                {
-                    if (m_namespace.empty())
-                    {
-                        return;
-                    }
-                    if (auto result = m_namespace.back().identifiers.find(nonLocal);
-                        result != m_namespace.back().identifiers.end())
-                    {
-                        switch (result->second)
-                        {
-                            case Syntax::Scope::Kind::Local:
-                            case Syntax::Scope::Kind::Cell:
-                                createError(nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
-                                            nonLocal.getValue())
-                                    .addHighlight(nonLocal)
-                                    .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
-                                    .addHighlight(result->first);
-                                break;
-                            case Syntax::Scope::Kind::Global:
-                                createError(nonLocal, Diag::DECLARATION_OF_NONLOCAL_N_CONFLICTS_WITH_GLOBAL_VARIABLE,
-                                            nonLocal.getValue())
-                                    .addHighlight(nonLocal)
-                                    .addNote(result->first, Diag::GLOBAL_VARIABLE_N_BOUND_HERE, nonLocal.getValue())
-                                    .addHighlight(result->first);
-                                break;
-                            case Syntax::Scope::Kind::Unknown:
-                                createError(nonLocal, Diag::NONLOCAL_N_USED_PRIOR_TO_DECLARATION, nonLocal.getValue())
-                                    .addHighlight(nonLocal)
-                                    .addNote(result->first, Diag::N_USED_HERE, nonLocal.getValue())
-                                    .addHighlight(result->first);
-                                break;
-                            case Syntax::Scope::Kind::NonLocal: break;
-                        }
-                    }
-                };
-
-                for (auto& iter : identifiers)
-                {
-                    handleToken(iter);
-                    if (!m_namespace.empty())
-                    {
-                        m_namespace.back().identifiers.insert({iter, Syntax::Scope::Kind::NonLocal});
-                    }
-                }
                 return make_node<Syntax::GlobalOrNonLocalStmt>(keyword, std::move(identifiers));
-            }
-
-            if (!m_namespace.empty())
-            {
-                auto handleToken = [&](const IdentifierToken& global)
-                {
-                    if (auto result = m_namespace.back().identifiers.find(global);
-                        result != m_namespace.back().identifiers.end())
-                    {
-                        switch (result->second)
-                        {
-                            case Syntax::Scope::Kind::Local:
-                            case Syntax::Scope::Kind::Cell:
-                                createError(global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_LOCAL_VARIABLE,
-                                            global.getValue())
-                                    .addHighlight(global)
-                                    .addNote(result->first, Diag::LOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
-                                    .addHighlight(result->first);
-                                break;
-                            case Syntax::Scope::Kind::NonLocal:
-                                createError(global, Diag::DECLARATION_OF_GLOBAL_N_CONFLICTS_WITH_NONLOCAL_VARIABLE,
-                                            global.getValue())
-                                    .addHighlight(global)
-                                    .addNote(result->first, Diag::NONLOCAL_VARIABLE_N_BOUND_HERE, global.getValue())
-                                    .addHighlight(result->first);
-                                break;
-                            case Syntax::Scope::Kind::Unknown:
-                                createError(global, Diag::GLOBAL_N_USED_PRIOR_TO_DECLARATION, global.getValue())
-                                    .addHighlight(global)
-                                    .addNote(result->first, Diag::N_USED_HERE, global.getValue())
-                                    .addHighlight(result->first);
-                                break;
-                            case Syntax::Scope::Kind::Global: break;
-                        }
-                    }
-                };
-                for (auto& iter : identifiers)
-                {
-                    handleToken(iter);
-                    m_globals.insert(iter);
-                    m_namespace.back().identifiers.insert({iter, Syntax::Scope::Kind::Global});
-                }
-            }
-            else
-            {
-                for (auto& iter : identifiers)
-                {
-                    m_globals.insert(iter);
-                }
             }
             return make_node<Syntax::GlobalOrNonLocalStmt>(keyword, std::move(identifiers));
         }
@@ -331,7 +223,6 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
                 {
                     // If an assignment follows, check whether the starred expression could be a target list
                     checkTarget(**starredExpression, *m_current);
-                    addToNamespace(**starredExpression);
                     auto assignmentStmt = parseAssignmentStmt(std::move(*starredExpression));
                     if (!assignmentStmt)
                     {
@@ -356,7 +247,6 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::SimpleStmt>> pylir::Parser::parse
                 {
                     // needs to be an augtarget then
                     checkAug(**starredExpression, *m_current);
-                    addToNamespace(**starredExpression);
                     if (auto colon = maybeConsume(TokenType::Colon))
                     {
                         auto expression = parseExpression();

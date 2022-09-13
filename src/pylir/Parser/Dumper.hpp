@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -29,6 +27,7 @@ class Dumper
     {
     };
 
+public:
     class Builder
     {
         Dumper* m_dumper;
@@ -70,6 +69,7 @@ class Dumper
         [[nodiscard]] std::string emit() const;
     };
 
+private:
     template <class S, class... Args>
     Builder createBuilder(const S& s, Args&&... args)
     {

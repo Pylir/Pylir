@@ -1,5 +1,11 @@
 name: Linux
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 on:
   push:
     branches: [ "master" ]
@@ -11,14 +17,25 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        sanitizer: [ "address,undefined","thread" ]
+        cxx_compiler: [ clang++, g++-10 ]
+        c_compiler: [ clang, gcc-10 ]
+        sanitizer: [ "address,undefined", "thread", "" ]
+        exclude:
+          - cxx_compiler: clang++
+            c_compiler: gcc-10
+          - cxx_compiler: g++-10
+            c_compiler: clang
+          - cxx_compiler: g++-10
+            sanitizer: "address,undefined"
+          - cxx_compiler: g++-10
+            sanitizer: "thread"
 
     steps:
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libunwind-dev
+          sudo apt install libunwind-dev g++-10 lld
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -35,7 +52,7 @@ jobs:
 
       - name: Install Python depends
         run: |
-          python -m pip install -r $GITHUB_WORKSPACE/Pylir/test/requirements.txt
+          python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
       # See https://github.com/actions/cache/issues/53
       - name: Sanitize key
@@ -46,79 +63,38 @@ jobs:
         uses: hendrikmuhs/ccache-action@v1.2.2
         with:
           max-size: 2G
-          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}
-
-      - name: Checkout LLVM
-        uses: actions/checkout@v3
-        with:
-          repository: llvm/llvm-project
-          ref: 74b5dad5e944db21e56e6d81eb14f11891a741ab
-          path: llvm-project
-
-      - name: Configure LLVM Optimized TableGen
-        run: |
-          cmake -GNinja -Bllvm-optimized-tblgen \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
-            -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_TARGETS_TO_BUILD=host \
-            -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE="$(which python)" \
-            -S $GITHUB_WORKSPACE/llvm-project/llvm
-
-      - name: Build LLVM Optimized TableGen
-        run: |
-          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
-
-      - name: Sanitizers name to LLVM
-        id: sanitize-llvm-name
-        run: |
-          echo "::set-output name=llvm_sanitizer::$(echo ${{matrix.sanitizer}} |\
-          sed 's/,/;/g' |\
-          python3 -c 'import sys; print(sys.stdin.read().title())' )"
-
-      - name: Configure LLVM
-        run: |
-          cmake -GNinja -Bllvm-build \
-            -DLLVM_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/llvm-tblgen" \
-            -DMLIR_TABLEGEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-tblgen" \
-            -DMLIR_LINALG_ODS_YAML_GEN="$GITHUB_WORKSPACE/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
-            -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_ENABLE_ASSERTIONS=ON \
-            -DLLVM_ENABLE_PROJECTS="mlir;lld" \
-            -DLLVM_TARGETS_TO_BUILD=host \
-            -DLLVM_ENABLE_LLD=ON \
-            -DPython3_EXECUTABLE="$(which python)" \
-            -DLLVM_USE_SANITIZER="${{steps.sanitize-llvm-name.outputs.llvm_sanitizer}}" \
-            -S $GITHUB_WORKSPACE/llvm-project/llvm
+          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
 
       - name: Build LLVM
-        run: |
-          cmake --build llvm-build
+        id: llvm-build
+        uses: ./Pylir/.github/actions/llvm-build
+        with:
+          c-compiler: ${{matrix.c_compiler}}
+          cpp-compiler: ${{matrix.cxx_compiler}}
+          sanitizers: ${{matrix.sanitizer}}
 
       - name: Configure Pylir
         run: |
+          if [[ ! -z "${{matrix.sanitizer}}" ]]
+          then
+            SAN_ARG=-DPYLIR_SANITIZER=${{matrix.sanitizer}}
+          fi
           cmake -GNinja -Bpylir-build \
             -DCMAKE_BUILD_TYPE=Release \
             -DPYLIR_EMBED_LLD=ON \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER=clang \
-            -DPYLIR_SANITIZER=${{matrix.sanitizer}} \
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} \
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} \
+            $SAN_ARG \
             -DPython3_EXECUTABLE="$(which python)" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DCMAKE_CXX_FLAGS="-g1" \
             -DPYLIR_ENABLE_ASSERTIONS=ON \
-            -DLLVM_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/llvm/" \
-            -DMLIR_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/mlir/" \
-            -DLLD_DIR="$GITHUB_WORKSPACE/llvm-build/lib/cmake/lld/" \
-            -S $GITHUB_WORKSPACE/Pylir
+            -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" \
+            -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" \
+            -DLLD_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/lld/" \
+            -S ${{github.workspace}}/Pylir
 
       - name: Build Pylir
         run: |

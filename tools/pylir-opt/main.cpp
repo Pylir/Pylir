@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/MLIRContext.h>
@@ -16,26 +14,8 @@
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
 
+#include "Passes.hpp"
 #include "TestDialect.hpp"
-
-std::unique_ptr<mlir::Pass> createTestMemorySSA();
-
-std::unique_ptr<mlir::Pass> createTestInlinerInterface();
-
-std::unique_ptr<mlir::Pass> createTestTypeFlow();
-
-std::unique_ptr<mlir::Pass> createTestAliasSetTracker();
-
-std::unique_ptr<mlir::Pass> createTestLoopInfo();
-
-std::unique_ptr<mlir::Pass> createTestHelloWorld();
-
-std::unique_ptr<mlir::Pass> createTestLinker();
-
-std::unique_ptr<mlir::Pass> createTestInlineAll();
-
-#define GEN_PASS_REGISTRATION
-#include "Passes.h.inc"
 
 int main(int argc, char** argv)
 {
@@ -48,7 +28,7 @@ int main(int argc, char** argv)
     pylir::registerConversionPasses();
     pylir::registerTransformPasses();
     pylir::Py::registerTransformPasses();
-    ::registerTestPasses();
+    pylir::test::registerTestPasses();
 
     return mlir::failed(mlir::MlirOptMain(argc, argv, "Standalone optimizer driver\n", registry));
 }

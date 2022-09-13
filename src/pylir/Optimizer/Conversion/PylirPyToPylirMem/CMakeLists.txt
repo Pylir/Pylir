@@ -4,18 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(LLVM_TARGET_DEFINITIONS PylirPyToPylirMem.td)
-mlir_tablegen(PylirPyToPylirMem.cpp.inc -gen-rewriters)
-add_public_tablegen_target(PylirPyToPylirMemIncGen)
+add_pylir_rewriter(PylirPyToPylirMem)
 
-add_mlir_conversion_library(PylirPyToPylirMem
-        PylirPyToPylirMem.cpp
-
-        DEPENDS
-        PylirConversionPassIncGen
-        PylirPyToPylirMemIncGen
-
-        LINK_LIBS PUBLIC PylirPyDialect PylirMemDialect MLIRPass MLIRTransforms)
+add_library(PylirPyToPylirMem PylirPyToPylirMem.cpp)
+add_dependencies(PylirPyToPylirMem PylirConversionPassIncGen PylirPyToPylirMemIncGen)
+target_link_libraries(PylirPyToPylirMem PUBLIC PylirPyDialect PylirMemDialect MLIRPass MLIRTransforms)
+set_property(GLOBAL APPEND PROPERTY MLIR_CONVERSION_LIBS PylirPyToPylirMem)
 
 if (PYLIR_USE_PCH)
     target_link_libraries(PylirPyToPylirMem PRIVATE COMMON_PCH)

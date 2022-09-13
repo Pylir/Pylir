@@ -14,7 +14,8 @@ func.func @test() -> !py.dynamic {
 // CHECK-LABEL: llvm.func internal @"$__GLOBAL_INIT__"
 // CHECK-NEXT: %[[DICT:.*]] = llvm.mlir.addressof
 // CHECK-NEXT: %[[KEY:.*]] = llvm.mlir.addressof
+// CHECK-NEXT: %[[HASH:.*]] = llvm.call @pylir_str_hash(%[[KEY]])
 // CHECK-NEXT: %[[VALUE:.*]] = llvm.mlir.addressof
-// CHECK-NEXT: llvm.call @pylir_dict_insert(%[[DICT]], %[[KEY]], %[[VALUE]])
+// CHECK-NEXT: llvm.call @pylir_dict_insert_unique(%[[DICT]], %[[KEY]], %[[HASH]], %[[VALUE]])
 
 // CHECK: llvm.mlir.global_ctors {ctors = [@"$__GLOBAL_INIT__"], priorities = [{{.*}}]}

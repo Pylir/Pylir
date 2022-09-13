@@ -68,7 +68,7 @@ add_subdirectory(MarkAndSweep)
 
 if (MSVC)
     add_custom_command(TARGET PylirRuntime POST_BUILD
-            COMMAND ${Python_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/merge_archives.py
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/merge_archives.py
             ARGS
             -o "$<TARGET_LINKER_FILE:PylirRuntime>"
             --ar "${CMAKE_AR}"

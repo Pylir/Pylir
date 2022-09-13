@@ -11,7 +11,7 @@ add_library(Parser
         Syntax.cpp
         ParserCompounds.cpp
         Visitor.cpp
-        Parser.cpp)
+        Parser.cpp SemanticAnalysis.cpp)
 target_link_libraries(Parser PUBLIC Lexer)
 if (PYLIR_USE_PCH)
     target_link_libraries(Parser PRIVATE COMMON_PCH)

@@ -38,7 +38,7 @@ func.func @__init__() {
 ^loop(%iter : !py.dynamic):
 	%0 = py.typeOf %iter
 	%1 = py.type.mro %0
-	%2, %found = py.mroLookup "__add__" in %1
+	%2 = py.mroLookup "__add__" in %1
 	%3 = py.makeTuple (%iter, %one)
 	%4 = py.constant(#py.dict<{}>)
 	%5 = py.function.call %2(%2, %3, %4)
@@ -59,12 +59,12 @@ func.func @__init__() {
 // CHECK-NEXT: %[[TYPE:.*]] = typeOf %[[ITER]]
 // CHECK-NEXT: %[[MRO:.*]] = calc value %[[TYPE]]
 // CHECK-SAME: py.type.mro
-// CHECK-NEXT: %[[RESULT:.*]]:2 = calc value %[[MRO]]
+// CHECK-NEXT: %[[RESULT:.*]] = calc value %[[MRO]]
 // CHECK-SAME: py.mroLookup "__add__"
 // CHECK-NEXT: %[[TUPLE:.*]] = calc %[[ITER]], %[[C0]]
 // CHECK-SAME: py.makeTuple
 // CHECK-NEXT: %[[C2:.*]] = constant #py.dict<{}>
-// CHECK-NEXT: %[[RES:.*]] = call_indirect %[[RESULT]]#0(%[[RESULT]]#0, %[[TUPLE]], %[[C2]])
+// CHECK-NEXT: %[[RES:.*]] = call_indirect %[[RESULT]](%[[RESULT]], %[[TUPLE]], %[[C2]])
 // CHECK-NEXT: branch ^[[BODY]], ^[[EXIT:[[:alnum:]]+]], (%[[RES]])
 // CHECK-NEXT: ^[[EXIT]]:
 // CHECK-NEXT: branch

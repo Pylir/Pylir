@@ -174,12 +174,54 @@ def bar():
 def del_too():
     del a
 
+
 # CHECK-LABEL: function del_too
 # CHECK-NEXT: locals: a
 
 def in_sub():
     x[0] = 3
 
+
 # CHECK-LABEL: function in_sub
 # CHECK-NOT: locals: x
 
+def outer2():
+    x = 3
+
+    lambda: print(x)
+
+
+# CHECK-LABEL: function outer2
+# CHECK-NOT: nonlocals
+# CHECK-NEXT: cells: x
+
+# CHECK-LABEL: lambda expression
+# CHECK-NOT: locals:
+# CHECK-NEXT: nonlocals: x
+# CHECK-NOT: cells:
+
+lambda x: x
+
+# CHECK-LABEL: lambda expression
+# CHECK-NEXT: parameter
+# CHECK-NEXT: locals: x
+# CHECK-NOT: nonlocals
+# CHECK-NOT: cells
+
+lambda: (x := 3)
+
+# CHECK-LABEL: lambda expression
+# CHECK-NEXT: locals: x
+# CHECK-NOT: nonlocals
+# CHECK-NOT: cells
+
+lambda: (x := 3) + (lambda: x)()
+
+# CHECK-LABEL: lambda expression
+# CHECK-NOT: locals
+# CHECK-NOT: nonlocals
+# CHECK-NEXT: cells: x
+# CHECK-LABEL: lambda expression
+# CHECK-NOT: locals
+# CHECK-NEXT: nonlocals: x
+# CHECK-NOT: cells

@@ -30,6 +30,7 @@ def bar(a, *args, k, **kwd):
 
 # processing of k...
 # CHECK: %[[CONSTANT:.*]] = py.constant(#py.str<"k">)
-# CHECK: py.dict.delItem %[[CONSTANT]] from %[[DICT]]
+# CHECK: %[[CONSTANT_HASH:.*]] = py.str.hash %[[CONSTANT]]
+# CHECK: py.dict.delItem %[[CONSTANT]] hash(%[[CONSTANT_HASH]]) from %[[DICT]]
 
 # CHECK: call @"bar$impl[0]"(%[[SELF]], %[[BAR_A:[[:alnum:]]+]], %[[TUPLE_ARG]], %[[BAR_K:[[:alnum:]]+]], %[[DICT]])

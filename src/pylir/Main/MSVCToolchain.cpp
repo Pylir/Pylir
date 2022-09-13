@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "MSVCToolchain.hpp"
 
@@ -39,7 +37,7 @@ bool pylir::MSVCToolchain::link(cli::CommandLine& commandLine, llvm::StringRef o
     }
     else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
-        llvm::SmallString<20> path(input->getValue());
+        llvm::SmallString<20> path(llvm::sys::path::stem(input->getValue()));
         llvm::sys::path::replace_extension(path, ".exe");
         arguments.push_back(("-out:" + path).str());
     }

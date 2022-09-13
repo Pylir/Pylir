@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -307,7 +305,7 @@ public:
         return insert_hash(hash, value);
     }
 
-    template <class M>
+    template <class M, bool unique = false>
     std::pair<iterator, bool> insert_or_assign_hash(std::size_t hash, const key_type& key, M&& mapped)
     {
         auto bucketIndex = hash & mask();
@@ -321,7 +319,8 @@ public:
             for (; !m_buckets[bucketIndex].empty() && idealBucketDistance <= distanceFromIdealBucket(bucketIndex);
                  bucketIndex = nextBucket(bucketIndex), idealBucketDistance++)
             {
-                if (m_buckets[bucketIndex].hash == hash && equal(key, m_values[m_buckets[bucketIndex].index].key))
+                if (m_buckets[bucketIndex].hash == hash && !unique
+                    && equal(key, m_values[m_buckets[bucketIndex].index].key))
                 {
                     m_values[m_buckets[bucketIndex].index].value = std::forward<M>(mapped);
                     return {&m_values[m_buckets[bucketIndex].index], false};

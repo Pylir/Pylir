@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -65,10 +63,6 @@ class PyObject
     {
         return *reinterpret_cast<PyObjectStorage*>(this);
     }
-
-    PyObject* mroLookup(int index);
-
-    PyObject* methodLookup(int index);
 
 public:
     constexpr PyObject() = default;
@@ -317,14 +311,39 @@ public:
         return result->value;
     }
 
+    PyObject* tryGetItem(PyObject& key, std::size_t hash)
+    {
+        auto* result = m_table.find_hash(hash, &key);
+        if (result == m_table.end())
+        {
+            return nullptr;
+        }
+        return result->value;
+    }
+
     void setItem(PyObject& key, PyObject& value)
     {
         m_table.insert_or_assign(&key, &value);
     }
 
+    void setItem(PyObject& key, std::size_t hash, PyObject& value)
+    {
+        m_table.insert_or_assign_hash(hash, &key, &value);
+    }
+
+    void setItemUnique(PyObject& key, std::size_t hash, PyObject& value)
+    {
+        m_table.insert_or_assign_hash<PyObject*, true>(hash, &key, &value);
+    }
+
     void delItem(PyObject& key)
     {
         m_table.erase(&key);
+    }
+
+    void delItem(PyObject& key, std::size_t hash)
+    {
+        m_table.erase_hash(hash, &key);
     }
 
     auto begin()
@@ -512,41 +531,26 @@ constexpr details::AllocType<type> alloc;
 template <class... Args>
 PyObject& PyObject::operator()(Args&&... args)
 {
-    PyObject* self = this;
-    while (true)
-    {
-        auto* call = self->methodLookup(PyTypeObject::Call);
-        if (!call)
+    constexpr std::size_t tupleCount = (... + std::is_base_of_v<PyObject, std::remove_reference_t<Args>>);
+    auto& tuple = alloc<Builtins::Tuple>(tupleCount);
+    auto& dict = alloc<Builtins::Dict>();
+    auto iter = tuple.begin();
+    (
+        [&](auto&& arg)
         {
-            // TODO: raise Type error
-        }
-        if (auto* pyF = call->dyn_cast<PyFunction>())
-        {
-            constexpr std::size_t tupleCount = (1 + ... + std::is_base_of_v<PyObject, std::remove_reference_t<Args>>);
-            auto& tuple = alloc<Builtins::Tuple>(tupleCount);
-            auto& dict = alloc<Builtins::Dict>();
-            auto iter = tuple.begin();
-            *iter++ = self;
-            (
-                [&](auto&& arg)
-                {
-                    static_assert(
-                        std::is_base_of_v<PyObject, std::remove_reference_t<
-                                                        decltype(arg)>> || std::is_same_v<KeywordArg&&, decltype(arg)>);
-                    if constexpr (std::is_same_v<KeywordArg&&, decltype(arg)>)
-                    {
-                        dict.setItem(alloc<Builtins::Str>(arg.name), arg.arg);
-                    }
-                    else
-                    {
-                        *iter++ = &arg;
-                    }
-                }(std::forward<Args>(args)),
-                ...);
-            return pyF->m_function(*pyF, tuple, dict);
-        }
-        self = call;
-    }
+            static_assert(std::is_base_of_v<PyObject, std::remove_reference_t<decltype(arg)>>
+                          || std::is_same_v<KeywordArg&&, decltype(arg)>);
+            if constexpr (std::is_same_v<KeywordArg&&, decltype(arg)>)
+            {
+                dict.setItem(alloc<Builtins::Str>(arg.name), arg.arg);
+            }
+            else
+            {
+                *iter++ = &arg;
+            }
+        }(std::forward<Args>(args)),
+        ...);
+    return Builtins::pylir__call__(*this, tuple, dict);
 }
 
 template <>

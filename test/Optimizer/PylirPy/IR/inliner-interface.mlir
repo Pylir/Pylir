@@ -194,3 +194,36 @@ func.func @__init__() -> !py.dynamic {
 // CHECK-NEXT: %[[TYPE:.*]] = py.constant(@builtins.BaseException)
 // CHECK-NEXT: %[[EX:.*]] = py.makeObject %[[TYPE]]
 // CHECK-NEXT: py.raise %[[EX]]
+
+// -----
+
+func.func @inline_foo() -> !py.dynamic {
+	%1 = py.call @inline_foo() : () -> !py.dynamic
+    %r = test.random
+    cf.cond_br %r, ^bb0, ^bb1
+
+^bb0:
+	return %1 : !py.dynamic
+
+^bb1:
+    test.use(%r) : i1
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL: func.func @inline_foo
+// CHECK-NEXT: %[[CALL:.*]] = py.call @inline_foo()
+// CHECK-NEXT: %[[R:.*]] = test.random
+// CHECK-NEXT: cf.cond_br %[[R]], ^[[BB1:.*]], ^[[BB2:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[BB1]]:
+// CHECK-NEXT: cf.br ^[[BB3:[[:alnum:]]+]](%[[CALL]] : !py.dynamic)
+// CHECK-NEXT: ^[[BB2]]:
+// CHECK-NEXT: test.use(%[[R]])
+// CHECK-NEXT: cf.br ^[[BB3]](%[[CALL]] : !py.dynamic)
+// CHECK-NEXT: ^[[BB3]](%[[ARG:.*]]: !py.dynamic):
+// CHECK-NEXT: %[[R:.*]] = test.random
+// CHECK-NEXT: cf.cond_br %[[R]], ^[[BB4:.*]], ^[[BB5:[[:alnum:]]+]]
+// CHECK-NEXT: ^[[BB4]]:
+// CHECK-NEXT: return %[[ARG]]
+// CHECK-NEXT: ^[[BB5]]:
+// CHECK-NEXT: test.use(%[[R]])
+// CHECK-NEXT: return %[[ARG]]

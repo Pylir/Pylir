@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "PylirPyAttributes.hpp"
 
@@ -60,13 +58,13 @@ llvm::hash_code hash_value(const pylir::BigInt& bigInt)
 } // namespace pylir
 
 #define GET_ATTRDEF_CLASSES
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
 
 void pylir::Py::PylirPyDialect::initializeAttributes()
 {
     addAttributes<
 #define GET_ATTRDEF_LIST
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsAttributes.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
         >();
 }
 

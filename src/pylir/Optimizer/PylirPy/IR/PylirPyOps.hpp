@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -18,8 +16,11 @@
 
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
+#include <pylir/Optimizer/Interfaces/SROAInterfaces.hpp>
 #include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/CopyObjectInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/OnlyReadsValueInterface.hpp>
 
 #include <optional>
 #include <variant>
@@ -40,7 +41,14 @@ struct MappingExpansion
     mlir::Value value;
 };
 
-using DictArg = std::variant<std::pair<mlir::Value, mlir::Value>, MappingExpansion>;
+struct DictEntry
+{
+    mlir::Value key;
+    mlir::Value hash;
+    mlir::Value value;
+};
+
+using DictArg = std::variant<DictEntry, MappingExpansion>;
 using IterArg = std::variant<mlir::Value, IterExpansion>;
 
 enum class OperandShape
@@ -136,6 +144,7 @@ struct AddableExceptionHandling
 class DictArgsIterator
 {
     mlir::OperandRange::iterator m_keys;
+    mlir::OperandRange::iterator m_hashes;
     mlir::OperandRange::iterator m_values;
     llvm::ArrayRef<std::int32_t> m_expansions;
     llvm::ArrayRef<std::int32_t>::iterator m_currExp;
@@ -150,10 +159,11 @@ public:
     using difference_type = std::ptrdiff_t;
     using iterator_category = std::bidirectional_iterator_tag;
 
-    DictArgsIterator(mlir::OperandRange::iterator keys, mlir::OperandRange::iterator values,
-                     llvm::ArrayRef<std::int32_t>::iterator expIterator, llvm::ArrayRef<std::int32_t> expansions,
-                     std::size_t index)
+    DictArgsIterator(mlir::OperandRange::iterator keys, mlir::OperandRange::iterator hashes,
+                     mlir::OperandRange::iterator values, llvm::ArrayRef<std::int32_t>::iterator expIterator,
+                     llvm::ArrayRef<std::int32_t> expansions, std::size_t index)
         : m_keys(keys),
+          m_hashes(hashes),
           m_values(values),
           m_expansions(expansions),
           m_currExp(expIterator),
@@ -194,7 +204,7 @@ public:
 
 } // namespace pylir::Py
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyOpsEnums.h.inc>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyEnums.h.inc>
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.h.inc>

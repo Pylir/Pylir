@@ -8,6 +8,7 @@
 #define PYLIR_MEMORY_SSA_TABLEGEN
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/EnumAttr.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/RegionKindInterface.td"
 include "mlir/IR/OpAsmInterface.td"
@@ -46,13 +47,13 @@ def InstrAttr : MemorySSA_Attr<"Instruction"> {
     let hasCustomAssemblyFormat = 1;
 }
 
-def ReadAttr : MemorySSA_Attr<"Read"> {
-    let mnemonic = "read";
-    let parameters = (ins "::mlir::Value":$read);
-    let returnType = "::mlir::Value";
-    let convertFromStorage = "$_self.getRead()";
+def ReadWriteAttr : MemorySSA_Attr<"ReadWrite"> {
+    let mnemonic = "readWrite";
+    let parameters = (ins ArrayRefParameter<"::llvm::PointerUnion<::mlir::Value, ::mlir::SymbolRefAttr>">:$locations);
+    let returnType = "::llvm::ArrayRef<::llvm::PointerUnion<::mlir::Value, ::mlir::SymbolRefAttr>>";
+    let convertFromStorage = "$_self.getLocations()";
 
-    let constBuilderCall = "::pylir::MemSSA::ReadAttr::get($_builder.getContext(), $0)";
+    let constBuilderCall = "::pylir::MemSSA::ReadWriteAttr::get($_builder.getContext(), $0)";
     let hasCustomAssemblyFormat = 1;
 }
 
@@ -73,17 +74,17 @@ def MemoryLiveOnEntryOp : MemorySSA_Op<"liveOnEntry"> {
 }
 
 def MemoryUseOp : MemorySSA_Op<"use"> {
-    let arguments = (ins MemoryDefType:$definition, InstrAttr:$instruction, ReadAttr:$read);
+    let arguments = (ins MemoryDefType:$definition, InstrAttr:$instruction, ReadWriteAttr:$reads);
     let results = (outs);
 
-    let assemblyFormat = "`(` $definition `)` attr-dict `\\n` $instruction $read";
+    let assemblyFormat = "`(` $definition `)` attr-dict `\\n` $instruction $reads";
 }
 
 def MemoryDefOp : MemorySSA_Op<"def"> {
-    let arguments = (ins MemoryDefType:$clobbered, InstrAttr:$instruction);
+    let arguments = (ins MemoryDefType:$clobbered, InstrAttr:$instruction, ReadWriteAttr:$writes, ReadWriteAttr:$reads);
     let results = (outs MemoryDefType:$result);
 
-    let assemblyFormat = "`(` $clobbered `)` attr-dict `\\n` $instruction";
+    let assemblyFormat = "`(` $clobbered `)` attr-dict `\\n` $instruction $writes $reads";
 }
 
 def MemoryBranchOp : MemorySSA_Op<"br", [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>]> {

@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "PylirPyTypes.hpp"
 
@@ -21,7 +19,7 @@ void pylir::Py::PylirPyDialect::initializeTypes()
 {
     addTypes<
 #define GET_TYPEDEF_LIST
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.cpp.inc"
         >();
 }
 
@@ -167,4 +165,4 @@ pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constan
 }
 
 #define GET_TYPEDEF_CLASSES
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsTypes.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.cpp.inc"

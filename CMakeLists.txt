@@ -101,7 +101,6 @@ endif ()
 
 find_package(Threads REQUIRED)
 link_libraries(Threads::Threads)
-# revision 74b5dad5e944db21e56e6d81eb14f11891a741ab
 find_package(MLIR REQUIRED CONFIG)
 
 if (PYLIR_EMBED_LLD)
@@ -170,7 +169,9 @@ endif ()
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-find_package(Python COMPONENTS Interpreter REQUIRED)
+include(AddPylir)
+
+find_package(Python3 3.6 COMPONENTS Interpreter REQUIRED)
 
 include_directories(src)
 include_directories(SYSTEM 3rdParty)

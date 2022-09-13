@@ -1,11 +1,11 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Analysis/AliasAnalysis.h>
 #include <mlir/IR/AsmState.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
 
 #include <pylir/Optimizer/Analysis/AliasSetTracker.hpp>
@@ -13,9 +13,15 @@
 
 #include "Passes.hpp"
 
+namespace pylir::test
+{
+#define GEN_PASS_DEF_TESTALIASSETTRACKERPASS
+#include "Passes.h.inc"
+} // namespace pylir::test
+
 namespace
 {
-class TestAliasSetTracker : public TestAliasSetTrackerBase<TestAliasSetTracker>
+class TestAliasSetTracker : public pylir::test::impl::TestAliasSetTrackerPassBase<TestAliasSetTracker>
 {
 protected:
     void runOnOperation() override
@@ -66,10 +72,8 @@ protected:
             }
         }
     }
+
+public:
+    using Base::Base;
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> createTestAliasSetTracker()
-{
-    return std::make_unique<TestAliasSetTracker>();
-}

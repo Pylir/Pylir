@@ -1,9 +1,7 @@
 
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -13,9 +11,10 @@
 
 namespace pylir
 {
-std::unique_ptr<mlir::Pass> createLoadForwardingPass();
-
 #define GEN_PASS_REGISTRATION
+#define GEN_PASS_DECL_LOADFORWARDINGPASS
+#define GEN_PASS_DECL_SROAPASS
+#define GEN_PASS_DECL_FIXPOINTPASS
 #include "pylir/Optimizer/Transforms/Passes.h.inc"
 
 } // namespace pylir

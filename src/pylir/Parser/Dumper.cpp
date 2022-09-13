@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "Dumper.hpp"
 
@@ -32,7 +30,7 @@ std::vector<std::string_view> splitLines(std::string_view text)
 std::string dumpVariables(llvm::ArrayRef<pylir::IdentifierToken> tokens)
 {
     PYLIR_ASSERT(!tokens.empty());
-    auto iter = tokens.begin();
+    const auto* iter = tokens.begin();
     std::string text{(iter++)->getValue()};
     for (; iter != tokens.end(); iter++)
     {
@@ -40,6 +38,37 @@ std::string dumpVariables(llvm::ArrayRef<pylir::IdentifierToken> tokens)
         text += iter->getValue();
     }
     return text;
+}
+
+void dumpScope(pylir::Dumper::Builder& builder, const pylir::Syntax::Scope& scope)
+{
+    std::vector<pylir::IdentifierToken> localVariables;
+    std::vector<pylir::IdentifierToken> nonLocalVariables;
+    std::vector<pylir::IdentifierToken> cells;
+
+    for (const auto& [id, kind] : scope.identifiers)
+    {
+        switch (kind)
+        {
+            case pylir::Syntax::Scope::Local: localVariables.push_back(id); break;
+            case pylir::Syntax::Scope::NonLocal: nonLocalVariables.push_back(id); break;
+            case pylir::Syntax::Scope::Cell: cells.push_back(id); break;
+            default: break;
+        }
+    }
+
+    if (!localVariables.empty())
+    {
+        builder.add(dumpVariables(localVariables), "locals");
+    }
+    if (!nonLocalVariables.empty())
+    {
+        builder.add(dumpVariables(nonLocalVariables), "nonlocals");
+    }
+    if (!cells.empty())
+    {
+        builder.add(dumpVariables(cells), "cells");
+    }
 }
 } // namespace
 
@@ -302,14 +331,11 @@ std::string pylir::Dumper::dump(const pylir::Syntax::Conditional& conditionalExp
 std::string pylir::Dumper::dump(const pylir::Syntax::Lambda& lambda)
 {
     auto builder = createBuilder("lambda expression");
+    for (const auto& iter : lambda.parameters)
     {
-        auto subBuilder = createBuilder("parameters");
-        for (const auto& iter : lambda.parameters)
-        {
-            subBuilder.add(iter);
-        }
-        builder.add(subBuilder);
+        builder.add(iter);
     }
+    dumpScope(builder, lambda.scope);
     return builder.add(*lambda.expression).emit();
 }
 
@@ -663,34 +689,7 @@ std::string pylir::Dumper::dump(const pylir::Syntax::FuncDef& funcDef)
     {
         builder.add(*funcDef.maybeSuffix, "suffix");
     }
-
-    std::vector<IdentifierToken> localVariables;
-    std::vector<IdentifierToken> nonLocalVariables;
-    std::vector<IdentifierToken> cells;
-
-    for (const auto& [id, kind] : funcDef.scope.identifiers)
-    {
-        switch (kind)
-        {
-            case Syntax::Scope::Local: localVariables.push_back(id); break;
-            case Syntax::Scope::NonLocal: nonLocalVariables.push_back(id); break;
-            case Syntax::Scope::Cell: cells.push_back(id); break;
-            default: break;
-        }
-    }
-
-    if (!localVariables.empty())
-    {
-        builder.add(dumpVariables(localVariables), "locals");
-    }
-    if (!nonLocalVariables.empty())
-    {
-        builder.add(dumpVariables(nonLocalVariables), "nonlocals");
-    }
-    if (!cells.empty())
-    {
-        builder.add(dumpVariables(cells), "cells");
-    }
+    dumpScope(builder, funcDef.scope);
     return builder.add(*funcDef.suite).emit();
 }
 
@@ -708,27 +707,7 @@ std::string pylir::Dumper::dump(const Syntax::ClassDef& classDef)
             builder.add(iter);
         }
     }
-    std::vector<IdentifierToken> localVariables;
-    std::vector<IdentifierToken> nonLocalVariables;
-
-    for (const auto& [id, kind] : classDef.scope.identifiers)
-    {
-        switch (kind)
-        {
-            case Syntax::Scope::Local: localVariables.push_back(id); break;
-            case Syntax::Scope::NonLocal: nonLocalVariables.push_back(id); break;
-            default: break;
-        }
-    }
-
-    if (!localVariables.empty())
-    {
-        builder.add(dumpVariables(localVariables), "locals");
-    }
-    if (!nonLocalVariables.empty())
-    {
-        builder.add(dumpVariables(nonLocalVariables), "nonlocals");
-    }
+    dumpScope(builder, classDef.scope);
     builder.add(*classDef.suite);
     return builder.emit();
 }

@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "PylirPyDialect.hpp"
 
@@ -15,7 +13,7 @@
 
 #include <pylir/Optimizer/Interfaces/DialectCostInterface.hpp>
 
-#include "pylir/Optimizer/PylirPy/IR/PylirPyOpsDialect.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyDialect.cpp.inc"
 
 #include "PylirPyAttributes.hpp"
 #include "PylirPyOps.hpp"

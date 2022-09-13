@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "PylirMemDialect.hpp"
 
@@ -17,10 +15,10 @@
 #include "PylirMemOps.hpp"
 
 #define GET_TYPEDEF_CLASSES
-#include "pylir/Optimizer/PylirMem/IR/PylirMemOpsTypes.cpp.inc"
+#include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.cpp.inc"
 
 #define GET_ATTRDEF_CLASSES
-#include "pylir/Optimizer/PylirMem/IR/PylirMemOpsAttributes.cpp.inc"
+#include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.cpp.inc"
 
 void pylir::Mem::PylirMemDialect::initialize()
 {
@@ -30,12 +28,12 @@ void pylir::Mem::PylirMemDialect::initialize()
         >();
     addTypes<
 #define GET_TYPEDEF_LIST
-#include "pylir/Optimizer/PylirMem/IR/PylirMemOpsTypes.cpp.inc"
+#include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.cpp.inc"
         >();
     addAttributes<
 #define GET_ATTRDEF_LIST
-#include "pylir/Optimizer/PylirMem/IR/PylirMemOpsAttributes.cpp.inc"
+#include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.cpp.inc"
         >();
 }
 
-#include <pylir/Optimizer/PylirMem/IR/PylirMemOpsDialect.cpp.inc>
+#include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.cpp.inc>

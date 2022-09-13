@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Analysis/Liveness.h>
 #include <mlir/IR/BlockAndValueMapping.h>
@@ -18,6 +16,7 @@
 #include <pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.hpp>
 #include <pylir/Support/Functional.hpp>
@@ -29,17 +28,25 @@
 #include <utility>
 #include <variant>
 
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_MONOMORPHPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 #define DEBUG_TYPE "monomorph"
 
 namespace
 {
-class Monomorph : public MonomorphBase<Monomorph>
+class Monomorph : public pylir::Py::impl::MonomorphPassBase<Monomorph>
 {
 protected:
     void runOnOperation() override;
+
+public:
+    using Base::Base;
 };
 
 using TypeFlowArgValue = llvm::PointerUnion<mlir::SymbolRefAttr, pylir::Py::ObjectTypeInterface>;
@@ -1600,8 +1607,3 @@ void Monomorph::runOnOperation()
     }
 }
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createMonomorphPass()
-{
-    return std::make_unique<Monomorph>();
-}

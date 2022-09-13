@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
@@ -11,10 +9,12 @@
 #include <llvm/ADT/StringSet.h>
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/Transforms/Util/BranchOpInterfacePatterns.hpp>
 #include <pylir/Support/Variant.hpp>
 
 #include "PylirPyDialect.hpp"
 #include "PylirPyOps.hpp"
+#include "Value.hpp"
 
 namespace
 {
@@ -150,86 +150,6 @@ struct MakeExOpExceptionSimplifier : mlir::OpRewritePattern<ExOp>
     }
 };
 
-struct NoopBlockArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>
-{
-    using mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>::OpInterfaceRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(mlir::BranchOpInterface op, mlir::PatternRewriter& rewriter) const override
-    {
-        bool changed = false;
-        for (auto& iter : llvm::enumerate(op->getSuccessors()))
-        {
-            if (!iter.value()->getSinglePredecessor())
-            {
-                continue;
-            }
-            auto succOps = op.getSuccessorOperands(iter.index());
-            if (iter.value()->getNumArguments() == succOps.getProducedOperandCount())
-            {
-                continue;
-            }
-            changed = true;
-            auto* newSucc = rewriter.splitBlock(iter.value(), iter.value()->begin());
-            auto nonProduced = iter.value()->getArguments().take_front(succOps.getProducedOperandCount());
-            newSucc->addArguments(
-                llvm::to_vector(llvm::map_range(nonProduced, [](mlir::BlockArgument arg) { return arg.getType(); })),
-                llvm::to_vector(llvm::map_range(nonProduced, [](mlir::BlockArgument arg) { return arg.getLoc(); })));
-            rewriter.updateRootInPlace(
-                op,
-                [&]
-                {
-                    for (auto [blockArg, repl] :
-                         llvm::zip(iter.value()->getArguments().drop_front(succOps.getProducedOperandCount()),
-                                   succOps.getForwardedOperands()))
-                    {
-                        blockArg.replaceAllUsesWith(repl);
-                    }
-                    op->setSuccessor(newSucc, iter.index());
-                    succOps.erase(succOps.getProducedOperandCount(), succOps.getForwardedOperands().size());
-                });
-        }
-        return mlir::success(changed);
-    }
-};
-
-struct PassthroughArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>
-{
-    using mlir::OpInterfaceRewritePattern<mlir::BranchOpInterface>::OpInterfaceRewritePattern;
-
-    mlir::LogicalResult matchAndRewrite(mlir::BranchOpInterface op, mlir::PatternRewriter& rewriter) const override
-    {
-        bool changed = false;
-        for (auto& iter : llvm::enumerate(op->getSuccessors()))
-        {
-            if (iter.value()->getNumArguments() != 0)
-            {
-                continue;
-            }
-            auto brOp = mlir::dyn_cast_or_null<mlir::cf::BranchOp>(iter.value()->getTerminator());
-            if (!brOp)
-            {
-                continue;
-            }
-            if (&iter.value()->front() != brOp)
-            {
-                continue;
-            }
-            if (llvm::any_of(brOp.getDestOperands(), [op](mlir::Value value) { return value.getDefiningOp() == op; }))
-            {
-                continue;
-            }
-            changed = true;
-            rewriter.updateRootInPlace(op,
-                                       [&]
-                                       {
-                                           op->setSuccessor(brOp.getSuccessor(), iter.index());
-                                           op.getSuccessorOperands(iter.index()).append(brOp.getDestOperands());
-                                       });
-        }
-        return mlir::success(changed);
-    }
-};
-
 } // namespace
 
 void pylir::Py::MakeTupleOp::getCanonicalizationPatterns(::mlir::RewritePatternSet& results,
@@ -283,20 +203,6 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribut
 
 namespace
 {
-pylir::Py::ObjectAttrInterface resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
-{
-    auto ref = attr.dyn_cast_or_null<mlir::SymbolRefAttr>();
-    if (!ref)
-    {
-        return attr.dyn_cast_or_null<pylir::Py::ObjectAttrInterface>();
-    }
-    auto value = mlir::SymbolTable::lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
-    if (!value || (!value.getConstant() && onlyConstGlobal))
-    {
-        return attr.dyn_cast_or_null<pylir::Py::ObjectAttrInterface>();
-    }
-    return value.getInitializerAttr();
-}
 
 llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* context, mlir::Value operand)
 {
@@ -304,7 +210,7 @@ llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* cont
     mlir::Attribute attr;
     if (mlir::matchPattern(operand, mlir::m_Constant(&attr)))
     {
-        auto tuple = resolveValue(context, attr).dyn_cast_or_null<pylir::Py::TupleAttr>();
+        auto tuple = pylir::Py::resolveValue<pylir::Py::TupleAttr>(context, attr);
         if (!tuple)
         {
             result.emplace_back(nullptr);
@@ -384,22 +290,7 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     {
         return input.getTypeObject();
     }
-    if (auto op = getObject().getDefiningOp<pylir::Py::ObjectFromTypeObjectInterface>())
-    {
-        return op.getTypeObject();
-    }
-    if (auto refineable = getObject().getDefiningOp<Py::TypeRefineableInterface>())
-    {
-        llvm::SmallVector<Py::TypeAttrUnion> operandTypes(refineable->getNumOperands(), nullptr);
-        mlir::SymbolTableCollection collection;
-        llvm::SmallVector<Py::ObjectTypeInterface> res;
-        if (refineable.refineTypes(operandTypes, res, collection) == TypeRefineResult::Failure)
-        {
-            return nullptr;
-        }
-        return res[getObject().cast<mlir::OpResult>().getResultNumber()].getTypeObject();
-    }
-    return nullptr;
+    return getTypeOf(getObject());
 }
 
 mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -420,11 +311,6 @@ mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute
 
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     auto indexAttr = operands[1].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!indexAttr)
     {
@@ -442,17 +328,12 @@ mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getInput().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getInputMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     if (auto makeTuple = getInput().getDefiningOp<Py::MakeTupleOp>();
         makeTuple && makeTuple.getIterExpansionAttr().empty())
     {
         return mlir::IntegerAttr::get(getType(), makeTuple.getArguments().size());
     }
-    if (auto tuple = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>())
+    if (auto tuple = resolveValue<TupleAttr>(*this, operands[0]))
     {
         return mlir::IntegerAttr::get(getType(), tuple.getValue().size());
     }
@@ -461,14 +342,12 @@ mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> o
 
 mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     auto element = operands[0];
-    auto tuple = resolveValue(*this, operands[1]).dyn_cast_or_null<Py::TupleAttr>();
-    if (tuple && element)
+    if (!element)
+    {
+        return nullptr;
+    }
+    if (auto tuple = resolveValue<TupleAttr>(*this, operands[1]))
     {
         llvm::SmallVector<mlir::Attribute> values{element};
         values.append(tuple.getValue().begin(), tuple.getValue().end());
@@ -479,12 +358,7 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 ::mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
-    auto constant = resolveValue(*this, operands[1]).dyn_cast_or_null<Py::TupleAttr>();
+    auto constant = resolveValue<TupleAttr>(*this, operands[1]);
     if (constant && constant.getValue().empty())
     {
         return Py::TupleAttr::get(getContext());
@@ -503,19 +377,15 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 ::mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
-    }
     auto type = operands[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-    if (type && type.getValue() == Builtins::Tuple.name
-        && mlir::isa_and_nonnull<Py::TupleDropFrontOp, Py::TuplePrependOp, Py::MakeTupleOp, Py::MakeTupleExOp>(
-            getTuple().getDefiningOp()))
+    // Forwarding it is safe in the case that the types of the input tuple as well as the resulting tuple are identical
+    // and that the type is fully immutable. In the future this may be computed, but for the time being, the
+    // `builtins.tuple` will be special cased as known immutable.
+    if (type && type.getValue() == Builtins::Tuple.name && getTypeOf(getTuple()) == mlir::OpFoldResult(type))
     {
         return getTuple();
     }
-    auto constant = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::TupleAttr>();
+    auto constant = resolveValue<TupleAttr>(*this, operands[0]);
     if (!constant || !type)
     {
         return nullptr;
@@ -599,7 +469,7 @@ mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(::llvm::ArrayRef<mlir::Attribut
     return Py::BoolAttr::get(getContext(), boolean.getValue());
 }
 
-mlir::OpFoldResult pylir::Py::IntFromIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::Py::IntFromUnsignedOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     auto integer = operands[0].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!integer)
@@ -609,33 +479,54 @@ mlir::OpFoldResult pylir::Py::IntFromIntegerOp::fold(::llvm::ArrayRef<::mlir::At
     return Py::IntAttr::get(getContext(), BigInt(integer.getValue().getZExtValue()));
 }
 
-mlir::LogicalResult pylir::Py::IntToIntegerOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                                    ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+mlir::OpFoldResult pylir::Py::IntFromSignedOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
+    if (auto op = getInput().getDefiningOp<IntToIndexOp>())
+    {
+        return op.getInput();
+    }
+    auto integer = operands[0].dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!integer)
+    {
+        return nullptr;
+    }
+    return Py::IntAttr::get(getContext(), BigInt(integer.getValue().getSExtValue()));
+}
+
+mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    if (auto op = getInput().getDefiningOp<IntFromSignedOp>())
+    {
+        return op.getInput();
+    }
+    if (auto op = getInput().getDefiningOp<IntFromUnsignedOp>())
+    {
+        return op.getInput();
+    }
+
     auto integer = operands[0].dyn_cast_or_null<Py::IntAttrInterface>();
     if (!integer)
     {
-        return mlir::failure();
+        return nullptr;
     }
-    std::size_t bitWidth;
-    if (getResult().getType().isa<mlir::IndexType>())
+    std::size_t bitWidth = mlir::DataLayout::closest(*this).getTypeSizeInBits(getResult().getType());
+    if (integer.getIntegerValue() < BigInt(0))
     {
-        bitWidth = mlir::DataLayout::closest(*this).getTypeSizeInBits(getResult().getType());
-    }
-    else
-    {
-        bitWidth = getResult().getType().getIntOrFloatBitWidth();
+        auto optional = integer.getIntegerValue().tryGetInteger<std::intmax_t>();
+        if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, true).isSignedIntN(bitWidth))
+        {
+            // TODO: I will probably want a poison value here in the future.
+            return mlir::IntegerAttr::get(getType(), 0);
+        }
+        return mlir::IntegerAttr::get(getType(), *optional);
     }
     auto optional = integer.getIntegerValue().tryGetInteger<std::uintmax_t>();
-    if (!optional || *optional > (1uLL << (bitWidth - 1)))
+    if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, false).isIntN(bitWidth))
     {
-        results.emplace_back(mlir::IntegerAttr::get(getResult().getType(), 0));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
+        // TODO: I will probably want a poison value here in the future.
+        return mlir::IntegerAttr::get(getType(), 0);
     }
-    results.emplace_back(mlir::IntegerAttr::get(getResult().getType(), *optional));
-    results.emplace_back(mlir::BoolAttr::get(getContext(), true));
-    return mlir::success();
+    return mlir::IntegerAttr::get(getType(), *optional);
 }
 
 mlir::OpFoldResult pylir::Py::IntCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -675,25 +566,9 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::At
     {
         return mlir::BoolAttr::get(getContext(), operands[0].isa<Py::UnboundAttr>());
     }
-    if (auto blockArg = getValue().dyn_cast<mlir::BlockArgument>(); blockArg)
+    if (auto unboundRes = isUnbound(getValue()))
     {
-        if (mlir::isa_and_nonnull<mlir::FunctionOpInterface>(blockArg.getOwner()->getParentOp())
-            && blockArg.getOwner()->isEntryBlock())
-        {
-            return mlir::BoolAttr::get(getContext(), false);
-        }
-        return nullptr;
-    }
-    // If the defining op has the AlwaysBound trait then it is false. Also manually sanction some ops from other
-    // dialects
-    auto* op = getValue().getDefiningOp();
-    if (!op)
-    {
-        return nullptr;
-    }
-    if (op->hasTrait<Py::AlwaysBound>())
-    {
-        return mlir::BoolAttr::get(getContext(), false);
+        return mlir::BoolAttr::get(getContext(), *unboundRes);
     }
     return nullptr;
 }
@@ -731,7 +606,7 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
 
 mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute> attributes)
 {
-    auto object = resolveValue(*this, attributes[0], false).dyn_cast_or_null<pylir::Py::TypeAttr>();
+    auto object = resolveValue<TypeAttr>(*this, attributes[0], false);
     if (!object)
     {
         return nullptr;
@@ -739,69 +614,55 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
     return object.getMroTuple();
 }
 
-mlir::LogicalResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> constantOperands,
-                                                 ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+::mlir::OpFoldResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> constantOperands)
 {
-    if (auto tuple = resolveValue(*this, constantOperands[0], false).dyn_cast_or_null<pylir::Py::TupleAttr>())
+    if (auto tuple = resolveValue<TupleAttr>(*this, constantOperands[0], false))
     {
         for (auto iter : tuple.getValue())
         {
             auto object = resolveValue(*this, iter);
             if (!object)
             {
-                return mlir::failure();
+                return nullptr;
             }
             const auto& map = object.getSlots();
             if (auto result = map.get(getSlotAttr()))
             {
-                results.emplace_back(result);
-                results.emplace_back(mlir::BoolAttr::get(getContext(), true));
-                return mlir::success();
+                return result;
             }
         }
-        results.emplace_back(Py::UnboundAttr::get(getContext()));
-        results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-        return mlir::success();
+        return Py::UnboundAttr::get(getContext());
     }
     auto operands = resolveTupleOperands(*this, getMroTuple());
     for (auto& iter : operands)
     {
         if (!iter || !iter.is<mlir::Attribute>())
         {
-            return mlir::failure();
+            return nullptr;
         }
         auto object = resolveValue(*this, iter.get<mlir::Attribute>());
         if (!object)
         {
-            return mlir::failure();
+            return nullptr;
         }
         const auto& map = object.getSlots();
         auto result = map.get(getSlotAttr());
         if (result)
         {
-            results.emplace_back(result);
-            results.emplace_back(mlir::BoolAttr::get(getContext(), true));
-            return mlir::success();
+            return result;
         }
     }
-    results.emplace_back(Py::UnboundAttr::get(getContext()));
-    results.emplace_back(mlir::BoolAttr::get(getContext(), false));
-    return mlir::success();
+    return Py::UnboundAttr::get(getContext());
 }
 
 mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tuple = resolveValue(*this, operands[0], false).dyn_cast_or_null<pylir::Py::TupleAttr>())
+    if (auto tuple = resolveValue<TupleAttr>(*this, operands[0], false))
     {
         if (auto element = operands[1])
         {
             return mlir::BoolAttr::get(getContext(), llvm::is_contained(tuple.getValue(), element));
         }
-    }
-    if (auto tupleCopy = getTuple().getDefiningOp<pylir::Py::TupleCopyOp>())
-    {
-        getTupleMutable().assign(tupleCopy.getTuple());
-        return mlir::Value{*this};
     }
     auto tupleOperands = resolveTupleOperands(*this, getTuple());
     bool hadWildcard = false;
@@ -841,7 +702,7 @@ mlir::OpFoldResult pylir::Py::StrConcatOp::fold(::llvm::ArrayRef<::mlir::Attribu
 
 mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
-    auto constantDict = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::DictAttr>();
+    auto constantDict = resolveValue<DictAttr>(*this, operands[0]);
     if (constantDict && constantDict.getValue().empty())
     {
         return Py::UnboundAttr::get(getContext());
@@ -868,7 +729,7 @@ mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attr
 
 mlir::OpFoldResult pylir::Py::DictLenOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
-    auto constantDict = resolveValue(*this, operands[0]).dyn_cast_or_null<Py::DictAttr>();
+    auto constantDict = resolveValue<DictAttr>(*this, operands[0]);
     if (!constantDict)
     {
         return nullptr;
@@ -904,7 +765,7 @@ mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, :
         {
             return mlir::failure();
         }
-        auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
+        auto functionAttr = resolveValue<FunctionAttr>(op, attribute, false);
         if (!functionAttr)
         {
             return mlir::failure();
@@ -929,7 +790,7 @@ mlir::LogicalResult pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp o
         {
             return mlir::failure();
         }
-        auto functionAttr = resolveValue(op, attribute, false).dyn_cast_or_null<pylir::Py::FunctionAttr>();
+        auto functionAttr = resolveValue<FunctionAttr>(op, attribute, false);
         if (!functionAttr)
         {
             return mlir::failure();
@@ -1012,17 +873,17 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
                     {
                         return mlir::failure();
                     }
-                    auto [key, value] = pylir::get<std::pair<mlir::Value, mlir::Value>>(variant);
-                    if (key == getKey())
+                    auto& entry = pylir::get<DictEntry>(variant);
+                    if (entry.key == getKey())
                     {
-                        results.emplace_back(value);
+                        results.emplace_back(entry.value);
                         return mlir::success();
                     }
                     // TODO:
                     //  some more generic mechanism to not automatically fail if we know they are definitely NOT
                     //  equal (trivial for constants at least, except for references as they need to be resolved).
                     mlir::Attribute attr1, attr2;
-                    if (mlir::matchPattern(key, mlir::m_Constant(&attr1))
+                    if (mlir::matchPattern(entry.key, mlir::m_Constant(&attr1))
                         && mlir::matchPattern(getKey(), mlir::m_Constant(&attr2)) && attr1 != attr2
                         && !attr1.isa<mlir::SymbolRefAttr>())
                     {
@@ -1293,6 +1154,47 @@ struct ArithSelectTransform : mlir::OpRewritePattern<mlir::arith::SelectOp>
     }
 };
 
+struct FoldOnlyReadsValueOfCopy : mlir::OpInterfaceRewritePattern<pylir::Py::CopyObjectInterface>
+{
+    using mlir::OpInterfaceRewritePattern<pylir::Py::CopyObjectInterface>::OpInterfaceRewritePattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::CopyObjectInterface op,
+                                        mlir::PatternRewriter& rewriter) const override
+    {
+        bool removedAll = true;
+        bool changed = false;
+        rewriter.startRootUpdate(op);
+        for (mlir::OpResult iter : op->getResults())
+        {
+            bool replaced = false;
+            iter.replaceUsesWithIf(op.getCopiedOperand().get(),
+                                   [&](mlir::OpOperand& operand) -> bool
+                                   {
+                                       auto interface =
+                                           mlir::dyn_cast<pylir::Py::OnlyReadsValueInterface>(operand.getOwner());
+                                       replaced = interface && interface.onlyReadsValue(operand);
+                                       return replaced;
+                                   });
+            changed = changed || replaced;
+            removedAll = removedAll && replaced;
+        }
+        if (removedAll)
+        {
+            rewriter.eraseOp(op);
+        }
+
+        if (changed)
+        {
+            rewriter.finalizeRootUpdate(op);
+        }
+        else
+        {
+            rewriter.cancelRootUpdate(op);
+        }
+        return mlir::success(changed);
+    }
+};
+
 pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Location loc, mlir::Value input,
                                          mlir::Attribute attr)
 {
@@ -1359,7 +1261,7 @@ mlir::LogicalResult resolvesToPattern(mlir::Operation* operation, mlir::Attribut
     {
         return mlir::failure();
     }
-    result = resolveValue(operation, result, constOnly);
+    result = pylir::Py::resolveValue(operation, result, constOnly);
     return mlir::success();
 }
 
@@ -1371,9 +1273,9 @@ mlir::LogicalResult resolvesToPattern(mlir::Operation* operation, mlir::Attribut
 void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(::mlir::RewritePatternSet& results) const
 {
     populateWithGenerated(results);
-    results.insert<NoopBlockArgRemove>(getContext());
-    results.insert<PassthroughArgRemove>(getContext());
+    pylir::populateWithBranchOpInterfacePattern(results);
     results.insert<ArithSelectTransform>(getContext());
+    results.insert<FoldOnlyReadsValueOfCopy>(getContext());
 }
 
 void pylir::Py::PylirPyDialect::initializeExternalModels()

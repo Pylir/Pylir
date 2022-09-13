@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -42,32 +40,24 @@ class ReturnsImmutable : public mlir::OpTrait::TraitBase<ConcreteType, ReturnsIm
     }
 };
 
-template <class ConcreteType>
-class NoCapture : public CaptureInterface::Trait<ConcreteType>
+template <const Builtins::Builtin& builtin>
+class RefinedType
 {
 public:
-    bool capturesOperand(unsigned int)
+    template <class ConcreteType>
+    class Impl : public TypeRefineableInterface::Trait<ConcreteType>
     {
-        return false;
-    }
-};
-
-#define BUILTIN_TYPE(x, ...)                                                                                   \
-    template <class ConcreteType>                                                                              \
-    class x##RefinedType : public TypeRefineableInterface::Trait<ConcreteType>                                 \
-    {                                                                                                          \
-    public:                                                                                                    \
-        pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,                      \
-                                                llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result, \
-                                                mlir::SymbolTableCollection&)                                  \
-        {                                                                                                      \
-            auto* context = this->getOperation()->getContext();                                                \
-            result.emplace_back(                                                                               \
-                pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, pylir::Builtins::x.name)));    \
-            return TypeRefineResult::Success;                                                                  \
-        }                                                                                                      \
+    public:
+        pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
+                                                llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
+                                                mlir::SymbolTableCollection&)
+        {
+            auto* context = this->getOperation()->getContext();
+            result.emplace_back(pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, builtin.name)));
+            return TypeRefineResult::Success;
+        }
     };
-#include <pylir/Interfaces/BuiltinsModule.def>
+};
 
 template <class ConcreteType>
 class RefinedTypeTupleApproximate : public TypeRefineableInterface::Trait<ConcreteType>

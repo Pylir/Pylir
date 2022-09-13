@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -162,8 +160,23 @@ struct Parameter
     } kind;
     std::optional<BaseToken> maybeStars;
     IdentifierToken name;
+    std::optional<BaseToken> maybeColon;
     IntrVarPtr<Expression> maybeType;
     IntrVarPtr<Expression> maybeDefault;
+};
+
+struct Scope
+{
+    enum Kind
+    {
+        Local,
+        Cell,
+        NonLocal,
+        Global,
+        Unknown
+    };
+
+    IdentifierMap<Kind> identifiers;
 };
 
 struct Lambda : Expression::Base<Lambda>
@@ -172,6 +185,8 @@ struct Lambda : Expression::Base<Lambda>
     std::vector<Parameter> parameters;
     BaseToken colon;
     IntrVarPtr<Expression> expression;
+
+    Scope scope;
 };
 
 struct Yield : Expression::Base<Yield>
@@ -445,20 +460,6 @@ struct Decorator
     BaseToken atSign;
     IntrVarPtr<Expression> expression;
     BaseToken newline;
-};
-
-struct Scope
-{
-    enum Kind
-    {
-        Local,
-        Cell,
-        NonLocal,
-        Global,
-        Unknown
-    };
-
-    IdentifierMap<Kind> identifiers;
 };
 
 struct FuncDef : CompoundStmt::Base<FuncDef>

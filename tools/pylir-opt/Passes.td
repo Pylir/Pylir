@@ -9,39 +9,27 @@
 
 include "mlir/Pass/PassBase.td"
 
-def TestMemorySSA : Pass<"test-memory-ssa","::mlir::ModuleOp"> {
-    let constructor = "::createTestMemorySSA()";
+def TestMemorySSAPass : Pass<"test-memory-ssa","::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::MemSSA::MemorySSADialect"];
 }
 
-def TestInlinerInterface : Pass<"test-inliner-interface", "::mlir::ModuleOp"> {
-	let constructor = "::createTestInlinerInterface()";
+def TestInlinerInterfacePass : Pass<"test-inliner-interface", "::mlir::ModuleOp"> {
 	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 }
 
-def TestTypeFlow : Pass<"test-type-flow", "::mlir::ModuleOp"> {
-    let constructor = "::createTestTypeFlow()";
+def TestTypeFlowPass : Pass<"test-type-flow", "::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::TypeFlow::TypeFlowDialect"];
 }
 
-def TestAliasSetTracker : Pass<"test-alias-set-tracker", "::mlir::ModuleOp"> {
-    let constructor = "::createTestAliasSetTracker()";
-}
+def TestAliasSetTrackerPass : Pass<"test-alias-set-tracker", "::mlir::ModuleOp">;
 
-def TestLoopInfo : Pass<"test-loop-info", "::mlir::ModuleOp"> {
-    let constructor = "::createTestLoopInfo()";
-}
+def TestLoopInfoPass : Pass<"test-loop-info", "::mlir::ModuleOp">;
 
-def TestHelloWorld : Pass<"test-hello-world"> {
-    let constructor = "::createTestHelloWorld()";
-}
+def TestHelloWorldPass : Pass<"test-hello-world">;
 
-def TestLinker : Pass<"test-linker", "::mlir::ModuleOp"> {
-    let constructor = "::createTestLinker()";
-}
+def TestLinkerPass : Pass<"test-linker", "::mlir::ModuleOp">;
 
-def TestInlineAll : Pass<"test-inline-all", "::mlir::ModuleOp"> {
-    let constructor = "::createTestInlineAll()";
+def TestInlineAllPass : Pass<"test-inline-all", "::mlir::ModuleOp"> {
 
     let statistics = [
     	Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
@@ -54,6 +42,10 @@ def TestInlineAll : Pass<"test-inline-all", "::mlir::ModuleOp"> {
         Option<"m_optimizationPipeline", "optimization-pipeline", "std::string", "",
                 "Optimization pipeline used to perform the inlining trials">,
     ];
+}
+
+def TestAddChangePass : Pass<"test-add-change", "::mlir::ModuleOp"> {
+    let dependentDialects = ["::pylir::test::TestDialect"];
 }
 
 #endif

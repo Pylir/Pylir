@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -208,14 +206,6 @@ class CodeGen
     void buildTupleForEach(mlir::Value tuple, mlir::Block* endBlock, mlir::ValueRange endArgs,
                            llvm::function_ref<void(mlir::Value)> iterationCallback);
 
-    mlir::Value makeTuple(const std::vector<Py::IterArg>& args);
-
-    mlir::Value makeList(const std::vector<Py::IterArg>& args);
-
-    mlir::Value makeSet(const std::vector<Py::IterArg>& args);
-
-    mlir::Value makeDict(const std::vector<Py::DictArg>& args);
-
     struct ModuleSpec
     {
         std::size_t dots;
@@ -370,6 +360,10 @@ class CodeGen
     void visitForConstruct(const Syntax::Target& targets, mlir::Value iterable, llvm::function_ref<void()> execSuite,
                            const std::optional<Syntax::IfStmt::Else>& elseSection = {});
 
+    mlir::Value visitFunction(llvm::ArrayRef<Syntax::Decorator> decorators,
+                              llvm::ArrayRef<Syntax::Parameter> parameterList, llvm::StringRef funcName,
+                              const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody);
+
     template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
     decltype(auto) visit(const T& variant)
     {
@@ -413,6 +407,11 @@ class CodeGen
         return exit;
     }
 
+    [[nodiscard]] mlir::Location synthesizedLoc()
+    {
+        return mlir::FileLineColLoc::get(m_builder.getStringAttr(m_docManager->getDocument().getFilename()), 0, 0);
+    }
+
     [[nodiscard]] auto changeLoc(mlir::Location loc)
     {
         auto currLoc = m_builder.getCurrentLoc();
@@ -435,11 +434,11 @@ class CodeGen
         m_builder.setInsertionPointToStart(m_currentFunc.addEntryBlock());
         m_functionScope.emplace(Scope{{},
                                       SSABuilder(
-                                          [this](mlir::BlockArgument arg) -> mlir::Value
+                                          [this](mlir::Block* block, mlir::Type, mlir::Location loc) -> mlir::Value
                                           {
-                                              auto locExit = changeLoc(arg.getLoc());
+                                              auto locExit = changeLoc(loc);
                                               mlir::OpBuilder::InsertionGuard guard{m_builder};
-                                              m_builder.setInsertionPointToStart(arg.getOwner());
+                                              m_builder.setInsertionPointToStart(block);
                                               return m_builder.createConstant(m_builder.getUnboundAttr());
                                           })});
         return tuple;

@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h>
 #include <mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h>
@@ -14,6 +12,7 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/IR/PatternMatch.h>
+#include <mlir/Pass/Pass.h>
 #include <mlir/Transforms/DialectConversion.h>
 
 #include <llvm/ADT/ScopeExit.h>
@@ -21,15 +20,22 @@
 #include <llvm/ADT/Triple.h>
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/Conversion/PassDetail.hpp>
+#include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/IR/Value.hpp>
 
 #include "WinX64.hpp"
 #include "X86_64.hpp"
 #include "ARM64.hpp"
+
+namespace pylir
+{
+#define GEN_PASS_DEF_CONVERTPYLIRTOLLVMPASS
+#include "pylir/Optimizer/Conversion/Passes.h.inc"
+} // namespace pylir
 
 namespace
 {
@@ -281,11 +287,10 @@ public:
         auto mpInt = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "mp_int");
         if (!mpInt.isInitialized())
         {
-            [[maybe_unused]] auto result = mpInt.setBody({mlir::IntegerType::get(&getContext(), 8 * sizeof(int)),
-                                                          mlir::IntegerType::get(&getContext(), 8 * sizeof(int)),
-                                                          mlir::LLVM::LLVMPointerType::get(&getContext()),
-                                                          mlir::IntegerType::get(&getContext(), 8 * sizeof(mp_sign))},
-                                                         false);
+            [[maybe_unused]] auto result =
+                mpInt.setBody({m_cabi->getInt(&getContext()), m_cabi->getInt(&getContext()),
+                               mlir::LLVM::LLVMPointerType::get(&getContext()), m_cabi->getInt(&getContext())},
+                              false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return mpInt;
@@ -492,6 +497,8 @@ public:
         Memcmp,
         malloc,
         mp_init_u64,
+        mp_init_i64,
+        mp_get_i64,
         mp_init,
         mp_unpack,
         mp_radix_size_overestimate,
@@ -500,9 +507,9 @@ public:
         mp_add,
         pylir_gc_alloc,
         pylir_str_hash,
-        pylir_int_get,
         pylir_dict_lookup,
         pylir_dict_insert,
+        pylir_dict_insert_unique,
         pylir_dict_erase,
         pylir_print,
         pylir_raise,
@@ -536,6 +543,18 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType, builder.getI64Type()};
                 functionName = "mp_init_u64";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                break;
+            case Runtime::mp_init_i64:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {m_objectPtrType, builder.getI64Type()};
+                functionName = "mp_init_i64";
+                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                break;
+            case Runtime::mp_get_i64:
+                returnType = builder.getI64Type();
+                argumentTypes = {m_objectPtrType};
+                functionName = "mp_get_i64";
                 passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
             case Runtime::pylir_str_hash:
@@ -599,27 +618,25 @@ public:
                 functionName = "mp_add";
                 passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
                 break;
-            case Runtime::pylir_int_get:
-                returnType = mlir::LLVM::LLVMStructType::getLiteral(
-                    &getContext(), {getIndexType(), mlir::IntegerType::get(&getContext(), 1)});
-                argumentTypes = {m_objectPtrType, getIndexType()};
-                functionName = "pylir_int_get";
-                passThroughAttributes = {"inaccessiblemem_or_argmemonly", "gc-leaf-function", "nounwind"};
-                break;
             case Runtime::pylir_dict_lookup:
                 returnType = m_objectPtrType;
-                argumentTypes = {m_objectPtrType, returnType};
+                argumentTypes = {m_objectPtrType, returnType, m_cabi->getSizeT(&getContext())};
                 functionName = "pylir_dict_lookup";
                 break;
             case Runtime::pylir_dict_erase:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
-                argumentTypes = {m_objectPtrType, m_objectPtrType};
+                argumentTypes = {m_objectPtrType, m_objectPtrType, m_cabi->getSizeT(&getContext())};
                 functionName = "pylir_dict_erase";
                 break;
             case Runtime::pylir_dict_insert:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
-                argumentTypes = {m_objectPtrType, m_objectPtrType, m_objectPtrType};
+                argumentTypes = {m_objectPtrType, m_objectPtrType, m_cabi->getSizeT(&getContext()), m_objectPtrType};
                 functionName = "pylir_dict_insert";
+                break;
+            case Runtime::pylir_dict_insert_unique:
+                returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
+                argumentTypes = {m_objectPtrType, m_objectPtrType, m_cabi->getSizeT(&getContext()), m_objectPtrType};
+                functionName = "pylir_dict_insert_unique";
                 break;
         }
         auto module = mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp());
@@ -819,19 +836,40 @@ public:
                     {
                         return;
                     }
-                    appendToGlobalInit(builder,
-                                       [&]
-                                       {
-                                           auto dictionary = builder.create<mlir::LLVM::AddressOfOp>(
-                                               global.getLoc(), m_objectPtrType, mlir::FlatSymbolRefAttr::get(global));
-                                           for (const auto& [key, value] : dict.getValue())
-                                           {
-                                               auto keyValue = getConstant(global.getLoc(), key, builder);
-                                               auto valueValue = getConstant(global.getLoc(), value, builder);
-                                               createRuntimeCall(global.getLoc(), builder, Runtime::pylir_dict_insert,
-                                                                 {dictionary, keyValue, valueValue});
-                                           }
-                                       });
+                    appendToGlobalInit(
+                        builder,
+                        [&]
+                        {
+                            auto dictionary = builder.create<mlir::LLVM::AddressOfOp>(
+                                global.getLoc(), m_objectPtrType, mlir::FlatSymbolRefAttr::get(global));
+                            for (const auto& [key, value] : dict.getValue())
+                            {
+                                auto keyValue = getConstant(global.getLoc(), key, builder);
+                                auto layoutType =
+                                    getLayoutType(dereference<pylir::Py::ObjectAttrInterface>(key).getTypeObject());
+                                mlir::Value hash;
+                                if (layoutType
+                                    == mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Str.name))
+                                {
+                                    hash = createRuntimeCall(global.getLoc(), builder, Runtime::pylir_str_hash,
+                                                             {keyValue});
+                                }
+                                else if (layoutType
+                                         == mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Object.name))
+                                {
+                                    hash = builder.create<mlir::LLVM::PtrToIntOp>(global.getLoc(), getIndexType(),
+                                                                                  keyValue);
+                                }
+                                else
+                                {
+                                    // TODO: Add more inline hash functions implementations.
+                                    PYLIR_UNREACHABLE;
+                                }
+                                auto valueValue = getConstant(global.getLoc(), value, builder);
+                                createRuntimeCall(global.getLoc(), builder, Runtime::pylir_dict_insert_unique,
+                                                  {dictionary, keyValue, hash, valueValue});
+                            }
+                        });
                 })
             .Case(
                 [&](pylir::Py::TypeAttr attr)
@@ -1840,7 +1878,7 @@ struct DictTryGetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py
     {
         auto dict = pyDictModel(op.getLoc(), rewriter, adaptor.getDict());
         auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_lookup,
-                                        {mlir::Value{dict}, adaptor.getKey()});
+                                        {mlir::Value{dict}, adaptor.getKey(), adaptor.getHash()});
         rewriter.replaceOp(op, result);
         return mlir::success();
     }
@@ -1855,7 +1893,7 @@ struct DictSetItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::D
     {
         auto dict = pyDictModel(op.getLoc(), rewriter, adaptor.getDict());
         createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_insert,
-                          {mlir::Value{dict}, adaptor.getKey(), adaptor.getValue()});
+                          {mlir::Value{dict}, adaptor.getKey(), adaptor.getHash(), adaptor.getValue()});
         rewriter.eraseOp(op);
         return mlir::success();
     }
@@ -1870,32 +1908,27 @@ struct DictDelItemOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::D
     {
         auto dict = pyDictModel(op.getLoc(), rewriter, adaptor.getDict());
         createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_dict_erase,
-                          {mlir::Value{dict}, adaptor.getKey()});
+                          {mlir::Value{dict}, adaptor.getKey(), adaptor.getHash()});
         rewriter.eraseOp(op);
         return mlir::success();
     }
 };
 
-struct IntGetIntegerOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::IntToIntegerOp>
+struct IntToIndexOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::IntToIndexOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::IntToIntegerOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::IntToIndexOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::IntToIntegerOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::IntToIndexOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto pyInt = pyIntModel(op.getLoc(), rewriter, adaptor.getInput());
-        auto mpInt = pyInt.mpIntPtr(op.getLoc());
-        auto converted = typeConverter->convertType(op.getResult().getType());
-        auto size = createIndexConstant(rewriter, op.getLoc(), sizeOf(converted));
-        auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::pylir_int_get,
-                                        {mlir::Value{mpInt}, size});
-        mlir::Value first = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), result, 0);
-        auto second = rewriter.create<mlir::LLVM::ExtractValueOp>(op.getLoc(), result, 1);
-        if (first.getType() != converted)
+        auto call =
+            createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_get_i64,
+                              mlir::Value{pyIntModel(op.getLoc(), rewriter, adaptor.getInput()).mpIntPtr(op.getLoc())});
+        if (call.getType() != typeConverter->convertType(op.getType()))
         {
-            first = rewriter.create<mlir::LLVM::TruncOp>(op.getLoc(), converted, first);
+            call = rewriter.create<mlir::LLVM::TruncOp>(op.getLoc(), typeConverter->convertType(op.getType()), call);
         }
-        rewriter.replaceOp(op, {first, second});
+        rewriter.replaceOp(op, call);
         return mlir::success();
     }
 };
@@ -2791,11 +2824,11 @@ struct InitTuplePrependOpConversion : public ConvertPylirOpToLLVMPattern<pylir::
     }
 };
 
-struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>
+struct InitIntUnsignedOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntUnsignedOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntUnsignedOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitIntOp op, OpAdaptor adaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitIntUnsignedOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto mpIntPointer = pyIntModel(op.getLoc(), rewriter, adaptor.getMemory()).mpIntPtr(op.getLoc());
@@ -2805,6 +2838,26 @@ struct InitIntOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Init
             value = rewriter.create<mlir::LLVM::ZExtOp>(op.getLoc(), rewriter.getI64Type(), value);
         }
         createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_init_u64,
+                          {mlir::Value{mpIntPointer}, value});
+        rewriter.replaceOp(op, adaptor.getMemory());
+        return mlir::success();
+    }
+};
+
+struct InitIntSignedOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntSignedOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitIntSignedOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitIntSignedOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto mpIntPointer = pyIntModel(op.getLoc(), rewriter, adaptor.getMemory()).mpIntPtr(op.getLoc());
+        auto value = adaptor.getInitializer();
+        if (value.getType() != rewriter.getI64Type())
+        {
+            value = rewriter.create<mlir::LLVM::ZExtOp>(op.getLoc(), rewriter.getI64Type(), value);
+        }
+        createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::mp_init_i64,
                           {mlir::Value{mpIntPointer}, value});
         rewriter.replaceOp(op, adaptor.getMemory());
         return mlir::success();
@@ -2942,19 +2995,66 @@ struct UnreachableOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::U
     }
 };
 
-class ConvertPylirToLLVMPass : public ConvertPylirToLLVMBase<ConvertPylirToLLVMPass>
+struct MROLookupOpConversion : ConvertPylirOpToLLVMPattern<pylir::Py::MROLookupOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::MROLookupOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::MROLookupOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        auto loc = op.getLoc();
+        auto tuple = adaptor.getMroTuple();
+        auto* block = op->getBlock();
+        auto* endBlock = block->splitBlock(op);
+        endBlock->addArguments(typeConverter->convertType(op.getType()), loc);
+
+        rewriter.setInsertionPointToEnd(block);
+        auto tupleSize = pyTupleModel(loc, rewriter, tuple).sizePtr(loc).load(loc);
+        auto startConstant = rewriter.create<mlir::LLVM::ConstantOp>(loc, getIndexType(), 0);
+        auto* conditionBlock = new mlir::Block;
+        conditionBlock->addArgument(getIndexType(), loc);
+        rewriter.create<mlir::LLVM::BrOp>(loc, mlir::ValueRange{startConstant}, conditionBlock);
+
+        conditionBlock->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(conditionBlock);
+        auto isLess = rewriter.create<mlir::LLVM::ICmpOp>(loc, mlir::LLVM::ICmpPredicate::ult,
+                                                          conditionBlock->getArgument(0), tupleSize);
+        auto* body = new mlir::Block;
+        mlir::Value unbound = rewriter.create<mlir::LLVM::NullOp>(loc, endBlock->getArgument(0).getType());
+        rewriter.create<mlir::LLVM::CondBrOp>(loc, isLess, body, endBlock, unbound);
+
+        body->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(body);
+        auto entry =
+            pyTupleModel(loc, rewriter, tuple).trailingPtr(loc).at(loc, conditionBlock->getArgument(0)).load(loc);
+        auto entryType = rewriter
+                             .create<mlir::UnrealizedConversionCastOp>(loc, rewriter.getType<pylir::Py::DynamicType>(),
+                                                                       mlir::Value(entry.typePtr(loc).load(loc)))
+                             ->getResult(0);
+        mlir::Value fetch = unrealizedConversion(
+            rewriter, rewriter.create<pylir::Py::GetSlotOp>(loc, mlir::Value(entry), entryType, adaptor.getSlotAttr()));
+        auto failure = rewriter.create<mlir::LLVM::ICmpOp>(loc, mlir::LLVM::ICmpPredicate::eq, fetch, unbound);
+        auto* notFound = new mlir::Block;
+        rewriter.create<mlir::LLVM::CondBrOp>(loc, failure, notFound, endBlock, fetch);
+
+        notFound->insertBefore(endBlock);
+        rewriter.setInsertionPointToStart(notFound);
+        auto one = rewriter.create<mlir::LLVM::ConstantOp>(loc, getIndexType(), 1);
+        auto nextIter = rewriter.create<mlir::LLVM::AddOp>(loc, conditionBlock->getArgument(0), one);
+        rewriter.create<mlir::LLVM::BrOp>(loc, mlir::ValueRange{nextIter}, conditionBlock);
+
+        rewriter.replaceOp(op, endBlock->getArguments());
+        return mlir::success();
+    }
+};
+
+class ConvertPylirToLLVMPass : public pylir::impl::ConvertPylirToLLVMPassBase<ConvertPylirToLLVMPass>
 {
 protected:
     void runOnOperation() override;
 
 public:
-    ConvertPylirToLLVMPass() = default;
-
-    ConvertPylirToLLVMPass(llvm::Triple triple, const llvm::DataLayout& dataLayout)
-    {
-        m_targetTripleCLI = triple.str();
-        m_dataLayoutCLI = dataLayout.getStringRepresentation();
-    }
+    using Base::Base;
 };
 
 void ConvertPylirToLLVMPass::runOnOperation()
@@ -3013,7 +3113,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<ListSetItemOpConversion>(converter);
     patternSet.insert<ListResizeOpConversion>(converter);
     patternSet.insert<RaiseOpConversion>(converter);
-    patternSet.insert<InitIntOpConversion>(converter);
+    patternSet.insert<InitIntUnsignedOpConversion>(converter);
+    patternSet.insert<InitIntSignedOpConversion>(converter);
     patternSet.insert<ObjectHashOpConversion>(converter);
     patternSet.insert<ObjectIdOpConversion>(converter);
     patternSet.insert<StrHashOpConversion>(converter);
@@ -3033,7 +3134,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<BoolToI1OpConversion>(converter);
     patternSet.insert<InitTuplePrependOpConversion>(converter);
     patternSet.insert<InitTupleDropFrontOpConversion>(converter);
-    patternSet.insert<IntGetIntegerOpConversion>(converter);
+    patternSet.insert<IntToIndexOpConversion>(converter);
     patternSet.insert<IntCmpOpConversion>(converter);
     patternSet.insert<InitIntAddOpConversion>(converter);
     patternSet.insert<UnreachableOpConversion>(converter);
@@ -3041,6 +3142,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<ArithmeticSelectOpConversion>(converter);
     patternSet.insert<TupleContainsOpConversion>(converter);
     patternSet.insert<InitTupleCopyOpConversion>(converter);
+    patternSet.insert<MROLookupOpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
@@ -3073,14 +3175,3 @@ void ConvertPylirToLLVMPass::runOnOperation()
     }
 }
 } // namespace
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> pylir::createConvertPylirToLLVMPass()
-{
-    return std::make_unique<ConvertPylirToLLVMPass>();
-}
-
-std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>>
-    pylir::createConvertPylirToLLVMPass(llvm::Triple targetTriple, const llvm::DataLayout& dataLayout)
-{
-    return std::make_unique<ConvertPylirToLLVMPass>(std::move(targetTriple), dataLayout);
-}

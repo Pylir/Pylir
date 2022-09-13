@@ -27,7 +27,7 @@ func.func @__init__() {
 ^loop(%iter : !py.dynamic):
 	%0 = py.typeOf %iter
 	%1 = py.type.mro %0
-	%2, %found = py.mroLookup "__add__" in %1
+	%2 = py.mroLookup "__add__" in %1
 	%3 = py.makeTuple (%iter, %one)
 	%4 = py.constant(#py.dict<{}>)
 	%5 = py.function.call %2(%2, %3, %4)

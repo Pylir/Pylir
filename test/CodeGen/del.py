@@ -13,7 +13,7 @@ def g():
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = py.constant(@builtins.NameError)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]], %{{.*}} = py.mroLookup "__new__" in %[[MRO]]
+# CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: py.raise %[[EXC]]
 
@@ -34,7 +34,7 @@ def local():
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = py.constant(@builtins.UnboundLocalError)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]], %{{.*}} = py.mroLookup "__new__" in %[[MRO]]
+# CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: py.raise %[[EXC]]
 
@@ -61,7 +61,7 @@ def closure():
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = py.constant(@builtins.UnboundLocalError)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]], %{{.*}} = py.mroLookup "__new__" in %[[MRO]]
+# CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: py.raise %[[EXC]]
 

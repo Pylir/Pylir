@@ -18,6 +18,7 @@ include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
+include "mlir/IR/EnumAttr.td"
 
 defvar ObjectAttr = PylirPy_ObjectAttr;
 defvar MemoryType = PylirMem_MemoryType;
@@ -53,11 +54,18 @@ def PylirMem_StackAllocTupleOp : PylirMem_Op<"stackAllocTuple"> {
     let assemblyFormat = "$type_object `[` $length `]` attr-dict";
 }
 
-def PylirMem_InitIntOp : PylirMem_Op<"initInt", [AlwaysBound]> {
-    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, IntegerLike:$initializer);
+def PylirMem_InitIntSignedOp : PylirMem_Op<"initIntSigned", [AlwaysBound]> {
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Index:$initializer);
     let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` $initializer attr-dict `:` type($initializer)";
+    let assemblyFormat = "$memory `to` $initializer attr-dict";
+}
+
+def PylirMem_InitIntUnsignedOp : PylirMem_Op<"initIntUnsigned", [AlwaysBound]> {
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Index:$initializer);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "$memory `to` $initializer attr-dict";
 }
 
 def PylirMem_InitIntAddOp : PylirMem_Op<"initIntAdd", [AlwaysBound]> {

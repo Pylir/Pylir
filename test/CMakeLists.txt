@@ -9,7 +9,8 @@ set(PYLIR_TEST_DEPENDS
         pylir-opt
         pylir-translate
         pylir
-        pylir-jit
+        pylir-tblgen
+        pylir-stdlib
         PylirRuntime
         PylirRuntimeMain
         )
@@ -20,5 +21,5 @@ configure_file(
         @ONLY
 )
 
-add_test(NAME lit-tests COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pylir-lit.py "${CMAKE_CURRENT_BINARY_DIR}" -v)
+add_test(NAME lit-tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pylir-lit.py "${CMAKE_CURRENT_BINARY_DIR}" -v)
 

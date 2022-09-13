@@ -1,5 +1,3 @@
-#  // Copyright 2022 Markus Böck
-#  //
 #  // Licensed under the Apache License v2.0 with LLVM Exceptions.
 #  // See https://llvm.org/LICENSE.txt for license information.
 #  // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -21,9 +19,8 @@ import pylir.intr.type
 #       dictionary unpacking
 def unary_method_call(method, obj):
     mro = pylir.intr.type.mro(type(method))
-    t = pylir.intr.mroLookup(mro, "__get__")
-    if t[1]:
-        method = t[0](obj, type(obj))
+    if not pylir.intr.isUnboundValue(t := pylir.intr.mroLookup(mro, "__get__")):
+        method = t(obj, type(obj))
     # TODO: This is incorrect. One should not be passing any arguments, and obj
     #       should be bound as the self parameter by the __get__ implementation
     #       of function. Until this is implemented we are doing this
@@ -33,9 +30,8 @@ def unary_method_call(method, obj):
 
 def binary_method_call(method, self, other):
     mro = pylir.intr.type.mro(type(method))
-    t = pylir.intr.mroLookup(mro, "__get__")
-    if t[1]:
-        method = t[0](self, type(self))
+    if not pylir.intr.isUnboundValue(t := pylir.intr.mroLookup(mro, "__get__")):
+        method = t(self, type(self))
     # TODO: This is incorrect; See unary_method call description for details.
     #       Should be `method(other)` in the future.
     return method(self, other)
@@ -62,8 +58,7 @@ class type:
             return pylir.intr.typeOf(pylir.intr.tuple.getItem(args, 0))
 
         mro = pylir.intr.type.mro(self)
-        new_method = pylir.intr.tuple.getItem(
-            pylir.intr.mroLookup(mro, "__new__"), 0)
+        new_method = pylir.intr.mroLookup(mro, "__new__")
         # TODO: This is not the proper sequence to call a function and only
         #       works for `function`, but not arbitrary callables.
         #       Proper would be 'new_method(new_method,*args,**kwargs)' once
@@ -75,8 +70,7 @@ class type:
         mro = pylir.intr.type.mro(res_type)
         if not pylir.intr.tuple.contains(mro, self):
             return res
-        init_method = pylir.intr.tuple.getItem(
-            pylir.intr.mroLookup(mro, "__init__"), 0)
+        init_method = pylir.intr.mroLookup(mro, "__init__")
         # TODO: Same as above but:
         #       'init_method(init_method, res, *args, **kwargs)'
         init_ret = pylir.intr.function.call(init_method, init_method,
@@ -112,6 +106,97 @@ class object:
 
     def __str__(self):
         return repr(self)
+
+    def __getattribute__(self, item):
+        if not isinstance(item, str):
+            raise TypeError
+
+        self_type = type(self)
+        mro = pylir.intr.type.mro(self_type)
+
+        NOT_FOUND_SENTINEL = object()
+
+        type_lookup = NOT_FOUND_SENTINEL
+        for i in mro:
+            # TODO: Remove below condition once __dict__ of types is properly
+            #       created.
+            if not pylir.intr.isUnboundValue(
+                    d := pylir.intr.getSlot(i, type(i), "__dict__")):
+                if not pylir.intr.isUnboundValue(
+                        attr_lookup := pylir.intr.dict.tryGetItem(d, item,
+                                                                  hash(item))
+                ):
+                    type_lookup = attr_lookup
+                    break
+
+        # Descriptor that has both __get__ and __set__ takes priority over
+        # __dict__. If it has just __get__ it will be called below if the
+        # object does not have a __dict__.
+        if type_lookup is not NOT_FOUND_SENTINEL:
+            type_lookup_mro = pylir.intr.type.mro(type(type_lookup))
+            if not pylir.intr.isUnboundValue(
+                    getter := pylir.intr.mroLookup(type_lookup_mro,
+                                                   "__get__")) and \
+                    not pylir.intr.isUnboundValue(
+                        pylir.intr.mroLookup(type_lookup_mro, "__set__")):
+                return getter(self, self_type)
+
+        if not pylir.intr.isUnboundValue(
+                d := pylir.intr.getSlot(self, self_type, "__dict__")):
+            try:
+                return d[item]
+            except KeyError:
+                raise AttributeError
+
+        if type_lookup is not NOT_FOUND_SENTINEL:
+            if not pylir.intr.isUnboundValue(
+                    getter := pylir.intr.mroLookup(mro,
+                                                   "__get__")):
+                return getter(self, self_type)
+
+            return type_lookup
+
+        raise AttributeError
+
+    def __getattr__(self, item):
+        # __getattr__ is called as a fallback when __getattribute__ fails with
+        # a AttributeError. The default fallback doesn't do anything but fail as
+        # well.
+        raise AttributeError
+
+    def __setattr__(self, key, value):
+        if not isinstance(key, str):
+            raise TypeError
+
+        self_type = type(self)
+        mro = pylir.intr.type.mro(self_type)
+
+        NOT_FOUND_SENTINEL = object()
+
+        type_lookup = NOT_FOUND_SENTINEL
+        for i in mro:
+            # TODO: Remove below condition once __dict__ of types is properly
+            #       created.
+            if not pylir.intr.isUnboundValue(
+                    d := pylir.intr.getSlot(i, type(i), "__dict__")):
+                if not pylir.intr.isUnboundValue(
+                        attr_lookup := pylir.intr.dict.tryGetItem(d, key,
+                                                                  hash(key))
+                ):
+                    type_lookup = attr_lookup
+                    break
+
+        if type_lookup is not NOT_FOUND_SENTINEL:
+            type_lookup_mro = pylir.intr.type.mro(type(type_lookup))
+            if not pylir.intr.isUnboundValue(
+                    setter := pylir.intr.mroLookup(type_lookup_mro, "__set__")):
+                return setter(self, value)
+
+        if not pylir.intr.isUnboundValue(
+                d := pylir.intr.getSlot(self, self_type, "__dict__")):
+            d[key] = value
+
+        raise AttributeError
 
 
 @pylir.intr.const_export
@@ -270,13 +355,13 @@ class dict:
         # would not work in the case that 'tryGetItem' returns an unbound value.
         # This way we can pipe the result into both 'res' and the intrinsic
         success = pylir.intr.isUnboundValue(
-            res := pylir.intr.dict.tryGetItem(self, item))
+            res := pylir.intr.dict.tryGetItem(self, item, hash(item)))
         if not success:
             raise KeyError
         return res
 
     def __setitem__(self, key, value):
-        pylir.intr.dict.setItem(self, key, value)
+        pylir.intr.dict.setItem(self, key, hash(key), value)
 
     def __len__(self):
         return pylir.intr.dict.len(self)
@@ -344,19 +429,19 @@ class bool(int):
 
     def __new__(cls, arg=False):
         mro = pylir.intr.type.mro(type(arg))
-        t = pylir.intr.mroLookup(mro, "__bool__")
-        if not t[1]:
+        if pylir.intr.isUnboundValue(
+                t := pylir.intr.mroLookup(mro, "__bool__")):
             mro = pylir.intr.type.mro(type(arg))
-            t = pylir.intr.mroLookup(mro, "__len__")
-            if not t[1]:
+            if pylir.intr.isUnboundValue(
+                    t := pylir.intr.mroLookup(mro, "__len__")):
                 return True
-            res = unary_method_call(t[0], arg)
+            res = unary_method_call(t, arg)
             mro = pylir.intr.type.mro(type(res))
-            t = pylir.intr.mroLookup(mro, "__index__")
-            if not t[1]:
+            if pylir.intr.isUnboundValue(
+                    t := pylir.intr.mroLookup(mro, "__index__")):
                 raise TypeError
-            return unary_method_call(t[0], res) != 0
-        return unary_method_call(t[0], arg)
+            return unary_method_call(t, res) != 0
+        return unary_method_call(t, arg)
 
     def __bool__(self):
         return self
@@ -390,7 +475,7 @@ class str:
             object = '' if object is None else object
             mro = pylir.intr.type.mro(type(object))
             t = pylir.intr.mroLookup(mro, "__str__")
-            res = unary_method_call(t[0], object)
+            res = unary_method_call(t, object)
             if not isinstance(res, str):
                 raise TypeError
             return res
@@ -415,10 +500,10 @@ class str:
 @pylir.intr.const_export
 def repr(arg):
     mro = pylir.intr.type.mro(type(arg))
-    t = pylir.intr.mroLookup(mro, "__repr__")
-    if not t[1]:
+    if pylir.intr.isUnboundValue(
+            t := pylir.intr.mroLookup(mro, "__repr__")):
         raise TypeError
-    res = unary_method_call(t[0], arg)
+    res = unary_method_call(t, arg)
     if not isinstance(res, str):
         raise TypeError
     return res
@@ -427,15 +512,13 @@ def repr(arg):
 @pylir.intr.const_export
 def len(arg):
     mro = pylir.intr.type.mro(type(arg))
-    t = pylir.intr.mroLookup(mro, "__len__")
-    if not t[1]:
+    if pylir.intr.isUnboundValue(t := pylir.intr.mroLookup(mro, "__len__")):
         raise TypeError
-    res = unary_method_call(t[0], arg)
+    res = unary_method_call(t, arg)
     mro = pylir.intr.type.mro(type(res))
-    t = pylir.intr.mroLookup(mro, "__index__")
-    if not t[1]:
+    if pylir.intr.isUnboundValue(t := pylir.intr.mroLookup(mro, "__index__")):
         raise TypeError
-    return unary_method_call(t[0], res)
+    return unary_method_call(t, res)
 
 
 @pylir.intr.const_export
@@ -461,11 +544,12 @@ def print(*objects, sep=None, end=None):
 
 @pylir.intr.const_export
 def hash(obj, /):
-    t = pylir.intr.mroLookup(pylir.intr.type.mro(type(obj)), "__hash__")
-    if not t[1] or t[0] is None:
+    mro = pylir.intr.type.mro(type(obj))
+    if pylir.intr.isUnboundValue(t := pylir.intr.mroLookup(mro, "__hash__")) \
+            or t is None:
         raise TypeError
     # TODO: Check in range of sys.maxsize
-    return unary_method_call(t[0], obj)
+    return unary_method_call(t, obj)
 
 
 def object_isinstance(inst, cls, /):
@@ -493,9 +577,10 @@ def isinstance(inst, cls, /):
                 return True
         return False
 
-    t = pylir.intr.mroLookup(pylir.intr.type.mro(cls_type), "__instancecheck__")
-    if t[1]:
-        return binary_method_call(t[0], cls, inst)
+    mro = pylir.intr.type.mro(cls_type)
+    if not pylir.intr.isUnboundValue(
+            t := pylir.intr.mroLookup(mro, "__instancecheck__")):
+        return binary_method_call(t, cls, inst)
 
     return object_isinstance(inst, cls)
 
@@ -529,13 +614,13 @@ def iter(*args):
     if len(args) == 1:
         obj = args[0]
         mro = pylir.intr.type.mro(type(obj))
-        t = pylir.intr.mroLookup(mro, "__iter__")
-        if t[1]:
-            if t[0] is None:
+        if not pylir.intr.isUnboundValue(
+                t := pylir.intr.mroLookup(mro, "__iter__")):
+            if t is None:
                 raise TypeError
-            return unary_method_call(t[0], obj)
-        t = pylir.intr.mroLookup(mro, "__getitem__")
-        if not t[1]:
+            return unary_method_call(t, obj)
+
+        if pylir.intr.isUnboundValue(pylir.intr.mroLookup(mro, "__getitem__")):
             raise TypeError
         return SeqIter(obj)
 
@@ -548,12 +633,11 @@ def next(*args):
         raise TypeError
     obj = args[0]
     mro = pylir.intr.type.mro(type(obj))
-    t = pylir.intr.mroLookup(mro, "__next__")
-    if not t[1]:
+    if pylir.intr.isUnboundValue(t := pylir.intr.mroLookup(mro, "__next__")):
         raise TypeError
 
     try:
-        return unary_method_call(t[0], obj)
+        return unary_method_call(t, obj)
     except StopIteration as e:
         if len(args) == 2:
             return args[1]

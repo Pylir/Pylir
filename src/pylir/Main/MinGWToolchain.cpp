@@ -1,9 +1,7 @@
 
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "MinGWToolchain.hpp"
 
@@ -23,8 +21,8 @@ std::optional<std::string> relativeSubdir(const llvm::Triple& triple, const pyli
     subdirs.emplace_back(triple.getArchName());
     subdirs[1] += "-w64-mingw32";
     llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
-    executablePath = llvm::sys::path::parent_path(executablePath);
-    executablePath = llvm::sys::path::parent_path(executablePath);
+    executablePath = llvm::sys::path::parent_path(executablePath).str();
+    executablePath = llvm::sys::path::parent_path(executablePath).str();
     for (auto& candidateSubdir : subdirs)
     {
         if (llvm::sys::fs::is_directory(executablePath + llvm::sys::path::get_separator() + candidateSubdir))
@@ -176,14 +174,23 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     }
     else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
-        llvm::SmallString<20> path(input->getValue());
+        llvm::SmallString<20> path(llvm::sys::path::stem(input->getValue()));
         llvm::sys::path::replace_extension(path, ".exe");
         arguments.emplace_back("-o");
         arguments.emplace_back(path);
     }
     auto gccLib = findGCCLib(m_triple, m_sysroot);
     auto sep = llvm::sys::path::get_separator();
-    llvm::SmallString<20> path(gccLib.value_or((m_sysroot + sep + m_subdir + sep + "lib").str()));
+    llvm::SmallString<20> sysRootAndSubDir(m_sysroot);
+    if (!m_subdir.empty())
+    {
+        sysRootAndSubDir += sep;
+        sysRootAndSubDir += m_subdir;
+    }
+    sysRootAndSubDir += sep;
+    sysRootAndSubDir += "lib";
+
+    llvm::SmallString<20> path(gccLib.value_or(static_cast<std::string>(sysRootAndSubDir)));
     arguments.emplace_back((path + sep + "crt2.o").str());
     arguments.emplace_back((path + sep + "crtbegin.o").str());
 
@@ -195,7 +202,7 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     {
         arguments.push_back("-L" + *gccLib);
     }
-    arguments.push_back(("-L" + m_sysroot + sep + m_subdir + sep + "lib").str());
+    arguments.push_back(("-L" + sysRootAndSubDir).str());
     arguments.push_back(("-L" + m_sysroot + sep + "lib").str());
     arguments.push_back(("-L" + m_sysroot + sep + "lib" + sep + m_triple.str()).str());
     arguments.push_back(("-L" + m_sysroot + sep + "sys-root" + sep + "mingw" + sep + "lib").str());

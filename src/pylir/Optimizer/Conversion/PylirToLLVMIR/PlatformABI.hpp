@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -15,8 +13,7 @@ class PlatformABI
     mlir::DataLayout m_dataLayout;
 
 protected:
-    // TODO use DataLayout exclusively once LLVM Dialect makes use of it
-
+    
     explicit PlatformABI(mlir::DataLayout dataLayout) : m_dataLayout(std::move(dataLayout)) {}
 
 public:

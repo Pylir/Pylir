@@ -1,25 +1,32 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <mlir/IR/Threading.h>
+#include <mlir/Analysis/CallGraph.h>
+#include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/SCCIterator.h>
 
 #include <pylir/Optimizer/Analysis/BodySize.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Util/InlinerUtil.hpp>
 #include <pylir/Support/Macros.hpp>
-#include <pylir/Support/Variant.hpp>
 
-#include <future>
-#include <mutex>
-#include <variant>
-
-#include "PassDetail.hpp"
 #include "Passes.hpp"
+
+#define DEBUG_TYPE "trial-inliner"
+
+#include <llvm/Support/Debug.h>
+
+namespace pylir::Py
+{
+#define GEN_PASS_DEF_TRIALINLINERPASS
+#include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
+} // namespace pylir::Py
 
 namespace
 {
@@ -84,23 +91,21 @@ namespace
 
 class TrialDataBase
 {
-    llvm::DenseMap<CallingContext, std::shared_future<bool>> m_decisions;
-    mutable std::mutex mutex;
+public:
+    enum class Result
+    {
+        NotComputed,
+        Profitable,
+        NotProfitable
+    };
+
+private:
+    llvm::DenseMap<CallingContext, Result> m_decisions;
 
 public:
-    std::variant<std::promise<bool>, bool> lookup(CallingContext context)
+    Result& lookup(CallingContext context)
     {
-        std::unique_lock lock{mutex};
-        auto [iter, inserted] = m_decisions.try_emplace(std::move(context), std::shared_future<bool>{});
-        if (!inserted)
-        {
-            auto copy = iter->second;
-            lock.unlock();
-            return copy.get();
-        }
-        std::promise<bool> promise;
-        iter->second = promise.get_future().share();
-        return promise;
+        return m_decisions.try_emplace(std::move(context), Result::NotComputed).first->second;
     }
 };
 
@@ -177,19 +182,20 @@ public:
     }
 };
 
-class TrialInliner : public TrialInlinerBase<TrialInliner>
+class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
 {
     mlir::OpPassManager m_passManager;
 
-    mlir::FailureOr<bool> performTrial(mlir::FunctionOpInterface functionOpInterface,
-                                       mlir::CallOpInterface callOpInterface,
-                                       mlir::CallableOpInterface callableOpInterface, std::size_t calleeSize,
-                                       mlir::OpPassManager& passManager)
+    mlir::FailureOr<TrialDataBase::Result> performTrial(mlir::FunctionOpInterface functionOpInterface,
+                                                        mlir::CallOpInterface callOpInterface,
+                                                        mlir::CallableOpInterface callableOpInterface,
+                                                        std::size_t calleeSize, mlir::OpPassManager& passManager)
     {
         mlir::OwningOpRef<mlir::FunctionOpInterface> rollback = functionOpInterface.clone();
         auto callerSize = pylir::BodySize(functionOpInterface).getSize();
         pylir::Py::inlineCall(callOpInterface, callableOpInterface);
 
+        m_optimizationRun++;
         if (mlir::failed(runPipeline(passManager, functionOpInterface)))
         {
             return mlir::failure();
@@ -199,13 +205,18 @@ class TrialInliner : public TrialInlinerBase<TrialInliner>
         auto delta =
             static_cast<std::ptrdiff_t>(callerSize + calleeSize) - static_cast<std::ptrdiff_t>(newCombinedSize);
         auto reduction = 1.0 - (static_cast<std::ptrdiff_t>(calleeSize) - delta) / static_cast<double>(calleeSize);
+        LLVM_DEBUG({
+            llvm::dbgs() << "Trial result: Reduction of " << static_cast<std::ptrdiff_t>(reduction * 100)
+                         << "%. Required size reduction: " << m_minCalleeSizeReduction
+                         << "%. Success = " << (reduction >= m_minCalleeSizeReduction / 100.0) << "\n";
+        });
         if (reduction >= m_minCalleeSizeReduction / 100.0)
         {
             m_callsInlined++;
-            return true;
+            return TrialDataBase::Result::Profitable;
         }
         functionOpInterface.getBody().takeBody(rollback->getBody());
-        return false;
+        return TrialDataBase::Result::NotProfitable;
     }
 
     class Inlineable
@@ -230,10 +241,8 @@ class TrialInliner : public TrialInlinerBase<TrialInliner>
         }
     };
 
-    mlir::FailureOr<mlir::FunctionOpInterface> optimize(mlir::FunctionOpInterface functionOpInterface,
-                                                        TrialDataBase& dataBase,
-                                                        const llvm::DenseMap<mlir::StringAttr, Inlineable>& symbolTable,
-                                                        mlir::OpPassManager& passManager)
+    mlir::LogicalResult optimize(mlir::FunctionOpInterface functionOpInterface, TrialDataBase& dataBase,
+                                 mlir::SymbolTableCollection& symbolTable, mlir::OpPassManager& passManager)
     {
         llvm::MapVector<mlir::CallableOpInterface, RecursionStateMachine> recursionDetection;
         llvm::DenseSet<mlir::CallableOpInterface> disabledCallables;
@@ -270,33 +279,34 @@ class TrialInliner : public TrialInlinerBase<TrialInliner>
             walkResult = functionOpInterface->walk<mlir::WalkOrder::PreOrder>(
                 [&](mlir::CallOpInterface callOpInterface)
                 {
-                    auto ref = callOpInterface.getCallableForCallee()
-                                   .dyn_cast<mlir::SymbolRefAttr>()
-                                   .dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-                    if (!ref)
+                    auto callable = mlir::dyn_cast_or_null<mlir::CallableOpInterface>(
+                        callOpInterface.resolveCallable(&symbolTable));
+                    if (!callable || !callable.getCallableRegion())
                     {
                         return mlir::WalkResult::advance();
                     }
-                    auto inlineable = symbolTable.find(ref.getAttr());
-                    if (inlineable == symbolTable.end())
+                    if (disabledCallables.contains(callable))
                     {
                         return mlir::WalkResult::advance();
                     }
-                    if (disabledCallables.contains(inlineable->second.getCallable()))
-                    {
-                        return mlir::WalkResult::advance();
-                    }
-                    auto result = dataBase.lookup({ref.getAttr(), callOpInterface.getArgOperands()});
-                    if (auto* maybeBool = std::get_if<bool>(&result))
+                    TrialDataBase::Result& result =
+                        dataBase.lookup({mlir::cast<mlir::SymbolOpInterface>(*callable).getNameAttr(),
+                                         callOpInterface.getArgOperands()});
+                    if (result != TrialDataBase::Result::NotComputed)
                     {
                         m_cacheHits++;
-                        if (!*maybeBool)
+                        if (result == TrialDataBase::Result::NotProfitable)
                         {
                             return mlir::WalkResult::advance();
                         }
-                        recursivePattern(inlineable->second.getCallable());
+                        recursivePattern(callable);
                         m_callsInlined++;
-                        pylir::Py::inlineCall(callOpInterface, inlineable->second.getCallable());
+                        LLVM_DEBUG({
+                            llvm::dbgs() << "Inlining " << mlir::cast<mlir::SymbolOpInterface>(*callable).getNameAttr()
+                                         << " into " << functionOpInterface.getName() << '\n';
+                        });
+                        pylir::Py::inlineCall(callOpInterface, callable);
+                        m_optimizationRun++;
                         if (mlir::failed(runPipeline(passManager, functionOpInterface)))
                         {
                             failed = true;
@@ -304,24 +314,26 @@ class TrialInliner : public TrialInlinerBase<TrialInliner>
                         return mlir::WalkResult::interrupt();
                     }
                     m_cacheMisses++;
-                    auto trialResult =
-                        performTrial(functionOpInterface, callOpInterface, inlineable->second.getCallable(),
-                                     inlineable->second.getCalleeSize(), passManager);
+                    LLVM_DEBUG({
+                        llvm::dbgs() << "Performing Trial of "
+                                     << mlir::cast<mlir::SymbolOpInterface>(*callable).getNameAttr() << " into "
+                                     << functionOpInterface.getName() << '\n';
+                    });
+                    auto trialResult = performTrial(functionOpInterface, callOpInterface, callable,
+                                                    getChildAnalysis<pylir::BodySize>(callable).getSize(), passManager);
                     if (mlir::failed(trialResult))
                     {
                         failed = true;
-                        // Unblock other threads
-                        pylir::get<std::promise<bool>>(result).set_value(false);
                         return mlir::WalkResult::interrupt();
                     }
-                    pylir::get<std::promise<bool>>(result).set_value(*trialResult);
-                    if (*trialResult)
+                    result = *trialResult;
+                    if (*trialResult == TrialDataBase::Result::Profitable)
                     {
                         // Add it to patterns afterwards. This is only really to add a new state machine for the
                         // callable. Any real patterns will be executed via cache hits. Since this was a cache miss
                         // it can't really have been part of any pattern and it doesn't matter that it will reset
                         // some of the existing state machines
-                        recursivePattern(inlineable->second.getCallable());
+                        recursivePattern(callable);
                     }
                     // We have to interrupt regardless of whether it was rolled back or not as the specific blocks
                     // operations that make up the function body had all been copied and then moved, aka they are not
@@ -329,19 +341,12 @@ class TrialInliner : public TrialInlinerBase<TrialInliner>
                     return mlir::WalkResult::interrupt();
                 });
         } while (walkResult.wasInterrupted());
-        if (failed)
-        {
-            return mlir::failure();
-        }
-        return functionOpInterface;
+        return mlir::failure(failed);
     }
 
 protected:
     void runOnOperation() override
     {
-        auto functions =
-            llvm::to_vector(llvm::make_filter_range(getOperation().getOps<mlir::FunctionOpInterface>(),
-                                                    [](mlir::FunctionOpInterface op) { return !op.isExternal(); }));
         // Run the optimization pipeline once beforehand to get a correct measurement on what improvements the inlining
         // would bring.
         mlir::OpPassManager passManager(getOperation()->getName());
@@ -352,21 +357,51 @@ protected:
             return;
         }
 
-        llvm::DenseMap<mlir::StringAttr, Inlineable> originalCallables;
-        for (auto iter : functions)
-        {
-            originalCallables.try_emplace(mlir::cast<mlir::SymbolOpInterface>(*iter).getNameAttr(), iter.clone(),
-                                          getChildAnalysis<pylir::BodySize>(iter).getSize());
-        }
-
         TrialDataBase dataBase;
-        for (auto& iter : functions)
+        mlir::SymbolTableCollection collection;
+        auto& callgraph = getAnalysis<mlir::CallGraph>();
+        for (auto iter = llvm::scc_begin(&std::as_const(callgraph)); !iter.isAtEnd(); ++iter)
         {
-            mlir::OpPassManager copy = m_passManager;
-            if (mlir::failed(optimize(iter, dataBase, originalCallables, copy)))
+            LLVM_DEBUG({
+                llvm::dbgs() << "Inlining SCC: ";
+                llvm::interleaveComma(*iter, llvm::dbgs(),
+                                      [](const mlir::CallGraphNode* node)
+                                      {
+                                          if (node->isExternal())
+                                          {
+                                              return;
+                                          }
+                                          llvm::dbgs() << mlir::cast<mlir::SymbolOpInterface>(
+                                                              node->getCallableRegion()->getParentOp())
+                                                              .getNameAttr();
+                                      });
+                llvm::dbgs() << '\n';
+            });
+            for (const auto& node : *iter)
             {
-                signalPassFailure();
-                return;
+                if (node->isExternal())
+                {
+                    continue;
+                }
+
+                if (mlir::failed(
+                        optimize(node->getCallableRegion()->getParentOp(), dataBase, collection, m_passManager)))
+                {
+                    signalPassFailure();
+                    return;
+                }
+
+                node->getCallableRegion()->walk(
+                    [&](mlir::CallOpInterface calls)
+                    {
+                        auto callable =
+                            mlir::dyn_cast_or_null<mlir::CallableOpInterface>(calls.resolveCallable(&collection));
+                        if (!callable || !callable.getCallableRegion())
+                        {
+                            return;
+                        }
+                        node->addCallEdge(callgraph.getOrAddNode(callable.getCallableRegion(), nullptr));
+                    });
             }
         }
     }
@@ -377,9 +412,11 @@ protected:
     }
 
 public:
+    using Base::Base;
+
     void getDependentDialects(mlir::DialectRegistry& registry) const override
     {
-        TrialInlinerBase::getDependentDialects(registry);
+        Base::getDependentDialects(registry);
         // Above initialize will signal the error properly. This also gets called before `initialize`, hence we can't
         // use m_passManager here.
         mlir::OpPassManager temp;
@@ -391,8 +428,3 @@ public:
     }
 };
 } // namespace
-
-std::unique_ptr<mlir::Pass> pylir::Py::createTrialInlinerPass()
-{
-    return std::make_unique<TrialInliner>();
-}

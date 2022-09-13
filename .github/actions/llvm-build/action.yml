@@ -1,0 +1,124 @@
+name: "Build LLVM"
+description: "Builds LLVM at the currently required/tested revision used to build Pylir"
+
+inputs:
+  c-compiler:
+    description: 'C compiler to use'
+    required: true
+  cpp-compiler:
+    description: 'C++ compiler to use'
+    required: true
+  sanitizers:
+    description: 'Sanitizers to use, comma separated'
+    required: false
+    default: ''
+  runtime_lib:
+    description: 'Runtime lib to use. MSVC environment only. Uses cmake name'
+    required: false
+
+outputs:
+  install-dir:
+    value: ${{steps.output-build-dir.outputs.build-dir}}
+    description: "Location of the compiled LLVM installation"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout LLVM
+      uses: actions/checkout@v3
+      with:
+        repository: llvm/llvm-project
+        ref: 82f86b862b8ba9b1c6d91a32c88907f0dad6c3d2
+        path: llvm-project
+
+    - name: Configure Optimized TableGen
+      shell: pwsh
+      run: |
+        cmake -GNinja -Bllvm-optimized-tblgen `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
+          -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
+          -DLLVM_CCACHE_BUILD=ON `
+          -DLLVM_BUILD_TOOLS=OFF `
+          -DLLVM_BUILD_UTILS=ON `
+          -DLLVM_INCLUDE_TESTS=OFF `
+          -DLLVM_INSTALL_UTILS=ON `
+          -DLLVM_ENABLE_PROJECTS="mlir" `
+          -DLLVM_TARGETS_TO_BUILD=host `
+          -DLLVM_ENABLE_LLD=ON `
+          -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+          -S ${{github.workspace}}/llvm-project/llvm
+
+    - name: Build Optimized TableGen
+      shell: pwsh
+      run: |
+        cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
+
+    - name: Configure LLVM
+      shell: pwsh
+      run: |
+        $work_space = "${{github.workspace}}".replace('\', '/') 
+        $san_flag = ''
+        if ('${{inputs.sanitizers}}') {
+          $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
+          $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
+        }
+        $runtime_lib = ''
+        switch ('${{inputs.runtime_lib}}') {
+          "MultiThreaded" {
+            $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MT'
+          }
+          "MultiThreadedDebug" {
+            $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MTd'
+          }
+          "MultiThreadedDLL" {
+            $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MD'
+          }
+          "MultiThreadedDebugDLL" {
+            $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MDd'
+          }
+          "" {}
+          Default {
+            throw 'Unknown runtime library ${{inputs.runtime_lib}}'
+          }
+        }
+        
+        $exe_suffix = ''
+        if ($IsWindows) {
+          $exe_suffix = '.exe'
+        }
+        
+        cmake -GNinja -Bllvm-build `
+        -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen$exe_suffix" `
+        -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen$exe_suffix" `
+        -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen$exe_suffix" `
+        -DCMAKE_BUILD_TYPE=Release `
+        -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
+        -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
+        -DLLVM_CCACHE_BUILD=ON `
+        -DLLVM_ENABLE_ASSERTIONS=ON `
+        -DLLVM_BUILD_TOOLS=OFF `
+        -DLLVM_BUILD_UTILS=ON `
+        -DLLVM_INCLUDE_TESTS=OFF `
+        -DLLVM_INSTALL_UTILS=ON `
+        -DLLVM_ENABLE_PROJECTS="mlir;lld" `
+        -DLLVM_TARGETS_TO_BUILD=host `
+        -DLLVM_ENABLE_LLD=ON `
+        -DLLVM_BUILD_LLVM_C_DYLIB=OFF `
+        -DLLVM_INCLUDE_BENCHMARKS=OFF `
+        -DLLVM_APPEND_VC_REV=OFF `
+        -DLLD_BUILD_TOOLS=OFF `
+        -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+        $san_flag `
+        $runtime_lib `
+        -S ${{github.workspace}}/llvm-project/llvm
+
+    - name: Build LLVM
+      shell: pwsh
+      run: |
+        cmake --build llvm-build
+
+    - name: Output build dir
+      id: output-build-dir
+      shell: pwsh
+      run: echo "::set-output name=build-dir::${{github.workspace}}/llvm-build"

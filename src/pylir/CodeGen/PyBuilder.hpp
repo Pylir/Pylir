@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -146,7 +144,7 @@ public:
     }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
-#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                                                                    \
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName, ...)                                                               \
     mlir::Value createPylir##name##Intrinsic(mlir::Value first, mlir::Value second, mlir::Value third,                 \
                                              mlir::Block* exceptBlock = nullptr)                                       \
     {                                                                                                                  \
@@ -164,7 +162,7 @@ public:
         return op.getResult(0);                                                                                        \
     }
 
-#define COMPILER_BUILTIN_BIN_OP(name, slotName)                                                                       \
+#define COMPILER_BUILTIN_BIN_OP(name, slotName, ...)                                                                  \
     mlir::Value createPylir##name##Intrinsic(mlir::Value lhs, mlir::Value rhs, mlir::Block* exceptBlock = nullptr)    \
     {                                                                                                                 \
         if (!exceptBlock)                                                                                             \
@@ -181,7 +179,7 @@ public:
         return op.getResult(0);                                                                                       \
     }
 
-#define COMPILER_BUILTIN_UNARY_OP(name, slotName)                                                          \
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName, ...)                                                     \
     mlir::Value createPylir##name##Intrinsic(mlir::Value val, mlir::Block* exceptBlock = nullptr)          \
     {                                                                                                      \
         if (!exceptBlock)                                                                                  \
@@ -197,21 +195,6 @@ public:
     }
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
-
-    mlir::Value createPylirCallMethodIntrinsic(mlir::Value self, mlir::Value tuple, mlir::Value keywords,
-                                               mlir::Block* exceptBlock = nullptr)
-    {
-        if (!exceptBlock)
-        {
-            return create<Py::CallOp>(getDynamicType(), "pylirCallMethod", mlir::ValueRange{self, tuple, keywords})
-                .getResult(0);
-        }
-        auto* happyPath = new mlir::Block;
-        auto op = create<Py::InvokeOp>(getDynamicType(), "pylirCallMethod", mlir::ValueRange{self, tuple, keywords},
-                                       mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptBlock);
-        implementBlock(happyPath);
-        return op.getResult(0);
-    }
 
     Py::ConstantOp createConstant(mlir::Attribute constant)
     {
@@ -275,19 +258,19 @@ public:
         return create<Py::SetSlotOp>(object, typeObject, slot, value);
     }
 
-    Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index)
+    Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index, mlir::Value hash)
     {
-        return create<Py::DictTryGetItemOp>(dict, index);
+        return create<Py::DictTryGetItemOp>(dict, index, hash);
     }
 
-    Py::DictSetItemOp createDictSetItem(mlir::Value dict, mlir::Value key, mlir::Value value)
+    Py::DictSetItemOp createDictSetItem(mlir::Value dict, mlir::Value key, mlir::Value hash, mlir::Value value)
     {
-        return create<Py::DictSetItemOp>(dict, key, value);
+        return create<Py::DictSetItemOp>(dict, key, hash, value);
     }
 
-    Py::DictDelItemOp createDictDelItem(mlir::Value dict, mlir::Value key)
+    Py::DictDelItemOp createDictDelItem(mlir::Value dict, mlir::Value key, mlir::Value hash)
     {
-        return create<Py::DictDelItemOp>(dict, key);
+        return create<Py::DictDelItemOp>(dict, key, hash);
     }
 
     Py::DictLenOp createDictLen(mlir::Value dict)
@@ -385,117 +368,72 @@ public:
         return create<Py::TupleContainsOp>(tuple, element);
     }
 
-    Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<Py::IterArg> args = {})
+    Py::MakeTupleOp createMakeTuple()
     {
-        return create<Py::MakeTupleOp>(args);
+        return create<Py::MakeTupleOp>(llvm::ArrayRef<Py::IterArg>{});
     }
 
-    Py::MakeTupleOp createMakeTuple(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
+    mlir::Value createMakeTuple(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
     {
-        if (!iterExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
         {
-            iterExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeTupleOp>(args);
         }
-        return create<Py::MakeTupleOp>(args, iterExpansion);
-    }
-
-    Py::MakeTupleExOp createMakeTupleEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* happyPath,
-                                        mlir::Block* unwindPath, llvm::ArrayRef<mlir::Value> normalOps = {},
-                                        llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeTupleExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeTupleExOp createMakeTupleEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeTupleExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
         return op;
     }
 
-    Py::MakeListOp createMakeList(llvm::ArrayRef<Py::IterArg> args = {})
+    Py::MakeListOp createMakeList()
     {
-        return create<Py::MakeListOp>(args);
+        return create<Py::MakeListOp>(llvm::ArrayRef<Py::IterArg>{});
     }
 
-    Py::MakeListOp createMakeList(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
+    mlir::Value createMakeList(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
     {
-        if (!iterExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
         {
-            iterExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeListOp>(args);
         }
-        return create<Py::MakeListOp>(args, iterExpansion);
-    }
-
-    Py::MakeListExOp createMakeListEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* happyPath, mlir::Block* unwindPath,
-                                      llvm::ArrayRef<mlir::Value> normalOps = {},
-                                      llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeListExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeListExOp createMakeListEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeListExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
         return op;
     }
 
-    Py::MakeSetOp createMakeSet(llvm::ArrayRef<Py::IterArg> args = {})
+    Py::MakeSetOp createMakeSet()
     {
-        return create<Py::MakeSetOp>(args);
+        return create<Py::MakeSetOp>(llvm::ArrayRef<Py::IterArg>{});
     }
 
-    Py::MakeSetOp createMakeSet(llvm::ArrayRef<mlir::Value> args, mlir::DenseI32ArrayAttr iterExpansion)
+    mlir::Value createMakeSet(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
     {
-        if (!iterExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
         {
-            iterExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeSetOp>(args);
         }
-        return create<Py::MakeSetOp>(args, iterExpansion);
-    }
-
-    Py::MakeSetExOp createMakeSetEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* happyPath, mlir::Block* unwindPath,
-                                    llvm::ArrayRef<mlir::Value> normalOps = {},
-                                    llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeSetExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeSetExOp createMakeSetEx(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeSetExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
         return op;
     }
 
-    Py::MakeDictOp createMakeDict(llvm::ArrayRef<Py::DictArg> args = {})
+    Py::MakeDictOp createMakeDict()
     {
-        return create<Py::MakeDictOp>(args);
+        return create<Py::MakeDictOp>(llvm::ArrayRef<Py::DictArg>{});
     }
 
-    Py::MakeDictOp createMakeDict(llvm::ArrayRef<mlir::Value> keys, llvm::ArrayRef<mlir::Value> values,
-                                  mlir::DenseI32ArrayAttr mappingExpansion = {})
+    mlir::Value createMakeDict(llvm::ArrayRef<Py::DictArg> args, mlir::Block* unwindPath)
     {
-        if (!mappingExpansion)
+        if (!unwindPath
+            || llvm::all_of(args, [](const Py::DictArg& arg) { return std::holds_alternative<Py::DictEntry>(arg); }))
         {
-            mappingExpansion = getDenseI32ArrayAttr({});
+            return create<Py::MakeDictOp>(args);
         }
-        return create<Py::MakeDictOp>(keys, values, mappingExpansion);
-    }
-
-    Py::MakeDictExOp createMakeDictEx(llvm::ArrayRef<Py::DictArg> args, mlir::Block* happyPath, mlir::Block* unwindPath,
-                                      llvm::ArrayRef<mlir::Value> normalOps = {},
-                                      llvm::ArrayRef<mlir::Value> unwindOps = {})
-    {
-        return create<Py::MakeDictExOp>(args, happyPath, normalOps, unwindPath, unwindOps);
-    }
-
-    Py::MakeDictExOp createMakeDictEx(llvm::ArrayRef<Py::DictArg> args, mlir::Block* unwindPath)
-    {
         auto* happyPath = new mlir::Block;
         auto op = create<Py::MakeDictExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
         implementBlock(happyPath);
@@ -541,14 +479,19 @@ public:
         return create<Py::BoolFromI1Op>(input);
     }
 
-    Py::IntFromIntegerOp createIntFromInteger(mlir::Value integer)
+    Py::IntFromSignedOp createIntFromSigned(mlir::Value integer)
     {
-        return create<Py::IntFromIntegerOp>(integer);
+        return create<Py::IntFromSignedOp>(integer);
     }
 
-    Py::IntToIntegerOp createIntToInteger(mlir::Type integerLike, mlir::Value object)
+    Py::IntFromUnsignedOp createIntFromUnsigned(mlir::Value integer)
     {
-        return create<Py::IntToIntegerOp>(integerLike, getI1Type(), object);
+        return create<Py::IntFromUnsignedOp>(integer);
+    }
+
+    Py::IntToIndexOp createIntToIndex(mlir::Value object)
+    {
+        return create<Py::IntToIndexOp>(object);
     }
 
     Py::IntCmpOp createIntCmp(Py::IntCmpKind kind, mlir::Value lhs, mlir::Value rhs)

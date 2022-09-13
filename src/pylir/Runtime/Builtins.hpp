@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #pragma once
 
@@ -29,6 +27,16 @@ namespace Builtins
 #endif
 #define BUILTIN(name, symbol, _, Type, ...) extern Type name asm(MANGLING symbol);
 #include <pylir/Interfaces/BuiltinsModule.def>
+
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName, ...) \
+    extern "C" PyObject& pylir##slotName(PyObject& first, PyObject& second, PyObject& third);
+
+#define COMPILER_BUILTIN_BIN_OP(name, slotName, ...) extern "C" PyObject& pylir##slotName(PyObject& lhs, PyObject& rhs);
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName, ...) extern "C" PyObject& pylir##slotName(PyObject& val);
+
+#include <pylir/Interfaces/CompilerBuiltins.def>
+
+#undef MANGLING
 } // namespace Builtins
 
 template <PyTypeObject&>

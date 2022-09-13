@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "Support.hpp"
 
@@ -12,15 +10,7 @@ using namespace pylir::rt;
 
 std::size_t PyObjectHasher::operator()(PyObject* object) const noexcept
 {
-    // TODO: use hash
-    auto* hashFunction = type(*object).getSlot(PyTypeObject::Hash);
-    PYLIR_ASSERT(hashFunction);
-    auto* integer = (*hashFunction)(*object).dyn_cast<PyInt>();
-    if (!integer)
-    {
-        // TODO: something
-    }
-    return integer->to<std::size_t>();
+    return Builtins::Hash(*object).cast<PyInt>().to<std::size_t>();
 }
 
 bool PyObjectEqual::operator()(PyObject* lhs, PyObject* rhs) const noexcept

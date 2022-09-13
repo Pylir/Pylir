@@ -1,8 +1,6 @@
-// Copyright 2022 Markus Böck
-//
-// Licensed under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//  Licensed under the Apache License v2.0 with LLVM Exceptions.
+//  See https://llvm.org/LICENSE.txt for license information.
+//  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "LinuxToolchain.hpp"
 
@@ -219,10 +217,8 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     }
     else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
     {
-        llvm::SmallString<20> path(input->getValue());
-        llvm::sys::path::replace_extension(path, "");
         arguments.emplace_back("-o");
-        arguments.emplace_back(path);
+        arguments.emplace_back(llvm::sys::path::stem(input->getValue()));
     }
     auto sep = llvm::sys::path::get_separator();
     std::vector<llvm::SmallString<32>> builtinPaths;
