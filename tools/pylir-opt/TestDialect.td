@@ -38,4 +38,36 @@ def ChangeOp : Test_Op<"change"> {
     let assemblyFormat = "attr-dict";
 }
 
+def ReadValueOp : Test_Op<"readValue"> {
+    let arguments = (ins Arg<Variadic<AnyType>, "", [MemRead]>:$arguments);
+
+    let assemblyFormat = "$arguments attr-dict ( `:` type($arguments)^ )?";
+}
+
+def ReadAllOp : Test_Op<"readAll", [MemoryEffects<[MemRead]>]> {
+    let assemblyFormat = "attr-dict";
+}
+
+def ReadSymbolOp : Test_Op<"readSymbol"> {
+    let arguments = (ins Arg<SymbolRefAttr, "", [MemRead]>:$argument);
+
+    let assemblyFormat = "$argument attr-dict";
+}
+
+def WriteValueOp : Test_Op<"writeValue"> {
+    let arguments = (ins Arg<Variadic<AnyType>, "", [MemWrite]>:$arguments);
+
+    let assemblyFormat = "$arguments attr-dict ( `:` type($arguments)^ )?";
+}
+
+def WriteAllOp : Test_Op<"writeAll", [MemoryEffects<[MemWrite]>]> {
+    let assemblyFormat = "attr-dict";
+}
+
+def WriteSymbolOp : Test_Op<"writeSymbol"> {
+    let arguments = (ins Arg<SymbolRefAttr, "", [MemWrite]>:$argument);
+
+    let assemblyFormat = "$argument attr-dict";
+}
+
 #endif

@@ -645,9 +645,8 @@ def PylirPy_PrintOp : PylirPy_Op<"intr.print", [DeclareOpInterfaceMethods<Captur
     let assemblyFormat = "$string attr-dict";
 }
 
-// TODO: This should actually have `MemoryEffects<[MemRead]>` as it reads slots from the elements in $mro_tuple, but
-//       the current MemorySSA can't currently cope with that.
-def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [DeclareOpInterfaceMethods<CaptureInterface>]> {
+def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [MemoryEffects<[MemRead]>,
+                                                   DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins DynamicType:$mro_tuple, StrAttr:$slot);
     let results = (outs DynamicType:$result);
 

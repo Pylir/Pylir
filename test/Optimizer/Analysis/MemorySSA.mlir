@@ -106,3 +106,30 @@ func.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: call @bar()
 // CHECK-NEXT: use(%[[DEF2]])
 // CHECK-NEXT: py.getSlot "test"
+
+// -----
+
+func.func @test5(%arg0 : !py.dynamic) {
+    test.writeSymbol @foo
+    test.writeSymbol @bar
+    test.readSymbol @foo
+    test.writeValue %arg0 : !py.dynamic
+    test.writeAll
+    test.readValue %arg0 : !py.dynamic
+    return
+}
+
+// CHECK-LABEL: memSSA.module
+// CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
+// CHECK-NEXT: %[[WRITE_FOO:.*]] = def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: test.writeSymbol @foo
+// CHECK-NEXT: %[[WRITE_BAR:.*]] = def(%[[WRITE_FOO]])
+// CHECK-NEXT: test.writeSymbol @bar
+// CHECK-NEXT: use(%[[WRITE_FOO]])
+// CHECK-NEXT: test.readSymbol @foo
+// CHECK-NEXT: %[[WRITE_ARG0:.*]] = def(%[[WRITE_BAR]])
+// CHECK-NEXT: test.writeValue %[[ARG0:.*]] : !py.dynamic
+// CHECK-NEXT: %[[WRITE_ALL:.*]] = def(%[[WRITE_ARG0]])
+// CHECK-NEXT: test.writeAll
+// CHECK-NEXT: use(%[[WRITE_ALL]])
+// CHECK-NEXT: test.readValue %[[ARG0]]

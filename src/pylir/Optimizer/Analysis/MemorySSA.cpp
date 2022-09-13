@@ -21,9 +21,7 @@ mlir::Operation* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
 
 namespace
 {
-// TODO: support multiple reads
-mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::MemorySSA& ssa, mlir::Operation* operation,
-                                mlir::Value lastDef)
+mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, mlir::Operation* operation, mlir::Value lastDef)
 {
     using namespace pylir::MemSSA;
     llvm::SmallVector<mlir::MemoryEffects::EffectInstance> effects;
@@ -32,54 +30,61 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, pylir::Memo
     {
         memoryEffectOpInterface.getEffects(effects);
     }
-    if ((memoryEffectOpInterface && effects.empty())
-        || (!memoryEffectOpInterface && operation->hasTrait<mlir::OpTrait::HasRecursiveSideEffects>()))
+    if (!memoryEffectOpInterface && operation->hasTrait<mlir::OpTrait::HasRecursiveSideEffects>())
     {
         return nullptr;
     }
-    mlir::Value read;
+
+    llvm::SmallSetVector<llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>, 4> read, written;
     for (auto& iter : effects)
     {
+        decltype(read)* set = nullptr;
         if (llvm::isa<mlir::MemoryEffects::Write>(iter.getEffect()))
         {
-            return builder.create<MemoryDefOp>(lastDef, operation);
+            set = &written;
         }
-        if (llvm::isa<mlir::MemoryEffects::Read>(iter.getEffect()))
+        else if (llvm::isa<mlir::MemoryEffects::Read>(iter.getEffect()))
         {
-            PYLIR_ASSERT(iter.getValue() && "Reading non mlir::Value is not yet supported");
-            PYLIR_ASSERT(!read && "Multiple reads are not yet supported");
-            read = iter.getValue();
+            set = &read;
+        }
+        else
+        {
+            continue;
+        }
+
+        if (iter.getValue())
+        {
+            set->insert(iter.getValue());
+        }
+        else if (iter.getSymbolRef())
+        {
+            set->insert(iter.getSymbolRef());
+        }
+        else
+        {
+            set->insert(nullptr);
         }
     }
 
-    auto capturing = mlir::dyn_cast<pylir::CaptureInterface>(operation);
-    for (auto& operand : operation->getOpOperands())
+    if (memoryEffectOpInterface && read.empty() && written.empty())
     {
-        auto* opAccess = ssa.getMemoryAccess(operand.get().getDefiningOp());
-        if (!opAccess)
-        {
-            continue;
-        }
-        // Reads are assumed to not capture until proven otherwise
-        if (memoryEffectOpInterface
-            && memoryEffectOpInterface.getEffectOnValue<mlir::MemoryEffects::Read>(operand.get()))
-        {
-            continue;
-        }
-        if (capturing && !capturing.capturesOperand(operand))
-        {
-            continue;
-        }
-        // Conservatively assume it was captured and clobbered
-        return builder.create<MemoryDefOp>(lastDef, operation);
+        return nullptr;
     }
-    if (read)
+
+    if (!written.empty())
     {
-        return builder.create<MemoryUseOp>(lastDef, operation, read);
+        return builder.create<MemoryDefOp>(lastDef, operation, written.takeVector(), read.takeVector());
     }
-    // If we had no indication it was reading or didn't have any side effects we have to conservatively assume it does
-    // TODO: Escape analysis could figure this out probably
-    return builder.create<MemoryDefOp>(lastDef, operation);
+
+    if (!read.empty())
+    {
+        return builder.create<MemoryUseOp>(lastDef, operation, read.takeVector());
+    }
+
+    // This is the conservative case that may happen if an op does not implement 'MemoryEffectOpInterface'. In this case
+    // we do a memory def, specify that all memory is clobbered and all memory was also read.
+    return builder.create<MemoryDefOp>(lastDef, operation, llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{},
+                                       llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{});
 }
 
 void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
@@ -134,7 +139,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
         }
         for (auto& op : block)
         {
-            auto* result = maybeAddAccess(builder, ssa, &op, lastDef);
+            auto* result = maybeAddAccess(builder, &op, lastDef);
             if (result)
             {
                 results.insert({&op, result});
@@ -291,8 +296,8 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
 
 namespace
 {
-mlir::Value getLastClobber(mlir::Value location, mlir::AliasAnalysis& aliasAnalysis,
-                           llvm::ArrayRef<mlir::Value> dominatingDefs)
+mlir::Value getLastClobber(llvm::ArrayRef<llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>> location,
+                           mlir::AliasAnalysis& aliasAnalysis, llvm::ArrayRef<mlir::Value> dominatingDefs)
 {
     for (auto def : llvm::reverse(dominatingDefs.drop_front()))
     {
@@ -302,8 +307,34 @@ mlir::Value getLastClobber(mlir::Value location, mlir::AliasAnalysis& aliasAnaly
             return blockArg;
         }
         auto memDef = def.getDefiningOp<pylir::MemSSA::MemoryDefOp>();
-        auto modRef = aliasAnalysis.getModRef(memDef.getInstruction(), location);
-        if (modRef.isMod())
+        if (llvm::any_of(location,
+                         [&](llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr> ptr)
+                         {
+                             // If no affected location is specified, conservatively assume it reads the def.
+                             if (!ptr)
+                             {
+                                 return true;
+                             }
+
+                             if (auto val = ptr.dyn_cast<mlir::Value>())
+                             {
+                                 return aliasAnalysis.getModRef(memDef.getInstruction(), val).isMod();
+                             }
+
+                             // There is no support for symbol ref attrs in MLIRs alias analysis. For the time being we
+                             // assume a symbol ref is always clobbered except if some other symbol is being written to.
+                             // Technically speaking, this assumption could not hold if there was some kind of global
+                             // symbol alias mechanism/op, but we just assume such a thing does not exist for now.
+                             return llvm::any_of(memDef.getWrites(),
+                                                 [ptr](llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr> write)
+                                                 {
+                                                     if (llvm::isa<mlir::SymbolRefAttr>(write))
+                                                     {
+                                                         return write == ptr;
+                                                     }
+                                                     return true;
+                                                 });
+                         }))
         {
             return memDef;
         }
@@ -326,7 +357,7 @@ void optimizeUsesInBlock(mlir::Block* block, mlir::AliasAnalysis& aliasAnalysis,
             dominatingDefs.push_back(access.getResult(0));
             continue;
         }
-        use.getDefinitionMutable().assign(getLastClobber(use.getRead(), aliasAnalysis, dominatingDefs));
+        use.getDefinitionMutable().assign(getLastClobber(use.getReads(), aliasAnalysis, dominatingDefs));
     }
 }
 } // namespace

@@ -59,9 +59,9 @@ mlir::Attribute pylir::MemSSA::InstructionAttr::parse(::mlir::AsmParser& parser,
     return {};
 }
 
-void pylir::MemSSA::ReadAttr::print(::mlir::AsmPrinter&) const {}
+void pylir::MemSSA::ReadWriteAttr::print(::mlir::AsmPrinter&) const {}
 
-mlir::Attribute pylir::MemSSA::ReadAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
+mlir::Attribute pylir::MemSSA::ReadWriteAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
 {
     parser.emitError(parser.getCurrentLocation(), "Parsing " + getMnemonic() + " not supported");
     return {};
@@ -76,6 +76,16 @@ llvm::StringRef pylir::MemSSA::MemoryModuleOp::getDefaultDialect()
 {
     return pylir::MemSSA::MemorySSADialect::getDialectNamespace();
 }
+
+// TODO: I don't like this due to a fear of ODR if LLVM ever adds this. Might also want to upstream it myself.
+namespace llvm
+{
+template <class... Args>
+llvm::hash_code hash_value(llvm::PointerUnion<Args...> ptr)
+{
+    return llvm::hash_value(ptr.getOpaqueValue());
+}
+} // namespace llvm
 
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/Analysis/MemorySSAIROps.cpp.inc"
