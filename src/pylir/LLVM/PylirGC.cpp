@@ -56,8 +56,8 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
             default: kind = llvm::SectionKind::getReadOnlyWithRel(); break;
         }
         auto alignment = printer.getDataLayout().getPointerABIAlignment(0);
-        // os.switchSection(
-        //     printer.getObjFileLowering().getSectionForConstant(printer.getDataLayout(), kind, nullptr, alignment));
+        os.switchSection(
+            printer.getObjFileLowering().getSectionForConstant(printer.getDataLayout(), kind, nullptr, alignment));
         os.emitValueToAlignment(alignment.value());
     }
 
@@ -133,6 +133,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
 
         for (auto& iter : callSiteInfos)
         {
+            os.emitValueToAlignment(4);
             os.emitValue(iter.programCounter, pointerSize);
             PYLIR_ASSERT(iter.locations.size() <= std::numeric_limits<std::uint32_t>::max());
             os.emitULEB128IntValue(iter.locations.size());
