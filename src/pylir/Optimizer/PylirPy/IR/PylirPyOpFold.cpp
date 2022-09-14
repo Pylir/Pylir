@@ -900,13 +900,24 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
 mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber,
                                                     ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
-    auto makeListOp = mlir::dyn_cast<Py::MakeListOp>(lastClobber);
-    if (!makeListOp || !makeListOp.getIterExpansion().empty())
-    {
-        return mlir::failure();
-    }
-    results.emplace_back(mlir::IntegerAttr::get(getType(), makeListOp.getArguments().size()));
-    return mlir::success();
+    return llvm::TypeSwitch<mlir::Operation*, mlir::LogicalResult>(lastClobber)
+        .Case<Py::MakeListOp, Py::MakeListExOp>(
+            [&](auto makeListOp)
+            {
+                if (!makeListOp.getIterExpansion().empty())
+                {
+                    return mlir::failure();
+                }
+                results.emplace_back(mlir::IntegerAttr::get(getType(), makeListOp.getArguments().size()));
+                return mlir::success();
+            })
+        .Case(
+            [&](Py::ListResizeOp resizeOp)
+            {
+                results.emplace_back(resizeOp.getLength());
+                return mlir::success();
+            })
+        .Default(mlir::failure());
 }
 
 pylir::Py::TypeRefineResult

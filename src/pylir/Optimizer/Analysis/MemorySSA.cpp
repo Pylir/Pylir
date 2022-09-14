@@ -14,14 +14,11 @@
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 
-mlir::Operation* pylir::MemorySSA::getMemoryAccess(mlir::Operation* operation)
-{
-    return m_results.lookup(operation);
-}
-
 namespace
 {
-mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, mlir::Operation* operation, mlir::Value lastDef)
+void maybeAddAccess(
+    mlir::ImplicitLocOpBuilder& builder, mlir::Operation* operation, pylir::SSABuilder& ssaBuilder,
+    llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<pylir::SSABuilder::DefinitionsMap>>& lastDefs)
 {
     using namespace pylir::MemSSA;
     llvm::SmallVector<mlir::MemoryEffects::EffectInstance> effects;
@@ -32,24 +29,33 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, mlir::Opera
     }
     if (!memoryEffectOpInterface && operation->hasTrait<mlir::OpTrait::HasRecursiveSideEffects>())
     {
-        return nullptr;
+        // Ops with recursive side effects contain regions with side effects which will be inlined later anyway.
+        // Nothing to do here.
+        return;
     }
 
-    llvm::SmallSetVector<llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>, 4> read, written;
+    struct ReadWrite
+    {
+        llvm::SetVector<llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>> read, written;
+    };
+
+    llvm::MapVector<mlir::SideEffects::Resource*, ReadWrite> resourceToEffect;
     for (auto& iter : effects)
     {
-        decltype(read)* set = nullptr;
+        if (!llvm::isa<mlir::MemoryEffects::Write, mlir::MemoryEffects::Read>(iter.getEffect()))
+        {
+            continue;
+        }
+
+        auto& sets = resourceToEffect[iter.getResource()];
+        decltype(sets.read)* set = nullptr;
         if (llvm::isa<mlir::MemoryEffects::Write>(iter.getEffect()))
         {
-            set = &written;
+            set = &sets.written;
         }
         else if (llvm::isa<mlir::MemoryEffects::Read>(iter.getEffect()))
         {
-            set = &read;
-        }
-        else
-        {
-            continue;
+            set = &sets.read;
         }
 
         if (iter.getValue())
@@ -66,39 +72,102 @@ mlir::Operation* maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, mlir::Opera
         }
     }
 
-    if (memoryEffectOpInterface && read.empty() && written.empty())
+    auto getLastDef = [&](mlir::SideEffects::Resource* resource)
     {
-        return nullptr;
+        // If this is the first use of a resource we need to read from the 'nullptr' resource. The 'nullptr' resource
+        // is a special sentinel which contains all 'clobber all' operations. Any resources that were not yet known
+        // at the time of the clobber all have to do their first use from the 'clobber all' operation. If we didn't
+        // special case this, it'd read from 'liveOnEntry' which would technically be incorrect.
+        // TODO: Figure out whether this matters. Gut feeling says no.
+        auto res = lastDefs.find(resource);
+        if (res == lastDefs.end())
+        {
+            bool inserted;
+            std::tie(res, inserted) = lastDefs.insert({nullptr, nullptr});
+            if (inserted)
+            {
+                res->second = std::make_unique<pylir::SSABuilder::DefinitionsMap>();
+            }
+        }
+        return ssaBuilder.readVariable(builder.getLoc(), builder.getType<DefType>(), *res->second, builder.getBlock());
+    };
+
+    if (resourceToEffect.empty())
+    {
+        if (!memoryEffectOpInterface)
+        {
+            // This is the conservative case that may happen if an op does not implement 'MemoryEffectOpInterface'.
+            // In this case we do a memory def for every resource and specify that all memory is clobbered and all
+            // memory was also read. Also writes to the 'clobber all' resource aka 'nullptr' resource for any later
+            // occurring new resources.
+            bool nullptrSeen = false;
+            std::array<mlir::SideEffects::Resource*, 1> array{};
+            for (auto* iter :
+                 llvm::concat<mlir::SideEffects::Resource*>(llvm::to_vector(llvm::make_first_range(lastDefs)), array))
+            {
+                if (!iter)
+                {
+                    // nullptr may also occur as key in 'lastDefs' already. The 'array' that we concat here is just to
+                    // be safe in the case 'nullptr' resource has not yet been used. Don't want two defs of 'nullptr'
+                    // either however, hence this logic.
+                    if (nullptrSeen)
+                    {
+                        continue;
+                    }
+                    nullptrSeen = true;
+                }
+
+                auto lastDef = getLastDef(iter);
+                // Not specifying a memory location here simply means "conservatively assume everything was
+                // read/written".
+                auto clobberAll = builder.create<MemoryDefOp>(lastDef, operation,
+                                                              llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{},
+                                                              llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{});
+                auto [res, inserted] = lastDefs.insert({iter, nullptr});
+                if (inserted)
+                {
+                    res->second = std::make_unique<pylir::SSABuilder::DefinitionsMap>();
+                }
+                (*res->second)[builder.getBlock()] = clobberAll;
+            }
+        }
+        return;
     }
 
-    if (!written.empty())
+    for (auto& [resource, readWrites] : resourceToEffect)
     {
-        return builder.create<MemoryDefOp>(lastDef, operation, written.takeVector(), read.takeVector());
-    }
+        auto lastDef = getLastDef(resource);
+        if (!readWrites.written.empty())
+        {
+            auto write = builder.create<MemoryDefOp>(lastDef, operation, readWrites.written.takeVector(),
+                                                     readWrites.read.takeVector());
+            auto [res, inserted] = lastDefs.insert({resource, nullptr});
+            if (inserted)
+            {
+                res->second = std::make_unique<pylir::SSABuilder::DefinitionsMap>();
+            }
+            (*res->second)[builder.getBlock()] = write;
+            continue;
+        }
 
-    if (!read.empty())
-    {
-        return builder.create<MemoryUseOp>(lastDef, operation, read.takeVector());
+        PYLIR_ASSERT(!readWrites.read.empty());
+        builder.create<MemoryUseOp>(lastDef, operation, readWrites.read.takeVector());
     }
-
-    // This is the conservative case that may happen if an op does not implement 'MemoryEffectOpInterface'. In this case
-    // we do a memory def, specify that all memory is clobbered and all memory was also read.
-    return builder.create<MemoryDefOp>(lastDef, operation, llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{},
-                                       llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{});
 }
 
-void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
-                llvm::DenseMap<mlir::Block*, mlir::Block*>& blockMapping, pylir::MemorySSA& ssa,
-                pylir::SSABuilder& ssaBuilder, pylir::SSABuilder::DefinitionsMap& lastDefs,
-                llvm::DenseMap<mlir::Operation*, mlir::Operation*>& results,
-                llvm::ArrayRef<mlir::Block*> regionSuccessors)
+} // namespace
+
+void pylir::MemorySSA::fillRegion(
+    mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, SSABuilder& ssaBuilder,
+    llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<SSABuilder::DefinitionsMap>>& lastDefs,
+    llvm::ArrayRef<mlir::Block*> regionSuccessors)
 {
     auto hasUnresolvedPredecessors = [&](mlir::Block* block)
     {
         return llvm::any_of(block->getPredecessors(),
                             [&](mlir::Block* pred)
                             {
-                                auto* predMemBlock = blockMapping.lookup(pred);
+                                auto* predMemBlock = m_blockMapping.lookup(pred);
                                 if (!predMemBlock)
                                 {
                                     return true;
@@ -111,7 +180,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
     {
         mlir::Block* memBlock;
         {
-            auto [lookup, inserted] = blockMapping.insert({&block, nullptr});
+            auto [lookup, inserted] = m_blockMapping.insert({&block, nullptr});
             if (inserted)
             {
                 lookup->second = new mlir::Block;
@@ -124,36 +193,17 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
         {
             ssaBuilder.markOpenBlock(memBlock);
         }
-        ssa.getMemoryRegion().push_back(memBlock);
+        getMemoryRegion().push_back(memBlock);
         builder.setInsertionPointToStart(memBlock);
 
-        mlir::Value lastDef;
-        if (memBlock->isEntryBlock())
-        {
-            lastDef = builder.create<pylir::MemSSA::MemoryLiveOnEntryOp>();
-        }
-        else
-        {
-            lastDef = ssaBuilder.readVariable(builder.getLoc(), builder.getType<pylir::MemSSA::DefType>(), lastDefs,
-                                              memBlock);
-        }
         for (auto& op : block)
         {
-            auto* result = maybeAddAccess(builder, &op, lastDef);
-            if (result)
-            {
-                results.insert({&op, result});
-                if (auto def = mlir::dyn_cast_or_null<pylir::MemSSA::MemoryDefOp>(result))
-                {
-                    lastDef = def;
-                }
-            }
+            maybeAddAccess(builder, &op, ssaBuilder, lastDefs);
             auto regionBranchOp = mlir::dyn_cast<mlir::RegionBranchOpInterface>(&op);
             if (!regionBranchOp)
             {
                 continue;
             }
-            lastDefs[memBlock] = lastDef;
             llvm::SmallVector<mlir::RegionSuccessor> successors;
             regionBranchOp.getSuccessorRegions(llvm::None, successors);
             PYLIR_ASSERT(!successors.empty());
@@ -171,7 +221,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
                                         {
                                             return continueRegion;
                                         }
-                                        auto result = blockMapping.insert({&succ.getSuccessor()->front(), nullptr});
+                                        auto result = m_blockMapping.insert({&succ.getSuccessor()->front(), nullptr});
                                         if (result.second)
                                         {
                                             result.first->second = new mlir::Block;
@@ -217,8 +267,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
                 }
                 llvm::SmallVector<mlir::RegionSuccessor> subRegionSuccessors;
                 regionBranchOp.getSuccessorRegions(succ->getRegionNumber(), subRegionSuccessors);
-                fillRegion(*succ, builder, blockMapping, ssa, ssaBuilder, lastDefs, results,
-                           getRegionSuccBlocks(subRegionSuccessors));
+                fillRegion(*succ, builder, ssaBuilder, lastDefs, getRegionSuccBlocks(subRegionSuccessors));
                 fillWorkList(subRegionSuccessors);
             }
             for (auto& iter : regionEntries)
@@ -226,14 +275,10 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
                 ssaBuilder.sealBlock(iter);
             }
 
-            ssa.getMemoryRegion().push_back(continueRegion);
+            getMemoryRegion().push_back(continueRegion);
             builder.setInsertionPointToStart(continueRegion);
             memBlock = continueRegion;
-
-            lastDef = ssaBuilder.readVariable(builder.getLoc(), builder.getType<pylir::MemSSA::DefType>(), lastDefs,
-                                              memBlock);
         }
-        lastDefs[memBlock] = lastDef;
 
         if (block.getTerminator()->hasTrait<mlir::OpTrait::ReturnLike>())
         {
@@ -246,7 +291,7 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
         llvm::SmallVector<mlir::Block*> sealAfter;
         for (auto* succ : block.getSuccessors())
         {
-            auto [lookup, inserted] = blockMapping.insert({succ, nullptr});
+            auto [lookup, inserted] = m_blockMapping.insert({succ, nullptr});
             if (inserted)
             {
                 lookup->second = new mlir::Block;
@@ -269,8 +314,6 @@ void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
     }
 }
 
-} // namespace
-
 void pylir::MemorySSA::createIR(mlir::Operation* operation)
 {
     mlir::ImplicitLocOpBuilder builder(mlir::UnknownLoc::get(operation->getContext()), operation->getContext());
@@ -286,28 +329,38 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
         builder.create<pylir::MemSSA::MemoryBranchOp>(llvm::ArrayRef<mlir::ValueRange>{}, mlir::BlockRange{});
         return;
     }
-    SSABuilder::DefinitionsMap lastDefs;
-    pylir::SSABuilder ssaBuilder;
+    pylir::SSABuilder ssaBuilder(
+        [&](mlir::Block*, mlir::Type, mlir::Location) -> mlir::Value
+        {
+            if (!m_region->getBody().front().empty())
+            {
+                if (auto op = mlir::dyn_cast<MemSSA::MemoryLiveOnEntryOp>(m_region->getBody().front().front()))
+                {
+                    return op;
+                }
+            }
+            auto exit = mlir::OpBuilder::InsertionGuard{builder};
+            builder.setInsertionPointToStart(&m_region->getBody().front());
+            return builder.create<MemSSA::MemoryLiveOnEntryOp>();
+        });
+    llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<SSABuilder::DefinitionsMap>> lastDefs;
 
     // Insert entry block that has no predecessors
     m_blockMapping.insert({&region.getBlocks().front(), new mlir::Block});
-    fillRegion(region, builder, m_blockMapping, *this, ssaBuilder, lastDefs, m_results, {});
+    fillRegion(region, builder, ssaBuilder, lastDefs, {});
 }
 
 namespace
 {
-mlir::Value getLastClobber(llvm::ArrayRef<llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>> location,
-                           mlir::AliasAnalysis& aliasAnalysis, llvm::ArrayRef<mlir::Value> dominatingDefs)
+mlir::Value getLastClobber(pylir::MemSSA::MemoryUseOp use, mlir::AliasAnalysis& aliasAnalysis)
 {
-    for (auto def : llvm::reverse(dominatingDefs.drop_front()))
+    // TODO: Implement optimizations for block args.
+    mlir::Value def = use.getDefinition();
+    for (; def.getDefiningOp<pylir::MemSSA::MemoryDefOp>();
+         def = def.getDefiningOp<pylir::MemSSA::MemoryDefOp>().getClobbered())
     {
-        if (auto blockArg = def.dyn_cast<mlir::BlockArgument>())
-        {
-            // TODO: Implement optimizations
-            return blockArg;
-        }
         auto memDef = def.getDefiningOp<pylir::MemSSA::MemoryDefOp>();
-        if (llvm::any_of(location,
+        if (llvm::any_of(use.getReads(),
                          [&](llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr> ptr)
                          {
                              // If no affected location is specified, conservatively assume it reads the def.
@@ -339,63 +392,16 @@ mlir::Value getLastClobber(llvm::ArrayRef<llvm::PointerUnion<mlir::Value, mlir::
             return memDef;
         }
     }
-    return dominatingDefs[0];
+    return def;
 }
 
-void optimizeUsesInBlock(mlir::Block* block, mlir::AliasAnalysis& aliasAnalysis,
-                         llvm::SmallVectorImpl<mlir::Value>& dominatingDefs)
-{
-    for (auto& blockArg : block->getArguments())
-    {
-        dominatingDefs.push_back(blockArg);
-    }
-    for (auto& access : block->without_terminator())
-    {
-        auto use = mlir::dyn_cast<pylir::MemSSA::MemoryUseOp>(access);
-        if (!use)
-        {
-            dominatingDefs.push_back(access.getResult(0));
-            continue;
-        }
-        use.getDefinitionMutable().assign(getLastClobber(use.getReads(), aliasAnalysis, dominatingDefs));
-    }
-}
 } // namespace
 
 void pylir::MemorySSA::optimizeUses(mlir::AnalysisManager& analysisManager)
 {
     auto& aliasAnalysis = analysisManager.getAnalysis<mlir::AliasAnalysis>();
-    auto& dominanceInfo = analysisManager.getAnalysis<mlir::DominanceInfo>();
-
-    llvm::SmallVector<mlir::Value> dominatingDefs;
-    if (m_region->getBody().hasOneBlock())
-    {
-        optimizeUsesInBlock(&m_region->getBody().front(), aliasAnalysis, dominatingDefs);
-        return;
-    }
-
-    auto& tree = dominanceInfo.getDomTree(&m_region->getBody());
-    for (auto* node : llvm::depth_first(tree.getRootNode()))
-    {
-        auto* block = node->getBlock();
-        auto accesses = block->without_terminator();
-        if (accesses.empty() && block->getNumArguments() == 0)
-        {
-            continue;
-        }
-
-        // Pop any values that are in blocks that do not dominate the current block
-        while (!block->isEntryBlock() && !tree.dominates(dominatingDefs.back().getParentBlock(), block))
-        {
-            auto* backBlock = dominatingDefs.back().getParentBlock();
-            while (dominatingDefs.back().getParentBlock() == backBlock)
-            {
-                dominatingDefs.pop_back();
-            }
-        }
-
-        optimizeUsesInBlock(block, aliasAnalysis, dominatingDefs);
-    }
+    m_region->walk([&](MemSSA::MemoryUseOp use)
+                   { use.getDefinitionMutable().assign(getLastClobber(use, aliasAnalysis)); });
 }
 
 pylir::MemorySSA::MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager)

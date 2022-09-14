@@ -15,13 +15,15 @@ func.func @test(%arg0 : i1, %length : index) -> index {
 
 // CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[ENTRY:.*]] = liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = def(%[[ENTRY]])
+// CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[ENTRY]])
+// CHECK-NEXT: py.makeList
+// CHECK-NEXT: %[[DEF_LIST:.*]] = def(%[[ENTRY]])
 // CHECK-NEXT: py.makeList
 // CHECK-NEXT: br ^[[REGION1:.*]], ^[[REGION2:.*]] (), ()
 // CHECK-NEXT: ^[[REGION1]]:
-// CHECK-NEXT: br ^[[END:.*]] (%[[DEF]])
+// CHECK-NEXT: br ^[[END:.*]] (%[[DEF_LIST]])
 // CHECK-NEXT: ^[[REGION2]]:
-// CHECK-NEXT: %[[DEF2:.*]] = def(%[[DEF]])
+// CHECK-NEXT: %[[DEF2:.*]] = def(%[[DEF_LIST]])
 // CHECK-NEXT: py.list.resize
 // CHECK-NEXT: br ^[[END]] (%[[DEF2]])
 // CHECK-NEXT: ^[[END]]

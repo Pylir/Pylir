@@ -202,6 +202,35 @@ public:
     }
 };
 
+#define TRIVIAL_RESOURCE(prefix)                                                  \
+    struct prefix##Resource : mlir::SideEffects::Resource::Base<prefix##Resource> \
+    {                                                                             \
+        llvm::StringRef getName() final                                           \
+        {                                                                         \
+            return #prefix "Resource";                                            \
+        }                                                                         \
+    }
+
+/// Reads and writes from 'py.globalHandle'.
+TRIVIAL_RESOURCE(Handle);
+
+/// Reads and writes to the object parts. This currently just reads and writes to slots.
+TRIVIAL_RESOURCE(Object);
+
+/// Reads and writes to the list parts of a list object.
+TRIVIAL_RESOURCE(List);
+
+/// Reads and writes to the dict parts of a dict object.
+TRIVIAL_RESOURCE(Dict);
+
+#undef TRIVIAL_RESOURCE
+
+inline auto getAllResources()
+{
+    return std::array<mlir::SideEffects::Resource*, 4>{HandleResource::get(), ObjectResource::get(),
+                                                       ListResource::get(), DictResource::get()};
+}
+
 } // namespace pylir::Py
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyEnums.h.inc>

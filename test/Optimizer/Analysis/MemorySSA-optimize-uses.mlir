@@ -17,11 +17,15 @@ func.func @test() -> index {
 
 // CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY:.*]])
+// CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[LIVE_ON_ENTRY:.*]])
 // CHECK-NEXT: %[[DICT1:.*]] = py.makeDict ()
-// CHECK-NEXT: %[[DEF2:.*]] = def(%[[DEF]])
+// CHECK-NEXT: %[[DEF_DICT:.*]] = def(%[[LIVE_ON_ENTRY:.*]])
+// CHECK-NEXT: %[[DICT1]] = py.makeDict ()
+// CHECK-NEXT: %[[DEF_OBJECT2:.*]] = def(%[[DEF_OBJECT]])
 // CHECK-NEXT: %[[DICT2:.*]] = py.makeDict ()
-// CHECK-NEXT: %[[DEF3:.*]] = def(%[[DEF2]])
+// CHECK-NEXT: %[[DEF_DICT2:.*]] = def(%[[DEF_DICT]])
+// CHECK-NEXT: %[[DICT2]] = py.makeDict ()
+// CHECK-NEXT: %[[DEF3:.*]] = def(%[[DEF_DICT2]])
 // CHECK-NEXT: py.dict.setItem %[[DICT1]]
 // CHECK-NEXT: %[[DEF4:.*]] = def(%[[DEF3]])
 // CHECK-NEXT: py.dict.setItem %[[DICT2]]

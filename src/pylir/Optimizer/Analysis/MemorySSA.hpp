@@ -11,6 +11,7 @@
 
 #include <llvm/ADT/DenseMap.h>
 
+#include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 #include <pylir/Support/Macros.hpp>
 
 #include <memory>
@@ -28,17 +29,19 @@ namespace pylir
 class MemorySSA
 {
     mlir::OwningOpRef<MemSSA::MemoryModuleOp> m_region;
-    llvm::DenseMap<mlir::Operation*, mlir::Operation*> m_results;
     llvm::DenseMap<mlir::Block*, mlir::Block*> m_blockMapping;
 
     void createIR(mlir::Operation* operation);
 
     void optimizeUses(mlir::AnalysisManager& analysisManager);
 
+    void fillRegion(
+        mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, pylir::SSABuilder& ssaBuilder,
+        llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<pylir::SSABuilder::DefinitionsMap>>& lastDefs,
+        llvm::ArrayRef<mlir::Block*> regionSuccessors);
+
 public:
     explicit MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager);
-
-    mlir::Operation* getMemoryAccess(mlir::Operation* operation);
 
     mlir::Region& getMemoryRegion()
     {

@@ -326,18 +326,29 @@ void printVarTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::TypeR
 void pylir::Py::MakeTupleOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    if (!getIterExpansionAttr().empty())
+    if (getIterExpansionAttr().empty())
     {
-        effects.emplace_back(mlir::MemoryEffects::Read::get());
-        effects.emplace_back(mlir::MemoryEffects::Write::get());
+        return;
+    }
+    for (auto* iter : getAllResources())
+    {
+        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
+        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
     }
 }
 
 void pylir::Py::MakeTupleExOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    effects.emplace_back(mlir::MemoryEffects::Read::get());
-    effects.emplace_back(mlir::MemoryEffects::Write::get());
+    if (getIterExpansionAttr().empty())
+    {
+        return;
+    }
+    for (auto* iter : getAllResources())
+    {
+        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
+        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
+    }
 }
 
 namespace

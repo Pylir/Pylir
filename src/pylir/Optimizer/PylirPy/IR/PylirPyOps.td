@@ -71,6 +71,11 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
     }];
 }
 
+def HandleResource : Resource<"::pylir::Py::HandleResource">;
+def ObjectResource : Resource<"::pylir::Py::ObjectResource">;
+def ListResource : Resource<"::pylir::Py::ListResource">;
+def DictResource : Resource<"::pylir::Py::DictResource">;
+
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, ReturnsImmutable,
 												 DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
     let arguments = (ins AnyPylirAttr:$constant);
@@ -108,7 +113,7 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryF
                                                DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
                                               ]> {
 
-    let arguments = (ins Arg<DynamicType, "", [MemRead, SROAAggregate]>:$object,
+    let arguments = (ins Arg<DynamicType, "", [MemRead<ObjectResource>, SROAAggregate]>:$object,
                          DynamicType:$type_object, StrAttr:$slot);
 
     let results = (outs DynamicType:$result);
@@ -128,7 +133,7 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
                                                DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
                                               ]> {
 
-    let arguments = (ins Arg<DynamicType, "", [MemWrite, SROAAggregate]>:$object,
+    let arguments = (ins Arg<DynamicType, "", [MemWrite<ObjectResource>, SROAAggregate]>:$object,
                          DynamicType:$type_object, StrAttr:$slot,
                          Arg<DynamicType, "", [Captured]>:$value);
     let results = (outs);
@@ -149,7 +154,7 @@ def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [DeclareOpInterface
                                                               DeclareOpInterfaceMethods<SROAReadWriteOpInterface,
                                                                 ["validateKey"]>,
                                                               ]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead, SROAAggregate]>:$dict,
+    let arguments = (ins Arg<DynamicType, "", [MemRead<DictResource>, SROAAggregate]>:$dict,
                          Arg<DynamicType, "", [SROAKey]>:$key, Index:$hash);
 
     let results = (outs DynamicType:$result);
@@ -171,7 +176,7 @@ def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem", [DeclareOpInterfaceMethod
                                                          ["validateKey"]>,
                                                        ]> {
 
-    let arguments = (ins Arg<DynamicType, "", [MemWrite, SROAAggregate]>:$dict,
+    let arguments = (ins Arg<DynamicType, "", [MemWrite<DictResource>, SROAAggregate]>:$dict,
                          Arg<DynamicType, "", [SROAKey]>:$key, Index:$hash, DynamicType:$value);
 
     let results = (outs);
@@ -190,7 +195,7 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [DeclareOpInterfaceMethod
                                                           ["validateKey"]>,
                                                        ]> {
 
-    let arguments = (ins Arg<DynamicType, "", [MemWrite, SROAAggregate]>:$dict,
+    let arguments = (ins Arg<DynamicType, "", [MemWrite<DictResource>, SROAAggregate]>:$dict,
                          Arg<DynamicType, "", [Captured, SROAKey]>:$key,
                          Index:$hash);
 
@@ -206,7 +211,7 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [DeclareOpInterfaceMethod
 }
 
 def PylirPy_DictLenOp : PylirPy_Op<"dict.len", [DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$input);
+    let arguments = (ins Arg<DynamicType, "", [MemRead<DictResource>]>:$input);
     let results = (outs Index:$result);
 
     let assemblyFormat = [{
@@ -298,7 +303,7 @@ def PylirPy_TupleCopyOp : PylirPy_Op<"tuple.copy", [AlwaysBound, ObjectFromTypeO
     let arguments = (ins Arg<DynamicType, "", [Copied, OnlyReadsValue]>:$tuple,
                          Arg<DynamicType, "", [Captured]>:$type_object);
 
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
     let description = [{
         Creates a new tuple object of type `$type_object` and initializes it by copying the tuple parts of `$tuple`.
@@ -339,7 +344,7 @@ def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoSideEffect,
 def PylirPy_ListResizeOp : PylirPy_Op<"list.resize", [DeclareOpInterfaceMethods<CaptureInterface>,
                                                       DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
                                                      ]> {
-    let arguments = (ins Arg<DynamicType, "", [MemWrite, SROAAggregate]>:$list, Index:$length);
+    let arguments = (ins Arg<DynamicType, "", [MemWrite<ListResource>, SROAAggregate]>:$list, Index:$length);
     let results = (outs);
 
     let assemblyFormat = [{
@@ -358,7 +363,7 @@ def PylirPy_ListSetItemOp : PylirPy_Op<"list.setItem", [DeclareOpInterfaceMethod
                                                         DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
                                                        ]> {
 
-    let arguments = (ins Arg<DynamicType, "",[MemWrite, SROAAggregate]>:$list,
+    let arguments = (ins Arg<DynamicType, "",[MemWrite<ListResource>, SROAAggregate]>:$list,
                          Arg<Index, "", [SROAKey]>:$index,
                          Arg<DynamicType, "", [Captured]>:$element);
 
@@ -379,7 +384,10 @@ def PylirPy_ListGetItemOp : PylirPy_Op<"list.getItem", [AlwaysBound,
                                                         DeclareOpInterfaceMethods<CaptureInterface>,
                                                         DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
                                                        ]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead, SROAAggregate]>:$list, Arg<Index, "", [SROAKey]>:$index);
+
+    let arguments = (ins Arg<DynamicType, "", [MemRead<ListResource>, SROAAggregate]>:$list,
+                         Arg<Index, "", [SROAKey]>:$index);
+
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -396,7 +404,8 @@ def PylirPy_ListGetItemOp : PylirPy_Op<"list.getItem", [AlwaysBound,
 def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<MemoryFoldInterface>,
                                                 DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
                                                ]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead, SROAAggregate]>:$list);
+
+    let arguments = (ins Arg<DynamicType, "", [MemRead<ListResource>, SROAAggregate]>:$list);
     let results = (outs Index:$result);
 
     let assemblyFormat = [{
@@ -410,7 +419,7 @@ def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<Memory
 }
 
 def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, RefinedTypeTupleApproximate, ReturnsImmutable]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead]>:$list);
+    let arguments = (ins Arg<DynamicType, "", [MemRead<ListResource>]>:$list);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -486,7 +495,7 @@ def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<Captur
     let arguments = (ins Arg<DynamicType, "", [Copied, OnlyReadsValue]>:$string,
                          Arg<DynamicType, "", [Captured]>:$type_object);
 
-    let results = (outs Arg<DynamicType, "", [MemAlloc, MemWrite]>:$result);
+    let results = (outs Arg<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
     let assemblyFormat = "$string `:` $type_object attr-dict";
 
@@ -638,14 +647,16 @@ def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [DeclareOpInterfaceMethods<Capt
 
 // Intrinsics
 
-def PylirPy_PrintOp : PylirPy_Op<"intr.print", [DeclareOpInterfaceMethods<CaptureInterface>]> {
+def PylirPy_PrintOp : PylirPy_Op<"intr.print", [DeclareOpInterfaceMethods<CaptureInterface>,
+                                                MemoryEffects<[MemWrite]>,
+                                               ]> {
     let arguments = (ins DynamicType:$string);
     let results = (outs);
 
     let assemblyFormat = "$string attr-dict";
 }
 
-def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [MemoryEffects<[MemRead]>,
+def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [MemoryEffects<[MemRead<ObjectResource>]>,
                                                    DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins DynamicType:$mro_tuple, StrAttr:$slot);
     let results = (outs DynamicType:$result);
@@ -779,7 +790,7 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, AddableExceptionHa
     let arguments = (ins Variadic<DynamicType>:$arguments,
                          DenseI32ArrayAttr:$iter_expansion
                          );
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<ListResource>]>:$result);
 
     let assemblyFormat = [{
         custom<IterArguments>($arguments, $iter_expansion) attr-dict
@@ -815,7 +826,7 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHand
                          DenseI32ArrayAttr:$iter_expansion
                          );
 
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
     let builders = [
         OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$values)>
@@ -857,7 +868,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
                         DenseI32ArrayAttr:$mapping_expansion
                         );
 
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<DictResource>]>:$result);
 
     let builders = [
             OpBuilder<(ins CArg<"const std::vector<::pylir::Py::DictArg>&","{}">:$keyValues)>
@@ -898,7 +909,7 @@ def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [AlwaysBound, RefinedType<"Funct
 												]> {
     let arguments = (ins FlatSymbolRefAttr:$function);
 
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
     let assemblyFormat = [{
         $function attr-dict
@@ -910,7 +921,7 @@ def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, RefinedObjectF
                                                     ]> {
     let arguments = (ins DynamicType:$type_object);
 
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite]>:$result);
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
     let description = [{
         Creates a new object of the type of the given type object. If `$type_object` is not an instance of `builtins.type`
@@ -1016,7 +1027,7 @@ def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
 def PylirPy_StoreOp : PylirPy_Op<"store", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "store operation";
 
-    let arguments = (ins DynamicType:$value, FlatSymbolRefAttr:$handle);
+    let arguments = (ins DynamicType:$value, Arg<FlatSymbolRefAttr, "", [MemWrite<HandleResource>]>:$handle);
     let results = (outs);
 
     let assemblyFormat = [{
@@ -1032,7 +1043,7 @@ def PylirPy_StoreOp : PylirPy_Op<"store", [DeclareOpInterfaceMethods<SymbolUserO
 def PylirPy_LoadOp : PylirPy_Op<"load", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let summary = "load operation";
 
-    let arguments = (ins FlatSymbolRefAttr:$handle);
+    let arguments = (ins Arg<FlatSymbolRefAttr, "", [MemRead<HandleResource>]>:$handle);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$handle attr-dict";
