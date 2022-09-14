@@ -920,6 +920,18 @@ mlir::LogicalResult pylir::Py::ListLenOp::foldUsage(mlir::Operation* lastClobber
         .Default(mlir::failure());
 }
 
+mlir::LogicalResult pylir::Py::LoadOp::foldUsage(mlir::Operation* lastClobber,
+                                                 ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
+{
+    auto store = mlir::dyn_cast<StoreOp>(lastClobber);
+    if (!store)
+    {
+        return mlir::failure();
+    }
+    results.emplace_back(store.getValue());
+    return mlir::success();
+}
+
 pylir::Py::TypeRefineResult
     pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion>,
                                        llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,

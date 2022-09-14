@@ -1040,7 +1040,8 @@ def PylirPy_StoreOp : PylirPy_Op<"store", [DeclareOpInterfaceMethods<SymbolUserO
     }];
 }
 
-def PylirPy_LoadOp : PylirPy_Op<"load", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_LoadOp : PylirPy_Op<"load", [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+                                         DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
     let summary = "load operation";
 
     let arguments = (ins Arg<FlatSymbolRefAttr, "", [MemRead<HandleResource>]>:$handle);
