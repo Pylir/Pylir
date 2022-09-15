@@ -233,3 +233,42 @@ func.func @other2() -> !py.dynamic {
 // CHECK-LABEL: func.func @other2
 // CHECK-NOT: py.load
 // CHECK: return
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.global "private" @foo : index
+
+func.func @test() {
+    %0 = arith.constant 5 : index
+    py.store %0 : index into @foo
+    return
+}
+
+func.func @bar() -> index {
+    %0 = py.load @foo : index
+    return %0 : index
+}
+
+// CHECK-LABEL: @test
+// CHECK-NOT: py.store
+// CHECK: return
+
+// CHECK-LABEL: @bar
+// CHECK-NEXT: %[[C:.*]] = arith.constant 5
+// CHECK-NEXT: return %[[C]]
+
+// -----
+
+py.global "private" @foo : index
+
+func.func @bar() -> index {
+    %0 = py.load @foo : index
+    return %0 : index
+}
+
+// CHECK-LABEL: @bar
+// CHECK-NEXT: %[[C:.*]] = arith.constant
+// CHECK-NEXT: return %[[C]]

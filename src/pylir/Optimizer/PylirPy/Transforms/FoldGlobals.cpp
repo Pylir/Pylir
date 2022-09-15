@@ -2,6 +2,7 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 #include <mlir/IR/Dominance.h>
 #include <mlir/IR/Matchers.h>
 #include <mlir/Pass/Pass.h>
@@ -31,7 +32,7 @@ protected:
     void runOnOperation() override;
 
 private:
-    pylir::Py::GlobalValueOp createGlobalValueFromHandle(pylir::Py::GlobalOp globalOp,
+    pylir::Py::GlobalValueOp createGlobalValueFromGlobal(pylir::Py::GlobalOp globalOp,
                                                          pylir::Py::ObjectAttrInterface initializer, bool constant)
     {
         PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
@@ -44,13 +45,14 @@ private:
     {
         for (auto* op : llvm::make_early_inc_range(users))
         {
-            // Turn any loads into constants referring to a py.globalValue
             if (!mlir::isa<pylir::Py::LoadOp>(op))
             {
                 continue;
             }
             mlir::OpBuilder builder(op);
-            auto newOp = builder.create<pylir::Py::ConstantOp>(op->getLoc(), constant);
+            auto* newOp = getContext().getLoadedDialect<pylir::Py::PylirPyDialect>()->materializeConstant(
+                builder, constant, op->getResult(0).getType(), op->getLoc());
+            PYLIR_ASSERT(newOp);
             op->replaceAllUsesWith(newOp);
             op->erase();
         }
@@ -59,17 +61,25 @@ private:
     void handleSingleStoreConstant(mlir::Attribute attr, pylir::Py::StoreOp singleStore, pylir::Py::GlobalOp globalOp,
                                    llvm::ArrayRef<mlir::Operation*> users)
     {
-        // If the single store into the handle is already a reference to a global value there isn't a lot to be done
-        // except replace all loads with such a reference. Otherwise if not unbound, we create a global value with the
-        // constant as initializer instead of the handle.
-        mlir::Attribute constantStorage = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
-        if (!constantStorage)
+        mlir::Attribute constantStorage;
+        if (globalOp.getType().isa<pylir::Py::DynamicType>())
         {
-            constantStorage = attr.dyn_cast<pylir::Py::UnboundAttr>();
+            // If the single store into the global is already a reference to a global value there isn't a lot to be done
+            // except replace all loads with such a reference. Otherwise if not unbound, we create a global value with
+            // the constant as initializer instead of the handle.
+            constantStorage = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
+            if (!constantStorage)
+            {
+                constantStorage = attr.dyn_cast<pylir::Py::UnboundAttr>();
+            }
+            if (!constantStorage)
+            {
+                constantStorage = mlir::FlatSymbolRefAttr::get(globalOp);
+            }
         }
-        if (!constantStorage)
+        else
         {
-            constantStorage = mlir::FlatSymbolRefAttr::get(globalOp);
+            constantStorage = attr;
         }
 
         replaceLoadsWithAttr(users, constantStorage);
@@ -78,7 +88,7 @@ private:
         // Create the global value if the constant was not a reference but a constant object.
         if (auto initializer = attr.dyn_cast<pylir::Py::ObjectAttrInterface>())
         {
-            createGlobalValueFromHandle(globalOp, initializer, true);
+            createGlobalValueFromGlobal(globalOp, initializer, true);
         }
         globalOp->erase();
         m_singleStoreGlobalsConverted++;
@@ -87,10 +97,28 @@ private:
     void handleSingleFunctionGlobal(mlir::Region& parent, pylir::Py::GlobalOp globalOp)
     {
         pylir::SSABuilder builder(
-            [](mlir::Block* block, mlir::Type, mlir::Location loc) -> mlir::Value
+            [](mlir::Block* block, mlir::Type type, mlir::Location loc) -> mlir::Value
             {
                 auto builder = mlir::OpBuilder::atBlockBegin(block);
-                return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());
+                // TODO: Make this generic? A "undefined" type interface maybe? Or a poison value of any type?
+                if (type.isa<pylir::Py::DynamicType>())
+                {
+                    return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());
+                }
+                if (type.isa<mlir::IndexType>())
+                {
+                    return builder.create<mlir::arith::ConstantIndexOp>(loc, 0);
+                }
+                if (type.isa<mlir::IntegerType>())
+                {
+                    return builder.create<mlir::arith::ConstantIntOp>(loc, 0, type);
+                }
+                if (auto ft = type.dyn_cast<mlir::FloatType>())
+                {
+                    return builder.create<mlir::arith::ConstantFloatOp>(
+                        loc, llvm::APFloat::getZero(ft.getFloatSemantics()), ft);
+                }
+                PYLIR_UNREACHABLE;
             });
         pylir::SSABuilder::DefinitionsMap definitions;
         pylir::updateSSAinRegion(builder, parent,
@@ -134,11 +162,11 @@ void FoldGlobalsPass::runOnOperation()
     {
         mlir::SymbolUserMap userMap(collection, module);
         changedThisIteration = false;
-        for (auto handle : llvm::make_early_inc_range(module.getOps<pylir::Py::GlobalOp>()))
+        for (auto global : llvm::make_early_inc_range(module.getOps<pylir::Py::GlobalOp>()))
         {
-            // If the globalHandle is not public and there is only a single store to it with a constant value,
+            // If the global is not public and there is only a single store to it with a constant value,
             // change it to a globalValueOp. If there are no loads, remove it entirely.
-            if (handle.isPublic())
+            if (global.isPublic())
             {
                 continue;
             }
@@ -148,7 +176,7 @@ void FoldGlobalsPass::runOnOperation()
             bool hasSingleParent = false;
             mlir::Region* singleParent = nullptr;
 
-            auto users = userMap.getUsers(handle);
+            auto users = userMap.getUsers(global);
             for (auto* op : users)
             {
                 if (!singleParent)
@@ -183,7 +211,7 @@ void FoldGlobalsPass::runOnOperation()
             {
                 m_noLoadGlobalsRemoved++;
                 std::for_each(users.begin(), users.end(), std::mem_fn(&mlir::Operation::erase));
-                collection.getSymbolTable(module).erase(handle);
+                collection.getSymbolTable(module).erase(global);
                 changed = true;
                 changedThisIteration = true;
                 continue;
@@ -191,8 +219,8 @@ void FoldGlobalsPass::runOnOperation()
             if (hasSingleParent)
             {
                 m_singleRegionGlobalsConverted++;
-                handleSingleFunctionGlobal(*singleParent, handle);
-                collection.getSymbolTable(module).erase(handle);
+                handleSingleFunctionGlobal(*singleParent, global);
+                collection.getSymbolTable(module).erase(global);
                 changed = true;
                 changedThisIteration = true;
                 continue;
@@ -206,7 +234,7 @@ void FoldGlobalsPass::runOnOperation()
             auto value = singleStore.getValue();
             if (mlir::matchPattern(value, mlir::m_Constant(&attr)))
             {
-                handleSingleStoreConstant(attr, singleStore, handle, users);
+                handleSingleStoreConstant(attr, singleStore, global, users);
                 changed = true;
                 changedThisIteration = true;
                 continue;
@@ -221,8 +249,8 @@ void FoldGlobalsPass::runOnOperation()
                     .Case(
                         [&](pylir::Py::MakeFuncOp makeFuncOp)
                         {
-                            auto value = createGlobalValueFromHandle(
-                                handle, pylir::Py::FunctionAttr::get(&getContext(), makeFuncOp.getFunctionAttr()),
+                            auto value = createGlobalValueFromGlobal(
+                                global, pylir::Py::FunctionAttr::get(&getContext(), makeFuncOp.getFunctionAttr()),
                                 false);
                             mlir::OpBuilder builder(makeFuncOp);
                             auto ref = mlir::FlatSymbolRefAttr::get(value);
@@ -238,7 +266,7 @@ void FoldGlobalsPass::runOnOperation()
             }
             replaceLoadsWithAttr(users, ref);
             singleStore->erase();
-            collection.getSymbolTable(module).erase(handle);
+            collection.getSymbolTable(module).erase(global);
             m_singleStoreGlobalsConverted++;
             changed = true;
             changedThisIteration = true;
