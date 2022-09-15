@@ -16,7 +16,7 @@
 
 namespace pylir::Py
 {
-#define GEN_PASS_DEF_HANDLELOADSTOREELIMINATIONPASS
+#define GEN_PASS_DEF_GLOBALLOADSTOREELIMINATIONPASS
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 } // namespace pylir::Py
 
@@ -28,8 +28,8 @@ struct BlockData
     std::vector<std::pair<pylir::Py::LoadOp, pylir::ValueTracker>> candidates;
 };
 
-struct HandleLoadStoreEliminationPass
-    : pylir::Py::impl::HandleLoadStoreEliminationPassBase<HandleLoadStoreEliminationPass>
+struct GlobalLoadStoreEliminationPass
+    : pylir::Py::impl::GlobalLoadStoreEliminationPassBase<GlobalLoadStoreEliminationPass>
 {
     using Base::Base;
 
@@ -42,7 +42,7 @@ private:
                        pylir::SSABuilder& ssaBuilder);
 };
 
-void HandleLoadStoreEliminationPass::runOnOperation()
+void GlobalLoadStoreEliminationPass::runOnOperation()
 {
     bool changed = false;
     auto* topLevel = getOperation();
@@ -96,7 +96,7 @@ void HandleLoadStoreEliminationPass::runOnOperation()
     markAnalysesPreserved<mlir::DominanceInfo>();
 }
 
-bool HandleLoadStoreEliminationPass::optimizeBlock(
+bool GlobalLoadStoreEliminationPass::optimizeBlock(
     mlir::Block& block, mlir::Value clobberTracker, BlockData& blockArgUsages,
     llvm::DenseMap<mlir::SymbolRefAttr, pylir::SSABuilder::DefinitionsMap>& definitions, pylir::SSABuilder& ssaBuilder)
 {
@@ -106,8 +106,8 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
     {
         if (auto load = mlir::dyn_cast<pylir::Py::LoadOp>(op))
         {
-            unusedStores.erase(load.getHandleAttr());
-            auto& map = definitions[load.getHandleAttr()];
+            unusedStores.erase(load.getGlobalAttr());
+            auto& map = definitions[load.getGlobalAttr()];
             auto read = ssaBuilder.readVariable(load->getLoc(), load.getType(), map, &block);
             if (read == clobberTracker)
             {
@@ -133,7 +133,7 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
         }
         if (auto store = mlir::dyn_cast<pylir::Py::StoreOp>(op))
         {
-            auto [iter, inserted] = unusedStores.insert({store.getHandleAttr(), store});
+            auto [iter, inserted] = unusedStores.insert({store.getGlobalAttr(), store});
             if (!inserted)
             {
                 m_storesRemoved++;
@@ -141,7 +141,7 @@ bool HandleLoadStoreEliminationPass::optimizeBlock(
                 iter->second = store;
                 changed = true;
             }
-            definitions[store.getHandleAttr()][&block] = store.getValue();
+            definitions[store.getGlobalAttr()][&block] = store.getValue();
             continue;
         }
         auto mem = mlir::dyn_cast<mlir::MemoryEffectOpInterface>(op);

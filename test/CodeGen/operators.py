@@ -86,7 +86,7 @@ def boolean_ops(a, b):
 
     # CHECK: ^[[DEST]](
     # CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-    # CHECK: py.store %[[ARG]] into @c
+    # CHECK: py.store %[[ARG]] : !py.dynamic into @c
 
     c = a() or b()
     # CHECK: %[[TUPLE:.*]] = py.makeTuple ()
@@ -113,7 +113,7 @@ def boolean_ops(a, b):
 
     # CHECK: ^[[DEST]](
     # CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-    # CHECK: py.store %[[ARG]] into @c
+    # CHECK: py.store %[[ARG]] : !py.dynamic into @c
 
     c = not a
     # CHECK: %[[BOOL:.*]] = py.constant(@builtins.bool)
@@ -130,7 +130,7 @@ def boolean_ops(a, b):
     # CHECK: %[[TRUE:.*]] = arith.constant true
     # CHECK: %[[INVERTED:.*]] = arith.xori %[[TRUE]], %[[RES_AS_I1]]
     # CHECK: %[[AS_BOOL:.*]] = py.bool.fromI1 %[[INVERTED]]
-    # CHECK: py.store %[[AS_BOOL]] into @c
+    # CHECK: py.store %[[AS_BOOL]] : !py.dynamic into @c
 
 
 # CHECK-LABEL: @"aug_assign_ops$impl[0]"

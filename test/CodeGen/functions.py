@@ -11,7 +11,7 @@
 # CHECK: py.setSlot "__kwdefaults__" of %[[RES]] : %{{.*}} to %[[KWDEFAULTS]]
 # CHECK: %[[CLOSURE:.*]] = py.constant(@builtins.None)
 # CHECK: py.setSlot "__closure__" of %[[RES]] : %{{.*}} to %[[CLOSURE]]
-# CHECK: py.store %[[RES]] into @foo
+# CHECK: py.store %[[RES]] : !py.dynamic into @foo
 
 def foo():
     y = 5

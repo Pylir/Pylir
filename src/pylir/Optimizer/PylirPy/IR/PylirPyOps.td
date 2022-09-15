@@ -71,7 +71,7 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
     }];
 }
 
-def HandleResource : Resource<"::pylir::Py::HandleResource">;
+def GlobalResource : Resource<"::pylir::Py::GlobalResource">;
 def ObjectResource : Resource<"::pylir::Py::ObjectResource">;
 def ListResource : Resource<"::pylir::Py::ListResource">;
 def DictResource : Resource<"::pylir::Py::DictResource">;
@@ -1005,19 +1005,22 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
     let hasFolder = 1;
 }
 
-def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
+def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
+
     let arguments = (ins
             SymbolNameAttr:$sym_name,
-            OptionalAttr<StrAttr>:$sym_visibility);
+            OptionalAttr<StrAttr>:$sym_visibility,
+            TypeAttr:$type);
 
     let results = (outs);
 
     let assemblyFormat = [{
-        ($sym_visibility^)? $sym_name attr-dict
+        ($sym_visibility^)? $sym_name `:` $type attr-dict
     }];
 
     let description = [{
-        This op creates a global handle to which objects can be bound.
+        This op creates a global to which values of type `$type` can be assigned. See `py.store` and `py.load` how to
+        use it.
         Loading from it before a value has ever been stored in it is undefined behaviour.
     }];
 }
@@ -1025,33 +1028,41 @@ def PylirPy_GlobalHandleOp : PylirPy_Op<"globalHandle", [Symbol]> {
 // Memory access Operation
 
 def PylirPy_StoreOp : PylirPy_Op<"store", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+
     let summary = "store operation";
 
-    let arguments = (ins DynamicType:$value, Arg<FlatSymbolRefAttr, "", [MemWrite<HandleResource>]>:$handle);
+    let arguments = (ins AnyType:$value, Arg<FlatSymbolRefAttr, "", [MemWrite<GlobalResource>]>:$global);
     let results = (outs);
 
     let assemblyFormat = [{
-        $value `into` $handle attr-dict
+        $value `:` type($value) `into` $global attr-dict
     }];
 
     let description = [{
-        This op binds the object denoted by `$value` to the `$handle`. Subsequent loads will return the last stored
-        values.
+        This op binds the value denoted by `$value` to the `$global`. Subsequent loads will return the last stored
+        values. The type of `$value` has to match up exactly with the type of `$global`.
     }];
 }
 
 def PylirPy_LoadOp : PylirPy_Op<"load", [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
                                          DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
+
     let summary = "load operation";
 
-    let arguments = (ins Arg<FlatSymbolRefAttr, "", [MemRead<HandleResource>]>:$handle);
-    let results = (outs DynamicType:$result);
+    let arguments = (ins Arg<FlatSymbolRefAttr, "", [MemRead<GlobalResource>]>:$global);
+    let results = (outs AnyType:$result);
 
-    let assemblyFormat = "$handle attr-dict";
+    let assemblyFormat = "$global `:` type($result) attr-dict";
+
+    let builders = [
+        OpBuilder<(ins "::pylir::Py::GlobalOp":$global), [{
+            build($_builder, $_state, global.getType(), ::mlir::FlatSymbolRefAttr::get(global));
+        }]>
+    ];
 
     let description = [{
-        This op retrieves the object that was last stored into the `$handle`. If `$handle` is unbound it returns
-        `py.unboundValue`.
+        This op retrieves the value that was last stored into `$global`. If no value was previously stored into
+        `$global` the behaviour is undefined.
     }];
 }
 

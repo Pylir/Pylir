@@ -1583,11 +1583,11 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
     }
 };
 
-struct GlobalHandleOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GlobalHandleOp>
+struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GlobalOp>
 {
-    using ConvertPylirOpToLLVMPattern<pylir::Py::GlobalHandleOp>::ConvertPylirOpToLLVMPattern;
+    using ConvertPylirOpToLLVMPattern<pylir::Py::GlobalOp>::ConvertPylirOpToLLVMPattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::GlobalHandleOp op, OpAdaptor,
+    mlir::LogicalResult matchAndRewrite(pylir::Py::GlobalOp op, OpAdaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         mlir::LLVM::Linkage linkage;
@@ -1597,8 +1597,8 @@ struct GlobalHandleOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::
             case mlir::SymbolTable::Visibility::Private: linkage = mlir::LLVM::linkage::Linkage::Private; break;
             case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
         }
-        auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, pointer(REF_ADDRESS_SPACE), false, linkage,
-                                                                        op.getName(), mlir::Attribute{}, 0, 0, true);
+        auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(
+            op, typeConverter->convertType(op.getType()), false, linkage, op.getName(), mlir::Attribute{}, 0, 0, true);
         global.setSectionAttr(getRootSection());
         rewriter.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
         auto null = rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), global.getType());
@@ -1614,7 +1614,7 @@ struct LoadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::LoadOp>
     mlir::LogicalResult matchAndRewrite(pylir::Py::LoadOp op, OpAdaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), pointer(), op.getHandleAttr());
+        auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), pointer(), op.getGlobalAttr());
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, pointer(REF_ADDRESS_SPACE), address);
         return mlir::success();
     }
@@ -1627,7 +1627,7 @@ struct StoreOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StoreOp
     mlir::LogicalResult matchAndRewrite(pylir::Py::StoreOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), pointer(), adaptor.getHandle());
+        auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), pointer(), adaptor.getGlobalAttr());
         rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.getValue(), address);
         return mlir::success();
     }
@@ -3081,7 +3081,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
     patternSet.insert<ConstantOpConversion>(converter);
     patternSet.insert<GlobalValueOpConversion>(converter);
-    patternSet.insert<GlobalHandleOpConversion>(converter);
+    patternSet.insert<GlobalOpConversion>(converter);
     patternSet.insert<StoreOpConversion>(converter);
     patternSet.insert<LoadOpConversion>(converter);
     patternSet.insert<IsOpConversion>(converter);

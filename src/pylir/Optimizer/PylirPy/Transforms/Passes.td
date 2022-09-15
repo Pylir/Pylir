@@ -17,29 +17,29 @@ def ExpandPyDialectPass : Pass<"pylir-expand-py-dialect"> {
                              "::mlir::cf::ControlFlowDialect"];
 }
 
-def FoldHandlesPass : Pass<"pylir-fold-handles", "::mlir::ModuleOp"> {
-    let summary = "Fold py.globalHandle";
+def FoldGlobalsPass : Pass<"pylir-fold-globals", "::mlir::ModuleOp"> {
+    let summary = "Fold py.global";
 
     let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
     let statistics = [
-        Statistic<"m_noLoadHandlesRemoved", "No-load Handles removed",
+        Statistic<"m_noLoadGlobalsRemoved", "No-load Globals removed",
             "Amount of handles that were removed as they were never loaded">,
-        Statistic<"m_singleStoreHandlesConverted", "Single-store Handles converted",
-            "Amount of handles converted to values as they only had a single constant store">,
-        Statistic<"m_singleRegionHandlesConverted", "Single-region Handles converted",
-                    "Amount of handles turned to SSA as they only occur in a single region">
+        Statistic<"m_singleStoreGlobalsConverted", "Single-store Globals converted",
+            "Amount of globals converted to values as they only had a single constant store">,
+        Statistic<"m_singleRegionGlobalsConverted", "Single-region Globals converted",
+                    "Amount of globals turned to SSA as they only occur in a single region">
     ];
 }
 
-def HandleLoadStoreEliminationPass : Pass<"pylir-handle-load-store-elimination"> {
-    let summary = "Eliminate loads and stores of handles";
+def GlobalLoadStoreEliminationPass : Pass<"pylir-global-load-store-elimination"> {
+    let summary = "Eliminate loads and stores of globals";
 
     let statistics = [
-        Statistic<"m_loadRemoved", "handle loads removed",
-            "Amount of loads of handles that could be removed">,
-        Statistic<"m_storesRemoved", "Stores to handles removed",
-            "Amount of stores to handles removed">
+        Statistic<"m_loadRemoved", "global loads removed",
+            "Amount of loads of globals that could be removed">,
+        Statistic<"m_storesRemoved", "Stores to globals removed",
+            "Amount of stores to globals removed">
     ];
 }
 

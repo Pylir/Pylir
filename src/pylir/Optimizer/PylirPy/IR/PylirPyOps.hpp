@@ -211,8 +211,8 @@ public:
         }                                                                         \
     }
 
-/// Reads and writes from 'py.globalHandle'.
-TRIVIAL_RESOURCE(Handle);
+/// Reads and writes from 'py.global'.
+TRIVIAL_RESOURCE(Global);
 
 /// Reads and writes to the object parts. This currently just reads and writes to slots.
 TRIVIAL_RESOURCE(Object);
@@ -227,7 +227,7 @@ TRIVIAL_RESOURCE(Dict);
 
 inline auto getAllResources()
 {
-    return std::array<mlir::SideEffects::Resource*, 4>{HandleResource::get(), ObjectResource::get(),
+    return std::array<mlir::SideEffects::Resource*, 4>{GlobalResource::get(), ObjectResource::get(),
                                                        ListResource::get(), DictResource::get()};
 }
 

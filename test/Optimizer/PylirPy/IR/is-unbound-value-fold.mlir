@@ -17,10 +17,10 @@ func.func @entry_block(%arg0 : !py.dynamic) -> i1 {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.bool = #py.type
 
-py.globalHandle @a
+py.global @a : !py.dynamic
 
 func.func @block_argument(%arg0 : i1) -> i1 {
-    %c = py.load @a
+    %c = py.load @a : !py.dynamic
     cf.cond_br %arg0, ^true, ^false(%c : !py.dynamic)
 
 ^true:
@@ -42,18 +42,18 @@ func.func @block_argument(%arg0 : i1) -> i1 {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.bool = #py.type
 
-py.globalHandle @a
+py.global @a : !py.dynamic
 
 func.func @load_op(%arg0 : !py.dynamic) -> i1 {
-    py.store %arg0 into @a
-    %0 = py.load @a
+    py.store %arg0 : !py.dynamic into @a
+    %0 = py.load @a : !py.dynamic
     %1 = py.isUnboundValue %0
     return %1 : i1
 }
 
 // CHECK-LABEL: @load_op
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: py.store %[[ARG0]] into @a
+// CHECK: py.store %[[ARG0]] : !py.dynamic into @a
 // CHECK: %[[LOADED:.*]] = py.load @a
 // CHECK: %[[UNBOUND:.*]] = py.isUnboundValue %[[LOADED]]
 // CHECK: return %[[UNBOUND]]

@@ -11,7 +11,7 @@ def foo():
 # CHECK-LABEL: @"foo$impl[0]"
 # CHECK-NOT: ^{{[[:alnum:]]+}}
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-# CHECK: py.store %[[THREE]] into @x
+# CHECK: py.store %[[THREE]] : !py.dynamic into @x
 
 def foo2():
     global x
@@ -25,7 +25,7 @@ def foo2():
 # CHECK-NOT: ^{{[[:alnum:]]+}}
 # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-# CHECK: py.store %[[THREE]] into @x
+# CHECK: py.store %[[THREE]] : !py.dynamic into @x
 # CHECK: return %[[FIVE]]
 
 def foo3():
@@ -42,9 +42,9 @@ def foo3():
 # CHECK-LABEL: @"foo3$impl[0]"
 # CHECK-NOT: ^{{[[:alnum:]]+}}
 # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
-# CHECK: py.store %[[FIVE]] into @x
+# CHECK: py.store %[[FIVE]] : !py.dynamic into @x
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-# CHECK: py.store %[[THREE]] into @x
+# CHECK: py.store %[[THREE]] : !py.dynamic into @x
 
 def foo4():
     global x
@@ -62,12 +62,12 @@ def foo4():
 # CHECK: ^[[CONDITION:[[:alnum:]]+]]:
 # CHECK: ^[[BODY:[[:alnum:]]+]]:
 # CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
-# CHECK: py.store %[[FIVE]] into @x
+# CHECK: py.store %[[FIVE]] : !py.dynamic into @x
 # CHECK: br ^[[EXIT_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[EXIT_BLOCK:[[:alnum:]]+]]:
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-# CHECK: py.store %[[THREE]] into @x
+# CHECK: py.store %[[THREE]] : !py.dynamic into @x
 
 def foo5():
     global x
@@ -82,4 +82,4 @@ def foo5():
 # CHECK-LABEL: @"foo5$impl[0]"
 # CHECK-NOT: ^{{[[:alnum:]]+}}
 # CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-# CHECK: py.store %[[THREE]] into @x
+# CHECK: py.store %[[THREE]] : !py.dynamic into @x

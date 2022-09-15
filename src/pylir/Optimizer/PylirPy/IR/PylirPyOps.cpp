@@ -354,32 +354,41 @@ void pylir::Py::MakeTupleExOp::getEffects(
 namespace
 {
 template <class SymbolOp>
-mlir::LogicalResult verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
-                                    mlir::SymbolTableCollection& symbolTable)
+mlir::FailureOr<SymbolOp> verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
+                                          mlir::SymbolTableCollection& symbolTable)
 {
-    if (auto symbol = symbolTable.lookupNearestSymbolFrom(op, name))
+    if (auto* symbol = symbolTable.lookupNearestSymbolFrom(op, name))
     {
-        if (!mlir::isa<SymbolOp>(symbol))
+        auto casted = mlir::dyn_cast<SymbolOp>(symbol);
+        if (!casted)
         {
             return op->emitOpError("Expected ") << name << " to be of different type, not " << symbol->getName();
         }
+        return casted;
     }
-    else
-    {
-        return op->emitOpError("Failed to find symbol named ") << name;
-    }
-    return mlir::success();
+    return op->emitOpError("Failed to find symbol named ") << name;
 }
 } // namespace
 
 mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, getHandleAttr(), symbolTable);
+    return verifySymbolUse<Py::GlobalOp>(*this, getGlobalAttr(), symbolTable);
 }
 
 mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, getHandleAttr(), symbolTable);
+    auto global = verifySymbolUse<Py::GlobalOp>(*this, getGlobalAttr(), symbolTable);
+    if (mlir::failed(global))
+    {
+        return mlir::failure();
+    }
+    if (global->getType() != getValue().getType())
+    {
+        return emitOpError("Type of value to store '")
+               << getValue().getType() << "' does not match type of global '" << global->getSymName() << " : "
+               << global->getType() << "' to store into";
+    }
+    return mlir::success();
 }
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)

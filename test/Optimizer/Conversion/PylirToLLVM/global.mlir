@@ -3,12 +3,12 @@
 
 py.globalValue @builtins.tuple = #py.tuple<()>
 
-py.globalHandle @handle
+py.global @handle : !py.dynamic
 
 func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.tuple<()>)
-    py.store %0 into @handle
-    %1 = py.load @handle
+    py.store %0 : !py.dynamic into @handle
+    %1 = py.load @handle : !py.dynamic
     return %1 : !py.dynamic
 }
 

@@ -84,7 +84,6 @@ def DynamicType : PylirPy_Type<"Dynamic"> {
 	let summary = "dynamic type";
 }
 
-defvar IntegerLike = TypeConstraint<Or<[Index.predicate, AnySignlessInteger.predicate]>>;
 def PyFunctionType : Type<
     And<[
         FunctionType.predicate,

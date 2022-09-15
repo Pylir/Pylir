@@ -17,13 +17,13 @@
 
 namespace pylir::Py
 {
-#define GEN_PASS_DEF_FOLDHANDLESPASS
+#define GEN_PASS_DEF_FOLDGLOBALSPASS
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 } // namespace pylir::Py
 
 namespace
 {
-struct FoldHandlesPass : public pylir::Py::impl::FoldHandlesPassBase<FoldHandlesPass>
+struct FoldGlobalsPass : public pylir::Py::impl::FoldGlobalsPassBase<FoldGlobalsPass>
 {
     using Base::Base;
 
@@ -31,12 +31,13 @@ protected:
     void runOnOperation() override;
 
 private:
-    pylir::Py::GlobalValueOp createGlobalValueFromHandle(pylir::Py::GlobalHandleOp handleOp,
+    pylir::Py::GlobalValueOp createGlobalValueFromHandle(pylir::Py::GlobalOp globalOp,
                                                          pylir::Py::ObjectAttrInterface initializer, bool constant)
     {
-        mlir::OpBuilder builder(handleOp);
-        return builder.create<pylir::Py::GlobalValueOp>(handleOp->getLoc(), handleOp.getSymName(),
-                                                        handleOp.getSymVisibilityAttr(), constant, initializer);
+        PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
+        mlir::OpBuilder builder(globalOp);
+        return builder.create<pylir::Py::GlobalValueOp>(globalOp->getLoc(), globalOp.getSymName(),
+                                                        globalOp.getSymVisibilityAttr(), constant, initializer);
     }
 
     void replaceLoadsWithAttr(llvm::ArrayRef<mlir::Operation*> users, mlir::Attribute constant)
@@ -55,8 +56,8 @@ private:
         }
     }
 
-    void handleSingleStoreConstant(mlir::Attribute attr, pylir::Py::StoreOp singleStore,
-                                   pylir::Py::GlobalHandleOp handle, llvm::ArrayRef<mlir::Operation*> users)
+    void handleSingleStoreConstant(mlir::Attribute attr, pylir::Py::StoreOp singleStore, pylir::Py::GlobalOp globalOp,
+                                   llvm::ArrayRef<mlir::Operation*> users)
     {
         // If the single store into the handle is already a reference to a global value there isn't a lot to be done
         // except replace all loads with such a reference. Otherwise if not unbound, we create a global value with the
@@ -68,7 +69,7 @@ private:
         }
         if (!constantStorage)
         {
-            constantStorage = mlir::FlatSymbolRefAttr::get(handle);
+            constantStorage = mlir::FlatSymbolRefAttr::get(globalOp);
         }
 
         replaceLoadsWithAttr(users, constantStorage);
@@ -77,13 +78,13 @@ private:
         // Create the global value if the constant was not a reference but a constant object.
         if (auto initializer = attr.dyn_cast<pylir::Py::ObjectAttrInterface>())
         {
-            createGlobalValueFromHandle(handle, initializer, true);
+            createGlobalValueFromHandle(globalOp, initializer, true);
         }
-        handle->erase();
-        m_singleStoreHandlesConverted++;
+        globalOp->erase();
+        m_singleStoreGlobalsConverted++;
     }
 
-    void handleSingleFunctionHandle(mlir::Region& parent, pylir::Py::GlobalHandleOp handleOp)
+    void handleSingleFunctionGlobal(mlir::Region& parent, pylir::Py::GlobalOp globalOp)
     {
         pylir::SSABuilder builder(
             [](mlir::Block* block, mlir::Type, mlir::Location loc) -> mlir::Value
@@ -99,7 +100,7 @@ private:
                                      {
                                          if (auto store = mlir::dyn_cast<pylir::Py::StoreOp>(op))
                                          {
-                                             if (store.getHandleAttr().getAttr() != handleOp.getSymNameAttr())
+                                             if (store.getGlobalAttr().getAttr() != globalOp.getSymNameAttr())
                                              {
                                                  continue;
                                              }
@@ -109,7 +110,7 @@ private:
                                          }
                                          if (auto load = mlir::dyn_cast<pylir::Py::LoadOp>(op))
                                          {
-                                             if (load.getHandleAttr().getAttr() != handleOp.getSymNameAttr())
+                                             if (load.getGlobalAttr().getAttr() != globalOp.getSymNameAttr())
                                              {
                                                  continue;
                                              }
@@ -123,7 +124,7 @@ private:
     }
 };
 
-void FoldHandlesPass::runOnOperation()
+void FoldGlobalsPass::runOnOperation()
 {
     auto module = getOperation();
     mlir::SymbolTableCollection collection;
@@ -133,7 +134,7 @@ void FoldHandlesPass::runOnOperation()
     {
         mlir::SymbolUserMap userMap(collection, module);
         changedThisIteration = false;
-        for (auto handle : llvm::make_early_inc_range(module.getOps<pylir::Py::GlobalHandleOp>()))
+        for (auto handle : llvm::make_early_inc_range(module.getOps<pylir::Py::GlobalOp>()))
         {
             // If the globalHandle is not public and there is only a single store to it with a constant value,
             // change it to a globalValueOp. If there are no loads, remove it entirely.
@@ -180,7 +181,7 @@ void FoldHandlesPass::runOnOperation()
             // Remove if it has no loads
             if (!hasLoads)
             {
-                m_noLoadHandlesRemoved++;
+                m_noLoadGlobalsRemoved++;
                 std::for_each(users.begin(), users.end(), std::mem_fn(&mlir::Operation::erase));
                 collection.getSymbolTable(module).erase(handle);
                 changed = true;
@@ -189,8 +190,8 @@ void FoldHandlesPass::runOnOperation()
             }
             if (hasSingleParent)
             {
-                m_singleRegionHandlesConverted++;
-                handleSingleFunctionHandle(*singleParent, handle);
+                m_singleRegionGlobalsConverted++;
+                handleSingleFunctionGlobal(*singleParent, handle);
                 collection.getSymbolTable(module).erase(handle);
                 changed = true;
                 changedThisIteration = true;
@@ -238,7 +239,7 @@ void FoldHandlesPass::runOnOperation()
             replaceLoadsWithAttr(users, ref);
             singleStore->erase();
             collection.getSymbolTable(module).erase(handle);
-            m_singleStoreHandlesConverted++;
+            m_singleStoreGlobalsConverted++;
             changed = true;
             changedThisIteration = true;
         }
