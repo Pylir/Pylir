@@ -148,16 +148,12 @@ bool GlobalLoadStoreEliminationPass::optimizeBlock(
         llvm::SmallVector<mlir::MemoryEffects::EffectInstance> effects;
         if (mem)
         {
-            mem.getEffects(effects);
+            mem.getEffectsOnResource(pylir::Py::GlobalResource::get(), effects);
         }
         bool mayWrite = false;
         bool mayRead = false;
         for (auto& effect : effects)
         {
-            if (effect.getSymbolRef() || effect.getValue())
-            {
-                continue;
-            }
             if (mlir::isa<mlir::MemoryEffects::Write>(effect.getEffect()))
             {
                 mayWrite = true;

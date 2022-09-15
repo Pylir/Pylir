@@ -382,3 +382,24 @@ func.func @test() -> !py.dynamic {
 // CHECK: ^[[BB2]]:
 // CHECK-NOT: py.load
 // CHECK: return %[[ARG]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+py.global @foo : !py.dynamic
+
+func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
+    py.store %arg0 : !py.dynamic into @foo
+    %c = arith.constant 5 : index
+    py.list.resize %arg0 to %c
+    %1 = py.load @foo : !py.dynamic
+    return %1 : !py.dynamic
+}
+
+// CHECK-LABEL:  func @test
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK: py.store %[[ARG0]] : !py.dynamic into @foo
+// CHECK-NOT: py.load
+// CHECK: return %[[ARG0]]
