@@ -16,9 +16,8 @@
 
 namespace
 {
-void maybeAddAccess(
-    mlir::ImplicitLocOpBuilder& builder, mlir::Operation* operation, pylir::SSABuilder& ssaBuilder,
-    llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<pylir::SSABuilder::DefinitionsMap>>& lastDefs)
+void maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, mlir::Operation* operation, pylir::SSABuilder& ssaBuilder,
+                    llvm::MapVector<mlir::SideEffects::Resource*, pylir::SSABuilder::DefinitionsMap>& lastDefs)
 {
     using namespace pylir::MemSSA;
     llvm::SmallVector<mlir::MemoryEffects::EffectInstance> effects;
@@ -82,14 +81,9 @@ void maybeAddAccess(
         auto res = lastDefs.find(resource);
         if (res == lastDefs.end())
         {
-            bool inserted;
-            std::tie(res, inserted) = lastDefs.insert({nullptr, nullptr});
-            if (inserted)
-            {
-                res->second = std::make_unique<pylir::SSABuilder::DefinitionsMap>();
-            }
+            res = lastDefs.insert({nullptr, pylir::SSABuilder::DefinitionsMap{}}).first;
         }
-        return ssaBuilder.readVariable(builder.getLoc(), builder.getType<DefType>(), *res->second, builder.getBlock());
+        return ssaBuilder.readVariable(builder.getLoc(), builder.getType<DefType>(), res->second, builder.getBlock());
     };
 
     if (resourceToEffect.empty())
@@ -123,12 +117,7 @@ void maybeAddAccess(
                 auto clobberAll = builder.create<MemoryDefOp>(lastDef, operation,
                                                               llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{},
                                                               llvm::PointerUnion<mlir::Value, mlir::SymbolRefAttr>{});
-                auto [res, inserted] = lastDefs.insert({iter, nullptr});
-                if (inserted)
-                {
-                    res->second = std::make_unique<pylir::SSABuilder::DefinitionsMap>();
-                }
-                (*res->second)[builder.getBlock()] = clobberAll;
+                lastDefs[iter][builder.getBlock()] = clobberAll;
             }
         }
         return;
@@ -141,12 +130,7 @@ void maybeAddAccess(
         {
             auto write = builder.create<MemoryDefOp>(lastDef, operation, readWrites.written.takeVector(),
                                                      readWrites.read.takeVector());
-            auto [res, inserted] = lastDefs.insert({resource, nullptr});
-            if (inserted)
-            {
-                res->second = std::make_unique<pylir::SSABuilder::DefinitionsMap>();
-            }
-            (*res->second)[builder.getBlock()] = write;
+            lastDefs[resource][builder.getBlock()] = write;
             continue;
         }
 
@@ -157,10 +141,9 @@ void maybeAddAccess(
 
 } // namespace
 
-void pylir::MemorySSA::fillRegion(
-    mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, SSABuilder& ssaBuilder,
-    llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<SSABuilder::DefinitionsMap>>& lastDefs,
-    llvm::ArrayRef<mlir::Block*> regionSuccessors)
+void pylir::MemorySSA::fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, SSABuilder& ssaBuilder,
+                                  llvm::MapVector<mlir::SideEffects::Resource*, SSABuilder::DefinitionsMap>& lastDefs,
+                                  llvm::ArrayRef<mlir::Block*> regionSuccessors)
 {
     auto hasUnresolvedPredecessors = [&](mlir::Block* block)
     {
@@ -343,7 +326,7 @@ void pylir::MemorySSA::createIR(mlir::Operation* operation)
             builder.setInsertionPointToStart(&m_region->getBody().front());
             return builder.create<MemSSA::MemoryLiveOnEntryOp>();
         });
-    llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<SSABuilder::DefinitionsMap>> lastDefs;
+    llvm::MapVector<mlir::SideEffects::Resource*, SSABuilder::DefinitionsMap> lastDefs;
 
     // Insert entry block that has no predecessors
     m_blockMapping.insert({&region.getBlocks().front(), new mlir::Block});

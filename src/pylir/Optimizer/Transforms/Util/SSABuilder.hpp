@@ -45,12 +45,79 @@ namespace pylir
 /// required to implement 'BranchOpInterface'.
 class SSABuilder
 {
+    using InternalDefinitionsMap = llvm::DenseMap<mlir::Block*, ValueTracker>;
+
 public:
-    /// The definition map users use to create new definitions of a variable within a block.
-    using DefinitionsMap = llvm::DenseMap<mlir::Block*, ValueTracker>;
+    /// The definition map users use to create new definitions of a variable within a block. It's a simple wrapper
+    /// around a DenseMap, mapping blocks to ValueTrackers, keeping its address stable for the sake of capturing by the
+    /// SSABuilder.
+    class DefinitionsMap
+    {
+        std::unique_ptr<llvm::DenseMap<mlir::Block*, ValueTracker>> m_map;
+
+    public:
+        using value_type = typename std::decay_t<decltype(*m_map)>::value_type;
+
+        DefinitionsMap() : m_map(std::make_unique<llvm::DenseMap<mlir::Block*, ValueTracker>>()) {}
+
+        DefinitionsMap(llvm::DenseMap<mlir::Block*, ValueTracker>&& map)
+            : m_map(std::make_unique<llvm::DenseMap<mlir::Block*, ValueTracker>>(std::move(map)))
+        {
+        }
+
+        DefinitionsMap(const llvm::DenseMap<mlir::Block*, ValueTracker>& map)
+            : m_map(std::make_unique<llvm::DenseMap<mlir::Block*, ValueTracker>>(map))
+        {
+        }
+
+        DefinitionsMap(std::initializer_list<value_type> initList)
+            : m_map(std::make_unique<llvm::DenseMap<mlir::Block*, ValueTracker>>(initList))
+        {
+        }
+
+        ValueTracker& operator[](mlir::Block* block)
+        {
+            return (*m_map)[block];
+        }
+
+        auto insert(value_type pair)
+        {
+            return m_map->insert(std::move(pair));
+        }
+
+        auto find(mlir::Block* block)
+        {
+            return m_map->find(block);
+        }
+
+        auto find(mlir::Block* block) const
+        {
+            return m_map->find(block);
+        }
+
+        auto end()
+        {
+            return m_map->end();
+        }
+
+        auto end() const
+        {
+            return m_map->end();
+        }
+
+        InternalDefinitionsMap* get()
+        {
+            return m_map.get();
+        }
+
+        InternalDefinitionsMap& operator*()
+        {
+            return *m_map;
+        }
+    };
 
 private:
-    llvm::DenseMap<mlir::Block*, std::vector<DefinitionsMap*>> m_openBlocks;
+    llvm::DenseMap<mlir::Block*, std::vector<InternalDefinitionsMap*>> m_openBlocks;
     std::function<mlir::Value(mlir::Block*, mlir::Type, mlir::Location)> m_undefinedCallback;
     std::function<mlir::Value(mlir::Value, mlir::Value)> m_blockArgMergeOptCallback;
     llvm::DenseMap<mlir::Block*, mlir::BlockArgument> m_marked;
@@ -66,11 +133,14 @@ private:
 
     mlir::Value replaceBlockArgument(mlir::BlockArgument argument, mlir::Value replacement);
 
-    mlir::Value addBlockArguments(DefinitionsMap& map, mlir::BlockArgument argument);
+    mlir::Value addBlockArguments(InternalDefinitionsMap& map, mlir::BlockArgument argument);
 
-    mlir::Value readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block);
+    mlir::Value readVariableRecursive(mlir::Location loc, mlir::Type type, InternalDefinitionsMap& map,
+                                      mlir::Block* block);
 
     void removeBlockArgumentOperands(mlir::BlockArgument argument);
+
+    mlir::Value readVariable(mlir::Location loc, mlir::Type type, InternalDefinitionsMap& map, mlir::Block* block);
 
 public:
     /// Creates a new SSA builder.
@@ -116,6 +186,12 @@ public:
     /// Creates a use of a variable. 'loc' and 'type' are used to create any required block arguments in predecessors
     /// blocks. 'type' also has to match the type of the variable being created. 'map' is the
     /// "block to latest definition" map handled by the user. 'block' is the block where the use is being created.
-    mlir::Value readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block);
+    ///
+    /// NOTE: 'map' may be captured in the case of encountering a seal block and must therefore outlive the SSABuilder.
+    ///       It does not have to have a stable address however.
+    mlir::Value readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map, mlir::Block* block)
+    {
+        return readVariable(loc, type, *map, block);
+    }
 };
 } // namespace pylir

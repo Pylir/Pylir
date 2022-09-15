@@ -30,7 +30,7 @@ void pylir::SSABuilder::sealBlock(mlir::Block* block)
     m_openBlocks.erase(result);
 }
 
-mlir::Value pylir::SSABuilder::addBlockArguments(DefinitionsMap& map, mlir::BlockArgument argument)
+mlir::Value pylir::SSABuilder::addBlockArguments(InternalDefinitionsMap& map, mlir::BlockArgument argument)
 {
     for (auto pred = argument.getOwner()->pred_begin(); pred != argument.getOwner()->pred_end(); pred++)
     {
@@ -137,7 +137,7 @@ mlir::Value pylir::SSABuilder::optimizeBlockArgsOperands(llvm::ArrayRef<mlir::Va
     return same;
 }
 
-mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
+mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type, InternalDefinitionsMap& map,
                                             mlir::Block* block)
 {
     if (auto result = map.find(block); result != map.end())
@@ -151,7 +151,7 @@ mlir::Value pylir::SSABuilder::readVariable(mlir::Location loc, mlir::Type type,
     return readVariableRecursive(loc, type, map, block);
 }
 
-mlir::Value pylir::SSABuilder::readVariableRecursive(mlir::Location loc, mlir::Type type, DefinitionsMap& map,
+mlir::Value pylir::SSABuilder::readVariableRecursive(mlir::Location loc, mlir::Type type, InternalDefinitionsMap& map,
                                                      mlir::Block* block)
 {
     if (auto result = m_openBlocks.find(block); result != m_openBlocks.end())

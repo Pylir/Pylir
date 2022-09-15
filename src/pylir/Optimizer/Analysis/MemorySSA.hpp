@@ -37,7 +37,7 @@ class MemorySSA
 
     void fillRegion(
         mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, pylir::SSABuilder& ssaBuilder,
-        llvm::MapVector<mlir::SideEffects::Resource*, std::unique_ptr<pylir::SSABuilder::DefinitionsMap>>& lastDefs,
+        llvm::MapVector<mlir::SideEffects::Resource*, pylir::SSABuilder::DefinitionsMap>& lastDefs,
         llvm::ArrayRef<mlir::Block*> regionSuccessors);
 
 public:

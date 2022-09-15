@@ -220,8 +220,9 @@ void pylir::CodeGen::visit(const Syntax::GlobalOrNonLocalStmt& globalOrNonLocalS
     for (const auto& identifier : globalOrNonLocalStmt.identifiers)
     {
         auto result = m_globalScope.identifiers.find(identifier.getValue());
-        PYLIR_ASSERT(result != m_globalScope.identifiers.end());
-        m_functionScope->identifiers.insert(*result);
+        PYLIR_ASSERT(result != m_globalScope.identifiers.end() && result->second.kind.index() == Identifier::Global);
+        m_functionScope->identifiers.insert(
+            {result->first, Identifier{pylir::get<mlir::Operation*>(result->second.kind)}});
     }
 }
 
