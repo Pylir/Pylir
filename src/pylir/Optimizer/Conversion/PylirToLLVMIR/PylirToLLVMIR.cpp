@@ -1598,11 +1598,15 @@ struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Global
             case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
         }
         auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(
-            op, typeConverter->convertType(op.getType()), false, linkage, op.getName(), mlir::Attribute{}, 0, 0, true);
-        global.setSectionAttr(getRootSection());
+            op, typeConverter->convertType(op.getType()), false, linkage, op.getName(), mlir::Attribute{},
+            alignOf(typeConverter->convertType(op.getType())), 0, true);
+        if (op.getType().isa<pylir::Py::DynamicType>())
+        {
+            global.setSectionAttr(getRootSection());
+        }
         rewriter.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
-        auto null = rewriter.create<mlir::LLVM::NullOp>(op.getLoc(), global.getType());
-        rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), mlir::ValueRange{null});
+        mlir::Value undef = rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), global.getType());
+        rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), undef);
         return mlir::success();
     }
 };
@@ -1615,7 +1619,7 @@ struct LoadOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::LoadOp>
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto address = rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), pointer(), op.getGlobalAttr());
-        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, pointer(REF_ADDRESS_SPACE), address);
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, typeConverter->convertType(op.getType()), address);
         return mlir::success();
     }
 };
