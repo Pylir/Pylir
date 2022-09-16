@@ -50,3 +50,30 @@ py.globalValue @Foo = #py.type<mroTuple = #py.tuple<(@Foo, @builtins.object)>>
 py.globalValue @bar = #py.obj<@Foo>
 // expected-error@below {{Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.}}
 py.globalValue @dict = #py.dict<{@bar to @builtins.None}>
+
+// -----
+
+// expected-error@below {{Expected integer attribute initializer}}
+py.global @lol1 : index = 5.3 : f64
+
+// -----
+
+// expected-error@below {{Expected float attribute initializer}}
+py.global @lol2 : f64 = 5 : index
+
+// -----
+
+// expected-error@below {{Expected initializer of type 'ObjectAttrInterface' or 'FlatSymbolRefAttr' to global value}}
+py.global @lol3 : !py.dynamic = 5 : index
+
+// -----
+
+py.global @lol : !py.dynamic
+
+// expected-error@below {{Expected '@lol' to be of kind 'py.globalValue', not 'py.global'}}
+py.global @lol4 : !py.dynamic = @lol
+
+// -----
+
+// expected-error@below {{Failed to find symbol named '@lol'}}
+py.global @lol5: !py.dynamic = @lol

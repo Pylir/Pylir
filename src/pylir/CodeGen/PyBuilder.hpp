@@ -518,7 +518,7 @@ public:
 
     Py::GlobalOp createGlobal(llvm::StringRef symbolName)
     {
-        return create<Py::GlobalOp>(symbolName, getStringAttr("private"), getDynamicType());
+        return create<Py::GlobalOp>(symbolName, getStringAttr("private"), getDynamicType(), nullptr);
     }
 
     Py::StoreOp createStore(mlir::Value value, mlir::FlatSymbolRefAttr handle)

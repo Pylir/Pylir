@@ -355,29 +355,72 @@ namespace
 {
 template <class SymbolOp>
 mlir::FailureOr<SymbolOp> verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
-                                          mlir::SymbolTableCollection& symbolTable)
+                                          mlir::SymbolTableCollection& symbolTable, llvm::StringRef kindName)
 {
     if (auto* symbol = symbolTable.lookupNearestSymbolFrom(op, name))
     {
         auto casted = mlir::dyn_cast<SymbolOp>(symbol);
         if (!casted)
         {
-            return op->emitOpError("Expected ") << name << " to be of different type, not " << symbol->getName();
+            return op->emitOpError("Expected '")
+                   << name << "' to be of kind '" << kindName << "', not '" << symbol->getName() << "'";
         }
         return casted;
     }
-    return op->emitOpError("Failed to find symbol named ") << name;
+    return op->emitOpError("Failed to find symbol named '") << name << "'";
 }
 } // namespace
 
+mlir::LogicalResult pylir::Py::GlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    if (!getInitializerAttr())
+    {
+        return mlir::success();
+    }
+    return llvm::TypeSwitch<mlir::Type, mlir::LogicalResult>(getType())
+        .Case(
+            [&](DynamicType) -> mlir::LogicalResult
+            {
+                if (getInitializerAttr().isa<ObjectAttrInterface>())
+                {
+                    return mlir::success();
+                }
+                auto ref = getInitializerAttr().dyn_cast<mlir::FlatSymbolRefAttr>();
+                if (!ref)
+                {
+                    return emitOpError(
+                        "Expected initializer of type 'ObjectAttrInterface' or 'FlatSymbolRefAttr' to global value");
+                }
+                return verifySymbolUse<GlobalValueOp>(*this, ref, symbolTable, GlobalValueOp::getOperationName());
+            })
+        .Case(
+            [&](mlir::IndexType) -> mlir::LogicalResult
+            {
+                if (!getInitializerAttr().isa<mlir::IntegerAttr>())
+                {
+                    return emitOpError("Expected integer attribute initializer");
+                }
+                return mlir::success();
+            })
+        .Case(
+            [&](mlir::FloatType) -> mlir::LogicalResult
+            {
+                if (!getInitializerAttr().isa<mlir::FloatAttr>())
+                {
+                    return emitOpError("Expected float attribute initializer");
+                }
+                return mlir::success();
+            });
+}
+
 mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalOp>(*this, getGlobalAttr(), symbolTable);
+    return verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
 }
 
 mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    auto global = verifySymbolUse<Py::GlobalOp>(*this, getGlobalAttr(), symbolTable);
+    auto global = verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
     if (mlir::failed(global))
     {
         return mlir::failure();
@@ -393,7 +436,7 @@ mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableColl
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::FunctionOpInterface>(*this, getFunctionAttr(), symbolTable);
+    return verifySymbolUse<mlir::FunctionOpInterface>(*this, getFunctionAttr(), symbolTable, "FunctionOpInterface");
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,

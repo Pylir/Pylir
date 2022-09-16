@@ -1005,23 +1005,28 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
     let hasFolder = 1;
 }
 
-def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol]> {
+defvar GlobalOpSupportedTypes = AnyTypeOf<[DynamicType, Index, F64]>;
+defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr, F64Attr, FlatSymbolRefAttr]>;
+
+def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
 
     let arguments = (ins
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility,
-            TypeAttr:$type);
+            TypeAttrOf<GlobalOpSupportedTypes>:$type,
+            OptionalAttr<GlobalOpSupportedAttrs>:$initializer);
 
     let results = (outs);
 
     let assemblyFormat = [{
-        ($sym_visibility^)? $sym_name `:` $type attr-dict
+        ($sym_visibility^)? $sym_name `:` $type (`=` $initializer^)? attr-dict
     }];
 
     let description = [{
         This op creates a global to which values of type `$type` can be assigned. See `py.store` and `py.load` how to
-        use it.
-        Loading from it before a value has ever been stored in it is undefined behaviour.
+        use it. The global may optionally have an initializer which serves as the initial value returned by `py.load`
+        if no value has ever been stored into the global. If the global does not have an initializer loading from it
+        before a value has ever been stored in it is undefined behaviour.
     }];
 }
 
