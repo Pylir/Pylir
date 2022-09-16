@@ -15,15 +15,9 @@ def SROAAllocOpInterface : OpInterface<"SROAAllocOpInterface"> {
 
     let description = [{
         This interface signifies that an aggregate created by this operation should participate in SROA.
-        SROA works by replacing an aggregate and its read and write operations into pure SSA form of every contained
-        value. This only works if given read and write operations statically know which value within the aggregate
+        SROA works by deconstructing an aggregate type into its elements.
+        This only works if given read and write operations statically know which value within the aggregate
         they're referring to. See the `SROAReadWriteOpInterface` below for read and write operations.
-
-        To build this SSA representation, `pylir::AggregateDefs` is used. It is simply a map that maps a
-        `std::pair<mlir::Value, mlir::Attribute>` to a `pylir::SSABuilder::DefinitionMap` for the `SSABuilder` to use.
-        The first value of the pair should refer to the aggregate being replaced, while the second Attribute in the
-        pair refers to the location of the value within the map. The precise attributes used as well as their semantics
-        is up to the the implementation of the operations reading and writing to the aggregate.
     }];
 
     let methods = [
@@ -44,12 +38,14 @@ def SROAAllocOpInterface : OpInterface<"SROAAllocOpInterface"> {
                                                           "::mlir::Location":$loc)>,
         InterfaceMethod<[{
             Called during replacement of the aggregate. The purpose of this method is to be able to initialize the
-            values of the aggregate. This can be done as usual when building an SSA representation by writing
-            to `defs` at the block of the operation.
+            values of the aggregate. This is done via the callback `write`, which takes two arguments. The first is the
+            key, which is used by all participating 'SROAReadWriteOpInterface' operations and this operation to
+            identity a value within the aggregate. The second argument is the value that should be written to the value
+            within the aggregate.
             If any operations should be created during the process `builder` may be used, which has its insertion point
             set to right before the operation.
-        }], "void", "replaceAggregate", (ins "::pylir::AggregateDefs&":$defs, "::pylir::SSABuilder&":$ssaBuilder,
-                                             "::mlir::OpBuilder&":$builder), "", [{
+        }], "void", "replaceAggregate", (ins "::mlir::OpBuilder&":$builder,
+                                             "::llvm::function_ref<void(mlir::Attribute, mlir::Value)>":$write), "", [{
             // define nothing by default.
         }]>,
     ];
@@ -96,16 +92,19 @@ def SROAReadWriteOpInterface : OpInterface<"SROAReadWriteOpInterface"> {
             return mlir::success();
         }]>,
         InterfaceMethod<[{
-            Called during the replacement of the aggregate. Using `ssaBuilder` and `defs` it is possible to perform
-            both definitions as well as uses of the aggregates values when translating it to SSA.
-            See the description of `SROAAllocOpInterface` for the precise interpretation of `defs` key.
+            Called during the replacement of the aggregate. Using the callbacks `read` and `write` one can make reads
+            and writes to specific values within the aggregate. These values are located via the `Attribute` passed
+            as the first argument to each callbacks respectively. `read`s second argument is the type of the value
+            to be read. It then returns the given value.
+            `write`s second argument is the value that should be written to the value within the aggregate.
             `builder` may be used in case any operations are to be created and has its insertion point set before this
-            operation. `optionalKey` is the static value of the `key` operand returned by `getOptionalKeyOperand` or
-            a null attribute if no key exists.
+            operation. `optionalKey` is the static value of the `SROAKey` operand returned by `getOptionalKeyOperand` or
+            a null attribute if no operand was annotated as such.
 
             If this operation has any results they're required to have no uses after this operations.
-        }], "void", "replaceAggregate", (ins "::pylir::AggregateDefs&":$defs, "::pylir::SSABuilder&":$ssaBuilder,
-                                             "::mlir::OpBuilder&":$builder, "::mlir::Attribute":$optionalKey)>,
+        }], "void", "replaceAggregate", (ins "::mlir::OpBuilder&":$builder, "::mlir::Attribute":$optionalKey,
+                                             "::llvm::function_ref<mlir::Value(mlir::Attribute, mlir::Type)>":$read,
+                                             "::llvm::function_ref<void(mlir::Attribute, mlir::Value)>":$write)>,
     ];
 }
 
