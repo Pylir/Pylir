@@ -97,9 +97,17 @@ private:
     void handleSingleFunctionGlobal(mlir::Region& parent, pylir::Py::GlobalOp globalOp)
     {
         pylir::SSABuilder builder(
-            [](mlir::Block* block, mlir::Type type, mlir::Location loc) -> mlir::Value
+            [&globalOp](mlir::Block* block, mlir::Type type, mlir::Location loc) -> mlir::Value
             {
                 auto builder = mlir::OpBuilder::atBlockBegin(block);
+                if (globalOp.getInitializerAttr())
+                {
+                    auto* constant =
+                        globalOp->getDialect()->materializeConstant(builder, globalOp.getInitializerAttr(), type, loc);
+                    PYLIR_ASSERT(constant);
+                    return constant->getResult(0);
+                }
+
                 // TODO: Make this generic? A "undefined" type interface maybe? Or a poison value of any type?
                 if (type.isa<pylir::Py::DynamicType>())
                 {
@@ -234,11 +242,23 @@ void FoldGlobalsPass::runOnOperation()
             auto value = singleStore.getValue();
             if (mlir::matchPattern(value, mlir::m_Constant(&attr)))
             {
+                // If the global has an initializer, we can only replace it with the single store if the single store
+                // happens to store the same value into the global. Otherwise, it is impossible to know whether a load
+                // would retrieve the initializer or the single store.
+                if (global.getInitializerAttr() && global.getInitializerAttr() != attr)
+                {
+                    continue;
+                }
                 handleSingleStoreConstant(attr, singleStore, global, users);
                 changed = true;
                 changedThisIteration = true;
                 continue;
             }
+            if (global.getInitializerAttr())
+            {
+                continue;
+            }
+
             auto* op = value.getDefiningOp();
             if (!op)
             {
