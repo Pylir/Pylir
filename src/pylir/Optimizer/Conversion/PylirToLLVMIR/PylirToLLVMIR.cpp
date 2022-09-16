@@ -1605,8 +1605,36 @@ struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Global
             global.setSectionAttr(getRootSection());
         }
         rewriter.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
-        mlir::Value undef = rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), global.getType());
-        rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), undef);
+        if (!op.getInitializerAttr())
+        {
+            mlir::Value undef = rewriter.create<mlir::LLVM::UndefOp>(op.getLoc(), global.getType());
+            rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), undef);
+        }
+        else
+        {
+            llvm::TypeSwitch<mlir::Attribute>(op.getInitializerAttr())
+                .Case<mlir::IntegerAttr, mlir::FloatAttr>(
+                    [&](auto attr)
+                    {
+                        mlir::Value constant =
+                            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), global.getType(), attr);
+                        rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), constant);
+                    })
+                .Case(
+                    [&](mlir::FlatSymbolRefAttr attr)
+                    {
+                        mlir::Value address =
+                            rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), global.getType(), attr);
+                        rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), address);
+                    })
+                .Case(
+                    [&](pylir::Py::ObjectAttrInterface attr)
+                    {
+                        mlir::Value address = getConstant(op.getLoc(), attr, rewriter);
+                        rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), address);
+                    });
+        }
+
         return mlir::success();
     }
 };
