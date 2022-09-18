@@ -175,21 +175,21 @@ void GlobalSROAPass::runOnOperation()
                 // The produced symbol retains the private visibility, and the insert into the symbol table guarantees
                 // the uniqueness of the symbol.
                 std::string suffix;
-                if (auto str = attr.dyn_cast<mlir::StringAttr>())
+                if (auto str = attr.dyn_cast_or_null<mlir::StringAttr>())
                 {
                     suffix = str.getValue();
                 }
-                else if (auto pyStr = attr.dyn_cast<pylir::Py::StrAttr>())
+                else if (auto pyStr = attr.dyn_cast_or_null<pylir::Py::StrAttr>())
                 {
                     suffix = pyStr.getValue();
                 }
-                else if (auto integer = attr.dyn_cast<mlir::IntegerAttr>())
+                else if (auto integer = attr.dyn_cast_or_null<mlir::IntegerAttr>())
                 {
                     llvm::SmallString<10> temp;
                     integer.getValue().toStringSigned(temp);
                     suffix = temp.str();
                 }
-                else if (auto pyInt = attr.dyn_cast<pylir::Py::IntAttrInterface>())
+                else if (auto pyInt = attr.dyn_cast_or_null<pylir::Py::IntAttrInterface>())
                 {
                     suffix = pyInt.getIntegerValue().toString();
                 }

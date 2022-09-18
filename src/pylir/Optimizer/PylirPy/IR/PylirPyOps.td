@@ -210,8 +210,9 @@ def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [DeclareOpInterfaceMethod
     }];
 }
 
-def PylirPy_DictLenOp : PylirPy_Op<"dict.len", [DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
-    let arguments = (ins Arg<DynamicType, "", [MemRead<DictResource>]>:$input);
+def PylirPy_DictLenOp : PylirPy_Op<"dict.len", [DeclareOpInterfaceMethods<MemoryFoldInterface>,
+                                                DeclareOpInterfaceMethods<SROAReadWriteOpInterface>]> {
+    let arguments = (ins Arg<DynamicType, "", [MemRead<DictResource>, SROAAggregate]>:$input);
     let results = (outs Index:$result);
 
     let assemblyFormat = [{

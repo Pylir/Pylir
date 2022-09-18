@@ -178,8 +178,11 @@ void pylir::Py::ListLenOp::replaceAggregate(mlir::OpBuilder&, mlir::Attribute,
 namespace
 {
 template <class T>
-void replaceDictAggregate(T op, llvm::function_ref<void(mlir::Attribute, mlir::Value)> write)
+void replaceDictAggregate(T op, mlir::OpBuilder& builder, llvm::function_ref<void(mlir::Attribute, mlir::Value)> write)
 {
+    // TODO: This is inaccurate and does not take into account duplicate keys that may be specified here.
+    auto size = builder.create<mlir::arith::ConstantIndexOp>(op.getLoc(), op.getKeys().size());
+    write(nullptr, size);
     for (auto [key, value] : llvm::zip(op.getKeys(), op.getValues()))
     {
         mlir::Attribute attr;
@@ -190,16 +193,16 @@ void replaceDictAggregate(T op, llvm::function_ref<void(mlir::Attribute, mlir::V
 }
 } // namespace
 
-void pylir::Py::MakeDictOp::replaceAggregate(mlir::OpBuilder&,
+void pylir::Py::MakeDictOp::replaceAggregate(mlir::OpBuilder& builder,
                                              llvm::function_ref<void(mlir::Attribute, mlir::Value)> write)
 {
-    replaceDictAggregate(*this, write);
+    replaceDictAggregate(*this, builder, write);
 }
 
-void pylir::Py::MakeDictExOp::replaceAggregate(mlir::OpBuilder&,
+void pylir::Py::MakeDictExOp::replaceAggregate(mlir::OpBuilder& builder,
                                                llvm::function_ref<void(mlir::Attribute, mlir::Value)> write)
 {
-    replaceDictAggregate(*this, write);
+    replaceDictAggregate(*this, builder, write);
 }
 
 void pylir::Py::DictTryGetItemOp::replaceAggregate(mlir::OpBuilder&, mlir::Attribute key,
@@ -209,10 +212,16 @@ void pylir::Py::DictTryGetItemOp::replaceAggregate(mlir::OpBuilder&, mlir::Attri
     replaceAllUsesWith(read(key, getType()));
 }
 
-void pylir::Py::DictSetItemOp::replaceAggregate(mlir::OpBuilder&, mlir::Attribute key,
-                                                llvm::function_ref<mlir::Value(mlir::Attribute, mlir::Type)>,
+void pylir::Py::DictSetItemOp::replaceAggregate(mlir::OpBuilder& builder, mlir::Attribute key,
+                                                llvm::function_ref<mlir::Value(mlir::Attribute, mlir::Type)> read,
                                                 llvm::function_ref<void(mlir::Attribute, mlir::Value)> write)
 {
+    auto size = read(nullptr, builder.getIndexType());
+    auto value = read(key, builder.getType<pylir::Py::DynamicType>());
+    auto didNotExist = builder.create<IsUnboundValueOp>(getLoc(), value);
+    auto oneValue = builder.create<mlir::arith::ConstantIndexOp>(getLoc(), 1);
+    auto incremented = builder.create<mlir::arith::AddIOp>(getLoc(), size, oneValue);
+    write(nullptr, builder.create<mlir::arith::SelectOp>(getLoc(), didNotExist, incremented, size));
     write(key, getValue());
 }
 
@@ -220,13 +229,24 @@ void pylir::Py::DictDelItemOp::replaceAggregate(mlir::OpBuilder& builder, mlir::
                                                 llvm::function_ref<mlir::Value(mlir::Attribute, mlir::Type)> read,
                                                 llvm::function_ref<void(mlir::Attribute, mlir::Value)> write)
 {
+    auto size = read(nullptr, builder.getIndexType());
     auto value = read(key, builder.getType<pylir::Py::DynamicType>());
     auto unbound = builder.create<ConstantOp>(getLoc(), builder.getAttr<UnboundAttr>());
     write(key, unbound);
     auto didNotExist = builder.create<IsUnboundValueOp>(getLoc(), value);
-    auto one = builder.create<mlir::arith::ConstantIntOp>(getLoc(), true, 1);
-    mlir::Value existed = builder.create<mlir::arith::XOrIOp>(getLoc(), didNotExist, one);
+    auto oneValue = builder.create<mlir::arith::ConstantIndexOp>(getLoc(), 1);
+    auto trueValue = builder.create<mlir::arith::ConstantIntOp>(getLoc(), true, 1);
+    mlir::Value existed = builder.create<mlir::arith::XOrIOp>(getLoc(), didNotExist, trueValue);
     replaceAllUsesWith(existed);
+    auto decremented = builder.create<mlir::arith::SubIOp>(getLoc(), size, oneValue);
+    write(nullptr, builder.create<mlir::arith::SelectOp>(getLoc(), didNotExist, size, decremented));
+}
+
+void pylir::Py::DictLenOp::replaceAggregate(::mlir::OpBuilder&, ::mlir::Attribute,
+                                            ::llvm::function_ref<mlir::Value(mlir::Attribute, mlir::Type)> read,
+                                            ::llvm::function_ref<void(mlir::Attribute, mlir::Value)>)
+{
+    replaceAllUsesWith(read(nullptr, mlir::IndexType::get(getContext())));
 }
 
 void pylir::Py::SetSlotOp::replaceAggregate(mlir::OpBuilder&, mlir::Attribute,
@@ -314,6 +334,8 @@ void pylir::Py::DictAttr::destructureAggregate(
     llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
 {
     destructureSlots(*this, write);
+    auto indexType = mlir::IndexType::get(getContext());
+    write(nullptr, indexType, mlir::IntegerAttr::get(indexType, getValue().size()));
     // TODO: This is problematic with keys that are FlatSymbolRefAttr. But that is somewhat a problem of DictAttr in
     //  general. I need to flesh it out with more proper APIs and just generally nail down its semantics.
     for (auto [key, value] : getValue())
