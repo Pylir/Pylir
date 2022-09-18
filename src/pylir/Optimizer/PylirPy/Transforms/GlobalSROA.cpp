@@ -97,6 +97,7 @@ void GlobalSROAPass::runOnOperation()
         changed = true;
         for (auto& aggregate : aggregates)
         {
+            m_globalsSplit++;
             // We have a chicken and egg situation going on here! We don't know into which values/symbols the global
             // will destruct to until we have seen them. At the same time we can't make reads and writes to those
             // symbols before we created them.
