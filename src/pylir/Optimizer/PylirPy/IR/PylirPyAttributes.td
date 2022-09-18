@@ -10,6 +10,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.td"
 include "pylir/Optimizer/PylirPy/IR/IntAttrInterface.td"
+include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
 include "pylir/Optimizer/Util/TablegenUtil.td"
 include "mlir/IR/SubElementInterfaces.td"
 
@@ -32,7 +33,8 @@ class TypeObjectSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> t
     : AttrSpecBuilder<name,
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "typeObject">, ParamSpec<SlotsMap, "slots">]),
     !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-										["replaceImmediateSubAttribute"]>, ObjectAttrInterface]),
+										["replaceImmediateSubAttribute"]>, ObjectAttrInterface,
+						 DeclareAttrInterfaceMethods<SROAAttrInterface>]),
 										extraBuilderCode>;
 
 
@@ -40,7 +42,8 @@ class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait>
     : AttrSpecBuilder<name,
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "typeObject">]),
     !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-										["replaceImmediateSubAttribute"]>, ObjectAttrInterface])>;
+										["replaceImmediateSubAttribute"]>, ObjectAttrInterface,
+						 DeclareAttrInterfaceMethods<SROAAttrInterface>])>;
 
 
 def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [
@@ -178,7 +181,7 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kwDefaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
 	 ], [DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>,
-	     DeclareAttrInterfaceMethods<ObjectAttrInterface>]>
+	     DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<SROAAttrInterface>]>
 {
 	let mnemonic = "function";
 	let summary = "python function";

@@ -39,26 +39,8 @@ llvm::DenseSet<mlir::Value> SROA::collectAggregates()
             {
                 return;
             }
-            if (llvm::all_of(sroaAllocOpInterface->getResult(0).getUses(),
-                             [](const mlir::OpOperand& operand)
-                             {
-                                 auto op = mlir::dyn_cast_or_null<pylir::SROAReadWriteOpInterface>(operand.getOwner());
-                                 if (!op || &op.getAggregateOperand() != &operand)
-                                 {
-                                     return false;
-                                 }
-                                 auto* key = op.getOptionalKeyOperand();
-                                 if (!key)
-                                 {
-                                     return true;
-                                 }
-                                 mlir::Attribute attr;
-                                 if (!mlir::matchPattern(key->get(), mlir::m_Constant(&attr)))
-                                 {
-                                     return false;
-                                 }
-                                 return mlir::succeeded(op.validateKey(attr));
-                             }))
+            if (llvm::all_of(sroaAllocOpInterface->getResult(0).getUses(), [](const mlir::OpOperand& operand)
+                             { return mlir::succeeded(pylir::aggregateUseCanParticipateInSROA(operand)); }))
             {
                 aggregates.insert(sroaAllocOpInterface->getResult(0));
             }

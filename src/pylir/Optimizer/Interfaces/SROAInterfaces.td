@@ -1,5 +1,3 @@
-// Copyright 2022 Markus Böck
-//
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
@@ -7,6 +5,7 @@
 #ifndef PYLIR_INTERFACES_SROA_INTERFACES
 #define PYLIR_INTERFACES_SROA_INTERFACES
 
+include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/OpBase.td"
 include "pylir/Optimizer/Util/OpVariableBase.td"
 
@@ -117,6 +116,26 @@ def SROAAggregate : OpVariableGen<SROAReadWriteOpInterface> {
 def SROAKey : OpVariableGen<SROAReadWriteOpInterface> {
     let methodGens = [
         OpVariableMethodGen<"getOptionalKeyOperand", "return &$_arg;">
+    ];
+}
+
+def SROAAttrInterface : AttrInterface<"SROAAttrInterface"> {
+    let cppNamespace = "::pylir::Py";
+
+    let description = [{
+        Interface for attributes of aggregates to participate in SROA.
+    }];
+
+    let methods = [
+        InterfaceMethod<[{
+            Method to initialize the scalar values of an aggregate that is initialized by an attribute. This works
+            similarly to the callbacks with `replaceAggregate` of `SROAAllocOpInterface` and `SROAReadWriteOpInterface`
+            respectively.
+            `write` is used to initialize the values within the aggregate. The first parameter `key` denotes the
+            location within the attribute, and initializes it with `value`. Additionally the MLIR `type` of the value
+            has to be passed as second argument.
+        }], "void", "destructureAggregate",
+            (ins "::llvm::function_ref<void(mlir::Attribute key, mlir::Type type, mlir::Attribute value)>":$write)>
     ];
 }
 

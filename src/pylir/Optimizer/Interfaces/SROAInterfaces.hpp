@@ -8,4 +8,10 @@
 
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 
-#include "pylir/Optimizer/Interfaces/SROAInterfaces.h.inc"
+#include "pylir/Optimizer/Interfaces/SROAAttrInterfaces.h.inc"
+#include "pylir/Optimizer/Interfaces/SROAOpInterfaces.h.inc"
+
+namespace pylir
+{
+mlir::LogicalResult aggregateUseCanParticipateInSROA(const mlir::OpOperand& aggregateUse);
+}

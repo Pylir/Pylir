@@ -242,3 +242,94 @@ void pylir::Py::GetSlotOp::replaceAggregate(mlir::OpBuilder&, mlir::Attribute,
 {
     replaceAllUsesWith(read(getSlotAttr(), getType()));
 }
+
+namespace
+{
+void destructureSlots(pylir::Py::ObjectAttrInterface attr,
+                      llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write)
+{
+    for (const auto& iter : attr.getSlots())
+    {
+        write(iter.getName(), pylir::Py::DynamicType::get(attr.getContext()), iter.getValue());
+    }
+}
+} // namespace
+
+void pylir::Py::ObjectAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}
+
+void pylir::Py::IntAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}
+
+void pylir::Py::BoolAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}
+
+void pylir::Py::FloatAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}
+
+void pylir::Py::StrAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}
+
+void pylir::Py::TupleAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}
+
+void pylir::Py::ListAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+    auto indexType = mlir::IndexType::get(getContext());
+    write(nullptr, indexType, mlir::IntegerAttr::get(indexType, getValue().size()));
+    for (auto [index, iter] : llvm::enumerate(getValue()))
+    {
+        write(mlir::IntegerAttr::get(indexType, index), DynamicType::get(getContext()), iter);
+    }
+}
+
+void pylir::Py::SetAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+    // TODO: Support SetAttr
+}
+
+void pylir::Py::DictAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+    // TODO: This is problematic with keys that are FlatSymbolRefAttr. But that is somewhat a problem of DictAttr in
+    //  general. I need to flesh it out with more proper APIs and just generally nail down its semantics.
+    for (auto [key, value] : getValue())
+    {
+        write(key, DynamicType::get(getContext()), value);
+    }
+}
+
+void pylir::Py::FunctionAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}
+
+void pylir::Py::TypeAttr::destructureAggregate(
+    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
+{
+    destructureSlots(*this, write);
+}

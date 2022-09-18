@@ -9,6 +9,7 @@
 #include <mlir/IR/SubElementInterfaces.h>
 
 #include <pylir/Interfaces/Builtins.hpp>
+#include <pylir/Optimizer/Interfaces/SROAInterfaces.hpp>
 #include <pylir/Support/BigInt.hpp>
 
 #include <map>

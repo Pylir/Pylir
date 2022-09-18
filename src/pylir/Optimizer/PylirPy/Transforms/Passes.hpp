@@ -16,5 +16,6 @@ namespace pylir::Py
 #define GEN_PASS_DECL_GLOBALLOADSTOREELIMINATIONPASS
 #define GEN_PASS_DECL_MONOMORPHPASS
 #define GEN_PASS_DECL_TRIALINLINERPASS
+#define GEN_PASS_DECL_GLOBALSROAPASS
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 } // namespace pylir::Py

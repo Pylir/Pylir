@@ -4,4 +4,27 @@
 
 #include "SROAInterfaces.hpp"
 
-#include "pylir/Optimizer/Interfaces/SROAInterfaces.cpp.inc"
+#include <mlir/IR/Matchers.h>
+
+#include "pylir/Optimizer/Interfaces/SROAAttrInterfaces.cpp.inc"
+#include "pylir/Optimizer/Interfaces/SROAOpInterfaces.cpp.inc"
+
+mlir::LogicalResult pylir::aggregateUseCanParticipateInSROA(const mlir::OpOperand& aggregateUse)
+{
+    auto op = mlir::dyn_cast_or_null<pylir::SROAReadWriteOpInterface>(aggregateUse.getOwner());
+    if (!op || &op.getAggregateOperand() != &aggregateUse)
+    {
+        return mlir::failure();
+    }
+    auto* key = op.getOptionalKeyOperand();
+    if (!key)
+    {
+        return mlir::success();
+    }
+    mlir::Attribute attr;
+    if (!mlir::matchPattern(key->get(), mlir::m_Constant(&attr)))
+    {
+        return mlir::failure();
+    }
+    return op.validateKey(attr);
+}

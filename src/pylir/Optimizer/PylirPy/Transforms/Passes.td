@@ -43,6 +43,14 @@ def GlobalLoadStoreEliminationPass : Pass<"pylir-global-load-store-elimination">
     ];
 }
 
+def GlobalSROAPass : Pass<"pylir-global-sroa", "::mlir::ModuleOp"> {
+    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+
+    let statistics = [
+        Statistic<"m_globalsSplit", "Globals split", "Global aggregates that have been split into their values">,
+    ];
+}
+
 def MonomorphPass : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
 	let summary = "Monomorph module";
 
