@@ -422,6 +422,12 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 manager.enableTiming();
             }
+
+            if (args.getLastArgValue(OPT_g, "0") == llvm::StringRef{"0"})
+            {
+                manager.addPass(mlir::createStripDebugInfoPass());
+            }
+
             if (!shouldOutput(OPT_emit_pylir))
             {
                 addOptimizationPasses(args.getLastArgValue(OPT_O, "0"), manager);
