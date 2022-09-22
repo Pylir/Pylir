@@ -1,3 +1,5 @@
+; REQUIRES: aarch64-registered-target
+
 ; RUN: pylir %s -S -o - | FileCheck %s
 
 ; Needed a target that has mangling. Mach-O targets always use `_` as prefix

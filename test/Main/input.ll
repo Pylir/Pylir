@@ -1,3 +1,5 @@
+; REQUIRES: x86-registered-target
+
 ; RUN: pylir %s -S -emit-llvm -o - | FileCheck %s
 
 ; ModuleID = 'LLVMDialectModule'
