@@ -2,11 +2,11 @@
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.str = #py.type
-py.globalHandle @foo
+py.global @foo : !py.dynamic
 
 func.func @test() -> !py.dynamic {
   %0 = py.constant(#py.str<"value">)
-  py.store %0 into @foo
+  py.store %0 : !py.dynamic into @foo
   cf.br ^bb1(%0 : !py.dynamic)
 
 ^bb1(%1: !py.dynamic):

@@ -66,8 +66,8 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         for (const auto& token : fileInput.globals)
         {
             auto locExit = changeLoc(token);
-            auto op = m_builder.createGlobalHandle(m_qualifiers + std::string(token.getValue()) + "$handle");
-            m_globalScope.identifiers.emplace(token.getValue(), Identifier{op.getOperation()});
+            auto op = m_builder.createGlobal(m_qualifiers + std::string(token.getValue()) + "$handle");
+            m_globalScope.identifiers.emplace(token.getValue(), Identifier{op});
         }
 
         auto initFunc = mlir::func::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__",
@@ -87,7 +87,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         auto unbound = m_builder.createConstant(m_builder.getUnboundAttr());
         for (auto& [name, identifier] : m_globalScope.identifiers)
         {
-            m_builder.createStore(unbound, mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(identifier.kind)));
+            m_builder.createStore(unbound, mlir::FlatSymbolRefAttr::get(pylir::get<Py::GlobalOp>(identifier.kind)));
         }
 
         visit(fileInput.input);
@@ -220,8 +220,8 @@ void pylir::CodeGen::visit(const Syntax::GlobalOrNonLocalStmt& globalOrNonLocalS
     for (const auto& identifier : globalOrNonLocalStmt.identifiers)
     {
         auto result = m_globalScope.identifiers.find(identifier.getValue());
-        PYLIR_ASSERT(result != m_globalScope.identifiers.end());
-        m_functionScope->identifiers.insert(*result);
+        PYLIR_ASSERT(result != m_globalScope.identifiers.end() && result->second.kind.index() == Identifier::Global);
+        m_functionScope->identifiers.insert({result->first, Identifier{pylir::get<Py::GlobalOp>(result->second.kind)}});
     }
 }
 
@@ -816,9 +816,9 @@ mlir::Value pylir::CodeGen::readIdentifier(std::string_view name)
     {
         case Identifier::Global:
             loadedValue =
-                m_builder.createLoad(mlir::FlatSymbolRefAttr::get(pylir::get<mlir::Operation*>(result->second.kind)));
+                m_builder.createLoad(mlir::FlatSymbolRefAttr::get(pylir::get<Py::GlobalOp>(result->second.kind)));
             break;
-        case Identifier::StackAlloc:
+        case Identifier::Local:
             loadedValue = scope->ssaBuilder.readVariable(m_builder.getCurrentLoc(), m_builder.getDynamicType(),
                                                          pylir::get<SSABuilder::DefinitionsMap>(result->second.kind),
                                                          m_builder.getBlock());

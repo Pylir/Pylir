@@ -19,7 +19,7 @@ def g():
 
 # CHECK: ^[[DEL_BLOCK]]:
 # CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: py.store %[[UNBOUND]] into @a$handle
+# CHECK: py.store %[[UNBOUND]] : !py.dynamic into @a$handle
 
 def local():
     del a

@@ -326,54 +326,117 @@ void printVarTypeList(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::TypeR
 void pylir::Py::MakeTupleOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    if (!getIterExpansionAttr().empty())
+    if (getIterExpansionAttr().empty())
     {
-        effects.emplace_back(mlir::MemoryEffects::Read::get());
-        effects.emplace_back(mlir::MemoryEffects::Write::get());
+        return;
+    }
+    for (auto* iter : getAllResources())
+    {
+        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
+        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
     }
 }
 
 void pylir::Py::MakeTupleExOp::getEffects(
     ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    effects.emplace_back(mlir::MemoryEffects::Read::get());
-    effects.emplace_back(mlir::MemoryEffects::Write::get());
+    if (getIterExpansionAttr().empty())
+    {
+        return;
+    }
+    for (auto* iter : getAllResources())
+    {
+        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
+        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
+    }
 }
 
 namespace
 {
 template <class SymbolOp>
-mlir::LogicalResult verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
-                                    mlir::SymbolTableCollection& symbolTable)
+mlir::FailureOr<SymbolOp> verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
+                                          mlir::SymbolTableCollection& symbolTable, llvm::StringRef kindName)
 {
-    if (auto symbol = symbolTable.lookupNearestSymbolFrom(op, name))
+    if (auto* symbol = symbolTable.lookupNearestSymbolFrom(op, name))
     {
-        if (!mlir::isa<SymbolOp>(symbol))
+        auto casted = mlir::dyn_cast<SymbolOp>(symbol);
+        if (!casted)
         {
-            return op->emitOpError("Expected ") << name << " to be of different type, not " << symbol->getName();
+            return op->emitOpError("Expected '")
+                   << name << "' to be of kind '" << kindName << "', not '" << symbol->getName() << "'";
         }
+        return casted;
     }
-    else
-    {
-        return op->emitOpError("Failed to find symbol named ") << name;
-    }
-    return mlir::success();
+    return op->emitOpError("Failed to find symbol named '") << name << "'";
 }
 } // namespace
 
+mlir::LogicalResult pylir::Py::GlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    if (!getInitializerAttr())
+    {
+        return mlir::success();
+    }
+    return llvm::TypeSwitch<mlir::Type, mlir::LogicalResult>(getType())
+        .Case(
+            [&](DynamicType) -> mlir::LogicalResult
+            {
+                if (getInitializerAttr().isa<ObjectAttrInterface>())
+                {
+                    return mlir::success();
+                }
+                auto ref = getInitializerAttr().dyn_cast<mlir::FlatSymbolRefAttr>();
+                if (!ref)
+                {
+                    return emitOpError(
+                        "Expected initializer of type 'ObjectAttrInterface' or 'FlatSymbolRefAttr' to global value");
+                }
+                return verifySymbolUse<GlobalValueOp>(*this, ref, symbolTable, GlobalValueOp::getOperationName());
+            })
+        .Case(
+            [&](mlir::IndexType) -> mlir::LogicalResult
+            {
+                if (!getInitializerAttr().isa<mlir::IntegerAttr>())
+                {
+                    return emitOpError("Expected integer attribute initializer");
+                }
+                return mlir::success();
+            })
+        .Case(
+            [&](mlir::FloatType) -> mlir::LogicalResult
+            {
+                if (!getInitializerAttr().isa<mlir::FloatAttr>())
+                {
+                    return emitOpError("Expected float attribute initializer");
+                }
+                return mlir::success();
+            });
+}
+
 mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, getHandleAttr(), symbolTable);
+    return verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
 }
 
 mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<Py::GlobalHandleOp>(*this, getHandleAttr(), symbolTable);
+    auto global = verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
+    if (mlir::failed(global))
+    {
+        return mlir::failure();
+    }
+    if (global->getType() != getValue().getType())
+    {
+        return emitOpError("Type of value to store '")
+               << getValue().getType() << "' does not match type of global '" << global->getSymName() << " : "
+               << global->getType() << "' to store into";
+    }
+    return mlir::success();
 }
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifySymbolUse<mlir::FunctionOpInterface>(*this, getFunctionAttr(), symbolTable);
+    return verifySymbolUse<mlir::FunctionOpInterface>(*this, getFunctionAttr(), symbolTable, "FunctionOpInterface");
 }
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,

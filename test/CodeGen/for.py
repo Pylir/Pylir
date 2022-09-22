@@ -20,7 +20,7 @@ for i in (3, 5, 7):
 # CHECK-NEXT: label ^[[ASSIGN:.*]] unwind ^[[EXIT:[[:alnum:]]+]]
 
 # CHECK: ^[[ASSIGN]]:
-# CHECK: py.store %[[ITEM]] into @i$handle
+# CHECK: py.store %[[ITEM]] : !py.dynamic into @i$handle
 # CHECK: cf.br ^[[BODY:[[:alnum:]]+]]
 
 # CHECK: ^[[BODY]]:

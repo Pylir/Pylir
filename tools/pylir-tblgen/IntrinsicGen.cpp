@@ -3,6 +3,7 @@
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Support/IndentedOstream.h>
+#include <mlir/TableGen/CodeGenHelpers.h>
 #include <mlir/TableGen/GenInfo.h>
 #include <mlir/TableGen/Operator.h>
 
@@ -14,14 +15,6 @@
 
 namespace
 {
-
-std::string stringify(llvm::StringRef ref)
-{
-    std::string result = "\"";
-    llvm::raw_string_ostream ss(result);
-    ss.write_escaped(ref);
-    return result + '"';
-}
 
 bool typeIsCompatible(const mlir::tblgen::TypeConstraint& type)
 {
@@ -119,11 +112,12 @@ std::string genAttrConversion(mlir::raw_indented_ostream& os, std::string inputV
 
         auto failureScope = os.scope("{\n", "}\n");
         os << llvm::formatv(
-            "createError(arguments[{0}], Diag::INVALID_ENUM_VALUE_N_FOR_ENUM_N_ARGUMENT, attr.getValue(), {1})\n"
+            "createError(arguments[{0}], Diag::INVALID_ENUM_VALUE_N_FOR_ENUM_N_ARGUMENT, attr.getValue(), \"{1}\")\n"
             ".addHighlight(arguments[{0}])\n"
             ".addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(), Diag::flags::secondaryColour)"
-            ".addNote(arguments[{0}], Diag::VALID_VALUES_ARE_N, {2});\n",
-            cppArgIndex, stringify(enumAttr.getEnumClassName()), stringify(validEnumValues));
+            ".addNote(arguments[{0}], Diag::VALID_VALUES_ARE_N, \"{2}\");\n",
+            cppArgIndex, mlir::tblgen::escapeString(enumAttr.getEnumClassName()),
+            mlir::tblgen::escapeString(validEnumValues));
         os << "return {};\n";
     }
     return llvm::formatv("{0}::get(m_builder.getContext(), *value)", enumAttr.getStorageType());
@@ -149,7 +143,7 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
         }
 
         auto opName = op.getOperationName().substr(op.getDialectName().size() + 1);
-        os << llvm::formatv("if(intrName == {0})\n", stringify("pylir.intr." + opName));
+        os << llvm::formatv("if(intrName == \"{0}\")\n", mlir::tblgen::escapeString("pylir.intr." + opName));
         auto isOpScope = os.scope("{\n", "}\n");
         if (op.getNumVariableLengthOperands() == 0)
         {
@@ -191,7 +185,8 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
             }
             auto scope = os.scope("{\n", "}\n");
             auto* attr = iter.value().get<mlir::tblgen::NamedAttribute*>();
-            os << llvm::formatv("attributes.emplace_back(m_builder.getStringAttr({0}), {1});\n", stringify(attr->name),
+            os << llvm::formatv("attributes.emplace_back(m_builder.getStringAttr(\"{0}\"), {1});\n",
+                                mlir::tblgen::escapeString(attr->name),
                                 genAttrConversion(os, llvm::formatv("args[{0} + {1}]", iter.index(), argOffset),
                                                   attr->attr, iter.index()));
         }

@@ -39,26 +39,8 @@ llvm::DenseSet<mlir::Value> SROA::collectAggregates()
             {
                 return;
             }
-            if (llvm::all_of(sroaAllocOpInterface->getResult(0).getUses(),
-                             [](const mlir::OpOperand& operand)
-                             {
-                                 auto op = mlir::dyn_cast_or_null<pylir::SROAReadWriteOpInterface>(operand.getOwner());
-                                 if (!op || &op.getAggregateOperand() != &operand)
-                                 {
-                                     return false;
-                                 }
-                                 auto* key = op.getOptionalKeyOperand();
-                                 if (!key)
-                                 {
-                                     return true;
-                                 }
-                                 mlir::Attribute attr;
-                                 if (!mlir::matchPattern(key->get(), mlir::m_Constant(&attr)))
-                                 {
-                                     return false;
-                                 }
-                                 return mlir::succeeded(op.validateKey(attr));
-                             }))
+            if (llvm::all_of(sroaAllocOpInterface->getResult(0).getUses(), [](const mlir::OpOperand& operand)
+                             { return mlir::succeeded(pylir::aggregateUseCanParticipateInSROA(operand)); }))
             {
                 aggregates.insert(sroaAllocOpInterface->getResult(0));
             }
@@ -79,7 +61,7 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                                                                                                        loc);
             });
 
-        pylir::AggregateDefs definitions;
+        llvm::DenseMap<std::pair<mlir::Value, mlir::Attribute>, pylir::SSABuilder::DefinitionsMap> definitions;
         pylir::updateSSAinRegion(
             ssaBuilder, region,
             [&](mlir::Block* block)
@@ -94,7 +76,10 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                             continue;
                         }
                         // Not yet deleting the aggregate here as we have to wait till all its uses have been replaced.
-                        allocOp.replaceAggregate(definitions, ssaBuilder, builder);
+                        allocOp.replaceAggregate(builder,
+                                                 [&](mlir::Attribute attr, mlir::Value val) {
+                                                     definitions[{currAggregate, attr}][allocOp->getBlock()] = val;
+                                                 });
                         continue;
                     }
 
@@ -112,7 +97,17 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                             bool result = mlir::matchPattern(keyOperand->get(), mlir::m_Constant(&optionalKey));
                             PYLIR_ASSERT(result);
                         }
-                        readWriteOp.replaceAggregate(definitions, ssaBuilder, builder, optionalKey);
+                        readWriteOp.replaceAggregate(
+                            builder, optionalKey,
+                            [&](mlir::Attribute attr, mlir::Type type) -> mlir::Value
+                            {
+                                return ssaBuilder.readVariable(readWriteOp->getLoc(), type,
+                                                               definitions[{currAggregate, attr}],
+                                                               readWriteOp->getBlock());
+                            },
+                            [&](mlir::Attribute attr, mlir::Value val) {
+                                definitions[{currAggregate, attr}][readWriteOp->getBlock()] = val;
+                            });
                         iter.erase();
                         m_readWriteOpsRemoved++;
                         continue;

@@ -47,6 +47,8 @@ def grp_codegen : OptionGroup<"CodeGen">, HelpText<"Codegen options">;
 
 def O : Joined<["-"], "O">, Group<grp_codegen>, MetaVarName<"<level>">, HelpText<"Optimization level">;
 def O_flag : F<"O", "Alias for -O1">, Alias<O>, AliasArgs<["1"]>, Group<grp_codegen>;
+def g : Joined<["-"], "g">, Group<grp_codegen>, MetaVarName<"<level>">, HelpText<"Debug level">;
+def g_flag : F<"g", "Alias for -g1">, Alias<g>, AliasArgs<["1"]>, Group<grp_codegen>;
 defm target : Eq<"target", "Generate code for the given target">, MetaVarName<"<target>">, Group<grp_codegen>;
 def flto : F<"flto", "Enable link time optimization">, Group<grp_codegen>;
 def fno_lto : F<"fno-lto", "Disable link time optimization">, Group<grp_codegen>;

@@ -12,11 +12,13 @@ func.func @test(%length : index) -> index {
 
 // CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
-// CHECK-NEXT: %[[APPEND:.*]] = def(%[[DEF]])
+// CHECK-NEXT: %[[DEF_LIST:.*]] = def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: // {{.*}} py.makeList
+// CHECK-NEXT: %[[RESIZE:.*]] = def(%[[DEF_LIST]])
 // CHECK-NEXT: // py.list.resize
-// CHECK-NEXT: use(%[[APPEND]])
+// CHECK-NEXT: use(%[[RESIZE]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
 func.func @test2(%arg0 : i1, %length : index) -> index {
@@ -34,13 +36,15 @@ func.func @test2(%arg0 : i1, %length : index) -> index {
 
 // CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
-// CHECK-NEXT: br ^[[FIRST:.*]], ^[[SECOND:.*]] (), (%[[DEF]])
+// CHECK-NEXT: %[[DEF_LIST:.*]] = def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: // {{.*}} py.makeList
+// CHECK-NEXT: br ^[[FIRST:.*]], ^[[SECOND:.*]] (), (%[[DEF_LIST]])
 // CHECK-NEXT: ^[[FIRST]]:
-// CHECK-NEXT: %[[APPEND:.*]] = def(%[[DEF]])
+// CHECK-NEXT: %[[RESIZE:.*]] = def(%[[DEF_LIST]])
 // CHECK-NEXT: // py.list.resize
-// CHECK-NEXT: br ^[[SECOND]] (%[[APPEND]])
+// CHECK-NEXT: br ^[[SECOND]] (%[[RESIZE]])
 // CHECK-NEXT: ^[[SECOND]]
 // CHECK-SAME: %[[MERGE:[[:alnum:]]+]]
 // CHECK-NEXT: use(%[[MERGE]])
@@ -65,9 +69,11 @@ func.func @test3(%length : index) -> index {
 
 // CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
-// CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
-// CHECK-NEXT: br ^[[FIRST:.*]] (%[[DEF]])
+// CHECK-NEXT: %[[DEF_LIST:.*]] = def(%[[LIVE_ON_ENTRY]])
+// CHECK-NEXT: // {{.*}} py.makeList
+// CHECK-NEXT: br ^[[FIRST:.*]] (%[[DEF_LIST]])
 // CHECK-NEXT: ^[[FIRST]]
 // CHECK-SAME: %[[COND:[[:alnum:]]+]]
 // CHECK-NEXT: br ^[[BODY:.*]], ^[[EXIT:.*]] (), ()
@@ -102,9 +108,11 @@ func.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: py.setSlot "test"
-// CHECK-NEXT: %[[DEF2:.*]] = def(%[[DEF]])
+// CHECK-NEXT: %[[DEF_ALL:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: call @bar()
-// CHECK-NEXT: use(%[[DEF2]])
+// CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[DEF]])
+// CHECK-NEXT: call @bar()
+// CHECK-NEXT: use(%[[DEF_OBJECT]])
 // CHECK-NEXT: py.getSlot "test"
 
 // -----

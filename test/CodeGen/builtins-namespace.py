@@ -7,7 +7,7 @@ object
 # CHECK: py.constant(@builtins.object)
 
 # CHECK: %[[VALUE:.*]] = py.load @BaseException
-# CHECK: py.store %[[VALUE]] into @x
+# CHECK: py.store %[[VALUE]] : !py.dynamic into @x
 x = BaseException
 
 BaseException = True

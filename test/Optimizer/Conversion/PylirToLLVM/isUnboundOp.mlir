@@ -1,9 +1,9 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalHandle @handle
+py.global @handle : !py.dynamic
 
 func.func @test() -> i1 {
-    %0 = py.load @handle
+    %0 = py.load @handle : !py.dynamic
     %1 = py.isUnboundValue %0
     return %1 : i1
 }

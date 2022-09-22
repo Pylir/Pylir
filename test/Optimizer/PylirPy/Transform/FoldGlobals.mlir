@@ -1,18 +1,18 @@
-// RUN: pylir-opt %s --pylir-fold-handles --split-input-file | FileCheck %s
+// RUN: pylir-opt %s --pylir-fold-globals --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-py.globalHandle "private" @foo
+py.global "private" @foo : !py.dynamic
 
 func.func @test() {
     %0 = py.constant(#py.int<5>)
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     return
 }
 
 func.func @bar() -> !py.dynamic {
-    %0 = py.load @foo
+    %0 = py.load @foo : !py.dynamic
     return %0 : !py.dynamic
 }
 
@@ -31,17 +31,17 @@ func.func @bar() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-py.globalHandle "private" @foo
+py.global "private" @foo : !py.dynamic
 
 func.func @test() {
     %0 = py.constant(#py.int<5>)
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     return
 }
 
 func.func @bar() {
     %0 = py.constant(#py.int<10>)
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     return
 }
 
@@ -61,21 +61,21 @@ func.func @bar() {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-py.globalHandle "private" @foo
+py.global "private" @foo : !py.dynamic
 
 func.func @test() {
     %0 = py.constant(@builtins.int)
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     return
 }
 
 func.func @bar() -> !py.dynamic {
-    %0 = py.load @foo
+    %0 = py.load @foo : !py.dynamic
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @test
-// CHECK-NOT: py.store %{{.*}} into @foo
+// CHECK-NOT: py.store %{{.*}} : !py.dynamic into @foo
 // CHECK: return
 
 // CHECK-LABEL: @bar
@@ -88,21 +88,21 @@ func.func @bar() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-py.globalHandle "private" @foo
+py.global "private" @foo : !py.dynamic
 
 func.func @test() {
     %0 = py.constant(#py.unbound)
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     return
 }
 
 func.func @bar() -> !py.dynamic {
-    %0 = py.load @foo
+    %0 = py.load @foo : !py.dynamic
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @test
-// CHECK-NOT: py.store %{{.*}} into @foo
+// CHECK-NOT: py.store %{{.*}} : !py.dynamic into @foo
 // CHECK: return
 
 // CHECK-LABEL: @bar
@@ -124,16 +124,16 @@ func.func @real(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -
     return %0 : !py.dynamic
 }
 
-py.globalHandle "private" @foo
+py.global "private" @foo : !py.dynamic
 
 func.func @test() {
     %0 = py.makeFunc @real
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     return
 }
 
 func.func @bar() -> !py.dynamic {
-    %0 = py.load @foo
+    %0 = py.load @foo : !py.dynamic
     return %0 : !py.dynamic
 }
 
@@ -153,27 +153,27 @@ func.func @bar() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-py.globalHandle "private" @foo
+py.global "private" @foo : !py.dynamic
 
 func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.int<5>)
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     %1 = test.random
     cf.cond_br %1, ^bb1, ^bb2
 
 ^bb1:
     %2 = py.constant(#py.int<10>)
-    py.store %2 into @foo
+    py.store %2 : !py.dynamic into @foo
     cf.br ^bb3
 
 ^bb2:
-    %3 = py.load @foo
+    %3 = py.load @foo : !py.dynamic
     %4 = py.int.add %3, %0
-    py.store %4 into @foo
+    py.store %4 : !py.dynamic into @foo
     cf.br ^bb3
 
 ^bb3:
-    %5 = py.load @foo
+    %5 = py.load @foo : !py.dynamic
     return %5 : !py.dynamic
 }
 
@@ -200,23 +200,23 @@ func.func @test() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.int = #py.type
 
-py.globalHandle "private" @bar
-py.globalHandle "private" @foo
+py.global "private" @bar : !py.dynamic
+py.global "private" @foo : !py.dynamic
 
 func.func @test() {
     %0 = py.constant(#py.int<5>)
-    py.store %0 into @foo
+    py.store %0 : !py.dynamic into @foo
     return
 }
 
 func.func @other() {
-    %0 = py.load @foo
-    py.store %0 into @bar
+    %0 = py.load @foo : !py.dynamic
+    py.store %0 : !py.dynamic into @bar
     return
 }
 
 func.func @other2() -> !py.dynamic {
-    %0 = py.load @bar
+    %0 = py.load @bar : !py.dynamic
     return %0 : !py.dynamic
 }
 
@@ -233,3 +233,107 @@ func.func @other2() -> !py.dynamic {
 // CHECK-LABEL: func.func @other2
 // CHECK-NOT: py.load
 // CHECK: return
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.global "private" @foo : index
+
+func.func @test() {
+    %0 = arith.constant 5 : index
+    py.store %0 : index into @foo
+    return
+}
+
+func.func @bar() -> index {
+    %0 = py.load @foo : index
+    return %0 : index
+}
+
+// CHECK-LABEL: @test
+// CHECK-NOT: py.store
+// CHECK: return
+
+// CHECK-LABEL: @bar
+// CHECK-NEXT: %[[C:.*]] = arith.constant 5
+// CHECK-NEXT: return %[[C]]
+
+// -----
+
+py.global "private" @foo : index
+
+func.func @bar() -> index {
+    %0 = py.load @foo : index
+    return %0 : index
+}
+
+// CHECK-LABEL: @bar
+// CHECK-NEXT: %[[C:.*]] = arith.constant
+// CHECK-NEXT: return %[[C]]
+
+
+// -----
+
+py.global "private" @foo : index = 5 : index
+
+func.func @bar() -> index {
+    %0 = py.load @foo : index
+    return %0 : index
+}
+
+// CHECK-LABEL: @bar
+// CHECK-NEXT: %[[C:.*]] = arith.constant 5 : index
+// CHECK-NEXT: return %[[C]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.global "private" @foo : index = 3 : index
+
+func.func @test() {
+    %0 = arith.constant 5 : index
+    py.store %0 : index into @foo
+    return
+}
+
+func.func @bar() -> index {
+    %0 = py.load @foo : index
+    return %0 : index
+}
+
+// CHECK-LABEL: @test
+// CHECK: py.store
+
+// CHECK-LABEL: @bar
+// CHECK: py.load
+
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.global "private" @foo : index = 5 : index
+
+func.func @test() {
+    %0 = arith.constant 5 : index
+    py.store %0 : index into @foo
+    return
+}
+
+func.func @bar() -> index {
+    %0 = py.load @foo : index
+    return %0 : index
+}
+
+// CHECK-LABEL: @test
+// CHECK-NOT: py.store
+// CHECK: return
+
+// CHECK-LABEL: @bar
+// CHECK-NEXT: %[[C:.*]] = arith.constant 5
+// CHECK-NEXT: return %[[C]]

@@ -516,9 +516,9 @@ public:
                                          initializer);
     }
 
-    Py::GlobalHandleOp createGlobalHandle(llvm::StringRef symbolName)
+    Py::GlobalOp createGlobal(llvm::StringRef symbolName)
     {
-        return create<Py::GlobalHandleOp>(symbolName, getStringAttr("private"));
+        return create<Py::GlobalOp>(symbolName, getStringAttr("private"), getDynamicType(), nullptr);
     }
 
     Py::StoreOp createStore(mlir::Value value, mlir::FlatSymbolRefAttr handle)
@@ -528,7 +528,7 @@ public:
 
     Py::LoadOp createLoad(mlir::FlatSymbolRefAttr handle)
     {
-        return create<Py::LoadOp>(handle);
+        return create<Py::LoadOp>(getDynamicType(), handle);
     }
 
     Py::IsUnboundValueOp createIsUnboundValue(mlir::Value value)

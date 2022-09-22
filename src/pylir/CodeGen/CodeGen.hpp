@@ -88,10 +88,10 @@ class CodeGen
         enum Kind
         {
             Global = 0,
-            StackAlloc = 1,
+            Local = 1,
             Cell = 2
         };
-        std::variant<mlir::Operation*, SSABuilder::DefinitionsMap, mlir::Value> kind;
+        std::variant<Py::GlobalOp, SSABuilder::DefinitionsMap, mlir::Value> kind;
     };
 
     struct Scope

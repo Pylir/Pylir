@@ -130,3 +130,23 @@ func.func @test_list_len() -> index {
 // CHECK-LABEL: @test_list_len
 // CHECK: %[[C:.*]] = arith.constant 2
 // CHECK: return %[[C]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.str = #py.type
+
+func.func @test_resources(%arg0 : !py.dynamic) -> index {
+    %0 = arith.constant 5 : index
+    py.list.resize %arg0 to %0
+    %1 = py.typeOf %arg0
+    %2 = py.constant(#py.str<"mhm">)
+    py.setSlot "lol" of %arg0 : %1 to %2
+    %3 = py.list.len %arg0
+    return %3 : index
+}
+
+// CHECK-LABEL: @test_resources
+// CHECK: %[[C:.*]] = arith.constant 5
+// CHECK-NOT: py.list.len
+// CHECK: return %[[C]]
