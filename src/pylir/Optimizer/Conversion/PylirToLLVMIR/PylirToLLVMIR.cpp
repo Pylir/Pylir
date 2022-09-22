@@ -149,7 +149,7 @@ public:
         // https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html
         if (triple.isOSBinFormatMachO())
         {
-            constSectionPrefix = "__TEXT,";
+            constSectionPrefix = "__DATA,";
             dataSectionPrefix = "__DATA,";
         }
 

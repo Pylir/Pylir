@@ -167,7 +167,7 @@ bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef
         arguments.emplace_back("-pie");
     }
 
-    arguments.emplace_back("-arch arm64 -platform_version macos 12.0 13.0");
+    // arguments.emplace_back("-arch arm64 -platform_version macos 12.0 13.0");
 
     // arguments.emplace_back("--eh-frame-hdr");
     // const auto* emulation = getEmulation(m_triple, commandLine);
