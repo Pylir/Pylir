@@ -77,7 +77,8 @@ def ListResource : Resource<"::pylir::Py::ListResource">;
 def DictResource : Resource<"::pylir::Py::DictResource">;
 
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, ReturnsImmutable,
-												 DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
+												 DeclareOpInterfaceMethods<TypeRefineableInterface>,
+												 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins AnyPylirAttr:$constant);
     let results = (outs DynamicType:$result);
 
@@ -91,8 +92,6 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, Ret
         Creates a constant value from the given attribute.
         Writing to a value returned from this op is undefined behaviour.
     }];
-
-    let hasVerifier = 1;
 }
 
 def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect, AlwaysBound]> {
@@ -984,7 +983,8 @@ def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [AlwaysBound, RefinedType<"
 
 // Memory operations
 
-def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>]> {
+def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>,
+                                                       DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility,
@@ -1002,7 +1002,6 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
         are undefined behaviour.
     }];
 
-    let hasVerifier = 1;
     let hasFolder = 1;
 }
 

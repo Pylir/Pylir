@@ -77,3 +77,21 @@ py.global @lol4 : !py.dynamic = @lol
 
 // expected-error@below {{Failed to find symbol named '@lol'}}
 py.global @lol5: !py.dynamic = @lol
+
+// -----
+
+func.func @foo() {
+    // expected-error@below {{Failed to find symbol named '@lol'}}
+    %0 = py.constant(@lol)
+    return
+}
+
+// -----
+
+py.global @lol : index = 5 : index
+
+func.func @foo() {
+    // expected-error@below {{Expected '@lol' to be of kind 'py.globalValue', not 'py.global'}}
+    %0 = py.constant(@lol)
+    return
+}
