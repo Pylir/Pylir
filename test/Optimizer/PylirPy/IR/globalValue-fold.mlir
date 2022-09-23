@@ -11,7 +11,7 @@ py.globalValue @g1 = #py.int<3>
 py.globalValue @g2 = #py.float<5.0>
 py.globalValue @g3 = #py.bool<True>
 py.globalValue @g4 = #py.str<"text">
-py.globalValue @g5 = #py.tuple<(@g1, @g2, @g3, @g4)>
+py.globalValue @g5 = #py.tuple<(#py.ref<@g1>, #py.ref<@g2>, #py.ref<@g3>, #py.ref<@g4>)>
 
 // CHECK: py.globalValue const @g1
 // CHECK: py.globalValue const @g2

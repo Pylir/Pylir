@@ -53,7 +53,7 @@ public:
                                                 mlir::SymbolTableCollection&)
         {
             auto* context = this->getOperation()->getContext();
-            result.emplace_back(pylir::Py::ClassType::get(mlir::FlatSymbolRefAttr::get(context, builtin.name)));
+            result.emplace_back(pylir::Py::ClassType::get(RefAttr::get(context, builtin.name)));
             return TypeRefineResult::Success;
         }
     };
@@ -67,8 +67,7 @@ public:
                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                             mlir::SymbolTableCollection&)
     {
-        result.emplace_back(
-            Py::ClassType::get(mlir::FlatSymbolRefAttr::get(this->getOperation()->getContext(), Builtins::Tuple.name)));
+        result.emplace_back(Py::ClassType::get(RefAttr::get(this->getOperation()->getContext(), Builtins::Tuple.name)));
         return TypeRefineResult::Approximate;
     }
 };
@@ -81,8 +80,8 @@ public:
                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                             mlir::SymbolTableCollection&)
     {
-        mlir::FlatSymbolRefAttr type = operands[mlir::cast<ConcreteType>(this->getOperation()).getTypeObjectIndex()]
-                                           .template dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+        RefAttr type = operands[mlir::cast<ConcreteType>(this->getOperation()).getTypeObjectIndex()]
+                           .template dyn_cast_or_null<RefAttr>();
         if (!type)
         {
             return TypeRefineResult::Failure;

@@ -77,7 +77,7 @@ mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAtt
         results.emplace_back(type.getTypeObject());
         return mlir::success();
     }
-    if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
+    if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, Py::RefAttr, Py::UnboundAttr>())
     {
         results.emplace_back(
             Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getInstruction()).getTypeObject());
@@ -156,7 +156,7 @@ mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::Ty
                 results.emplace_back(mlir::BoolAttr::get(getContext(), false));
                 return mlir::success();
             }
-            if (lhsAttr.isa<mlir::SymbolRefAttr>() && rhsAttr.isa<mlir::SymbolRefAttr>())
+            if (lhsAttr.isa<Py::RefAttr>() && rhsAttr.isa<Py::RefAttr>())
             {
                 results.emplace_back(mlir::BoolAttr::get(getContext(), true));
                 return mlir::success();
@@ -166,11 +166,11 @@ mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::Ty
     }
     auto lhsType = operands[0].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
     auto rhsType = operands[1].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
-    if (!lhsType && operands[0].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    if (!lhsType && operands[0].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, Py::RefAttr>())
     {
         lhsType = Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getInstruction());
     }
-    if (!rhsType && operands[1].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    if (!rhsType && operands[1].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, Py::RefAttr>())
     {
         rhsType = Py::typeOfConstant(operands[1].cast<mlir::Attribute>(), collection, getInstruction());
     }
@@ -248,7 +248,7 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
         {
             continue;
         }
-        if (iter.isa_and_nonnull<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
+        if (iter.isa_and_nonnull<pylir::Py::ObjectAttrInterface, Py::RefAttr, Py::UnboundAttr>())
         {
             iter = pylir::Py::typeOfConstant(iter.cast<mlir::Attribute>(), collection, getInstruction());
         }

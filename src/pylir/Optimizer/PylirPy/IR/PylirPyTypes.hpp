@@ -9,6 +9,7 @@
 #include <mlir/IR/Types.h>
 
 #include "ObjectTypeInterface.hpp"
+#include "PylirPyAttributes.hpp"
 
 #define GET_TYPEDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.h.inc"

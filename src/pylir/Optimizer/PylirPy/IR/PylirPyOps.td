@@ -10,6 +10,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyRefAttr.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
@@ -79,7 +80,7 @@ def DictResource : Resource<"::pylir::Py::DictResource">;
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, ReturnsImmutable,
 												 DeclareOpInterfaceMethods<TypeRefineableInterface>,
 												 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-    let arguments = (ins AnyPylirAttr:$constant);
+    let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface, PylirPy_RefAttr]>:$constant);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -1006,7 +1007,7 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
 }
 
 defvar GlobalOpSupportedTypes = AnyTypeOf<[DynamicType, Index, F64]>;
-defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr, F64Attr, FlatSymbolRefAttr]>;
+defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr, F64Attr, PylirPy_RefAttr]>;
 
 def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
 

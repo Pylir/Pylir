@@ -23,8 +23,8 @@ class ParamSpecBuilder<list<ParamSpec> spec, code extraCode = ""> : AttrBuilder<
 	"return Base::get($_ctxt, " # !interleave(!foreach(x, spec, x.name), ", ") # ");"
 >;
 
-class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::mlir::FlatSymbolRefAttr",
-	"::mlir::FlatSymbolRefAttr::get($_ctxt, ::pylir::Builtins::" # name # ".name)", description>;
+class DefaultType<string name, string description = ""> : DefaultValuedParameter<"::pylir::Py::RefAttr",
+	"::pylir::Py::RefAttr::get($_ctxt, ::pylir::Builtins::" # name # ".name)", description>;
 
 class CustomPrint<AttrOrTypeParameter x, string elementParse = ?, string elementPrint = ?>
 	: AttrOrTypeParameter<x.cppType, x.summary, x.cppAccessorType>

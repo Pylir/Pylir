@@ -67,14 +67,14 @@ private:
             // If the single store into the global is already a reference to a global value there isn't a lot to be done
             // except replace all loads with such a reference. Otherwise if not unbound, we create a global value with
             // the constant as initializer instead of the handle.
-            constantStorage = attr.dyn_cast<mlir::FlatSymbolRefAttr>();
+            constantStorage = attr.dyn_cast<pylir::Py::RefAttr>();
             if (!constantStorage)
             {
                 constantStorage = attr.dyn_cast<pylir::Py::UnboundAttr>();
             }
             if (!constantStorage)
             {
-                constantStorage = mlir::FlatSymbolRefAttr::get(globalOp);
+                constantStorage = pylir::Py::RefAttr::get(&getContext(), mlir::FlatSymbolRefAttr::get(globalOp));
             }
         }
         else
@@ -265,7 +265,7 @@ void FoldGlobalsPass::runOnOperation()
                 continue;
             }
             auto ref =
-                llvm::TypeSwitch<mlir::Operation*, mlir::FlatSymbolRefAttr>(op)
+                llvm::TypeSwitch<mlir::Operation*, mlir::Attribute>(op)
                     .Case(
                         [&](pylir::Py::MakeFuncOp makeFuncOp)
                         {
@@ -273,7 +273,7 @@ void FoldGlobalsPass::runOnOperation()
                                 global, pylir::Py::FunctionAttr::get(&getContext(), makeFuncOp.getFunctionAttr()),
                                 false);
                             mlir::OpBuilder builder(makeFuncOp);
-                            auto ref = mlir::FlatSymbolRefAttr::get(value);
+                            auto ref = pylir::Py::RefAttr::get(value);
                             auto c = builder.create<pylir::Py::ConstantOp>(makeFuncOp->getLoc(), ref);
                             makeFuncOp->replaceAllUsesWith(c);
                             makeFuncOp->erase();

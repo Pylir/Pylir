@@ -16,13 +16,13 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
 func.func @constant_obj() -> !py.dynamic {
-    %0 = py.constant(#py.obj<@a>)
+    %0 = py.constant(#py.obj<#py.ref<@a>>)
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @constant_obj
-// CHECK: %[[CONST:.*]] = py.constant(@a)
+// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@a>)
 // CHECK: return %[[CONST]]
 
 // -----
@@ -31,13 +31,13 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @a = #py.type
 
 func.func @global_value() -> !py.dynamic {
-    %0 = py.constant(@a)
+    %0 = py.constant(#py.ref<@a>)
     %1 = py.typeOf %0
     return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @global_value
-// CHECK: %[[CONST:.*]] = py.constant(@builtins.type)
+// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@builtins.type>)
 // CHECK: return %[[CONST]]
 
 // -----
@@ -68,7 +68,7 @@ func.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dyna
 }
 
 // CHECK-LABEL: @type_refineable
-// CHECK: %[[CONST:.*]] = py.constant(@builtins.tuple)
+// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@builtins.tuple>)
 // CHECK: return %[[CONST]]
 
 // -----
@@ -83,5 +83,5 @@ func.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynami
 }
 
 // CHECK-LABEL: @tuple_prepend
-// CHECK: %[[CONST:.*]] = py.constant(@builtins.tuple)
+// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@builtins.tuple>)
 // CHECK: return %[[CONST]]

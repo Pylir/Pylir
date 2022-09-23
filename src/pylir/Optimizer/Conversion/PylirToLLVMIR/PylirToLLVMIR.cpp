@@ -72,7 +72,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
     mlir::StringAttr m_rootSection;
     mlir::StringAttr m_collectionSection;
     mlir::StringAttr m_constantSection;
-    llvm::DenseMap<mlir::Attribute, mlir::FlatSymbolRefAttr> m_layoutTypeCache;
+    llvm::DenseMap<mlir::Attribute, pylir::Py::RefAttr> m_layoutTypeCache;
 
     mlir::LLVM::LLVMArrayType getSlotEpilogue(unsigned slotSize = 0)
     {
@@ -95,7 +95,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
         section();
     }
 
-    bool isSubtype(pylir::Py::TypeAttr subType, mlir::FlatSymbolRefAttr base)
+    bool isSubtype(pylir::Py::TypeAttr subType, pylir::Py::RefAttr base)
     {
         auto tuple = dereference<pylir::Py::TupleAttr>(subType.getMroTuple()).getValue();
         return std::any_of(tuple.begin(), tuple.end(), [base](mlir::Attribute attr) { return attr == base; });
@@ -154,7 +154,7 @@ public:
                                  pylir::Builtins::Type, pylir::Builtins::Function, pylir::Builtins::Str,
                                  pylir::Builtins::Int, pylir::Builtins::Dict, pylir::Builtins::BaseException})
         {
-            auto ref = mlir::FlatSymbolRefAttr::get(&getContext(), iter.name);
+            auto ref = pylir::Py::RefAttr::get(&getContext(), iter.name);
             m_layoutTypeCache[ref] = ref;
         }
     }
@@ -412,24 +412,24 @@ public:
         PYLIR_UNREACHABLE;
     }
 
-    mlir::FlatSymbolRefAttr getLayoutType(pylir::Py::TypeAttr type)
+    pylir::Py::RefAttr getLayoutType(pylir::Py::TypeAttr type)
     {
         if (auto result = m_layoutTypeCache.lookup(type))
         {
             return result;
         }
-        mlir::FlatSymbolRefAttr winner;
+        pylir::Py::RefAttr winner;
         auto mro = dereference<pylir::Py::TupleAttr>(type.getMroTuple()).getValue();
         if (mro.empty())
         {
             // TODO: This is a special case that I should probably disallow at one point instead
-            winner = mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Object.name);
+            winner = pylir::Py::RefAttr::get(&getContext(), pylir::Builtins::Object.name);
         }
         else
         {
             for (const auto& iter : mro.drop_front())
             {
-                mlir::FlatSymbolRefAttr candidate = getLayoutType(iter.cast<mlir::FlatSymbolRefAttr>());
+                pylir::Py::RefAttr candidate = getLayoutType(iter.cast<pylir::Py::RefAttr>());
                 if (!winner)
                 {
                     winner = candidate;
@@ -445,7 +445,7 @@ public:
         return winner;
     }
 
-    mlir::FlatSymbolRefAttr getLayoutType(mlir::FlatSymbolRefAttr type)
+    pylir::Py::RefAttr getLayoutType(pylir::Py::RefAttr type)
     {
         if (auto result = m_layoutTypeCache.lookup(type))
         {
@@ -458,10 +458,10 @@ public:
 
     mlir::LLVM::LLVMStructType typeOf(pylir::Py::ObjectAttrInterface objectAttr)
     {
-        auto typeObject = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getTypeObject().getAttr());
+        auto typeObject = objectAttr.getTypeObject();
         PYLIR_ASSERT(typeObject);
-        PYLIR_ASSERT(!typeObject.isDeclaration() && "Type objects can't be declarations");
-        auto slots = typeObject.getInitializer()->getSlots();
+        PYLIR_ASSERT(typeObject.getSymbol().getInitializer() && "Type objects can't be declarations");
+        auto slots = typeObject.getSymbol().getInitializerAttr().getSlots();
         unsigned count = 0;
         auto result = slots.get("__slots__");
         if (result)
@@ -657,12 +657,12 @@ public:
     {
         builder.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
         mlir::Value undef = builder.create<mlir::LLVM::UndefOp>(global.getLoc(), global.getType());
-        auto globalValueOp = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(objectAttr.getTypeObject().getValue());
-        PYLIR_ASSERT(globalValueOp);
-        PYLIR_ASSERT(!globalValueOp.isDeclaration() && "Type objects can't be a declaration");
-        auto typeObjectAttr = *globalValueOp.getInitializer();
-        auto typeObj =
-            builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), m_objectPtrType, objectAttr.getTypeObject());
+        auto typeObject = objectAttr.getTypeObject();
+        PYLIR_ASSERT(typeObject);
+        PYLIR_ASSERT(typeObject.getSymbol().getInitializerAttr() && "Type objects can't be a declaration");
+        auto typeObjectAttr = typeObject.getSymbol().getInitializerAttr();
+        auto typeObj = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), m_objectPtrType,
+                                                               objectAttr.getTypeObject().getRef());
         undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, typeObj, 0);
         llvm::TypeSwitch<pylir::Py::ObjectAttrInterface>(objectAttr)
             .Case(
@@ -841,14 +841,13 @@ public:
                                 auto layoutType =
                                     getLayoutType(dereference<pylir::Py::ObjectAttrInterface>(key).getTypeObject());
                                 mlir::Value hash;
-                                if (layoutType
-                                    == mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Str.name))
+                                if (layoutType == pylir::Py::RefAttr::get(&getContext(), pylir::Builtins::Str.name))
                                 {
                                     hash = createRuntimeCall(global.getLoc(), builder, Runtime::pylir_str_hash,
                                                              {keyValue});
                                 }
                                 else if (layoutType
-                                         == mlir::FlatSymbolRefAttr::get(&getContext(), pylir::Builtins::Object.name))
+                                         == pylir::Py::RefAttr::get(&getContext(), pylir::Builtins::Object.name))
                                 {
                                     hash = builder.create<mlir::LLVM::PtrToIntOp>(global.getLoc(), getIndexType(),
                                                                                   keyValue);
@@ -867,10 +866,11 @@ public:
             .Case(
                 [&](pylir::Py::TypeAttr attr)
                 {
-                    auto layoutType = getLayoutType(mlir::FlatSymbolRefAttr::get(global));
+                    auto layoutType =
+                        getLayoutType(pylir::Py::RefAttr::get(&getContext(), mlir::FlatSymbolRefAttr::get(global)));
 
                     {
-                        auto instanceType = getBuiltinsInstanceType(layoutType.getValue());
+                        auto instanceType = getBuiltinsInstanceType(layoutType.getRef().getValue());
                         auto asCount = builder.create<mlir::LLVM::ConstantOp>(
                             global.getLoc(), getIndexType(),
                             builder.getI32IntegerAttr(getPlatformABI().getSizeOf(instanceType)
@@ -917,9 +917,9 @@ public:
     mlir::Value getConstant(mlir::Location loc, mlir::Attribute attribute, mlir::OpBuilder& builder)
     {
         mlir::LLVM::AddressOfOp address;
-        if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = attribute.dyn_cast<pylir::Py::RefAttr>())
         {
-            return builder.create<mlir::LLVM::AddressOfOp>(loc, m_objectPtrType, ref);
+            return builder.create<mlir::LLVM::AddressOfOp>(loc, m_objectPtrType, ref.getRef());
         }
         if (attribute.isa<pylir::Py::UnboundAttr>())
         {
@@ -955,11 +955,9 @@ public:
     template <class T>
     T dereference(mlir::Attribute attr)
     {
-        if (auto ref = attr.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = attr.dyn_cast<pylir::Py::RefAttr>())
         {
-            auto globalValueOp = m_symbolTable.lookup<pylir::Py::GlobalValueOp>(ref.getAttr());
-            PYLIR_ASSERT(!globalValueOp.isDeclaration() && "Type objects can't be a declaration");
-            return globalValueOp.getInitializer()->dyn_cast<T>();
+            return ref.getSymbol().getInitializerAttr().template dyn_cast_or_null<T>();
         }
         return attr.dyn_cast<T>();
     }
@@ -1469,17 +1467,17 @@ protected:
         return getTypeConverter()->template dereference<Attr>(attr);
     }
 
-    [[nodiscard]] mlir::Type getBuiltinsInstanceType(mlir::FlatSymbolRefAttr ref) const
+    [[nodiscard]] mlir::Type getBuiltinsInstanceType(pylir::Py::RefAttr ref) const
     {
-        return getTypeConverter()->getBuiltinsInstanceType(ref.getValue());
+        return getTypeConverter()->getBuiltinsInstanceType(ref.getRef().getValue());
     }
 
-    [[nodiscard]] mlir::FlatSymbolRefAttr getLayoutType(mlir::FlatSymbolRefAttr ref) const
+    [[nodiscard]] pylir::Py::RefAttr getLayoutType(pylir::Py::RefAttr ref) const
     {
         return getTypeConverter()->getLayoutType(ref);
     }
 
-    [[nodiscard]] mlir::FlatSymbolRefAttr getLayoutType(pylir::Py::TypeAttr attr) const
+    [[nodiscard]] pylir::Py::RefAttr getLayoutType(pylir::Py::TypeAttr attr) const
     {
         return getTypeConverter()->getLayoutType(attr);
     }
@@ -1562,7 +1560,7 @@ struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::G
         bool constant = op.getConstant();
         if (!op.isDeclaration())
         {
-            constant = (constant || immutable.contains(op.getInitializer()->getTypeObject().getValue()))
+            constant = (constant || immutable.contains(op.getInitializer()->getTypeObject().getRef().getValue()))
                        && !needToBeRuntimeInit(*op.getInitializer());
         }
         auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(op, type, constant, linkage, op.getName(),
@@ -1621,10 +1619,10 @@ struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::Global
                         rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), constant);
                     })
                 .Case(
-                    [&](mlir::FlatSymbolRefAttr attr)
+                    [&](pylir::Py::RefAttr attr)
                     {
                         mlir::Value address =
-                            rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), global.getType(), attr);
+                            rewriter.create<mlir::LLVM::AddressOfOp>(op.getLoc(), global.getType(), attr.getRef());
                         rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), address);
                     })
                 .Case(
@@ -2180,7 +2178,7 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             return mlir::failure();
         }
         pylir::Py::TypeAttr typeObject;
-        auto ref = constant.getConstant().dyn_cast<mlir::FlatSymbolRefAttr>();
+        auto ref = constant.getConstant().dyn_cast<pylir::Py::RefAttr>();
         typeObject = dereference<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
@@ -2247,7 +2245,7 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             return mlir::failure();
         }
         pylir::Py::TypeAttr typeObject;
-        auto ref = constant.getConstant().dyn_cast<mlir::FlatSymbolRefAttr>();
+        auto ref = constant.getConstant().dyn_cast<pylir::Py::RefAttr>();
         typeObject = dereference<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
@@ -2316,7 +2314,7 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Type.name));
+            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
             rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
         mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
@@ -2381,7 +2379,7 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Type.name));
+            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
             rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
         mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
@@ -2518,7 +2516,7 @@ struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T>
             mlir::OpBuilder::InsertionGuard guard{rewriter};
             rewriter.setInsertionPointToStart(&op->getParentRegion()->front());
             catchType = this->getConstant(
-                op.getLoc(), mlir::FlatSymbolRefAttr::get(this->getContext(), pylir::Builtins::BaseException.name),
+                op.getLoc(), pylir::Py::RefAttr::get(this->getContext(), pylir::Builtins::BaseException.name),
                 rewriter);
         }
         // We use a integer of pointer width instead of a pointer to keep it opaque to statepoint passes.
@@ -2591,7 +2589,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
             return mlir::failure();
         }
         pylir::Py::TypeAttr typeAttr;
-        auto ref = constant.getConstant().dyn_cast<mlir::FlatSymbolRefAttr>();
+        auto ref = constant.getConstant().dyn_cast<pylir::Py::RefAttr>();
         typeAttr = dereference<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeAttr)
         {
@@ -2643,7 +2641,7 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
 
         rewriter.setInsertionPointToEnd(block);
         auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Type.name));
+            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
             rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
         auto* hasSlotsBlock = new mlir::Block;
@@ -2724,7 +2722,7 @@ struct InitListOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
         list.sizePtr(op.getLoc()).store(op.getLoc(), size);
 
         auto tupleType =
-            getConstant(op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Tuple.name), rewriter);
+            getConstant(op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Tuple.name), rewriter);
         auto tupleMemory = rewriter.create<pylir::Mem::GCAllocTupleOp>(op.getLoc(), tupleType, size);
         mlir::Value tupleInit =
             rewriter.create<pylir::Mem::InitTupleOp>(op.getLoc(), op.getType(), tupleMemory, adaptor.getInitializer());

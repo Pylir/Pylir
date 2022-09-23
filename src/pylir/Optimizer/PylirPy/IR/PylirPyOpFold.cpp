@@ -377,11 +377,11 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 ::mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto type = operands[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+    auto type = operands[1].dyn_cast_or_null<RefAttr>();
     // Forwarding it is safe in the case that the types of the input tuple as well as the resulting tuple are identical
     // and that the type is fully immutable. In the future this may be computed, but for the time being, the
     // `builtins.tuple` will be special cased as known immutable.
-    if (type && type.getValue() == Builtins::Tuple.name && getTypeOf(getTuple()) == mlir::OpFoldResult(type))
+    if (type && type.getRef().getValue() == Builtins::Tuple.name && getTypeOf(getTuple()) == mlir::OpFoldResult(type))
     {
         return getTuple();
     }
@@ -588,8 +588,8 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
         auto rhsEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(getRhs().getDefiningOp());
         bool lhsAlloc = lhsEffect && lhsEffect.hasEffect<mlir::MemoryEffects::Allocate>();
         bool rhsAlloc = rhsEffect && rhsEffect.hasEffect<mlir::MemoryEffects::Allocate>();
-        if ((lhsAlloc && rhsAlloc) || (operands[0].dyn_cast_or_null<mlir::SymbolRefAttr>() && rhsAlloc)
-            || (lhsAlloc && operands[1].dyn_cast_or_null<mlir::SymbolRefAttr>()))
+        if ((lhsAlloc && rhsAlloc) || (operands[0].dyn_cast_or_null<RefAttr>() && rhsAlloc)
+            || (lhsAlloc && operands[1].dyn_cast_or_null<RefAttr>()))
         {
             return mlir::BoolAttr::get(getContext(), false);
         }
@@ -743,7 +743,8 @@ mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attrib
     static llvm::StringSet<> immutableTypes = {
         Builtins::Float.name, Builtins::Int.name, Builtins::Bool.name, Builtins::Str.name, Builtins::Tuple.name,
     };
-    if (!getConstant() && getInitializer() && immutableTypes.contains(getInitializer()->getTypeObject().getValue()))
+    if (!getConstant() && getInitializer()
+        && immutableTypes.contains(getInitializer()->getTypeObject().getRef().getValue()))
     {
         setConstantAttr(mlir::UnitAttr::get(getContext()));
         return mlir::success();
@@ -885,7 +886,7 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
                     mlir::Attribute attr1, attr2;
                     if (mlir::matchPattern(entry.key, mlir::m_Constant(&attr1))
                         && mlir::matchPattern(getKey(), mlir::m_Constant(&attr2)) && attr1 != attr2
-                        && !attr1.isa<mlir::SymbolRefAttr>())
+                        && !attr1.isa<RefAttr>())
                     {
                         continue;
                     }
@@ -946,7 +947,7 @@ pylir::Py::TypeRefineResult
                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
                                           mlir::SymbolTableCollection&)
 {
-    result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+    result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
     return TypeRefineResult::Approximate;
 }
 
@@ -957,7 +958,7 @@ pylir::Py::TypeRefineResult
 {
     if (!getIterExpansionAttr().empty())
     {
-        result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+        result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
         return TypeRefineResult::Approximate;
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
@@ -965,7 +966,7 @@ pylir::Py::TypeRefineResult
     {
         if (!iter)
         {
-            result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+            result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
             return TypeRefineResult::Approximate;
         }
         elementTypes.push_back(iter.cast<Py::ObjectTypeInterface>());
@@ -979,7 +980,7 @@ pylir::Py::TypeRefineResult
                                         ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes,
                                         ::mlir::SymbolTableCollection&)
 {
-    auto typeObject = inputs[1].dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+    auto typeObject = inputs[1].dyn_cast_or_null<RefAttr>();
     if (!typeObject)
     {
         return TypeRefineResult::Failure;
@@ -1038,7 +1039,7 @@ pylir::Py::TypeRefineResult
     auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
     if (!tupleType)
     {
-        result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+        result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
         return TypeRefineResult::Approximate;
     }
     if (tupleType.getElements().empty())
@@ -1076,7 +1077,7 @@ pylir::Py::TypeRefineResult
     // TODO: Once/if tuple type accepts nullptr elements (for unknown), the below or should not be necessary
     if (!tupleType || !argumentTypes[0].isa_and_nonnull<Py::ObjectTypeInterface>())
     {
-        result.emplace_back(Py::ClassType::get(mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Tuple.name)));
+        result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
         return TypeRefineResult::Approximate;
     }
     llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());

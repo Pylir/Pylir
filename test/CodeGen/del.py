@@ -11,7 +11,7 @@ def g():
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = py.constant(@builtins.NameError)
+# CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.NameError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
@@ -32,7 +32,7 @@ def local():
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = py.constant(@builtins.UnboundLocalError)
+# CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.UnboundLocalError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
@@ -59,7 +59,7 @@ def closure():
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = py.constant(@builtins.UnboundLocalError)
+# CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.UnboundLocalError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})

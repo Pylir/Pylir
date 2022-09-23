@@ -77,7 +77,7 @@ py.globalValue @a = #py.type
 
 // CHECK-LABEL: test_objects
 func.func @test_objects() -> !py.dynamic {
-    %0 = py.constant(#py.obj<@a>)
-    %1 = py.constant(#py.obj<@a, {__dict__ = #py.dict<{}>}>)
+    %0 = py.constant(#py.obj<#py.ref<@a>>)
+    %1 = py.constant(#py.obj<#py.ref<@a>, {__dict__ = #py.dict<{}>}>)
     return %1 : !py.dynamic
 }

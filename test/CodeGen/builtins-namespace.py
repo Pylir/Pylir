@@ -4,7 +4,7 @@
 
 object
 
-# CHECK: py.constant(@builtins.object)
+# CHECK: py.constant(#py.ref<@builtins.object>)
 
 # CHECK: %[[VALUE:.*]] = py.load @BaseException
 # CHECK: py.store %[[VALUE]] : !py.dynamic into @x

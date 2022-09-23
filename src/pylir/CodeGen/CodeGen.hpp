@@ -53,7 +53,7 @@ class CodeGen
     Diag::DiagnosticsDocManager* m_docManager;
     mlir::Value m_classNamespace{};
     std::unordered_map<std::string, std::size_t> m_implNames;
-    std::unordered_map<std::string_view, mlir::FlatSymbolRefAttr> m_builtinNamespace;
+    std::unordered_map<std::string_view, Py::RefAttr> m_builtinNamespace;
     bool m_constantClass = false;
 
     struct Loop

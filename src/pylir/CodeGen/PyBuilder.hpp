@@ -7,6 +7,7 @@
 #include <mlir/IR/Builders.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyRefAttr.hpp>
 #include <pylir/Support/BigInt.hpp>
 
 namespace pylir
@@ -54,7 +55,7 @@ public:
         return Py::UnboundAttr::get(getContext());
     }
 
-    Py::ObjectAttr getObjectAttr(mlir::FlatSymbolRefAttr type, mlir::DictionaryAttr slots = {})
+    Py::ObjectAttr getObjectAttr(Py::RefAttr type, mlir::DictionaryAttr slots = {})
     {
         return Py::ObjectAttr::get(context, type, slots);
     }
@@ -130,10 +131,10 @@ public:
         return mlir::OpBuilder::create<Op>(getCurrentLoc(), std::forward<First>(first), std::forward<Args>(args)...);
     }
 
-#define BUILTIN(name, str, ...)                                   \
-    mlir::FlatSymbolRefAttr get##name##Builtin()                  \
-    {                                                             \
-        return mlir::FlatSymbolRefAttr::get(getContext(), (str)); \
+#define BUILTIN(name, str, ...)                       \
+    Py::RefAttr get##name##Builtin()                  \
+    {                                                 \
+        return Py::RefAttr::get(getContext(), (str)); \
     }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
@@ -198,7 +199,7 @@ public:
 
     Py::ConstantOp createConstant(mlir::Attribute constant)
     {
-        if (auto ref = constant.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = constant.dyn_cast<Py::RefAttr>())
         {
             return create<Py::ConstantOp>(ref);
         }

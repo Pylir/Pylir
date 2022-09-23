@@ -84,9 +84,9 @@ pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInt
             // This can probably only be a result of undefined behaviour.
             continue;
         }
-        if (auto ref = iter.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = iter.dyn_cast<RefAttr>())
         {
-            auto opt = llvm::StringSwitch<std::optional<BuiltinMethodKind>>(ref.getValue())
+            auto opt = llvm::StringSwitch<std::optional<BuiltinMethodKind>>(ref.getRef().getValue())
                            .Case(Builtins::Int.name, BuiltinMethodKind::Int)
                            .Case(Builtins::Str.name, BuiltinMethodKind::Str)
                            .Case(Builtins::Object.name, BuiltinMethodKind::Object)

@@ -15,8 +15,8 @@ func.func @test() {
 
 // -----
 
-py.globalValue const @builtins.type = #py.type<mroTuple = #py.tuple<(@builtins.type, @builtins.object)>>
-py.globalValue const @builtins.object = #py.type<mroTuple = #py.tuple<(@builtins.object)>>
+py.globalValue const @builtins.type = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
+py.globalValue const @builtins.object = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.object>)>>
 py.globalValue const @builtins.function = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
@@ -25,13 +25,13 @@ py.globalValue const @builtins.None = #py.type
 
 func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
-py.globalValue const @Foo = #py.type<mroTuple = #py.tuple<(@Foo, @builtins.object)>, slots = {
+py.globalValue const @Foo = #py.type<mroTuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>, slots = {
     __hash__ = #py.function<@foo>
 }>
 
-py.globalValue @bar = #py.obj<@Foo>
+py.globalValue @bar = #py.obj<#py.ref<@Foo>>
 // expected-error@below {{Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.}}
-py.globalValue @dict = #py.dict<{@bar to @builtins.None}>
+py.globalValue @dict = #py.dict<{#py.ref<@bar> to #py.ref<@builtins.None>}>
 
 // -----
 
@@ -45,11 +45,11 @@ py.globalValue const @builtins.None = #py.type
 
 func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
-py.globalValue @Foo = #py.type<mroTuple = #py.tuple<(@Foo, @builtins.object)>>
+py.globalValue @Foo = #py.type<mroTuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>>
 
-py.globalValue @bar = #py.obj<@Foo>
+py.globalValue @bar = #py.obj<#py.ref<@Foo>>
 // expected-error@below {{Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.}}
-py.globalValue @dict = #py.dict<{@bar to @builtins.None}>
+py.globalValue @dict = #py.dict<{#py.ref<@bar> to #py.ref<@builtins.None>}>
 
 // -----
 
@@ -63,7 +63,7 @@ py.global @lol2 : f64 = 5 : index
 
 // -----
 
-// expected-error@below {{Expected initializer of type 'ObjectAttrInterface' or 'FlatSymbolRefAttr' to global value}}
+// expected-error@below {{Expected initializer of type 'ObjectAttrInterface' or 'RefAttr' to global value}}
 py.global @lol3 : !py.dynamic = 5 : index
 
 // -----
@@ -71,18 +71,18 @@ py.global @lol3 : !py.dynamic = 5 : index
 py.global @lol : !py.dynamic
 
 // expected-error@below {{Expected '@lol' to be of kind 'py.globalValue', not 'py.global'}}
-py.global @lol4 : !py.dynamic = @lol
+py.global @lol4 : !py.dynamic = #py.ref<@lol>
 
 // -----
 
 // expected-error@below {{Failed to find symbol named '@lol'}}
-py.global @lol5: !py.dynamic = @lol
+py.global @lol5: !py.dynamic = #py.ref<@lol>
 
 // -----
 
 func.func @foo() {
     // expected-error@below {{Failed to find symbol named '@lol'}}
-    %0 = py.constant(@lol)
+    %0 = py.constant(#py.ref<@lol>)
     return
 }
 
@@ -92,6 +92,6 @@ py.global @lol : index = 5 : index
 
 func.func @foo() {
     // expected-error@below {{Expected '@lol' to be of kind 'py.globalValue', not 'py.global'}}
-    %0 = py.constant(@lol)
+    %0 = py.constant(#py.ref<@lol>)
     return
 }

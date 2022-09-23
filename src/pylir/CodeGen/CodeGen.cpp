@@ -53,8 +53,7 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::DiagnosticsDocManager&
         {
             continue;
         }
-        m_builtinNamespace.emplace(iter.name.substr(builtinsModule.size()),
-                                   mlir::FlatSymbolRefAttr::get(context, iter.name));
+        m_builtinNamespace.emplace(iter.name.substr(builtinsModule.size()), Py::RefAttr::get(context, iter.name));
     }
 }
 
@@ -1715,7 +1714,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                                           m_builder.getDictAttr(keywordDefaultParams)),
                 *constExport);
         }
-        return m_builder.createConstant(mlir::FlatSymbolRefAttr::get(valueOp));
+        return m_builder.createConstant(Py::RefAttr::get(valueOp));
     }
 
     mlir::Value value = m_builder.createMakeFunc(mlir::FlatSymbolRefAttr::get(func));
@@ -1868,7 +1867,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
             func.erase();
         });
 
-    std::vector<mlir::FlatSymbolRefAttr> basesConst;
+    std::vector<Py::RefAttr> basesConst;
     if (classDef.inheritance)
     {
         for (const auto& iter : classDef.inheritance->argumentList)
@@ -1894,11 +1893,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         }
     }
 
-    std::vector<mlir::Attribute> mroTuple{mlir::FlatSymbolRefAttr::get(m_builder.getContext(), qualifiedName)};
+    std::vector<mlir::Attribute> mroTuple{Py::RefAttr::get(m_builder.getContext(), qualifiedName)};
     Py::TupleAttr parentSlots;
     if (basesConst.empty())
     {
-        if (qualifiedName != m_builder.getObjectBuiltin().getValue())
+        if (qualifiedName != m_builder.getObjectBuiltin().getRef().getValue())
         {
             mroTuple.push_back(m_builder.getObjectBuiltin());
         }
@@ -1906,13 +1905,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     else
     {
         PYLIR_ASSERT(basesConst.size() == 1 && "Multiple inheritance not yet implemented");
-        auto baseResolved = m_module.lookupSymbol<Py::GlobalValueOp>(basesConst[0]);
-        if (!baseResolved)
-        {
-            // TODO: diagnostic
-            PYLIR_UNREACHABLE;
-        }
-        auto typeAttr = baseResolved.getInitializerAttr().cast<pylir::Py::TypeAttr>();
+        auto typeAttr = basesConst[0].getSymbol().getInitializerAttr().cast<pylir::Py::TypeAttr>();
         auto baseMRO = dereference<Py::TupleAttr>(typeAttr.getMroTuple());
         PYLIR_ASSERT(baseMRO);
         mroTuple.insert(mroTuple.end(), baseMRO.getValue().begin(), baseMRO.getValue().end());
@@ -2010,7 +2003,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
             qualifiedName, true,
             m_builder.getTypeAttr(m_builder.getTupleAttr(mroTuple), m_builder.getDictionaryAttr(slots)), true);
     }
-    writeIdentifier(classDef.className.getValue(), m_builder.createConstant(mlir::FlatSymbolRefAttr::get(valueOp)));
+    writeIdentifier(classDef.className.getValue(), m_builder.createConstant(Py::RefAttr::get(valueOp)));
 }
 
 void pylir::CodeGen::visit(const Syntax::Suite& suite)
@@ -2726,7 +2719,7 @@ mlir::Value pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrin
 mlir::Value pylir::buildException(mlir::Location loc, PyBuilder& builder, std::string_view kind,
                                   std::vector<Py::IterArg> args, mlir::Block* exceptionHandler)
 {
-    auto typeObj = builder.createConstant(mlir::FlatSymbolRefAttr::get(builder.getContext(), kind));
+    auto typeObj = builder.createConstant(Py::RefAttr::get(builder.getContext(), kind));
     args.emplace(args.begin(), typeObj);
     mlir::Value tuple = builder.createMakeTuple(args, exceptionHandler);
     auto dict = builder.createConstant(builder.getDictAttr());

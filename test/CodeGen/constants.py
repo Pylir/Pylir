@@ -18,4 +18,4 @@ False
 # CHECK: py.constant(#py.bool<False>)
 
 None
-# CHECK: py.constant(@builtins.None)
+# CHECK: py.constant(#py.ref<@builtins.None>)

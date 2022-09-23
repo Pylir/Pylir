@@ -13,17 +13,17 @@ py.globalValue @builtins.str = #py.type
 
 func.func private @"builtins.type.__call__$impl[0]"(%arg0: !py.dynamic, %arg1: !py.dynamic, %arg2: !py.dynamic, %arg3: !py.dynamic) -> !py.dynamic {
   %0 = py.constant(#py.dict<{}>)
-  %1 = py.constant(@builtins.None)
+  %1 = py.constant(#py.ref<@builtins.None>)
   %2 = py.constant(#py.int<1>)
   %3 = py.constant(#py.int<0>)
-  %4 = py.constant(@builtins.bool)
+  %4 = py.constant(#py.ref<@builtins.bool>)
   %true = arith.constant true
-  %5 = py.constant(@builtins.type)
-  %6 = py.constant(@builtins.BaseException)
+  %5 = py.constant(#py.ref<@builtins.type>)
+  %6 = py.constant(#py.ref<@builtins.BaseException>)
   %c0 = arith.constant 0 : index
   %7 = py.constant(#py.tuple<()>)
-  %8 = py.constant(@builtins.TypeError)
-  %9 = py.constant(@builtins.type.__call__)
+  %8 = py.constant(#py.ref<@builtins.TypeError>)
+  %9 = py.constant(#py.ref<@builtins.type.__call__>)
   %10 = py.tuple.len %arg2
   %11 = py.int.fromUnsigned %10
   %12 = py.dict.len %arg3
@@ -96,9 +96,9 @@ func.func private @"builtins.type.__call__$cc[0]"(%arg0: !py.dynamic, %arg1: !py
   %0 = py.constant(#py.unbound)
   %1 = py.constant(#py.str<"self">)
   %2 = py.constant(#py.dict<{}>)
-  %3 = py.constant(@builtins.None)
+  %3 = py.constant(#py.ref<@builtins.None>)
   %c1 = arith.constant 1 : index
-  %5 = py.constant(@builtins.TypeError)
+  %5 = py.constant(#py.ref<@builtins.TypeError>)
   %6 = py.constant(#py.tuple<()>)
   %7 = py.tuple.len %arg1
   %8 = arith.cmpi ugt, %7, %c0 : index
@@ -134,8 +134,8 @@ py.globalValue "private" const @builtins.type.__call__ = #py.function<@"builtins
 func.func @root() -> !py.dynamic {
     %3 = py.constant(#py.dict<{}>)
     %7 = py.constant(#py.tuple<()>)
-    %10 = py.constant(@builtins.type.__call__)
-    %12 = py.constant(@builtins.TypeError)
+    %10 = py.constant(#py.ref<@builtins.type.__call__>)
+    %12 = py.constant(#py.ref<@builtins.TypeError>)
     %17 = py.call @"builtins.type.__call__$impl[0]"(%10, %12, %7, %3) : (!py.dynamic, !py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
     return %17 : !py.dynamic
 }

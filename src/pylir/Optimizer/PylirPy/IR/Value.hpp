@@ -25,27 +25,18 @@ llvm::Optional<bool> isUnbound(mlir::Value value);
 /// 'const' and 'onlyConstGlobal' is true, a null value is returned.
 /// If the cast does not succeed or the 'attr' passed in is a null value, a null value is also returned.
 template <class T = ObjectAttrInterface>
-T resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
+T resolveValue(mlir::Operation*, mlir::Attribute attr, bool onlyConstGlobal = true)
 {
-    auto ref = attr.dyn_cast_or_null<mlir::SymbolRefAttr>();
+    RefAttr ref = attr.dyn_cast_or_null<RefAttr>();
     if (!ref)
     {
         return attr.dyn_cast_or_null<T>();
     }
-    auto value = mlir::SymbolTable::lookupNearestSymbolFrom<GlobalValueOp>(op, ref);
-    // TODO: This 'if' is nasty workaround to make PylirToLLVM not crash. Reason being that dialect conversion attempts
-    //       to also do folding to legalize an operation. Since we re mid dialect conversion however, the GlobalValueOp
-    //       may have already been converted to LLVM and erased, hence it does not exist anymore. By returning nullptr
-    //       we ought to fail gracefully.
-    if (!value)
+    if (!ref.getSymbol().getConstant() && onlyConstGlobal)
     {
         return nullptr;
     }
-    if (!value.getConstant() && onlyConstGlobal)
-    {
-        return nullptr;
-    }
-    return value.getInitializerAttr().template dyn_cast_or_null<T>();
+    return ref.getSymbol().getInitializerAttr().dyn_cast_or_null<T>();
 }
 
 enum class BuiltinMethodKind

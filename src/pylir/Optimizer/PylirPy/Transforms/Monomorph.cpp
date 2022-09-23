@@ -49,7 +49,7 @@ public:
     using Base::Base;
 };
 
-using TypeFlowArgValue = llvm::PointerUnion<mlir::SymbolRefAttr, pylir::Py::ObjectTypeInterface>;
+using TypeFlowArgValue = llvm::PointerUnion<pylir::Py::RefAttr, pylir::Py::ObjectTypeInterface>;
 
 struct FunctionSpecialization
 {
@@ -78,7 +78,7 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const FunctionSpecializatio
     llvm::interleaveComma(specialization.argTypes, os,
                           [&](TypeFlowArgValue value)
                           {
-                              if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                              if (auto ref = value.dyn_cast<pylir::Py::RefAttr>())
                               {
                                   os << ref;
                               }
@@ -285,7 +285,7 @@ public:
                                 {
                                     returnValue = type;
                                 }
-                                else if (lookup.isa<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr,
+                                else if (lookup.isa<pylir::Py::ObjectAttrInterface, pylir::Py::RefAttr,
                                                     pylir::Py::UnboundAttr>())
                                 {
                                     returnValue =
@@ -309,16 +309,11 @@ public:
                                 auto funcAttr = calleeValue.template dyn_cast_or_null<pylir::Py::FunctionAttr>();
                                 if (!funcAttr)
                                 {
-                                    if (auto callee = calleeValue.template dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
+                                    if (auto callee = calleeValue.template dyn_cast_or_null<pylir::Py::RefAttr>())
                                     {
-                                        auto functionObject =
-                                            collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context,
-                                                                                                         callee);
-                                        if (functionObject)
-                                        {
-                                            funcAttr = functionObject.getInitializerAttr()
-                                                           .template dyn_cast_or_null<pylir::Py::FunctionAttr>();
-                                        }
+                                        funcAttr = callee.getSymbol()
+                                                       .getInitializerAttr()
+                                                       .template dyn_cast_or_null<pylir::Py::FunctionAttr>();
                                     }
                                 }
 
@@ -340,12 +335,11 @@ public:
                                 auto value = m_values[inValue];
                                 // We only allow references referring to type object to be passed as objects across
                                 // function boundaries. Everything else has to be a type.
-                                if (auto ref = value.template dyn_cast_or_null<mlir::SymbolRefAttr>())
+                                if (auto ref = value.template dyn_cast_or_null<pylir::Py::RefAttr>())
                                 {
-                                    auto lookup =
-                                        collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context, ref);
-                                    if (lookup
-                                        && lookup.getInitializerAttr().template isa_and_nonnull<pylir::Py::TypeAttr>())
+                                    if (ref.getSymbol()
+                                            .getInitializerAttr()
+                                            .template isa_and_nonnull<pylir::Py::TypeAttr>())
                                     {
                                         argValue = ref;
                                         continue;
@@ -357,7 +351,7 @@ public:
                                     argValue = type;
                                 }
                                 else if (value.template isa_and_nonnull<pylir::Py::ObjectAttrInterface,
-                                                                        mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
+                                                                        pylir::Py::RefAttr, pylir::Py::UnboundAttr>())
                                 {
                                     argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>(),
                                                                          collection, context);
@@ -648,7 +642,7 @@ public:
                                          {
                                              return nullptr;
                                          }
-                                         if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                                         if (auto ref = value.dyn_cast<pylir::Py::RefAttr>())
                                          {
                                              return ref;
                                          }
@@ -1371,7 +1365,7 @@ public:
             for (auto [arg, value] :
                  llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.argTypes))
             {
-                if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                if (auto ref = value.dyn_cast<pylir::Py::RefAttr>())
                 {
                     entryValues[arg] = ref;
                 }

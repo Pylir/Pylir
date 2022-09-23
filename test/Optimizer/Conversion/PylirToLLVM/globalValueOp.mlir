@@ -5,7 +5,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @foo = #py.tuple<()>
-py.globalValue @bar = #py.tuple<(@foo, @builtins.type)>
+py.globalValue @bar = #py.tuple<(#py.ref<@foo>, #py.ref<@builtins.type>)>
 
 // CHECK-LABEL: llvm.mlir.global external constant @foo
 // SECTION_COFF-SAME: section = "py_const"

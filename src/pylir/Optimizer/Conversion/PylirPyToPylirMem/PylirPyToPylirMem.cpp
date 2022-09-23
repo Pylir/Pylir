@@ -31,7 +31,7 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
     mlir::LogicalResult matchAndRewrite(pylir::Py::MakeDictOp op, mlir::PatternRewriter& rewriter) const override
     {
         auto dict = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), mlir::FlatSymbolRefAttr::get(getContext(), pylir::Builtins::Dict.name));
+            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Dict.name));
         auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict);
         auto init = rewriter.replaceOpWithNewOp<pylir::Mem::InitDictOp>(op, op.getType(), mem);
         for (auto arg : op.getDictArgs())

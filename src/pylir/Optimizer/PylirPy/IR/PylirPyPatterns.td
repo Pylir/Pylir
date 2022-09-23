@@ -22,7 +22,7 @@ class DenseArrayCount<int n> : AttrConstraint<
     CPred<"$_self.cast<::mlir::ElementsAttr>().size() == " #n>,
     "with exactly " # n # " elements">;
 
-defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
+defvar TypeRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.type">;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, DenseArrayCount<0>)),
           (PylirPy_MakeTupleOp
@@ -61,7 +61,7 @@ class PlusAttrs<Attr attrType, Attr resultAttr = attrType> : BinOpAttrs<"+", att
 def : Pat<(PylirPy_TupleDropFrontOp $count1, (PylirPy_TupleDropFrontOp $count2, $tuple)),
           (PylirPy_TupleDropFrontOp (Arith_AddIOp $count1, $count2), $tuple)>;
 
-defvar TupleRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.tuple">;
+defvar TupleRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.tuple">;
 
 def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher ConstantAttr<IndexAttr,"0">), $tuple),
 			(PylirPy_TupleCopyOp $tuple, (PylirPy_ConstantOp TupleRef))>;

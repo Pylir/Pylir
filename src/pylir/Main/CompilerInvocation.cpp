@@ -427,6 +427,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 manager.addPass(mlir::createStripDebugInfoPass());
             }
+            manager.addPass(pylir::Py::createFinalizeRefAttrsPass());
 
             if (!shouldOutput(OPT_emit_pylir))
             {

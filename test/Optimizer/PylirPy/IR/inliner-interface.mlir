@@ -74,7 +74,7 @@ py.globalValue const @builtins.None = #py.type
 py.globalValue "private" @function
 
 func.func @inline_foo(%arg0 : i1) -> !py.dynamic {
-    %f = py.constant(@function)
+    %f = py.constant(#py.ref<@function>)
 	%0 = py.function.call %f()
 	cf.cond_br %arg0, ^throw, ^normal_return
 
@@ -101,7 +101,7 @@ func.func @__init__() -> !py.dynamic {
 
 // CHECK-LABEL: @__init__
 // CHECK-NEXT: %[[RANDOM:.*]] = test.random
-// CHECK-NEXT: %[[F:.*]] = py.constant(@function)
+// CHECK-NEXT: %[[F:.*]] = py.constant(#py.ref<@function>)
 // CHECK-NEXT: %[[EX:.*]] = py.function.call %[[F]]()
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
@@ -112,7 +112,7 @@ func.func @__init__() -> !py.dynamic {
 // CHECK-NEXT: ^[[CONTINUE]]
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
 // CHECK-NEXT: test.use(%[[EX]])
-// CHECK-NEXT: %[[F:.*]] = py.constant(@function)
+// CHECK-NEXT: %[[F:.*]] = py.constant(#py.ref<@function>)
 // CHECK-NEXT: %[[EX:.*]] = py.function.invoke %[[F]]()
 // CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[HANDLER:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[SUCCESS]]
@@ -144,7 +144,7 @@ py.globalValue const @builtins.None = #py.type
 py.globalValue "private" @function
 
 func.func @inline_foo() -> !py.dynamic {
-    %0 = py.constant(@builtins.BaseException) loc("source.mlir":146:69)
+    %0 = py.constant(#py.ref<@builtins.BaseException>) loc("source.mlir":146:69)
     %1 = py.makeObject %0 loc("source.mlir":147:49)
 	py.raise %1
 }
@@ -155,7 +155,7 @@ func.func @test_loc() -> !py.dynamic {
 }
 
 // INLINE-LOC-LABEL: @test_loc
-// INLINE-LOC-NEXT: %[[TYPE:.*]] = py.constant(@builtins.BaseException) loc(callsite("source.mlir":146:69 at "source.mlir":152:74))
+// INLINE-LOC-NEXT: %[[TYPE:.*]] = py.constant(#py.ref<@builtins.BaseException>) loc(callsite("source.mlir":146:69 at "source.mlir":152:74))
 // INLINE-LOC-NEXT: %[[EX:.*]] = py.makeObject %[[TYPE]] loc(callsite("source.mlir":147:49 at "source.mlir":152:74))
 // INLINE-LOC-NEXT: py.raise %[[EX]]
 
@@ -172,7 +172,7 @@ py.globalValue const @builtins.None = #py.type
 py.globalValue "private" @function
 
 func.func @inline_foo() -> !py.dynamic {
-    %0 = py.constant(@builtins.BaseException)
+    %0 = py.constant(#py.ref<@builtins.BaseException>)
     %1 = py.makeObject %0
 	py.raise %1
 }
@@ -191,7 +191,7 @@ func.func @__init__() -> !py.dynamic {
 }
 
 // CHECK-LABEL: @__init__
-// CHECK-NEXT: %[[TYPE:.*]] = py.constant(@builtins.BaseException)
+// CHECK-NEXT: %[[TYPE:.*]] = py.constant(#py.ref<@builtins.BaseException>)
 // CHECK-NEXT: %[[EX:.*]] = py.makeObject %[[TYPE]]
 // CHECK-NEXT: py.raise %[[EX]]
 

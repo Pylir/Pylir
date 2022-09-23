@@ -7,12 +7,12 @@ py.globalValue "private" @test
 
 func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = py.typeOf %arg0
-	%1 = py.constant(@builtins.int)
+	%1 = py.constant(#py.ref<@builtins.int>)
 	%2 = py.is %0, %1
 	cf.cond_br %2, ^exit(%arg0 : !py.dynamic), ^call
 
 ^call:
-	%3 = py.constant(@test)
+	%3 = py.constant(#py.ref<@test>)
 	cf.br ^exit(%3 : !py.dynamic)
 
 ^exit(%4 : !py.dynamic):
@@ -27,5 +27,5 @@ func.func @__init__() -> !py.dynamic {
 }
 
 // CHECK-LABEL: func @__init__
-// CHECK: %[[TYPE:.*]] = py.constant(@builtins.int)
+// CHECK: %[[TYPE:.*]] = py.constant(#py.ref<@builtins.int>)
 // CHECK: return %[[TYPE]]

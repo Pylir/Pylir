@@ -65,7 +65,7 @@ def boolean_ops(a, b):
     # CHECK: %[[TUPLE:.*]] = py.makeTuple ()
     # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
     # CHECK: %[[RES:.*]] = py.call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
-    # CHECK: %[[BOOL:.*]] = py.constant(@builtins.bool)
+    # CHECK: %[[BOOL:.*]] = py.constant(#py.ref<@builtins.bool>)
     # CHECK: %[[TYPE:.*]] = py.typeOf %[[RES]]
     # CHECK: %[[IS_BOOL:.*]] = py.is %[[TYPE]], %[[BOOL]]
     # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
@@ -92,7 +92,7 @@ def boolean_ops(a, b):
     # CHECK: %[[TUPLE:.*]] = py.makeTuple ()
     # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
     # CHECK: %[[RES:.*]] = py.call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
-    # CHECK: %[[BOOL:.*]] = py.constant(@builtins.bool)
+    # CHECK: %[[BOOL:.*]] = py.constant(#py.ref<@builtins.bool>)
     # CHECK: %[[TYPE:.*]] = py.typeOf %[[RES]]
     # CHECK: %[[IS_BOOL:.*]] = py.is %[[TYPE]], %[[BOOL]]
     # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
@@ -116,7 +116,7 @@ def boolean_ops(a, b):
     # CHECK: py.store %[[ARG]] : !py.dynamic into @c
 
     c = not a
-    # CHECK: %[[BOOL:.*]] = py.constant(@builtins.bool)
+    # CHECK: %[[BOOL:.*]] = py.constant(#py.ref<@builtins.bool>)
     # CHECK: %[[TYPE:.*]] = py.typeOf %[[A]]
     # CHECK: %[[IS_BOOL:.*]] = py.is %[[TYPE]], %[[BOOL]]
     # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[A]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]

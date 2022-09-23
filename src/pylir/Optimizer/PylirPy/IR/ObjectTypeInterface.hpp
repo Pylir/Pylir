@@ -7,6 +7,8 @@
 #include <mlir/IR/BuiltinAttributes.h>
 #include <mlir/IR/Types.h>
 
+#include "PylirPyRefAttr.hpp"
+
 #include "pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.h.inc"
 
 template <>

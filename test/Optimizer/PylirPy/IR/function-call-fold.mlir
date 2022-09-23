@@ -15,7 +15,7 @@ func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) ->
 py.globalValue @test_function = #py.function<@foo>
 
 func.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(@test_function)
+    %0 = py.constant(#py.ref<@test_function>)
     %1 = py.function.call %0(%0, %arg0, %arg1)
     return %1 : !py.dynamic
 }
@@ -23,7 +23,7 @@ func.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: func @test(
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK-DAG: %[[CLOSURE:.*]] = py.constant(@test_function)
+// CHECK-DAG: %[[CLOSURE:.*]] = py.constant(#py.ref<@test_function>)
 // CHECK-NEXT: %[[RESULT:.*]] = py.call @foo(%[[CLOSURE]], %[[ARG0]], %[[ARG1]])
 // CHECK-NEXT: return %[[RESULT]]
 

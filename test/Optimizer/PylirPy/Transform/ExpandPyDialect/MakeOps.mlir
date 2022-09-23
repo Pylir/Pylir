@@ -25,14 +25,14 @@ func.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: %[[FOUR:.*]] = py.constant(#py.int<4>)
 // CHECK: %[[ONE:.*]] = arith.constant 1
 // CHECK: %[[LIST:.*]] = py.makeList (%[[THREE]])
-// CHECK: %[[ITER_F:.*]] = py.constant(@builtins.iter)
+// CHECK: %[[ITER_F:.*]] = py.constant(#py.ref<@builtins.iter>)
 // CHECK: %[[ARGS:.*]] = py.makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = py.call @pylir__call__(%[[ITER_F]], %[[ARGS]], %[[DICT]])
 // CHECK: cf.br ^[[COND:[[:alnum:]]+]]
 
 // CHECK: ^[[COND]]:
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[ARGS:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ITEM:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[ARGS]], %[[DICT]])
@@ -46,7 +46,7 @@ func.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: cf.br ^[[COND]]
 
 // CHECK: ^[[EXIT]](%[[EXC:.*]]: !py.dynamic):
-// CHECK: %[[STOP_ITER:.*]] = py.constant(@builtins.StopIteration)
+// CHECK: %[[STOP_ITER:.*]] = py.constant(#py.ref<@builtins.StopIteration>)
 // CHECK: %[[EXC_TYPE:.*]] = py.typeOf %[[EXC]]
 // CHECK: %[[IS:.*]] = py.is %[[STOP_ITER]], %[[EXC_TYPE]]
 // CHECK: cf.cond_br %[[IS]], ^[[END:.*]], ^[[RERAISE:[[:alnum:]]+]]
@@ -88,14 +88,14 @@ func.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: %[[FOUR:.*]] = py.constant(#py.int<4>)
 // CHECK: %[[ONE:.*]] = arith.constant 1
 // CHECK: %[[LIST:.*]] = py.makeList (%[[THREE]])
-// CHECK: %[[ITER_F:.*]] = py.constant(@builtins.iter)
+// CHECK: %[[ITER_F:.*]] = py.constant(#py.ref<@builtins.iter>)
 // CHECK: %[[ARGS:.*]] = py.makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = py.call @pylir__call__(%[[ITER_F]], %[[ARGS]], %[[DICT]])
 // CHECK: cf.br ^[[COND:[[:alnum:]]+]]
 
 // CHECK: ^[[COND]]:
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[ARGS:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ITEM:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[ARGS]], %[[DICT]])
@@ -109,7 +109,7 @@ func.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: cf.br ^[[COND]]
 
 // CHECK: ^[[EXIT]](%[[EXC:.*]]: !py.dynamic):
-// CHECK: %[[STOP_ITER:.*]] = py.constant(@builtins.StopIteration)
+// CHECK: %[[STOP_ITER:.*]] = py.constant(#py.ref<@builtins.StopIteration>)
 // CHECK: %[[EXC_TYPE:.*]] = py.typeOf %[[EXC]]
 // CHECK: %[[IS:.*]] = py.is %[[STOP_ITER]], %[[EXC_TYPE]]
 // CHECK: cf.cond_br %[[IS]], ^[[END:.*]], ^[[RERAISE:[[:alnum:]]+]]

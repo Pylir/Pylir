@@ -47,6 +47,8 @@ IncludeCategories:
     Priority: 6
   - Regex: '<.*>'
     Priority: 5
+  - Regex: '".*inc"'
+    Priority: 9
   - Regex: '"pylir/.*"'
     Priority: 7
   - Regex: '".*"'

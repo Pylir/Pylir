@@ -16,7 +16,7 @@ func.func @plusTwo(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^bb1:
 	%1 = py.call @plusOne(%arg0) : (!py.dynamic) -> !py.dynamic
-	%2 = py.constant(@test)
+	%2 = py.constant(#py.ref<@test>)
     return %2 : !py.dynamic
 
 ^bb2:
@@ -46,4 +46,4 @@ func.func @root() -> !py.dynamic {
 }
 
 // CHECK-LABEL: func.func @root
-// CHECK-NOT: py.constant(@builtins.int)
+// CHECK-NOT: py.constant(#py.ref<@builtins.int>)

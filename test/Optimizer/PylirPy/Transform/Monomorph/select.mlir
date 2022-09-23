@@ -9,7 +9,7 @@ func.func @test(%arg1 : i1, %arg2 : i1) -> i1 {
     %1 = py.bool.fromI1 %arg2
     %2 = arith.select %arg0, %0, %1 : !py.dynamic
     %3 = py.typeOf %2
-    %4 = py.constant(@builtins.bool)
+    %4 = py.constant(#py.ref<@builtins.bool>)
     %5 = py.is %3, %4
     return %5 : i1
 }

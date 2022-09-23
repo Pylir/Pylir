@@ -17,7 +17,7 @@ func.func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynami
 }
 
 py.globalValue @builtins.int.__add__ = #py.function<@builtins.int.__add__$impl>
-py.globalValue const @builtins.int = #py.type<slots = {__add__ = @builtins.int.__add__}, mroTuple = #py.tuple<(@builtins.int)>>
+py.globalValue const @builtins.int = #py.type<slots = {__add__ = #py.ref<@builtins.int.__add__>}, mroTuple = #py.tuple<(#py.ref<@builtins.int>)>>
 
 func.func @__init__() {
 	%one = py.constant(#py.int<1>)
@@ -43,7 +43,7 @@ func.func @__init__() {
 // CHECK-DAG: %[[ONE:.*]] = py.constant(#py.int<1>)
 // CHECK-DAG: %[[ZERO:.*]] = py.constant(#py.int<0>)
 // CHECK-DAG: %[[DICT:.*]] = py.constant(#py.dict<{}>)
-// CHECK-DAG: %[[FUNC:.*]] = py.constant(@builtins.int.__add__)
+// CHECK-DAG: %[[FUNC:.*]] = py.constant(#py.ref<@builtins.int.__add__>)
 // CHECK: cf.br ^[[LOOP:.*]](%[[ZERO]] : {{.*}})
 // CHECK-NEXT: ^[[LOOP]]
 // CHECK-SAME: %[[ITER:[[:alnum:]]+]]

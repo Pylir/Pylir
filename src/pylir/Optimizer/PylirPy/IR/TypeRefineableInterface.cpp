@@ -34,7 +34,7 @@ pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion
         {
             return joinTypes(thisType, rhsType);
         }
-        if (rhs.isa<Py::UnboundAttr, mlir::SymbolRefAttr, Py::ObjectAttrInterface>())
+        if (rhs.isa<Py::UnboundAttr, RefAttr, Py::ObjectAttrInterface>())
         {
             return joinTypes(thisType, Py::typeOfConstant(rhs.cast<mlir::Attribute>(), collection, context));
         }
@@ -43,8 +43,7 @@ pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion
     {
         return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>(), collection, context), rhsType);
     }
-    else if (rhs.isa<mlir::SymbolRefAttr, Py::ObjectAttrInterface>()
-             && isa<mlir::SymbolRefAttr, Py::ObjectAttrInterface>())
+    else if (rhs.isa<RefAttr, Py::ObjectAttrInterface>() && isa<RefAttr, Py::ObjectAttrInterface>())
     {
         return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>(), collection, context),
                          Py::typeOfConstant(rhs.cast<mlir::Attribute>(), collection, context));

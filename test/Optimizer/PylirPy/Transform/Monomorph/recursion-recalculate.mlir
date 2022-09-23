@@ -13,7 +13,7 @@ func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 	%1 = py.constant(#py.int<1>)
 	%2 = py.int.add %arg0, %1
 	%3 = py.call @foo(%2) : (!py.dynamic) -> !py.dynamic
-	%4 = py.constant(@test)
+	%4 = py.constant(#py.ref<@test>)
 	return %4 : !py.dynamic
 
 ^exit(%5 : !py.dynamic):

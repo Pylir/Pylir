@@ -177,8 +177,8 @@ def PylirPy_DictAttr : TypeObjectSlotsAttr<"Dict",
 def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	[ParamSpec<AttrParameter<"mlir::FlatSymbolRefAttr", "">, "value">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::StrAttr::get($_ctxt, \"\")">, "qualName">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Builtins::None.name)">, "defaults">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::FlatSymbolRefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kwDefaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "defaults">,
+	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kwDefaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
 	 ], [DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>,
 	     DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<SROAAttrInterface>]>
@@ -200,10 +200,6 @@ def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let mnemonic = "unbound";
     let summary = "python unbound value";
-}
-
-def AnyPylirAttr : AnyAttrOf<[PylirPy_UnboundAttr, SymbolRefAttr, ObjectAttrInterface]> {
-	let valueType = NoneType;
 }
 
 #endif

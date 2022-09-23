@@ -598,8 +598,8 @@ void pylir::Py::UnpackExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     }
     mlir::Type dynamicType = odsBuilder.getType<pylir::Py::DynamicType>();
     build(odsBuilder, odsState, llvm::SmallVector(beforeCount, dynamicType), restIndex ? dynamicType : nullptr,
-          llvm::SmallVector(afterCount, dynamicType), iterable,
-          normal_dest_operands, unwind_dest_operands, happy_path, unwindPath);
+          llvm::SmallVector(afterCount, dynamicType), iterable, normal_dest_operands, unwind_dest_operands, happy_path,
+          unwindPath);
 }
 
 namespace
@@ -666,12 +666,12 @@ template <class T = pylir::Py::ObjectAttrInterface>
 T resolveValue(mlir::Operation* op, mlir::Attribute attr, mlir::SymbolTableCollection& collection,
                bool onlyConstGlobal = true)
 {
-    auto ref = attr.dyn_cast_or_null<mlir::SymbolRefAttr>();
+    auto ref = attr.dyn_cast_or_null<pylir::Py::RefAttr>();
     if (!ref)
     {
         return attr.dyn_cast_or_null<T>();
     }
-    auto value = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
+    auto value = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref.getRef());
     if (!value)
     {
         return nullptr;
@@ -708,9 +708,9 @@ pylir::Py::BuiltinMethodKind getHashFunction(pylir::Py::ObjectAttrInterface attr
             // This can probably only be a result of undefined behaviour.
             continue;
         }
-        if (auto ref = iter.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = iter.dyn_cast<pylir::Py::RefAttr>())
         {
-            auto opt = llvm::StringSwitch<std::optional<pylir::Py::BuiltinMethodKind>>(ref.getValue())
+            auto opt = llvm::StringSwitch<std::optional<pylir::Py::BuiltinMethodKind>>(ref.getRef().getValue())
                            .Case(pylir::Builtins::Int.name, pylir::Py::BuiltinMethodKind::Int)
                            .Case(pylir::Builtins::Str.name, pylir::Py::BuiltinMethodKind::Str)
                            .Case(pylir::Builtins::Object.name, pylir::Py::BuiltinMethodKind::Object)
@@ -758,9 +758,9 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
     auto object = attribute.dyn_cast<pylir::Py::ObjectAttrInterface>();
     if (!object)
     {
-        if (auto ref = attribute.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = attribute.dyn_cast<pylir::Py::RefAttr>())
         {
-            return verifySymbolUse<pylir::Py::GlobalValueOp>(op, ref, collection,
+            return verifySymbolUse<pylir::Py::GlobalValueOp>(op, ref.getRef(), collection,
                                                              pylir::Py::GlobalValueOp::getOperationName());
         }
         if (!attribute.isa<pylir::Py::UnboundAttr>())
@@ -769,7 +769,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
         }
         return mlir::success();
     }
-    if (!collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, object.getTypeObject()))
+    if (!collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, object.getTypeObject().getRef()))
     {
         return op->emitOpError("Type of attribute '") << object.getTypeObject() << "' not found\n";
     }
@@ -830,14 +830,14 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                 {
                     return op->emitOpError("Expected __kwdefaults__ in function attribute\n");
                 }
-                if (!functionAttr.getKwDefaults().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
+                if (!functionAttr.getKwDefaults().isa<pylir::Py::DictAttr, pylir::Py::RefAttr>())
                 {
                     return op->emitOpError("Expected __kwdefaults__ to be a dictionary or symbol reference\n");
                 }
-                if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
-                    ref && ref.getValue() != pylir::Builtins::None.name)
+                if (auto ref = functionAttr.dyn_cast<pylir::Py::RefAttr>();
+                    ref && ref.getRef().getValue() != pylir::Builtins::None.name)
                 {
-                    auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
+                    auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref.getRef());
                     if (!lookup)
                     {
                         return op->emitOpError("Expected __kwdefaults__ to refer to a dictionary\n");
@@ -848,14 +848,14 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                 {
                     return op->emitOpError("Expected __defaults__ in function attribute\n");
                 }
-                if (!functionAttr.getDefaults().isa<pylir::Py::TupleAttr, mlir::FlatSymbolRefAttr>())
+                if (!functionAttr.getDefaults().isa<pylir::Py::TupleAttr, pylir::Py::RefAttr>())
                 {
                     return op->emitOpError("Expected __defaults__ to be a tuple or symbol reference\n");
                 }
-                if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>();
-                    ref && ref.getValue() != pylir::Builtins::None.name)
+                if (auto ref = functionAttr.dyn_cast<pylir::Py::RefAttr>();
+                    ref && ref.getRef().getValue() != pylir::Builtins::None.name)
                 {
-                    auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
+                    auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref.getRef());
                     if (!lookup)
                     {
                         return op->emitOpError("Expected __defaults__ to refer to a tuple\n");
@@ -864,13 +864,13 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                 }
                 if (functionAttr.getDict())
                 {
-                    if (!functionAttr.getDict().isa<pylir::Py::DictAttr, mlir::FlatSymbolRefAttr>())
+                    if (!functionAttr.getDict().isa<pylir::Py::DictAttr, pylir::Py::RefAttr>())
                     {
                         return op->emitOpError("Expected __dict__ to be a dict or symbol reference\n");
                     }
-                    if (auto ref = functionAttr.dyn_cast<mlir::FlatSymbolRefAttr>())
+                    if (auto ref = functionAttr.dyn_cast<pylir::Py::RefAttr>())
                     {
-                        auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
+                        auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref.getRef());
                         if (!lookup)
                         {
                             return op->emitOpError("Expected __dict__ to refer to a dict\n");
@@ -885,9 +885,9 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
             {
                 if (auto result = typeAttr.getSlots().get("__slots__"); result)
                 {
-                    if (auto ref = result.dyn_cast<mlir::FlatSymbolRefAttr>())
+                    if (auto ref = result.dyn_cast<pylir::Py::RefAttr>())
                     {
-                        auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref);
+                        auto lookup = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(op, ref.getRef());
                         if (!lookup || !lookup.getInitializerAttr()
                             || !lookup.getInitializerAttr().isa<pylir::Py::TupleAttr>())
                         {
@@ -973,10 +973,10 @@ mlir::LogicalResult pylir::Py::GlobalOp::verifySymbolUses(::mlir::SymbolTableCol
         .Case(
             [&](DynamicType) -> mlir::LogicalResult
             {
-                if (!getInitializerAttr().isa<ObjectAttrInterface, mlir::FlatSymbolRefAttr, UnboundAttr>())
+                if (!getInitializerAttr().isa<ObjectAttrInterface, RefAttr, UnboundAttr>())
                 {
                     return emitOpError(
-                        "Expected initializer of type 'ObjectAttrInterface' or 'FlatSymbolRefAttr' to global value");
+                        "Expected initializer of type 'ObjectAttrInterface' or 'RefAttr' to global value");
                 }
                 return ::verify(*this, getInitializerAttr(), symbolTable);
             })

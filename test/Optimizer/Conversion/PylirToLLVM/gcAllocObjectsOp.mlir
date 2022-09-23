@@ -7,7 +7,7 @@ py.globalValue const @builtins.tuple = #py.type // stub
 py.globalValue const @builtins.str = #py.type // stub
 
 func.func @foo() -> !pyMem.memory {
-    %0 = py.constant(@builtins.str)
+    %0 = py.constant(#py.ref<@builtins.str>)
     %1 = pyMem.gcAllocObject %0
     return %1 : !pyMem.memory
 }

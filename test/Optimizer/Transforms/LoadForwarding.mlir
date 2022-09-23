@@ -6,7 +6,7 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @foo = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"test">)>}>
 
 func.func @test_get_slot() -> !py.dynamic {
-    %0 = py.constant(@foo)
+    %0 = py.constant(#py.ref<@foo>)
     %1 = py.makeObject %0
     %2 = py.constant(#py.str<"value">)
     py.setSlot "test" of %1 : %0 to %2

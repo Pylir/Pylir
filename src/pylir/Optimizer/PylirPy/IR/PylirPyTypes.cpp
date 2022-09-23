@@ -32,7 +32,7 @@ void pylir::Py::ClassType::walkImmediateSubElements(llvm::function_ref<void(mlir
 mlir::Type pylir::Py::ClassType::replaceImmediateSubElements(::llvm::ArrayRef<::mlir::Attribute> replAttrs,
                                                              ::llvm::ArrayRef<::mlir::Type>) const
 {
-    return get(replAttrs[0].cast<mlir::FlatSymbolRefAttr>());
+    return get(replAttrs[0].cast<RefAttr>());
 }
 
 void pylir::Py::TupleType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
@@ -46,7 +46,7 @@ mlir::Type pylir::Py::TupleType::replaceImmediateSubElements(::llvm::ArrayRef<::
                                                              ::llvm::ArrayRef<::mlir::Type> replTypes) const
 {
     return get(
-        replAttrs[0].cast<mlir::FlatSymbolRefAttr>(),
+        replAttrs[0].cast<RefAttr>(),
         llvm::to_vector(llvm::map_range(replTypes, std::mem_fn(&mlir::Type::cast<pylir::Py::ObjectTypeInterface>))));
 }
 
@@ -138,14 +138,13 @@ pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constan
                                                          mlir::SymbolTableCollection& collection,
                                                          mlir::Operation* context)
 {
-    if (auto ref = constant.dyn_cast<mlir::SymbolRefAttr>())
+    if (auto ref = constant.dyn_cast<RefAttr>())
     {
-        auto globalVal = collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context, ref);
-        if (globalVal.isDeclaration())
+        if (!ref.getSymbol().getInitializerAttr())
         {
             return nullptr;
         }
-        return typeOfConstant(globalVal.getInitializerAttr(), collection, context);
+        return typeOfConstant(ref.getSymbol().getInitializerAttr(), collection, context);
     }
     if (constant.isa<pylir::Py::UnboundAttr>())
     {
