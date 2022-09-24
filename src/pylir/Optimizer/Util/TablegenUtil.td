@@ -16,9 +16,9 @@ class ParamSpec<AttrOrTypeParameter m_type, string m_name, string m_defaultArg =
 }
 
 class ParamSpecBuilder<list<ParamSpec> spec, code extraCode = ""> : AttrBuilder<!dag(ins,
-											!foreach(x, spec, CArg<x.type.cppType, !if(x.type.isOptional, "{}", x.defaultArg)>),
-															!foreach(x, spec, x.name)),
-	!interleave(!foreach(x, !filter(x, spec, x.type.isOptional),
+    !foreach(x, spec, CArg<x.type.cppType, !if(!not(!empty(x.type.defaultValue)), "{}", x.defaultArg)>),
+        !foreach(x, spec, x.name)),
+	!interleave(!foreach(x, !filter(x, spec, !not(!empty(x.type.defaultValue))),
 					x.name # " = " # x.name # " ? " # x.name # " : " # x.type.defaultValue # ";\n"), "") # extraCode #
 	"return Base::get($_ctxt, " # !interleave(!foreach(x, spec, x.name), ", ") # ");"
 >;
@@ -33,7 +33,6 @@ class CustomPrint<AttrOrTypeParameter x, string elementParse = ?, string element
 	let comparator = x.comparator;
 	let cppStorageType = x.cppStorageType;
 	let syntax = x.syntax;
-	let isOptional = x.isOptional;
 	let defaultValue = x.defaultValue;
 
 	let parser = elementParse;

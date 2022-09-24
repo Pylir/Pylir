@@ -28,7 +28,7 @@ runs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: 82f86b862b8ba9b1c6d91a32c88907f0dad6c3d2
+        ref: de3efd1b4c8e120c37b24e7cc264b5a117641bb1
         path: llvm-project
 
     - name: Configure Optimized TableGen
