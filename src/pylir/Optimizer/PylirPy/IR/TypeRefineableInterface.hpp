@@ -104,7 +104,7 @@ public:
         return isa_and_nonnull<T>() ? cast<T>() : nullptr;
     }
 
-    TypeAttrUnion join(TypeAttrUnion rhs, mlir::SymbolTableCollection& collection, mlir::Operation* context);
+    pylir::Py::TypeAttrUnion join(pylir::Py::TypeAttrUnion rhs);
 
     using Base::operator bool;
 

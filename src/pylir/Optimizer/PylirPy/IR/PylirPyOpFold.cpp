@@ -935,17 +935,15 @@ mlir::LogicalResult pylir::Py::LoadOp::foldUsage(mlir::Operation* lastClobber,
 
 pylir::Py::TypeRefineResult
     pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion>,
-                                       llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                       mlir::SymbolTableCollection& table)
+                                       llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
-    result.push_back(typeOfConstant(getConstantAttr(), table, *this));
+    result.push_back(typeOfConstant(getConstantAttr()));
     return TypeRefineResult::Success;
 }
 
 pylir::Py::TypeRefineResult
     pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
-                                          llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                          mlir::SymbolTableCollection&)
+                                          llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
     result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
     return TypeRefineResult::Approximate;
@@ -953,8 +951,7 @@ pylir::Py::TypeRefineResult
 
 pylir::Py::TypeRefineResult
     pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
-                                        llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                        mlir::SymbolTableCollection&)
+                                        llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
     if (!getIterExpansionAttr().empty())
     {
@@ -977,8 +974,7 @@ pylir::Py::TypeRefineResult
 
 pylir::Py::TypeRefineResult
     pylir::Py::TupleCopyOp::refineTypes(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
-                                        ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes,
-                                        ::mlir::SymbolTableCollection&)
+                                        ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes)
 {
     auto typeObject = inputs[1].dyn_cast_or_null<RefAttr>();
     if (!typeObject)
@@ -997,8 +993,7 @@ pylir::Py::TypeRefineResult
 
 pylir::Py::TypeRefineResult
     pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion> argumentTypes,
-                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                           mlir::SymbolTableCollection&)
+                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
     auto tupleType = argumentTypes[0].dyn_cast_or_null<pylir::Py::TupleType>();
     if (!tupleType)
@@ -1033,8 +1028,7 @@ pylir::Py::TypeRefineResult
 
 pylir::Py::TypeRefineResult
     pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
-                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                             mlir::SymbolTableCollection&)
+                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
     auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
     if (!tupleType)
@@ -1070,8 +1064,7 @@ pylir::Py::TypeRefineResult
 
 pylir::Py::TypeRefineResult
     pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
-                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                           mlir::SymbolTableCollection&)
+                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
     auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
     // TODO: Once/if tuple type accepts nullptr elements (for unknown), the below or should not be necessary
@@ -1093,8 +1086,7 @@ struct ArithSelectTypeRefinable
     : public pylir::Py::TypeRefineableInterface::ExternalModel<ArithSelectTypeRefinable, mlir::arith::SelectOp>
 {
     pylir::Py::TypeRefineResult refineTypes(mlir::Operation*, ::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
-                                            ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes,
-                                            ::mlir::SymbolTableCollection&) const
+                                            ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes) const
     {
         auto lhsType = inputs[1].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
         auto rhsType = inputs[2].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();

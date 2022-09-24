@@ -228,7 +228,7 @@ public:
                             if (mlir::failed(interface.exec(
                                     llvm::to_vector(llvm::map_range(interface->getOperands(),
                                                                     [&](mlir::Value val) { return m_values[val]; })),
-                                    result, collection)))
+                                    result)))
                             {
                                 for (auto iter : interface->getOpResults())
                                 {
@@ -288,8 +288,7 @@ public:
                                 else if (lookup.isa<pylir::Py::ObjectAttrInterface, pylir::Py::RefAttr,
                                                     pylir::Py::UnboundAttr>())
                                 {
-                                    returnValue =
-                                        pylir::Py::typeOfConstant(lookup.cast<mlir::Attribute>(), collection, context);
+                                    returnValue = pylir::Py::typeOfConstant(lookup.cast<mlir::Attribute>());
                                 }
                             }
                             return returnedValues;
@@ -353,8 +352,7 @@ public:
                                 else if (value.template isa_and_nonnull<pylir::Py::ObjectAttrInterface,
                                                                         pylir::Py::RefAttr, pylir::Py::UnboundAttr>())
                                 {
-                                    argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>(),
-                                                                         collection, context);
+                                    argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>());
                                 }
                             }
                             return FunctionCall{FunctionSpecialization{function, std::move(arguments)},
@@ -479,7 +477,7 @@ class Orchestrator
                     auto [existing, inserted] = values.insert({arg, succValue});
                     if (!inserted)
                     {
-                        existing->second = existing->second.join(succValue, collection, m_context);
+                        existing->second = existing->second.join(succValue);
                     }
                     blockArgs[arg.getArgNumber()] = existing->second;
                 }

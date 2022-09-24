@@ -49,8 +49,7 @@ public:
     {
     public:
         pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
-                                                llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                                mlir::SymbolTableCollection&)
+                                                llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
         {
             auto* context = this->getOperation()->getContext();
             result.emplace_back(pylir::Py::ClassType::get(RefAttr::get(context, builtin.name)));
@@ -64,8 +63,7 @@ class RefinedTypeTupleApproximate : public TypeRefineableInterface::Trait<Concre
 {
 public:
     pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
-                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                            mlir::SymbolTableCollection&)
+                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
     {
         result.emplace_back(Py::ClassType::get(RefAttr::get(this->getOperation()->getContext(), Builtins::Tuple.name)));
         return TypeRefineResult::Approximate;
@@ -77,8 +75,7 @@ class RefinedObjectFromTypeObjectImpl : public TypeRefineableInterface::Trait<Co
 {
 public:
     pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> operands,
-                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result,
-                                            mlir::SymbolTableCollection&)
+                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
     {
         RefAttr type = operands[mlir::cast<ConcreteType>(this->getOperation()).getTypeObjectIndex()]
                            .template dyn_cast_or_null<RefAttr>();

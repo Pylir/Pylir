@@ -22,9 +22,8 @@ mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value)
     if (auto refineable = value.getDefiningOp<Py::TypeRefineableInterface>())
     {
         llvm::SmallVector<Py::TypeAttrUnion> operandTypes(refineable->getNumOperands(), nullptr);
-        mlir::SymbolTableCollection collection;
         llvm::SmallVector<Py::ObjectTypeInterface> res;
-        if (refineable.refineTypes(operandTypes, res, collection) == TypeRefineResult::Failure)
+        if (refineable.refineTypes(operandTypes, res) == TypeRefineResult::Failure)
         {
             return nullptr;
         }
@@ -59,8 +58,7 @@ llvm::Optional<bool> pylir::Py::isUnbound(mlir::Value value)
     return llvm::None;
 }
 
-pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInterface attribute,
-                                                        mlir::Operation* context)
+pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(ObjectAttrInterface attribute)
 {
     if (!attribute)
     {

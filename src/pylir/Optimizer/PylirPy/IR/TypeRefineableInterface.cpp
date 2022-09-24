@@ -8,9 +8,7 @@
 
 #include "PylirPyAttributes.hpp"
 
-pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion rhs,
-                                                        mlir::SymbolTableCollection& collection,
-                                                        mlir::Operation* context)
+pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion rhs)
 {
     if (!rhs || !*this)
     {
@@ -36,17 +34,17 @@ pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion
         }
         if (rhs.isa<Py::UnboundAttr, RefAttr, Py::ObjectAttrInterface>())
         {
-            return joinTypes(thisType, Py::typeOfConstant(rhs.cast<mlir::Attribute>(), collection, context));
+            return joinTypes(thisType, Py::typeOfConstant(rhs.cast<mlir::Attribute>()));
         }
     }
     else if (auto rhsType = rhs.dyn_cast<ObjectTypeInterface>())
     {
-        return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>(), collection, context), rhsType);
+        return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>()), rhsType);
     }
     else if (rhs.isa<RefAttr, Py::ObjectAttrInterface>() && isa<RefAttr, Py::ObjectAttrInterface>())
     {
-        return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>(), collection, context),
-                         Py::typeOfConstant(rhs.cast<mlir::Attribute>(), collection, context));
+        return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>()),
+                         Py::typeOfConstant(rhs.cast<mlir::Attribute>()));
     }
     return {};
 }
@@ -62,7 +60,7 @@ void pylir::Py::TypeAttrUnion::dump()
     {
         return attr.dump();
     }
-    else if (auto type = dyn_cast<Py::ObjectTypeInterface>())
+    if (auto type = dyn_cast<Py::ObjectTypeInterface>())
     {
         return type.dump();
     }

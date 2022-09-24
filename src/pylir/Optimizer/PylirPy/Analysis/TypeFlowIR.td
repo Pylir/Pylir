@@ -96,7 +96,6 @@ defvar foldAsExec = [{
 mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     llvm::SmallVector<::pylir::TypeFlow::OpFoldResult> res;
-    mlir::SymbolTableCollection collection;
     if (mlir::failed(exec(llvm::to_vector(llvm::map_range(operands, [](mlir::Attribute attr) -> ::pylir::Py::TypeAttrUnion {
         if (auto typeAttr = attr.dyn_cast_or_null<mlir::TypeAttr>())
         {
@@ -106,7 +105,7 @@ mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
         {
             return attr;
         }
-    })), res, collection)))
+    })), res)))
     {
         return nullptr;
     }
@@ -173,7 +172,6 @@ def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOp
 	let extraClassDeclaration = [{
         mlir::LogicalResult exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
                                  ::llvm::SmallVectorImpl<OpFoldResult>& results,
-                                 ::mlir::SymbolTableCollection& collection,
                                  bool forFolding);
 	}];
 }

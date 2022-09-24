@@ -134,9 +134,7 @@ bool pylir::Py::isMoreSpecific(pylir::Py::ObjectTypeInterface lhs, pylir::Py::Ob
     return rhs.isa<Py::TupleType>();
 }
 
-pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constant,
-                                                         mlir::SymbolTableCollection& collection,
-                                                         mlir::Operation* context)
+pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constant)
 {
     if (auto ref = constant.dyn_cast<RefAttr>())
     {
@@ -144,23 +142,23 @@ pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constan
         {
             return nullptr;
         }
-        return typeOfConstant(ref.getSymbol().getInitializerAttr(), collection, context);
+        return typeOfConstant(ref.getSymbol().getInitializerAttr());
     }
-    if (constant.isa<pylir::Py::UnboundAttr>())
+    if (constant.isa<UnboundAttr>())
     {
-        return pylir::Py::UnboundType::get(constant.getContext());
+        return UnboundType::get(constant.getContext());
     }
-    if (auto tuple = constant.dyn_cast<pylir::Py::TupleAttr>())
+    if (auto tuple = constant.dyn_cast<TupleAttr>())
     {
-        llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
+        llvm::SmallVector<ObjectTypeInterface> elementTypes;
         for (const auto& iter : tuple.getValue())
         {
-            elementTypes.push_back(typeOfConstant(iter, collection, context));
+            elementTypes.push_back(typeOfConstant(iter));
         }
-        return pylir::Py::TupleType::get(tuple.getTypeObject(), elementTypes);
+        return TupleType::get(tuple.getTypeObject(), elementTypes);
     }
-    auto object = constant.cast<pylir::Py::ObjectAttrInterface>();
-    return pylir::Py::ClassType::get(object.getTypeObject());
+    auto object = constant.cast<ObjectAttrInterface>();
+    return ClassType::get(object.getTypeObject());
 }
 
 #define GET_TYPEDEF_CLASSES
