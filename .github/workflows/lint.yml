@@ -1,0 +1,92 @@
+name: Lint
+
+on:
+  pull_request: { }
+  push: { }
+
+
+jobs:
+  lint-run:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Install dependencies
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 15 all
+          sudo apt update
+          sudo apt install libunwind-dev lld g++-10
+          
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      # Required by clang-tidy-diff.py.
+      - name: Install Python depends
+        run: |
+          python -m pip install pyyaml
+
+      - name: Install Ninja
+        uses: ashutoshvarma/setup-ninja@v1.1
+
+      - name: Checkout Pylir
+        uses: actions/checkout@v3
+        with:
+          path: Pylir
+          # Depth 2 because we use git diff HEAD^ later.
+          fetch-depth: 2
+
+      # We are reusing the clang++ Linux build without sanitizers. Hence also reusing its cache key.
+      - name: Install CCache
+        uses: hendrikmuhs/ccache-action@v1.2.2
+        with:
+          max-size: 2G
+          key: ${{runner.os}}--clang++
+
+      - name: Build LLVM
+        id: llvm-build
+        uses: ./Pylir/.github/actions/llvm-build
+        with:
+          c-compiler: clang
+          cpp-compiler: clang++
+
+      # Since we are reusing the cache from the normal build we should also use the same compiler options here.
+      - name: Configure Pylir
+        run: |
+          cmake -GNinja -Bpylir-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPYLIR_EMBED_LLD=ON \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER=clang \
+            -DPython3_EXECUTABLE="$(which python)" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
+            -DPYLIR_ENABLE_ASSERTIONS=ON \
+            -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" \
+            -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" \
+            -DLLD_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/lld/" \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -S ${{github.workspace}}/Pylir
+
+      # Even if compilation were to fail, build as many targets as possible to make sure that all code created by
+      # code generators has been generated.
+      - name: Build Pylir
+        continue-on-error: true
+        run: |
+          cmake --build pylir-build -- -k0
+
+      # We let clang-tidy output a fixes.yml file. If no warnings have ever been emitted it will be empty, otherwise
+      # we exit with an error code.
+      - name: Run clang-tidy
+        working-directory: ${{github.workspace}}/Pylir
+        run: |
+          git diff -U0 HEAD^ | \
+          clang-tidy-diff-15.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
+            -export-fixes ${{github.workspace}}/fixes.yml
+          if [ -s ${{github.workspace}}/fixes.yml ] 
+          then
+            exit 1
+          fi
