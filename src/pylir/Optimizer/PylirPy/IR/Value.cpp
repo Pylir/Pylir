@@ -67,12 +67,12 @@ pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInt
         return BuiltinMethodKind::Unknown;
     }
 
-    auto typeAttr = resolveValue<TypeAttr>(context, attribute.getTypeObject(), false);
+    auto typeAttr = ref_cast_or_null<TypeAttr>(attribute.getTypeObject(), false);
     if (!typeAttr)
     {
         return BuiltinMethodKind::Unknown;
     }
-    auto mro = resolveValue<TupleAttr>(context, typeAttr.getMroTuple(), false);
+    auto mro = ref_cast_or_null<TupleAttr>(typeAttr.getMroTuple(), false);
     if (!mro)
     {
         return BuiltinMethodKind::Unknown;
@@ -96,7 +96,7 @@ pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInt
                 return *opt;
             }
         }
-        auto baseType = resolveValue<TypeAttr>(context, iter);
+        auto baseType = ref_cast_or_null<TypeAttr>(iter);
         if (!baseType)
         {
             return BuiltinMethodKind::Unknown;

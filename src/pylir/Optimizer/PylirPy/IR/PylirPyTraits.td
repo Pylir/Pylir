@@ -8,8 +8,13 @@
 #define PYLIR_PY_TRAITS_TABLEGEN
 
 include "pylir/Optimizer/PylirPy/Interfaces/ObjectFromTypeObjectInterface.td"
+include "mlir/IR/AttrTypeBase.td"
 
 class PylirPyOpTrait<string name> : NativeOpTrait<name> {
+    let cppNamespace = "pylir::Py";
+}
+
+class PylirPyAttrTrait<string name> : NativeAttrTrait<name> {
     let cppNamespace = "pylir::Py";
 }
 
@@ -38,5 +43,9 @@ def RefinedTypeTupleApproximate : PylirPyOpTrait<"RefinedTypeTupleApproximate">;
 /// implementation.
 def RefinedObjectFromTypeObject : TraitList<[PylirPyOpTrait<"RefinedObjectFromTypeObjectImpl">,
                                              ObjectFromTypeObjectInterface]>;
+
+/// Indicates that an attribute is of an immutable python object. This is mainly useful for the initializer of
+/// 'py.globalValue'.
+def ImmutableAttr : PylirPyAttrTrait<"ImmutableAttr">;
 
 #endif

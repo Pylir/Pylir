@@ -10,6 +10,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.td"
 include "pylir/Optimizer/PylirPy/IR/IntAttrInterface.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
 include "pylir/Optimizer/Util/TablegenUtil.td"
 include "mlir/IR/SubElementInterfaces.td"
@@ -57,7 +58,7 @@ def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [
 def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
 	ParamSpec<CustomPrint<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">,
 											?, "$_printer << $_self.toString();">, "value">],
-	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
+	[DeclareAttrInterfaceMethods<IntAttrInterface>, ImmutableAttr]> {
 	let mnemonic = "int";
 	let summary = "python integer";
 
@@ -84,14 +85,14 @@ def PylirPy_BoolAttr : TypeObjectSlotsAttr<"Bool", [ParamSpec<CustomPrint<AttrPa
 }], [{
 	$_printer << ($_self ? "True" : "False");
 }]>, "value">],
-	[DeclareAttrInterfaceMethods<IntAttrInterface>]> {
+	[DeclareAttrInterfaceMethods<IntAttrInterface>, ImmutableAttr]> {
 	let mnemonic = "bool";
 	let summary = "python boolean";
 
 	let assemblyFormat = "`<`$value ( `,` struct($typeObject, $slots)^)?`>`";
 }
 
-def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter<"">, "value">]> {
+def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter<"">, "value">], [ImmutableAttr]> {
 	let mnemonic = "float";
 	let summary = "python float";
 
@@ -109,7 +110,7 @@ def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRe
 	$_printer << "\"";
 	llvm::printEscapedString($_self, $_printer.getStream());
 	$_printer << "\"";
-}]>, "value">]> {
+}]>, "value">], [ImmutableAttr]> {
 	let mnemonic = "str";
 	let summary = "python string";
 
@@ -117,7 +118,7 @@ def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRe
 }
 
 def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
-	[ParamSpec<ListPrint<"::mlir::Attribute", "Paren">, "value", "{}">]> {
+	[ParamSpec<ListPrint<"::mlir::Attribute", "Paren">, "value", "{}">], [ImmutableAttr]> {
 	let mnemonic = "tuple";
 	let summary = "python tuple";
 
@@ -181,7 +182,8 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kwDefaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
 	 ], [DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>,
-	     DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<SROAAttrInterface>]>
+	     DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<SROAAttrInterface>,
+	     ImmutableAttr]>
 {
 	let mnemonic = "function";
 	let summary = "python function";
@@ -190,7 +192,8 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 }
 
 def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
-	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctxt, {})">, "mroTuple">]> {
+	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctxt, {})">, "mroTuple">],
+	[ImmutableAttr]> {
 	let mnemonic = "type";
 	let summary = "python type";
 

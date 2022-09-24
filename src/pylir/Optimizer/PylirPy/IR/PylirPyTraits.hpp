@@ -91,4 +91,9 @@ public:
     }
 };
 
+template <class ConcreteType>
+class ImmutableAttr : public mlir::AttributeTrait::TraitBase<ConcreteType, ImmutableAttr>
+{
+};
+
 } // namespace pylir::Py
