@@ -122,6 +122,6 @@ jobs:
 
       - name: Run clang-format on changes
         run: |
-          python $(which git-clang-format-$LLVM_VERSION) HEAD^
+          python $(which git-clang-format-$LLVM_VERSION) --binary $(which clang-format-$LLVM_VERSION) HEAD^
           git diff -U0 --exit-code --no-prefix
 
