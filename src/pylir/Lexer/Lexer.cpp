@@ -25,7 +25,7 @@ namespace
 {
 #pragma region unicode
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-constexpr llvm::sys::UnicodeCharRange initialCharacters[] = {
+constexpr llvm::sys::UnicodeCharRange INITIAL_CHARACTERS[] = {
     {0x41, 0x5a},       {0x5f, 0x5f},       {0x61, 0x7a},       {0xaa, 0xaa},       {0xb5, 0xb5},
     {0xba, 0xba},       {0xc0, 0xd6},       {0xd8, 0xf6},       {0xf8, 0x13e},      {0x141, 0x2c1},
     {0x2c6, 0x2d1},     {0x2e0, 0x2e4},     {0x2ec, 0x2ec},     {0x2ee, 0x2ee},     {0x370, 0x374},
@@ -152,7 +152,7 @@ constexpr llvm::sys::UnicodeCharRange initialCharacters[] = {
     {0x20000, 0x2a6d6}, {0x2a700, 0x2b734}, {0x2b740, 0x2b81d}, {0x2b820, 0x2cea1}, {0x2ceb0, 0x2ebe0},
 };
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-constexpr llvm::sys::UnicodeCharRange legalIdentifiers[] = {
+constexpr llvm::sys::UnicodeCharRange LEGAL_IDENTIFIERS[] = {
     {0x30, 0x39},       {0x41, 0x5a},       {0x5f, 0x5f},       {0x61, 0x7a},       {0xaa, 0xaa},
     {0xb5, 0xb5},       {0xba, 0xba},       {0xc0, 0xd6},       {0xd8, 0xf6},       {0xf8, 0x13e},
     {0x141, 0x2c1},     {0x2c6, 0x2d1},     {0x2e0, 0x2e4},     {0x2ec, 0x2ec},     {0x2ee, 0x2ee},
@@ -750,7 +750,7 @@ bool pylir::Lexer::parseNext()
 
 void pylir::Lexer::parseIdentifier()
 {
-    static auto initialCharacterSet = llvm::sys::UnicodeCharSet(initialCharacters);
+    static auto initialCharacterSet = llvm::sys::UnicodeCharSet(INITIAL_CHARACTERS);
     if (!initialCharacterSet.contains(*m_current))
     {
         createError(m_current - m_diagManager->getDocument().begin(), Diag::UNEXPECTED_CHARACTER_N,
@@ -760,7 +760,7 @@ void pylir::Lexer::parseIdentifier()
         m_current++;
         return;
     }
-    static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
+    static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(LEGAL_IDENTIFIERS);
     const auto* start = m_current;
     m_current = std::find_if_not(m_current, m_diagManager->getDocument().end(),
                                  [&](char32_t value) { return legalIdentifierSet.contains(value); });
@@ -1328,7 +1328,7 @@ void pylir::Lexer::parseNumber()
     }
     auto checkSuffix = [&]
     {
-        static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(legalIdentifiers);
+        static auto legalIdentifierSet = llvm::sys::UnicodeCharSet(LEGAL_IDENTIFIERS);
         const auto* suffixEnd = std::find_if_not(m_current, m_diagManager->getDocument().end(),
                                                  [&](char32_t value) { return legalIdentifierSet.contains(value); });
         if (suffixEnd != m_current)

@@ -487,7 +487,9 @@ public:
 
     enum class Runtime
     {
-        Memcmp,
+        // NOLINTBEGIN(readability-identifier-naming): For clarity purpose, these enum values should have the exact same
+        // case as the actual functions they're representing.
+        memcmp,
         malloc,
         mp_init_u64,
         mp_init_i64,
@@ -506,6 +508,7 @@ public:
         pylir_dict_erase,
         pylir_print,
         pylir_raise,
+        // NOLINTEND(readability-identifier-naming)
     };
 
     mlir::Value createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder, Runtime func, mlir::ValueRange args)
@@ -516,7 +519,7 @@ public:
         llvm::SmallVector<llvm::StringRef> passThroughAttributes;
         switch (func)
         {
-            case Runtime::Memcmp:
+            case Runtime::memcmp:
                 returnType = m_cabi->getInt(&getContext());
                 argumentTypes = {builder.getType<mlir::LLVM::LLVMPointerType>(),
                                  builder.getType<mlir::LLVM::LLVMPointerType>(), getIndexType()};
@@ -2123,7 +2126,7 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrE
         rewriter.setInsertionPointToStart(bufferCmp);
         auto lhsBuffer = mlir::Value{lhs.elementPtr(op.getLoc()).load(op.getLoc())};
         auto rhsBuffer = mlir::Value{rhs.elementPtr(op.getLoc()).load(op.getLoc())};
-        auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::Memcmp,
+        auto result = createRuntimeCall(op.getLoc(), rewriter, PylirTypeConverter::Runtime::memcmp,
                                         {lhsBuffer, rhsBuffer, lhsLen});
         zeroI = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), getInt(), rewriter.getI32IntegerAttr(0));
         auto isZero = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, result, zeroI);

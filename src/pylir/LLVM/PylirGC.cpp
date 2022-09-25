@@ -40,7 +40,7 @@ public:
 };
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-llvm::GCRegistry::Add<PylirGCStrategy> X("pylir-gc", "Garbage collector in Pylir");
+llvm::GCRegistry::Add<PylirGCStrategy> x("pylir-gc", "Garbage collector in Pylir");
 
 class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
 {
@@ -227,7 +227,7 @@ public:
 };
 
 // NOLINTNEXTLINE(cert-err58-cpp)
-llvm::GCMetadataPrinterRegistry::Add<PylirGCMetaDataPrinter> Y("pylir-gc", "Pylir GC stackmap writer");
+llvm::GCMetadataPrinterRegistry::Add<PylirGCMetaDataPrinter> y("pylir-gc", "Pylir GC stackmap writer");
 
 } // namespace
 

@@ -17,7 +17,7 @@
 using llvm::opt::HelpHidden;
 
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
-static const llvm::opt::OptTable::Info InfoTable[] = {
+static constexpr llvm::opt::OptTable::Info INFO_TABLE[] = {
 #define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) \
     {PREFIX,                                                                                             \
      NAME,                                                                                               \
@@ -35,7 +35,7 @@ static const llvm::opt::OptTable::Info InfoTable[] = {
 #undef OPTION
 };
 
-pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(InfoTable) {}
+pylir::cli::PylirOptTable::PylirOptTable() : llvm::opt::OptTable(INFO_TABLE) {}
 
 pylir::cli::CommandLine::CommandLine(std::string exe, int argc, char** argv,
                                      pylir::Diag::DiagnosticsManager& diagnosticsManager)

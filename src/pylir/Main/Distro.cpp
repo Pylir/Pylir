@@ -22,28 +22,28 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/Threading.h>
 
-static pylir::Distro::DistroType DetectOsRelease()
+static pylir::Distro::DistroType detectOsRelease()
 {
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> File = llvm::MemoryBuffer::getFile("/etc/os-release");
-    if (!File)
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> file = llvm::MemoryBuffer::getFile("/etc/os-release");
+    if (!file)
     {
-        File = llvm::MemoryBuffer::getFile("/usr/lib/os-release");
+        file = llvm::MemoryBuffer::getFile("/usr/lib/os-release");
     }
-    if (!File)
+    if (!file)
     {
         return pylir::Distro::UnknownDistro;
     }
 
-    llvm::SmallVector<llvm::StringRef, 16> Lines;
-    File.get()->getBuffer().split(Lines, "\n");
-    pylir::Distro::DistroType Version = pylir::Distro::UnknownDistro;
+    llvm::SmallVector<llvm::StringRef, 16> lines;
+    file.get()->getBuffer().split(lines, "\n");
+    pylir::Distro::DistroType version = pylir::Distro::UnknownDistro;
 
     // Obviously this can be improved a lot.
-    for (llvm::StringRef Line : Lines)
+    for (llvm::StringRef line : lines)
     {
-        if (Version == pylir::Distro::UnknownDistro && Line.startswith("ID="))
+        if (version == pylir::Distro::UnknownDistro && line.startswith("ID="))
         {
-            Version = llvm::StringSwitch<pylir::Distro::DistroType>(Line.substr(3))
+            version = llvm::StringSwitch<pylir::Distro::DistroType>(line.substr(3))
                           .Case("alpine", pylir::Distro::AlpineLinux)
                           .Case("fedora", pylir::Distro::Fedora)
                           .Case("gentoo", pylir::Distro::Gentoo)
@@ -55,26 +55,26 @@ static pylir::Distro::DistroType DetectOsRelease()
                           .Default(pylir::Distro::UnknownDistro);
         }
     }
-    return Version;
+    return version;
 }
 
-static pylir::Distro::DistroType DetectLsbRelease()
+static pylir::Distro::DistroType detectLsbRelease()
 {
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> File = llvm::MemoryBuffer::getFile("/etc/lsb-release");
-    if (!File)
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> file = llvm::MemoryBuffer::getFile("/etc/lsb-release");
+    if (!file)
     {
         return pylir::Distro::UnknownDistro;
     }
 
-    llvm::SmallVector<llvm::StringRef, 16> Lines;
-    File.get()->getBuffer().split(Lines, "\n");
-    pylir::Distro::DistroType Version = pylir::Distro::UnknownDistro;
+    llvm::SmallVector<llvm::StringRef, 16> lines;
+    file.get()->getBuffer().split(lines, "\n");
+    pylir::Distro::DistroType version = pylir::Distro::UnknownDistro;
 
-    for (llvm::StringRef Line : Lines)
+    for (llvm::StringRef line : lines)
     {
-        if (Version == pylir::Distro::UnknownDistro && Line.startswith("DISTRIB_CODENAME="))
+        if (version == pylir::Distro::UnknownDistro && line.startswith("DISTRIB_CODENAME="))
         {
-            Version = llvm::StringSwitch<pylir::Distro::DistroType>(Line.substr(17))
+            version = llvm::StringSwitch<pylir::Distro::DistroType>(line.substr(17))
                           .Case("hardy", pylir::Distro::UbuntuHardy)
                           .Case("intrepid", pylir::Distro::UbuntuIntrepid)
                           .Case("jaunty", pylir::Distro::UbuntuJaunty)
@@ -107,50 +107,50 @@ static pylir::Distro::DistroType DetectLsbRelease()
                           .Default(pylir::Distro::UnknownDistro);
         }
     }
-    return Version;
+    return version;
 }
 
-static pylir::Distro::DistroType DetectDistro()
+static pylir::Distro::DistroType detectDistro()
 {
-    pylir::Distro::DistroType Version;
+    pylir::Distro::DistroType version;
 
     // Newer freedesktop.org's compilant systemd-based systems
     // should provide /etc/os-release or /usr/lib/os-release.
-    Version = DetectOsRelease();
-    if (Version != pylir::Distro::UnknownDistro)
+    version = detectOsRelease();
+    if (version != pylir::Distro::UnknownDistro)
     {
-        return Version;
+        return version;
     }
 
     // Older systems might provide /etc/lsb-release.
-    Version = DetectLsbRelease();
-    if (Version != pylir::Distro::UnknownDistro)
+    version = detectLsbRelease();
+    if (version != pylir::Distro::UnknownDistro)
     {
-        return Version;
+        return version;
     }
 
     // Otherwise try some distro-specific quirks for RedHat...
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> File = llvm::MemoryBuffer::getFile("/etc/redhat-release");
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> file = llvm::MemoryBuffer::getFile("/etc/redhat-release");
 
-    if (File)
+    if (file)
     {
-        llvm::StringRef Data = File.get()->getBuffer();
-        if (Data.startswith("Fedora release"))
+        llvm::StringRef data = file.get()->getBuffer();
+        if (data.startswith("Fedora release"))
         {
             return pylir::Distro::Fedora;
         }
-        if (Data.startswith("Red Hat Enterprise Linux") || Data.startswith("CentOS")
-            || Data.startswith("Scientific Linux"))
+        if (data.startswith("Red Hat Enterprise Linux") || data.startswith("CentOS")
+            || data.startswith("Scientific Linux"))
         {
-            if (Data.contains("release 7"))
+            if (data.contains("release 7"))
             {
                 return pylir::Distro::RHEL7;
             }
-            if (Data.contains("release 6"))
+            if (data.contains("release 6"))
             {
                 return pylir::Distro::RHEL6;
             }
-            if (Data.contains("release 5"))
+            if (data.contains("release 5"))
             {
                 return pylir::Distro::RHEL5;
             }
@@ -159,15 +159,15 @@ static pylir::Distro::DistroType DetectDistro()
     }
 
     // ...for Debian
-    File = llvm::MemoryBuffer::getFile("/etc/debian_version");
-    if (File)
+    file = llvm::MemoryBuffer::getFile("/etc/debian_version");
+    if (file)
     {
-        llvm::StringRef Data = File.get()->getBuffer();
+        llvm::StringRef data = file.get()->getBuffer();
         // Contents: < major.minor > or < codename/sid >
-        int MajorVersion;
-        if (!Data.split('.').first.getAsInteger(10, MajorVersion))
+        int majorVersion;
+        if (!data.split('.').first.getAsInteger(10, majorVersion))
         {
-            switch (MajorVersion)
+            switch (majorVersion)
             {
                 case 5: return pylir::Distro::DebianLenny;
                 case 6: return pylir::Distro::DebianSqueeze;
@@ -180,7 +180,7 @@ static pylir::Distro::DistroType DetectDistro()
                 default: return pylir::Distro::UnknownDistro;
             }
         }
-        return llvm::StringSwitch<pylir::Distro::DistroType>(Data.split("\n").first)
+        return llvm::StringSwitch<pylir::Distro::DistroType>(data.split("\n").first)
             .Case("squeeze/sid", pylir::Distro::DebianSqueeze)
             .Case("wheezy/sid", pylir::Distro::DebianWheezy)
             .Case("jessie/sid", pylir::Distro::DebianJessie)
@@ -192,27 +192,27 @@ static pylir::Distro::DistroType DetectDistro()
     }
 
     // ...for SUSE
-    File = llvm::MemoryBuffer::getFile("/etc/SuSE-release");
-    if (File)
+    file = llvm::MemoryBuffer::getFile("/etc/SuSE-release");
+    if (file)
     {
-        llvm::StringRef Data = File.get()->getBuffer();
-        llvm::SmallVector<llvm::StringRef, 8> Lines;
-        Data.split(Lines, "\n");
-        for (const llvm::StringRef& Line : Lines)
+        llvm::StringRef data = file.get()->getBuffer();
+        llvm::SmallVector<llvm::StringRef, 8> lines;
+        data.split(lines, "\n");
+        for (const llvm::StringRef& line : lines)
         {
-            if (!Line.trim().startswith("VERSION"))
+            if (!line.trim().startswith("VERSION"))
             {
                 continue;
             }
-            std::pair<llvm::StringRef, llvm::StringRef> SplitLine = Line.split('=');
+            std::pair<llvm::StringRef, llvm::StringRef> splitLine = line.split('=');
             // Old versions have split VERSION and PATCHLEVEL
             // Newer versions use VERSION = x.y
-            std::pair<llvm::StringRef, llvm::StringRef> SplitVer = SplitLine.second.trim().split('.');
-            int Version;
+            std::pair<llvm::StringRef, llvm::StringRef> splitVer = splitLine.second.trim().split('.');
+            int version;
 
             // OpenSUSE/SLES 10 and older are not supported and not compatible
             // with our rules, so just treat them as Distro::UnknownDistro.
-            if (!SplitVer.first.getAsInteger(10, Version) && Version > 10)
+            if (!splitVer.first.getAsInteger(10, version) && version > 10)
             {
                 return pylir::Distro::OpenSUSE;
             }
@@ -230,7 +230,7 @@ static pylir::Distro::DistroType DetectDistro()
     return pylir::Distro::UnknownDistro;
 }
 
-static pylir::Distro::DistroType GetDistro(const llvm::Triple& TargetOrHost)
+static pylir::Distro::DistroType getDistro(const llvm::Triple& TargetOrHost)
 {
     // If we don't target Linux, no need to check the distro. This saves a few
     // OS calls.
@@ -243,14 +243,14 @@ static pylir::Distro::DistroType GetDistro(const llvm::Triple& TargetOrHost)
     // system, no need to check the distro. This is the case where someone
     // is cross-compiling from BSD or Windows to Linux, and it would be
     // meaningless to try to figure out the "distro" of the non-Linux host.
-    llvm::Triple HostTriple(llvm::sys::getProcessTriple());
-    if (!HostTriple.isOSLinux())
+    llvm::Triple hostTriple(llvm::sys::getProcessTriple());
+    if (!hostTriple.isOSLinux())
     {
         return pylir::Distro::UnknownDistro;
     }
 
-    static pylir::Distro::DistroType LinuxDistro = DetectDistro();
-    return LinuxDistro;
+    static pylir::Distro::DistroType linuxDistro = detectDistro();
+    return linuxDistro;
 }
 
-pylir::Distro::Distro(const llvm::Triple& TargetOrHost) : DistroVal(GetDistro(TargetOrHost)) {}
+pylir::Distro::Distro(const llvm::Triple& TargetOrHost) : DistroVal(getDistro(TargetOrHost)) {}

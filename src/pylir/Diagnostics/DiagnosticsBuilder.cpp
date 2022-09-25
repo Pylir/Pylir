@@ -303,8 +303,8 @@ llvm::raw_ostream& pylir::Diag::operator<<(llvm::raw_ostream& os, const Diagnost
     auto largestLine = *std::prev(neededLines.end());
     auto width = pylir::roundUpTo(1 + (std::size_t)std::floor(log10f(static_cast<float>(largestLine))), 4);
 
-    constexpr auto MARGIN = 1;
-    for (std::size_t i = std::max<std::ptrdiff_t>(1, static_cast<std::ptrdiff_t>(*neededLines.begin()) - MARGIN);
+    constexpr auto margin = 1;
+    for (std::size_t i = std::max<std::ptrdiff_t>(1, static_cast<std::ptrdiff_t>(*neededLines.begin()) - margin);
          i < *neededLines.begin(); i++)
     {
         os << fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
@@ -314,7 +314,7 @@ llvm::raw_ostream& pylir::Diag::operator<<(llvm::raw_ostream& os, const Diagnost
         auto& set = highlighted[i];
         Diagnostic::printLine(os, width, i, document, {std::move_iterator(set.begin()), std::move_iterator(set.end())});
     }
-    for (std::size_t i = largestLine + 1; i < largestLine + MARGIN + 1 && document.hasLine(i); i++)
+    for (std::size_t i = largestLine + 1; i < largestLine + margin + 1 && document.hasLine(i); i++)
     {
         os << fmt::format("{1: >{0}} | {2}\n", width, i, Text::toUTF8String(document.getLine(i)));
     }

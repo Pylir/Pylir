@@ -349,11 +349,11 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner)
                 {
                     case pylir::Syntax::Scope::NonLocal:
                     {
-                        if (std::none_of(scopes.begin(), scopes.end(),
+                        if (std::none_of(m_scopes.begin(), m_scopes.end(),
                                          [&id = id](const pylir::Syntax::Scope* scope) -> bool
                                          { return scope->identifiers.count(id); }))
                         {
-                            analysis->createError(id, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, id.getValue())
+                            m_analysis->createError(id, Diag::COULD_NOT_FIND_VARIABLE_N_IN_OUTER_SCOPES, id.getValue())
                                 .addHighlight(id);
                             break;
                         }
@@ -361,7 +361,7 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner)
                     }
                     case pylir::Syntax::Scope::Unknown:
                     {
-                        for (auto& iter : llvm::reverse(scopes))
+                        for (auto& iter : llvm::reverse(m_scopes))
                         {
                             auto res = iter->identifiers.find(id);
                             if (res != iter->identifiers.end())
@@ -391,7 +391,7 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner)
                 {
                     continue;
                 }
-                llvm::TypeSwitch<ScopeOwner>(parentDef)
+                llvm::TypeSwitch<ScopeOwner>(m_parentDef)
                     .Case<pylir::Syntax::FuncDef*, pylir::Syntax::Lambda*>(
                         [&id = id](auto* func)
                         {
@@ -408,20 +408,20 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner)
             }
         }
 
-        std::vector<const pylir::Syntax::Scope*> scopes;
-        ScopeOwner parentDef;
-        SemanticAnalysis* analysis;
+        std::vector<const pylir::Syntax::Scope*> m_scopes;
+        ScopeOwner m_parentDef;
+        SemanticAnalysis* m_analysis;
 
     public:
-        explicit NamespaceVisitor(SemanticAnalysis& analysis) : analysis(&analysis) {}
+        explicit NamespaceVisitor(SemanticAnalysis& analysis) : m_analysis(&analysis) {}
 
         using Visitor::visit;
 
         void visit(pylir::Syntax::ClassDef& classDef)
         {
             {
-                pylir::ValueReset reset(parentDef);
-                parentDef = &classDef;
+                pylir::ValueReset reset(m_parentDef);
+                m_parentDef = &classDef;
                 Visitor::visit(classDef);
             }
             finishNamespace(classDef.scope);
@@ -430,10 +430,10 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner)
         void visit(pylir::Syntax::FuncDef& funcDef)
         {
             {
-                scopes.push_back(&funcDef.scope);
-                auto exit = llvm::make_scope_exit([&] { scopes.pop_back(); });
-                pylir::ValueReset reset(parentDef);
-                parentDef = &funcDef;
+                m_scopes.push_back(&funcDef.scope);
+                auto exit = llvm::make_scope_exit([&] { m_scopes.pop_back(); });
+                pylir::ValueReset reset(m_parentDef);
+                m_parentDef = &funcDef;
                 Visitor::visit(funcDef);
             }
             finishNamespace(funcDef.scope);
@@ -442,10 +442,10 @@ void pylir::SemanticAnalysis::finishNamespace(ScopeOwner owner)
         void visit(pylir::Syntax::Lambda& lambda)
         {
             {
-                scopes.push_back(&lambda.scope);
-                auto exit = llvm::make_scope_exit([&] { scopes.pop_back(); });
-                pylir::ValueReset reset(parentDef);
-                parentDef = &lambda;
+                m_scopes.push_back(&lambda.scope);
+                auto exit = llvm::make_scope_exit([&] { m_scopes.pop_back(); });
+                pylir::ValueReset reset(m_parentDef);
+                m_parentDef = &lambda;
                 Visitor::visit(lambda);
             }
             finishNamespace(lambda.scope);

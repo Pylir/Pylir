@@ -36,6 +36,7 @@ namespace
 // DWARF Constants
 enum
 {
+    // NOLINTBEGIN(readability-identifier-naming): These names are part of a standard.
     DW_EH_PE_absptr = 0x00,
     DW_EH_PE_uleb128 = 0x01,
     DW_EH_PE_udata2 = 0x02,
@@ -52,6 +53,7 @@ enum
     DW_EH_PE_aligned = 0x50,
     DW_EH_PE_indirect = 0x80,
     DW_EH_PE_omit = 0xFF
+    // NOLINTEND(readability-identifier-naming)
 };
 
 template <class AsType>
@@ -310,7 +312,7 @@ _Unwind_Reason_Code personalityImpl(int version, _Unwind_Action actions, _Unwind
     #define WIN32_MEAN_AND_LEAN
     #include <windows.h>
 
-// NOLINTNEXTLINE(bugprone-reserved-identifier)
+// NOLINTNEXTLINE(bugprone-reserved-identifier, readability-identifier-naming)
 extern "C" EXCEPTION_DISPOSITION _GCC_specific_handler(EXCEPTION_RECORD* exc, void* frame, CONTEXT* ctx,
                                                        DISPATCHER_CONTEXT* disp, _Unwind_Personality_Fn pers);
 

@@ -971,7 +971,7 @@ public:
 template <class F>
 class ActionIterator
 {
-    F* f;
+    F* m_f;
 
 public:
     using iterator_category = std::output_iterator_tag;
@@ -980,14 +980,14 @@ public:
     using reference = void;
     using difference_type = std::ptrdiff_t;
 
-    explicit ActionIterator(F&& f) : f(&f) {}
+    explicit ActionIterator(F&& f) : m_f(&f) {}
 
-    explicit ActionIterator(F& f) : f(&f) {}
+    explicit ActionIterator(F& f) : m_f(&f) {}
 
     template <class T, std::enable_if_t<std::is_invocable_v<F, T>>* = nullptr>
     ActionIterator& operator=(T&& t)
     {
-        (*f)(std::forward<T>(t));
+        (*m_f)(std::forward<T>(t));
         return *this;
     }
 
