@@ -119,6 +119,6 @@ jobs:
 
       - name: Run clang-format on changes
         run: |
-          python git-clang-format-15 HEAD^
+          python $(which git-clang-format-15) HEAD^
           git diff -U0 --exit-code --no-prefix
 
