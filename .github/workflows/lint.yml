@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  LLVM_VERSION: 15
+
 jobs:
   lint-run:
     runs-on: ubuntu-20.04
@@ -18,7 +21,7 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 15 all
+          sudo ./llvm.sh $LLVM_VERSION all
           sudo apt update
           sudo apt install libunwind-dev lld g++-10
           
@@ -88,7 +91,7 @@ jobs:
         working-directory: ${{github.workspace}}/Pylir
         run: |
           git diff -U0 HEAD^ | \
-          clang-tidy-diff-15.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
+          clang-tidy-diff-$LLVM_VERSION.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
             -export-fixes ${{github.workspace}}/fixes.yml
           if [ -s ${{github.workspace}}/fixes.yml ] 
           then
@@ -104,7 +107,7 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 15 all
+          sudo ./llvm.sh $LLVM_VERSION all
           
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -119,6 +122,6 @@ jobs:
 
       - name: Run clang-format on changes
         run: |
-          python $(which git-clang-format-15) HEAD^
+          python $(which git-clang-format-$LLVM_VERSION) HEAD^
           git diff -U0 --exit-code --no-prefix
 
