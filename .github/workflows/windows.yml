@@ -116,7 +116,7 @@ jobs:
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
-      # See https://github.com/actions/cache/issues/53
+      # See https://github.com/actions/cache/issues/53.
       - name: Sanitize key
         id: sanitize-key
         run: echo "::set-output name=key::$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )"
