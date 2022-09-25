@@ -105,6 +105,11 @@ jobs:
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 15 all
+          
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
 
       - name: Checkout Pylir
         uses: actions/checkout@v3
@@ -114,6 +119,6 @@ jobs:
 
       - name: Run clang-format on changes
         run: |
-          git clang-format HEAD^
+          python git-clang-format-15 HEAD^
           git diff -U0 --exit-code --no-prefix
 
