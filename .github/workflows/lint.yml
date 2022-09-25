@@ -94,3 +94,17 @@ jobs:
           then
             exit 1
           fi
+
+
+  format-run:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout Pylir
+        uses: actions/checkout@v3
+
+      - name: Run clang-format
+        uses: DoozyX/clang-format-lint-action@v0.14
+        with:
+          clangFormatVersion: 14
+
