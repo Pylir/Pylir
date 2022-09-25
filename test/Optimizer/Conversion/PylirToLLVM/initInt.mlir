@@ -5,7 +5,7 @@ py.globalValue const @builtins.int = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
 func.func @foo(%value : index) -> !py.dynamic {
-    %0 = py.constant(@builtins.int)
+    %0 = py.constant(#py.ref<@builtins.int>)
     %1 = pyMem.gcAllocObject %0
     %2 = pyMem.initIntUnsigned %1 to %value
     return %2 : !py.dynamic
@@ -19,7 +19,7 @@ func.func @foo(%value : index) -> !py.dynamic {
 // CHECK-NEXT: llvm.return %[[MEMORY]]
 
 func.func @bar(%value : index) -> !py.dynamic {
-    %0 = py.constant(@builtins.int)
+    %0 = py.constant(#py.ref<@builtins.int>)
     %1 = pyMem.gcAllocObject %0
     %2 = pyMem.initIntSigned %1 to %value
     return %2 : !py.dynamic

@@ -72,7 +72,7 @@ void handleBranchOpInterface(mlir::BranchOpInterface branchOpInterface, mlir::Im
 }
 
 void handleNoReadWriteEffectOp(mlir::Operation* op, mlir::ImplicitLocOpBuilder& builder, ValueTracking& valueTracking,
-                          llvm::DenseSet<mlir::Value>& foldEdges)
+                               llvm::DenseSet<mlir::Value>& foldEdges)
 {
     auto typeDependentConstant =
         llvm::any_of(op->getOperands(), [&](mlir::Value val) { return foldEdges.contains(val); });

@@ -12,8 +12,8 @@ include "pylir/Optimizer/PylirMem/IR/PylirMemOps.td"
 include "mlir/Dialect/Arithmetic/IR/ArithmeticOps.td"
 include "mlir/IR/PatternBase.td"
 
-defvar TupleRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.tuple">;
-defvar TypeRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.type">;
+defvar TupleRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.tuple">;
+defvar TypeRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.type">;
 
 def : Pattern<(PylirPy_MakeTupleOp $args, $_), [
     (PylirPy_ConstantOp:$tupleType TupleRef),
@@ -47,17 +47,17 @@ def : Pattern<(PylirPy_TupleCopyOp $tuple, $typeObj), [
 def : Pat<(PylirPy_ListToTupleOp $list), (PylirMem_InitTupleFromListOp
     (PylirMem_GCAllocTupleOp (PylirPy_ConstantOp TupleRef), (PylirPy_ListLenOp $list)), $list)>;
 
-defvar ListRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.list">;
+defvar ListRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.list">;
 
 def : Pat<(PylirPy_MakeListOp $args, $_),
     (PylirMem_InitListOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp ListRef)), $args)>;
 
-defvar SetRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.set">;
+defvar SetRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.set">;
 
 def : Pat<(PylirPy_MakeSetOp $args, $_),
     (PylirMem_InitSetOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp SetRef)), $args)>;
 
-defvar StrRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.str">;
+defvar StrRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.str">;
 
 def : Pat<(PylirPy_StrConcatOp $args),
     (PylirMem_InitStrOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp StrRef)), $args)>;
@@ -69,12 +69,12 @@ def : Pat<(PylirPy_StrCopyOp $arg, $typeObj),
 def : Pat<(PylirPy_IntToStrOp $integer),
     (PylirMem_InitStrFromIntOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp StrRef)), $integer)>;
 
-defvar FunctionRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.function">;
+defvar FunctionRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.function">;
 
 def : Pat<(PylirPy_MakeFuncOp $symbol),
     (PylirMem_InitFuncOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp FunctionRef)), $symbol)>;
 
-defvar BoolRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.bool">;
+defvar BoolRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.bool">;
 
 defvar IndexSizedInteger = NativeCodeCall<[{
     $_builder.getIntegerType(mlir::DataLayout::closest($0.getOwner()).getTypeSizeInBits($_builder.getIndexType()))
@@ -87,7 +87,7 @@ def : Pattern<(PylirPy_BoolFromI1Op:$op $input), [
     (PylirMem_InitIntUnsignedOp $boolMem, $intToIndex)
 ]>;
 
-defvar IntRef = ConstantStrAttr<FlatSymbolRefAttr, "builtins.int">;
+defvar IntRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.int">;
 
 def : Pat<(PylirPy_IntFromSignedOp $input), (PylirMem_InitIntSignedOp
     (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef)), $input)>;

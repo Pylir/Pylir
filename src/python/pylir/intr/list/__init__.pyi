@@ -5,5 +5,6 @@
 def len(obj):
     pass
 
+
 def getItem(list, index):
     pass

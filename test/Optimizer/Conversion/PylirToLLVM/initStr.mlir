@@ -6,7 +6,7 @@ py.globalValue const @builtins.str = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
 func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(@builtins.str)
+    %0 = py.constant(#py.ref<@builtins.str>)
     %1 = pyMem.gcAllocObject %0
     %2 = pyMem.initStr %1 to %arg0, %arg1
     return %2 : !py.dynamic

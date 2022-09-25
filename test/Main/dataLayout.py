@@ -1,3 +1,5 @@
+# REQUIRES: x86-registered-target
+
 # RUN: pylir %s --target x86_64-w64-windows-gnu -o - -S -emit-pylir | FileCheck %s --check-prefixes=CHECK,AMD64
 # RUN: pylir %s --target x86_64-pc-windows-msvc -o - -S -emit-pylir | FileCheck %s --check-prefixes=CHECK,AMD64
 # RUN: pylir %s --target x86_64-unknown-linux-gnu -o - -S -emit-pylir | FileCheck %s --check-prefixes=CHECK,AMD64

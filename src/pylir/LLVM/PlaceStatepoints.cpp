@@ -13,6 +13,7 @@
 
 // Modified version of RewriteStatepointsForGC.cpp for pylir-gc.
 // pylir-gc is currently not relocating, but still precise on the stack. Few adjustments are made
+// NOLINTBEGIN
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
@@ -1855,7 +1856,7 @@ static void relocationViaAlloca(Function& F, DominatorTree& DT, ArrayRef<Value*>
     DenseMap<Value*, AllocaInst*> AllocaMap;
     SmallVector<AllocaInst*, 200> PromotableAllocas;
     // Used later to chack that we have enough allocas to store all values
-    std::size_t NumRematerializedValues = 0;
+    [[maybe_unused]] std::size_t NumRematerializedValues = 0;
     PromotableAllocas.reserve(Live.size());
 
     // Emit alloca for "LiveValue" and record it in "allocaMap" and
@@ -3182,3 +3183,5 @@ static void recomputeLiveInValues(const GCStrategy& strategy, GCPtrLivenessData&
 
     Info.LiveSet = Updated;
 }
+
+// NOLINTEND

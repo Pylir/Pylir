@@ -20,7 +20,7 @@ func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 	cf.br ^call
 
 ^loopExit:
-	%5 = py.constant(@test)
+	%5 = py.constant(#py.ref<@test>)
 	return %5 : !py.dynamic
 
 ^exit:

@@ -6,13 +6,13 @@ py.globalValue @builtins.str = #py.type
 
 func.func @test() -> !py.dynamic {
     %0 = py.constant(#py.tuple<()>)
-    %1 = py.constant(@builtins.tuple)
+    %1 = py.constant(#py.ref<@builtins.tuple>)
     %2 = py.tuple.prepend %1, %0
     return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test
-// CHECK: %[[C:.*]] = py.constant(#py.tuple<(@builtins.tuple)>)
+// CHECK: %[[C:.*]] = py.constant(#py.tuple<(#py.ref<@builtins.tuple>)>)
 // CHECK: return %[[C]]
 
 func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {

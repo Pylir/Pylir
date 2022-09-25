@@ -27,7 +27,7 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @foo = #py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>
 
 func.func @constant_tuple() -> index {
-    %0 = py.constant(@foo)
+    %0 = py.constant(#py.ref<@foo>)
     %1 = py.tuple.len %0
     return %1 : index
 }

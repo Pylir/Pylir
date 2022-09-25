@@ -167,8 +167,7 @@ protected:
                     {
                         return mlir::WalkResult::advance();
                     }
-                    auto callable =
-                        collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(callOpInterface, ref);
+                    auto callable = collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(callOpInterface, ref);
                     if (!callable)
                     {
                         return mlir::WalkResult::advance();

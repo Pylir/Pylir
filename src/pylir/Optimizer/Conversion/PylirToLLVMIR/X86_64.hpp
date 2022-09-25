@@ -66,4 +66,4 @@ public:
         return mlir::IntegerType::get(context, 64);
     }
 };
-} // namespace pylir::Dialect
+} // namespace pylir

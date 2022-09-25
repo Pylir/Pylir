@@ -4,5 +4,6 @@
 
 __slots__: tuple[str]
 
+
 def mro(obj):
     pass

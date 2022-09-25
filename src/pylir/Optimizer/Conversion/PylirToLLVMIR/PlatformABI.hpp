@@ -13,7 +13,6 @@ class PlatformABI
     mlir::DataLayout m_dataLayout;
 
 protected:
-    
     explicit PlatformABI(mlir::DataLayout dataLayout) : m_dataLayout(std::move(dataLayout)) {}
 
 public:
@@ -38,4 +37,4 @@ public:
 
     virtual mlir::Type getSizeT(mlir::MLIRContext* context) const = 0;
 };
-} // namespace pylir::Dialect
+} // namespace pylir

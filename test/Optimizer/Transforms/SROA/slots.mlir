@@ -8,7 +8,7 @@ func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"Hello">)
     %1 = py.constant(#py.str<" ">)
     %2 = py.constant(#py.str<"World">)
-    %c = py.constant(@builtins.type)
+    %c = py.constant(#py.ref<@builtins.type>)
     %l = py.makeObject %c
     py.setSlot "zero" of %l : %c to %0
     py.setSlot "one" of %l : %c to %1

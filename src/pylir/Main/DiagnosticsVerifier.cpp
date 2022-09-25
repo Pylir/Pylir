@@ -62,39 +62,39 @@ pylir::DiagnosticsVerifier::DiagnosticsVerifier(Diag::DiagnosticsManager& manage
         });
 }
 
-constexpr static auto pattern = ctll::fixed_string{
+constexpr static auto PATTERN = ctll::fixed_string{
     R"(expected-(?<kind>error|note|warning)(?<re>-re)?\h*(?:@(?:(?<rel>[+\-][0-9]+)|(?<above>above)|(?<below>below)))?(?<text>(?:\h*\{\{.*\}\})+))"};
 
-constexpr static auto kind = ctll::fixed_string{"kind"};
-constexpr static auto rel = ctll::fixed_string{"rel"};
-constexpr static auto re = ctll::fixed_string{"re"};
-constexpr static auto above = ctll::fixed_string{"above"};
-constexpr static auto below = ctll::fixed_string{"below"};
+constexpr static auto KIND = ctll::fixed_string{"kind"};
+constexpr static auto REL = ctll::fixed_string{"rel"};
+constexpr static auto RE = ctll::fixed_string{"re"};
+constexpr static auto ABOVE = ctll::fixed_string{"above"};
+constexpr static auto BELOW = ctll::fixed_string{"below"};
 
-constexpr static auto text = ctll::fixed_string{"text"};
-constexpr static auto textWithinPattern = ctll::fixed_string{R"(\{\{(?<text>.*)\}\})"};
+constexpr static auto TEXT = ctll::fixed_string{"text"};
+constexpr static auto TEXT_WITHIN_PATTERN = ctll::fixed_string{R"(\{\{(?<text>.*)\}\})"};
 
 void pylir::DiagnosticsVerifier::addDocument(const pylir::Diag::Document& document)
 {
-    for (const auto& iter : ctre::multiline_range<pattern>(document.getText()))
+    for (const auto& iter : ctre::multiline_range<PATTERN>(document.getText()))
     {
         Diag::Severity severity;
-        if (iter.get<kind>() == U"error")
+        if (iter.get<KIND>() == U"error")
         {
             severity = Diag::Severity::Error;
         }
-        else if (iter.get<kind>() == U"note")
+        else if (iter.get<KIND>() == U"note")
         {
             severity = Diag::Severity::Note;
         }
-        else if (iter.get<kind>() == U"warning")
+        else if (iter.get<KIND>() == U"warning")
         {
             severity = Diag::Severity::Warning;
         }
         std::size_t line = document.getLineNumber(iter.data() - document.begin());
-        if (iter.get<rel>())
+        if (iter.get<REL>())
         {
-            auto view = iter.get<rel>().view();
+            auto view = iter.get<REL>().view();
             bool add = view.front() == U'+';
             view = view.substr(1);
             std::size_t offset = 0;
@@ -111,20 +111,20 @@ void pylir::DiagnosticsVerifier::addDocument(const pylir::Diag::Document& docume
                 line -= offset;
             }
         }
-        else if (iter.get<above>())
+        else if (iter.get<ABOVE>())
         {
             line--;
         }
-        else if (iter.get<below>())
+        else if (iter.get<BELOW>())
         {
             line++;
         }
-        for (const auto& iter2 : ctre::multiline_range<textWithinPattern>(iter.get<text>()))
+        for (const auto& iter2 : ctre::multiline_range<TEXT_WITHIN_PATTERN>(iter.get<TEXT>()))
         {
-            auto textWithin = iter2.get<text>();
+            auto textWithin = iter2.get<TEXT>();
             std::size_t start = textWithin.data() - document.begin();
             std::size_t end = start + textWithin.size();
-            if (!iter.get<re>())
+            if (!iter.get<RE>())
             {
                 m_fileLineToExpectedMessages[{&document, line}].push_back(
                     {start, end, severity, nullptr, Text::toUTF8String(textWithin.view())});

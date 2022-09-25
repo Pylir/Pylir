@@ -53,7 +53,7 @@ class CodeGen
     Diag::DiagnosticsDocManager* m_docManager;
     mlir::Value m_classNamespace{};
     std::unordered_map<std::string, std::size_t> m_implNames;
-    std::unordered_map<std::string_view, mlir::FlatSymbolRefAttr> m_builtinNamespace;
+    std::unordered_map<std::string_view, Py::RefAttr> m_builtinNamespace;
     bool m_constantClass = false;
 
     struct Loop
@@ -197,7 +197,7 @@ class CodeGen
 
     mlir::Value readIdentifier(std::string_view name);
 
-    void writeIdentifier(std::string_view name, mlir::Value value);
+    void writeIdentifier(std::string_view text, mlir::Value value);
 
     void raiseException(mlir::Value exceptionObject);
 
@@ -541,13 +541,13 @@ public:
 
     mlir::Value visit(const Syntax::Yield& yield);
 
-    mlir::Value visit(const Syntax::Conditional& expression);
+    mlir::Value visit(const Syntax::Conditional& conditional);
 
     mlir::Value visit(const Syntax::Comparison& comparison);
 
     mlir::Value visit(const Syntax::Atom& atom);
 
-    mlir::Value visit(const Syntax::Subscription& primary);
+    mlir::Value visit(const Syntax::Subscription& subscription);
 
     mlir::Value visit(const Syntax::Assignment& assignment);
 

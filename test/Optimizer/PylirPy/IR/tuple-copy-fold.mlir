@@ -18,7 +18,7 @@ func.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -
 
 func.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = py.makeTuple (%arg0)
-	%1 = py.constant (@builtins.tuple)
+	%1 = py.constant(#py.ref<@builtins.tuple>)
 	%2 = py.tuple.copy %0 : %1
 	return %2 : !py.dynamic
 }
@@ -30,7 +30,7 @@ func.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 
 func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = py.list.toTuple %arg0
-	%1 = py.constant (@builtins.tuple)
+	%1 = py.constant(#py.ref<@builtins.tuple>)
 	%2 = py.tuple.copy %0 : %1
 	return %2 : !py.dynamic
 }

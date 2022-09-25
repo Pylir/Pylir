@@ -65,7 +65,7 @@ class DiagnosticsVerifier
 public:
     /// Installs this verifier onto the given 'DiagnosticManager', intercepting its diagnostics and matching them
     /// against any 'expected' lines found.
-    explicit DiagnosticsVerifier(Diag::DiagnosticsManager& diagnostic);
+    explicit DiagnosticsVerifier(Diag::DiagnosticsManager& manager);
 
     /// Adds a document that may contain 'expected' lines to match diagnostics against.
     void addDocument(const Diag::Document& document);

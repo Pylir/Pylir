@@ -16,12 +16,12 @@ func.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynam
 
 // CHECK-LABEL: func.func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[STOP_ITER:.*]] = py.constant(@builtins.StopIteration)
-// CHECK: %[[ITER_F:.*]] = py.constant(@builtins.iter)
+// CHECK: %[[STOP_ITER:.*]] = py.constant(#py.ref<@builtins.StopIteration>)
+// CHECK: %[[ITER_F:.*]] = py.constant(#py.ref<@builtins.iter>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = py.call @pylir__call__(%[[ITER_F]], %[[TUPLE]], %[[DICT]])
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[A:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -40,7 +40,7 @@ func.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynam
 // CHECK: py.raise %[[EXC]]
 
 // CHECK: ^[[VALUE_ERROR_BLOCK]]:
-// CHECK: %[[VALUE_ERROR:.*]] = py.constant(@builtins.ValueError)
+// CHECK: %[[VALUE_ERROR:.*]] = py.constant(#py.ref<@builtins.ValueError>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple ()
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[EXC:.*]] = py.call @pylir__call__(%[[VALUE_ERROR]], %[[TUPLE]], %[[DICT]])
@@ -48,7 +48,7 @@ func.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynam
 
 // CHECK: ^[[REST_ARGS]]:
 // CHECK: %[[ONE:.*]] = arith.constant 1
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ELEMENT:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -62,7 +62,7 @@ func.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynam
 // CHECK: cf.br ^[[REST_ARGS]]
 
 // CHECK: ^[[EXHAUSTED]](%[[EXC:.*]]: !py.dynamic):
-// CHECK: %[[STOP_ITER:.*]] = py.constant(@builtins.StopIteration)
+// CHECK: %[[STOP_ITER:.*]] = py.constant(#py.ref<@builtins.StopIteration>)
 // CHECK: %[[EXC_TYPE:.*]] = py.typeOf %[[EXC]]
 // CHECK: %[[IS_STOP_ITER:.*]] = py.is %[[STOP_ITER]], %[[EXC_TYPE]]
 // CHECK: cf.cond_br %[[IS_STOP_ITER]], ^[[EXHAUSTED:.*]], ^[[RERAISE:[[:alnum:]]+]]
@@ -102,33 +102,33 @@ func.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !p
 
 // CHECK-LABEL: func.func @no_rest_arg
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[STOP_ITER:.*]] = py.constant(@builtins.StopIteration)
-// CHECK: %[[ITER_F:.*]] = py.constant(@builtins.iter)
+// CHECK: %[[STOP_ITER:.*]] = py.constant(#py.ref<@builtins.StopIteration>)
+// CHECK: %[[ITER_F:.*]] = py.constant(#py.ref<@builtins.iter>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = py.call @pylir__call__(%[[ITER_F]], %[[TUPLE]], %[[DICT]])
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[A:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[B:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[C:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -143,7 +143,7 @@ func.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !p
 // CHECK: py.raise %[[EXC]]
 
 // CHECK: ^[[VALUE_ERROR_BLOCK]]:
-// CHECK: %[[VALUE_ERROR:.*]] = py.constant(@builtins.ValueError)
+// CHECK: %[[VALUE_ERROR:.*]] = py.constant(#py.ref<@builtins.ValueError>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple ()
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[EXC:.*]] = py.call @pylir__call__(%[[VALUE_ERROR]], %[[TUPLE]], %[[DICT]])
@@ -187,15 +187,15 @@ func.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic,
 
 // CHECK-LABEL: func.func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[STOP_ITER:.*]] = py.constant(@builtins.StopIteration)
-// CHECK: %[[ITER_F:.*]] = py.constant(@builtins.iter)
+// CHECK: %[[STOP_ITER:.*]] = py.constant(#py.ref<@builtins.StopIteration>)
+// CHECK: %[[ITER_F:.*]] = py.constant(#py.ref<@builtins.iter>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = py.invoke @pylir__call__(%[[ITER_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[ERROR:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[A:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -214,7 +214,7 @@ func.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic,
 // CHECK: cf.br ^[[ERROR]](%[[EXC]] : !py.dynamic)
 
 // CHECK: ^[[VALUE_ERROR_BLOCK]]:
-// CHECK: %[[VALUE_ERROR:.*]] = py.constant(@builtins.ValueError)
+// CHECK: %[[VALUE_ERROR:.*]] = py.constant(#py.ref<@builtins.ValueError>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple ()
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[EXC:.*]] = py.invoke @pylir__call__(%[[VALUE_ERROR]], %[[TUPLE]], %[[DICT]])
@@ -225,7 +225,7 @@ func.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic,
 
 // CHECK: ^[[REST_ARGS]]:
 // CHECK: %[[ONE:.*]] = arith.constant 1
-// CHECK: %[[NEXT_F:.*]] = py.constant(@builtins.next)
+// CHECK: %[[NEXT_F:.*]] = py.constant(#py.ref<@builtins.next>)
 // CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 // CHECK: %[[ELEMENT:.*]] = py.invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -239,7 +239,7 @@ func.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic,
 // CHECK: cf.br ^[[REST_ARGS]]
 
 // CHECK: ^[[EXHAUSTED]](%[[EXC:.*]]: !py.dynamic):
-// CHECK: %[[STOP_ITER:.*]] = py.constant(@builtins.StopIteration)
+// CHECK: %[[STOP_ITER:.*]] = py.constant(#py.ref<@builtins.StopIteration>)
 // CHECK: %[[EXC_TYPE:.*]] = py.typeOf %[[EXC]]
 // CHECK: %[[IS_STOP_ITER:.*]] = py.is %[[STOP_ITER]], %[[EXC_TYPE]]
 // CHECK: cf.cond_br %[[IS_STOP_ITER]], ^[[EXHAUSTED:.*]], ^[[RERAISE:[[:alnum:]]+]]

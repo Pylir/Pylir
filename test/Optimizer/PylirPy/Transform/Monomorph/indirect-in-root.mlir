@@ -16,7 +16,7 @@ func.func @real(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -
 py.globalValue @function = #py.function<@real>
 
 func.func @__init__() -> !py.dynamic {
-    %0 = py.constant(@function)
+    %0 = py.constant(#py.ref<@function>)
     %1 = py.function.call %0(%0, %0, %0)
     return %1 : !py.dynamic
 }
@@ -27,5 +27,5 @@ func.func @__init__() -> !py.dynamic {
 // CHECK: py.call @[[REAL_CLONE:.*]](%{{.*}})
 
 // CHECK: func.func private @[[REAL_CLONE:([[:alnum:]]|_)+]]
-// CHECK: %[[TYPE:.*]] = py.constant(@builtins.function)
+// CHECK: %[[TYPE:.*]] = py.constant(#py.ref<@builtins.function>)
 // CHECK: return %[[TYPE]]

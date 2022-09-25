@@ -427,6 +427,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 manager.addPass(mlir::createStripDebugInfoPass());
             }
+            manager.addPass(pylir::Py::createFinalizeRefAttrsPass());
 
             if (!shouldOutput(OPT_emit_pylir))
             {
@@ -449,7 +450,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 }
                 else
                 {
-                    mlir::writeBytecodeToFile(*mlirModule, *m_output, "Pylir " PYLIR_VERSION);
+                    mlir::writeBytecodeToFile(*mlirModule, *m_output,
+                                              mlir::BytecodeWriterConfig("Pylir " PYLIR_VERSION));
                 }
                 return finalizeOutputStream(mlir::success(), commandLine);
             }

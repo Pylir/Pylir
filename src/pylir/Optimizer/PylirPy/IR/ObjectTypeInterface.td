@@ -13,7 +13,7 @@ def ObjectTypeInterface : TypeInterface<"ObjectTypeInterface"> {
     let cppNamespace = "::pylir::Py";
 
     let methods = [
-        InterfaceMethod<[{}], "::mlir::FlatSymbolRefAttr", "getTypeObject", (ins)>,
+        InterfaceMethod<[{}], "pylir::Py::RefAttr", "getTypeObject", (ins)>,
     ];
 }
 

@@ -20,32 +20,43 @@ mlir::OpFoldResult getTypeOf(mlir::Value value);
 /// unknown whether it's bound or not, otherwise the optional contains whether the value is unbound.
 llvm::Optional<bool> isUnbound(mlir::Value value);
 
-/// Casts the attribute to the given 'T'. If the attribute is a symbol reference it uses 'op' to find the nearest
-/// 'py.globalValue' and return and cast its initialize to 'T' instead. If the 'py.globalValue' that is found is not
-/// 'const' and 'onlyConstGlobal' is true, a null value is returned.
-/// If the cast does not succeed or the 'attr' passed in is a null value, a null value is also returned.
-template <class T = ObjectAttrInterface>
-T resolveValue(mlir::Operation* op, mlir::Attribute attr, bool onlyConstGlobal = true)
+/// Casts the attribute to the given 'T'. It differs from 'dyn_cast' in the case that the attribute is a 'RefAttr'. It
+/// then uses the referred to 'py.globalValue' and attempts to cast its initializer to 'T' instead.
+///
+/// If the 'py.globalValue' used is not 'constant' and 'onlyConstGlobal' is true, a null value is returned.
+/// By default, 'onlyConstGlobal' is set to true, unless 'T' is an instance of 'ImmutableAttr' or 'IntAttrInterface'.
+///
+/// The rationale is that if one of these attributes is requested, one is almost certainly going to only read from the
+/// immutable value parts of the attribute, even if the 'py.globalValue' may not be 'constant'.
+///
+/// Nevertheless, one has to make sure **NOT TO READ FROM THE SLOTS OF AN IMMUTABLE ATTR** in such a case, as they may
+/// not be constant! Either 'ref_cast' to 'ObjectAttrInterface' instead or explicitly set 'onlyConstGlobal' to true.
+///
+/// If the cast does not succeed a null value is also returned.
+template <class T>
+T ref_cast(
+    mlir::Attribute attr,
+    bool onlyConstGlobal = !std::disjunction_v<std::is_same<IntAttrInterface, T>, std::is_base_of<ImmutableAttr<T>, T>>)
 {
-    auto ref = attr.dyn_cast_or_null<mlir::SymbolRefAttr>();
-    if (!ref)
+    if (auto val = attr.dyn_cast<T>())
     {
-        return attr.dyn_cast_or_null<T>();
+        return val;
     }
-    auto value = mlir::SymbolTable::lookupNearestSymbolFrom<GlobalValueOp>(op, ref);
-    // TODO: This 'if' is nasty workaround to make PylirToLLVM not crash. Reason being that dialect conversion attempts
-    //       to also do folding to legalize an operation. Since we re mid dialect conversion however, the GlobalValueOp
-    //       may have already been converted to LLVM and erased, hence it does not exist anymore. By returning nullptr
-    //       we ought to fail gracefully.
-    if (!value)
+    RefAttr ref = attr.dyn_cast<RefAttr>();
+    if (!ref || (!ref.getSymbol().getConstant() && onlyConstGlobal))
     {
         return nullptr;
     }
-    if (!value.getConstant() && onlyConstGlobal)
-    {
-        return nullptr;
-    }
-    return value.getInitializerAttr().template dyn_cast_or_null<T>();
+    return ref.getSymbol().getInitializerAttr().dyn_cast_or_null<T>();
+}
+
+/// Same as 'ref_cast' but returns a null value if 'attr' is null.
+template <class T>
+T ref_cast_or_null(
+    mlir::Attribute attr,
+    bool onlyConstGlobal = !std::disjunction_v<std::is_same<IntAttrInterface, T>, std::is_base_of<ImmutableAttr<T>, T>>)
+{
+    return attr ? ref_cast<T>(attr, onlyConstGlobal) : nullptr;
 }
 
 enum class BuiltinMethodKind
@@ -58,7 +69,6 @@ enum class BuiltinMethodKind
 
 /// Given any kind of object, attempts to return the hash function used at runtime to hash that object. If the hash
 /// function may change at runtime or a custom one is used that is not known to the compiler, 'Unknown' is returned.
-/// 'context' is used for any symbol lookups to find the nearest symbol table.
-BuiltinMethodKind getHashFunction(ObjectAttrInterface attribute, mlir::Operation* context);
+BuiltinMethodKind getHashFunction(ObjectAttrInterface attribute);
 
 } // namespace pylir::Py

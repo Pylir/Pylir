@@ -1,2 +1,9 @@
 InheritParentConfig: true
-Checks: '-cert-err58-cpp, -google-explicit-constructor'
+Checks: >
+  -cert-err58-cpp,
+  -google-explicit-constructor,
+  -performance-no-int-to-ptr
+
+CheckOptions:
+  - key: readability-identifier-naming.FunctionIgnoredRegexp
+    value: '__init__|pylir_.*'

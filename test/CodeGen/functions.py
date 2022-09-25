@@ -5,11 +5,11 @@
 # CHECK: %[[RES:.*]] = py.makeFunc @"foo$cc[0]"
 # CHECK: %[[NAME:.*]] = py.constant(#py.str<"foo">)
 # CHECK: py.setSlot "__qualname__" of %[[RES]] : %{{.*}} to %[[NAME]]
-# CHECK: %[[DEFAULTS:.*]] = py.constant(@builtins.None)
+# CHECK: %[[DEFAULTS:.*]] = py.constant(#py.ref<@builtins.None>)
 # CHECK: py.setSlot "__defaults__" of %[[RES]] : %{{.*}} to %[[DEFAULTS]]
-# CHECK: %[[KWDEFAULTS:.*]] = py.constant(@builtins.None)
+# CHECK: %[[KWDEFAULTS:.*]] = py.constant(#py.ref<@builtins.None>)
 # CHECK: py.setSlot "__kwdefaults__" of %[[RES]] : %{{.*}} to %[[KWDEFAULTS]]
-# CHECK: %[[CLOSURE:.*]] = py.constant(@builtins.None)
+# CHECK: %[[CLOSURE:.*]] = py.constant(#py.ref<@builtins.None>)
 # CHECK: py.setSlot "__closure__" of %[[RES]] : %{{.*}} to %[[CLOSURE]]
 # CHECK: py.store %[[RES]] : !py.dynamic into @foo
 
@@ -21,12 +21,12 @@ def foo():
         return x + y
 
 # CHECK-LABEL: func private @"foo$impl[0]"
-# CHECK: %[[CELL_TYPE:.*]] = py.constant(@builtins.cell)
+# CHECK: %[[CELL_TYPE:.*]] = py.constant(#py.ref<@builtins.cell>)
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = py.getSlot "__new__" from %[[CELL_TYPE]]
 # CHECK: %[[Y:.*]] = py.function.call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
-# CHECK: %[[CELL_TYPE:.*]] = py.constant(@builtins.cell)
+# CHECK: %[[CELL_TYPE:.*]] = py.constant(#py.ref<@builtins.cell>)
 # CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = py.constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = py.getSlot "__new__" from %[[CELL_TYPE]]

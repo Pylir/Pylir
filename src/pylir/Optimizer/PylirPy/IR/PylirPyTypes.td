@@ -22,7 +22,7 @@ def PylirPy_UnboundType : PylirPy_ObjectType<"Unbound"> {
     let summary = "unbound type";
 
     let extraClassDeclaration = [{
-        mlir::FlatSymbolRefAttr getTypeObject() const
+        pylir::Py::RefAttr getTypeObject() const
         {
             return {};
         }
@@ -33,7 +33,7 @@ def PylirPy_ClassType : PylirPy_ObjectType<"Class", [DeclareTypeInterfaceMethods
 	let mnemonic = "class";
 	let summary = "class type";
 
-	let parameters = (ins "::mlir::FlatSymbolRefAttr":$typeObject);
+	let parameters = (ins "RefAttr":$typeObject);
 
 	let builders = [TypeBuilderWithInferredContext<parameters, [{
 		return get(typeObject.getContext(), typeObject);
@@ -50,10 +50,10 @@ def PylirPy_TupleType : PylirPy_ObjectType<"Tuple", [DeclareTypeInterfaceMethods
 
 	let skipDefaultBuilders = 1;
 
-	let builders = [TypeBuilderWithInferredContext<(ins "::mlir::FlatSymbolRefAttr":$typeObject,
+	let builders = [TypeBuilderWithInferredContext<(ins "RefAttr":$typeObject,
 										CArg<"::llvm::ArrayRef<::pylir::Py::ObjectTypeInterface>", "{}">:$elements), [{
     	return Base::get(typeObject.getContext(), typeObject, elements);
-	}]>, TypeBuilder<(ins CArg<"::mlir::FlatSymbolRefAttr", "{}">:$typeObject,
+	}]>, TypeBuilder<(ins CArg<"RefAttr", "{}">:$typeObject,
 						  CArg<"::llvm::ArrayRef<::pylir::Py::ObjectTypeInterface>", "{}">:$elements), [{
 		typeObject = typeObject ? typeObject : }] # DefaultType<"Tuple">.defaultValue # [{;
 		return get(typeObject, elements);
@@ -72,7 +72,7 @@ def PylirPy_VariantType : PylirPy_ObjectType<"Variant", [DeclareTypeInterfaceMet
 
 	let extraClassDeclaration = [{
 
-		mlir::FlatSymbolRefAttr getTypeObject() const
+		RefAttr getTypeObject() const
         {
             return {};
 		}

@@ -49,7 +49,7 @@ public:
     using Base::Base;
 };
 
-using TypeFlowArgValue = llvm::PointerUnion<mlir::SymbolRefAttr, pylir::Py::ObjectTypeInterface>;
+using TypeFlowArgValue = llvm::PointerUnion<pylir::Py::RefAttr, pylir::Py::ObjectTypeInterface>;
 
 struct FunctionSpecialization
 {
@@ -78,7 +78,7 @@ llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const FunctionSpecializatio
     llvm::interleaveComma(specialization.argTypes, os,
                           [&](TypeFlowArgValue value)
                           {
-                              if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                              if (auto ref = value.dyn_cast<pylir::Py::RefAttr>())
                               {
                                   os << ref;
                               }
@@ -228,7 +228,7 @@ public:
                             if (mlir::failed(interface.exec(
                                     llvm::to_vector(llvm::map_range(interface->getOperands(),
                                                                     [&](mlir::Value val) { return m_values[val]; })),
-                                    result, collection)))
+                                    result)))
                             {
                                 for (auto iter : interface->getOpResults())
                                 {
@@ -285,11 +285,10 @@ public:
                                 {
                                     returnValue = type;
                                 }
-                                else if (lookup.isa<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr,
+                                else if (lookup.isa<pylir::Py::ObjectAttrInterface, pylir::Py::RefAttr,
                                                     pylir::Py::UnboundAttr>())
                                 {
-                                    returnValue =
-                                        pylir::Py::typeOfConstant(lookup.cast<mlir::Attribute>(), collection, context);
+                                    returnValue = pylir::Py::typeOfConstant(lookup.cast<mlir::Attribute>());
                                 }
                             }
                             return returnedValues;
@@ -309,16 +308,11 @@ public:
                                 auto funcAttr = calleeValue.template dyn_cast_or_null<pylir::Py::FunctionAttr>();
                                 if (!funcAttr)
                                 {
-                                    if (auto callee = calleeValue.template dyn_cast_or_null<mlir::FlatSymbolRefAttr>())
+                                    if (auto callee = calleeValue.template dyn_cast_or_null<pylir::Py::RefAttr>())
                                     {
-                                        auto functionObject =
-                                            collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context,
-                                                                                                         callee);
-                                        if (functionObject)
-                                        {
-                                            funcAttr = functionObject.getInitializerAttr()
-                                                           .template dyn_cast_or_null<pylir::Py::FunctionAttr>();
-                                        }
+                                        funcAttr = callee.getSymbol()
+                                                       .getInitializerAttr()
+                                                       .template dyn_cast_or_null<pylir::Py::FunctionAttr>();
                                     }
                                 }
 
@@ -340,12 +334,11 @@ public:
                                 auto value = m_values[inValue];
                                 // We only allow references referring to type object to be passed as objects across
                                 // function boundaries. Everything else has to be a type.
-                                if (auto ref = value.template dyn_cast_or_null<mlir::SymbolRefAttr>())
+                                if (auto ref = value.template dyn_cast_or_null<pylir::Py::RefAttr>())
                                 {
-                                    auto lookup =
-                                        collection.lookupNearestSymbolFrom<pylir::Py::GlobalValueOp>(context, ref);
-                                    if (lookup
-                                        && lookup.getInitializerAttr().template isa_and_nonnull<pylir::Py::TypeAttr>())
+                                    if (ref.getSymbol()
+                                            .getInitializerAttr()
+                                            .template isa_and_nonnull<pylir::Py::TypeAttr>())
                                     {
                                         argValue = ref;
                                         continue;
@@ -357,10 +350,9 @@ public:
                                     argValue = type;
                                 }
                                 else if (value.template isa_and_nonnull<pylir::Py::ObjectAttrInterface,
-                                                                        mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
+                                                                        pylir::Py::RefAttr, pylir::Py::UnboundAttr>())
                                 {
-                                    argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>(),
-                                                                         collection, context);
+                                    argValue = pylir::Py::typeOfConstant(value.template cast<mlir::Attribute>());
                                 }
                             }
                             return FunctionCall{FunctionSpecialization{function, std::move(arguments)},
@@ -485,7 +477,7 @@ class Orchestrator
                     auto [existing, inserted] = values.insert({arg, succValue});
                     if (!inserted)
                     {
-                        existing->second = existing->second.join(succValue, collection, m_context);
+                        existing->second = existing->second.join(succValue);
                     }
                     blockArgs[arg.getArgNumber()] = existing->second;
                 }
@@ -632,7 +624,6 @@ class Orchestrator
     friend class InQueueCount;
 
 public:
-
     [[nodiscard]] llvm::StringRef getName() const
     {
         return m_typeFlowIR.getFunction().getName();
@@ -648,7 +639,7 @@ public:
                                          {
                                              return nullptr;
                                          }
-                                         if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                                         if (auto ref = value.dyn_cast<pylir::Py::RefAttr>())
                                          {
                                              return ref;
                                          }
@@ -980,7 +971,7 @@ public:
 template <class F>
 class ActionIterator
 {
-    F* f;
+    F* m_f;
 
 public:
     using iterator_category = std::output_iterator_tag;
@@ -989,14 +980,14 @@ public:
     using reference = void;
     using difference_type = std::ptrdiff_t;
 
-    explicit ActionIterator(F&& f) : f(&f) {}
+    explicit ActionIterator(F&& f) : m_f(&f) {}
 
-    explicit ActionIterator(F& f) : f(&f) {}
+    explicit ActionIterator(F& f) : m_f(&f) {}
 
     template <class T, std::enable_if_t<std::is_invocable_v<F, T>>* = nullptr>
     ActionIterator& operator=(T&& t)
     {
-        (*f)(std::forward<T>(t));
+        (*m_f)(std::forward<T>(t));
         return *this;
     }
 
@@ -1371,7 +1362,7 @@ public:
             for (auto [arg, value] :
                  llvm::zip(existing->second->getEntryBlock()->getArguments(), existing->first.argTypes))
             {
-                if (auto ref = value.dyn_cast<mlir::SymbolRefAttr>())
+                if (auto ref = value.dyn_cast<pylir::Py::RefAttr>())
                 {
                     entryValues[arg] = ref;
                 }

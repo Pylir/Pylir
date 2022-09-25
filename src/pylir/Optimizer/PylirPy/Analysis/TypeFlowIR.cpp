@@ -69,18 +69,16 @@ mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::At
 }
 
 mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
-                                                    ::llvm::SmallVectorImpl<OpFoldResult>& results,
-                                                    ::mlir::SymbolTableCollection& collection)
+                                                    ::llvm::SmallVectorImpl<OpFoldResult>& results)
 {
     if (auto type = operands[0].dyn_cast_or_null<Py::ObjectTypeInterface>())
     {
         results.emplace_back(type.getTypeObject());
         return mlir::success();
     }
-    if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
+    if (operands[0].isa_and_nonnull<Py::ObjectAttrInterface, Py::RefAttr, Py::UnboundAttr>())
     {
-        results.emplace_back(
-            Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getInstruction()).getTypeObject());
+        results.emplace_back(Py::typeOfConstant(operands[0].cast<mlir::Attribute>()).getTypeObject());
         return mlir::success();
     }
     return mlir::failure();
@@ -104,8 +102,7 @@ mlir::Value mapBackOperand(mlir::Value foldResult, mlir::Operation* normalIROp, 
 } // namespace
 
 mlir::LogicalResult pylir::TypeFlow::TupleLenOp::exec(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> operands,
-                                                      ::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>& results,
-                                                      ::mlir::SymbolTableCollection&)
+                                                      ::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>& results)
 {
     llvm::SmallVector<mlir::OpFoldResult> mlirFoldResults;
     if (mlir::succeeded(getInstruction()->fold(
@@ -144,8 +141,7 @@ mlir::LogicalResult pylir::TypeFlow::TupleLenOp::exec(::llvm::ArrayRef<::pylir::
 }
 
 mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> operands,
-                                                ::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>& results,
-                                                ::mlir::SymbolTableCollection& collection)
+                                                ::llvm::SmallVectorImpl<::pylir::TypeFlow::OpFoldResult>& results)
 {
     if (auto lhsAttr = operands[0].dyn_cast_or_null<mlir::Attribute>())
     {
@@ -156,7 +152,7 @@ mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::Ty
                 results.emplace_back(mlir::BoolAttr::get(getContext(), false));
                 return mlir::success();
             }
-            if (lhsAttr.isa<mlir::SymbolRefAttr>() && rhsAttr.isa<mlir::SymbolRefAttr>())
+            if (lhsAttr.isa<Py::RefAttr>() && rhsAttr.isa<Py::RefAttr>())
             {
                 results.emplace_back(mlir::BoolAttr::get(getContext(), true));
                 return mlir::success();
@@ -166,13 +162,13 @@ mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::Ty
     }
     auto lhsType = operands[0].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
     auto rhsType = operands[1].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
-    if (!lhsType && operands[0].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    if (!lhsType && operands[0].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, Py::RefAttr>())
     {
-        lhsType = Py::typeOfConstant(operands[0].cast<mlir::Attribute>(), collection, getInstruction());
+        lhsType = Py::typeOfConstant(operands[0].cast<mlir::Attribute>());
     }
-    if (!rhsType && operands[1].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, mlir::SymbolRefAttr>())
+    if (!rhsType && operands[1].isa_and_nonnull<Py::UnboundAttr, Py::ObjectAttrInterface, Py::RefAttr>())
     {
-        rhsType = Py::typeOfConstant(operands[1].cast<mlir::Attribute>(), collection, getInstruction());
+        rhsType = Py::typeOfConstant(operands[1].cast<mlir::Attribute>());
     }
     if (!lhsType || !rhsType)
     {
@@ -187,8 +183,7 @@ mlir::LogicalResult pylir::TypeFlow::IsOp::exec(::llvm::ArrayRef<::pylir::Py::Ty
 }
 
 mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
-                                                  ::llvm::SmallVectorImpl<OpFoldResult>& results,
-                                                  ::mlir::SymbolTableCollection& collection, bool forFolding)
+                                                  ::llvm::SmallVectorImpl<OpFoldResult>& results, bool forFolding)
 {
     llvm::SmallVector<mlir::OpFoldResult> mlirFoldResults;
     if (mlir::succeeded(getInstruction()->fold(
@@ -209,7 +204,7 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
             {
                 if (!getValueCalc())
                 {
-                    results.emplace_back(pylir::Py::typeOfConstant(attr, collection, getInstruction()));
+                    results.emplace_back(pylir::Py::typeOfConstant(attr));
                     continue;
                 }
                 results.emplace_back(attr);
@@ -248,13 +243,13 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
         {
             continue;
         }
-        if (iter.isa_and_nonnull<pylir::Py::ObjectAttrInterface, mlir::SymbolRefAttr, pylir::Py::UnboundAttr>())
+        if (iter.isa_and_nonnull<pylir::Py::ObjectAttrInterface, Py::RefAttr, Py::UnboundAttr>())
         {
-            iter = pylir::Py::typeOfConstant(iter.cast<mlir::Attribute>(), collection, getInstruction());
+            iter = pylir::Py::typeOfConstant(iter.cast<mlir::Attribute>());
         }
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> resultTypes;
-    auto result = refinable.refineTypes(inputs, resultTypes, collection);
+    auto result = refinable.refineTypes(inputs, resultTypes);
     if (forFolding && result != Py::TypeRefineResult::Success)
     {
         return mlir::failure();
@@ -269,17 +264,15 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
 }
 
 mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
-                                                  ::llvm::SmallVectorImpl<OpFoldResult>& results,
-                                                  ::mlir::SymbolTableCollection& collection)
+                                                  ::llvm::SmallVectorImpl<OpFoldResult>& results)
 {
-    return exec(operands, results, collection, false);
+    return exec(operands, results, false);
 }
 
 mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
                                                   ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
     llvm::SmallVector<::pylir::TypeFlow::OpFoldResult> res;
-    mlir::SymbolTableCollection collection;
     if (mlir::failed(exec(
             llvm::to_vector(llvm::map_range(operands,
                                             [](mlir::Attribute attr) -> Py::TypeAttrUnion
@@ -290,7 +283,7 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attri
                                                 }
                                                 return attr;
                                             })),
-            res, collection, true)))
+            res, true)))
     {
         return mlir::failure();
     }

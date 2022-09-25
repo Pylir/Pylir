@@ -10,6 +10,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyRefAttr.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
@@ -77,8 +78,9 @@ def ListResource : Resource<"::pylir::Py::ListResource">;
 def DictResource : Resource<"::pylir::Py::DictResource">;
 
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, ReturnsImmutable,
-												 DeclareOpInterfaceMethods<TypeRefineableInterface>]> {
-    let arguments = (ins AnyPylirAttr:$constant);
+												 DeclareOpInterfaceMethods<TypeRefineableInterface>,
+												 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+    let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface, PylirPy_RefAttr]>:$constant);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -91,8 +93,6 @@ def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoSideEffect, Ret
         Creates a constant value from the given attribute.
         Writing to a value returned from this op is undefined behaviour.
     }];
-
-    let hasVerifier = 1;
 }
 
 def PylirPy_TypeOfOp : PylirPy_Op<"typeOf", [NoSideEffect, AlwaysBound]> {
@@ -773,10 +773,10 @@ def PylirPy_MakeTupleExOp : AddExceptionHandling<PylirPy_MakeTupleOp> {
 
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 
@@ -798,7 +798,7 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, AddableExceptionHa
     }];
 
     let builders = [
-        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$values)>
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
     ];
 
     let hasCanonicalizer = 1;
@@ -811,10 +811,10 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, AddableExceptionHa
 def PylirPy_MakeListExOp : AddExceptionHandling<PylirPy_MakeListOp> {
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 
@@ -830,7 +830,7 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHand
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
     let builders = [
-        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$values)>
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
     ];
 
     let assemblyFormat = [{
@@ -847,10 +847,10 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHand
 def PylirPy_MakeSetExOp : AddExceptionHandling<PylirPy_MakeSetOp> {
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 
@@ -872,7 +872,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<DictResource>]>:$result);
 
     let builders = [
-            OpBuilder<(ins CArg<"const std::vector<::pylir::Py::DictArg>&","{}">:$keyValues)>
+            OpBuilder<(ins CArg<"const std::vector<::pylir::Py::DictArg>&","{}">:$args)>
     ];
 
     let assemblyFormat = [{
@@ -894,10 +894,10 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
 def PylirPy_MakeDictExOp : AddExceptionHandling<PylirPy_MakeDictOp> {
     let builders = [
         OpBuilder<(ins "const std::vector<::pylir::Py::DictArg>&":$keyValues,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 
@@ -984,7 +984,8 @@ def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [AlwaysBound, RefinedType<"
 
 // Memory operations
 
-def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>]> {
+def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>,
+                                                       DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility,
@@ -1002,12 +1003,11 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
         are undefined behaviour.
     }];
 
-    let hasVerifier = 1;
     let hasFolder = 1;
 }
 
 defvar GlobalOpSupportedTypes = AnyTypeOf<[DynamicType, Index, F64]>;
-defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr, F64Attr, FlatSymbolRefAttr]>;
+defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr, F64Attr, PylirPy_RefAttr]>;
 
 def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
 

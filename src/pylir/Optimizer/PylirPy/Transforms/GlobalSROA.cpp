@@ -57,7 +57,9 @@ std::vector<GlobalSROAPass::Aggregate> GlobalSROAPass::collectReplaceAble(mlir::
         auto canSROAReplace = [&](mlir::Operation* operation) -> mlir::LogicalResult
         {
             auto ref = mlir::dyn_cast<pylir::Py::ConstantOp>(operation);
-            if (!ref)
+            // The 'py.constant' also has to contain the ref attr. A simple use within an aggregate attribute
+            // (eg. '#py.tuple<(#py.ref<@valueOp>)>') can't be replaced.
+            if (!ref || !ref.getConstant().isa<pylir::Py::RefAttr>())
             {
                 return mlir::failure();
             }

@@ -25,5 +25,6 @@ def setSlot(obj: object, type: type, slot: str, value: object):
 def isUnboundValue(obj: object) -> bool:
     pass
 
+
 def mroLookup(mro_tuple, slot: str):
     pass

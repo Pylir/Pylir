@@ -28,7 +28,7 @@ runs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: 82f86b862b8ba9b1c6d91a32c88907f0dad6c3d2
+        ref: de3efd1b4c8e120c37b24e7cc264b5a117641bb1
         path: llvm-project
 
     - name: Configure Optimized TableGen
@@ -102,7 +102,7 @@ runs:
         -DLLVM_INCLUDE_TESTS=OFF `
         -DLLVM_INSTALL_UTILS=ON `
         -DLLVM_ENABLE_PROJECTS="mlir;lld" `
-        -DLLVM_TARGETS_TO_BUILD=host `
+        -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
         -DLLVM_ENABLE_LLD=ON `
         -DLLVM_BUILD_LLVM_C_DYLIB=OFF `
         -DLLVM_INCLUDE_BENCHMARKS=OFF `

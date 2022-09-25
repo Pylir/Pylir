@@ -156,10 +156,10 @@ std::array<char16_t, 2> pylir::Text::toUTF16(char32_t utf32, bool* legal)
     }
 
     // https://unicode.org/faq/utf_bom.html
-    constexpr char32_t LEAD_OFFSET = 0xD800 - (0x10000 >> 10);
+    constexpr char32_t leadOffset = 0xD800 - (0x10000 >> 10);
 
     std::array<char16_t, 2> result{};
-    result[0] = LEAD_OFFSET + (utf32 >> 10);
+    result[0] = leadOffset + (utf32 >> 10);
     result[1] = 0xDC00 + (utf32 & 0x3FF);
     return result;
 }
@@ -202,13 +202,13 @@ char32_t pylir::Text::toUTF32(std::u16string_view& utf16, bool* legal)
     }
     char16_t first = utf16.front();
     utf16.remove_prefix(1);
-    constexpr char32_t UTF16_LOW_SURROGATE_START = 0xDC00;
-    constexpr char32_t UTF16_LOW_SURROGATE_END = 0xDFFF;
-    constexpr char32_t UTF16_HIGH_SURROGATE_START = 0xD800;
-    constexpr char32_t UTF16_HIGH_SURROGATE_END = 0xDBFF;
-    if (first < UTF16_HIGH_SURROGATE_START || first > UTF16_HIGH_SURROGATE_END)
+    constexpr char32_t utF16LowSurrogateStart = 0xDC00;
+    constexpr char32_t utF16LowSurrogateEnd = 0xDFFF;
+    constexpr char32_t utF16HighSurrogateStart = 0xD800;
+    constexpr char32_t utF16HighSurrogateEnd = 0xDBFF;
+    if (first < utF16HighSurrogateStart || first > utF16HighSurrogateEnd)
     {
-        if (first >= UTF16_LOW_SURROGATE_START && first <= UTF16_LOW_SURROGATE_END)
+        if (first >= utF16LowSurrogateStart && first <= utF16LowSurrogateEnd)
         {
             if (legal)
             {
@@ -228,7 +228,7 @@ char32_t pylir::Text::toUTF32(std::u16string_view& utf16, bool* legal)
     }
     char16_t second = utf16.front();
     utf16.remove_prefix(1);
-    if (second < UTF16_LOW_SURROGATE_START || second > UTF16_LOW_SURROGATE_END)
+    if (second < utF16LowSurrogateStart || second > utF16LowSurrogateEnd)
     {
         if (legal)
         {
@@ -236,7 +236,7 @@ char32_t pylir::Text::toUTF32(std::u16string_view& utf16, bool* legal)
         }
         return REPLACEMENT_CHARACTER_UTF32;
     }
-    return ((first - UTF16_HIGH_SURROGATE_START) << 10) + (second - UTF16_LOW_SURROGATE_START) + 0x0010000;
+    return ((first - utF16HighSurrogateStart) << 10) + (second - utF16LowSurrogateStart) + 0x0010000;
 }
 
 char32_t pylir::Text::toUTF32(char32_t utf32, bool* legal)
@@ -332,7 +332,7 @@ std::u32string pylir::Text::toUTF32String(std::string_view utf8, bool* legal)
 
 bool pylir::Text::isWhitespace(char32_t codepoint)
 {
-    const auto *properties = utf8proc_get_property(codepoint);
+    const auto* properties = utf8proc_get_property(codepoint);
     return properties->category == UTF8PROC_CATEGORY_ZS || properties->bidi_class == UTF8PROC_BIDI_CLASS_WS
            || properties->bidi_class == UTF8PROC_BIDI_CLASS_B || properties->bidi_class == UTF8PROC_BIDI_CLASS_S;
 }

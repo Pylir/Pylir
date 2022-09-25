@@ -10,7 +10,7 @@ func.func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_tuple
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[TUPLE:.*]] = py.constant(@builtins.tuple)
+// CHECK-NEXT: %[[TUPLE:.*]] = py.constant(#py.ref<@builtins.tuple>)
 // CHECK-NEXT: %[[SIZE:.*]] = arith.constant 1
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocTuple %[[TUPLE]][%[[SIZE]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initTuple %[[MEM]] to (%[[ARG]])
@@ -28,7 +28,7 @@ func.func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_list
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LIST:.*]] = py.constant(@builtins.list)
+// CHECK-NEXT: %[[LIST:.*]] = py.constant(#py.ref<@builtins.list>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[LIST]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initList %[[MEM]] to [%[[ARG]]]
 // CHECK-NEXT: return %[[RESULT]]
@@ -45,7 +45,7 @@ func.func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_set
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[SET:.*]] = py.constant(@builtins.set)
+// CHECK-NEXT: %[[SET:.*]] = py.constant(#py.ref<@builtins.set>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[SET]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initSet %[[MEM]] to {%[[ARG]]}
 // CHECK-NEXT: return %[[RESULT]]
@@ -64,7 +64,7 @@ func.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> 
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
-// CHECK-NEXT: %[[DICT:.*]] = py.constant(@builtins.dict)
+// CHECK-NEXT: %[[DICT:.*]] = py.constant(#py.ref<@builtins.dict>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[DICT]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initDict %[[MEM]]
 // CHECK-NEXT: py.dict.setItem %[[RESULT]][%[[ARG0]] hash(%[[ARG1]])] to %[[ARG2]]
@@ -84,7 +84,7 @@ func.func @make_function() -> !py.dynamic {
 }
 
 // CHECK-LABEL: @make_function
-// CHECK-NEXT: %[[FUNCTION:.*]] = py.constant(@builtins.function)
+// CHECK-NEXT: %[[FUNCTION:.*]] = py.constant(#py.ref<@builtins.function>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[FUNCTION]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initFunc %[[MEM]] to @test
 // CHECK-NEXT: return %[[RESULT]]
@@ -114,7 +114,7 @@ func.func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_tuple_from_list
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[TUPLE:.*]] = py.constant(@builtins.tuple)
+// CHECK-NEXT: %[[TUPLE:.*]] = py.constant(#py.ref<@builtins.tuple>)
 // CHECK-NEXT: %[[SIZE:.*]] = py.list.len %[[ARG]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocTuple %[[TUPLE]][%[[SIZE]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initTupleFromList %[[MEM]] to (* %[[ARG]])
@@ -132,7 +132,7 @@ func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
 
 // CHECK-LABEL: @make_bool_from_i1
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[BOOL:.*]] = py.constant(@builtins.bool)
+// CHECK-NEXT: %[[BOOL:.*]] = py.constant(#py.ref<@builtins.bool>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
 // CHECK-NEXT: %[[EXT:.*]] = arith.extui %[[ARG]] : i1 to i{{[0-9]+}}
 // CHECK-NEXT: %[[INDEX:.*]] = arith.index_cast %[[EXT]]
@@ -151,7 +151,7 @@ func.func @make_int_fromInteger(%arg0 : index) -> !py.dynamic {
 
 // CHECK-LABEL: @make_int_fromInteger
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[BOOL:.*]] = py.constant(@builtins.int)
+// CHECK-NEXT: %[[BOOL:.*]] = py.constant(#py.ref<@builtins.int>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initIntUnsigned %[[MEM]] to %[[ARG]]
 // CHECK-NEXT: return %[[RESULT]]
@@ -170,7 +170,7 @@ func.func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_str_fromInt
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[STR:.*]] = py.constant(@builtins.str)
+// CHECK-NEXT: %[[STR:.*]] = py.constant(#py.ref<@builtins.str>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[STR]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initStrFromInt %[[MEM]] to %[[ARG]]
 // CHECK-NEXT: return %[[RESULT]]
@@ -188,7 +188,7 @@ func.func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dy
 // CHECK-LABEL: @make_int_from_add
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK-NEXT: %[[INT:.*]] = py.constant(@builtins.int)
+// CHECK-NEXT: %[[INT:.*]] = py.constant(#py.ref<@builtins.int>)
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[INT]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initIntAdd %[[MEM]] to %[[ARG0]] + %[[ARG1]]
 // CHECK-NEXT: return %[[RESULT]]

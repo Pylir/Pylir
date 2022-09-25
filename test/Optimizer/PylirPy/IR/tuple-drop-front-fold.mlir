@@ -4,7 +4,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func.func @test() -> !py.dynamic {
-    %0 = py.constant(#py.tuple<(@builtins.tuple)>)
+    %0 = py.constant(#py.tuple<(#py.ref<@builtins.tuple>)>)
     %1 = arith.constant 1 : index
     %result = py.tuple.dropFront %1, %0
     return %result : !py.dynamic
@@ -35,7 +35,7 @@ func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @test3
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK-NEXT: %[[C:.*]] = py.constant(@builtins.tuple)
+// CHECK-NEXT: %[[C:.*]] = py.constant(#py.ref<@builtins.tuple>)
 // CHECK-NEXT: %[[TUPLE:.*]] = py.tuple.copy %[[ARG0]] : %[[C]]
 // CHECK-NEXT: return %[[TUPLE]]
 
@@ -75,6 +75,6 @@ func.func @test6(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @test6
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK: %[[C:.*]] = py.constant(@builtins.tuple)
+// CHECK: %[[C:.*]] = py.constant(#py.ref<@builtins.tuple>)
 // CHECK: %[[COPY:.*]] = py.tuple.copy %[[ARG1]] : %[[C]]
 // CHECK: return %[[COPY]]

@@ -10,19 +10,19 @@ func.func @createObject(%typeObject : !py.dynamic) -> !py.dynamic {
 }
 
 func.func @test() -> !py.dynamic {
-	%0 = py.constant(@aType)
+	%0 = py.constant(#py.ref<@aType>)
 	%1 = py.call @createObject(%0) : (!py.dynamic) -> !py.dynamic
 	%2 = py.typeOf %1
 	return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: func @test
-// CHECK-NEXT: %[[INT:.*]] = py.constant(@aType)
+// CHECK-NEXT: %[[INT:.*]] = py.constant(#py.ref<@aType>)
 // CHECK-NEXT: py.call @[[SPECIALIZATION:[[:alnum:]]+]]
 // CHECK: return %[[INT]]
 
 // CHECK: func private @[[SPECIALIZATION]]
-// CHECK-NEXT: %[[C:.*]] = py.constant(@aType)
+// CHECK-NEXT: %[[C:.*]] = py.constant(#py.ref<@aType>)
 // CHECK-NEXT: %[[O:.*]] = py.makeObject %[[C]]
 // CHECK-NEXT: test.use(%[[O]])
 // CHECK-NEXT: return %[[O]]

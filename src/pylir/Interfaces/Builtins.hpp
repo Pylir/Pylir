@@ -4,8 +4,9 @@
 
 #pragma once
 
-#include <array>
 #include <llvm/ADT/StringRef.h>
+
+#include <array>
 
 namespace pylir::Builtins
 {
@@ -29,4 +30,4 @@ constexpr std::array allBuiltins = {
 #define COMPILER_BUILTIN(cppName, ...) Pylir##cppName,
 #include "CompilerBuiltins.def"
 };
-} // namespace pylir::Py::Builtins
+} // namespace pylir::Builtins

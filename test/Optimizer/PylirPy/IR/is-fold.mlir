@@ -39,8 +39,8 @@ py.globalValue @builtins.bool = #py.type
 // CHECK: %[[RES:.*]] = arith.constant true
 // CHECK: return %[[RES]]
 func.func @singletons() -> i1 {
-    %0 = py.constant(@builtins.bool)
-    %1 = py.constant(@builtins.bool)
+    %0 = py.constant(#py.ref<@builtins.bool>)
+    %1 = py.constant(#py.ref<@builtins.bool>)
     %2 = py.is %0, %1
     return %2 : i1
 }
@@ -55,7 +55,7 @@ py.globalValue @builtins.bool = #py.type
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
 func.func @alloca_symbol(%arg0 : !py.dynamic) -> i1 {
-    %0 = py.constant(@builtins.bool)
+    %0 = py.constant(#py.ref<@builtins.bool>)
     %1 = py.makeTuple (%arg0)
     %2 = py.is %0, %1
     return %2 : i1

@@ -22,9 +22,8 @@ mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value)
     if (auto refineable = value.getDefiningOp<Py::TypeRefineableInterface>())
     {
         llvm::SmallVector<Py::TypeAttrUnion> operandTypes(refineable->getNumOperands(), nullptr);
-        mlir::SymbolTableCollection collection;
         llvm::SmallVector<Py::ObjectTypeInterface> res;
-        if (refineable.refineTypes(operandTypes, res, collection) == TypeRefineResult::Failure)
+        if (refineable.refineTypes(operandTypes, res) == TypeRefineResult::Failure)
         {
             return nullptr;
         }
@@ -59,20 +58,19 @@ llvm::Optional<bool> pylir::Py::isUnbound(mlir::Value value)
     return llvm::None;
 }
 
-pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInterface attribute,
-                                                        mlir::Operation* context)
+pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(ObjectAttrInterface attribute)
 {
     if (!attribute)
     {
         return BuiltinMethodKind::Unknown;
     }
 
-    auto typeAttr = resolveValue<TypeAttr>(context, attribute.getTypeObject(), false);
+    auto typeAttr = ref_cast_or_null<TypeAttr>(attribute.getTypeObject(), false);
     if (!typeAttr)
     {
         return BuiltinMethodKind::Unknown;
     }
-    auto mro = resolveValue<TupleAttr>(context, typeAttr.getMroTuple(), false);
+    auto mro = ref_cast_or_null<TupleAttr>(typeAttr.getMroTuple(), false);
     if (!mro)
     {
         return BuiltinMethodKind::Unknown;
@@ -84,9 +82,9 @@ pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInt
             // This can probably only be a result of undefined behaviour.
             continue;
         }
-        if (auto ref = iter.dyn_cast<mlir::FlatSymbolRefAttr>())
+        if (auto ref = iter.dyn_cast<RefAttr>())
         {
-            auto opt = llvm::StringSwitch<std::optional<BuiltinMethodKind>>(ref.getValue())
+            auto opt = llvm::StringSwitch<std::optional<BuiltinMethodKind>>(ref.getRef().getValue())
                            .Case(Builtins::Int.name, BuiltinMethodKind::Int)
                            .Case(Builtins::Str.name, BuiltinMethodKind::Str)
                            .Case(Builtins::Object.name, BuiltinMethodKind::Object)
@@ -96,7 +94,7 @@ pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(pylir::Py::ObjectAttrInt
                 return *opt;
             }
         }
-        auto baseType = resolveValue<TypeAttr>(context, iter);
+        auto baseType = ref_cast_or_null<TypeAttr>(iter);
         if (!baseType)
         {
             return BuiltinMethodKind::Unknown;

@@ -23,7 +23,7 @@ func.func @bar() -> !py.dynamic {
 // CHECK: return
 
 // CHECK-LABEL: @bar
-// CHECK-NEXT: %[[C:.*]] = py.constant(@foo)
+// CHECK-NEXT: %[[C:.*]] = py.constant(#py.ref<@foo>)
 // CHECK-NEXT: return %[[C]]
 
 // -----
@@ -64,7 +64,7 @@ py.globalValue @builtins.int = #py.type
 py.global "private" @foo : !py.dynamic
 
 func.func @test() {
-    %0 = py.constant(@builtins.int)
+    %0 = py.constant(#py.ref<@builtins.int>)
     py.store %0 : !py.dynamic into @foo
     return
 }
@@ -79,7 +79,7 @@ func.func @bar() -> !py.dynamic {
 // CHECK: return
 
 // CHECK-LABEL: @bar
-// CHECK-NEXT: %[[C:.*]] = py.constant(@builtins.int)
+// CHECK-NEXT: %[[C:.*]] = py.constant(#py.ref<@builtins.int>)
 // CHECK-NEXT: return %[[C]]
 
 // -----
@@ -145,7 +145,7 @@ func.func @bar() -> !py.dynamic {
 // CHECK: return
 
 // CHECK-LABEL: @bar
-// CHECK-NEXT: %[[C:.*]] = py.constant(@foo)
+// CHECK-NEXT: %[[C:.*]] = py.constant(#py.ref<@foo>)
 // CHECK-NEXT: return %[[C]]
 
 // -----

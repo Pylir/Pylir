@@ -7,14 +7,14 @@ py.globalValue @builtins.str = #py.type
 py.globalValue "private" @thing = #py.dict<{}>
 
 func.func @test(%hash: index) -> !py.dynamic {
-    %0 = py.constant(@thing)
+    %0 = py.constant(#py.ref<@thing>)
     %1 = py.constant(#py.str<"lol">)
     %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
 func.func @foo(%hash: index, %arg0 : !py.dynamic) {
-    %0 = py.constant(@thing)
+    %0 = py.constant(#py.ref<@thing>)
     %1 = py.constant(#py.str<"lol">)
     py.dict.setItem %0[%1 hash(%hash)] to %arg0
     return
@@ -42,7 +42,7 @@ py.globalValue @builtins.str = #py.type
 py.globalValue "private" @thing = #py.dict<{}>
 
 func.func @store_only(%hash: index, %arg0 : !py.dynamic) {
-    %0 = py.constant(@thing)
+    %0 = py.constant(#py.ref<@thing>)
     %1 = py.constant(#py.str<"lol">)
     py.dict.setItem %0[%1 hash(%hash)] to %arg0
     return
@@ -65,7 +65,7 @@ py.globalValue @builtins.str = #py.type
 py.globalValue "private" @thing = #py.dict<{}>
 
 func.func @load_only(%hash: index) -> !py.dynamic {
-    %0 = py.constant(@thing)
+    %0 = py.constant(#py.ref<@thing>)
     %1 = py.constant(#py.str<"lol">)
     %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
@@ -88,7 +88,7 @@ py.globalValue @builtins.int = #py.type
 py.globalValue "private" @thing = #py.dict<{#py.str<"lol"> to #py.int<5>}>
 
 func.func @init_attr(%hash: index) -> !py.dynamic {
-    %0 = py.constant(@thing)
+    %0 = py.constant(#py.ref<@thing>)
     %1 = py.constant(#py.str<"lol">)
     %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
@@ -115,3 +115,23 @@ py.globalValue "private" @thing = #py.dict<{#py.str<"lol"> to #py.int<5>}>
 // CHECK-NOT: py.globalValue "private" thing
 
 // CHECK: py.global "private" @[[DES:.*]] : !py.dynamic = #py.int<5>
+
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.globalValue "private" @thing = #py.dict<{}>
+
+func.func @sub_attr(%hash: index) -> !py.dynamic {
+    %0 = py.constant(#py.dict<{#py.int<5> to #py.ref<@thing>}>)
+    %1 = py.constant(#py.str<"lol">)
+    %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
+    return %2 : !py.dynamic
+}
+
+// CHECK: py.globalValue "private" @thing = #py.dict<{}>
+// CHECK: py.constant(#py.dict<{#py.int<5> to #py.ref<@thing>}>)

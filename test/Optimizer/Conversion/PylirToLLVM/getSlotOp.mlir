@@ -6,8 +6,8 @@ py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func.func @foo() -> !py.dynamic {
-    %0 = py.constant(@builtins.type)
-    %1 = py.constant(@builtins.tuple)
+    %0 = py.constant(#py.ref<@builtins.type>)
+    %1 = py.constant(#py.ref<@builtins.tuple>)
     %2 = py.getSlot "__slots__" from %1 : %0
     return %2 : !py.dynamic
 }

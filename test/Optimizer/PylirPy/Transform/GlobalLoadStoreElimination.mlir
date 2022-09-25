@@ -203,18 +203,18 @@ module {
   py.global "private" @x$handle : !py.dynamic
   func.func @__init__() {
     %0 = py.constant(#py.unbound)
-    %1 = py.constant(@builtins.iter)
+    %1 = py.constant(#py.ref<@builtins.iter>)
     %2 = py.constant(#py.dict<{}>)
     %3 = py.constant(#py.bool<True>)
-    %4 = py.constant(@builtins.bool)
-    %5 = py.constant(@builtins.print)
-    %6 = py.constant(@builtins.next)
-    %7 = py.constant(@builtins.None)
-    %8 = py.constant(@builtins.StopIteration)
+    %4 = py.constant(#py.ref<@builtins.bool>)
+    %5 = py.constant(#py.ref<@builtins.print>)
+    %6 = py.constant(#py.ref<@builtins.next>)
+    %7 = py.constant(#py.ref<@builtins.None>)
+    %8 = py.constant(#py.ref<@builtins.StopIteration>)
     %true = arith.constant true
     %9 = py.constant(#py.tuple<(#py.tuple<(#py.int<3>, #py.int<5>, #py.int<6>)>)>)
-    %10 = py.constant(#py.tuple<(@builtins.NameError)>)
-    %11 = py.constant(@builtins.BaseException.__new__)
+    %10 = py.constant(#py.tuple<(#py.ref<@builtins.NameError>)>)
+    %11 = py.constant(#py.ref<@builtins.BaseException.__new__>)
     %12 = py.constant(#py.tuple<(#py.tuple<(#py.int<2>, #py.int<4>, #py.int<7>)>)>)
     py.call @builtins.__init__() : () -> ()
     py.store %0 : !py.dynamic into @x$handle

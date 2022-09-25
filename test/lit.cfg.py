@@ -42,6 +42,9 @@ llvm_config.with_system_environment(
 
 llvm_config.use_default_substitutions()
 
+for arch in config.llvm_targets_to_build.split(';'):
+    config.available_features.add(arch.lower() + '-registered-target')
+
 # excludes: A list of directories to exclude from the testsuite. The 'Inputs'
 # subdirectories contain auxiliary inputs for various tests in their parent
 # directories.

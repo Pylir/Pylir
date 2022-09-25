@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "PylirPyDialect.hpp"
+#include "PylirPyOps.hpp"
 
 template <>
 struct mlir::FieldParser<llvm::APFloat>
@@ -55,7 +56,45 @@ llvm::hash_code hash_value(const pylir::BigInt& bigInt)
     PYLIR_ASSERT(result == MP_OKAY);
     return llvm::hash_value(makeArrayRef(data));
 }
+
+namespace Py::detail
+{
+struct RefAttrStorage : mlir::AttributeStorage
+{
+    using KeyTy = std::tuple<mlir::FlatSymbolRefAttr>;
+
+    explicit RefAttrStorage(mlir::FlatSymbolRefAttr identity) : identity(identity) {}
+
+    bool operator==(const KeyTy& key) const
+    {
+        return std::get<0>(key) == identity;
+    }
+
+    static RefAttrStorage* construct(mlir::AttributeStorageAllocator& allocator, const KeyTy& key)
+    {
+        return new (allocator.allocate<RefAttrStorage>()) RefAttrStorage(std::get<0>(key));
+    }
+
+    mlir::SymbolRefAttr identity;
+    mlir::Operation* value;
+};
+} // namespace Py::detail
 } // namespace pylir
+
+mlir::FlatSymbolRefAttr pylir::Py::RefAttr::getRef() const
+{
+    return getImpl()->identity.cast<mlir::FlatSymbolRefAttr>();
+}
+
+pylir::Py::GlobalValueOp pylir::Py::RefAttr::getSymbol() const
+{
+    PYLIR_ASSERT(
+        getImpl()->value
+        && "Symbol the RefAttr refers to does not exist, `pylir-finalize-ref-attrs` pass was not run OR RefAttr was "
+           "created with the '::llvm::StringRef' constructor. If within an optimization pass, please use the "
+           "constructor directly referencing the 'GlobalValueOp'");
+    return mlir::cast<GlobalValueOp>(getImpl()->value);
+}
 
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
@@ -80,9 +119,9 @@ const pylir::BigInt& pylir::Py::BoolAttr::getIntegerValue() const
     return getValue() ? trueValue : falseValue;
 }
 
-mlir::FlatSymbolRefAttr pylir::Py::FunctionAttr::getTypeObject() const
+pylir::Py::RefAttr pylir::Py::FunctionAttr::getTypeObject() const
 {
-    return mlir::FlatSymbolRefAttr::get(getContext(), Builtins::Function.name);
+    return RefAttr::get(getContext(), Builtins::Function.name);
 }
 
 mlir::DictionaryAttr pylir::Py::FunctionAttr::getSlots() const
@@ -115,7 +154,7 @@ void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
 mlir::Attribute pylir::Py::DictAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
                                                                  llvm::ArrayRef<mlir::Type>) const
 {
-    auto type = replAttrs.take_back(2).back().cast<mlir::FlatSymbolRefAttr>();
+    auto type = replAttrs.take_back(2).back().cast<RefAttr>();
     auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
     std::vector<std::pair<mlir::Attribute, mlir::Attribute>> vector;
     for (std::size_t i = 0; i < replAttrs.size() - 2; i += 2)
@@ -137,7 +176,7 @@ void doTypeObjectSlotsWalk(Op op, llvm::function_ref<void(mlir::Attribute)> walk
 template <class Op, class... Args>
 Op doTypeObjectSlotsReplace(Op op, llvm::ArrayRef<mlir::Attribute> replAttrs, Args&&... prior)
 {
-    auto type = replAttrs.take_back(2).back().cast<mlir::FlatSymbolRefAttr>();
+    auto type = replAttrs.take_back(2).back().cast<pylir::Py::RefAttr>();
     auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
     return Op::get(op.getContext(), std::forward<Args>(prior)..., type, slots);
 }
@@ -216,7 +255,7 @@ void pylir::Py::TupleAttr::walkImmediateSubElements(llvm::function_ref<void(mlir
 mlir::Attribute pylir::Py::TupleAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
                                                                   llvm::ArrayRef<mlir::Type>) const
 {
-    auto typeObject = replAttrs.back().cast<mlir::FlatSymbolRefAttr>();
+    auto typeObject = replAttrs.back().cast<RefAttr>();
     return get(getContext(), replAttrs.drop_back(), typeObject);
 }
 
@@ -234,7 +273,7 @@ void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
 mlir::Attribute pylir::Py::ListAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
                                                                  llvm::ArrayRef<mlir::Type>) const
 {
-    auto typeObject = replAttrs.take_back(2).front().cast<mlir::FlatSymbolRefAttr>();
+    auto typeObject = replAttrs.take_back(2).front().cast<RefAttr>();
     auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
     return get(getContext(), replAttrs.drop_back(2), typeObject, slots);
 }
@@ -253,7 +292,7 @@ void pylir::Py::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::
 mlir::Attribute pylir::Py::SetAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
                                                                 llvm::ArrayRef<mlir::Type>) const
 {
-    auto typeObject = replAttrs.take_back(2).front().cast<mlir::FlatSymbolRefAttr>();
+    auto typeObject = replAttrs.take_back(2).front().cast<RefAttr>();
     auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
     return get(getContext(), replAttrs.drop_back(2), typeObject, slots);
 }
@@ -294,7 +333,19 @@ mlir::Attribute pylir::Py::TypeAttr::replaceImmediateSubElements(llvm::ArrayRef<
                                                                  llvm::ArrayRef<mlir::Type>) const
 {
     auto value = replAttrs[0];
-    auto typeObject = replAttrs[1].cast<mlir::FlatSymbolRefAttr>();
+    auto typeObject = replAttrs[1].cast<RefAttr>();
     auto slots = replAttrs[2].cast<mlir::DictionaryAttr>();
     return get(getContext(), value, typeObject, slots);
+}
+
+void pylir::Py::RefAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+                                                  llvm::function_ref<void(mlir::Type)>) const
+{
+    walkAttrsFn(getRef());
+}
+
+mlir::Attribute pylir::Py::RefAttr::replaceImmediateSubElements(::llvm::ArrayRef<::mlir::Attribute> replAttrs,
+                                                                ::llvm::ArrayRef<::mlir::Type>) const
+{
+    return RefAttr::get(getContext(), replAttrs[0].cast<mlir::FlatSymbolRefAttr>());
 }
