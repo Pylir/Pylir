@@ -559,7 +559,7 @@ struct LocationProvider<Syntax::Comparison>
 template <>
 struct LocationProvider<Syntax::UnaryOp>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::UnaryOp& power) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::UnaryOp& value) noexcept;
 };
 
 template <>
@@ -625,25 +625,25 @@ struct LocationProvider<Syntax::Atom>
 template <>
 struct LocationProvider<Syntax::StarredItem>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredItem& starredItem) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::StarredItem& value) noexcept;
 };
 
 template <>
 struct LocationProvider<Syntax::Assignment>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Assignment& assignmentExpression) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Assignment& value) noexcept;
 };
 
 template <>
 struct LocationProvider<Syntax::Argument>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Argument& argument) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Argument& value) noexcept;
 };
 
 template <>
 struct LocationProvider<Syntax::Parameter>
 {
-    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Parameter& parameter) noexcept;
+    static std::pair<std::size_t, std::size_t> getRange(const Syntax::Parameter& value) noexcept;
 };
 
 template <>

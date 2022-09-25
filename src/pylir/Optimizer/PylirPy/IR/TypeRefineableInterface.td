@@ -32,7 +32,7 @@ def TypeRefineableInterface : OpInterface<"TypeRefineableInterface"> {
             which must be equal to the amount of results of the operation at the end of the call.
         }], "::pylir::Py::TypeRefineResult", "refineTypes",
                                 (ins "::llvm::ArrayRef<::pylir::Py::TypeAttrUnion>":$inputs,
-                                     "::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>&":$resultTypes)>
+                                     "::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>&":$result)>
     ];
 }
 

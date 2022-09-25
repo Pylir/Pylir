@@ -247,7 +247,7 @@ void pylir::CodeGen::assignTarget(const Syntax::Subscription& subscription, mlir
     m_builder.createPylirSetItemIntrinsic(container, indices, value, m_currentExceptBlock);
 }
 
-void pylir::CodeGen::assignTarget(const Syntax::Slice& slice, mlir::Value value)
+void pylir::CodeGen::assignTarget(const Syntax::Slice&, mlir::Value)
 {
     // TODO:
     PYLIR_UNREACHABLE;
@@ -323,19 +323,19 @@ void pylir::CodeGen::delTarget(const Syntax::Atom& atom)
     writeIdentifier(variableName, m_builder.createConstant(m_builder.getUnboundAttr()));
 }
 
-void pylir::CodeGen::delTarget(const Syntax::Subscription& subscription)
+void pylir::CodeGen::delTarget(const Syntax::Subscription&)
 {
     // TODO:
     PYLIR_UNREACHABLE;
 }
 
-void pylir::CodeGen::delTarget(const Syntax::Slice& slice)
+void pylir::CodeGen::delTarget(const Syntax::Slice&)
 {
     // TODO:
     PYLIR_UNREACHABLE;
 }
 
-void pylir::CodeGen::delTarget(const Syntax::AttributeRef& attributeRef)
+void pylir::CodeGen::delTarget(const Syntax::AttributeRef&)
 {
     // TODO:
     PYLIR_UNREACHABLE;
@@ -1495,7 +1495,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
     }
 }
 
-void pylir::CodeGen::visit(const pylir::Syntax::WithStmt& withStmt)
+void pylir::CodeGen::visit(const pylir::Syntax::WithStmt&)
 {
     // TODO:
     PYLIR_UNREACHABLE;
@@ -2345,7 +2345,7 @@ void pylir::CodeGen::visit(const Syntax::ExpressionStmt& expressionStmt)
     visit(*expressionStmt.expression);
 }
 
-mlir::Value pylir::CodeGen::visit(const Syntax::Slice& slice)
+mlir::Value pylir::CodeGen::visit(const Syntax::Slice&)
 {
     // TODO:
     PYLIR_UNREACHABLE;
@@ -2378,13 +2378,13 @@ mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef)
         object, m_builder.createConstant(attributeRef.identifier.getValue()), m_currentExceptBlock);
 }
 
-mlir::Value pylir::CodeGen::visit(const Syntax::Generator& generator)
+mlir::Value pylir::CodeGen::visit(const Syntax::Generator&)
 {
     // TODO:
     PYLIR_UNREACHABLE;
 }
 
-void pylir::CodeGen::visit(const Syntax::AssertStmt& assertStmt)
+void pylir::CodeGen::visit(const Syntax::AssertStmt&)
 {
     // TODO:
     PYLIR_UNREACHABLE;
@@ -2439,7 +2439,7 @@ void pylir::CodeGen::visit(const Syntax::ImportStmt& importStmt)
     }
 }
 
-void pylir::CodeGen::visit(const Syntax::FutureStmt& importStmt)
+void pylir::CodeGen::visit(const Syntax::FutureStmt&)
 {
     // TODO:
     PYLIR_UNREACHABLE;

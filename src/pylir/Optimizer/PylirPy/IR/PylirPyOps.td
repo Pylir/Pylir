@@ -773,10 +773,10 @@ def PylirPy_MakeTupleExOp : AddExceptionHandling<PylirPy_MakeTupleOp> {
 
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 
@@ -798,7 +798,7 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, AddableExceptionHa
     }];
 
     let builders = [
-        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$values)>
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
     ];
 
     let hasCanonicalizer = 1;
@@ -811,10 +811,10 @@ def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, AddableExceptionHa
 def PylirPy_MakeListExOp : AddExceptionHandling<PylirPy_MakeListOp> {
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 
@@ -830,7 +830,7 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHand
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
 
     let builders = [
-        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$values)>
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
     ];
 
     let assemblyFormat = [{
@@ -847,10 +847,10 @@ def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHand
 def PylirPy_MakeSetExOp : AddExceptionHandling<PylirPy_MakeSetOp> {
     let builders = [
         OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 
@@ -872,7 +872,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<DictResource>]>:$result);
 
     let builders = [
-            OpBuilder<(ins CArg<"const std::vector<::pylir::Py::DictArg>&","{}">:$keyValues)>
+            OpBuilder<(ins CArg<"const std::vector<::pylir::Py::DictArg>&","{}">:$args)>
     ];
 
     let assemblyFormat = [{
@@ -894,10 +894,10 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
 def PylirPy_MakeDictExOp : AddExceptionHandling<PylirPy_MakeDictOp> {
     let builders = [
         OpBuilder<(ins "const std::vector<::pylir::Py::DictArg>&":$keyValues,
-                       "mlir::Block*":$happy_path,
-                       "mlir::ValueRange":$normal_dest_operands,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwind_dest_operands
+                       "mlir::ValueRange":$unwindDestOperands
          )>
     ];
 

@@ -604,9 +604,9 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(::llvm::ArrayRef<::mlir::Attribute> ope
     return nullptr;
 }
 
-mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute> attributes)
+mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto object = ref_cast_or_null<TypeAttr>(attributes[0]);
+    auto object = ref_cast_or_null<TypeAttr>(operands[0]);
     if (!object)
     {
         return nullptr;
@@ -614,9 +614,9 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
     return object.getMroTuple();
 }
 
-::mlir::OpFoldResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> constantOperands)
+::mlir::OpFoldResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    if (auto tuple = ref_cast_or_null<TupleAttr>(constantOperands[0]))
+    if (auto tuple = ref_cast_or_null<TupleAttr>(operands[0]))
     {
         for (auto iter : tuple.getValue())
         {
@@ -633,8 +633,8 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
         }
         return Py::UnboundAttr::get(getContext());
     }
-    auto operands = resolveTupleOperands(*this, getMroTuple());
-    for (auto& iter : operands)
+    auto tupleOperands = resolveTupleOperands(*this, getMroTuple());
+    for (auto& iter : tupleOperands)
     {
         if (!iter || !iter.is<mlir::Attribute>())
         {
@@ -950,7 +950,7 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
+    pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> inputs,
                                         llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
     if (!getIterExpansionAttr().empty())
@@ -959,7 +959,7 @@ pylir::Py::TypeRefineResult
         return TypeRefineResult::Approximate;
     }
     llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
-    for (auto iter : argumentTypes)
+    for (auto iter : inputs)
     {
         if (!iter)
         {
@@ -974,7 +974,7 @@ pylir::Py::TypeRefineResult
 
 pylir::Py::TypeRefineResult
     pylir::Py::TupleCopyOp::refineTypes(::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
-                                        ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes)
+                                        ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& result)
 {
     auto typeObject = inputs[1].dyn_cast_or_null<RefAttr>();
     if (!typeObject)
@@ -984,18 +984,18 @@ pylir::Py::TypeRefineResult
     auto tuple = inputs[0].dyn_cast_or_null<pylir::Py::TupleType>();
     if (!tuple)
     {
-        resultTypes.emplace_back(Py::ClassType::get(getContext(), typeObject));
+        result.emplace_back(Py::ClassType::get(getContext(), typeObject));
         return TypeRefineResult::Approximate;
     }
-    resultTypes.emplace_back(Py::TupleType::get(getContext(), typeObject, tuple.getElements()));
+    result.emplace_back(Py::TupleType::get(getContext(), typeObject, tuple.getElements()));
     return TypeRefineResult::Success;
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion> argumentTypes,
+    pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion> inputs,
                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
-    auto tupleType = argumentTypes[0].dyn_cast_or_null<pylir::Py::TupleType>();
+    auto tupleType = inputs[0].dyn_cast_or_null<pylir::Py::TupleType>();
     if (!tupleType)
     {
         return TypeRefineResult::Failure;
@@ -1005,7 +1005,7 @@ pylir::Py::TypeRefineResult
         result.emplace_back(UnboundType::get(getContext()));
         return TypeRefineResult::Success;
     }
-    auto index = argumentTypes[1].dyn_cast_or_null<mlir::IntegerAttr>();
+    auto index = inputs[1].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!index)
     {
         Py::ObjectTypeInterface sumType = tupleType.getElements().front();
@@ -1027,10 +1027,10 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
+    pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> inputs,
                                              llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
-    auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
+    auto tupleType = inputs[1].dyn_cast_or_null<Py::TupleType>();
     if (!tupleType)
     {
         result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
@@ -1041,7 +1041,7 @@ pylir::Py::TypeRefineResult
         result.emplace_back(tupleType);
         return TypeRefineResult::Success;
     }
-    auto index = argumentTypes[0].dyn_cast_or_null<mlir::IntegerAttr>();
+    auto index = inputs[0].dyn_cast_or_null<mlir::IntegerAttr>();
     if (!index)
     {
         Py::ObjectTypeInterface sumType = tupleType.getElements().front();
@@ -1063,18 +1063,18 @@ pylir::Py::TypeRefineResult
 }
 
 pylir::Py::TypeRefineResult
-    pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> argumentTypes,
+    pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> inputs,
                                            llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
 {
-    auto tupleType = argumentTypes[1].dyn_cast_or_null<Py::TupleType>();
+    auto tupleType = inputs[1].dyn_cast_or_null<Py::TupleType>();
     // TODO: Once/if tuple type accepts nullptr elements (for unknown), the below or should not be necessary
-    if (!tupleType || !argumentTypes[0].isa_and_nonnull<Py::ObjectTypeInterface>())
+    if (!tupleType || !inputs[0].isa_and_nonnull<Py::ObjectTypeInterface>())
     {
         result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
         return TypeRefineResult::Approximate;
     }
     llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());
-    elements.insert(elements.begin(), argumentTypes[0].cast<Py::ObjectTypeInterface>());
+    elements.insert(elements.begin(), inputs[0].cast<Py::ObjectTypeInterface>());
     result.emplace_back(Py::TupleType::get(getContext(), {}, elements));
     return TypeRefineResult::Success;
 }
