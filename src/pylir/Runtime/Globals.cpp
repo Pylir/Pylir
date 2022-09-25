@@ -19,7 +19,7 @@ bool pylir::rt::isGlobal(PyObject* object)
     struct Ranges
     {
         pylir::rt::PyObject* constMin;
-        pylir::rt::PyObject*    constMax;
+        pylir::rt::PyObject* constMax;
         pylir::rt::PyObject* collMin;
         pylir::rt::PyObject* collMax;
     };
