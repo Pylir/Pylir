@@ -214,7 +214,6 @@ public:
     }
 
     template <std::size_t n>
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
     Py::ConstantOp createConstant(const char (&c)[n])
     {
         return create<Py::ConstantOp>(getStrAttr(c));

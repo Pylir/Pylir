@@ -16,7 +16,6 @@
 // Don't have much choice until this is fixed in LLVM
 using llvm::opt::HelpHidden;
 
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays)
 static constexpr llvm::opt::OptTable::Info INFO_TABLE[] = {
 #define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) \
     {PREFIX,                                                                                             \
