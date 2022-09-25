@@ -34,6 +34,10 @@ runs:
     - name: Configure Optimized TableGen
       shell: pwsh
       run: |
+        $work_around_flags = ''
+        if ('${{inputs.cpp-compiler}}'.contains('g++')) {
+          $work_around_flags = '-DCMAKE_CXX_FLAGS=-no-canonical-prefixes -DCMAKE_C_FLAGS=-no-canonical-prefixes'
+        }
         cmake -GNinja -Bllvm-optimized-tblgen `
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
@@ -46,6 +50,7 @@ runs:
           -DLLVM_ENABLE_PROJECTS="mlir" `
           -DLLVM_TARGETS_TO_BUILD=host `
           -DLLVM_ENABLE_LLD=ON `
+           $work_around_flags `
           -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
           -S ${{github.workspace}}/llvm-project/llvm
 
@@ -65,7 +70,7 @@ runs:
         }
         $work_around_flags = ''
         if ('${{inputs.cpp-compiler}}'.contains('g++')) {
-          $work_around_flags = '-DCMAKE_CXX_FLAGS=-no-canonical-prefix -DCMAKE_C_FLAGS=-no-canonical-prefix'
+          $work_around_flags = '-DCMAKE_CXX_FLAGS=-no-canonical-prefixes -DCMAKE_C_FLAGS=-no-canonical-prefixes'
         }
         $runtime_lib = ''
         switch ('${{inputs.runtime_lib}}') {
