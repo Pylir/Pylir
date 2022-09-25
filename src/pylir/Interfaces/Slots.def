@@ -23,7 +23,7 @@
 #endif
 
 #ifndef TYPE_SLOT_REV_BIN_OP
-#define TYPE_SLOT_REV_BIN_OP(slotName, revSlotName, cppName, ...) TYPE_SLOT_BIN_OP(slotName, cppName)
+#define TYPE_SLOT_REV_BIN_OP(slotName, revSlotName, cppName) TYPE_SLOT_BIN_OP(slotName, cppName)
 #endif
 
 #ifndef TYPE_SLOT_TERNARY_OP

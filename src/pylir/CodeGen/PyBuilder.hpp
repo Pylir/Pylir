@@ -145,7 +145,7 @@ public:
     }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
-#define COMPILER_BUILTIN_TERNARY_OP(name, slotName, ...)                                                               \
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                                                                    \
     mlir::Value createPylir##name##Intrinsic(mlir::Value first, mlir::Value second, mlir::Value third,                 \
                                              mlir::Block* exceptBlock = nullptr)                                       \
     {                                                                                                                  \
@@ -163,7 +163,7 @@ public:
         return op.getResult(0);                                                                                        \
     }
 
-#define COMPILER_BUILTIN_BIN_OP(name, slotName, ...)                                                                  \
+#define COMPILER_BUILTIN_BIN_OP(name, slotName)                                                                       \
     mlir::Value createPylir##name##Intrinsic(mlir::Value lhs, mlir::Value rhs, mlir::Block* exceptBlock = nullptr)    \
     {                                                                                                                 \
         if (!exceptBlock)                                                                                             \
@@ -180,7 +180,7 @@ public:
         return op.getResult(0);                                                                                       \
     }
 
-#define COMPILER_BUILTIN_UNARY_OP(name, slotName, ...)                                                     \
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName)                                                          \
     mlir::Value createPylir##name##Intrinsic(mlir::Value val, mlir::Block* exceptBlock = nullptr)          \
     {                                                                                                      \
         if (!exceptBlock)                                                                                  \

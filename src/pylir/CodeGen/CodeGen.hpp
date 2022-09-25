@@ -169,8 +169,7 @@ class CodeGen
             return m_block;
         }
 
-        // NOLINTNEXTLINE(google-explicit-constructor)
-        operator mlir::Block*() const
+        /*implicit*/ operator mlir::Block*() const
         {
             return get();
         }
@@ -317,13 +316,13 @@ class CodeGen
 
     std::string formImplName(std::string_view symbol);
 
-    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    template <class T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>
     void assignTarget(const T& variant, mlir::Value value)
     {
         variant.match([=](const auto& sub) { assignTarget(sub, value); });
     }
 
-    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    template <class T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>
     void delTarget(const T& variant)
     {
         variant.match([=](const auto& sub) { delTarget(sub); });
@@ -364,7 +363,7 @@ class CodeGen
                               llvm::ArrayRef<Syntax::Parameter> parameterList, llvm::StringRef funcName,
                               const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody);
 
-    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    template <class T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>
     decltype(auto) visit(const T& variant)
     {
         auto lambda = [&] { return variant.match([=](const auto& sub) -> decltype(auto) { return visit(sub); }); };

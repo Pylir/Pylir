@@ -81,7 +81,7 @@ class HashTable
 
     bool insertionRehash()
     {
-        if (m_bucketCount > 0 && (m_values.size() + 1) / m_bucketCount < MAX_LOAD_FACTOR)
+        if (m_bucketCount > 0 && (m_values.size() + 1) / static_cast<float>(m_bucketCount) < MAX_LOAD_FACTOR)
         {
             return false;
         }
@@ -233,7 +233,7 @@ public:
         return m_values.data();
     }
 
-    const_iterator begin() const
+    [[nodiscard]] const_iterator begin() const
     {
         return m_values.data();
     }
@@ -243,7 +243,7 @@ public:
         return m_values.data();
     }
 
-    const_iterator cbegin() const
+    [[nodiscard]] const_iterator cbegin() const
     {
         return m_values.data();
     }
@@ -253,7 +253,7 @@ public:
         return m_values.data() + m_values.size();
     }
 
-    const_iterator end() const
+    [[nodiscard]] const_iterator end() const
     {
         return m_values.data() + m_values.size();
     }
@@ -263,7 +263,7 @@ public:
         return m_values.data() + m_values.size();
     }
 
-    const_iterator cend() const
+    [[nodiscard]] const_iterator cend() const
     {
         return m_values.data() + m_values.size();
     }
@@ -371,7 +371,7 @@ public:
         return find_hash(hash, key);
     }
 
-    const_iterator find(const key_type& key) const
+    [[nodiscard]] const_iterator find(const key_type& key) const
     {
         auto hash = this->hash(key);
         return const_cast<HashTable*>(this)->find_hash(hash, key);
@@ -400,7 +400,8 @@ public:
         // We'll move these and then continue searching for the real one
         for (; stopBucket < m_bucketCount && !m_buckets[stopBucket].empty() && distanceFromIdealBucket(stopBucket) != 0;
              stopBucket++)
-            ;
+        {
+        }
         std::move(m_buckets + bucketIndex + 1, m_buckets + stopBucket, m_buckets + bucketIndex);
         if (stopBucket != m_bucketCount)
         {
@@ -414,7 +415,8 @@ public:
             for (; stopBucket < m_bucketCount && !m_buckets[stopBucket].empty()
                    && distanceFromIdealBucket(stopBucket) != 0;
                  stopBucket++)
-                ;
+            {
+            }
             if (stopBucket == 0)
             {
                 // Special case if the very first element is the stop bucket. No move necessary but the back has to be

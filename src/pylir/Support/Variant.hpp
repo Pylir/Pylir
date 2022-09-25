@@ -45,12 +45,12 @@ constexpr decltype(auto) get(Variant&& variant) noexcept
 namespace detail
 {
 template <class... Ts>
-struct overload : Ts...
+struct Overload : Ts...
 {
     using Ts::operator()...;
 };
 template <class... Ts>
-overload(Ts...) -> overload<Ts...>;
+Overload(Ts...) -> Overload<Ts...>;
 
 template <std::size_t i, class Callable, class Variant>
 constexpr decltype(auto) visitImpl(Callable&& callable, Variant&& variant,
@@ -281,6 +281,6 @@ template <typename Variant, typename... Matchers>
 constexpr decltype(auto) match(Variant&& variant, Matchers&&... matchers)
 {
     PYLIR_ASSERT(!variant.valueless_by_exception());
-    return detail::visit(detail::overload{std::forward<Matchers>(matchers)...}, std::forward<Variant>(variant));
+    return detail::visit(detail::Overload{std::forward<Matchers>(matchers)...}, std::forward<Variant>(variant));
 }
 } // namespace pylir

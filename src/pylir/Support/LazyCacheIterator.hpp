@@ -23,7 +23,7 @@ class LazyCacheIterator
         return std::invoke(containerAccess, m_cache);
     }
 
-    decltype(auto) container() const
+    [[nodiscard]] decltype(auto) container() const
     {
         return std::invoke(containerAccess, m_cache);
     }
@@ -97,7 +97,7 @@ public:
         return m_index - rhs.m_index;
     }
 
-    pointer data() const
+    [[nodiscard]] pointer data() const
     {
         return container().data() + m_index;
     }

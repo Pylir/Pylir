@@ -164,7 +164,8 @@ elseif (MSVC)
     endif ()
 endif ()
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    add_compile_options(-Wno-nullability-completeness -Wno-nullability-extension -Wno-assume)
+    add_compile_options(-Wno-nullability-completeness -Wno-nullability-extension -Wno-assume
+      $<$<COMPILE_LANGUAGE:CXX>:-Wno-return-type-c-linkage>)
 endif ()
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)

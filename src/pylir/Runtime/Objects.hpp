@@ -150,7 +150,7 @@ public:
 
     enum Slots
     {
-#define TYPE_SLOT(x, y, ...) y,
+#define TYPE_SLOT(x, y) y,
 #include <pylir/Interfaces/Slots.def>
     };
 
@@ -181,7 +181,7 @@ public:
 
     enum Slots
     {
-#define FUNCTION_SLOT(x, y, ...) y,
+#define FUNCTION_SLOT(x, y) y,
 #include <pylir/Interfaces/Slots.def>
     };
 };
@@ -392,7 +392,7 @@ public:
 
     enum Slots
     {
-#define BASEEXCEPTION_SLOT(x, y, ...) y,
+#define BASEEXCEPTION_SLOT(x, y) y,
 #include <pylir/Interfaces/Slots.def>
     };
 

@@ -191,7 +191,7 @@ public:
     }
 
     template <class T, std::enable_if_t<std::is_integral_v<T>>* = nullptr>
-    std::optional<T> tryGetInteger() const
+    [[nodiscard]] std::optional<T> tryGetInteger() const
     {
         constexpr auto max = std::numeric_limits<T>::max();
         constexpr auto min = std::numeric_limits<T>::lowest();
@@ -214,7 +214,7 @@ public:
     }
 
     template <class T, std::enable_if_t<std::is_integral_v<T>>* = nullptr>
-    T getInteger() const
+    [[nodiscard]] T getInteger() const
     {
         auto optional = tryGetInteger<T>();
         PYLIR_ASSERT(optional);

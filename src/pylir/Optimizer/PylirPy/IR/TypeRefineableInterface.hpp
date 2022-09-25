@@ -39,14 +39,11 @@ class TypeAttrUnion : private llvm::PointerUnion<mlir::Attribute, pylir::Py::Obj
 public:
     TypeAttrUnion() = default;
 
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    TypeAttrUnion(std::nullptr_t) : Base(nullptr) {}
+    /*implicit*/ TypeAttrUnion(std::nullptr_t) : Base(nullptr) {}
 
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    TypeAttrUnion(ObjectTypeInterface type) : Base(type) {}
+    /*implicit*/ TypeAttrUnion(ObjectTypeInterface type) : Base(type) {}
 
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    TypeAttrUnion(mlir::Attribute attr) : Base(attr) {}
+    /*implicit*/ TypeAttrUnion(mlir::Attribute attr) : Base(attr) {}
 
     template <class... Args>
     [[nodiscard]] bool isa() const
@@ -71,7 +68,6 @@ public:
     }
 
     template <class... Args>
-    // NOLINTNEXTLINE(readability-identifier-naming): Follows LLVM convention
     [[nodiscard]] bool isa_and_nonnull() const
     {
         if (!*this)
@@ -96,14 +92,12 @@ public:
     }
 
     template <class T>
-    // NOLINTNEXTLINE(readability-identifier-naming): Follows LLVM convention
     [[nodiscard]] T dyn_cast() const
     {
         return isa<T>() ? cast<T>() : nullptr;
     }
 
     template <class T>
-    // NOLINTNEXTLINE(readability-identifier-naming): Follows LLVM convention
     [[nodiscard]] T dyn_cast_or_null() const
     {
         return isa_and_nonnull<T>() ? cast<T>() : nullptr;

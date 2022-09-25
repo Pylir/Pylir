@@ -29,7 +29,6 @@ Checks: >
   bugprone-reserved-identifier,
   bugprone-shared-ptr-array-mismatch,
   bugprone-sizeof-container,
-  bugprone-sizeof-expression,
   bugprone-spuriously-wake-up-functions,
   bugprone-string-constructor,
   bugprone-string-integer-assignment,
@@ -101,7 +100,6 @@ Checks: >
   cppcoreguidelines-special-member-functions,
   cppcoreguidelines-virtual-class-destructor,
   google-default-arguments,
-  google-explicit-constructor,
   google-runtime-operator,
   hicpp-exception-baseclass,
   hicpp-multiway-paths-covered,
@@ -162,7 +160,6 @@ Checks: >
   performance-move-const-arg,
   performance-move-constructor-init,
   performance-no-automatic-move,
-  performance-no-int-to-ptr,
   performance-noexcept-move-constructor,
   performance-trivially-destructible,
   performance-type-promotion-in-math-fn,
@@ -236,16 +233,17 @@ CheckOptions:
     value: UPPER_CASE
   - key: readability-identifier-naming.ClassMemberCase
     value: camelBack
-  - key: readability-identifier-naming.ClassMethodCase
+  - key: readability-identifier-naming.MethodCase
     value: camelBack
-  - key: readability-identifier-naming.ClassMethodIgnoredRegexp
-    # Ignoring methods from template specializations which obviously have to match.
-    value: 'child_begin|child_end'
+  - key: readability-identifier-naming.MethodIgnoredRegexp
+    # Ignoring methods from template specializations which obviously have to match, STL style methods, some LLVM style
+    # methods etc.
+    value: 'child_begin|child_end|push_back|emplace_back|insert(_.+)?|find(_.+)?|erase(_.+)?|isa(_.+)?|([a-z]+)_cast(_.+)?'
   - key: readability-identifier-naming.FunctionCase
     value: camelBack
   - key: readability-identifier-naming.FunctionIgnoredRegexp
     # Ignoring function overloads where the name obviously has to match.
-    value: 'hash_value'
+    value: 'hash_value|isa(_.+)?|([a-z]+)_cast(_.+)?'
   - key: readability-identifier-naming.VariableCase
     value: camelBack
   - key: readability-identifier-naming.ValueTemplateParameterCase
@@ -258,3 +256,5 @@ CheckOptions:
     value: 1
   - key: readability-uniqueptr-delete-release.PreferResetCall
     value: 1
+  - key: readability-simplify-boolean-expr.SimplifyDeMorgan
+    value: 0

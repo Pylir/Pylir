@@ -45,8 +45,7 @@ public:
 
     ValueTracker& operator=(ValueTracker&& rhs) noexcept = default;
 
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    ValueTracker(mlir::Value value)
+    /*implicit*/ ValueTracker(mlir::Value value)
     {
         if (!value)
         {
@@ -66,8 +65,7 @@ public:
         return *this;
     }
 
-    // NOLINTNEXTLINE(google-explicit-constructor)
-    operator mlir::Value() const
+    /*implicit*/ operator mlir::Value() const
     {
         if (!m_tracker)
         {

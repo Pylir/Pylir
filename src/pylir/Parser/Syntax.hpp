@@ -525,7 +525,7 @@ struct LocationProvider<Syntax::Lambda>
 };
 
 template <class T>
-struct LocationProvider<T, std::enable_if_t<is_abstract_variant_concrete<T>{}>>
+struct LocationProvider<T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>>
 {
     static std::pair<std::size_t, std::size_t> getRange(const T& value) noexcept
     {

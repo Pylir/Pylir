@@ -23,7 +23,7 @@ protected:
         pylir::match(variant, [this](auto& value) { getImpl()->visit(value); });
     }
 
-    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    template <class T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>
     void visit(T& variant)
     {
         variant.match([this](auto& value) { getImpl()->visit(value); });
