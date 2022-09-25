@@ -63,6 +63,10 @@ runs:
           $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
           $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
         }
+        $work_around_flags = ''
+        if ('${{inputs.cpp-compiler}}'.contains('g++')) {
+          $work_around_flags = '-DCMAKE_CXX_FLAGS=-no-canonical-prefix -DCMAKE_C_FLAGS=-no-canonical-prefix'
+        }
         $runtime_lib = ''
         switch ('${{inputs.runtime_lib}}') {
           "MultiThreaded" {
@@ -109,7 +113,7 @@ runs:
         -DLLVM_APPEND_VC_REV=OFF `
         -DLLD_BUILD_TOOLS=OFF `
         -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-        $san_flag `
+        $san_flag $work_around_flags `
         $runtime_lib `
         -S ${{github.workspace}}/llvm-project/llvm
 
