@@ -33,19 +33,23 @@ class TypeAttrUnion : private llvm::PointerUnion<mlir::Attribute, pylir::Py::Obj
     friend struct llvm::DenseMapInfo<TypeAttrUnion>;
     friend struct llvm::PointerLikeTypeTraits<TypeAttrUnion>;
 
+    // NOLINTNEXTLINE(google-explicit-constructor)
     TypeAttrUnion(Base base) : Base(base) {}
 
 public:
     TypeAttrUnion() = default;
 
+    // NOLINTNEXTLINE(google-explicit-constructor)
     TypeAttrUnion(std::nullptr_t) : Base(nullptr) {}
 
-    /*implicit*/ TypeAttrUnion(ObjectTypeInterface type) : Base(type) {}
+    // NOLINTNEXTLINE(google-explicit-constructor)
+    TypeAttrUnion(ObjectTypeInterface type) : Base(type) {}
 
-    /*implicit*/ TypeAttrUnion(mlir::Attribute attr) : Base(attr) {}
+    // NOLINTNEXTLINE(google-explicit-constructor)
+    TypeAttrUnion(mlir::Attribute attr) : Base(attr) {}
 
     template <class... Args>
-    bool isa() const
+    [[nodiscard]] bool isa() const
     {
         // Can't check for ObjectTypeInterface statically.
         static_assert(((std::is_base_of_v<mlir::Attribute, Args> || std::is_base_of_v<mlir::Type, Args>)&&...));
@@ -56,20 +60,19 @@ public:
                                       using T = typename decltype(type)::argument_type;
                                       if constexpr (std::is_base_of_v<mlir::Attribute, T>)
                                       {
-                                          return Base::dyn_cast<mlir::Attribute>().template isa_and_nonnull<T>();
+                                          return Base::dyn_cast<mlir::Attribute>().isa_and_nonnull<T>();
                                       }
                                       else
                                       {
-                                          // TODO: mlir::Type does not have `isa_and_nonull`. Odd.
-                                          return static_cast<bool>(
-                                              Base::dyn_cast<pylir::Py::ObjectTypeInterface>().dyn_cast_or_null<T>());
+                                          return Base::dyn_cast<pylir::Py::ObjectTypeInterface>().isa_and_nonnull<T>();
                                       }
                                   }(llvm::identity<Args>{})
                                   || ...);
     }
 
     template <class... Args>
-    bool isa_and_nonnull() const
+    // NOLINTNEXTLINE(readability-identifier-naming): Follows LLVM convention
+    [[nodiscard]] bool isa_and_nonnull() const
     {
         if (!*this)
         {
@@ -79,7 +82,7 @@ public:
     }
 
     template <class T>
-    T cast() const
+    [[nodiscard]] T cast() const
     {
         static_assert(std::is_base_of_v<mlir::Attribute, T> || std::is_base_of_v<mlir::Type, T>);
         if constexpr (std::is_base_of_v<mlir::Attribute, T>)
@@ -93,13 +96,15 @@ public:
     }
 
     template <class T>
-    T dyn_cast() const
+    // NOLINTNEXTLINE(readability-identifier-naming): Follows LLVM convention
+    [[nodiscard]] T dyn_cast() const
     {
         return isa<T>() ? cast<T>() : nullptr;
     }
 
     template <class T>
-    T dyn_cast_or_null() const
+    // NOLINTNEXTLINE(readability-identifier-naming): Follows LLVM convention
+    [[nodiscard]] T dyn_cast_or_null() const
     {
         return isa_and_nonnull<T>() ? cast<T>() : nullptr;
     }

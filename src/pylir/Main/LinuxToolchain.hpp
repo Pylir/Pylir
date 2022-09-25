@@ -14,12 +14,12 @@ class LinuxToolchain : public Toolchain
 protected:
     [[nodiscard]] Stdlib defaultStdlib() const override
     {
-        return Stdlib::libstdcpp;
+        return Stdlib::Libstdcpp;
     }
 
     [[nodiscard]] RTLib defaultRTLib() const override
     {
-        return RTLib::libgcc;
+        return RTLib::Libgcc;
     }
 
 public:

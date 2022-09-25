@@ -246,15 +246,15 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
 
     switch (getStdlib(commandLine))
     {
-        case Stdlib::libstdcpp: arguments.emplace_back("-lstdc++"); break;
-        case Stdlib::libcpp: arguments.emplace_back("-lc++"); break;
+        case Stdlib::Libstdcpp: arguments.emplace_back("-lstdc++"); break;
+        case Stdlib::Libcpp: arguments.emplace_back("-lc++"); break;
     }
 
     arguments.emplace_back("--start-group");
     arguments.emplace_back("-lmingw32");
     switch (getRTLib(commandLine))
     {
-        case RTLib::compiler_rt:
+        case RTLib::CompilerRt:
             if (!clangRTPath || llvm::sys::fs::exists(*clangRTPath + sep + "libclang_rt.builtins.a"))
             {
                 arguments.emplace_back("-lclang_rt.builtins");
@@ -264,7 +264,7 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
                 arguments.push_back(("-lclang_rt.builtins-" + m_triple.getArchName()).str());
             }
             break;
-        case RTLib::libgcc:
+        case RTLib::Libgcc:
             arguments.emplace_back("-lgcc");
             arguments.emplace_back("-lgcc_eh");
             break;
@@ -294,18 +294,18 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
 pylir::Toolchain::Stdlib pylir::MinGWToolchain::defaultStdlib() const
 {
 #ifdef _WIN32
-    return Stdlib::libcpp;
+    return Stdlib::Libcpp;
 #else
-    return Stdlib::libstdcpp;
+    return Stdlib::Libstdcpp;
 #endif
 }
 
 pylir::Toolchain::RTLib pylir::MinGWToolchain::defaultRTLib() const
 {
 #ifdef _WIN32
-    return RTLib::compiler_rt;
+    return RTLib::CompilerRt;
 #else
-    return RTLib::libgcc;
+    return RTLib::Libgcc;
 #endif
 }
 

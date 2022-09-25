@@ -83,7 +83,7 @@ pylir::LoopInfo::LoopInfo(mlir::Operation* operation, mlir::AnalysisManager& ana
         return;
     }
     auto& domInfo = analysisManager.getAnalysis<mlir::DominanceInfo>();
-    for (auto& iter : llvm::post_order(domInfo.getRootNode(&region)))
+    for (const auto& iter : llvm::post_order(domInfo.getRootNode(&region)))
     {
         auto* maybeHeader = iter->getBlock();
         llvm::SmallVector<mlir::Block*> latches;

@@ -105,6 +105,7 @@ public:
     }
 
     template <class T>
+    // Name taken from LLVMs RTTI system. NOLINTNEXTLINE(readability-identifier-naming)
     T* dyn_cast()
     {
         return isa<T>() ? &cast<T>() : nullptr;
@@ -223,8 +224,8 @@ public:
 class PyList : public PyObject
 {
     PyObjectStorage m_base;
-    std::size_t m_size;
-    PyTuple* m_tuple;
+    std::size_t m_size{};
+    PyTuple* m_tuple{};
 
 public:
     explicit PyList(PyTypeObject& type = Builtins::List) : m_base{&type} {}
@@ -443,7 +444,7 @@ public:
     {
         static_assert(std::is_standard_layout_v<std::remove_reference_t<decltype(*this)>>);
         new (m_buffer.data()) InstanceType(std::forward<Args>(args)...);
-        std::array<PyObject*, slotCount> slots;
+        std::array<PyObject*, slotCount> slots{};
         for (auto& [index, object] : slotsInit)
         {
             slots[index] = &object;
@@ -517,8 +518,7 @@ struct AllocType<Builtins::Tuple>
     decltype(auto) operator()(std::size_t count, Args&&... args) const noexcept
     {
         using InstanceType = typename PyTypeTraits<Builtins::Tuple>::instanceType;
-        std::byte* memory =
-            reinterpret_cast<std::byte*>(pylir_gc_alloc(sizeof(InstanceType) + sizeof(PyObject*) * count));
+        auto* memory = reinterpret_cast<std::byte*>(pylir_gc_alloc(sizeof(InstanceType) + sizeof(PyObject*) * count));
         return *new (memory) InstanceType(count, std::forward<Args>(args)...);
     }
 };
@@ -534,7 +534,7 @@ PyObject& PyObject::operator()(Args&&... args)
     constexpr std::size_t tupleCount = (... + std::is_base_of_v<PyObject, std::remove_reference_t<Args>>);
     auto& tuple = alloc<Builtins::Tuple>(tupleCount);
     auto& dict = alloc<Builtins::Dict>();
-    auto iter = tuple.begin();
+    auto* iter = tuple.begin();
     (
         [&](auto&& arg)
         {

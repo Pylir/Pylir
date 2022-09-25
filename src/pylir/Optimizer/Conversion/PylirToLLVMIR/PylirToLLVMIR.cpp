@@ -2196,13 +2196,13 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         }
         auto tupleAttr = dereference<pylir::Py::TupleAttr>(iter);
         PYLIR_ASSERT(tupleAttr);
-        auto* result = llvm::find_if(tupleAttr.getValue(),
-                                     [&](mlir::Attribute attribute)
-                                     {
-                                         auto str = dereference<pylir::Py::StrAttr>(attribute);
-                                         PYLIR_ASSERT(str);
-                                         return str.getValue() == adaptor.getSlot();
-                                     });
+        const auto* result = llvm::find_if(tupleAttr.getValue(),
+                                           [&](mlir::Attribute attribute)
+                                           {
+                                               auto str = dereference<pylir::Py::StrAttr>(attribute);
+                                               PYLIR_ASSERT(str);
+                                               return str.getValue() == adaptor.getSlot();
+                                           });
         if (result == tupleAttr.getValue().end())
         {
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));

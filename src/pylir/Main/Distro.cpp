@@ -253,4 +253,4 @@ static pylir::Distro::DistroType getDistro(const llvm::Triple& TargetOrHost)
     return linuxDistro;
 }
 
-pylir::Distro::Distro(const llvm::Triple& TargetOrHost) : DistroVal(getDistro(TargetOrHost)) {}
+pylir::Distro::Distro(const llvm::Triple& TargetOrHost) : m_distroVal(getDistro(TargetOrHost)) {}

@@ -51,7 +51,7 @@ public:
     Loop& operator=(const Loop&) = delete;
     Loop& operator=(Loop&&) = delete;
 
-    std::size_t getLoopDepth() const
+    [[nodiscard]] std::size_t getLoopDepth() const
     {
         std::size_t i = 0;
         for (auto* curr = m_parentLoop; curr; curr = curr->m_parentLoop)
@@ -61,7 +61,7 @@ public:
         return i;
     }
 
-    mlir::Block* getHeader() const
+    [[nodiscard]] mlir::Block* getHeader() const
     {
         return m_blocks.front();
     }
@@ -71,7 +71,7 @@ public:
         return m_blocks;
     }
 
-    Loop* getParentLoop() const
+    [[nodiscard]] Loop* getParentLoop() const
     {
         return m_parentLoop;
     }

@@ -24,7 +24,7 @@ BigInt powmod(const BigInt& base, const BigInt& expo, const BigInt& mod);
 class BigInt
 {
     // Abuse array to pointer decay
-    mp_int m_int[1];
+    mp_int m_int[1]{};
 
     static void cantFail(mp_err err)
     {
@@ -244,7 +244,8 @@ public:
 
     std::pair<BigInt, BigInt> divmod(const BigInt& rhs)
     {
-        BigInt div, mod;
+        BigInt div;
+        BigInt mod;
         cantFail(mp_div(m_int, rhs.m_int, div.m_int, mod.m_int));
         return {std::move(div), std::move(mod)};
     }

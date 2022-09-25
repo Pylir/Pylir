@@ -203,14 +203,11 @@ public:
         {
             return create<Py::ConstantOp>(ref);
         }
-        else if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
+        if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
         {
             return create<Py::ConstantOp>(unbound);
         }
-        else
-        {
-            return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
-        }
+        return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
     }
 
     template <std::size_t n>

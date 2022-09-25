@@ -15,13 +15,15 @@ class ValueTracker
 {
     mlir::OwningOpRef<mlir::UnrealizedConversionCastOp> m_tracker;
 
-    mlir::OwningOpRef<mlir::UnrealizedConversionCastOp>& tracker() const
+    [[nodiscard]] mlir::OwningOpRef<mlir::UnrealizedConversionCastOp>& tracker() const
     {
         return const_cast<std::remove_const_t<decltype(m_tracker)>&>(m_tracker);
     }
 
 public:
     ValueTracker() = default;
+
+    ~ValueTracker() = default;
 
     ValueTracker(const ValueTracker& rhs) : m_tracker(rhs.m_tracker ? rhs.tracker()->clone() : nullptr) {}
 

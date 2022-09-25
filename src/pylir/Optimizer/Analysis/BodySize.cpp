@@ -8,7 +8,7 @@
 
 #include <pylir/Optimizer/Interfaces/DialectCostInterface.hpp>
 
-pylir::BodySize::BodySize(mlir::Operation* operation) : m_size(0)
+pylir::BodySize::BodySize(mlir::Operation* operation)
 {
     mlir::DialectInterfaceCollection<pylir::DialectCostInterface> collection(operation->getContext());
     operation->walk(

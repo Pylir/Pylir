@@ -13,13 +13,13 @@ namespace pylir
 {
 struct Version
 {
-    int majorVersion;
-    int minorVersion;
-    int patch;
+    int majorVersion{-1};
+    int minorVersion{-1};
+    int patch{-1};
     std::string suffix;
     std::string original;
 
-    Version() : majorVersion(-1), minorVersion(-1), patch(-1) {}
+    Version() = default;
 
     static std::optional<Version> parse(llvm::StringRef version);
 

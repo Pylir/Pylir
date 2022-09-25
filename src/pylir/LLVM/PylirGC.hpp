@@ -9,4 +9,4 @@
 namespace pylir
 {
 void linkInGCStrategy();
-}
+} // namespace pylir

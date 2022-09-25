@@ -54,7 +54,7 @@ protected:
     {
         builder.setInsertionPoint(op);
         llvm::SmallVector<pylir::Py::IterArg> currentArgs = op.getIterArgs();
-        for (auto begin = currentArgs.begin(); begin != currentArgs.end();)
+        for (auto* begin = currentArgs.begin(); begin != currentArgs.end();)
         {
             auto* expansion = std::get_if<pylir::Py::IterExpansion>(&*begin);
             if (!expansion)
@@ -273,9 +273,10 @@ llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* cont
                     result.emplace_back(nullptr);
                     return;
                 }
-                auto begin = tuple.begin();
+                auto* begin = tuple.begin();
                 for (std::size_t i = 0; attr.getValue().ugt(i) && begin != tuple.end() && *begin; i++, begin++)
-                    ;
+                {
+                }
                 result.insert(result.end(), begin, tuple.end());
             })
         .Default([&](auto) { result.emplace_back(nullptr); });
@@ -883,7 +884,8 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
                     // TODO:
                     //  some more generic mechanism to not automatically fail if we know they are definitely NOT
                     //  equal (trivial for constants at least, except for references as they need to be resolved).
-                    mlir::Attribute attr1, attr2;
+                    mlir::Attribute attr1;
+                    mlir::Attribute attr2;
                     if (mlir::matchPattern(entry.key, mlir::m_Constant(&attr1))
                         && mlir::matchPattern(getKey(), mlir::m_Constant(&attr2)) && attr1 != attr2
                         && !attr1.isa<RefAttr>())

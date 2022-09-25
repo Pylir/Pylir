@@ -122,7 +122,8 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
     auto typeOf = m_builder.createTypeOf(expression);
     auto typeObject = m_builder.createTypeRef();
     auto isTypeSubclass = buildSubclassCheck(typeOf, typeObject);
-    BlockPtr isType, instanceBlock;
+    BlockPtr isType;
+    BlockPtr instanceBlock;
     instanceBlock->addArgument(m_builder.getDynamicType(), m_builder.getCurrentLoc());
     m_builder.create<mlir::cf::CondBranchOp>(isTypeSubclass, isType, instanceBlock, mlir::ValueRange{expression});
 
@@ -130,7 +131,8 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
         implementBlock(isType);
         auto baseException = m_builder.createBaseExceptionRef();
         auto isBaseException = buildSubclassCheck(expression, baseException);
-        BlockPtr typeError, createException;
+        BlockPtr typeError;
+        BlockPtr createException;
         m_builder.create<mlir::cf::CondBranchOp>(isBaseException, createException, typeError);
 
         {
@@ -151,7 +153,8 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
     typeOf = m_builder.createTypeOf(instanceBlock->getArgument(0));
     auto baseException = m_builder.createBaseExceptionRef();
     auto isBaseException = buildSubclassCheck(typeOf, baseException);
-    BlockPtr typeError, raiseBlock;
+    BlockPtr typeError;
+    BlockPtr raiseBlock;
     m_builder.create<mlir::cf::CondBranchOp>(isBaseException, raiseBlock, typeError);
 
     {
@@ -1187,7 +1190,8 @@ void pylir::CodeGen::visitForConstruct(const Syntax::Target& targets, mlir::Valu
 
     implementBlock(condition);
     auto conditionSeal = markOpenBlock(condition);
-    BlockPtr stopIterationHandler, thenBlock;
+    BlockPtr stopIterationHandler;
+    BlockPtr thenBlock;
     auto implementThenBlock = llvm::make_scope_exit(
         [&]
         {
@@ -1804,7 +1808,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     }
 
     m_builder.setCurrentLoc(getLoc(classDef, classDef.className));
-    mlir::Value bases, keywords;
+    mlir::Value bases;
+    mlir::Value keywords;
     if (!*constExport)
     {
         if (classDef.inheritance)

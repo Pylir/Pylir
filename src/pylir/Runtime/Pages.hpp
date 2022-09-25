@@ -31,7 +31,7 @@ public:
     using std::unique_ptr<std::byte, PageDeleter>::get;
     using std::unique_ptr<std::byte, PageDeleter>::operator*;
 
-    std::size_t size() const noexcept
+    [[nodiscard]] std::size_t size() const noexcept
     {
         return get_deleter().size;
     }

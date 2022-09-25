@@ -68,7 +68,7 @@ public:
     constexpr FlagParam(std::in_place_type_t<T>, ID) {}
 
     /// Constructs a 'FlagParam' without a value.
-    constexpr FlagParam(ID) {}
+    constexpr explicit FlagParam(ID) {}
 
     using value_type = T;
     using identifier = ID;
@@ -213,7 +213,7 @@ private:
 
     friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Diagnostic& rhs)
     {
-        for (auto& iter : rhs.messages)
+        for (const auto& iter : rhs.messages)
         {
             os << iter;
         }

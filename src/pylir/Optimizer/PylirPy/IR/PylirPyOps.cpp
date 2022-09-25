@@ -72,7 +72,7 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
     vector.insert(vector.end(), unwindOperands.begin(), unwindOperands.end());
     state.addOperands(vector);
     llvm::SmallVector<mlir::NamedAttribute> attributes;
-    for (auto& iter : operation->getAttrs())
+    for (const auto& iter : operation->getAttrs())
     {
         attributes.push_back(iter);
         if (iter.getName() == attrSizedSegmentName)
@@ -408,7 +408,9 @@ void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operatio
 void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                   const std::vector<::pylir::Py::DictArg>& args)
 {
-    llvm::SmallVector<mlir::Value> keys, hashes, values;
+    llvm::SmallVector<mlir::Value> keys;
+    llvm::SmallVector<mlir::Value> hashes;
+    llvm::SmallVector<mlir::Value> values;
     llvm::SmallVector<std::int32_t> mappingExpansion;
     for (const auto& iter : llvm::enumerate(args))
     {
@@ -537,7 +539,9 @@ void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
                                     mlir::ValueRange unwindDestOperands)
 {
-    llvm::SmallVector<mlir::Value> keys, hashes, values;
+    llvm::SmallVector<mlir::Value> keys;
+    llvm::SmallVector<mlir::Value> hashes;
+    llvm::SmallVector<mlir::Value> values;
     llvm::SmallVector<std::int32_t> mappingExpansion;
     for (const auto& iter : llvm::enumerate(keyValues))
     {

@@ -7,9 +7,9 @@
 namespace mlir
 {
 class RewritePatternSet;
-}
+} // namespace mlir
 
 namespace pylir
 {
 void populateWithBranchOpInterfacePattern(mlir::RewritePatternSet& patterns);
-}
+} // namespace pylir
