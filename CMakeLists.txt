@@ -122,9 +122,9 @@ include(AddMLIR)
 
 set(LLVM_TABLEGEN_EXE "llvm-tblgen")
 
+include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
-include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/src)
 include_directories(SYSTEM ${PROJECT_BINARY_DIR}/src)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
