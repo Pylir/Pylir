@@ -4,9 +4,9 @@
 
 #include "TypeRefineableInterface.hpp"
 
-#include "pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.cpp.inc"
-
 #include "PylirPyAttributes.hpp"
+
+#include "pylir/Optimizer/PylirPy/IR/TypeRefineableInterface.cpp.inc"
 
 pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion rhs)
 {
@@ -43,8 +43,7 @@ pylir::Py::TypeAttrUnion pylir::Py::TypeAttrUnion::join(pylir::Py::TypeAttrUnion
     }
     else if (rhs.isa<RefAttr, Py::ObjectAttrInterface>() && isa<RefAttr, Py::ObjectAttrInterface>())
     {
-        return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>()),
-                         Py::typeOfConstant(rhs.cast<mlir::Attribute>()));
+        return joinTypes(Py::typeOfConstant(cast<mlir::Attribute>()), Py::typeOfConstant(rhs.cast<mlir::Attribute>()));
     }
     return {};
 }

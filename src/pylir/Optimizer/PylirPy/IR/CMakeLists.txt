@@ -28,17 +28,17 @@ add_pylir_interface(OP TypeRefineableInterface)
 add_pylir_rewriter(PylirPyPatterns)
 
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
-        ObjectAttrInterface.cpp IntAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp Value.cpp
-        PylirPyOpSROA.cpp)
+  ObjectAttrInterface.cpp IntAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp Value.cpp
+  PylirPyOpSROA.cpp)
 add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen IntAttrInterfaceIncGen
-        ObjectTypeInterfaceIncGen TypeRefineableInterfaceIncGen)
+  ObjectTypeInterfaceIncGen TypeRefineableInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
-        PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyObjectFromTypeObjectInterface
-        PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface PylirSROAInterfaces
-        PRIVATE MLIRArithmeticDialect MLIRControlFlowDialect PylirTransformsUtils)
+  PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyObjectFromTypeObjectInterface
+  PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface PylirSROAInterfaces
+  PRIVATE MLIRArithmeticDialect MLIRControlFlowDialect PylirTransformsUtils)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
 if (PYLIR_USE_PCH)
-    target_link_libraries(PylirPyDialect PRIVATE COMMON_PCH)
-    target_precompile_headers(PylirPyDialect PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
+  target_link_libraries(PylirPyDialect PRIVATE COMMON_PCH)
+  target_precompile_headers(PylirPyDialect PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
 endif ()
 

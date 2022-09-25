@@ -193,7 +193,7 @@ public:
         std::move(m_data + index + 1, m_data + m_size, m_data + index);
         m_size--;
         std::destroy_at(m_data + m_size);
-   }
+    }
 
     void clear()
     {

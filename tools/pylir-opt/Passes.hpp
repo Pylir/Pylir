@@ -21,4 +21,4 @@ namespace pylir::test
 #define GEN_PASS_DECL_TESTTYPEFLOWPASS
 #define GEN_PASS_DECL_TESTADDCHANGEPASS
 #include "Passes.h.inc"
-} // namespace
+} // namespace pylir::test

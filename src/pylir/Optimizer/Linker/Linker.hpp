@@ -23,4 +23,4 @@ namespace pylir
 ///
 /// Input modules are left in an unspecified state.
 mlir::OwningOpRef<mlir::ModuleOp> linkModules(llvm::MutableArrayRef<mlir::OwningOpRef<mlir::ModuleOp>> modules);
-}
+} // namespace pylir

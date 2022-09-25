@@ -332,7 +332,7 @@ std::u32string pylir::Text::toUTF32String(std::string_view utf8, bool* legal)
 
 bool pylir::Text::isWhitespace(char32_t codepoint)
 {
-    const auto *properties = utf8proc_get_property(codepoint);
+    const auto* properties = utf8proc_get_property(codepoint);
     return properties->category == UTF8PROC_CATEGORY_ZS || properties->bidi_class == UTF8PROC_BIDI_CLASS_WS
            || properties->bidi_class == UTF8PROC_BIDI_CLASS_B || properties->bidi_class == UTF8PROC_BIDI_CLASS_S;
 }

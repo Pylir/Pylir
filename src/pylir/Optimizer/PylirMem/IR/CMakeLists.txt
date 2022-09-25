@@ -12,6 +12,6 @@ target_link_libraries(PylirMemDialect PUBLIC MLIRIR PylirPyDialect PylirSupport 
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirMemDialect)
 
 if (PYLIR_USE_PCH)
-    target_link_libraries(PylirMemDialect PRIVATE COMMON_PCH)
-    target_precompile_headers(PylirMemDialect PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
+  target_link_libraries(PylirMemDialect PRIVATE COMMON_PCH)
+  target_precompile_headers(PylirMemDialect PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
 endif ()

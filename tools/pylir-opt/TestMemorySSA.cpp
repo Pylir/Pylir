@@ -29,7 +29,6 @@ protected:
     void runOnOperation() override;
 
 public:
-
     using Base::Base;
 };
 

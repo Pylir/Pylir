@@ -22,14 +22,14 @@ set(sources builtins.py
 
 set(outputs)
 foreach (f ${sources})
-    set(src ${CMAKE_CURRENT_SOURCE_DIR}/${f})
-    set(dst ${CMAKE_BINARY_DIR}/lib/${f})
-    add_custom_command(OUTPUT ${dst}
-      DEPENDS ${src}
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${src} ${dst}
-      COMMENT "Copying pylirs ${f}..."
-      )
-    list(APPEND outputs ${dst})
+  set(src ${CMAKE_CURRENT_SOURCE_DIR}/${f})
+  set(dst ${CMAKE_BINARY_DIR}/lib/${f})
+  add_custom_command(OUTPUT ${dst}
+    DEPENDS ${src}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${src} ${dst}
+    COMMENT "Copying pylirs ${f}..."
+    )
+  list(APPEND outputs ${dst})
 endforeach ()
 
 add_custom_target(pylir-stdlib ALL DEPENDS ${outputs} SOURCES ${sources})

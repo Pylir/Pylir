@@ -1085,8 +1085,9 @@ namespace
 struct ArithSelectTypeRefinable
     : public pylir::Py::TypeRefineableInterface::ExternalModel<ArithSelectTypeRefinable, mlir::arith::SelectOp>
 {
-    pylir::Py::TypeRefineResult refineTypes(mlir::Operation*, ::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
-                                            ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes) const
+    pylir::Py::TypeRefineResult
+        refineTypes(mlir::Operation*, ::llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
+                    ::llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes) const
     {
         auto lhsType = inputs[1].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
         auto rhsType = inputs[2].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();

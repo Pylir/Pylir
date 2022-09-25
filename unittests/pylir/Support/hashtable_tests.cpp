@@ -29,7 +29,7 @@ TEST_CASE("HashTable Insertion and lookup", "[HashTable]")
         }
         for (std::size_t i = 0; i < std::size(primes); i++)
         {
-            auto *iter = table.find(primes[i]);
+            auto* iter = table.find(primes[i]);
             REQUIRE(iter != table.end());
             CHECK(iter->value == i);
         }
@@ -73,8 +73,8 @@ TEST_CASE("HashTable Erase", "[HashTable]")
     REQUIRE(table.size() == std::size(withoutDuplicates));
     CHECK(std::equal(table.begin(), table.end(), std::begin(withoutDuplicates),
                      [](const auto& lhs, const auto& rhs) { return lhs.key == rhs; }));
-    auto *iter = std::max_element(table.begin(), table.end(),
-                                 [](const auto& lhs, const auto& rhs) { return lhs.value < rhs.value; });
+    auto* iter = std::max_element(table.begin(), table.end(),
+                                  [](const auto& lhs, const auto& rhs) { return lhs.value < rhs.value; });
     CHECK(table.erase(iter->key) == 1);
     iter = table.find("in");
     CHECK(iter == table.end());

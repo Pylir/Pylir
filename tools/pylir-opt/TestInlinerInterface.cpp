@@ -52,7 +52,6 @@ protected:
     }
 
 public:
-
     using Base::Base;
 };
 

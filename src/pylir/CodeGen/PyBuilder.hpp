@@ -558,4 +558,4 @@ public:
         return create<Py::FunctionInvokeOp>(callee, operands, normalOperands, unwindOperands, happyPath, unwindPath);
     }
 };
-} // namespace pylir::Py
+} // namespace pylir

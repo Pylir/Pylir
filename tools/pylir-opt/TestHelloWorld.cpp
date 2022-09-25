@@ -24,7 +24,6 @@ protected:
     }
 
 public:
-
     using Base::Base;
 };
 } // namespace

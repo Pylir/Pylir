@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 if (MSVC AND ("${PYLIR_SANITIZER}" MATCHES ".*address.*"))
-    add_compile_definitions(CATCH_CONFIG_NO_WINDOWS_SEH)
+  add_compile_definitions(CATCH_CONFIG_NO_WINDOWS_SEH)
 endif ()
 
 add_subdirectory(Diagnostics)

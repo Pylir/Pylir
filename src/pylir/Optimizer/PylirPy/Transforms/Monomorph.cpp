@@ -624,7 +624,6 @@ class Orchestrator
     friend class InQueueCount;
 
 public:
-
     [[nodiscard]] llvm::StringRef getName() const
     {
         return m_typeFlowIR.getFunction().getName();

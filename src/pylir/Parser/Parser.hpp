@@ -489,7 +489,8 @@ public:
      */
     std::optional<IntrVarPtr<Syntax::Target>> parseTarget(const Token& assignmentLikeToken);
 
-    std::optional<IntrVarPtr<Syntax::Target>> parseTargetList(const Token& assignmentLikeToken, bool deleteStmt = false);
+    std::optional<IntrVarPtr<Syntax::Target>> parseTargetList(const Token& assignmentLikeToken,
+                                                              bool deleteStmt = false);
 
     /**
      * assignment_stmt ::=  target_list "=" { target_list "=" } (starred_expression | yield_expression)

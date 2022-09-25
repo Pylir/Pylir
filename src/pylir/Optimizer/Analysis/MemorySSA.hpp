@@ -35,10 +35,9 @@ class MemorySSA
 
     void optimizeUses(mlir::AnalysisManager& analysisManager);
 
-    void fillRegion(
-        mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, pylir::SSABuilder& ssaBuilder,
-        llvm::MapVector<mlir::SideEffects::Resource*, pylir::SSABuilder::DefinitionsMap>& lastDefs,
-        llvm::ArrayRef<mlir::Block*> regionSuccessors);
+    void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, pylir::SSABuilder& ssaBuilder,
+                    llvm::MapVector<mlir::SideEffects::Resource*, pylir::SSABuilder::DefinitionsMap>& lastDefs,
+                    llvm::ArrayRef<mlir::Block*> regionSuccessors);
 
 public:
     explicit MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager);

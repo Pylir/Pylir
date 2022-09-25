@@ -18,7 +18,7 @@ public:
 
     llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager& AM);
 
-    bool runOnFunction(llvm::Function& F, llvm::DominatorTree& DT,
-                       llvm::TargetTransformInfo& TTI, const llvm::TargetLibraryInfo& TLI);
+    bool runOnFunction(llvm::Function& F, llvm::DominatorTree& DT, llvm::TargetTransformInfo& TTI,
+                       const llvm::TargetLibraryInfo& TLI);
 };
 } // namespace pylir
