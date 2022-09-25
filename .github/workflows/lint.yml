@@ -122,5 +122,15 @@ jobs:
 
       - name: Run clang-format on changes
         run: |
-          python $(which git-clang-format-$LLVM_VERSION) --binary $(which clang-format-$LLVM_VERSION) --diff HEAD^
+          # Below ensures that the exit code of git-clang-format is properly propagated
+          set -o pipefail
+          python $(which git-clang-format-$LLVM_VERSION) --binary $(which clang-format-$LLVM_VERSION) --diff HEAD^ \
+            | tee ${{github.workspace}}/clang-format.patch
+
+      - name: Upload clang-format patch
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: clang-format.patch
+          path: ${{github.workspace}}/clang-format.patch
 
