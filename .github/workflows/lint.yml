@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  LLVM_VERSION: 15
+
 jobs:
   lint-run:
     runs-on: ubuntu-20.04
@@ -18,7 +21,7 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 15 all
+          sudo ./llvm.sh $LLVM_VERSION all
           sudo apt update
           sudo apt install libunwind-dev lld g++-10
           
@@ -88,9 +91,46 @@ jobs:
         working-directory: ${{github.workspace}}/Pylir
         run: |
           git diff -U0 HEAD^ | \
-          clang-tidy-diff-15.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
+          clang-tidy-diff-$LLVM_VERSION.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
             -export-fixes ${{github.workspace}}/fixes.yml
           if [ -s ${{github.workspace}}/fixes.yml ] 
           then
             exit 1
           fi
+
+
+  format-run:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Install dependencies
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh $LLVM_VERSION all
+          
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Checkout Pylir
+        uses: actions/checkout@v3
+        with:
+          # Depth 2 because we need the diff.
+          fetch-depth: 2
+
+      - name: Run clang-format on changes
+        run: |
+          # Below ensures that the exit code of git-clang-format is properly propagated
+          set -o pipefail
+          python $(which git-clang-format-$LLVM_VERSION) --binary $(which clang-format-$LLVM_VERSION) --diff HEAD^ \
+            | tee ${{github.workspace}}/clang-format.patch
+
+      - name: Upload clang-format patch
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: clang-format.patch
+          path: ${{github.workspace}}/clang-format.patch
+
