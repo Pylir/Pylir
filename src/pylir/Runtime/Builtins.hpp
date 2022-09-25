@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+
 namespace pylir::rt
 {
 class PyObject;
