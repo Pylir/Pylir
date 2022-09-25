@@ -107,4 +107,5 @@ jobs:
         uses: DoozyX/clang-format-lint-action@v0.14
         with:
           clangFormatVersion: 14
+          exclude: './3rdParty ./unittests/catch2'
 
