@@ -62,7 +62,7 @@ jobs:
       - name: Install CCache
         uses: hendrikmuhs/ccache-action@v1.2.2
         with:
-          max-size: 2G
+          max-size: 0.5G
           key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
 
       - name: Build LLVM
