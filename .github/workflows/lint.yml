@@ -92,7 +92,9 @@ jobs:
         run: |
           git diff -U0 HEAD^ | \
           clang-tidy-diff-$LLVM_VERSION.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
-            -export-fixes ${{github.workspace}}/fixes.yml
+            -export-fixes ${{github.workspace}}/fixes.yml -clang-tidy-binary $(which clang-tidy-$LLVM_VERSION) \
+          -j$(nproc)
+          
           if [ -s ${{github.workspace}}/fixes.yml ] 
           then
             exit 1
