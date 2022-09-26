@@ -285,8 +285,8 @@ bool pylir::DarwinToolchain::link(cli::CommandLine& commandLine, llvm::StringRef
 
     switch (getStdlib(commandLine))
     {
-        case Stdlib::libstdcpp: arguments.emplace_back("-lstdc++"); break;
-        case Stdlib::libcpp: arguments.emplace_back("-lc++"); break;
+        case Stdlib::Libstdcpp: arguments.emplace_back("-lstdc++"); break;
+        case Stdlib::Libcpp: arguments.emplace_back("-lc++"); break;
     }
 
     // arguments.emplace_back("-lm");

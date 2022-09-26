@@ -15,12 +15,12 @@ class DarwinToolchain : public Toolchain
 protected:
     [[nodiscard]] Stdlib defaultStdlib() const override
     {
-        return Stdlib::libcpp;
+        return Stdlib::Libcpp;
     }
 
     [[nodiscard]] RTLib defaultRTLib() const override
     {
-        return RTLib::compiler_rt;
+        return RTLib::CompilerRt;
     }
 
 public:
