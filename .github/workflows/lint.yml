@@ -51,7 +51,7 @@ jobs:
         with:
           ccache_options: |
             max_size=1G
-          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
+          override_cache_key: ${{runner.os}}--clang++
 
       - name: Build LLVM
         id: llvm-build
