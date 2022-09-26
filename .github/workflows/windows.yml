@@ -106,7 +106,7 @@ jobs:
           msystem: clang64
           update: true
           pacboy: >-
-            toolchain:p
+            clang:p
           location: D:\
             
       - name: Prepend Msys2 to path
@@ -168,3 +168,6 @@ jobs:
       - name: Test
         working-directory: ${{github.workspace}}/pylir-build
         run: ctest --extra-verbose
+
+      - name: Cleanup disk space
+        run: Remove-Item -Recurse -Force llvm-project Pylir
