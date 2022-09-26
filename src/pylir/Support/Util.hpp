@@ -6,14 +6,15 @@
 
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <type_traits>
 
 namespace pylir
 {
-template <class T1, class T2>
+/// Returns 'number' rounded up to the next multiple 'multiple'. If 'multiple' is 0, simply returns 'number'.
+template <class T1, class T2, std::enable_if_t<std::is_integral_v<T1> && std::is_integral_v<T2>>* = nullptr>
 constexpr T1 roundUpTo(T1 number, T2 multiple)
 {
-    static_assert(std::is_integral_v<T1> && std::is_integral_v<T2>);
     if (multiple == 0)
     {
         return number;
@@ -26,6 +27,33 @@ constexpr T1 roundUpTo(T1 number, T2 multiple)
     }
 
     return number + multiple - remainder;
+}
+
+/// Returns true if 'integer' is a power of 2.
+/// Note: integer may be signed in which case it is reinterpreted as unsigned. '-8' is therefore not regarded as a
+/// power of 2 at the moment.
+template <class T, std::enable_if_t<std::is_integral_v<T>>* = nullptr>
+constexpr bool isPowerOf2(T integer)
+{
+    auto temp = static_cast<std::make_unsigned_t<T>>(integer);
+    // Old trick to check whether only a single bit is set in our number. Single bit implies power of 2.
+    return temp != 0 && (temp & (temp - 1)) == 0;
+}
+
+/// Returns 'ptr' rounded up to the next 'multiple'. Effectively used to ensure alignment of a pointer.
+/// 'multiple' is required to be a multiple of the sizeof of the pointer element type as well as a power of 2.
+template <class T1, class T2, std::enable_if_t<std::is_integral_v<T2>>* = nullptr>
+T1* roundUpTo(T1* ptr, T2 multiple)
+{
+    PYLIR_ASSERT(multiple % sizeof(T1) == 0 && isPowerOf2(multiple));
+#ifdef __has_builtin
+    #if __has_builtin(__builtin_align_up)
+    return __builtin_align_up(ptr, multiple);
+    #endif
+#endif
+    std::size_t dummy = multiple * 2;
+    void* temp = reinterpret_cast<void*>(const_cast<std::remove_const_t<T1>*>(ptr));
+    return reinterpret_cast<T1*>(std::align(multiple, sizeof(T1), temp, dummy));
 }
 
 /// Type dependent constant that always returns false. This isa useful inside of `static_assert` functions as it makes
