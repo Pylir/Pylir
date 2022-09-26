@@ -130,8 +130,6 @@ jobs:
           # Lying here because I am not running within msys2
           windows_compile_environment: msvc
 
-      - run: ccache -C
-
       - name: Build LLVM
         id: llvm-build
         uses: ./Pylir/.github/actions/llvm-build
