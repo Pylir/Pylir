@@ -29,7 +29,6 @@ Checks: >
   bugprone-reserved-identifier,
   bugprone-shared-ptr-array-mismatch,
   bugprone-sizeof-container,
-  bugprone-sizeof-expression,
   bugprone-spuriously-wake-up-functions,
   bugprone-string-constructor,
   bugprone-string-integer-assignment,
@@ -71,9 +70,6 @@ Checks: >
   clang-analyzer-apiModeling.TrustNonnull,
   clang-analyzer-core.builtin.BuiltinFunctions,
   clang-analyzer-core.builtin.NoReturnFunctions,
-  clang-analyzer-core.CallAndMessage,
-  clang-analyzer-core.CallAndMessageModeling,
-  clang-analyzer-core.DivideZero,
   clang-analyzer-core.DynamicTypePropagation,
   clang-analyzer-core.NonnilStringConstants,
   clang-analyzer-core.NonNullParamChecker,
@@ -84,60 +80,17 @@ Checks: >
   clang-analyzer-core.uninitialized.ArraySubscript,
   clang-analyzer-core.uninitialized.Assign,
   clang-analyzer-core.uninitialized.Branch,
-  clang-analyzer-core.uninitialized.CapturedBlockVariable,
   clang-analyzer-core.uninitialized.UndefReturn,
   clang-analyzer-core.VLASize,
-  clang-analyzer-cplusplus.InnerPointer,
-  clang-analyzer-cplusplus.Move,
-  clang-analyzer-cplusplus.NewDelete,
-  clang-analyzer-cplusplus.NewDeleteLeaks,
-  clang-analyzer-cplusplus.PlacementNew,
-  clang-analyzer-cplusplus.PureVirtualCall,
-  clang-analyzer-cplusplus.SelfAssignment,
-  clang-analyzer-cplusplus.SmartPtrModeling,
-  clang-analyzer-cplusplus.StringChecker,
-  clang-analyzer-cplusplus.VirtualCallModeling,
+  clang-analyzer-cplusplus.*
   clang-analyzer-deadcode.DeadStores,
-  clang-analyzer-fuchsia.HandleChecker,
-  clang-analyzer-nullability.NullabilityBase,
-  clang-analyzer-nullability.NullableDereferenced,
-  clang-analyzer-nullability.NullablePassedToNonnull,
-  clang-analyzer-nullability.NullableReturnedFromNonnull,
-  clang-analyzer-nullability.NullPassedToNonnull,
-  clang-analyzer-nullability.NullReturnedFromNonnull,
-  clang-analyzer-optin.cplusplus.UninitializedObject,
-  clang-analyzer-optin.cplusplus.VirtualCall,
-  clang-analyzer-optin.mpi.MPI-Checker,
+  clang-analyzer-optin.cplusplus.*
   clang-analyzer-optin.performance.Padding,
   clang-analyzer-optin.portability.UnixAPI,
   clang-analyzer-security.FloatLoopCounter,
-  clang-analyzer-security.insecureAPI.bcmp,
-  clang-analyzer-security.insecureAPI.bcopy,
-  clang-analyzer-security.insecureAPI.bzero,
-  clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
-  clang-analyzer-security.insecureAPI.getpw,
-  clang-analyzer-security.insecureAPI.gets,
-  clang-analyzer-security.insecureAPI.mkstemp,
-  clang-analyzer-security.insecureAPI.mktemp,
-  clang-analyzer-security.insecureAPI.rand,
-  clang-analyzer-security.insecureAPI.SecuritySyntaxChecker,
-  clang-analyzer-security.insecureAPI.strcpy,
-  clang-analyzer-security.insecureAPI.UncheckedReturn,
-  clang-analyzer-security.insecureAPI.vfork,
-  clang-analyzer-unix.API,
-  clang-analyzer-unix.cstring.BadSizeArg,
-  clang-analyzer-unix.cstring.CStringModeling,
-  clang-analyzer-unix.cstring.NullArg,misc-definitions-in-headers,
-  clang-analyzer-unix.DynamicMemoryModeling,
-  clang-analyzer-unix.Malloc,
-  clang-analyzer-unix.MallocSizeof,
-  clang-analyzer-unix.MismatchedDeallocator,
-  clang-analyzer-unix.Vfork,
-  clang-analyzer-valist.CopyToSelf,
-  clang-analyzer-valist.Uninitialized,
-  clang-analyzer-valist.Unterminated,
-  clang-analyzer-valist.ValistBase,
-  cppcoreguidelines-avoid-const-or-ref-data-members,
+  clang-analyzer-security.insecureAPI.*
+  clang-analyzer-unix.*
+  clang-analyzer-valist.*
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-interfaces-global-init,
   cppcoreguidelines-prefer-member-initializer,
@@ -147,9 +100,7 @@ Checks: >
   cppcoreguidelines-special-member-functions,
   cppcoreguidelines-virtual-class-destructor,
   google-default-arguments,
-  google-explicit-constructor,
   google-runtime-operator,
-  google-readability-casting,
   hicpp-exception-baseclass,
   hicpp-multiway-paths-covered,
   llvm-else-after-return,
@@ -209,7 +160,6 @@ Checks: >
   performance-move-const-arg,
   performance-move-constructor-init,
   performance-no-automatic-move,
-  performance-no-int-to-ptr,
   performance-noexcept-move-constructor,
   performance-trivially-destructible,
   performance-type-promotion-in-math-fn,
@@ -249,47 +199,51 @@ Checks: >
   readability-uniqueptr-delete-release,
   readability-use-anyofallof
 FormatStyle: file
+HeaderFilterRegex: '.*\.hpp'
 
 CheckOptions:
   - key: misc-unused-parameters.StrictMode
     value: 1
   - key: readability-identifier-naming.ClassCase
     value: CamelCase
-  - key: readability-identifier-naming.StructCase
-    value: CamelCase
+  - key: readability-identifier-naming.ClassIgnoredRegexp
+    # Attempt to ignore cases such as X86_64. clang-tidy wants to turn it to CamelCase by simply removing the
+    # underscore. I'd rather it keep it as is.
+    value: '[[:alnum:]]*[0-9]+_[0-9]+'
   - key: readability-identifier-naming.UnionCase
     value: CamelCase
   - key: readability-identifier-naming.TypeTemplateParameterCase
     value: CamelCase
   - key: readability-identifier-naming.TypeAliasCase
-    value: CamelCase
-  - key: readability-identifier-naming.TypeAliasIgnoredRegexp
-    # All the stuff from the C++ standard.
-    value: 'iterator|const_iterator|difference_type|reference|pointer|value_type|iterator_category'
+    # A lot of type aliases are to conform to STL interfaces while others are our own whose casing generally depend
+    # on their purpose.
+    value: aNy_CasE
   - key: readability-identifier-naming.EnumCase
     value: CamelCase
   - key: readability-identifier-naming.EnumConstantCase
     value: CamelCase
   - key: readability-identifier-naming.ClassConstantCase
-    value: UPPER_CASE
+    value: aNy_CasE
   - key: readability-identifier-naming.GlobalConstantCase
-    value: UPPER_CASE
-  - key: readability-identifier-naming.GlobalConstantIgnoredRegexp
-    value: 'pylir_.*'
+    # This is too broad of an option. It considers any global that is `const` or `constexpr` a GlobalConstant but
+    # their uses are widely different. Some are e.g. used as type_traits, others may be used to implement named
+    # parameter flags. These have different casing which I'd rather just handle manually.
+    value: aNy_CasE
   - key: readability-identifier-naming.MacroDefinitionCase
     value: UPPER_CASE
   - key: readability-identifier-naming.ClassMemberCase
     value: camelBack
-  - key: readability-identifier-naming.ClassMethodCase
+  - key: readability-identifier-naming.MethodCase
     value: camelBack
-  - key: readability-identifier-naming.ClassMethodIgnoredRegexp
-    # Ignoring methods from template specializations which obviously have to match.
-    value: 'child_begin|child_end'
+  - key: readability-identifier-naming.MethodIgnoredRegexp
+    # Ignoring methods from template specializations which obviously have to match, STL style methods, some LLVM style
+    # methods etc.
+    value: 'child_begin|child_end|push_back|emplace_back|insert(_.+)?|find(_.+)?|erase(_.+)?|isa(_.+)?|([a-z]+)_cast(_.+)?'
   - key: readability-identifier-naming.FunctionCase
     value: camelBack
   - key: readability-identifier-naming.FunctionIgnoredRegexp
     # Ignoring function overloads where the name obviously has to match.
-    value: 'hash_value'
+    value: 'hash_value|isa(_.+)?|([a-z]+)_cast(_.+)?'
   - key: readability-identifier-naming.VariableCase
     value: camelBack
   - key: readability-identifier-naming.ValueTemplateParameterCase
@@ -302,3 +256,5 @@ CheckOptions:
     value: 1
   - key: readability-uniqueptr-delete-release.PreferResetCall
     value: 1
+  - key: readability-simplify-boolean-expr.SimplifyDeMorgan
+    value: 0

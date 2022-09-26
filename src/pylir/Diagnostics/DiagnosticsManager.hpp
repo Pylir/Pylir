@@ -45,7 +45,7 @@ class SubDiagnosticsManagerBase
     void report(Diagnostic&& diag);
 
 protected:
-    SubDiagnosticsManagerBase(DiagnosticsManager* parent) : m_parent(parent) {}
+    explicit SubDiagnosticsManagerBase(DiagnosticsManager* parent) : m_parent(parent) {}
 
 public:
     /// Returns true if errors have been reported through this.
@@ -55,7 +55,7 @@ public:
     }
 
     /// Returns Warning struct for a specific warning, or nullptr if it does not exist.
-    const Warning* getWarning(llvm::StringRef warningName) const;
+    [[nodiscard]] const Warning* getWarning(llvm::StringRef warningName) const;
 };
 
 /// Subclass of 'SubDiagnosticsManagerBase' which references a document and context. When used with
@@ -89,7 +89,7 @@ public:
 class DiagnosticsNoDocManager final : public SubDiagnosticsManagerBase
 {
 public:
-    DiagnosticsNoDocManager(DiagnosticsManager* parent) : SubDiagnosticsManagerBase(parent) {}
+    explicit DiagnosticsNoDocManager(DiagnosticsManager* parent) : SubDiagnosticsManagerBase(parent) {}
 };
 
 /// The main global diagnostics manager. It allows customization around the behaviour of diagnostics, including
@@ -109,7 +109,7 @@ public:
     /// is provided, diagnostics are simply streamed to llvm::errs() by default.
     /// Callbacks are executed under the lock of a mutex and hence do not need to take care of being threadsafe
     /// themselves.
-    DiagnosticsManager(std::function<void(Diagnostic&&)> diag = {});
+    explicit DiagnosticsManager(std::function<void(Diagnostic&&)> diag = {});
 
     /// Sets the callback for how to handle diagnostics.
     /// Callbacks are executed under the lock of a mutex and hence do not need to take care of being threadsafe
@@ -139,7 +139,7 @@ public:
     /// Creates a new sub diagnostics manager for a document and optionally a context.
     DiagnosticsDocManager createSubDiagnosticManager(const Document& document, const void* context = nullptr)
     {
-        return DiagnosticsDocManager(document, context, this);
+        return {document, context, this};
     }
 
     /// Creates a new sub diagnostics manager that does not have any locations.

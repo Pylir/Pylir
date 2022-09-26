@@ -24,7 +24,7 @@ public:
 
 private:
     std::vector<mlir::Value> m_set;
-    Kind m_kind;
+    Kind m_kind{Kind::MustAlias};
 
     friend class AliasSetTracker;
 
@@ -33,7 +33,7 @@ private:
         m_set.clear();
     }
 
-    bool isTombStone() const
+    [[nodiscard]] bool isTombStone() const
     {
         return m_set.empty();
     }
@@ -45,7 +45,7 @@ private:
     void insert(mlir::Value value, mlir::AliasResult result);
 
 public:
-    explicit AliasSet(mlir::Value value) : m_set{value}, m_kind(Kind::MustAlias) {}
+    explicit AliasSet(mlir::Value value) : m_set{value} {}
 
     auto begin()
     {
@@ -57,12 +57,12 @@ public:
         return m_set.end();
     }
 
-    auto begin() const
+    [[nodiscard]] auto begin() const
     {
         return m_set.begin();
     }
 
-    auto end() const
+    [[nodiscard]] auto end() const
     {
         return m_set.end();
     }
@@ -87,17 +87,17 @@ public:
         return m_sets[m_map.find(value)->second];
     }
 
-    bool contains(mlir::Value value) const
+    [[nodiscard]] bool contains(mlir::Value value) const
     {
         return m_map.count(value) != 0;
     }
 
-    auto begin() const
+    [[nodiscard]] auto begin() const
     {
         return m_sets.begin();
     }
 
-    auto end() const
+    [[nodiscard]] auto end() const
     {
         return m_sets.end();
     }

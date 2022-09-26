@@ -38,7 +38,7 @@ TEST_CASE("UTF16 conversions", "[Text]")
     {
         bool ok;
         std::u16string s;
-        s += 0xD800;
+        s += static_cast<char16_t>(0xD800);
         std::u16string_view sv{s};
         pylir::Text::toUTF32(sv, &ok);
         CHECK_FALSE(ok);
@@ -47,7 +47,7 @@ TEST_CASE("UTF16 conversions", "[Text]")
         pylir::Text::toUTF32(sv, &ok);
         CHECK_FALSE(ok);
         s[0] = 0xD800;
-        s += 0x0700;
+        s += static_cast<char16_t>(0x0700);
         sv = s;
         pylir::Text::toUTF32(sv, &ok);
         CHECK_FALSE(ok);

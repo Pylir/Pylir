@@ -112,7 +112,7 @@ struct llvm::DenseMapInfo<FunctionSpecialization>
 
     static inline unsigned getHashValue(const FunctionSpecialization& value)
     {
-        auto f = [](TypeFlowArgValue unionVal) { return (std::uintptr_t)unionVal.getOpaqueValue(); };
+        auto f = [](TypeFlowArgValue unionVal) { return reinterpret_cast<std::uintptr_t>(unionVal.getOpaqueValue()); };
         auto argTypes = value.argTypes;
         return llvm::hash_combine(&*value.function, llvm::hash_combine_range(llvm::mapped_iterator(argTypes.begin(), f),
                                                                              llvm::mapped_iterator(argTypes.end(), f)));
@@ -645,7 +645,7 @@ public:
                                          }
                                          return value.cast<pylir::Py::ObjectTypeInterface>();
                                      });
-        return FunctionSpecialization(m_context, {range.begin(), range.end()});
+        return {m_context, {range.begin(), range.end()}};
     }
 
     [[nodiscard]] bool finishedExecution() const

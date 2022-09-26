@@ -145,7 +145,7 @@ public:
     }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
-#define COMPILER_BUILTIN_TERNARY_OP(name, slotName, ...)                                                               \
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                                                                    \
     mlir::Value createPylir##name##Intrinsic(mlir::Value first, mlir::Value second, mlir::Value third,                 \
                                              mlir::Block* exceptBlock = nullptr)                                       \
     {                                                                                                                  \
@@ -163,7 +163,7 @@ public:
         return op.getResult(0);                                                                                        \
     }
 
-#define COMPILER_BUILTIN_BIN_OP(name, slotName, ...)                                                                  \
+#define COMPILER_BUILTIN_BIN_OP(name, slotName)                                                                       \
     mlir::Value createPylir##name##Intrinsic(mlir::Value lhs, mlir::Value rhs, mlir::Block* exceptBlock = nullptr)    \
     {                                                                                                                 \
         if (!exceptBlock)                                                                                             \
@@ -180,7 +180,7 @@ public:
         return op.getResult(0);                                                                                       \
     }
 
-#define COMPILER_BUILTIN_UNARY_OP(name, slotName, ...)                                                     \
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName)                                                          \
     mlir::Value createPylir##name##Intrinsic(mlir::Value val, mlir::Block* exceptBlock = nullptr)          \
     {                                                                                                      \
         if (!exceptBlock)                                                                                  \
@@ -203,14 +203,11 @@ public:
         {
             return create<Py::ConstantOp>(ref);
         }
-        else if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
+        if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
         {
             return create<Py::ConstantOp>(unbound);
         }
-        else
-        {
-            return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
-        }
+        return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
     }
 
     template <std::size_t n>

@@ -118,7 +118,8 @@ bool pylir::Parser::lookaheadEquals(tcb::span<const TokenType> tokens)
     Lexer::iterator end;
     std::size_t count = 0;
     for (end = m_current; end != m_lexer.end() && count != tokens.size(); end++, count++)
-        ;
+    {
+    }
     if (count != tokens.size())
     {
         return false;

@@ -84,7 +84,7 @@ public:
                                         std::forward<Args>(args)...);
     }
 
-    Diag::DiagnosticsDocManager& getDiagManager() const
+    [[nodiscard]] Diag::DiagnosticsDocManager& getDiagManager() const
     {
         return *m_diagManager;
     }

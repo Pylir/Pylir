@@ -54,7 +54,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
         case TokenType::Identifier:
         {
             auto token = *m_current++;
-            return make_node<Syntax::Atom>(token);
+            return makeNode<Syntax::Atom>(token);
         }
         case TokenType::StringLiteral:
         case TokenType::ByteLiteral:
@@ -63,7 +63,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
         case TokenType::ComplexLiteral:
         case TokenType::TrueKeyword:
         case TokenType::FalseKeyword:
-        case TokenType::NoneKeyword: return make_node<Syntax::Atom>(*m_current++);
+        case TokenType::NoneKeyword: return makeNode<Syntax::Atom>(*m_current++);
         case TokenType::OpenParentheses:
         case TokenType::OpenBrace:
         case TokenType::OpenSquareBracket: return parseEnclosure();
@@ -97,8 +97,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                 {
                     return std::nullopt;
                 }
-                return make_node<Syntax::TupleConstruct>(openParenth, std::vector<Syntax::StarredItem>{},
-                                                         *closeParentheses);
+                return makeNode<Syntax::TupleConstruct>(openParenth, std::vector<Syntax::StarredItem>{},
+                                                        *closeParentheses);
             }
             if (m_current->getTokenType() == TokenType::YieldKeyword)
             {
@@ -162,8 +162,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
             {
                 return std::nullopt;
             }
-            return make_node<Syntax::Generator>(std::move(openParenth), std::move(*expression), std::move(*compFor),
-                                                std::move(*closeParentheses));
+            return makeNode<Syntax::Generator>(std::move(openParenth), std::move(*expression), std::move(*compFor),
+                                               std::move(*closeParentheses));
         }
         case TokenType::OpenBrace:
         {
@@ -175,8 +175,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                 {
                     return std::nullopt;
                 }
-                return make_node<Syntax::DictDisplay>(
-                    std::move(openBrace), std::vector<Syntax::DictDisplay::KeyDatum>{}, std::move(*closeBrace));
+                return makeNode<Syntax::DictDisplay>(std::move(openBrace), std::vector<Syntax::DictDisplay::KeyDatum>{},
+                                                     std::move(*closeBrace));
             }
 
             if (peekedIs(TokenType::Star) || lookaheadEquals(std::array{TokenType::Identifier, TokenType::Walrus}))
@@ -191,8 +191,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                 {
                     return std::nullopt;
                 }
-                return make_node<Syntax::SetDisplay>(std::move(openBrace), std::move(*starredList),
-                                                     std::move(*closeBrace));
+                return makeNode<Syntax::SetDisplay>(std::move(openBrace), std::move(*starredList),
+                                                    std::move(*closeBrace));
             }
 
             std::optional<Syntax::DictDisplay::KeyDatum> keyDatum;
@@ -218,8 +218,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                         {
                             return std::nullopt;
                         }
-                        return make_node<Syntax::SetDisplay>(std::move(openBrace), std::move(*comprehension),
-                                                             std::move(*closeBrace));
+                        return makeNode<Syntax::SetDisplay>(std::move(openBrace), std::move(*comprehension),
+                                                            std::move(*closeBrace));
                     }
                     auto starredList = parseStarredList(Syntax::StarredItem{std::nullopt, std::move(*expression)});
                     if (!starredList)
@@ -231,8 +231,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                     {
                         return std::nullopt;
                     }
-                    return make_node<Syntax::SetDisplay>(std::move(openBrace), std::move(*starredList),
-                                                         std::move(*closeBrace));
+                    return makeNode<Syntax::SetDisplay>(std::move(openBrace), std::move(*starredList),
+                                                        std::move(*closeBrace));
                 }
                 auto colon = *m_current++;
                 auto secondExpression = parseExpression();
@@ -252,7 +252,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                     {
                         return std::nullopt;
                     }
-                    return make_node<Syntax::DictDisplay>(
+                    return makeNode<Syntax::DictDisplay>(
                         std::move(openBrace),
                         Syntax::DictDisplay::DictComprehension{std::move(*expression), std::move(colon),
                                                                std::move(*secondExpression), std::move(*compFor)},
@@ -302,8 +302,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
             {
                 return std::nullopt;
             }
-            return make_node<Syntax::DictDisplay>(std::move(openBrace), std::move(*keyDatumList),
-                                                  std::move(*closeBrace));
+            return makeNode<Syntax::DictDisplay>(std::move(openBrace), std::move(*keyDatumList),
+                                                 std::move(*closeBrace));
         }
         case TokenType::OpenSquareBracket:
         {
@@ -315,8 +315,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                 {
                     return std::nullopt;
                 }
-                return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::vector<Syntax::StarredItem>{},
-                                                      std::move(*closeSquare));
+                return makeNode<Syntax::ListDisplay>(std::move(openSquareBracket), std::vector<Syntax::StarredItem>{},
+                                                     std::move(*closeSquare));
             }
             if (firstInStarredItem(m_current->getTokenType()) && !firstInComprehension(m_current->getTokenType()))
             {
@@ -330,8 +330,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                 {
                     return std::nullopt;
                 }
-                return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*starredList),
-                                                      std::move(*closeSquare));
+                return makeNode<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*starredList),
+                                                     std::move(*closeSquare));
             }
 
             auto assignment = parseAssignmentExpression();
@@ -351,8 +351,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                 {
                     return std::nullopt;
                 }
-                return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*starredList),
-                                                      std::move(*closeSquare));
+                return makeNode<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*starredList),
+                                                     std::move(*closeSquare));
             }
 
             auto comprehension = parseComprehension(std::move(*assignment));
@@ -365,8 +365,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
             {
                 return std::nullopt;
             }
-            return make_node<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*comprehension),
-                                                  std::move(*closeSquare));
+            return makeNode<Syntax::ListDisplay>(std::move(openSquareBracket), std::move(*comprehension),
+                                                 std::move(*closeSquare));
         }
         case TokenType::SyntaxError: return std::nullopt;
         default:
@@ -445,8 +445,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>>
                 }
                 stride = std::move(*temp);
             }
-            return make_node<Syntax::Slice>(std::move(lowerBound), std::move(firstColon), std::move(upperBound),
-                                            std::move(*secondColumn), std::move(stride));
+            return makeNode<Syntax::Slice>(std::move(lowerBound), std::move(firstColon), std::move(upperBound),
+                                           std::move(*secondColumn), std::move(stride));
         },
         &firstInExpression);
     if (!list)
@@ -466,13 +466,13 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>>
                            return Syntax::StarredItem{std::nullopt, std::move(expr)};
                        });
 
-        return make_node<Syntax::Subscription>(
+        return makeNode<Syntax::Subscription>(
             std::move(expression), std::move(*squareBracket),
-            make_node<Syntax::TupleConstruct>(std::nullopt, std::move(starredItems), std::nullopt),
+            makeNode<Syntax::TupleConstruct>(std::nullopt, std::move(starredItems), std::nullopt),
             std::move(*closeSquareBracket));
     }
-    return make_node<Syntax::Subscription>(std::move(expression), std::move(*squareBracket), std::move(list->front()),
-                                           std::move(*closeSquareBracket));
+    return makeNode<Syntax::Subscription>(std::move(expression), std::move(*squareBracket), std::move(list->front()),
+                                          std::move(*closeSquareBracket));
 }
 
 std::optional<std::vector<pylir::Syntax::Argument>>
@@ -717,7 +717,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
                    [](IntrVarPtr<Syntax::Expression>&& expr) {
                        return Syntax::StarredItem{std::nullopt, std::move(expr)};
                    });
-    return make_node<Syntax::TupleConstruct>(std::nullopt, std::move(items), std::nullopt);
+    return makeNode<Syntax::TupleConstruct>(std::nullopt, std::move(items), std::nullopt);
 }
 
 std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseAssignmentExpression()
@@ -734,7 +734,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
     {
         return std::nullopt;
     }
-    return make_node<Syntax::Assignment>(std::move(variable), walrus, std::move(*expression));
+    return makeNode<Syntax::Assignment>(std::move(variable), walrus, std::move(*expression));
 }
 
 std::optional<pylir::Syntax::UnaryOp> pylir::Parser::parseAwaitExpr()
@@ -783,7 +783,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
     {
         return std::nullopt;
     }
-    return make_node<Syntax::BinOp>(std::move(expression), std::move(*powerOf), std::move(*uExpr));
+    return makeNode<Syntax::BinOp>(std::move(expression), std::move(*powerOf), std::move(*uExpr));
 }
 
 std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseUExpr()
@@ -802,7 +802,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
     std::reverse(unaries.begin(), unaries.end());
     for (Token& token : unaries)
     {
-        current = make_node<Syntax::UnaryOp>(std::move(token), std::move(current));
+        current = makeNode<Syntax::UnaryOp>(std::move(token), std::move(current));
     }
     return current;
 }
@@ -825,7 +825,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
             {
                 return std::nullopt;
             }
-            current = make_node<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
+            current = makeNode<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
             continue;
         }
 
@@ -834,7 +834,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
         {
             return std::nullopt;
         }
-        current = make_node<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
+        current = makeNode<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
     }
     return current;
 }
@@ -904,7 +904,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
     {
         return current;
     }
-    return make_node<Syntax::Comparison>(std::move(current), std::move(rest));
+    return makeNode<Syntax::Comparison>(std::move(current), std::move(rest));
 }
 
 std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseNotTest()
@@ -922,7 +922,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
     IntrVarPtr<Syntax::Expression> current{std::move(*comp)};
     for (Token& token : nots)
     {
-        current = make_node<Syntax::UnaryOp>(std::move(token), std::move(current));
+        current = makeNode<Syntax::UnaryOp>(std::move(token), std::move(current));
     }
     return {std::move(current)};
 }
@@ -964,8 +964,8 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parse
     {
         return std::nullopt;
     }
-    return make_node<Syntax::Conditional>(std::move(*orTest), std::move(*ifKeyword), std::move(*condition),
-                                          std::move(*elseKeyword), std::move(*other));
+    return makeNode<Syntax::Conditional>(std::move(*orTest), std::move(*ifKeyword), std::move(*condition),
+                                         std::move(*elseKeyword), std::move(*other));
 }
 
 std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>> pylir::Parser::parseExpression()
@@ -1186,7 +1186,7 @@ std::optional<pylir::IntrVarPtr<pylir::Syntax::Expression>>
             break;
         }
     }
-    return make_node<Syntax::TupleConstruct>(std::nullopt, std::move(items), std::nullopt);
+    return makeNode<Syntax::TupleConstruct>(std::nullopt, std::move(items), std::nullopt);
 }
 
 std::optional<pylir::Syntax::StarredItem> pylir::Parser::parseStarredItem()

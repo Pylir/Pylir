@@ -137,16 +137,16 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle sty
 pylir::Toolchain::Stdlib pylir::Toolchain::getStdlib(const pylir::cli::CommandLine& commandLine) const
 {
     return llvm::StringSwitch<Stdlib>(commandLine.getArgs().getLastArgValue(pylir::cli::OPT_stdlib_EQ))
-        .Case("libc++", Stdlib::libcpp)
-        .Case("libstdc++", Stdlib::libstdcpp)
+        .Case("libc++", Stdlib::Libcpp)
+        .Case("libstdc++", Stdlib::Libstdcpp)
         .Default(defaultStdlib());
 }
 
 pylir::Toolchain::RTLib pylir::Toolchain::getRTLib(const pylir::cli::CommandLine& commandLine) const
 {
     return llvm::StringSwitch<RTLib>(commandLine.getArgs().getLastArgValue(pylir::cli::OPT_rtlib_EQ))
-        .Case("compiler-rt", RTLib::compiler_rt)
-        .Case("libgcc", RTLib::libgcc)
+        .Case("compiler-rt", RTLib::CompilerRt)
+        .Case("libgcc", RTLib::Libgcc)
         .Default(defaultRTLib());
 }
 

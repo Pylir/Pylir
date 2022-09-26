@@ -102,12 +102,12 @@ public:
         return m_filename;
     }
 
-    constexpr std::pair<std::size_t, std::size_t> getStartOfFileLoc() const
+    [[nodiscard]] constexpr std::pair<std::size_t, std::size_t> getStartOfFileLoc() const
     {
         return {0, 1};
     }
 
-    std::pair<std::size_t, std::size_t> getEndOfFileLoc() const
+    [[nodiscard]] std::pair<std::size_t, std::size_t> getEndOfFileLoc() const
     {
         return {m_text.size(), m_text.size() + 1};
     }

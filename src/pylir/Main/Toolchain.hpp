@@ -29,8 +29,8 @@ protected:
 
     enum class Stdlib
     {
-        libstdcpp,
-        libcpp,
+        Libstdcpp,
+        Libcpp,
     };
 
     [[nodiscard]] virtual Stdlib defaultStdlib() const = 0;
@@ -39,8 +39,8 @@ protected:
 
     enum class RTLib
     {
-        compiler_rt,
-        libgcc,
+        CompilerRt,
+        Libgcc,
     };
 
     [[nodiscard]] virtual RTLib defaultRTLib() const = 0;

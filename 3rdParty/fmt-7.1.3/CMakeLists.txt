@@ -214,7 +214,7 @@ endif ()
 
 target_compile_features(fmt INTERFACE ${FMT_REQUIRED_FEATURES})
 
-target_include_directories(fmt PUBLIC
+target_include_directories(fmt SYSTEM PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${FMT_INC_DIR}>)
 

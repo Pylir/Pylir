@@ -78,7 +78,7 @@ private:
 
     friend class Builder;
 
-    template <class T, std::enable_if_t<is_abstract_variant_concrete<T>{}>* = nullptr>
+    template <class T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>
     std::string dump(const T& variant)
     {
         return variant.match([&](const auto& thing) { return dump(thing); });

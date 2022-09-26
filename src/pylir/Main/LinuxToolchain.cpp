@@ -164,30 +164,30 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         arguments.emplace_back("-pie");
     }
     Distro distro(m_triple);
-    if (distro.IsAlpineLinux())
+    if (distro.isAlpineLinux())
     {
         arguments.emplace_back("-z");
         arguments.emplace_back("now");
     }
-    if (distro.IsOpenSUSE() || distro.IsUbuntu() || distro.IsAlpineLinux())
+    if (distro.isOpenSuse() || distro.isUbuntu() || distro.isAlpineLinux())
     {
         arguments.emplace_back("-z");
         arguments.emplace_back("relro");
     }
 
-    if (distro.IsRedhat() || distro.IsOpenSUSE() || distro.IsAlpineLinux()
-        || (distro.IsUbuntu() && distro >= Distro::UbuntuMaverick))
+    if (distro.isRedhat() || distro.isOpenSuse() || distro.isAlpineLinux()
+        || (distro.isUbuntu() && distro >= Distro::UbuntuMaverick))
     {
         arguments.emplace_back("--hash-style=gnu");
     }
 
-    if (distro.IsDebian() || distro.IsOpenSUSE() || distro == Distro::UbuntuLucid || distro == Distro::UbuntuJaunty
+    if (distro.isDebian() || distro.isOpenSuse() || distro == Distro::UbuntuLucid || distro == Distro::UbuntuJaunty
         || distro == Distro::UbuntuKarmic)
     {
         arguments.emplace_back("--hash-style=both");
     }
 
-    if (distro.IsOpenSUSE())
+    if (distro.isOpenSuse())
     {
         arguments.emplace_back("--enable-new-dtags");
     }
@@ -306,8 +306,8 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
 
     switch (getStdlib(commandLine))
     {
-        case Stdlib::libstdcpp: arguments.emplace_back("-lstdc++"); break;
-        case Stdlib::libcpp: arguments.emplace_back("-lc++"); break;
+        case Stdlib::Libstdcpp: arguments.emplace_back("-lstdc++"); break;
+        case Stdlib::Libcpp: arguments.emplace_back("-lc++"); break;
     }
 
     arguments.emplace_back("-lm");

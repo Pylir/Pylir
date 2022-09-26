@@ -16,6 +16,8 @@
     #include <libunwind.h>
 #endif
 
+#include <pylir/Support/Util.hpp>
+
 #include "API.hpp"
 
 struct StackMap
@@ -53,6 +55,8 @@ const std::unordered_map<std::uintptr_t, std::vector<StackMap::Location>>& count
         std::unordered_map<std::uintptr_t, std::vector<StackMap::Location>> result(debug.callSiteCount);
         for (std::size_t i = 0; i < debug.callSiteCount; i++)
         {
+            curr = pylir::roundUpTo(curr, alignof(void*));
+
             std::uintptr_t programCounter;
             std::memcpy(&programCounter, curr, sizeof(std::uintptr_t));
             curr += sizeof(std::uintptr_t);

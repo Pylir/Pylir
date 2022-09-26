@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+
 namespace pylir::rt
 {
 class PyObject;
@@ -25,14 +29,14 @@ namespace Builtins
 #else
     #define MANGLING ""
 #endif
-#define BUILTIN(name, symbol, _, Type, ...) extern Type name asm(MANGLING symbol);
+#define BUILTIN(name, symbol, _, Type) extern Type name asm(MANGLING symbol);
 #include <pylir/Interfaces/BuiltinsModule.def>
 
-#define COMPILER_BUILTIN_TERNARY_OP(name, slotName, ...) \
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName) \
     extern "C" PyObject& pylir##slotName(PyObject& first, PyObject& second, PyObject& third);
 
-#define COMPILER_BUILTIN_BIN_OP(name, slotName, ...) extern "C" PyObject& pylir##slotName(PyObject& lhs, PyObject& rhs);
-#define COMPILER_BUILTIN_UNARY_OP(name, slotName, ...) extern "C" PyObject& pylir##slotName(PyObject& val);
+#define COMPILER_BUILTIN_BIN_OP(name, slotName) extern "C" PyObject& pylir##slotName(PyObject& lhs, PyObject& rhs);
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName) extern "C" PyObject& pylir##slotName(PyObject& val);
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
 

@@ -77,8 +77,8 @@ public:
     pylir::Py::TypeRefineResult refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> operands,
                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
     {
-        RefAttr type = operands[mlir::cast<ConcreteType>(this->getOperation()).getTypeObjectIndex()]
-                           .template dyn_cast_or_null<RefAttr>();
+        auto type = operands[mlir::cast<ConcreteType>(this->getOperation()).getTypeObjectIndex()]
+                        .template dyn_cast_or_null<RefAttr>();
         if (!type)
         {
             return TypeRefineResult::Failure;

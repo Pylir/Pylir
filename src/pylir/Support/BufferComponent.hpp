@@ -141,7 +141,7 @@ public:
         return m_data;
     }
 
-    const T* data() const
+    [[nodiscard]] const T* data() const
     {
         return m_data;
     }
@@ -161,7 +161,7 @@ public:
         return (*this)[m_size - 1];
     }
 
-    const T& back() const
+    [[nodiscard]] const T& back() const
     {
         return (*this)[m_size - 1];
     }

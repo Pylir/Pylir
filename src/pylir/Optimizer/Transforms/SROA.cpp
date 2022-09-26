@@ -71,7 +71,8 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                     mlir::OpBuilder builder(&iter);
                     if (auto allocOp = mlir::dyn_cast<pylir::SROAAllocOpInterface>(iter))
                     {
-                        if (!aggregates.contains(currAggregate = allocOp->getResult(0)))
+                        currAggregate = allocOp->getResult(0);
+                        if (!aggregates.contains(currAggregate))
                         {
                             continue;
                         }
@@ -85,7 +86,8 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
 
                     if (auto readWriteOp = mlir::dyn_cast<pylir::SROAReadWriteOpInterface>(iter))
                     {
-                        if (!aggregates.contains(currAggregate = readWriteOp.getAggregateOperand().get()))
+                        currAggregate = readWriteOp.getAggregateOperand().get();
+                        if (!aggregates.contains(currAggregate))
                         {
                             continue;
                         }

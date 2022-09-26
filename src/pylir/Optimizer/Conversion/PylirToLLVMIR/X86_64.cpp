@@ -52,10 +52,10 @@ std::tuple<pylir::X86_64::Adjustments::Arg, mlir::Type, mlir::Type>
     std::uint8_t takenIntegerRegisters = takenIntegers ? *takenIntegers : 0;
     std::uint8_t takenFloatingPointRegisters = takenFloats ? *takenFloats : 0;
     const auto flat = flatten(type);
-    auto iter = flat.begin();
+    const auto* iter = flat.begin();
     while (iter != flat.end())
     {
-        const auto begin = iter;
+        const auto* const begin = iter;
         bool encounteredInteger = false;
         std::size_t size = 0;
         std::size_t currentAlignment = 0;

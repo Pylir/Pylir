@@ -33,6 +33,7 @@ llvm::Optional<bool> isUnbound(mlir::Value value);
 /// not be constant! Either 'ref_cast' to 'ObjectAttrInterface' instead or explicitly set 'onlyConstGlobal' to true.
 ///
 /// If the cast does not succeed a null value is also returned.
+/// These are intentionally snake_case to follow 'dyn_cast's naming convention.
 template <class T>
 T ref_cast(
     mlir::Attribute attr,
@@ -42,7 +43,7 @@ T ref_cast(
     {
         return val;
     }
-    RefAttr ref = attr.dyn_cast<RefAttr>();
+    auto ref = attr.dyn_cast<RefAttr>();
     if (!ref || (!ref.getSymbol().getConstant() && onlyConstGlobal))
     {
         return nullptr;
@@ -51,6 +52,7 @@ T ref_cast(
 }
 
 /// Same as 'ref_cast' but returns a null value if 'attr' is null.
+/// These are intentionally snake_case to follow 'dyn_cast's naming convention.
 template <class T>
 T ref_cast_or_null(
     mlir::Attribute attr,

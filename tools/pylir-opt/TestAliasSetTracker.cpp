@@ -60,7 +60,7 @@ protected:
 
             auto state = mlir::AsmState(iter);
             llvm::outs() << "Alias sets for " << iter.getName() << ":\n";
-            for (auto& iter2 : tracker)
+            for (const auto& iter2 : tracker)
             {
                 llvm::outs() << "{";
                 for (auto iter3 : iter2)

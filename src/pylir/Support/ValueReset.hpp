@@ -39,7 +39,7 @@ public:
     ValueReset& operator=(const ValueReset&) = delete;
 
     ValueReset(ValueReset&& rhs) noexcept
-        : m_assignedTo(std::exchange(rhs.m_assignedTo, nullptr)), m_valueAfter(std::move(rhs.m_valueAfter))
+        : m_valueAfter(std::move(rhs.m_valueAfter)), m_assignedTo(std::exchange(rhs.m_assignedTo, nullptr))
     {
     }
 

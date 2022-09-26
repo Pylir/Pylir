@@ -54,24 +54,24 @@ struct LocationProvider<std::pair<U, V>, std::enable_if_t<std::is_integral_v<U> 
 };
 
 template <class T, class = void>
-struct hasLocationProviderRangeOneArg : std::false_type
+struct HasLocationProviderRangeOneArg : std::false_type
 {
 };
 
 template <class T>
-struct hasLocationProviderRangeOneArg<
+struct HasLocationProviderRangeOneArg<
     T, std::void_t<decltype(LocationProvider<std::decay_t<T>>::getRange(std::declval<std::decay_t<T>>()))>>
     : std::true_type
 {
 };
 
 template <class T, class = void>
-struct hasLocationProviderRangeTwoArg : std::false_type
+struct HasLocationProviderRangeTwoArg : std::false_type
 {
 };
 
 template <class T>
-struct hasLocationProviderRangeTwoArg<T, std::void_t<decltype(LocationProvider<std::decay_t<T>>::getRange(
+struct HasLocationProviderRangeTwoArg<T, std::void_t<decltype(LocationProvider<std::decay_t<T>>::getRange(
                                              std::declval<std::decay_t<T>>(), std::declval<const void*>()))>>
     : std::true_type
 {
@@ -85,31 +85,31 @@ struct hasLocationProviderRangeTwoArg<T, std::void_t<decltype(LocationProvider<s
 template <class T>
 std::pair<std::size_t, std::size_t> rangeLoc(const T& value, const void* context = nullptr)
 {
-    if constexpr (hasLocationProviderRangeTwoArg<T>{})
+    if constexpr (HasLocationProviderRangeTwoArg<T>{})
     {
         if (context)
         {
             return LocationProvider<T>::getRange(value, context);
         }
     }
-    if constexpr (hasLocationProviderRangeOneArg<T>{})
+    if constexpr (HasLocationProviderRangeOneArg<T>{})
     {
         return LocationProvider<T>::getRange(value);
     }
     else
     {
-        static_assert(hasLocationProviderRangeTwoArg<T>{}, "No LocationProvider<T>::getRange implementation found");
+        static_assert(HasLocationProviderRangeTwoArg<T>{}, "No LocationProvider<T>::getRange implementation found");
         PYLIR_UNREACHABLE;
     }
 }
 
 template <class T, class = void>
-struct hasLocationProviderPointer : std::false_type
+struct HasLocationProviderPointer : std::false_type
 {
 };
 
 template <class T>
-struct hasLocationProviderPointer<
+struct HasLocationProviderPointer<
     T, std::void_t<decltype(LocationProvider<std::decay_t<T>>::getPoint(std::declval<std::decay_t<T>>()))>>
     : std::true_type
 {
@@ -121,7 +121,7 @@ struct hasLocationProviderPointer<
 template <class T>
 std::size_t pointLoc(const T& value)
 {
-    if constexpr (hasLocationProviderPointer<T>{})
+    if constexpr (HasLocationProviderPointer<T>{})
     {
         return LocationProvider<T>::getPoint(value);
     }
@@ -133,6 +133,6 @@ std::size_t pointLoc(const T& value)
 
 template <class T>
 constexpr bool hasLocationProvider_v =
-    std::disjunction_v<hasLocationProviderRangeOneArg<T>, hasLocationProviderRangeTwoArg<T>>;
+    std::disjunction_v<HasLocationProviderRangeOneArg<T>, HasLocationProviderRangeTwoArg<T>>;
 
 } // namespace pylir::Diag

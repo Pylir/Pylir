@@ -83,69 +83,79 @@ public:
 
 private:
     /// The distribution, possibly with specific version.
-    DistroType DistroVal;
+    DistroType m_distroVal;
 
 public:
     /// @name Constructors
     /// @{
 
     /// Default constructor leaves the distribution unknown.
-    Distro() : DistroVal() {}
+    Distro() : m_distroVal() {}
 
     /// Constructs a Distro type for specific distribution.
-    Distro(DistroType D) : DistroVal(D) {}
+    explicit Distro(DistroType D) : m_distroVal(D) {}
 
     /// Detects the distribution using specified VFS.
     explicit Distro(const llvm::Triple& TargetOrHost);
 
     bool operator==(const Distro& Other) const
     {
-        return DistroVal == Other.DistroVal;
+        return m_distroVal == Other.m_distroVal;
+    }
+
+    bool operator==(const DistroType& Other) const
+    {
+        return m_distroVal == Other;
     }
 
     bool operator!=(const Distro& Other) const
     {
-        return DistroVal != Other.DistroVal;
+        return m_distroVal != Other.m_distroVal;
     }
 
     bool operator>=(const Distro& Other) const
     {
-        return DistroVal >= Other.DistroVal;
+        return m_distroVal >= Other.m_distroVal;
+    }
+
+    bool operator>=(const DistroType& Other) const
+    {
+        return m_distroVal >= Other;
     }
 
     bool operator<=(const Distro& Other) const
     {
-        return DistroVal <= Other.DistroVal;
+        return m_distroVal <= Other.m_distroVal;
     }
 
-    [[nodiscard]] bool IsRedhat() const
+    [[nodiscard]] bool isRedhat() const
     {
-        return DistroVal == Fedora || (DistroVal >= RHEL5 && DistroVal <= RHEL7);
+        return m_distroVal == Fedora || (m_distroVal >= RHEL5 && m_distroVal <= RHEL7);
     }
 
-    [[nodiscard]] bool IsOpenSUSE() const
+    [[nodiscard]] bool isOpenSuse() const
     {
-        return DistroVal == OpenSUSE;
+        return m_distroVal == OpenSUSE;
     }
 
-    [[nodiscard]] bool IsDebian() const
+    [[nodiscard]] bool isDebian() const
     {
-        return DistroVal >= DebianLenny && DistroVal <= DebianBookworm;
+        return m_distroVal >= DebianLenny && m_distroVal <= DebianBookworm;
     }
 
-    [[nodiscard]] bool IsUbuntu() const
+    [[nodiscard]] bool isUbuntu() const
     {
-        return DistroVal >= UbuntuHardy && DistroVal <= UbuntuJammy;
+        return m_distroVal >= UbuntuHardy && m_distroVal <= UbuntuJammy;
     }
 
-    [[nodiscard]] bool IsAlpineLinux() const
+    [[nodiscard]] bool isAlpineLinux() const
     {
-        return DistroVal == AlpineLinux;
+        return m_distroVal == AlpineLinux;
     }
 
-    [[nodiscard]] bool IsGentoo() const
+    [[nodiscard]] bool isGentoo() const
     {
-        return DistroVal == Gentoo;
+        return m_distroVal == Gentoo;
     }
 };
 

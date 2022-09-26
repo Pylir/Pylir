@@ -45,7 +45,7 @@ jobs:
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size: 0.5G
+            max_size=0.5G
           override_cache_key: ${{runner.os}}-${{matrix.runtime_lib}}-msvc
           windows_compile_environment: msvc
 
@@ -124,7 +124,7 @@ jobs:
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size: 0.5G
+            max_size=0.5G
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-clang64
           # Lying here because I am not running within msys2
           windows_compile_environment: msvc

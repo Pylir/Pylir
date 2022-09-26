@@ -76,7 +76,7 @@ struct RefAttrStorage : mlir::AttributeStorage
     }
 
     mlir::SymbolRefAttr identity;
-    mlir::Operation* value;
+    mlir::Operation* value{};
 };
 } // namespace Py::detail
 } // namespace pylir
@@ -245,7 +245,7 @@ mlir::Attribute pylir::Py::StrAttr::replaceImmediateSubElements(llvm::ArrayRef<m
 void pylir::Py::TupleAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                     llvm::function_ref<void(mlir::Type)>) const
 {
-    for (auto& iter : getValue())
+    for (const auto& iter : getValue())
     {
         walkAttrsFn(iter);
     }
@@ -262,7 +262,7 @@ mlir::Attribute pylir::Py::TupleAttr::replaceImmediateSubElements(llvm::ArrayRef
 void pylir::Py::ListAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                    llvm::function_ref<void(mlir::Type)>) const
 {
-    for (auto& iter : getValue())
+    for (const auto& iter : getValue())
     {
         walkAttrsFn(iter);
     }
@@ -281,7 +281,7 @@ mlir::Attribute pylir::Py::ListAttr::replaceImmediateSubElements(llvm::ArrayRef<
 void pylir::Py::SetAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                   llvm::function_ref<void(mlir::Type)>) const
 {
-    for (auto& iter : getValue())
+    for (const auto& iter : getValue())
     {
         walkAttrsFn(iter);
     }

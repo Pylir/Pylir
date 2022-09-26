@@ -12,6 +12,7 @@
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCStreamer.h>
+#include <llvm/MC/MCValue.h>
 #include <llvm/Target/TargetLoweringObjectFile.h>
 #include <llvm/Target/TargetMachine.h>
 
@@ -133,7 +134,12 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
 
         for (auto& iter : callSiteInfos)
         {
-            os.emitValueToAlignment(4);
+            // Mach-O arm64, seem to require that relocations are placed with proper alignment. Documentation is
+            // incredibly sparse however, and I fear this might be a requirement on more platforms. For the time being,
+            // we'll just require this everywhere. At worst, we are wasting pointerSize-1 bytes per call site.
+            // TODO: Reference documentation for alignment requirement.
+            os.emitValueToAlignment(pointerSize);
+
             os.emitValue(iter.programCounter, pointerSize);
             PYLIR_ASSERT(iter.locations.size() <= std::numeric_limits<std::uint32_t>::max());
             os.emitULEB128IntValue(iter.locations.size());

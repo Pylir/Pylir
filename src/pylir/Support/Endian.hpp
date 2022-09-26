@@ -8,7 +8,7 @@
 
 namespace pylir
 {
-// TODO: To be replaced in C++20
+/// Drop in replacement for std::endian until C++20 is used in the codebase. NOLINTBEGIN(readability-identifier-naming)
 enum class endian
 {
 #ifdef _WIN32
@@ -21,6 +21,7 @@ enum class endian
     native = __BYTE_ORDER__
 #endif
 };
+// NOLINTEND(readability-identifier-naming)
 
 template <class Integral>
 [[nodiscard]] Integral swapByteOrder(Integral value)

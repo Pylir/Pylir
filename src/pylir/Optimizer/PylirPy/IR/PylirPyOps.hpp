@@ -118,7 +118,7 @@ struct AddableExceptionHandling
                 deduced.has_value() ?
                     *deduced :
                     (ConcreteType::template hasTrait<mlir::OpTrait::VariadicOperands>() ? 1 : sizeof...(shape));
-            std::array<OperandShape, shapeSize> result;
+            std::array<OperandShape, shapeSize> result{};
             if constexpr (ConcreteType::template hasTrait<mlir::OpTrait::VariadicOperands>())
             {
                 result[0] = OperandShape::Variadic;

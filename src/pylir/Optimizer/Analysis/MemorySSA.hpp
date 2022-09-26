@@ -21,7 +21,7 @@
 namespace mlir
 {
 class ImplicitLocOpBuilder;
-}
+} // namespace mlir
 
 namespace pylir
 {

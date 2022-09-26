@@ -128,7 +128,7 @@ class Parser
         return result;
     }
 
-    std::pair<std::size_t, std::size_t> endOfFileLoc() const
+    [[nodiscard]] std::pair<std::size_t, std::size_t> endOfFileLoc() const
     {
         return m_lexer.getDiagManager().getDocument().getEndOfFileLoc();
     }
@@ -136,7 +136,7 @@ class Parser
     std::optional<Token> expect(TokenType tokenType);
 
     template <class T, class... Args>
-    static std::unique_ptr<T> make_node(Args&&... args)
+    static std::unique_ptr<T> makeNode(Args&&... args)
     {
         return std::unique_ptr<T>(new T{{}, std::forward<Args>(args)...});
     }
@@ -194,7 +194,7 @@ class Parser
             {
                 return std::nullopt;
             }
-            current = make_node<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
+            current = makeNode<Syntax::BinOp>(std::move(current), std::move(*op), std::move(*rhs));
         }
         return std::move(current);
     }
@@ -248,7 +248,7 @@ public:
     }
 
     template <class T, class S, class... Args>
-    auto createError(const T& location, const S& message, Args&&... args) const
+    [[nodiscard]] auto createError(const T& location, const S& message, Args&&... args) const
     {
         return Diag::DiagnosticsBuilder(m_lexer.getDiagManager(), Diag::Severity::Error, location, message,
                                         std::forward<Args>(args)...);

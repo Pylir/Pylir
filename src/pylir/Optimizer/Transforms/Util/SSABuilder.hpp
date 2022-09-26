@@ -60,12 +60,12 @@ public:
 
         DefinitionsMap() : m_map(std::make_unique<llvm::DenseMap<mlir::Block*, ValueTracker>>()) {}
 
-        DefinitionsMap(llvm::DenseMap<mlir::Block*, ValueTracker>&& map)
+        explicit DefinitionsMap(llvm::DenseMap<mlir::Block*, ValueTracker>&& map)
             : m_map(std::make_unique<llvm::DenseMap<mlir::Block*, ValueTracker>>(std::move(map)))
         {
         }
 
-        DefinitionsMap(const llvm::DenseMap<mlir::Block*, ValueTracker>& map)
+        explicit DefinitionsMap(const llvm::DenseMap<mlir::Block*, ValueTracker>& map)
             : m_map(std::make_unique<llvm::DenseMap<mlir::Block*, ValueTracker>>(map))
         {
         }
@@ -100,7 +100,7 @@ public:
             return m_map->end();
         }
 
-        auto end() const
+        [[nodiscard]] auto end() const
         {
             return m_map->end();
         }

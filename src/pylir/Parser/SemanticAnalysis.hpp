@@ -47,12 +47,12 @@ class SemanticAnalysis : public Syntax::Visitor<SemanticAnalysis>
     void finishNamespace(ScopeOwner owner);
 
 public:
-    SemanticAnalysis(Diag::DiagnosticsDocManager& manager) : m_manager(&manager) {}
+    explicit SemanticAnalysis(Diag::DiagnosticsDocManager& manager) : m_manager(&manager) {}
 
     using Visitor::visit;
 
     template <class T, class S, class... Args>
-    auto createError(const T& location, const S& message, Args&&... args) const
+    [[nodiscard]] auto createError(const T& location, const S& message, Args&&... args) const
     {
         return Diag::DiagnosticsBuilder(*m_manager, Diag::Severity::Error, location, message,
                                         std::forward<Args>(args)...);

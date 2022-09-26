@@ -360,7 +360,7 @@ public:
     using difference_type = std::ptrdiff_t;
     using size_type = std::size_t;
 
-    iterator begin() const
+    [[nodiscard]] iterator begin() const
     {
         return iterator(m_source, m_encoding);
     }

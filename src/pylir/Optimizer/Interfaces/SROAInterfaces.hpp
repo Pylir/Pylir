@@ -14,4 +14,4 @@
 namespace pylir
 {
 mlir::LogicalResult aggregateUseCanParticipateInSROA(const mlir::OpOperand& aggregateUse);
-}
+} // namespace pylir

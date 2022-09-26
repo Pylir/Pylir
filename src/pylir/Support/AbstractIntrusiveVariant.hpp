@@ -65,7 +65,7 @@ public:
     using Base = CRTP<T>;
 
     template <class T>
-    constexpr AbstractIntrusiveVariant(llvm::identity<T>)
+    constexpr explicit AbstractIntrusiveVariant(llvm::identity<T>)
         : m_index(std::integral_constant<index_type, indexOf<T>()>::value)
     {
         static_assert((std::is_same_v<T, Args> || ...), "T must be one of the subclasses specified in Args...");
@@ -129,7 +129,7 @@ public:
     template <class... F>
     decltype(auto) match(F&&... f)
     {
-        using Callable = decltype(detail::overload{std::forward<F>(f)...});
+        using Callable = decltype(detail::Overload{std::forward<F>(f)...});
         constexpr std::array<std::invoke_result_t<Callable, decltype(first<Args...>())&> (*)(AbstractIntrusiveVariant&,
                                                                                              Callable &&),
                              sizeof...(Args)>
@@ -141,7 +141,7 @@ public:
     template <class... F>
     decltype(auto) match(F&&... f) const
     {
-        using Callable = decltype(detail::overload{std::forward<F>(f)...});
+        using Callable = decltype(detail::Overload{std::forward<F>(f)...});
         constexpr std::array<std::invoke_result_t<Callable, const decltype(first<Args...>())&> (*)(
                                  const AbstractIntrusiveVariant&, Callable&&),
                              sizeof...(Args)>
@@ -170,7 +170,7 @@ public:
     IntrusiveVariantDeleter() = default;
 
     template <class T, std::enable_if_t<std::disjunction_v<std::is_same<T, SubClasses>...>>* = nullptr>
-    IntrusiveVariantDeleter(std::default_delete<T>&&) noexcept
+    /*implicit*/ IntrusiveVariantDeleter(std::default_delete<T>&&) noexcept
     {
     }
 
@@ -186,12 +186,12 @@ template <class T>
 using IntrVarPtr = std::unique_ptr<T, IntrusiveVariantDeleter<T>>;
 
 template <class T, class U = decltype(detail::AbstractIntrusiveVariant::deduceArgs(std::declval<T*>()))>
-struct is_abstract_variant_concrete : std::false_type
+struct IsAbstractVariantConcrete : std::false_type
 {
 };
 
 template <class T, class... SubClasses>
-struct is_abstract_variant_concrete<T, AbstractIntrusiveVariant<T, SubClasses...>> : std::true_type
+struct IsAbstractVariantConcrete<T, AbstractIntrusiveVariant<T, SubClasses...>> : std::true_type
 {
 };
 

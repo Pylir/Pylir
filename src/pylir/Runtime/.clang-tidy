@@ -1,8 +1,7 @@
 InheritParentConfig: true
 Checks: >
   -cert-err58-cpp,
-  -google-explicit-constructor,
-  -performance-no-int-to-ptr
+  -cppcoreguidelines-interfaces-global-init
 
 CheckOptions:
   - key: readability-identifier-naming.FunctionIgnoredRegexp
