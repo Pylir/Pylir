@@ -17,25 +17,18 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        cxx_compiler: [ clang++-11, g++-10 ]
-        c_compiler: [ clang-11, gcc-10 ]
-        sanitizer: [ "address,undefined", "thread", "" ]
-        exclude:
-          - cxx_compiler: clang++-11
-            c_compiler: gcc-10
-          - cxx_compiler: g++-10
-            c_compiler: clang-11
-          - cxx_compiler: g++-10
-            sanitizer: "address,undefined"
-          - cxx_compiler: g++-10
-            sanitizer: "thread"
+        include:
+          - { cxx_compiler: clang++, c_compiler: clang, sanitizer: "" }
+          - { cxx_compiler: clang++, c_compiler: clang, sanitizer: "address,undefined" }
+          - { cxx_compiler: clang++, c_compiler: clang, sanitizer: "thread" }
+          - { cxx_compiler: g++-10, c_compiler: gcc-10 }
 
     steps:
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libunwind-dev g++-10 lld clang-11
+          sudo apt install libunwind-dev g++-10 lld clang
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -54,16 +47,27 @@ jobs:
         run: |
           python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt
 
-      # See https://github.com/actions/cache/issues/53
+      # See https://github.com/actions/cache/issues/53.
       - name: Sanitize key
         id: sanitize-key
         run: echo "::set-output name=key::$(echo ${{matrix.sanitizer}} | sed 's/,/_and_/g')"
 
+      - name: Calculate cache size
+        id: cache-size
+        shell: pwsh
+        run: |
+          if ('${{matrix.sanitizer}}') {
+             echo "::set-output name=size::1.5G"
+          } else {
+             echo "::set-output name=size::0.5G"
+          }
+
       - name: Install CCache
-        uses: hendrikmuhs/ccache-action@v1.2.2
+        uses: Chocobo1/setup-ccache-action@v1
         with:
-          max-size: 0.5G
-          key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
+          ccache_options: |
+            max_size=${{steps.cache-size.outputs.size}}
+          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
 
       - name: Build LLVM
         id: llvm-build
