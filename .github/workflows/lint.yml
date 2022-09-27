@@ -45,13 +45,12 @@ jobs:
           # Depth 2 because we use git diff HEAD^ later.
           fetch-depth: 2
 
-      # We are reusing the clang++ Linux build without sanitizers. Hence also reusing its cache key.
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=1G
-          override_cache_key: ${{runner.os}}--clang++
+            max_size=0.5G
+          override_cache_key: ${{runner.os}}-clang-tidy
 
       - name: Build LLVM
         id: llvm-build
