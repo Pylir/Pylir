@@ -14,7 +14,7 @@ env:
 
 jobs:
   lint-run:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Install dependencies
@@ -23,7 +23,7 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh $LLVM_VERSION all
           sudo apt update
-          sudo apt install libunwind-dev lld g++-10
+          sudo apt install libunwind-dev lld
           
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -78,10 +78,7 @@ jobs:
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -S ${{github.workspace}}/Pylir
 
-      # Even if compilation were to fail, build as many targets as possible to make sure that all code created by
-      # code generators has been generated.
       - name: Build Pylir
-        continue-on-error: true
         run: |
           cmake --build pylir-build -- -k0
 

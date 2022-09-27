@@ -14,17 +14,17 @@ on:
 
 jobs:
   linux-build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       matrix:
-        cxx_compiler: [ clang++, g++-10 ]
-        c_compiler: [ clang, gcc-10 ]
+        cxx_compiler: [ clang++-11, g++-10 ]
+        c_compiler: [ clang-11, gcc-10 ]
         sanitizer: [ "address,undefined", "thread", "" ]
         exclude:
-          - cxx_compiler: clang++
+          - cxx_compiler: clang++-11
             c_compiler: gcc-10
           - cxx_compiler: g++-10
-            c_compiler: clang
+            c_compiler: clang-11
           - cxx_compiler: g++-10
             sanitizer: "address,undefined"
           - cxx_compiler: g++-10
@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install libunwind-dev g++-10 lld
+          sudo apt install libunwind-dev g++-10 lld clang-11
 
       - name: Set up Python
         uses: actions/setup-python@v2

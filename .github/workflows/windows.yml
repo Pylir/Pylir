@@ -104,6 +104,7 @@ jobs:
       - uses: msys2/setup-msys2@v2
         with:
           msystem: clang64
+          update: true
           pacboy: >-
             toolchain:p
           location: D:\
