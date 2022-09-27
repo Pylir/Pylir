@@ -553,8 +553,9 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoSideEffect, DeclareOpInterfa
 
 // Int ops
 
-def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned", [DeclareOpInterfaceMethods<CaptureInterface>, AlwaysBound,
-                                                            RefinedType<"Int">, ReturnsImmutable, NoSideEffect]> {
+def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned",
+    [AlwaysBound, RefinedType<"Int">, ReturnsImmutable, NoSideEffect]> {
+
     let arguments = (ins Index:$input);
     let results = (outs DynamicType:$result);
 
@@ -567,9 +568,9 @@ def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned", [DeclareOpInterfaceMe
     let hasFolder = 1;
 }
 
-def PylirPy_IntFromUnsignedOp : PylirPy_Op<"int.fromUnsigned", [DeclareOpInterfaceMethods<CaptureInterface>,
-                                                                AlwaysBound, RefinedType<"Int">, ReturnsImmutable,
-                                                                NoSideEffect]> {
+def PylirPy_IntFromUnsignedOp : PylirPy_Op<"int.fromUnsigned",
+    [AlwaysBound, RefinedType<"Int">, ReturnsImmutable, NoSideEffect]> {
+
     let arguments = (ins Index:$input);
     let results = (outs DynamicType:$result);
 
@@ -644,6 +645,57 @@ def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [DeclareOpInterfaceMethods<Capt
     }];
 
     let hasFolder = 1;
+}
+
+// Bool ops
+
+def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoSideEffect]> {
+    let arguments = (ins DynamicType:$input);
+    let results = (outs I1:$result);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let hasFolder = 1;
+
+    let description = [{
+        This op converts the boolean given by `$input` into an `I1` value that is usable for eg. conditional branches.
+        If `$input` is not really a `bool` (or a subclasses of) the behaviour is undefined.
+    }];
+}
+
+def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1",
+    [AlwaysBound, RefinedType<"Bool">, ReturnsImmutable, NoSideEffect]> {
+
+    let arguments = (ins I1:$input);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "$input attr-dict";
+
+    let hasFolder = 1;
+
+    let description = [{
+        This op converts an `I1` given by `$input` into a python bool object.
+    }];
+}
+
+// Float ops
+
+def PylirPy_FloatFromF64 : PylirPy_Op<"float.fromF64",
+    [AlwaysBound, RefinedType<"Float">, ReturnsImmutable, NoSideEffect]> {
+
+    let arguments = (ins F64:$input);
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = "$input attr-dict";
+}
+
+def PylirPy_FloatToF64 : PylirPy_Op<"float.toF64", [DeclareOpInterfaceMethods<CaptureInterface>, NoSideEffect,
+                                                    DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+
+    let arguments = (ins Arg<DynamicType, "", [OnlyReadsValue]>:$input);
+    let results = (outs F64:$result);
+
+    let assemblyFormat = "$input attr-dict";
 }
 
 // Intrinsics
@@ -951,35 +1003,6 @@ def PylirPy_IsOp : PylirPy_Op<"is", [NoSideEffect, Commutative]> {
 	let assemblyFormat = "$lhs `,` $rhs attr-dict";
 
     let hasFolder = 1;
-}
-
-// Conversions
-
-def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoSideEffect]> {
-    let arguments = (ins DynamicType:$input);
-    let results = (outs I1:$result);
-
-    let assemblyFormat = "$input attr-dict";
-
-    let hasFolder = 1;
-
-    let description = [{
-        This op converts the boolean given by `$input` into an `I1` value that is usable for eg. conditional branches.
-        If `$input` is not really a `bool` (or a subclasses of) the behaviour is undefined.
-    }];
-}
-
-def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1", [AlwaysBound, RefinedType<"Bool">, ReturnsImmutable, NoSideEffect]> {
-    let arguments = (ins I1:$input);
-    let results = (outs DynamicType:$result);
-
-    let assemblyFormat = "$input attr-dict";
-
-    let hasFolder = 1;
-
-    let description = [{
-        This op converts an `I1` given by `$input` into a python bool object.
-    }];
 }
 
 // Memory operations

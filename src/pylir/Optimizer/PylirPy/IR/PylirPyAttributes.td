@@ -86,6 +86,9 @@ def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter
     }];
 
     let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
+
+    let returnType = "double";
+    let convertFromStorage = "$_self.getDoubleValue()";
 }
 
 def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRefParameter<>, ?, [{

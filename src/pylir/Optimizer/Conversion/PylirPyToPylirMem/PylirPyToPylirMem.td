@@ -98,6 +98,12 @@ def : Pat<(PylirPy_IntFromUnsignedOp $input), (PylirMem_InitIntUnsignedOp
 def : Pat<(PylirPy_IntAddOp $lhs, $rhs), (PylirMem_InitIntAddOp
     (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp IntRef)), $lhs, $rhs)>;
 
+defvar FloatRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.float">;
+
+def : Pat<(PylirPy_FloatFromF64 $input),
+    (PylirMem_InitFloatOp (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp FloatRef)), $input)>;
+
+
 def : Pat<(PylirPy_MakeObjectOp $typeObj), (PylirMem_InitObjectOp (PylirMem_GCAllocObjectOp $typeObj))>;
 
 #endif

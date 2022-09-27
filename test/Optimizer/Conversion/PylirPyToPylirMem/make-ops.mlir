@@ -200,3 +200,21 @@ func.func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dy
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[INT]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initIntAdd %[[MEM]] to %[[ARG0]] + %[[ARG1]]
 // CHECK-NEXT: return %[[RESULT]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.float = #py.type
+
+func.func @make_float_fromF64(%arg0 : f64) -> !py.dynamic {
+    %0 = py.float.fromF64 %arg0
+    return %0 : !py.dynamic
+}
+
+// CHECK-LABEL: @make_float_fromF64
+// CHECK-SAME: %[[ARG:[[:alnum:]]+]]
+// CHECK-NEXT: %[[FLOAT:.*]] = py.constant(#py.ref<@builtins.float>)
+// CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[FLOAT]]
+// CHECK-NEXT: %[[RESULT:.*]] = pyMem.initFloat %[[MEM]] to %[[ARG]]
+// CHECK-NEXT: return %[[RESULT]]
