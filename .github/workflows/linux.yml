@@ -64,7 +64,7 @@ jobs:
         shell: pwsh
         run: |
           if ('${{matrix.sanitizer}}') {
-             echo "::set-output name=size::2G"
+             echo "::set-output name=size::1.5G"
           } else {
              echo "::set-output name=size::0.5G"
           }
