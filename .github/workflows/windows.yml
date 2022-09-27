@@ -103,11 +103,10 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
-          update: true
           msystem: clang64
           update: true
           pacboy: >-
-            clang:p crt:p
+            toolchain:p
           location: D:\
             
       - name: Prepend Msys2 to path
