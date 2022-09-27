@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 func.func @test(%arg1 : i1, %arg2 : i1) -> i1 {

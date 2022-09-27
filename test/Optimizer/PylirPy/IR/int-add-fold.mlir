@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -canonicalize | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @test1(%arg0 : !py.dynamic) -> !py.dynamic {

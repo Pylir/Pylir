@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @real(%arg0 : !py.dynamic) -> !py.dynamic {
@@ -37,6 +38,7 @@ func.func @__init__() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.dict = #py.type

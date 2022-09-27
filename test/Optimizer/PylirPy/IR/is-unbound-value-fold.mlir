@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 func.func @entry_block(%arg0 : !py.dynamic) -> i1 {
@@ -15,6 +16,7 @@ func.func @entry_block(%arg0 : !py.dynamic) -> i1 {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 py.global @a : !py.dynamic
@@ -40,6 +42,7 @@ func.func @block_argument(%arg0 : i1) -> i1 {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 py.global @a : !py.dynamic

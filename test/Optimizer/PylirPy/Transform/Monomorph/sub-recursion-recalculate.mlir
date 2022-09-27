@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --pylir-monomorph --canonicalize --split-input-file | FileCheck %s
 
 py.globalValue const @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue const @builtins.int = #py.type
 
 py.globalValue "private" @test

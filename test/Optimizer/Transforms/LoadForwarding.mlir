@@ -21,6 +21,7 @@ func.func @test_get_slot() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func private @bar()
@@ -66,6 +67,7 @@ func.func @test_dict_len() -> index {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
@@ -82,6 +84,7 @@ func.func @test_dict_lookup_setitem(%arg0 : !py.dynamic, %hash : index) -> !py.d
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic, %hash: index) -> !py.dynamic {
@@ -98,6 +101,7 @@ func.func @test_dict_lookup_delitem(%arg0 : !py.dynamic, %hash: index) -> !py.dy
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test_dict_lookup_makeDict(%hash : index) -> (!py.dynamic, !py.dynamic) {
@@ -117,6 +121,7 @@ func.func @test_dict_lookup_makeDict(%hash : index) -> (!py.dynamic, !py.dynamic
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test_list_len() -> index {
@@ -134,6 +139,7 @@ func.func @test_list_len() -> index {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test_resources(%arg0 : !py.dynamic) -> index {

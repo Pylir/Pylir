@@ -13,6 +13,7 @@ func.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @a = #py.type
 
 func.func @constant_obj() -> !py.dynamic {
@@ -28,6 +29,7 @@ func.func @constant_obj() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @a = #py.type
 
 func.func @global_value() -> !py.dynamic {
@@ -43,6 +45,7 @@ func.func @global_value() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {

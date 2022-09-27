@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @foo(%arg0: !py.dynamic) -> !py.dynamic {

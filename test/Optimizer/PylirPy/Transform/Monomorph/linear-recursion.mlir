@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --pylir-monomorph --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 // TODO: If we have some kind of observable support for variant types this test should make use of it

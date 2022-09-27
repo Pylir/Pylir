@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --pylir-fold-globals --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : !py.dynamic
@@ -29,6 +30,7 @@ func.func @bar() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : !py.dynamic
@@ -59,6 +61,7 @@ func.func @bar() {
 
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : !py.dynamic
@@ -86,6 +89,7 @@ func.func @bar() -> !py.dynamic {
 
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : !py.dynamic
@@ -151,6 +155,7 @@ func.func @bar() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : !py.dynamic
@@ -198,6 +203,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @bar : !py.dynamic
@@ -237,6 +243,7 @@ func.func @other2() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : index
@@ -290,6 +297,7 @@ func.func @bar() -> index {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : index = 3 : index
@@ -315,6 +323,7 @@ func.func @bar() -> index {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 py.global "private" @foo : index = 5 : index

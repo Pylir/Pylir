@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -pass-pipeline='any(pylir-expand-py-dialect)' --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.StopIteration = #py.type
 py.globalValue @builtins.ValueError = #py.type
@@ -87,6 +88,7 @@ func.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynam
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.StopIteration = #py.type
 py.globalValue @builtins.ValueError = #py.type
@@ -166,6 +168,7 @@ func.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !p
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.StopIteration = #py.type
 py.globalValue @builtins.ValueError = #py.type

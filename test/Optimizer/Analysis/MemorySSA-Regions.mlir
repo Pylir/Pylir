@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test(%arg0 : i1, %length : index) -> index {

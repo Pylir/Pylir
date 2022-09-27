@@ -1,6 +1,7 @@
 // RUN: pylir-opt -pass-pipeline="any(pylir-sroa)" %s --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test(%arg0 : !py.dynamic) -> (!py.dynamic, index) {
@@ -33,6 +34,7 @@ func.func @test(%arg0 : !py.dynamic) -> (!py.dynamic, index) {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
@@ -66,6 +68,7 @@ func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @neg_test(%arg0 : !py.dynamic, %arg1 : index) -> (!py.dynamic, index) {

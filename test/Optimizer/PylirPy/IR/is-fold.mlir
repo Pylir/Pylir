@@ -2,6 +2,7 @@
 
 // Stubs
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 // CHECK-LABEL: @same_value
@@ -17,6 +18,7 @@ func.func @same_value() -> i1 {
 
 // Stubs
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 // CHECK-LABEL: @two_allocs
@@ -33,6 +35,7 @@ func.func @two_allocs(%arg0 : !py.dynamic) -> i1 {
 
 // Stubs
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 // CHECK-LABEL: @singletons
@@ -49,6 +52,7 @@ func.func @singletons() -> i1 {
 
 // Stubs
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 // CHECK-LABEL: @alloca_symbol

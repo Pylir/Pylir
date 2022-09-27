@@ -35,8 +35,8 @@ py.globalValue @dict = #py.dict<{#py.ref<@bar> to #py.ref<@builtins.None>}>
 
 // -----
 
-py.globalValue const @builtins.type = #py.type<mroTuple = #py.tuple<(@builtins.type, @builtins.object)>>
-py.globalValue const @builtins.object = #py.type<mroTuple = #py.tuple<(@builtins.object)>>
+py.globalValue const @builtins.type = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
+py.globalValue const @builtins.object = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.object>)>>
 py.globalValue const @builtins.function = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
@@ -95,3 +95,52 @@ func.func @foo() {
     %0 = py.constant(#py.ref<@lol>)
     return
 }
+
+// -----
+
+// expected-error@below {{Expected MRO to refer to a tuple}}
+py.globalValue @builtins.type = #py.type<mroTuple = #py.int<5>>
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.tuple = #py.type
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.None = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.function = #py.type
+
+func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+
+// expected-error@below {{Expected __defaults__ to refer to a tuple}}
+py.globalValue @lol = #py.function<@foo, defaults = #py.int<5>>
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.None = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.function = #py.type
+
+func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+
+// expected-error@below {{Expected __kwdefaults__ to refer to a dictionary}}
+py.globalValue @lol = #py.function<@foo, kwDefaults = #py.int<5>>
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.None = #py.type
+py.globalValue @builtins.str = #py.type
+py.globalValue @builtins.function = #py.type
+
+func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+
+// expected-error@below {{Expected __dict__ to refer to a dictionary}}
+py.globalValue @lol = #py.function<@foo, dict = #py.int<5>>

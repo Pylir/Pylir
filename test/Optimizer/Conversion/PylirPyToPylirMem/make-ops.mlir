@@ -19,6 +19,7 @@ func.func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.list = #py.type
 
 func.func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
@@ -36,6 +37,7 @@ func.func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.set = #py.type
 
 func.func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
@@ -53,6 +55,7 @@ func.func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 
 func.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> !py.dynamic {
@@ -73,6 +76,7 @@ func.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> 
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.function = #py.type
 
@@ -123,6 +127,7 @@ func.func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
 func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
@@ -142,6 +147,7 @@ func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @make_int_fromInteger(%arg0 : index) -> !py.dynamic {
@@ -160,6 +166,7 @@ func.func @make_int_fromInteger(%arg0 : index) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.str = #py.type
 
@@ -178,6 +185,7 @@ func.func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {

@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
@@ -19,6 +20,7 @@ func.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
@@ -37,6 +39,7 @@ func.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
 func.func @make_set_op(%arg0 : !py.dynamic) -> !py.dynamic {

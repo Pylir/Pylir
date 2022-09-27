@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -pass-pipeline='any(pylir-global-load-store-elimination)' --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic
@@ -20,6 +21,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic
@@ -42,6 +44,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func private @clobber()
@@ -66,6 +69,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic
@@ -111,6 +115,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic
@@ -149,6 +154,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic
@@ -316,6 +322,7 @@ module {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic
@@ -352,6 +359,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic
@@ -386,6 +394,7 @@ func.func @test() -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.global @foo : !py.dynamic

@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --pylir-global-sroa --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 
@@ -36,6 +37,7 @@ func.func @foo(%hash: index, %arg0 : !py.dynamic) {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 
@@ -59,6 +61,7 @@ func.func @store_only(%hash: index, %arg0 : !py.dynamic) {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 
@@ -81,6 +84,7 @@ func.func @load_only(%hash: index) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.int = #py.type
@@ -106,6 +110,7 @@ func.func @init_attr(%hash: index) -> !py.dynamic {
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.int = #py.type
@@ -120,6 +125,7 @@ py.globalValue "private" @thing = #py.dict<{#py.str<"lol"> to #py.int<5>}>
 // -----
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.int = #py.type

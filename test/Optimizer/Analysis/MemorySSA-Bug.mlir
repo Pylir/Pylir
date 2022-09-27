@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file
 
 py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.list = #py.type
 
