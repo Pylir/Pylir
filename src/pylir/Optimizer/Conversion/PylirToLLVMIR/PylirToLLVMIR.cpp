@@ -46,7 +46,7 @@ bool needToBeRuntimeInit(pylir::Py::ObjectAttrInterface attr)
 {
     // Integer attrs currently need to be runtime init due to memory allocation in libtommath
     // Dict attr need to be runtime init due to the hash calculation
-    return attr.isa<pylir::Py::IntAttrInterface, pylir::Py::DictAttr>();
+    return attr.isa<pylir::Py::IntAttr, pylir::Py::DictAttr>();
 }
 
 mlir::LLVM::LLVMPointerType derivePointer(mlir::Type basePointerType)
@@ -480,7 +480,7 @@ public:
             .Case([&](pylir::Py::StrAttr) { return getPyStringType(count); })
             .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
             .Case([&](pylir::Py::FunctionAttr) { return getPyFunctionType(count); })
-            .Case([&](pylir::Py::IntAttrInterface) { return getPyIntType(count); })
+            .Case([&](pylir::Py::IntAttr) { return getPyIntType(count); })
             .Case([&](pylir::Py::DictAttr) { return getPyDictType(count); })
             .Default([&](auto) { return getPyObjectType(count); });
     }
@@ -748,14 +748,14 @@ public:
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, constant, 1);
                 })
             .Case(
-                [&](pylir::Py::IntAttrInterface integer)
+                [&](pylir::Py::IntAttr integer)
                 {
                     auto result = m_globalBuffers.lookup(integer);
                     if (!result)
                     {
                         mlir::OpBuilder::InsertionGuard bufferGuard{builder};
                         builder.setInsertionPointToStart(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
-                        auto bigInt = integer.getIntegerValue();
+                        auto bigInt = integer.getValue();
                         auto targetSizeTBytes = getPlatformABI().getSizeT(&getContext()).getIntOrFloatBitWidth() / 8;
                         auto size = mp_pack_count(&bigInt.getHandle(), 0, targetSizeTBytes);
                         llvm::SmallVector<std::size_t> data(size);

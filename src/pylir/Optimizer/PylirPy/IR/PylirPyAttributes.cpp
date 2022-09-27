@@ -107,16 +107,57 @@ void pylir::Py::PylirPyDialect::initializeAttributes()
         >();
 }
 
-const pylir::BigInt& pylir::Py::IntAttr::getIntegerValue() const
+void pylir::Py::PylirPyDialect::printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter& os) const
 {
-    return getValue();
+    if (auto boolAttr = attr.dyn_cast<BoolAttr>())
+    {
+        os << BoolAttr::getMnemonic();
+        boolAttr.print(os);
+        return;
+    }
+    (void)generatedAttributePrinter(attr, os);
 }
 
-const pylir::BigInt& pylir::Py::BoolAttr::getIntegerValue() const
+mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(mlir::DialectAsmParser& parser, mlir::Type type) const
 {
-    static pylir::BigInt trueValue(1);
-    static pylir::BigInt falseValue(0);
-    return getValue() ? trueValue : falseValue;
+    llvm::StringRef keyword;
+    mlir::Attribute res;
+    auto loc = parser.getCurrentLocation();
+    if (auto opt = generatedAttributeParser(parser, &keyword, type, res); opt.has_value())
+    {
+        if (mlir::failed(*opt))
+        {
+            return {};
+        }
+        return res;
+    }
+    if (keyword == BoolAttr::getMnemonic())
+    {
+        return BoolAttr::parse(parser, type);
+    }
+    parser.emitError(loc, "Unknown dialect attribute: ") << keyword;
+    return res;
+}
+
+void pylir::Py::BoolAttr::print(mlir::AsmPrinter& printer) const
+{
+    printer << "<" << (getValue() ? "True" : "False") << ">";
+}
+
+mlir::Attribute pylir::Py::BoolAttr::parse(mlir::AsmParser& parser, mlir::Type)
+{
+    llvm::StringRef keyword;
+    llvm::SMLoc loc;
+    if (parser.parseLess() || parser.getCurrentLocation(&loc) || parser.parseKeyword(&keyword) || parser.parseGreater())
+    {
+        return {};
+    }
+    if (keyword != "True" && keyword != "False")
+    {
+        parser.emitError(loc, "Expected one of 'True' or 'False'");
+        return {};
+    }
+    return get(parser.getContext(), keyword == "True");
 }
 
 pylir::Py::RefAttr pylir::Py::FunctionAttr::getTypeObject() const
@@ -202,18 +243,6 @@ void pylir::Py::IntAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::
 
 mlir::Attribute pylir::Py::IntAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
                                                                 llvm::ArrayRef<mlir::Type>) const
-{
-    return doTypeObjectSlotsReplace(*this, replAttrs, getValue());
-}
-
-void pylir::Py::BoolAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-                                                   llvm::function_ref<void(mlir::Type)>) const
-{
-    doTypeObjectSlotsWalk(*this, walkAttrsFn);
-}
-
-mlir::Attribute pylir::Py::BoolAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
-                                                                 llvm::ArrayRef<mlir::Type>) const
 {
     return doTypeObjectSlotsReplace(*this, replAttrs, getValue());
 }

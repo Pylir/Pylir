@@ -120,13 +120,13 @@ def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $cond, $lhs, $rhs)),
             }]>> $lhs, $rhs)]>;
 
 multiclass IntCommAndAssocPattern<Op op, string operator> {
-	def : Pat<(op (op $op, (ResolvesTo<0> IntAttrInterface:$first)), (ResolvesTo<0> IntAttrInterface:$second)),
+	def : Pat<(op (op $op, (ResolvesTo<0> PylirPy_IntAttr:$first)), (ResolvesTo<0> PylirPy_IntAttr:$second)),
 			(op $op,
-			(PylirPy_ConstantOp (BinOpAttrs<operator, IntAttrInterface, PylirPy_IntAttr> $first, $second)))>;
+			(PylirPy_ConstantOp (BinOpAttrs<operator, PylirPy_IntAttr, PylirPy_IntAttr> $first, $second)))>;
 
-	def : Pat<(op (op $x, (ResolvesTo<0> IntAttrInterface:$first)), (op $y, (ResolvesTo<0> IntAttrInterface:$second))),
+	def : Pat<(op (op $x, (ResolvesTo<0> PylirPy_IntAttr:$first)), (op $y, (ResolvesTo<0> PylirPy_IntAttr:$second))),
 			(op (op $x, $y),
-			(PylirPy_ConstantOp (BinOpAttrs<operator, IntAttrInterface, PylirPy_IntAttr> $first, $second)))>;
+			(PylirPy_ConstantOp (BinOpAttrs<operator, PylirPy_IntAttr, PylirPy_IntAttr> $first, $second)))>;
 }
 
 defm : IntCommAndAssocPattern<PylirPy_IntAddOp, "+">;

@@ -287,12 +287,6 @@ void pylir::Py::IntAttr::destructureAggregate(
     destructureSlots(*this, write);
 }
 
-void pylir::Py::BoolAttr::destructureAggregate(
-    llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
-{
-    destructureSlots(*this, write);
-}
-
 void pylir::Py::FloatAttr::destructureAggregate(
     llvm::function_ref<void(mlir::Attribute, mlir::Type, mlir::Attribute)> write) const
 {

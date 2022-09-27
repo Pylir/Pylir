@@ -23,15 +23,14 @@ add_public_tablegen_target(PylirPyIncGen)
 
 add_pylir_interface(ATTR ObjectAttrInterface)
 add_pylir_interface(TYPE ObjectTypeInterface)
-add_pylir_interface(ATTR IntAttrInterface)
 add_pylir_interface(OP TypeRefineableInterface)
 add_pylir_rewriter(PylirPyPatterns)
 
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
-  ObjectAttrInterface.cpp IntAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp Value.cpp
+  ObjectAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp Value.cpp
   PylirPyOpSROA.cpp PylirPyOpsVerifier.cpp)
-add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen IntAttrInterfaceIncGen
-  ObjectTypeInterfaceIncGen TypeRefineableInterfaceIncGen)
+add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen ObjectTypeInterfaceIncGen
+  TypeRefineableInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
   PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyObjectFromTypeObjectInterface
   PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface PylirSROAInterfaces

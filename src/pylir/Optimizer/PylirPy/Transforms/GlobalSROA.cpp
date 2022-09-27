@@ -192,9 +192,9 @@ void GlobalSROAPass::runOnOperation()
                     integer.getValue().toStringSigned(temp);
                     suffix = temp.str();
                 }
-                else if (auto pyInt = attr.dyn_cast_or_null<pylir::Py::IntAttrInterface>())
+                else if (auto pyInt = attr.dyn_cast_or_null<pylir::Py::IntAttr>())
                 {
-                    suffix = pyInt.getIntegerValue().toString();
+                    suffix = pyInt.getValue().toString();
                 }
 
                 mlir::Type type;

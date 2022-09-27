@@ -9,11 +9,11 @@
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.td"
-include "pylir/Optimizer/PylirPy/IR/IntAttrInterface.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
 include "pylir/Optimizer/Util/TablegenUtil.td"
 include "mlir/IR/SubElementInterfaces.td"
+include "mlir/IR/OpBase.td"
 
 class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
     AttrDef<PylirPy_Dialect, name, traits, baseCppClass>;
@@ -58,38 +58,20 @@ def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [
 def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
 	ParamSpec<CustomPrint<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">,
 											?, "$_printer << $_self.toString();">, "value">],
-	[DeclareAttrInterfaceMethods<IntAttrInterface>, ImmutableAttr]> {
+	[ImmutableAttr]> {
 	let mnemonic = "int";
 	let summary = "python integer";
 
 	let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
 
 	let constBuilderCall = "::pylir::Py::IntAttr::get($_builder.getContext(), $0)";
+
+	let returnType = "const ::pylir::BigInt&";
+    let convertFromStorage = "$_self.getValue()";
 }
 
-def PylirPy_BoolAttr : TypeObjectSlotsAttr<"Bool", [ParamSpec<CustomPrint<AttrParameter<"bool", "">, [{
-	[&]() -> mlir::FailureOr<bool> {
-		llvm::StringRef keyword;
-        auto loc = $_parser.getCurrentLocation();
-        if ($_parser.parseKeyword(&keyword))
-        {
-            return mlir::failure();
-        }
-        if (keyword != "True" && keyword != "False")
-        {
-            $_parser.emitError(loc, "Expected 'True' or 'False' instead of ") << keyword;
-            return mlir::failure();
-        }
-        return keyword == "True";
-	}()
-}], [{
-	$_printer << ($_self ? "True" : "False");
-}]>, "value">],
-	[DeclareAttrInterfaceMethods<IntAttrInterface>, ImmutableAttr]> {
-	let mnemonic = "bool";
+def PylirPy_BoolAttr : DialectAttr<PylirPy_Dialect, CPred<"$_self.isa<::pylir::Py::BoolAttr>()">> {
 	let summary = "python boolean";
-
-	let assemblyFormat = "`<`$value ( `,` struct($typeObject, $slots)^)?`>`";
 }
 
 def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter<"">, "value">], [ImmutableAttr]> {

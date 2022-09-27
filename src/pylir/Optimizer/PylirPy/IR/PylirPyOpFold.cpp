@@ -505,15 +505,15 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(::llvm::ArrayRef<::mlir::Attrib
         return op.getInput();
     }
 
-    auto integer = operands[0].dyn_cast_or_null<Py::IntAttrInterface>();
+    auto integer = operands[0].dyn_cast_or_null<Py::IntAttr>();
     if (!integer)
     {
         return nullptr;
     }
     std::size_t bitWidth = mlir::DataLayout::closest(*this).getTypeSizeInBits(getResult().getType());
-    if (integer.getIntegerValue() < BigInt(0))
+    if (integer.getValue() < BigInt(0))
     {
-        auto optional = integer.getIntegerValue().tryGetInteger<std::intmax_t>();
+        auto optional = integer.getValue().tryGetInteger<std::intmax_t>();
         if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, true).isSignedIntN(bitWidth))
         {
             // TODO: I will probably want a poison value here in the future.
@@ -521,7 +521,7 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(::llvm::ArrayRef<::mlir::Attrib
         }
         return mlir::IntegerAttr::get(getType(), *optional);
     }
-    auto optional = integer.getIntegerValue().tryGetInteger<std::uintmax_t>();
+    auto optional = integer.getValue().tryGetInteger<std::uintmax_t>();
     if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, false).isIntN(bitWidth))
     {
         // TODO: I will probably want a poison value here in the future.
@@ -532,8 +532,8 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(::llvm::ArrayRef<::mlir::Attrib
 
 mlir::OpFoldResult pylir::Py::IntCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto lhs = operands[0].dyn_cast_or_null<IntAttrInterface>();
-    auto rhs = operands[1].dyn_cast_or_null<IntAttrInterface>();
+    auto lhs = operands[0].dyn_cast_or_null<IntAttr>();
+    auto rhs = operands[1].dyn_cast_or_null<IntAttr>();
     if (!lhs || !rhs)
     {
         return nullptr;
@@ -541,24 +541,24 @@ mlir::OpFoldResult pylir::Py::IntCmpOp::fold(::llvm::ArrayRef<::mlir::Attribute>
     bool result;
     switch (getPred())
     {
-        case IntCmpKind::eq: result = lhs.getIntegerValue() == rhs.getIntegerValue(); break;
-        case IntCmpKind::ne: result = lhs.getIntegerValue() != rhs.getIntegerValue(); break;
-        case IntCmpKind::lt: result = lhs.getIntegerValue() < rhs.getIntegerValue(); break;
-        case IntCmpKind::le: result = lhs.getIntegerValue() <= rhs.getIntegerValue(); break;
-        case IntCmpKind::gt: result = lhs.getIntegerValue() > rhs.getIntegerValue(); break;
-        case IntCmpKind::ge: result = lhs.getIntegerValue() >= rhs.getIntegerValue(); break;
+        case IntCmpKind::eq: result = lhs.getValue() == rhs.getValue(); break;
+        case IntCmpKind::ne: result = lhs.getValue() != rhs.getValue(); break;
+        case IntCmpKind::lt: result = lhs.getValue() < rhs.getValue(); break;
+        case IntCmpKind::le: result = lhs.getValue() <= rhs.getValue(); break;
+        case IntCmpKind::gt: result = lhs.getValue() > rhs.getValue(); break;
+        case IntCmpKind::ge: result = lhs.getValue() >= rhs.getValue(); break;
     }
     return mlir::BoolAttr::get(getContext(), result);
 }
 
 mlir::OpFoldResult pylir::Py::IntToStrOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
-    auto integer = operands[0].dyn_cast_or_null<IntAttrInterface>();
+    auto integer = operands[0].dyn_cast_or_null<IntAttr>();
     if (!integer)
     {
         return nullptr;
     }
-    return StrAttr::get(getContext(), integer.getIntegerValue().toString());
+    return StrAttr::get(getContext(), integer.getValue().toString());
 }
 
 mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)

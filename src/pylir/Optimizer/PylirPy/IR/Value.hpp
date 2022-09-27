@@ -35,9 +35,7 @@ llvm::Optional<bool> isUnbound(mlir::Value value);
 /// If the cast does not succeed a null value is also returned.
 /// These are intentionally snake_case to follow 'dyn_cast's naming convention.
 template <class T>
-T ref_cast(
-    mlir::Attribute attr,
-    bool onlyConstGlobal = !std::disjunction_v<std::is_same<IntAttrInterface, T>, std::is_base_of<ImmutableAttr<T>, T>>)
+T ref_cast(mlir::Attribute attr, bool onlyConstGlobal = !std::is_base_of_v<ImmutableAttr<T>, T>)
 {
     if (auto val = attr.dyn_cast<T>())
     {
@@ -54,9 +52,7 @@ T ref_cast(
 /// Same as 'ref_cast' but returns a null value if 'attr' is null.
 /// These are intentionally snake_case to follow 'dyn_cast's naming convention.
 template <class T>
-T ref_cast_or_null(
-    mlir::Attribute attr,
-    bool onlyConstGlobal = !std::disjunction_v<std::is_same<IntAttrInterface, T>, std::is_base_of<ImmutableAttr<T>, T>>)
+T ref_cast_or_null(mlir::Attribute attr, bool onlyConstGlobal = !std::is_base_of_v<ImmutableAttr<T>, T>)
 {
     return attr ? ref_cast<T>(attr, onlyConstGlobal) : nullptr;
 }

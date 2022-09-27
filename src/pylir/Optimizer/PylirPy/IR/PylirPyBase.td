@@ -21,7 +21,9 @@ def PylirPy_Dialect : Dialect {
 
     let hasConstantMaterializer = 1;
     let hasCanonicalizer = 1;
-    let useDefaultAttributePrinterParser = 1;
+
+    let useDefaultAttributePrinterParser = 0;
+
     let useDefaultTypePrinterParser = 1;
 
     let hasOperationAttrVerify = 1;
@@ -32,6 +34,10 @@ def PylirPy_Dialect : Dialect {
         void initializeTypes();
 
         void initializeExternalModels();
+
+        mlir::Attribute parseAttribute(mlir::DialectAsmParser& parser, mlir::Type type) const override;
+
+        void printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter& os) const override;
     }];
 
     let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
