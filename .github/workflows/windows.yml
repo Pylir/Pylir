@@ -45,7 +45,7 @@ jobs:
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=1G
+            max_size=0.5G
           override_cache_key: ${{runner.os}}-${{matrix.runtime_lib}}-msvc
           windows_compile_environment: msvc
 
@@ -103,6 +103,7 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
+          update: true
           msystem: clang64
           update: true
           pacboy: >-
@@ -121,11 +122,21 @@ jobs:
         id: sanitize-key
         run: echo "::set-output name=key::$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )"
 
+      - name: Calculate cache size
+        id: cache-size
+        shell: pwsh
+        run: |
+          if ('${{matrix.sanitizer}}') {
+             echo "::set-output name=size::2G"
+          } else {
+             echo "::set-output name=size::0.5G"
+          }
+
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=1G
+            max_size=${{steps.cache-size.outputs.size}}
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-clang64
           # Lying here because I am not running within msys2
           windows_compile_environment: msvc

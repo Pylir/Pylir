@@ -59,11 +59,21 @@ jobs:
         id: sanitize-key
         run: echo "::set-output name=key::$(echo ${{matrix.sanitizer}} | sed 's/,/_and_/g')"
 
+      - name: Calculate cache size
+        id: cache-size
+        shell: pwsh
+        run: |
+          if ('${{matrix.sanitizer}}') {
+             echo "::set-output name=size::2G"
+          } else {
+             echo "::set-output name=size::0.5G"
+          }
+
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=1G
+            max_size=${{steps.cache-size.outputs.size}}
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.cxx_compiler}}
 
       - name: Build LLVM
