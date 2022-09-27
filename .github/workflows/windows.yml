@@ -107,7 +107,7 @@ jobs:
           msystem: clang64
           update: true
           pacboy: >-
-            clang:p
+            clang:p crt:p
           location: D:\
             
       - name: Prepend Msys2 to path
