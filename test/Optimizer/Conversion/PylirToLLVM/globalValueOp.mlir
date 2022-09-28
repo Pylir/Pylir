@@ -83,3 +83,19 @@ py.globalValue "private" const @barfoo = #py.list<[]>
 py.globalValue "private" const @sys.__excepthook__
 
 // CHECK: llvm.mlir.global external constant @sys.__excepthook__()
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.float = #py.type
+
+py.globalValue @bar = #py.float<5.25>
+
+// CHECK-LABEL: llvm.mlir.global external constant @bar
+// CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
+// CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.float
+// CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.mlir.constant(5.25{{0*}}e+{{0+}} : f64)
+// CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[VALUE]], %[[UNDEF1]][1]
+// CHECK-NEXT: llvm.return %[[UNDEF2]]

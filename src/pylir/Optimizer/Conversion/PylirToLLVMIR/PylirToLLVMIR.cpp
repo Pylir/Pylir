@@ -150,9 +150,10 @@ public:
         m_collectionSection = mlir::StringAttr::get(context, dataSectionPrefix + "py_coll");
         m_constantSection = mlir::StringAttr::get(context, constSectionPrefix + "py_const");
 
-        for (const auto& iter : {pylir::Builtins::Object, pylir::Builtins::Tuple, pylir::Builtins::List,
-                                 pylir::Builtins::Type, pylir::Builtins::Function, pylir::Builtins::Str,
-                                 pylir::Builtins::Int, pylir::Builtins::Dict, pylir::Builtins::BaseException})
+        for (const auto& iter :
+             {pylir::Builtins::Object, pylir::Builtins::Tuple, pylir::Builtins::List, pylir::Builtins::Type,
+              pylir::Builtins::Function, pylir::Builtins::Str, pylir::Builtins::Float, pylir::Builtins::Int,
+              pylir::Builtins::Dict, pylir::Builtins::BaseException})
         {
             auto ref = pylir::Py::RefAttr::get(&getContext(), iter.name);
             m_layoutTypeCache[ref] = ref;
@@ -305,6 +306,23 @@ public:
         return pyType;
     }
 
+    mlir::LLVM::LLVMStructType getPyFloatType(llvm::Optional<unsigned> slotSize = {})
+    {
+        if (slotSize)
+        {
+            return mlir::LLVM::LLVMStructType::getLiteral(
+                &getContext(), {m_objectPtrType, mlir::Float64Type::get(&getContext()), getSlotEpilogue(*slotSize)});
+        }
+        auto pyType = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyFloat");
+        if (!pyType.isInitialized())
+        {
+            [[maybe_unused]] auto result =
+                pyType.setBody({m_objectPtrType, mlir::Float64Type::get(&getContext()), getSlotEpilogue()}, false);
+            PYLIR_ASSERT(mlir::succeeded(result));
+        }
+        return pyType;
+    }
+
     mlir::LLVM::LLVMStructType getUnwindHeaderType()
     {
         auto unwindHeader = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "_Unwind_Exception");
@@ -401,6 +419,10 @@ public:
         {
             return getPyIntType();
         }
+        if (builtinsName == pylir::Builtins::Float.name)
+        {
+            return getPyFloatType();
+        }
         if (builtinsName == pylir::Builtins::Dict.name)
         {
             return getPyDictType();
@@ -481,6 +503,7 @@ public:
             .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
             .Case([&](pylir::Py::FunctionAttr) { return getPyFunctionType(count); })
             .Case([&](pylir::Py::IntAttr) { return getPyIntType(count); })
+            .Case([&](pylir::Py::FloatAttr) { return getPyFloatType(count); })
             .Case([&](pylir::Py::DictAttr) { return getPyDictType(count); })
             .Default([&](auto) { return getPyObjectType(count); });
     }
@@ -1268,6 +1291,21 @@ struct PyIntModel : PyObjectModel
     }
 };
 
+struct PyFloatModel : PyObjectModel
+{
+    using PyObjectModel::PyObjectModel;
+
+    static mlir::Type getElementType(PylirTypeConverter& typeConverter, mlir::Type)
+    {
+        return typeConverter.getPyFloatType();
+    }
+
+    auto doublePtr(mlir::Location loc)
+    {
+        return field<Pointer<>>(loc, 1);
+    }
+};
+
 struct PyFunctionModel : PyObjectModel
 {
     using PyObjectModel::PyObjectModel;
@@ -1367,6 +1405,11 @@ protected:
         return getTypeConverter()->getPyIntType();
     }
 
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyFloatType() const
+    {
+        return getTypeConverter()->getPyFloatType();
+    }
+
     [[nodiscard]] mlir::LLVM::LLVMStructType getUnwindHeaderType() const
     {
         return getTypeConverter()->getUnwindHeaderType();
@@ -1426,6 +1469,11 @@ protected:
     [[nodiscard]] PyIntModel pyIntModel(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value value) const
     {
         return {loc, builder, value, getPyIntType(), *getTypeConverter()};
+    }
+
+    [[nodiscard]] PyFloatModel pyFloatModel(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value value) const
+    {
+        return {loc, builder, value, getPyFloatType(), *getTypeConverter()};
     }
 
     [[nodiscard]] PyFunctionModel pyFunctionModel(mlir::Location loc, mlir::OpBuilder& builder, mlir::Value value) const
@@ -2991,6 +3039,34 @@ struct InitDictOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::Ini
     }
 };
 
+struct InitFloatOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem::InitFloatOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Mem::InitFloatOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Mem::InitFloatOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        pyFloatModel(op.getLoc(), rewriter, adaptor.getMemory())
+            .doublePtr(op.getLoc())
+            .store(op.getLoc(), adaptor.getInitializer());
+        rewriter.replaceOp(op, adaptor.getMemory());
+        return mlir::success();
+    }
+};
+
+struct FloatToF64OpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::FloatToF64>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::FloatToF64>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::FloatToF64 op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOp(
+            op, pyFloatModel(op.getLoc(), rewriter, adaptor.getInput()).doublePtr(op.getLoc()).load(op.getLoc()));
+        return mlir::success();
+    }
+};
+
 struct ArithmeticSelectOpConversion : public ConvertPylirOpToLLVMPattern<mlir::arith::SelectOp>
 {
     using ConvertPylirOpToLLVMPattern::ConvertPylirOpToLLVMPattern;
@@ -3168,6 +3244,8 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<TupleContainsOpConversion>(converter);
     patternSet.insert<InitTupleCopyOpConversion>(converter);
     patternSet.insert<MROLookupOpConversion>(converter);
+    patternSet.insert<InitFloatOpConversion>(converter);
+    patternSet.insert<FloatToF64OpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {
         signalPassFailure();
