@@ -461,7 +461,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             }
             auto* nested = &manager.nestAny();
             nested->addPass(mlir::arith::createArithmeticExpandOpsPass());
-            nested->addPass(mlir::arith::createConvertArithmeticToLLVMPass());
+            nested->addPass(mlir::createArithmeticToLLVMConversionPass());
             manager.addPass(
                 pylir::createConvertPylirToLLVMPass({m_targetMachine->getTargetTriple().str(),
                                                      m_targetMachine->createDataLayout().getStringRepresentation()}));

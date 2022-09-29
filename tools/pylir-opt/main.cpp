@@ -129,7 +129,9 @@ int main(int argc, char** argv)
                                                       return mlir::failure();
                                                   });
             },
-            registry, splitInputFile, verifyDiagnostics, verifyPasses, allowUnregisteredDialects, false, emitBytecode)))
+            registry, splitInputFile, verifyDiagnostics, verifyPasses, allowUnregisteredDialects,
+            /*preloadDialectsInContext=*/false, emitBytecode,
+            /*implicitModule=*/true)))
     {
         return -1;
     }
