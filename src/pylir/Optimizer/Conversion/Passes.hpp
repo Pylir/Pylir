@@ -14,8 +14,7 @@
 namespace pylir
 {
 #define GEN_PASS_REGISTRATION
-#define GEN_PASS_DECL_CONVERTPYLIRPYTOPYLIRMEMPASS
-#define GEN_PASS_DECL_CONVERTPYLIRTOLLVMPASS
+#define GEN_PASS_DECL
 #include "pylir/Optimizer/Conversion/Passes.h.inc"
 
 } // namespace pylir
