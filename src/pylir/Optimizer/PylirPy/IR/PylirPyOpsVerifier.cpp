@@ -125,7 +125,11 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
     {
         if (auto ref = attribute.dyn_cast<pylir::Py::RefAttr>())
         {
-            return verifySymbolUse<pylir::Py::GlobalValueOp>(op, ref.getRef(), collection);
+            if (!ref.getSymbol())
+            {
+                return op->emitOpError("RefAttr does not refer to a 'py.globalValue'");
+            }
+            return mlir::success();
         }
         if (!attribute.isa<pylir::Py::UnboundAttr>())
         {
@@ -133,7 +137,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
         }
         return mlir::success();
     }
-    if (mlir::failed(verifySymbolUse<pylir::Py::GlobalValueOp>(op, object.getTypeObject().getRef(), collection)))
+    if (mlir::failed(::verify(op, object.getTypeObject(), collection)))
     {
         return mlir::failure();
     }

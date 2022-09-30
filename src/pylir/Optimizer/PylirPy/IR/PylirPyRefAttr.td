@@ -28,13 +28,10 @@ def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref",
         * Constant time lookup in any context with no caching required.
 
         It however comes with a few very important constraints:
-        * The `RefAttr` always has to point to a `py.globalValue`.
         * Importing `RefAttr`s from either textual MLIR or MLIR Bytecode requires an explicit linking step to link
           all `RefAttr`s to the their `py.globalValue`s. For this purpose the `pylir-finalize-ref-attrs` pass is
-          provided which is run as the very first pass both within `pylir` and implicitly within `pylir-opt`.
-        * Verifier code cannot assume that `RefAttr` has been linked. Since verifier code is already run on MLIR before
-          any passes could be run, it is important for verifier code to only resolve symbols via `mlir::SymbolTable`.
-          All optimization passes should assume that `RefAttr` are linked.
+          provided which is run as the very first pass both within `pylir` and implicitly within `pylir-opt`, even
+          before the verifier is run.
         * `RefAttr` is uniqued only through the `FlatSymbolRefAttr` pointing to the `py.globalValue`. It is therefore
           not allowed for two different top level operations using the same context to contain `RefAttr`s that do not
           point to the exact same `py.globalValue`.
@@ -43,7 +40,7 @@ def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref",
           any `RefAttr` were to remain as well as violating the first point listed. It is possible to replace the
           `py.globalValue` with a new one, but this will require manual relinking of any `RefAttr`. This can simply be
           done by calling `RefAttr::get(newGlobal)`, which will update all `RefAttr` with the same `ref` to point to
-          the new global. Additionally, the `pylir-finalize-ref-attrs` pass can be run to relink all `RefAttr`s.
+          the new global.
 
           Syntax:
 
@@ -84,8 +81,9 @@ def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref",
     ];
 
     let extraClassDeclaration = [{
-        /// Returns the `py.globalValue` this `RefAttr` refers to. Asserts if it has not been linked or no
-        // `py.globalValue` with the given symbol name exists.
+        /// Returns the `py.globalValue` this `RefAttr` refers to or null if it does not refer to a `py.globalValue`.
+        /// Verifier, verifies that `RefAttr` are linked, so passes can rely on it not being null and must ensure
+        /// a `RefAttr` refers to a `py.globalValue`.
         GlobalValueOp getSymbol() const;
     }];
 

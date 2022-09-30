@@ -375,10 +375,14 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 {
                     return mlir::failure();
                 }
+
+                // verifyAfterParse is disabled as the verifiers rely on 'RefAttr' being linked, which may only
+                // happen after 'pylir-finalize-ref-attrs' pass has run.
+                auto config = mlir::ParserConfig(&*m_mlirContext, /*verifyAfterParse=*/false);
                 if (auto buffer = llvm::MemoryBufferRef(*content, inputFile->getValue()); mlir::isBytecode(buffer))
                 {
                     auto body = std::make_unique<mlir::Block>();
-                    if (mlir::failed(mlir::readBytecodeFile(buffer, body.get(), mlir::ParserConfig(&*m_mlirContext))))
+                    if (mlir::failed(mlir::readBytecodeFile(buffer, body.get(), config)))
                     {
                         return mlir::failure();
                     }
@@ -386,7 +390,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 }
                 else
                 {
-                    mlirModule = mlir::parseSourceString<mlir::ModuleOp>(*content, mlir::ParserConfig(&*m_mlirContext));
+                    mlirModule = mlir::parseSourceString<mlir::ModuleOp>(*content, config);
                 }
             }
             mlir::PassManager manager(&*m_mlirContext);
@@ -396,10 +400,6 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             }
 #ifndef NDEBUG
             manager.enableVerifier();
-            if (mlir::failed(mlir::verify(*mlirModule)))
-            {
-                return mlir::failure();
-            }
     #if !defined(__MINGW32_MAJOR_VERSION) || !defined(__clang__)
             manager.enableCrashReproducerGeneration("failure.mlir");
     #endif
@@ -423,11 +423,11 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 manager.enableTiming();
             }
 
+            manager.addPass(pylir::Py::createFinalizeRefAttrsPass());
             if (args.getLastArgValue(OPT_g, "0") == llvm::StringRef{"0"})
             {
                 manager.addPass(mlir::createStripDebugInfoPass());
             }
-            manager.addPass(pylir::Py::createFinalizeRefAttrsPass());
 
             if (!shouldOutput(OPT_emit_pylir))
             {

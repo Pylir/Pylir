@@ -2,11 +2,13 @@
 # RUN: pylir %s -S -emit-pylir -o %t1.mlir
 # RUN: pylir %t1.mlir -S -emit-pylir -o %t2.mlir
 # RUN: pylir %t1.mlir -o /dev/null
+# RUN: pylir-opt %t1.mlir -o /dev/null
 
 # RUN: rm -f %t1.mlirbc %t2.mlirbc
 # RUN: pylir %s -c -emit-pylir -o %t1.mlirbc
 # RUN: pylir %t1.mlirbc -c -emit-pylir -o %t2.mlirbc
 # RUN: pylir %t1.mlirbc -o /dev/null
+# RUN: pylir-opt %t1.mlirbc -o /dev/null
 
 # RUN: rm -f %t1.mlir %t2.mlir
 # RUN: pylir %s -S -emit-mlir -o %t1.mlir

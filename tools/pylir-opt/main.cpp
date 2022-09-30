@@ -2,6 +2,7 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <mlir/Bytecode/BytecodeWriter.h>
 #include <mlir/IR/AsmState.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/MLIRContext.h>
@@ -11,11 +12,14 @@
 #include <mlir/Support/DebugCounter.h>
 #include <mlir/Support/FileUtilities.h>
 #include <mlir/Support/Timing.h>
+#include <mlir/Support/ToolUtilities.h>
+#include <mlir/Tools/ParseUtilties.h>
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
 
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/InitLLVM.h>
 #include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/ToolOutputFile.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
@@ -26,6 +30,157 @@
 
 #include "Passes.hpp"
 #include "TestDialect.hpp"
+
+namespace
+{
+/// Perform the actions on the input file indicated by the command line flags
+/// within the specified context.
+///
+/// This typically parses the main source file, runs zero or more optimization
+/// passes, then prints the output.
+///
+static mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses, llvm::SourceMgr& sourceMgr,
+                                          mlir::MLIRContext* context, mlir::PassPipelineFn passManagerSetupFn,
+                                          bool emitBytecode)
+{
+    mlir::DefaultTimingManager tm;
+    applyDefaultTimingManagerCLOptions(tm);
+    mlir::TimingScope timing = tm.getRootScope();
+
+    // Disable multi-threading when parsing the input file. This removes the
+    // unnecessary/costly context synchronization when parsing.
+    bool wasThreadingEnabled = context->isMultithreadingEnabled();
+    context->disableMultithreading();
+
+    // Prepare the parser config, and attach any useful/necessary resource
+    // handlers. Unhandled external resources are treated as passthrough, i.e.
+    // they are not processed and will be emitted directly to the output
+    // untouched.
+    mlir::PassReproducerOptions reproOptions;
+    mlir::FallbackAsmResourceMap fallbackResourceMap;
+    mlir::ParserConfig config(context, /*verifyAfterParse=*/false, &fallbackResourceMap);
+    reproOptions.attachResourceParser(config);
+
+    // Parse the input file and reset the context threading state.
+    mlir::TimingScope parserTiming = timing.nest("Parser");
+    mlir::OwningOpRef<mlir::Operation*> op = mlir::parseSourceFileForTool(sourceMgr, config, true);
+    context->enableMultithreading(wasThreadingEnabled);
+    if (!op)
+    {
+        return mlir::failure();
+    }
+    parserTiming.stop();
+
+    // Prepare the pass manager, applying command-line and reproducer options.
+    mlir::PassManager pm(context, mlir::OpPassManager::Nesting::Implicit, op.get()->getName().getStringRef());
+    pm.enableVerifier(verifyPasses);
+    applyPassManagerCLOptions(pm);
+    pm.enableTiming(timing);
+    if (failed(reproOptions.apply(pm)) || failed(passManagerSetupFn(pm)))
+    {
+        return mlir::failure();
+    }
+
+    // Run the pipeline.
+    if (failed(pm.run(*op)))
+    {
+        return mlir::failure();
+    }
+
+    // Print the output.
+    mlir::TimingScope outputTiming = timing.nest("Output");
+    if (emitBytecode)
+    {
+        mlir::BytecodeWriterConfig writerConfig(fallbackResourceMap);
+        writeBytecodeToFile(op.get(), os, writerConfig);
+    }
+    else
+    {
+        mlir::AsmState asmState(op.get(), mlir::OpPrintingFlags(), /*locationMap=*/nullptr, &fallbackResourceMap);
+        op.get()->print(os, asmState);
+        os << '\n';
+    }
+    return mlir::success();
+}
+
+/// Parses the memory buffer.  If successfully, run a series of passes against
+/// it and print the result.
+static mlir::LogicalResult processBuffer(llvm::raw_ostream& os, std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
+                                         bool verifyDiagnostics, bool verifyPasses, bool allowUnregisteredDialects,
+                                         bool emitBytecode, mlir::PassPipelineFn passManagerSetupFn,
+                                         mlir::DialectRegistry& registry, llvm::ThreadPool* threadPool)
+{
+    // Tell sourceMgr about this buffer, which is what the parser will pick up.
+    llvm::SourceMgr sourceMgr;
+    sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
+
+    // Create a context just for the current buffer. Disable threading on creation
+    // since we'll inject the thread-pool separately.
+    mlir::MLIRContext context(registry, mlir::MLIRContext::Threading::DISABLED);
+    if (threadPool)
+    {
+        context.setThreadPool(*threadPool);
+    }
+
+    // Parse the input file.
+    context.allowUnregisteredDialects(allowUnregisteredDialects);
+    if (verifyDiagnostics)
+    {
+        context.printOpOnDiagnostic(false);
+    }
+    context.getDebugActionManager().registerActionHandler<mlir::DebugCounter>();
+
+    // If we are in verify diagnostics mode then we have a lot of work to do,
+    // otherwise just perform the actions without worrying about it.
+    if (!verifyDiagnostics)
+    {
+        mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
+        return performActions(os, verifyPasses, sourceMgr, &context, passManagerSetupFn, emitBytecode);
+    }
+
+    mlir::SourceMgrDiagnosticVerifierHandler sourceMgrHandler(sourceMgr, &context);
+
+    // Do any processing requested by command line flags.  We don't care whether
+    // these actions succeed or fail, we only care what diagnostics they produce
+    // and whether they match our expectations.
+    (void)performActions(os, verifyPasses, sourceMgr, &context, passManagerSetupFn, emitBytecode);
+
+    // Verify the diagnostic handler to make sure that each of the diagnostics
+    // matched.
+    return sourceMgrHandler.verify();
+}
+
+mlir::LogicalResult MlirOptMain(llvm::raw_ostream& outputStream, std::unique_ptr<llvm::MemoryBuffer> buffer,
+                                mlir::PassPipelineFn passManagerSetupFn, mlir::DialectRegistry& registry,
+                                bool splitInputFile, bool verifyDiagnostics, bool verifyPasses,
+                                bool allowUnregisteredDialects, bool emitBytecode)
+{
+    // The split-input-file mode is a very specific mode that slices the file
+    // up into small pieces and checks each independently.
+    // We use an explicit threadpool to avoid creating and joining/destroying
+    // threads for each of the split.
+    llvm::ThreadPool* threadPool = nullptr;
+
+    // Create a temporary context for the sake of checking if
+    // --mlir-disable-threading was passed on the command line.
+    // We use the thread-pool this context is creating, and avoid
+    // creating any thread when disabled.
+    mlir::MLIRContext threadPoolCtx;
+    if (threadPoolCtx.isMultithreadingEnabled())
+    {
+        threadPool = &threadPoolCtx.getThreadPool();
+    }
+
+    auto chunkFn = [&](std::unique_ptr<llvm::MemoryBuffer> chunkBuffer, llvm::raw_ostream& os)
+    {
+        return processBuffer(os, std::move(chunkBuffer), verifyDiagnostics, verifyPasses, allowUnregisteredDialects,
+                             emitBytecode, passManagerSetupFn, registry, threadPool);
+    };
+    return mlir::splitAndProcessBuffer(std::move(buffer), chunkFn, outputStream, splitInputFile,
+                                       /*insertMarkerInOutput=*/true);
+}
+
+} // namespace
 
 int main(int argc, char** argv)
 {
@@ -42,8 +197,6 @@ int main(int argc, char** argv)
 
     // Reimplementation of MlirOptMain overload that sets up all the command line options. The purpose of doing so is
     // to implicitly run `pylir-finalize-ref-attrs` pass over the whole module before any other compiler passes are run.
-    // TODO: Consider adding an overload upstream that allows us to customize the pass pipeline without having to
-    //       reimplement all of main.
 
     static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional, llvm::cl::desc("<input file>"),
                                                     llvm::cl::init("-"));
@@ -117,7 +270,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    if (failed(MlirOptMain(
+    if (failed(::MlirOptMain(
             output->os(), std::move(file),
             [&](mlir::PassManager& pm)
             {
@@ -129,9 +282,7 @@ int main(int argc, char** argv)
                                                       return mlir::failure();
                                                   });
             },
-            registry, splitInputFile, verifyDiagnostics, verifyPasses, allowUnregisteredDialects,
-            /*preloadDialectsInContext=*/false, emitBytecode,
-            /*implicitModule=*/true)))
+            registry, splitInputFile, verifyDiagnostics, verifyPasses, allowUnregisteredDialects, emitBytecode)))
     {
         return -1;
     }

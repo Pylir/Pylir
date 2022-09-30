@@ -88,12 +88,7 @@ mlir::FlatSymbolRefAttr pylir::Py::RefAttr::getRef() const
 
 pylir::Py::GlobalValueOp pylir::Py::RefAttr::getSymbol() const
 {
-    PYLIR_ASSERT(
-        getImpl()->value
-        && "Symbol the RefAttr refers to does not exist, `pylir-finalize-ref-attrs` pass was not run OR RefAttr was "
-           "created with the '::llvm::StringRef' constructor. If within an optimization pass, please use the "
-           "constructor directly referencing the 'GlobalValueOp'");
-    return mlir::cast<GlobalValueOp>(getImpl()->value);
+    return mlir::dyn_cast_or_null<GlobalValueOp>(getImpl()->value);
 }
 
 #define GET_ATTRDEF_CLASSES

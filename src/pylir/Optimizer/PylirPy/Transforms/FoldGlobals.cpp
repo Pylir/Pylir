@@ -88,7 +88,8 @@ private:
         // Create the global value if the constant was not a reference but a constant object.
         if (auto initializer = attr.dyn_cast<pylir::Py::ObjectAttrInterface>())
         {
-            createGlobalValueFromGlobal(globalOp, initializer, true);
+            // Link the RefAttr created above as well.
+            pylir::Py::RefAttr::get(createGlobalValueFromGlobal(globalOp, initializer, true));
         }
         globalOp->erase();
         m_singleStoreGlobalsConverted++;
