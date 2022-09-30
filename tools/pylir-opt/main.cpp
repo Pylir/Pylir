@@ -39,9 +39,9 @@ namespace
 /// This typically parses the main source file, runs zero or more optimization
 /// passes, then prints the output.
 ///
-static mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses, llvm::SourceMgr& sourceMgr,
-                                          mlir::MLIRContext* context, mlir::PassPipelineFn passManagerSetupFn,
-                                          bool emitBytecode)
+mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses, llvm::SourceMgr& sourceMgr,
+                                   mlir::MLIRContext* context, mlir::PassPipelineFn passManagerSetupFn,
+                                   bool emitBytecode)
 {
     mlir::DefaultTimingManager tm;
     applyDefaultTimingManagerCLOptions(tm);
@@ -105,10 +105,10 @@ static mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPass
 
 /// Parses the memory buffer.  If successfully, run a series of passes against
 /// it and print the result.
-static mlir::LogicalResult processBuffer(llvm::raw_ostream& os, std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
-                                         bool verifyDiagnostics, bool verifyPasses, bool allowUnregisteredDialects,
-                                         bool emitBytecode, mlir::PassPipelineFn passManagerSetupFn,
-                                         mlir::DialectRegistry& registry, llvm::ThreadPool* threadPool)
+mlir::LogicalResult processBuffer(llvm::raw_ostream& os, std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
+                                  bool verifyDiagnostics, bool verifyPasses, bool allowUnregisteredDialects,
+                                  bool emitBytecode, mlir::PassPipelineFn passManagerSetupFn,
+                                  mlir::DialectRegistry& registry, llvm::ThreadPool* threadPool)
 {
     // Tell sourceMgr about this buffer, which is what the parser will pick up.
     llvm::SourceMgr sourceMgr;
@@ -150,7 +150,7 @@ static mlir::LogicalResult processBuffer(llvm::raw_ostream& os, std::unique_ptr<
     return sourceMgrHandler.verify();
 }
 
-mlir::LogicalResult MlirOptMain(llvm::raw_ostream& outputStream, std::unique_ptr<llvm::MemoryBuffer> buffer,
+mlir::LogicalResult mlirOptMain(llvm::raw_ostream& outputStream, std::unique_ptr<llvm::MemoryBuffer> buffer,
                                 mlir::PassPipelineFn passManagerSetupFn, mlir::DialectRegistry& registry,
                                 bool splitInputFile, bool verifyDiagnostics, bool verifyPasses,
                                 bool allowUnregisteredDialects, bool emitBytecode)
@@ -270,7 +270,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    if (failed(::MlirOptMain(
+    if (failed(::mlirOptMain(
             output->os(), std::move(file),
             [&](mlir::PassManager& pm)
             {
