@@ -30,94 +30,6 @@ mlir::FailureOr<SymbolOp> verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAt
     return op->emitOpError("Failed to find symbol named '") << name << "'";
 }
 
-template <class T = pylir::Py::ObjectAttrInterface>
-mlir::FailureOr<T> resolveValue(mlir::Operation* op, mlir::Attribute attr, mlir::SymbolTableCollection& collection,
-                                bool onlyConstGlobal = false)
-{
-    auto ref = attr.dyn_cast_or_null<pylir::Py::RefAttr>();
-    if (!ref)
-    {
-        return attr.dyn_cast_or_null<T>();
-    }
-    auto value = verifySymbolUse<pylir::Py::GlobalValueOp>(op, ref.getRef(), collection);
-    if (mlir::failed(value))
-    {
-        return mlir::failure();
-    }
-    if (!value->getConstant() && onlyConstGlobal)
-    {
-        return {nullptr};
-    }
-    return value->getInitializerAttr().template dyn_cast_or_null<T>();
-}
-
-mlir::FailureOr<pylir::Py::BuiltinMethodKind> getHashFunction(pylir::Py::ObjectAttrInterface attribute,
-                                                              mlir::Operation* context,
-                                                              mlir::SymbolTableCollection& collection)
-{
-    if (!attribute)
-    {
-        return pylir::Py::BuiltinMethodKind::Unknown;
-    }
-
-    auto typeAttr = resolveValue<pylir::Py::TypeAttr>(context, attribute.getTypeObject(), collection);
-    if (mlir::failed(typeAttr))
-    {
-        return mlir::failure();
-    }
-    if (!*typeAttr)
-    {
-        return pylir::Py::BuiltinMethodKind::Unknown;
-    }
-    auto mro = resolveValue<pylir::Py::TupleAttr>(context, typeAttr->getMroTuple(), collection);
-    if (mlir::failed(mro))
-    {
-        return mlir::failure();
-    }
-    // This is actually a verification failure, but its handled elsewhere.
-    if (!*mro)
-    {
-        return pylir::Py::BuiltinMethodKind::Unknown;
-    }
-    for (const auto& iter : mro->getValue())
-    {
-        if (!iter)
-        {
-            // This can probably only be a result of undefined behaviour.
-            continue;
-        }
-        if (auto ref = iter.dyn_cast<pylir::Py::RefAttr>())
-        {
-            auto opt = llvm::StringSwitch<std::optional<pylir::Py::BuiltinMethodKind>>(ref.getRef().getValue())
-                           .Case(pylir::Builtins::Int.name, pylir::Py::BuiltinMethodKind::Int)
-                           .Case(pylir::Builtins::Str.name, pylir::Py::BuiltinMethodKind::Str)
-                           .Case(pylir::Builtins::Object.name, pylir::Py::BuiltinMethodKind::Object)
-                           .Default(std::nullopt);
-            if (opt)
-            {
-                return *opt;
-            }
-        }
-        auto baseType = resolveValue<pylir::Py::TypeAttr>(context, iter, collection, true);
-        if (mlir::failed(baseType))
-        {
-            return mlir::failure();
-        }
-        if (!*baseType)
-        {
-            return pylir::Py::BuiltinMethodKind::Unknown;
-        }
-        auto hashFunc = baseType->getSlots().get("__hash__");
-        if (!hashFunc)
-        {
-            continue;
-        }
-        return pylir::Py::BuiltinMethodKind::Unknown;
-    }
-
-    return pylir::Py::BuiltinMethodKind::Object;
-}
-
 mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir::SymbolTableCollection& collection)
 {
     auto object = attribute.dyn_cast<pylir::Py::ObjectAttrInterface>();
@@ -174,17 +86,8 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                     {
                         return mlir::failure();
                     }
-                    auto keyRes = resolveValue(op, key, collection);
-                    if (mlir::failed(keyRes))
-                    {
-                        return mlir::failure();
-                    }
-                    auto hashFunction = getHashFunction(*keyRes, op, collection);
-                    if (mlir::failed(hashFunction))
-                    {
-                        return mlir::failure();
-                    }
-                    if (*hashFunction == pylir::Py::BuiltinMethodKind::Unknown)
+                    if (pylir::Py::getHashFunction(pylir::Py::ref_cast_or_null<pylir::Py::ObjectAttrInterface>(key))
+                        == pylir::Py::BuiltinMethodKind::Unknown)
                     {
                         return op->emitOpError(
                             "Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.");
@@ -210,7 +113,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                 if (auto ref = functionAttr.getKwDefaults().dyn_cast_or_null<pylir::Py::RefAttr>();
                     !ref || ref.getRef().getValue() != pylir::Builtins::None.name)
                 {
-                    if (!*resolveValue<pylir::Py::DictAttr>(op, functionAttr.getKwDefaults(), collection))
+                    if (!pylir::Py::ref_cast<pylir::Py::DictAttr>(functionAttr.getKwDefaults()))
                     {
                         return op->emitOpError("Expected __kwdefaults__ to refer to a dictionary\n");
                     }
@@ -218,14 +121,14 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                 if (auto ref = functionAttr.getDefaults().dyn_cast_or_null<pylir::Py::RefAttr>();
                     !ref || ref.getRef().getValue() != pylir::Builtins::None.name)
                 {
-                    if (!*resolveValue<pylir::Py::TupleAttr>(op, functionAttr.getDefaults(), collection))
+                    if (!pylir::Py::ref_cast<pylir::Py::TupleAttr>(functionAttr.getDefaults()))
                     {
                         return op->emitOpError("Expected __defaults__ to refer to a tuple\n");
                     }
                 }
                 if (functionAttr.getDict())
                 {
-                    if (!*resolveValue<pylir::Py::DictAttr>(op, functionAttr.getDict(), collection))
+                    if (!pylir::Py::ref_cast<pylir::Py::DictAttr>(functionAttr.getDict()))
                     {
                         return op->emitOpError("Expected __dict__ to refer to a dictionary\n");
                     }
@@ -239,23 +142,14 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                 {
                     return mlir::failure();
                 }
-                auto mro = resolveValue<pylir::Py::TupleAttr>(op, typeAttr.getMroTuple(), collection);
-                if (mlir::failed(mro))
-                {
-                    return mlir::failure();
-                }
-                if (!*mro)
+                auto mro = pylir::Py::ref_cast<pylir::Py::TupleAttr>(typeAttr.getMroTuple());
+                if (!mro)
                 {
                     return op->emitOpError("Expected MRO to refer to a tuple\n");
                 }
                 if (auto result = typeAttr.getSlots().get("__slots__"); result)
                 {
-                    auto slots = resolveValue<pylir::Py::TupleAttr>(op, result, collection);
-                    if (mlir::failed(slots))
-                    {
-                        return mlir::failure();
-                    }
-                    if (!*slots)
+                    if (!pylir::Py::ref_cast<pylir::Py::TupleAttr>(result))
                     {
                         return op->emitOpError("Expected __slots__ to refer to a tuple\n");
                     }
