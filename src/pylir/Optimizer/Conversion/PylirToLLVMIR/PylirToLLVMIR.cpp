@@ -97,7 +97,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
 
     bool isSubtype(pylir::Py::TypeAttr subType, pylir::Py::RefAttr base)
     {
-        auto tuple = dereference<pylir::Py::TupleAttr>(subType.getMroTuple()).getValue();
+        auto tuple = pylir::Py::ref_cast<pylir::Py::TupleAttr>(subType.getMroTuple()).getValue();
         return std::any_of(tuple.begin(), tuple.end(), [base](mlir::Attribute attr) { return attr == base; });
     }
 
@@ -441,7 +441,7 @@ public:
             return result;
         }
         pylir::Py::RefAttr winner;
-        auto mro = dereference<pylir::Py::TupleAttr>(type.getMroTuple()).getValue();
+        auto mro = pylir::Py::ref_cast<pylir::Py::TupleAttr>(type.getMroTuple()).getValue();
         if (mro.empty())
         {
             // TODO: This is a special case that I should probably disallow at one point instead
@@ -457,7 +457,7 @@ public:
                     winner = candidate;
                     continue;
                 }
-                if (isSubtype(dereference<pylir::Py::TypeAttr>(candidate), winner))
+                if (isSubtype(pylir::Py::ref_cast<pylir::Py::TypeAttr>(candidate), winner))
                 {
                     winner = candidate;
                 }
@@ -473,7 +473,7 @@ public:
         {
             return result;
         }
-        auto layout = getLayoutType(dereference<pylir::Py::TypeAttr>(type));
+        auto layout = getLayoutType(pylir::Py::ref_cast<pylir::Py::TypeAttr>(type));
         m_layoutTypeCache[type] = layout;
         return layout;
     }
@@ -488,7 +488,7 @@ public:
         auto result = slots.get("__slots__");
         if (result)
         {
-            auto tuple = dereference<pylir::Py::TupleAttr>(result);
+            auto tuple = pylir::Py::ref_cast<pylir::Py::TupleAttr>(result);
             count = tuple.getValue().size();
         }
         return llvm::TypeSwitch<pylir::Py::ObjectAttrInterface, mlir::LLVM::LLVMStructType>(objectAttr)
@@ -864,8 +864,8 @@ public:
                             for (const auto& [key, value] : dict.getValue())
                             {
                                 auto keyValue = getConstant(global.getLoc(), key, builder);
-                                auto layoutType =
-                                    getLayoutType(dereference<pylir::Py::ObjectAttrInterface>(key).getTypeObject());
+                                auto layoutType = getLayoutType(
+                                    pylir::Py::ref_cast<pylir::Py::ObjectAttrInterface>(key, false).getTypeObject());
                                 mlir::Value hash;
                                 if (layoutType == pylir::Py::RefAttr::get(&getContext(), pylir::Builtins::Str.name))
                                 {
@@ -918,7 +918,7 @@ public:
         const auto& map = typeObjectAttr.getSlots();
         if (auto result = map.get("__slots__"))
         {
-            for (const auto& slot : llvm::enumerate(dereference<pylir::Py::TupleAttr>(result).getValue()))
+            for (const auto& slot : llvm::enumerate(pylir::Py::ref_cast<pylir::Py::TupleAttr>(result).getValue()))
             {
                 mlir::Value value;
                 auto initMap = objectAttr.getSlots();
@@ -976,16 +976,6 @@ public:
         m_globalConstants.insert({objectAttr, globalOp});
         initializeGlobal(globalOp, objectAttr, builder);
         return globalOp;
-    }
-
-    template <class T>
-    T dereference(mlir::Attribute attr)
-    {
-        if (auto ref = attr.dyn_cast<pylir::Py::RefAttr>())
-        {
-            return ref.getSymbol().getInitializerAttr().template dyn_cast_or_null<T>();
-        }
-        return attr.dyn_cast<T>();
     }
 
     mlir::LLVM::LLVMFuncOp getGlobalInit()
@@ -1510,12 +1500,6 @@ protected:
                                   mlir::ValueRange args) const
     {
         return getTypeConverter()->createRuntimeCall(loc, builder, func, args);
-    }
-
-    template <class Attr>
-    [[nodiscard]] Attr dereference(mlir::Attribute attr) const
-    {
-        return getTypeConverter()->template dereference<Attr>(attr);
     }
 
     [[nodiscard]] mlir::Type getBuiltinsInstanceType(pylir::Py::RefAttr ref) const
@@ -2229,7 +2213,7 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         }
         pylir::Py::TypeAttr typeObject;
         auto ref = constant.getConstant().dyn_cast<pylir::Py::RefAttr>();
-        typeObject = dereference<pylir::Py::TypeAttr>(constant.getConstant());
+        typeObject = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
             return mlir::failure();
@@ -2242,12 +2226,12 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
             return mlir::success();
         }
-        auto tupleAttr = dereference<pylir::Py::TupleAttr>(iter);
+        auto tupleAttr = pylir::Py::ref_cast<pylir::Py::TupleAttr>(iter);
         PYLIR_ASSERT(tupleAttr);
         const auto* result = llvm::find_if(tupleAttr.getValue(),
                                            [&](mlir::Attribute attribute)
                                            {
-                                               auto str = dereference<pylir::Py::StrAttr>(attribute);
+                                               auto str = pylir::Py::ref_cast<pylir::Py::StrAttr>(attribute);
                                                PYLIR_ASSERT(str);
                                                return str.getValue() == adaptor.getSlot();
                                            });
@@ -2296,7 +2280,7 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         }
         pylir::Py::TypeAttr typeObject;
         auto ref = constant.getConstant().dyn_cast<pylir::Py::RefAttr>();
-        typeObject = dereference<pylir::Py::TypeAttr>(constant.getConstant());
+        typeObject = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
             return mlir::failure();
@@ -2309,12 +2293,12 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             rewriter.eraseOp(op);
             return mlir::success();
         }
-        auto tupleAttr = dereference<pylir::Py::TupleAttr>(iter);
+        auto tupleAttr = pylir::Py::ref_cast<pylir::Py::TupleAttr>(iter);
         PYLIR_ASSERT(tupleAttr);
         const auto* result = llvm::find_if(tupleAttr.getValue(),
                                            [&](mlir::Attribute attribute)
                                            {
-                                               auto str = dereference<pylir::Py::StrAttr>(attribute);
+                                               auto str = pylir::Py::ref_cast<pylir::Py::StrAttr>(attribute);
                                                PYLIR_ASSERT(str);
                                                return str.getValue() == adaptor.getSlot();
                                            });
@@ -2640,7 +2624,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         }
         pylir::Py::TypeAttr typeAttr;
         auto ref = constant.getConstant().dyn_cast<pylir::Py::RefAttr>();
-        typeAttr = dereference<pylir::Py::TypeAttr>(constant.getConstant());
+        typeAttr = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeAttr)
         {
             return mlir::failure();
@@ -2651,7 +2635,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         auto iter = map.get("__slots__");
         if (iter)
         {
-            slotLen = dereference<pylir::Py::TupleAttr>(iter).getValue().size();
+            slotLen = pylir::Py::ref_cast<pylir::Py::TupleAttr>(iter).getValue().size();
         }
         // I could create GEP here to read the offset component of the type object, but LLVM is not aware that the size
         // component is const, even if the rest of the type isn't. So instead we calculate the size here again to have
