@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+add_compile_definitions(DO_NOT_USE_WMAIN)
 add_subdirectory(Catch2-3.1.0 EXCLUDE_FROM_ALL)
 add_subdirectory(fmt-7.1.3 EXCLUDE_FROM_ALL)
 add_subdirectory(utf8proc EXCLUDE_FROM_ALL)
