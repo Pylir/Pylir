@@ -14,6 +14,8 @@
 #include <mlir/Interfaces/InferTypeOpInterface.h>
 #include <mlir/Interfaces/SideEffectInterfaces.h>
 
+#include <llvm/ADT/iterator.h>
+
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
 #include <pylir/Optimizer/Interfaces/SROAInterfaces.hpp>
@@ -31,24 +33,97 @@
 
 namespace pylir::Py
 {
-struct IterExpansion
-{
-    mlir::Value value;
-};
 
+/// Struct used for the case of a mapping expansion (unary '**' in specific contexts in python). The contained value is
+/// mapping being expanded.
 struct MappingExpansion
 {
     mlir::Value value;
+
+    bool operator==(const MappingExpansion& rhs) const
+    {
+        return value == rhs.value;
+    }
+
+    bool operator!=(const MappingExpansion& rhs) const
+    {
+        return !(rhs == *this);
+    }
 };
 
+/// Struct used for normal dictionary entries. Comprised of the three operands which are the key, the keys hash and the
+/// value respectively.
 struct DictEntry
 {
     mlir::Value key;
     mlir::Value hash;
     mlir::Value value;
+
+    bool operator==(const DictEntry& rhs) const
+    {
+        return std::tie(key, hash, value) == std::tie(rhs.key, rhs.hash, rhs.value);
+    }
+
+    bool operator!=(const DictEntry& rhs) const
+    {
+        return !(rhs == *this);
+    }
 };
 
+/// Variant used when interacting with 'py.makeDict' and 'py.makeDictEx' to represent operands that may either be an
+/// expansion or a normal entry.
 using DictArg = std::variant<DictEntry, MappingExpansion>;
+
+class MakeDictOp;
+class MakeDictExOp;
+
+/// Bidirectional iterator over the dictionary operands of 'py.makeDict' and 'py.makeDictEx'. Returns a 'DictArg'
+/// which may either be a 'MappingExpansion' or 'DictEntry'.
+class DictArgsIterator : public llvm::iterator_facade_base<DictArgsIterator, std::bidirectional_iterator_tag, DictArg,
+                                                           std::ptrdiff_t, DictArg*, DictArg>
+{
+    llvm::PointerUnion<MakeDictOp, MakeDictExOp> m_op;
+    llvm::ArrayRef<std::int32_t>::iterator m_currExp{};
+    std::int32_t m_keyIndex = 0;
+    std::int32_t m_valueIndex = 0;
+
+    bool isCurrentlyExpansion();
+
+    DictArgsIterator(llvm::PointerUnion<MakeDictOp, MakeDictExOp> op) : m_op(op)
+    {
+        PYLIR_ASSERT(m_op);
+    }
+
+    llvm::ArrayRef<std::int32_t> getExpansion() const;
+
+    [[nodiscard]] mlir::OperandRange getKeys() const;
+
+    [[nodiscard]] mlir::OperandRange getValues() const;
+
+    [[nodiscard]] mlir::OperandRange getHashes() const;
+
+public:
+    static DictArgsIterator begin(llvm::PointerUnion<MakeDictOp, MakeDictExOp> op);
+
+    static DictArgsIterator end(llvm::PointerUnion<MakeDictOp, MakeDictExOp> op);
+
+    DictArg operator*();
+
+    bool operator==(const DictArgsIterator& rhs) const
+    {
+        return m_keyIndex == rhs.m_keyIndex;
+    }
+
+    DictArgsIterator& operator++();
+
+    DictArgsIterator& operator--();
+};
+
+struct IterExpansion
+{
+    mlir::Value value;
+};
+
 using IterArg = std::variant<mlir::Value, IterExpansion>;
 
 enum class OperandShape
@@ -141,67 +216,6 @@ struct AddableExceptionHandling
     };
 };
 
-class DictArgsIterator
-{
-    mlir::OperandRange::iterator m_keys;
-    mlir::OperandRange::iterator m_hashes;
-    mlir::OperandRange::iterator m_values;
-    llvm::ArrayRef<std::int32_t> m_expansions;
-    llvm::ArrayRef<std::int32_t>::iterator m_currExp;
-    std::int32_t m_index = 0;
-
-    bool isCurrentlyExpansion();
-
-public:
-    using value_type = DictArg;
-    using reference = DictArg;
-    using pointer = DictArg*;
-    using difference_type = std::ptrdiff_t;
-    using iterator_category = std::bidirectional_iterator_tag;
-
-    DictArgsIterator(mlir::OperandRange::iterator keys, mlir::OperandRange::iterator hashes,
-                     mlir::OperandRange::iterator values, llvm::ArrayRef<std::int32_t>::iterator expIterator,
-                     llvm::ArrayRef<std::int32_t> expansions, std::size_t index)
-        : m_keys(keys),
-          m_hashes(hashes),
-          m_values(values),
-          m_expansions(expansions),
-          m_currExp(expIterator),
-          m_index(static_cast<std::int32_t>(index))
-    {
-    }
-
-    DictArg operator*();
-
-    bool operator==(const DictArgsIterator& rhs) const
-    {
-        return m_keys == rhs.m_keys;
-    }
-
-    bool operator!=(const DictArgsIterator& rhs) const
-    {
-        return !(rhs == *this);
-    }
-
-    DictArgsIterator& operator++();
-
-    DictArgsIterator operator++(int)
-    {
-        auto copy = *this;
-        ++(*this);
-        return copy;
-    }
-
-    DictArgsIterator& operator--();
-
-    DictArgsIterator operator--(int)
-    {
-        auto copy = *this;
-        --(*this);
-        return copy;
-    }
-};
-
 #define TRIVIAL_RESOURCE(prefix)                                                  \
     struct prefix##Resource : mlir::SideEffects::Resource::Base<prefix##Resource> \
     {                                                                             \
@@ -237,3 +251,25 @@ inline auto getAllResources()
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.h.inc>
+
+#define SUPPORT_OP_IN_POINTER_UNION(opType)                                                                      \
+    template <>                                                                                                  \
+    struct llvm::PointerLikeTypeTraits<opType>                                                                   \
+    {                                                                                                            \
+        static void* getAsVoidPointer(opType op)                                                                 \
+        {                                                                                                        \
+            return const_cast<void*>(op.getAsOpaquePointer());                                                   \
+        }                                                                                                        \
+                                                                                                                 \
+        static opType getFromVoidPointer(void* p)                                                                \
+        {                                                                                                        \
+            return opType::getFromOpaquePointer(p);                                                              \
+        }                                                                                                        \
+                                                                                                                 \
+        constexpr static int NumLowBitsAvailable = PointerLikeTypeTraits<mlir::Operation*>::NumLowBitsAvailable; \
+    }
+
+SUPPORT_OP_IN_POINTER_UNION(pylir::Py::MakeDictOp);
+SUPPORT_OP_IN_POINTER_UNION(pylir::Py::MakeDictExOp);
+
+#undef SUPPORT_OP_IN_POINTER_UNION

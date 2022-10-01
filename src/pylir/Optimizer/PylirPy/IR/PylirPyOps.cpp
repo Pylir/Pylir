@@ -9,6 +9,7 @@
 #include <mlir/IR/OpImplementation.h>
 
 #include <llvm/ADT/ScopeExit.h>
+#include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Support/Text.hpp>
@@ -117,52 +118,90 @@ mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::
 }
 } // namespace pylir::Py::details
 
+llvm::ArrayRef<std::int32_t> pylir::Py::DictArgsIterator::getExpansion() const
+{
+    return llvm::TypeSwitch<decltype(m_op), llvm::ArrayRef<std::int32_t>>(m_op).Case<MakeDictOp, MakeDictExOp>(
+        [](auto op) { return op.getMappingExpansion(); });
+}
+
+mlir::OperandRange pylir::Py::DictArgsIterator::getKeys() const
+{
+    return llvm::TypeSwitch<decltype(m_op), mlir::OperandRange>(m_op).Case<MakeDictOp, MakeDictExOp>(
+        [](auto op) { return op.getKeys(); });
+}
+
+mlir::OperandRange pylir::Py::DictArgsIterator::getHashes() const
+{
+    return llvm::TypeSwitch<decltype(m_op), mlir::OperandRange>(m_op).Case<MakeDictOp, MakeDictExOp>(
+        [](auto op) { return op.getHashes(); });
+}
+
+mlir::OperandRange pylir::Py::DictArgsIterator::getValues() const
+{
+    return llvm::TypeSwitch<decltype(m_op), mlir::OperandRange>(m_op).Case<MakeDictOp, MakeDictExOp>(
+        [](auto op) { return op.getValues(); });
+}
+
+pylir::Py::DictArgsIterator pylir::Py::DictArgsIterator::begin(llvm::PointerUnion<MakeDictOp, MakeDictExOp> op)
+{
+    pylir::Py::DictArgsIterator result(op);
+    result.m_currExp = result.getExpansion().begin();
+    result.m_keyIndex = 0;
+    result.m_valueIndex = 0;
+    return result;
+}
+
+pylir::Py::DictArgsIterator pylir::Py::DictArgsIterator::end(llvm::PointerUnion<MakeDictOp, MakeDictExOp> op)
+{
+    pylir::Py::DictArgsIterator result(op);
+    result.m_currExp = result.getExpansion().end();
+    result.m_keyIndex = result.getKeys().size();
+    result.m_valueIndex = result.getValues().size();
+    return result;
+}
+
 bool pylir::Py::DictArgsIterator::isCurrentlyExpansion()
 {
-    return m_currExp != m_expansions.end() && *m_currExp == m_index;
+    return m_currExp != getExpansion().end() && *m_currExp == m_keyIndex;
 }
 
 pylir::Py::DictArg pylir::Py::DictArgsIterator::operator*()
 {
     if (isCurrentlyExpansion())
     {
-        return MappingExpansion{*m_keys};
+        return MappingExpansion{getKeys()[m_keyIndex]};
     }
-    return DictEntry{*m_keys, *m_hashes, *m_values};
+    return DictEntry{getKeys()[m_keyIndex], getHashes()[m_valueIndex], getValues()[m_valueIndex]};
 }
 
 pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator++()
 {
-    m_keys++;
-    m_index++;
-    while (m_currExp != m_expansions.end() && *m_currExp <= m_index)
+    m_keyIndex++;
+    while (m_currExp != getExpansion().end() && *m_currExp < m_keyIndex)
     {
         m_currExp++;
     }
     if (!isCurrentlyExpansion())
     {
-        m_values++;
-        m_hashes++;
+        m_valueIndex++;
     }
     return *this;
 }
 
 pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator--()
 {
-    m_keys--;
-    if (m_currExp == m_expansions.end() && !m_expansions.empty())
+    if (m_currExp == getExpansion().end() && !getExpansion().empty())
     {
         m_currExp--;
     }
-    m_index--;
-    while (m_currExp != m_expansions.begin() && *m_currExp > m_index)
+    m_keyIndex--;
+    while (m_currExp != getExpansion().begin() && *m_currExp > m_keyIndex)
     {
         m_currExp--;
     }
     if (!isCurrentlyExpansion())
     {
-        m_values--;
-        m_hashes--;
+        m_valueIndex--;
     }
     return *this;
 }

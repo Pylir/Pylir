@@ -934,11 +934,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     let extraClassDeclaration = [{
         llvm::iterator_range<::pylir::Py::DictArgsIterator> getDictArgs()
         {
-            auto expansion = getMappingExpansion();
-            return llvm::make_range(
-                DictArgsIterator(getKeys().begin(), getHashes().begin(), getValues().begin(),expansion.begin(), expansion, 0),
-                DictArgsIterator(getKeys().end(), getHashes().end(), getValues().end(), expansion.end(), expansion, getKeys().size())
-            );
+            return llvm::make_range(DictArgsIterator::begin(*this), DictArgsIterator::end(*this));
         }
     }];
 }
