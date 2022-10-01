@@ -451,6 +451,11 @@ class bool(int):
 
 
 @pylir.intr.const_export
+class float:
+    pass
+
+
+@pylir.intr.const_export
 class list:
 
     def __len__(self):
