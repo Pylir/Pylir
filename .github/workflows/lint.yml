@@ -87,10 +87,10 @@ jobs:
       - name: Run clang-tidy
         working-directory: ${{github.workspace}}/Pylir
         run: |
-          git diff -U0 HEAD^ | \
-          clang-tidy-diff-$LLVM_VERSION.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
-            -export-fixes ${{github.workspace}}/fixes.yml -clang-tidy-binary $(which clang-tidy-$LLVM_VERSION) \
-          -j$(nproc)
+          git diff -U0 HEAD^ :^3rdParty '***.c' '***.h' '***.hpp' '***.cpp' \
+           | clang-tidy-diff-$LLVM_VERSION.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
+             -export-fixes ${{github.workspace}}/fixes.yml -clang-tidy-binary $(which clang-tidy-$LLVM_VERSION) \
+             -j$(nproc)
           
           if [ -s ${{github.workspace}}/fixes.yml ] 
           then
@@ -130,8 +130,9 @@ jobs:
         run: |
           # Below ensures that the exit code of git-clang-format is properly propagated
           set -o pipefail
-          python $(which git-clang-format-$LLVM_VERSION) --binary $(which clang-format-$LLVM_VERSION) --diff HEAD^ \
-            | tee ${{github.workspace}}/clang-format.patch
+          git diff -U0 HEAD^ :^3rdParty '***.c' '***.h' '***.hpp' '***.cpp' \
+           | clang-format-diff-$LLVM_VERSION -p1 -binary $(which clang-format-$LLVM_VERSION) \
+           | tee ${{github.workspace}}/clang-format.patch
 
       - name: Upload clang-format patch
         if: ${{ failure() }}
