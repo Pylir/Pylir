@@ -650,7 +650,9 @@ mlir::Value pylir::CodeGen::visit(const pylir::Syntax::Comparison& comparison)
                 case Comp::Ne: cmp = m_builder.createPylirNeIntrinsic(previousRHS, other, m_currentExceptBlock); break;
                 case Comp::Ge: cmp = m_builder.createPylirGeIntrinsic(previousRHS, other, m_currentExceptBlock); break;
                 case Comp::Le: cmp = m_builder.createPylirLeIntrinsic(previousRHS, other, m_currentExceptBlock); break;
-                case Comp::In: cmp = m_builder.createPylirContainsIntrinsic(previousRHS, other); break;
+                case Comp::In:
+                    cmp = m_builder.createPylirContainsIntrinsic(other, previousRHS, m_currentExceptBlock);
+                    break;
                 case Comp::Is: cmp = m_builder.createBoolFromI1(m_builder.createIs(previousRHS, other)); break;
             }
             if (invert)

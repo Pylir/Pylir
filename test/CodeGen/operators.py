@@ -39,6 +39,9 @@ def bin_ops(a, b):
     a @ b
     # CHECK: py.call @pylir__matmul__(%[[A]], %[[B]])
 
+    a in b
+    # CHECK: py.call @pylir__contains__(%[[B]], %[[A]])
+
 
 # CHECK-LABEL: @"unary_ops$impl[0]"
 # CHECK-SAME: %{{[[:alnum:]]+}}
@@ -51,6 +54,7 @@ def unary_ops(a):
     # CHECK: py.call @pylir__pos__(%[[A]])
     ~a
     # CHECK: py.call @pylir__invert__(%[[A]])
+
 
 # CHECK-LABEL: @"boolean_ops$impl[0]"
 # CHECK-SAME: %{{[[:alnum:]]+}}
