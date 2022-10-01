@@ -4,6 +4,6 @@
 
 include(Catch)
 
-add_executable(ir_tests main.cpp ir_tests.cpp)
-target_link_libraries(ir_tests PylirPyDialect MLIRFuncDialect)
+add_executable(ir_tests ir_tests.cpp)
+target_link_libraries(ir_tests Catch2::Catch2WithMain PylirPyDialect MLIRFuncDialect)
 catch_discover_tests(ir_tests)

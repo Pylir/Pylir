@@ -35,8 +35,8 @@ FixNamespaceComments: true
 IncludeBlocks: Regroup
 IncludeIsMainRegex: ''
 IncludeCategories:
-  - Regex: '[<"](.*/)?catch\.(hpp|h)[">]'
-    Priority: -1
+  - Regex: '<catch2/.*>'
+    Priority: 1
   - Regex: '<mlir/.*>'
     Priority: 2
   - Regex: '<llvm/.*>'

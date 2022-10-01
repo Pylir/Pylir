@@ -6,6 +6,6 @@
 
 include(Catch)
 
-add_executable(parser_tests parser_tests.cpp main.cpp)
-target_link_libraries(parser_tests Parser)
+add_executable(parser_tests parser_tests.cpp)
+target_link_libraries(parser_tests Catch2::Catch2WithMain Parser)
 catch_discover_tests(parser_tests)

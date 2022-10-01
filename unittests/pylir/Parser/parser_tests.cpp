@@ -2,28 +2,27 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
 
-#include <iostream>
-
-#define PARSER_EMITS(source, ...)                                       \
-    [](std::string_view str)                                            \
-    {                                                                   \
-        std::string error;                                              \
-        pylir::Diag::DiagnosticsManager manager(                        \
-            [&error](pylir::Diag::Diagnostic&& base)                    \
-            {                                                           \
-                llvm::errs() << base;                                   \
-                llvm::raw_string_ostream(error) << base;                \
-            });                                                         \
-        pylir::Diag::Document document(str);                            \
-        auto docManager = manager.createSubDiagnosticManager(document); \
-        pylir::Parser(docManager).parseFileInput();                     \
-        CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__)));   \
+#define PARSER_EMITS(source, ...)                                                        \
+    [](std::string_view str)                                                             \
+    {                                                                                    \
+        std::string error;                                                               \
+        pylir::Diag::DiagnosticsManager manager(                                         \
+            [&error](pylir::Diag::Diagnostic&& base)                                     \
+            {                                                                            \
+                llvm::errs() << base;                                                    \
+                llvm::raw_string_ostream(error) << base;                                 \
+            });                                                                          \
+        pylir::Diag::Document document(str);                                             \
+        auto docManager = manager.createSubDiagnosticManager(document);                  \
+        pylir::Parser(docManager).parseFileInput();                                      \
+        CHECK_THAT(error, Catch::Matchers::ContainsSubstring(fmt::format(__VA_ARGS__))); \
     }(source)
 
 using namespace Catch::Matchers;

@@ -2,28 +2,30 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <catch2/catch.hpp>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Lexer/Lexer.hpp>
 
 #include <fmt/format.h>
 
-#define LEXER_EMITS(source, ...)                                        \
-    [](std::string_view str)                                            \
-    {                                                                   \
-        std::string error;                                              \
-        pylir::Diag::DiagnosticsManager manager(                        \
-            [&error](pylir::Diag::Diagnostic&& base)                    \
-            {                                                           \
-                llvm::errs() << base;                                   \
-                llvm::raw_string_ostream(error) << base;                \
-            });                                                         \
-        pylir::Diag::Document document(str);                            \
-        auto docManager = manager.createSubDiagnosticManager(document); \
-        pylir::Lexer lexer(docManager);                                 \
-        std::for_each(lexer.begin(), lexer.end(), [](auto&&) {});       \
-        CHECK_THAT(error, Catch::Contains(fmt::format(__VA_ARGS__)));   \
+#define LEXER_EMITS(source, ...)                                                         \
+    [](std::string_view str)                                                             \
+    {                                                                                    \
+        std::string error;                                                               \
+        pylir::Diag::DiagnosticsManager manager(                                         \
+            [&error](pylir::Diag::Diagnostic&& base)                                     \
+            {                                                                            \
+                llvm::errs() << base;                                                    \
+                llvm::raw_string_ostream(error) << base;                                 \
+            });                                                                          \
+        pylir::Diag::Document document(str);                                             \
+        auto docManager = manager.createSubDiagnosticManager(document);                  \
+        pylir::Lexer lexer(docManager);                                                  \
+        std::for_each(lexer.begin(), lexer.end(), [](auto&&) {});                        \
+        CHECK_THAT(error, Catch::Matchers::ContainsSubstring(fmt::format(__VA_ARGS__))); \
     }(source)
 
 TEST_CASE("Lex comments", "[Lexer]")
@@ -166,7 +168,7 @@ TEST_CASE("Lex keywords", "[Lexer]")
     std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                    [](const pylir::Token& token) { return token.getTokenType(); });
     CHECK_THAT(result,
-               Catch::Equals(std::vector<pylir::TokenType>{
+               Catch::Matchers::Equals(std::vector<pylir::TokenType>{
                    pylir::TokenType::FalseKeyword,  pylir::TokenType::NoneKeyword,     pylir::TokenType::TrueKeyword,
                    pylir::TokenType::AndKeyword,    pylir::TokenType::AsKeyword,       pylir::TokenType::AssertKeyword,
                    pylir::TokenType::AsyncKeyword,  pylir::TokenType::AwaitKeyword,    pylir::TokenType::BreakKeyword,
@@ -713,7 +715,7 @@ TEST_CASE("Lex operators and delimiters", "[Lexer]")
     std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
                    [](const pylir::Token& token) { return token.getTokenType(); });
     result.pop_back();
-    CHECK_THAT(result, Catch::Equals(std::vector{
+    CHECK_THAT(result, Catch::Matchers::Equals(std::vector{
                            pylir::TokenType::Plus,
                            pylir::TokenType::Minus,
                            pylir::TokenType::Star,
