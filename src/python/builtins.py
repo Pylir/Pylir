@@ -360,6 +360,10 @@ class dict:
             raise KeyError
         return res
 
+    def __contains__(self, item):
+        return not pylir.intr.isUnboundValue(
+            pylir.intr.dict.tryGetItem(self, item, hash(item)))
+
     def __setitem__(self, key, value):
         pylir.intr.dict.setItem(self, key, hash(key), value)
 
