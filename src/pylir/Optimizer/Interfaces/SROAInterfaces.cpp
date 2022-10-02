@@ -16,15 +16,5 @@ mlir::LogicalResult pylir::aggregateUseCanParticipateInSROA(const mlir::OpOperan
     {
         return mlir::failure();
     }
-    auto* key = op.getOptionalKeyOperand();
-    if (!key)
-    {
-        return mlir::success();
-    }
-    mlir::Attribute attr;
-    if (!mlir::matchPattern(key->get(), mlir::m_Constant(&attr)))
-    {
-        return mlir::failure();
-    }
-    return op.validateKey(attr);
+    return op.getSROAKey();
 }

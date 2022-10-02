@@ -6,6 +6,8 @@
 
 #include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
 
+#include "Value.hpp"
+
 namespace
 {
 mlir::Value materializeUndefined(mlir::OpBuilder& builder, mlir::Type type, mlir::Location loc)
@@ -14,27 +16,36 @@ mlir::Value materializeUndefined(mlir::OpBuilder& builder, mlir::Type type, mlir
     return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());
 }
 
-mlir::LogicalResult validateDictKey(::mlir::Attribute key)
+mlir::FailureOr<mlir::Attribute> getDictKey(mlir::Value keyOperand)
 {
-    // TODO: We currently don't allow symbol ref attrs as keys as we have to do a lookup to figure out their actual
-    //       value and I haven't yet thought about how to best do that.
-    return mlir::failure(key.isa<mlir::SymbolRefAttr>());
+    mlir::Attribute attr;
+    if (!mlir::matchPattern(keyOperand, mlir::m_Constant(&attr)))
+    {
+        return mlir::failure();
+    }
+    auto canon = pylir::Py::getCanonicalEqualsForm(attr);
+    if (!canon)
+    {
+        return mlir::failure();
+    }
+    return canon;
 }
+
 } // namespace
 
-mlir::LogicalResult pylir::Py::DictSetItemOp::validateKey(::mlir::Attribute key)
+mlir::FailureOr<mlir::Attribute> pylir::Py::DictSetItemOp::getSROAKey()
 {
-    return validateDictKey(key);
+    return getDictKey(getKey());
 }
 
-mlir::LogicalResult pylir::Py::DictTryGetItemOp::validateKey(::mlir::Attribute key)
+mlir::FailureOr<mlir::Attribute> pylir::Py::DictTryGetItemOp::getSROAKey()
 {
-    return validateDictKey(key);
+    return getDictKey(getKey());
 }
 
-mlir::LogicalResult pylir::Py::DictDelItemOp::validateKey(::mlir::Attribute key)
+mlir::FailureOr<mlir::Attribute> pylir::Py::DictDelItemOp::getSROAKey()
 {
-    return validateDictKey(key);
+    return getDictKey(getKey());
 }
 
 namespace
@@ -48,7 +59,7 @@ mlir::LogicalResult dictOpCanParticipateInSROA(T op)
                                          {
                                              mlir::Attribute attr;
                                              return mlir::matchPattern(val, mlir::m_Constant(&attr))
-                                                    && mlir::succeeded(validateDictKey(attr));
+                                                    && pylir::Py::getCanonicalEqualsForm(attr) != nullptr;
                                          }));
 }
 } // namespace
@@ -180,7 +191,6 @@ namespace
 template <class T>
 void replaceDictAggregate(T op, mlir::OpBuilder& builder, llvm::function_ref<void(mlir::Attribute, mlir::Value)> write)
 {
-    // TODO: This is inaccurate and does not take into account duplicate keys that may be specified here.
     auto size = builder.create<mlir::arith::ConstantIndexOp>(op.getLoc(), op.getKeys().size());
     write(nullptr, size);
     for (auto [key, value] : llvm::zip(op.getKeys(), op.getValues()))
@@ -188,7 +198,7 @@ void replaceDictAggregate(T op, mlir::OpBuilder& builder, llvm::function_ref<voi
         mlir::Attribute attr;
         bool result = mlir::matchPattern(key, mlir::m_Constant(&attr));
         PYLIR_ASSERT(result);
-        write(attr, value);
+        write(pylir::Py::getCanonicalEqualsForm(attr), value);
     }
 }
 } // namespace
@@ -330,11 +340,9 @@ void pylir::Py::DictAttr::destructureAggregate(
     destructureSlots(*this, write);
     auto indexType = mlir::IndexType::get(getContext());
     write(nullptr, indexType, mlir::IntegerAttr::get(indexType, getValue().size()));
-    // TODO: This is problematic with keys that are FlatSymbolRefAttr. But that is somewhat a problem of DictAttr in
-    //  general. I need to flesh it out with more proper APIs and just generally nail down its semantics.
     for (auto [key, value] : getValue())
     {
-        write(key, DynamicType::get(getContext()), value);
+        write(getCanonicalEqualsForm(key), DynamicType::get(getContext()), value);
     }
 }
 

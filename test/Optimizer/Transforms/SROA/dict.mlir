@@ -137,3 +137,77 @@ func.func @test(%arg0 : !py.dynamic, %hash : index) -> (i1, index) {
 // CHECK-NEXT: %[[DECREMENTED:.*]] = arith.subi %[[SIZE]], %[[ONE]]
 // CHECK-NEXT: %[[NEW_SIZE:.*]] = arith.select %[[IS_UNBOUND]], %[[SIZE]], %[[DECREMENTED]]
 // CHECK-NEXT: return %[[EXISTED]], %[[NEW_SIZE]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+
+func.func @test(%arg0 : !py.dynamic, %hash : index) -> i1 {
+    %0 = py.makeDict ()
+    %1 = py.constant(#py.int<5>)
+    %2 = py.constant(#py.float<5.0>)
+    py.dict.setItem %0[%1 hash(%hash)] to %arg0
+    %res = py.dict.delItem %2 hash(%hash) from %0
+    return %res : i1
+}
+
+
+// CHECK-LABEL: @test
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-NEXT: %[[UNBOUND:.*]] = py.constant(#py.unbound)
+// CHECK-NEXT: %[[ZERO:.*]] = arith.constant 0
+// CHECK-NEXT: %[[FIVE:.*]] = py.constant(#py.int<5>)
+// CHECK-NEXT: %[[G:.*]] = py.constant(#py.float<5.{{0+}}e+{{0+}}>)
+// CHECK-NEXT: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[UNBOUND]]
+// CHECK-NEXT: %[[ONE:.*]] = arith.constant 1
+// CHECK-NEXT: %[[ADDI:.*]] = arith.addi %[[ZERO]], %[[ONE]]
+// CHECK-NEXT: %[[SELECT:.*]] = arith.select %[[IS_UNBOUND]], %[[ADDI]], %[[ZERO]]
+// CHECK-NEXT: %[[UNBOUND:.*]] = py.constant(#py.unbound)
+// CHECK-NEXT: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[ARG0]]
+// CHECK-NEXT: %[[ONE:.*]] = arith.constant 1
+// CHECK-NEXT: %[[TRUE:.*]] = arith.constant true
+// CHECK-NEXT: %[[INV:.*]] = arith.xori %[[IS_UNBOUND]], %[[TRUE]]
+// CHECK-NEXT: %[[SUBI:.*]] = arith.subi %[[SELECT]], %[[ONE]]
+// CHECK-NEXT: %[[SELECT2:.*]] = arith.select %[[IS_UNBOUND]], %[[SELECT]], %[[SUBI]]
+// CHECK-NEXT: return %[[INV]]
+
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+
+py.globalValue @g = #py.float<5.0>
+
+func.func @test(%arg0 : !py.dynamic, %hash : index) -> i1 {
+    %0 = py.makeDict ()
+    %1 = py.constant(#py.int<5>)
+    %2 = py.constant(#py.ref<@g>)
+    py.dict.setItem %0[%1 hash(%hash)] to %arg0
+    %res = py.dict.delItem %2 hash(%hash) from %0
+    return %res : i1
+}
+
+// CHECK-LABEL: @test
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
+// CHECK-NEXT: %[[UNBOUND:.*]] = py.constant(#py.unbound)
+// CHECK-NEXT: %[[ZERO:.*]] = arith.constant 0
+// CHECK-NEXT: %[[FIVE:.*]] = py.constant(#py.int<5>)
+// CHECK-NEXT: %[[G:.*]] = py.constant(#py.ref<@g>)
+// CHECK-NEXT: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[UNBOUND]]
+// CHECK-NEXT: %[[ONE:.*]] = arith.constant 1
+// CHECK-NEXT: %[[ADDI:.*]] = arith.addi %[[ZERO]], %[[ONE]]
+// CHECK-NEXT: %[[SELECT:.*]] = arith.select %[[IS_UNBOUND]], %[[ADDI]], %[[ZERO]]
+// CHECK-NEXT: %[[UNBOUND:.*]] = py.constant(#py.unbound)
+// CHECK-NEXT: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[ARG0]]
+// CHECK-NEXT: %[[ONE:.*]] = arith.constant 1
+// CHECK-NEXT: %[[TRUE:.*]] = arith.constant true
+// CHECK-NEXT: %[[INV:.*]] = arith.xori %[[IS_UNBOUND]], %[[TRUE]]
+// CHECK-NEXT: %[[SUBI:.*]] = arith.subi %[[SELECT]], %[[ONE]]
+// CHECK-NEXT: %[[SELECT2:.*]] = arith.select %[[IS_UNBOUND]], %[[SELECT]], %[[SUBI]]
+// CHECK-NEXT: return %[[INV]]

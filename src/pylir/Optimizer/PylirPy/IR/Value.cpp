@@ -58,22 +58,35 @@ llvm::Optional<bool> pylir::Py::isUnbound(mlir::Value value)
     return llvm::None;
 }
 
-pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(ObjectAttrInterface attribute)
+namespace
 {
-    if (!attribute)
+pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute, llvm::StringRef method)
+{
+    auto typeObject = pylir::Py::ref_cast<pylir::Py::ObjectAttrInterface>(attribute, false).getTypeObject();
+    if (!typeObject)
     {
-        return BuiltinMethodKind::Unknown;
+        return pylir::Py::BuiltinMethodKind::Unknown;
     }
 
-    auto typeAttr = ref_cast_or_null<TypeAttr>(attribute.getTypeObject(), false);
-    if (!typeAttr)
+    auto getBuiltinMethod = [](pylir::Py::RefAttr ref)
     {
-        return BuiltinMethodKind::Unknown;
+        return llvm::StringSwitch<std::optional<pylir::Py::BuiltinMethodKind>>(ref.getRef().getValue())
+            .Case(pylir::Builtins::Int.name, pylir::Py::BuiltinMethodKind::Int)
+            .Case(pylir::Builtins::Float.name, pylir::Py::BuiltinMethodKind::Float)
+            .Case(pylir::Builtins::Str.name, pylir::Py::BuiltinMethodKind::Str)
+            .Case(pylir::Builtins::Object.name, pylir::Py::BuiltinMethodKind::Object)
+            .Default(std::nullopt);
+    };
+    if (auto opt = getBuiltinMethod(typeObject))
+    {
+        return *opt;
     }
-    auto mro = ref_cast_or_null<TupleAttr>(typeAttr.getMroTuple(), false);
+
+    auto mro = pylir::Py::ref_cast_or_null<pylir::Py::TupleAttr>(
+        pylir::Py::ref_cast<pylir::Py::TypeAttr>(typeObject).getMroTuple());
     if (!mro)
     {
-        return BuiltinMethodKind::Unknown;
+        return pylir::Py::BuiltinMethodKind::Unknown;
     }
     for (const auto& iter : mro.getValue())
     {
@@ -82,30 +95,60 @@ pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(ObjectAttrInterface attr
             // This can probably only be a result of undefined behaviour.
             continue;
         }
-        if (auto ref = iter.dyn_cast<RefAttr>())
+        if (auto ref = iter.dyn_cast<pylir::Py::RefAttr>())
         {
-            auto opt = llvm::StringSwitch<std::optional<BuiltinMethodKind>>(ref.getRef().getValue())
-                           .Case(Builtins::Int.name, BuiltinMethodKind::Int)
-                           .Case(Builtins::Str.name, BuiltinMethodKind::Str)
-                           .Case(Builtins::Object.name, BuiltinMethodKind::Object)
-                           .Default(std::nullopt);
-            if (opt)
+            if (auto opt = getBuiltinMethod(ref))
             {
                 return *opt;
             }
         }
-        auto baseType = ref_cast_or_null<TypeAttr>(iter);
+        auto baseType = pylir::Py::ref_cast_or_null<pylir::Py::TypeAttr>(iter, true);
         if (!baseType)
         {
-            return BuiltinMethodKind::Unknown;
+            return pylir::Py::BuiltinMethodKind::Unknown;
         }
-        auto hashFunc = baseType.getSlots().get("__hash__");
-        if (!hashFunc)
+        auto func = baseType.getSlots().get(method);
+        if (!func)
         {
             continue;
         }
-        return BuiltinMethodKind::Unknown;
+        return pylir::Py::BuiltinMethodKind::Unknown;
     }
 
     return pylir::Py::BuiltinMethodKind::Object;
+}
+} // namespace
+
+pylir::Py::BuiltinMethodKind pylir::Py::getHashFunction(mlir::Attribute attribute)
+{
+    return getBuiltinMethod(attribute, "__hash__");
+}
+
+pylir::Py::BuiltinMethodKind pylir::Py::getEqualsFunction(mlir::Attribute attribute)
+{
+    return getBuiltinMethod(attribute, "__eq__");
+}
+
+mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute)
+{
+    if (attribute.isa<UnboundAttr>())
+    {
+        return attribute;
+    }
+    BuiltinMethodKind implementation = getEqualsFunction(attribute);
+    switch (implementation)
+    {
+        case BuiltinMethodKind::Unknown: return nullptr;
+        case BuiltinMethodKind::Object:
+            // There is only really RefAttr that can tell us the object identity.
+            return attribute.dyn_cast<RefAttr>();
+        case BuiltinMethodKind::Str:
+            return mlir::StringAttr::get(attribute.getContext(), ref_cast<StrAttr>(attribute).getValue());
+        case BuiltinMethodKind::Int:
+            return FractionalAttr::get(attribute.getContext(), ref_cast<IntAttr>(attribute).getValue(), BigInt(1));
+        case BuiltinMethodKind::Float:
+            auto [nom, denom] = toRatio(ref_cast<FloatAttr>(attribute).getDoubleValue());
+            return FractionalAttr::get(attribute.getContext(), std::move(nom), std::move(denom));
+    }
+    PYLIR_UNREACHABLE;
 }

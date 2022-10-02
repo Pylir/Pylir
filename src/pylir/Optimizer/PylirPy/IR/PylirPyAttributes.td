@@ -190,4 +190,14 @@ def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let summary = "python unbound value";
 }
 
+def PylirPy_FractionalAttr : PylirPy_Attr<"Fractional"> {
+
+    let description = [{
+        Utility attribute used within compiler passes for computation, but is not part of the IR.
+    }];
+
+    let parameters = (ins AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">:$nominator,
+                          AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">:$denominator);
+}
+
 #endif

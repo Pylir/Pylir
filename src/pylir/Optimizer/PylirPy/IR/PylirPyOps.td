@@ -152,7 +152,7 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [DeclareOpInterfaceMethods<CaptureInterface>,
                                                               DeclareOpInterfaceMethods<MemoryFoldInterface>,
                                                               DeclareOpInterfaceMethods<SROAReadWriteOpInterface,
-                                                                ["validateKey"]>,
+                                                                ["getSROAKey"]>,
                                                               ]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead<DictResource>, SROAAggregate]>:$dict,
                          Arg<DynamicType, "", [SROAKey]>:$key, Index:$hash);
@@ -173,7 +173,7 @@ def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [DeclareOpInterface
 }
 
 def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem", [DeclareOpInterfaceMethods<SROAReadWriteOpInterface,
-                                                         ["validateKey"]>,
+                                                         ["getSROAKey"]>,
                                                        ]> {
 
     let arguments = (ins Arg<DynamicType, "", [MemWrite<DictResource>, SROAAggregate]>:$dict,
@@ -192,7 +192,7 @@ def PylirPy_DictSetItemOp : PylirPy_Op<"dict.setItem", [DeclareOpInterfaceMethod
 
 def PylirPy_DictDelItemOp : PylirPy_Op<"dict.delItem", [DeclareOpInterfaceMethods<CaptureInterface>,
                                                         DeclareOpInterfaceMethods<SROAReadWriteOpInterface,
-                                                          ["validateKey"]>,
+                                                          ["getSROAKey"]>,
                                                        ]> {
 
     let arguments = (ins Arg<DynamicType, "", [MemWrite<DictResource>, SROAAggregate]>:$dict,

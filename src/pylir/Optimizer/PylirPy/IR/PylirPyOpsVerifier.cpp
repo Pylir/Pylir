@@ -86,8 +86,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                     {
                         return mlir::failure();
                     }
-                    if (pylir::Py::getHashFunction(pylir::Py::ref_cast_or_null<pylir::Py::ObjectAttrInterface>(key))
-                        == pylir::Py::BuiltinMethodKind::Unknown)
+                    if (pylir::Py::getHashFunction(key) == pylir::Py::BuiltinMethodKind::Unknown)
                     {
                         return op->emitOpError(
                             "Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.");

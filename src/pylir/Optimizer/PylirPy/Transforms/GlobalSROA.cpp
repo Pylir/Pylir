@@ -127,12 +127,7 @@ void GlobalSROAPass::runOnOperation()
 
             for (auto readWrite : aggregate.uses)
             {
-                mlir::Attribute key;
-                if (auto* keyOperand = readWrite.getOptionalKeyOperand())
-                {
-                    bool result = mlir::matchPattern(keyOperand->get(), mlir::m_Constant(&key));
-                    PYLIR_ASSERT(result);
-                }
+                mlir::Attribute key = *readWrite.getSROAKey();
 
                 [[maybe_unused]] auto consistentType = [](LoadStorePlaceHolders& placeHolder, mlir::Type type) -> bool
                 {

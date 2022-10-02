@@ -62,11 +62,31 @@ enum class BuiltinMethodKind
     Unknown,
     Str,
     Int,
+    Float,
     Object
 };
 
 /// Given any kind of object, attempts to return the hash function used at runtime to hash that object. If the hash
 /// function may change at runtime or a custom one is used that is not known to the compiler, 'Unknown' is returned.
-BuiltinMethodKind getHashFunction(ObjectAttrInterface attribute);
+///
+/// 'attribute' has to either be a 'RefAttr' or 'ObjectAttrInterface', otherwise the behaviour is undefined.
+BuiltinMethodKind getHashFunction(mlir::Attribute attribute);
+
+/// Given any kind of object, attempts to return the __eq__ function used at runtime to compare that object to other
+/// objects. If the hash function may change at runtime or a custom one is used that is not known to the compiler,
+/// 'Unknown' is returned.
+///
+/// 'attribute' has to either be a 'RefAttr' or 'ObjectAttrInterface', otherwise the behaviour is undefined.
+BuiltinMethodKind getEqualsFunction(mlir::Attribute attribute);
+
+/// Given either a 'RefAttr', 'UnboundAttr' or 'ObjectAttrInterface', returns an attribute suitable for equality
+/// comparison. The precise attribute returned is of no significance, but is guaranteed to be the same attribute for
+/// every input attribute which would compare equal according to '__eq__' at runtime.
+///
+/// This requires that the '__eq__' implementation of the attribute, as determined by 'getEqualsFunction', is known to
+/// the compiler.
+/// If it is unknown, or the attribute passed in is not considered suitable for the given equality implementation, a
+/// null attribute is returned.
+mlir::Attribute getCanonicalEqualsForm(mlir::Attribute attribute);
 
 } // namespace pylir::Py

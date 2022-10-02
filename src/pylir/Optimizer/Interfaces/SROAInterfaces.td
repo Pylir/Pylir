@@ -69,8 +69,8 @@ def SROAReadWriteOpInterface : OpInterface<"SROAReadWriteOpInterface"> {
 
         Additionally, one may optionally add `SROAKey` to at max one operand. The key is an operand which is used to
         find out the precise value that is being read from or written to within the aggregate. If the operation
-        has such a key operand, it should be marked with `SROAKey`. This will then make sure that the key is statically
-        known and pass it along as well.
+        has such a key operand that is simply a constant operand, one can use `SROAKey` to autogenerate the `getKey`
+        method. Otherwise, the method should override `getKey` to return an appropriate key.
     }];
 
     let methods = [
@@ -78,18 +78,14 @@ def SROAReadWriteOpInterface : OpInterface<"SROAReadWriteOpInterface"> {
             Returns the aggregate operand which is read from or written to.
         }], "::mlir::OpOperand&", "getAggregateOperand", (ins), "", "PYLIR_UNREACHABLE;">,
         ExtendableInterfaceMethod<[{
-            Returns the key operand identifying the operand that is used to identify the precise location that is read
+            Returns the key identifying the operand that is used to identify the precise location that is read
             from or written to within the aggregate, or nullptr if no such key exists, as the operation always reads or
-            writes to a fixed value within the aggregate.
-        }], "::mlir::OpOperand*", "getOptionalKeyOperand", (ins), "", "return nullptr;">,
-        InterfaceMethod<[{
-            Called to validate the key. If `getOptionalKeyOperand` returned an operand which was then determined to
-            have a static value, it may then be additionally verified by the operation to make sure the key can be used
-            to precisely determine the value read from or written to within the aggregate. Should return success
-            if the key is suitable.
-        }], "::mlir::LogicalResult", "validateKey", (ins "::mlir::Attribute":$key), "", [{
-            return mlir::success();
-        }]>,
+            writes to a fixed value within the aggregate. The result of this method (including nullptr) is then passed
+            onto `replaceAggregate`. The default implementation simply returns nullptr.
+
+            If the op cannot participate in SROA due to no suitable key being able to be gathered, failure should be
+            returned.
+        }], "::mlir::FailureOr<::mlir::Attribute>", "getSROAKey", (ins), "", "return mlir::Attribute{};">,
         InterfaceMethod<[{
             Called during the replacement of the aggregate. Using the callbacks `read` and `write` one can make reads
             and writes to specific values within the aggregate. These values are located via the `Attribute` passed
@@ -113,9 +109,18 @@ def SROAAggregate : OpVariableGen<SROAReadWriteOpInterface> {
     ];
 }
 
+/// Common op variable annotation for ops whose 'getSROAKey' implementation should simply check whether a specific key
+/// has a statically known constant value.
 def SROAKey : OpVariableGen<SROAReadWriteOpInterface> {
     let methodGens = [
-        OpVariableMethodGen<"getOptionalKeyOperand", "return &$_arg;">
+        OpVariableMethodGen<"getSROAKey", [{
+            mlir::Attribute attr;
+            if (mlir::matchPattern($_arg.get(), mlir::m_Constant(&attr)))
+            {
+                return attr;
+            }
+            return mlir::failure();
+        }]>
     ];
 }
 

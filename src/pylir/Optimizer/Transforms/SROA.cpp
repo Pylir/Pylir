@@ -91,14 +91,7 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                         {
                             continue;
                         }
-                        mlir::Attribute optionalKey;
-                        if (auto* keyOperand = readWriteOp.getOptionalKeyOperand())
-                        {
-                            // It being a constant should already be verified by 'collectAggregates'. If this were not
-                            // the case, then the aggregate should never have been part of the replacement set.
-                            bool result = mlir::matchPattern(keyOperand->get(), mlir::m_Constant(&optionalKey));
-                            PYLIR_ASSERT(result);
-                        }
+                        mlir::Attribute optionalKey = *readWriteOp.getSROAKey();
                         readWriteOp.replaceAggregate(
                             builder, optionalKey,
                             [&](mlir::Attribute attr, mlir::Type type) -> mlir::Value
