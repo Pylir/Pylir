@@ -142,7 +142,9 @@ std::map<ExtendableInterfaceMethod, std::vector<std::string>>
         mlir::tblgen::Interface interface = interfaceTrait->getInterface();
         for (const auto& [index, method] : llvm::enumerate(interface.getDef().getValueAsListOfDefs("methods")))
         {
-            if (method->isSubClassOf("ExtendableInterfaceMethod"))
+            if (method->isSubClassOf("ExtendableInterfaceMethod")
+                && !llvm::is_contained(interfaceTrait->getAlwaysDeclaredMethods(),
+                                       mlir::tblgen::InterfaceMethod(method).getName()))
             {
                 result.insert({ExtendableInterfaceMethod(method), {}});
             }
@@ -218,7 +220,7 @@ void emitInterfaceMethodImpl(mlir::raw_indented_ostream& os, const mlir::tblgen:
         body << iter << '\n';
     }
     body << interfaceMethod.getEpilogue() << '\n';
-    method.writeDefTo(os, op.getQualCppClassName());
+    method.writeDefTo(os, op.getCppClassName());
 }
 
 bool emit(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
@@ -229,6 +231,7 @@ bool emit(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
     for (auto* iter : records.getAllDerivedDefinitions("Op"))
     {
         mlir::tblgen::Operator op(iter);
+        mlir::tblgen::NamespaceEmitter emitter(rawOs, op.getCppNamespace());
 
         auto interfaceMethodImpls = collectExtendableInterfaceMethods(op);
         for (auto& [interfaceMethod, bodies] : interfaceMethodImpls)

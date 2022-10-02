@@ -41,16 +41,16 @@ def Test_C : Test_Op<"c", [DeclareOpInterfaceMethods<TestInterface>]> {
     let arguments = (ins I32Attr:$test);
 }
 
-// CHECK-LABEL: int test::A::lol()
+// CHECK-LABEL: int A::lol()
 // CHECK-NEXT: int i = 0;
 // CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest2Mutable()).getBeginOperandIndex(), getTest2Mutable().size())) {
 // CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
 // CHECK-NEXT: }
 // CHECK: return i;
 
-// CHECK-NOT: test::B::lol
+// CHECK-NOT: B::lol
 
-// CHECK-LABEL: int test::C::lol()
+// CHECK-LABEL: int C::lol()
 // CHECK-NEXT: int i = 0;
 // CHECK-NEXT: return i;
 
@@ -58,7 +58,7 @@ def Test_D : Test_Op<"d", [DeclareOpInterfaceMethods<TestInterface>]> {
     let arguments = (ins Arg<Variadic<I32>, "", [TestVariableGen]>:$test1, Arg<Optional<I32>, "", [TestVariableGen]>:$test2);
 }
 
-// CHECK-LABEL: int test::D::lol()
+// CHECK-LABEL: int D::lol()
 // CHECK-NEXT: int i = 0;
 // CHECK: for (::mlir::OpOperand& tblGenOdsIter : (*this)->getOpOperands().slice(static_cast<::mlir::OperandRange>(getTest1Mutable()).getBeginOperandIndex(), getTest1Mutable().size())) {
 // CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
@@ -67,3 +67,9 @@ def Test_D : Test_Op<"d", [DeclareOpInterfaceMethods<TestInterface>]> {
 // CHECK-NEXT:     i += tblGenOdsIter.getOperandNumber();
 // CHECK-NEXT: }
 // CHECK: return i;
+
+def Test_E : Test_Op<"e", [DeclareOpInterfaceMethods<TestInterface, ["lol"]>]> {
+    let arguments = (ins I32Attr:$test);
+}
+
+// CHECK-NOT: E::lol

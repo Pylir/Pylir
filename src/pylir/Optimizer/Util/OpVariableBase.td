@@ -40,7 +40,9 @@ class OpVariableGen<Interface i> : OpVariableDecorator {
 /// * Substitution of every 'OpVariableGen' corresponding to this method with its operand
 /// * The epilogue passed into here
 ///
-/// This method body is not created when not using `DeclareInterfaceMethods` on the parent interface.
+/// This method body is not created when not using `DeclareInterfaceMethods` on the parent interface or if the method
+/// is listed as one of the overridden methods in `DeclareInterfaceMethods`, allowing for users to manually implement
+/// them instead.
 class ExtendableInterfaceMethod<string desc, string retTy, string methodName,
                       dag args = (ins), code p = "", code e = ""> : InterfaceMethod<desc, retTy, methodName, args> {
     /// Method body prologue.
