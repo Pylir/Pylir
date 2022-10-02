@@ -56,6 +56,58 @@ T1* roundUpTo(T1* ptr, T2 multiple)
     return reinterpret_cast<T1*>(std::align(multiple, sizeof(T1), temp, dummy));
 }
 
+/// Returns the amount the amount of zero bits, starting from the least significant bit, up until the very first bit
+/// set. If the value is zero, returns the bit-width of its type. Only allowed for unsigned integer types.
+template <class T, std::enable_if_t<std::is_unsigned_v<T>>* = nullptr>
+unsigned countTrailingZeros(T value)
+{
+    if (!value)
+    {
+        return std::numeric_limits<T>::digits;
+    }
+
+    if constexpr (sizeof(T) == 4)
+    {
+#ifdef __has_builtin
+    #if __has_builtin(__builtin_ctz)
+        return __builtin_ctz(value);
+    #endif
+#elif defined(_MSC_VER)
+        unsigned long result;
+        _BitScanForward(&result, value);
+        return result;
+#endif
+    }
+    else if constexpr (sizeof(T) == 8)
+    {
+#ifdef __has_builtin
+    #if __has_builtin(__builtin_ctzll)
+        return __builtin_ctzll(value);
+    #endif
+#elif defined(_MSC_VER)
+        unsigned long result;
+        _BitScanForward64(&result, value);
+        return result;
+#endif
+    }
+
+    // Essentially doing a binary search, checking if 'bitWidthChecked' are set and coming closer to the result by
+    // reducing the bits checked gradually to one.
+    unsigned result = 0;
+    T bitWidthChecked = std::numeric_limits<T>::digits / 2;
+    for (; bitWidthChecked; bitWidthChecked /= 2)
+    {
+        T temp = value << bitWidthChecked;
+        if (!temp)
+        {
+            result += bitWidthChecked;
+            continue;
+        }
+        value = temp;
+    }
+    return result;
+}
+
 /// Type dependent constant that always returns false. This isa useful inside of `static_assert` functions as it makes
 /// the expression type dependent (and hence, does not trigger immediately as `static_assert(false)` would) and yet
 /// always triggers if the corresponding code path isa instantiated.
