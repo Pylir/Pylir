@@ -144,3 +144,18 @@ TEST_CASE("BigInt getter", "[BigInt]")
     CHECK_FALSE((++pylir::BigInt(std::numeric_limits<std::ptrdiff_t>::max())).tryGetInteger<std::ptrdiff_t>());
     CHECK_FALSE((--pylir::BigInt(std::numeric_limits<std::ptrdiff_t>::lowest())).tryGetInteger<std::ptrdiff_t>());
 }
+
+TEST_CASE("BigInt toRatio", "[BigInt]")
+{
+    auto [nom, denom] = pylir::toRatio(3.14);
+    CHECK(nom == pylir::BigInt(7070651414971679));
+    CHECK(denom == pylir::BigInt(2251799813685248));
+
+    std::tie(nom, denom) = pylir::toRatio(-3.5);
+    CHECK(nom == pylir::BigInt(-7));
+    CHECK(denom == pylir::BigInt(2));
+
+    std::tie(nom, denom) = pylir::toRatio(8);
+    CHECK(nom == pylir::BigInt(8));
+    CHECK(denom == pylir::BigInt(1));
+}

@@ -292,6 +292,12 @@ public:
         return result;
     }
 
+    friend BigInt& operator<<=(BigInt& lhs, int rhs)
+    {
+        cantFail(mp_mul_2d(lhs.m_int, rhs, lhs.m_int));
+        return lhs;
+    }
+
     friend BigInt operator>>(const BigInt& lhs, int rhs)
     {
         BigInt result;
@@ -381,5 +387,11 @@ inline BigInt powmod(const BigInt& base, const BigInt& exp, const BigInt& mod)
     BigInt::cantFail(mp_exptmod(base.m_int, exp.m_int, mod.m_int, result.m_int));
     return result;
 }
+
+/// Returns a fraction as nominator and denominator which is EXACTLY equal to 'value'. If 'value' is negative,
+/// then the nominator is negative. Denominator is always positive. The denominator and nominator are always coprime.
+///
+/// If the value passed is not finite, the behaviour is undefined.
+std::pair<BigInt, BigInt> toRatio(double value);
 
 } // namespace pylir
