@@ -114,7 +114,7 @@ endfunction()
 function(add_build_reproducibility_settings target)
 # Make the build reproducible on versions of g++ and clang that supports -ffile-prefix-map
   if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND NOT ${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 8) OR
-     ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND NOT ${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 10))
+  ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND NOT ${CMAKE_CXX_COMPILER_VERSION} VERSION_LESS 10 AND NOT MSVC))
     target_compile_options(${target} PRIVATE "-ffile-prefix-map=${CATCH_DIR}=.")
   endif()
 endfunction()
