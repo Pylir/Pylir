@@ -881,18 +881,24 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
                         results.emplace_back(entry.value);
                         return mlir::success();
                     }
-                    // TODO:
-                    //  some more generic mechanism to not automatically fail if we know they are definitely NOT
-                    //  equal (trivial for constants at least, except for references as they need to be resolved).
+
                     mlir::Attribute attr1;
                     mlir::Attribute attr2;
-                    if (mlir::matchPattern(entry.key, mlir::m_Constant(&attr1))
-                        && mlir::matchPattern(getKey(), mlir::m_Constant(&attr2)) && attr1 != attr2
-                        && !attr1.isa<RefAttr>())
+                    if (!mlir::matchPattern(entry.key, mlir::m_Constant(&attr1))
+                        || !mlir::matchPattern(getKey(), mlir::m_Constant(&attr2)))
                     {
-                        continue;
+                        return mlir::failure();
                     }
-                    return mlir::failure();
+                    llvm::Optional<bool> equal = isEqual(attr1, attr2);
+                    if (!equal)
+                    {
+                        return mlir::failure();
+                    }
+                    if (*equal)
+                    {
+                        results.emplace_back(entry.value);
+                        return mlir::success();
+                    }
                 }
                 results.emplace_back(Py::UnboundAttr::get(getContext()));
                 return mlir::success();
@@ -1286,8 +1292,6 @@ mlir::LogicalResult resolvesToPattern(mlir::Operation* operation, mlir::Attribut
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyPatterns.cpp.inc"
 } // namespace
-
-#include "PylirPyDialect.hpp"
 
 void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(::mlir::RewritePatternSet& results) const
 {

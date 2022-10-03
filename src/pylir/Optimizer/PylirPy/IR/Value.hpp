@@ -89,4 +89,9 @@ BuiltinMethodKind getEqualsFunction(mlir::Attribute attribute);
 /// null attribute is returned.
 mlir::Attribute getCanonicalEqualsForm(mlir::Attribute attribute);
 
+/// Returns whether 'lhs' and 'rhs' are equal according to '__eq__' or an empty optional if unknown as determined
+/// by 'getCanonicalEqualsForm' for each of 'lhs' and 'rhs'.
+/// Both are required to be one of 'RefAttr', 'UnboundAttr' or 'ObjectAttrInterface'.
+llvm::Optional<bool> isEqual(mlir::Attribute lhs, mlir::Attribute rhs);
+
 } // namespace pylir::Py

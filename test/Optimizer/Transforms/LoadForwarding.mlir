@@ -156,3 +156,60 @@ func.func @test_resources(%arg0 : !py.dynamic) -> index {
 // CHECK: %[[C:.*]] = arith.constant 5
 // CHECK-NOT: py.list.len
 // CHECK: return %[[C]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+
+func.func @test_dict_lookup_makeDict_equal(%hash : index) -> !py.dynamic {
+    %0 = py.constant(#py.int<5>)
+    %1 = py.constant(#py.float<5.0>)
+    %2 = py.makeDict (%0 hash(%hash) : %0)
+    %res2 = py.dict.tryGetItem %2[%1 hash(%hash)]
+    return %res2 : !py.dynamic
+}
+
+// CHECK-LABEL: @test_dict_lookup_makeDict_equal
+// CHECK: %[[C:.*]] = py.constant(#py.int<5>)
+// CHECK: return %[[C]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+
+func.func @test_dict_lookup_makeDict_not_equal(%hash : index) -> !py.dynamic {
+    %0 = py.constant(#py.int<5>)
+    %1 = py.constant(#py.float<3.0>)
+    %2 = py.makeDict (%0 hash(%hash) : %0)
+    %res2 = py.dict.tryGetItem %2[%1 hash(%hash)]
+    return %res2 : !py.dynamic
+}
+
+// CHECK-LABEL: @test_dict_lookup_makeDict_not_equal
+// CHECK: %[[C:.*]] = py.constant(#py.unbound)
+// CHECK: return %[[C]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+
+func.func @test_dict_lookup_makeDict_neg(%hash : index, %key : !py.dynamic) -> !py.dynamic {
+    %0 = py.constant(#py.int<5>)
+    %2 = py.makeDict (%key hash(%hash) : %0)
+    %res2 = py.dict.tryGetItem %2[%0 hash(%hash)]
+    return %res2 : !py.dynamic
+}
+
+// CHECK-LABEL: @test_dict_lookup_makeDict_neg
+// CHECK: %[[D:.*]] = py.makeDict
+// CHECK-NEXT: %[[L:.*]] = py.dict.tryGetItem
+// CHECK-NEXT: return %[[L]]

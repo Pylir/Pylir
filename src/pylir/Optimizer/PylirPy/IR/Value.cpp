@@ -152,3 +152,18 @@ mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute)
     }
     PYLIR_UNREACHABLE;
 }
+
+llvm::Optional<bool> pylir::Py::isEqual(mlir::Attribute lhs, mlir::Attribute rhs)
+{
+    lhs = getCanonicalEqualsForm(lhs);
+    if (!lhs)
+    {
+        return llvm::None;
+    }
+    rhs = getCanonicalEqualsForm(rhs);
+    if (!rhs)
+    {
+        return llvm::None;
+    }
+    return lhs == rhs;
+}
