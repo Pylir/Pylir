@@ -1688,7 +1688,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                 PYLIR_UNREACHABLE;
             }
         }
-        std::vector<std::pair<mlir::Attribute, mlir::Attribute>> keywordDefaultParams;
+        std::vector<Py::DictAttr::Entry> keywordDefaultParams;
         for (auto& iter : keywordOnlyDefaultParameters)
         {
             if (std::holds_alternative<Py::MappingExpansion>(iter))
@@ -1697,16 +1697,19 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                 PYLIR_UNREACHABLE;
             }
             auto& entry = pylir::get<Py::DictEntry>(iter);
-            if (!mlir::matchPattern(entry.key, mlir::m_Constant(&keywordDefaultParams.emplace_back().first)))
+            mlir::Attribute key;
+            if (!mlir::matchPattern(entry.key, mlir::m_Constant(&key)))
+            {
+                // Should not be possible, keys are always 'StrAttr's.
+                PYLIR_UNREACHABLE;
+            }
+            mlir::Attribute value;
+            if (!mlir::matchPattern(entry.value, mlir::m_Constant(&value)))
             {
                 // TODO: emit error as required
                 PYLIR_UNREACHABLE;
             }
-            if (!mlir::matchPattern(entry.value, mlir::m_Constant(&keywordDefaultParams.back().second)))
-            {
-                // TODO: emit error as required
-                PYLIR_UNREACHABLE;
-            }
+            keywordDefaultParams.emplace_back(Py::DictAttr::DeduceNormalizedTag{}, key, value);
         }
         Py::GlobalValueOp valueOp;
         {

@@ -339,8 +339,8 @@ void pylir::Py::DictAttr::destructureAggregate(
 {
     destructureSlots(*this, write);
     auto indexType = mlir::IndexType::get(getContext());
-    write(nullptr, indexType, mlir::IntegerAttr::get(indexType, getValue().size()));
-    for (auto [key, value] : getValue())
+    write(nullptr, indexType, mlir::IntegerAttr::get(indexType, getKeyValuePairs().size()));
+    for (auto [key, value] : getKeyValuePairs())
     {
         write(getCanonicalEqualsForm(key), DynamicType::get(getContext()), value);
     }

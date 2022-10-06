@@ -76,7 +76,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
         .Case(
             [&](pylir::Py::DictAttr dict) -> mlir::LogicalResult
             {
-                for (auto [key, value] : dict.getValue())
+                for (auto [key, value] : dict.getKeyValuePairs())
                 {
                     if (mlir::failed(verify(op, key, collection)))
                     {
@@ -90,6 +90,16 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                     {
                         return op->emitOpError(
                             "Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.");
+                    }
+                }
+                for (const auto& entry :
+                     llvm::make_filter_range(dict.getNormalizedKeysInternal(), [](auto pair) { return pair.first; }))
+                {
+                    const auto& kv = dict.getKeyValuePairs()[entry.second];
+                    if (entry.first != pylir::Py::getCanonicalEqualsForm(kv.first))
+                    {
+                        return op->emitOpError("Incorrect normalized key entry '")
+                               << entry.first << "' for key-value pair '(" << kv.first << ", " << kv.second << ")'";
                     }
                 }
                 return mlir::success();

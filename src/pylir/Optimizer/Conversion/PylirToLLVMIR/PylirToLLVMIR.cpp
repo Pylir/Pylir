@@ -851,7 +851,7 @@ public:
                                                                       llvm::ArrayRef<std::int64_t>{1, 2});
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, zeroI, 2);
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, null, 3);
-                    if (dict.getValue().empty())
+                    if (dict.getKeyValuePairs().empty())
                     {
                         return;
                     }
@@ -861,7 +861,7 @@ public:
                         {
                             auto dictionary = builder.create<mlir::LLVM::AddressOfOp>(
                                 global.getLoc(), m_objectPtrType, mlir::FlatSymbolRefAttr::get(global));
-                            for (const auto& [key, value] : dict.getValue())
+                            for (const auto& [key, value] : dict.getKeyValuePairs())
                             {
                                 auto keyValue = getConstant(global.getLoc(), key, builder);
                                 auto layoutType = getLayoutType(

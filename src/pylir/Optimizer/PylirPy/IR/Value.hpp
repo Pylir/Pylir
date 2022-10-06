@@ -80,8 +80,10 @@ BuiltinMethodKind getHashFunction(mlir::Attribute attribute);
 BuiltinMethodKind getEqualsFunction(mlir::Attribute attribute);
 
 /// Given either a 'RefAttr', 'UnboundAttr' or 'ObjectAttrInterface', returns an attribute suitable for equality
-/// comparison. The precise attribute returned is of no significance, but is guaranteed to be the same attribute for
-/// every input attribute which would compare equal according to '__eq__' at runtime.
+/// comparison. The precise attribute returned is guaranteed to be the same attribute for every input attribute which
+/// would compare equal according to '__eq__' at runtime.
+/// The precise kind of attribute returned is irrelevant to majority of users but may be required for the textual
+/// IR presentation of `DictAttr`. See its description for the concrete attribute kinds by this function.
 ///
 /// This requires that the '__eq__' implementation of the attribute, as determined by 'getEqualsFunction', is known to
 /// the compiler.

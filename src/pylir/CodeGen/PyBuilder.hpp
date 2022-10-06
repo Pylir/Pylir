@@ -95,7 +95,7 @@ public:
         return Py::ListAttr::get(getContext(), value);
     }
 
-    Py::DictAttr getDictAttr(llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> value = {})
+    Py::DictAttr getDictAttr(llvm::ArrayRef<Py::DictAttr::Entry> value = {})
     {
         return Py::DictAttr::get(getContext(), value);
     }

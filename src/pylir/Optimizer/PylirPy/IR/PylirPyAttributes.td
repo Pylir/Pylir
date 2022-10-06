@@ -134,28 +134,98 @@ def PylirPy_SetAttr : TypeObjectSlotsAttr<"Set",
 	let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
 }
 
-def PylirPy_DictAttr : TypeObjectSlotsAttr<"Dict",
-	[ParamSpec<ListPrint<"std::pair<mlir::Attribute, mlir::Attribute>", "Braces", [{
-		[&]() -> mlir::FailureOr<std::pair<mlir::Attribute, mlir::Attribute>> {
-			mlir::Attribute first, second;
-			if ($_parser.parseAttribute(first) || $_parser.parseKeyword("to") || $_parser.parseAttribute(second))
-			{
-				return mlir::failure();
-			}
-			return std::pair{first, second};
-		}()
-	}], [{
-		$_printer << $_self.first << " to " << $_self.second;
-	}]>, "value", "{}">], [], [{
-		auto vector = value.vec();
-		vector.erase(std::unique(vector.begin(), vector.end(),
-                        [](const auto& lhs, const auto& rhs) { return lhs.first == rhs.first; }), vector.end());
-		value = vector;
-	}]> {
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
+    ["replaceImmediateSubAttribute"]>, ObjectAttrInterface, DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
+
     let mnemonic = "dict";
     let summary = "python dictionary";
 
-    let assemblyFormat = "`<` $value ( `,` struct($typeObject, $slots)^)? `>`";
+    let description = [{
+        Attribute for representing a constant dictionary. Like most `ObjectAttrInterface` implementations it is also
+        capable of having a custom `typeObject` as well as `slots`. If a `typeObject` is specified, it has to be a
+        subclass of `builtins.dict`. If unspecified, it defaults to `builtins.dict`.
+
+        `DictAttr` semantically behaves the same as python dictionaries: It uniques the key-value pairs based on the
+        key, ensuring only the latest entry is present, and retains insertion order of all key-value pairs while doing
+        so. The deduplication already happens during parsing.
+
+        The most important detail about using `DictAttr` is understanding the restrictions on the keys. Attributes
+        that are passed in as keys need to have both a known `__hash__` implementation as well as `__eq__`
+        implementation (as is determined by `getHashFunction` and `getEqualsFunction`). It is therefore not possible to
+        have arbitrary keys in a `DictAttr`.
+
+        Additionally, it is necessary to also specify a "normalized key" when constructing a `DictAttr` or within
+        the IR syntax, if using a `RefAttr` as key that does not use identity equality as equals function. The
+        normalized key is the result of calling `getCanonicalEqualsForm` on the actual key of an entry and is what is
+        used to determine whether two keys are equal.
+        Given a `RefAttr` referring to a `py.globalValue` with the given equals function of the initializer argument,
+        the following attribute kinds are returned by `getCanonicalEqualsForm`:
+        * `py.int`, `py.float` -> `py.frac`
+        * `py.str` -> "string literal"
+
+        Syntax:
+        ```
+        optional-attrs ::= (`typeObject` | `slots`) `=` attr
+        dict ::= `#py.dict` `<` `{` { attr [`norm` attr] `to` attr } `}` [`,` optional-attrs { `,` optional-attrs} ] `>`
+        ```
+
+        Examples:
+        ```
+        #py.dict<{#py.ref<@intGlobalValue> norm #py.frac<3,5> to #py.str<"value">}>
+        #py.dict<{#py.ref<@strGlobalValue> norm "the text" to #py.str<"value">}>
+        #py.dict<{#py.int<5> to #py.str<"value">}>
+        ```
+    }];
+
+    let parameters = (ins ArrayRefParameter<"std::pair<mlir::Attribute, std::size_t>">:$normalized_keys_internal,
+                          ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>">:$key_value_pairs,
+                          DefaultType<"Dict">:$typeObject, SlotsMap:$slots);
+
+    let builders = [
+        AttrBuilder<(ins CArg<"llvm::ArrayRef<Entry>", "{}">:$entries, CArg<"::pylir::Py::RefAttr", "{}">:$typeObject,
+                         CArg<"mlir::DictionaryAttr", "{}">:$slots)>
+    ];
+
+    let assemblyFormat = [{
+        `<` custom<KVPair>($key_value_pairs, $normalized_keys_internal) (`,` struct($typeObject, $slots)^)? `>`
+    }];
+
+    let extraClassDeclaration = [{
+
+        /// Tag used in 'Entry' to signal that the normalized key should be deduced.
+        struct DeduceNormalizedTag{};
+
+        struct Entry
+        {
+            mlir::Attribute key;
+            mlir::Attribute normalizedKey;
+            mlir::Attribute value;
+
+            /// Constructs an entry by explicitly specifying the key, its normalized value and the mapped to value.
+            Entry(mlir::Attribute key, mlir::Attribute normalizedKey, mlir::Attribute value) : key(key),
+                normalizedKey(normalizedKey), value(value)
+            {}
+
+            /// Constructs an entry by specifying the key and the mapped to value. The normalized value will be
+            /// deduced from the key.
+            Entry(DeduceNormalizedTag, mlir::Attribute key, mlir::Attribute value) : key(key), normalizedKey(nullptr),
+                value(value)
+            {}
+        };
+
+        /// Returns the value for a given key in the dictionary. Returns a null attribute if not found. The key must be
+        /// a 'RefAttr' or 'ObjectAttrInterface'.
+        mlir::Attribute lookup(mlir::Attribute key) const;
+
+        /// Returns a range of all the normalized keys. The order is unspecified.
+        auto getNormalizedKeys() const
+        {
+            return llvm::make_filter_range(llvm::map_range(getNormalizedKeysInternal(),
+                +[](std::pair<mlir::Attribute, std::size_t> pair) {
+                    return pair.first;
+                }), +[](mlir::Attribute attr) { return static_cast<bool>(attr); });
+        }
+    }];
 }
 
 def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
@@ -188,14 +258,21 @@ def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let summary = "python unbound value";
 }
 
+def BigIntParam : AttrParameter<"::pylir::BigInt", "Arbitrary sized integer", "const pylir::BigInt&"> {
+    let printer = "$_printer << $_self.toString();";
+}
+
 def PylirPy_FractionalAttr : PylirPy_Attr<"Fractional"> {
 
+    let mnemonic = "frac";
+
     let description = [{
-        Utility attribute used within compiler passes for computation, but is not part of the IR.
+
     }];
 
-    let parameters = (ins AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">:$nominator,
-                          AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">:$denominator);
+    let parameters = (ins BigIntParam:$nominator, BigIntParam:$denominator);
+
+    let assemblyFormat = "`<` $nominator `,` $denominator `>`";
 }
 
 #endif

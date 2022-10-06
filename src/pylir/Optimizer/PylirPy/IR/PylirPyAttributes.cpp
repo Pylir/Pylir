@@ -7,6 +7,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/DialectImplementation.h>
 
+#include <llvm/ADT/MapVector.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/TypeSwitch.h>
@@ -15,6 +16,7 @@
 
 #include "PylirPyDialect.hpp"
 #include "PylirPyOps.hpp"
+#include "Value.hpp"
 
 template <>
 struct mlir::FieldParser<llvm::APFloat>
@@ -91,9 +93,6 @@ pylir::Py::GlobalValueOp pylir::Py::RefAttr::getSymbol() const
     return mlir::dyn_cast_or_null<GlobalValueOp>(getImpl()->value);
 }
 
-#define GET_ATTRDEF_CLASSES
-#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
-
 void pylir::Py::PylirPyDialect::initializeAttributes()
 {
     addAttributes<
@@ -102,37 +101,171 @@ void pylir::Py::PylirPyDialect::initializeAttributes()
         >();
 }
 
-void pylir::Py::PylirPyDialect::printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter& os) const
+namespace
 {
-    if (auto boolAttr = attr.dyn_cast<BoolAttr>())
+
+std::size_t lookup(llvm::ArrayRef<std::pair<mlir::Attribute, std::size_t>> normalizedKeys, mlir::Attribute key)
+{
+    for (auto bucket = hash_value(key) % normalizedKeys.size();;
+         // This is essentially bucket = (bucket + 1) % normalizedKeys.size(), but uses a conditional move instead
+         // of a module operation on each iteration.
+         bucket = bucket + 1 < normalizedKeys.size() ? bucket + 1 : 0)
     {
-        os << BoolAttr::getMnemonic();
-        boolAttr.print(os);
-        return;
+        if (!normalizedKeys[bucket].first || key == normalizedKeys[bucket].first)
+        {
+            return bucket;
+        }
     }
-    (void)generatedAttributePrinter(attr, os);
+    PYLIR_UNREACHABLE;
 }
 
-mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(mlir::DialectAsmParser& parser, mlir::Type type) const
+struct UniqueOutput
 {
-    llvm::StringRef keyword;
-    mlir::Attribute res;
-    auto loc = parser.getCurrentLocation();
-    if (auto opt = generatedAttributeParser(parser, &keyword, type, res); opt.has_value())
-    {
-        if (mlir::failed(*opt))
-        {
-            return {};
-        }
-        return res;
-    }
-    if (keyword == BoolAttr::getMnemonic())
-    {
-        return BoolAttr::parse(parser, type);
-    }
-    parser.emitError(loc, "Unknown dialect attribute: ") << keyword;
-    return res;
+    llvm::SmallVector<std::pair<mlir::Attribute, std::size_t>> normalizedKeysUnique;
+    llvm::SmallVector<std::pair<mlir::Attribute, mlir::Attribute>> keyValuePairsUnique;
+};
+
+mlir::Attribute noRefCastNormalize(mlir::Attribute attr)
+{
+    return llvm::TypeSwitch<mlir::Attribute, mlir::Attribute>(attr)
+        .Case([](pylir::Py::IntAttr intAttr)
+              { return pylir::Py::FractionalAttr::get(intAttr.getContext(), intAttr.getValue(), pylir::BigInt(1)); })
+        .Case(
+            [](pylir::Py::FloatAttr floatAttr)
+            {
+                auto [nom, denom] = pylir::toRatio(floatAttr.getDoubleValue());
+                return pylir::Py::FractionalAttr::get(floatAttr.getContext(), std::move(nom), std::move(denom));
+            })
+        .Case([](pylir::Py::StrAttr strAttr)
+              { return mlir::StringAttr::get(strAttr.getContext(), strAttr.getValue()); })
+        .Default(attr);
 }
+
+UniqueOutput unique(llvm::ArrayRef<pylir::Py::DictAttr::Entry> entries)
+{
+    // Doing this step ahead of time with a MapVector purely to get the correct size ahead of time. Changing size
+    // would require rehashing.
+    llvm::MapVector<mlir::Attribute, std::pair<mlir::Attribute, mlir::Attribute>> map;
+    for (auto [key, normKey, value] : entries)
+    {
+        if (!normKey)
+        {
+            normKey = noRefCastNormalize(key);
+        }
+        auto [iter, inserted] = map.insert({normKey, {key, value}});
+        if (!inserted)
+        {
+            // We have to retain the key, but update the value it is mapped to.
+            iter->second.second = value;
+        }
+    }
+
+    // Our Hashtable has a load factor of 0.9 currently. The tradeoff here is between memory usage and lookup
+    // speed, especially in the case of a key not being within the dictionary.
+    UniqueOutput result;
+    result.normalizedKeysUnique.resize(10 * map.size() / 9);
+    result.keyValuePairsUnique.reserve(map.size());
+    for (auto& [key, pair] : map)
+    {
+        result.normalizedKeysUnique[lookup(result.normalizedKeysUnique, key)] = {key,
+                                                                                 result.keyValuePairsUnique.size()};
+        result.keyValuePairsUnique.push_back(std::move(pair));
+    }
+    return result;
+}
+
+} // namespace
+
+pylir::Py::DictAttr pylir::Py::DictAttr::get(mlir::MLIRContext* context, llvm::ArrayRef<Entry> entries,
+                                             RefAttr typeObject, mlir::DictionaryAttr slots)
+{
+    typeObject = typeObject ? typeObject : RefAttr::get(context, Builtins::Dict.name);
+    slots = slots ? slots : mlir::DictionaryAttr::get(context, {});
+
+    auto result = ::unique(entries);
+    return Base::get(context, result.normalizedKeysUnique, result.keyValuePairsUnique, typeObject, slots);
+}
+
+mlir::Attribute pylir::Py::DictAttr::lookup(mlir::Attribute key) const
+{
+    auto index = ::lookup(getNormalizedKeysInternal(), getCanonicalEqualsForm(key));
+    const auto& entry = getNormalizedKeysInternal()[index];
+    if (!entry.first)
+    {
+        return nullptr;
+    }
+    return getKeyValuePairs()[entry.second].second;
+}
+
+namespace
+{
+
+mlir::LogicalResult
+    parseKVPair(mlir::AsmParser& parser,
+                mlir::FailureOr<llvm::SmallVector<std::pair<mlir::Attribute, mlir::Attribute>>>& values,
+                mlir::FailureOr<llvm::SmallVector<std::pair<mlir::Attribute, std::size_t>>>& normalizedKeys)
+{
+    values.emplace();
+    llvm::SmallVector<pylir::Py::DictAttr::Entry> entries;
+    auto parseResult = parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
+                                                      [&]
+                                                      {
+                                                          mlir::Attribute key;
+                                                          mlir::Attribute normKey;
+                                                          mlir::Attribute value;
+                                                          if (parser.parseAttribute(key))
+                                                          {
+                                                              return mlir::failure();
+                                                          }
+                                                          if (mlir::succeeded(parser.parseOptionalKeyword("norm")))
+                                                          {
+                                                              if (mlir::failed(parser.parseAttribute(normKey)))
+                                                              {
+                                                                  return mlir::failure();
+                                                              }
+                                                          }
+                                                          else
+                                                          {
+                                                              normKey = noRefCastNormalize(key);
+                                                          }
+                                                          if (parser.parseKeyword("to") || parser.parseAttribute(value))
+                                                          {
+                                                              return mlir::failure();
+                                                          }
+                                                          entries.emplace_back(key, normKey, value);
+                                                          return mlir::success();
+                                                      });
+    if (mlir::failed(parseResult))
+    {
+        return mlir::failure();
+    }
+
+    auto result = ::unique(entries);
+    values = std::move(result.keyValuePairsUnique);
+    normalizedKeys = std::move(result.normalizedKeysUnique);
+
+    return mlir::success();
+}
+
+void printKVPair(mlir::AsmPrinter& printer, llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> values,
+                 llvm::ArrayRef<std::pair<mlir::Attribute, std::size_t>>)
+{
+    printer << "{";
+    llvm::interleaveComma(values, printer.getStream(),
+                          [&](auto pair)
+                          {
+                              printer << pair.first;
+                              if (auto canonical = pylir::Py::getCanonicalEqualsForm(pair.first);
+                                  canonical != noRefCastNormalize(pair.first))
+                              {
+                                  printer << " norm " << canonical;
+                              }
+                              printer << " to " << pair.second;
+                          });
+    printer << "}";
+}
+
+} // namespace
 
 void pylir::Py::BoolAttr::print(mlir::AsmPrinter& printer) const
 {
@@ -177,12 +310,13 @@ mlir::DictionaryAttr pylir::Py::FunctionAttr::getSlots() const
 void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                    llvm::function_ref<void(mlir::Type)>) const
 {
-    std::for_each(getValue().begin(), getValue().end(),
-                  [&](auto&& pair)
-                  {
-                      walkAttrsFn(pair.first);
-                      walkAttrsFn(pair.second);
-                  });
+    llvm::for_each(getNormalizedKeys(), walkAttrsFn);
+    llvm::for_each(getKeyValuePairs(),
+                   [&](auto&& pair)
+                   {
+                       walkAttrsFn(pair.first);
+                       walkAttrsFn(pair.second);
+                   });
     walkAttrsFn(getTypeObject());
     walkAttrsFn(getSlots());
 }
@@ -190,13 +324,24 @@ void pylir::Py::DictAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
 mlir::Attribute pylir::Py::DictAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
                                                                  llvm::ArrayRef<mlir::Type>) const
 {
-    auto type = replAttrs.take_back(2).back().cast<RefAttr>();
-    auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
-    std::vector<std::pair<mlir::Attribute, mlir::Attribute>> vector;
+    auto normalizedKeys = replAttrs.take_front(getKeyValuePairs().size());
+    replAttrs = replAttrs.drop_front(getKeyValuePairs().size());
+    std::vector<Entry> vector;
     for (std::size_t i = 0; i < replAttrs.size() - 2; i += 2)
     {
-        vector.emplace_back(replAttrs[i], replAttrs[i + 1]);
+        vector.emplace_back(replAttrs[i], nullptr, replAttrs[i + 1]);
     }
+
+    for (auto [newKey, oldEntry] :
+         llvm::zip(normalizedKeys, llvm::make_filter_range(
+                                       getNormalizedKeysInternal(),
+                                       +[](std::pair<mlir::Attribute, std::size_t> pair) { return pair.first; })))
+    {
+        vector[oldEntry.second].normalizedKey = newKey;
+    }
+
+    auto type = replAttrs.take_back(2).back().cast<RefAttr>();
+    auto slots = replAttrs.back().cast<mlir::DictionaryAttr>();
     return get(getContext(), vector, type, slots);
 }
 
@@ -372,4 +517,39 @@ mlir::Attribute pylir::Py::RefAttr::replaceImmediateSubElements(::llvm::ArrayRef
                                                                 ::llvm::ArrayRef<::mlir::Type>) const
 {
     return RefAttr::get(getContext(), replAttrs[0].cast<mlir::FlatSymbolRefAttr>());
+}
+
+#define GET_ATTRDEF_CLASSES
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
+
+void pylir::Py::PylirPyDialect::printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter& os) const
+{
+    if (auto boolAttr = attr.dyn_cast<BoolAttr>())
+    {
+        os << BoolAttr::getMnemonic();
+        boolAttr.print(os);
+        return;
+    }
+    (void)generatedAttributePrinter(attr, os);
+}
+
+mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(mlir::DialectAsmParser& parser, mlir::Type type) const
+{
+    llvm::StringRef keyword;
+    mlir::Attribute res;
+    auto loc = parser.getCurrentLocation();
+    if (auto opt = generatedAttributeParser(parser, &keyword, type, res); opt.has_value())
+    {
+        if (mlir::failed(*opt))
+        {
+            return {};
+        }
+        return res;
+    }
+    if (keyword == BoolAttr::getMnemonic())
+    {
+        return BoolAttr::parse(parser, type);
+    }
+    parser.emitError(loc, "Unknown dialect attribute: ") << keyword;
+    return res;
 }

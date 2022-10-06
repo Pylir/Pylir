@@ -704,7 +704,7 @@ mlir::OpFoldResult pylir::Py::StrConcatOp::fold(::llvm::ArrayRef<::mlir::Attribu
 mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
     auto constantDict = ref_cast_or_null<DictAttr>(operands[0]);
-    if (constantDict && constantDict.getValue().empty())
+    if (constantDict && constantDict.getKeyValuePairs().empty())
     {
         return Py::UnboundAttr::get(getContext());
     }
@@ -718,7 +718,7 @@ mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attr
         return nullptr;
     }
     // TODO: Make this work in the general case for builtin types (that have a known __eq__ impl)
-    for (const auto& [key, value] : constantDict.getValue())
+    for (const auto& [key, value] : constantDict.getKeyValuePairs())
     {
         if (key == operands[1] || ref_cast_or_null<ObjectAttrInterface>(key) == resolvedKey)
         {
@@ -735,7 +735,7 @@ mlir::OpFoldResult pylir::Py::DictLenOp::fold(::llvm::ArrayRef<mlir::Attribute> 
     {
         return nullptr;
     }
-    return mlir::IntegerAttr::get(mlir::IndexType::get(getContext()), constantDict.getValue().size());
+    return mlir::IntegerAttr::get(mlir::IndexType::get(getContext()), constantDict.getKeyValuePairs().size());
 }
 
 mlir::LogicalResult pylir::Py::GlobalValueOp::fold(::llvm::ArrayRef<mlir::Attribute>,

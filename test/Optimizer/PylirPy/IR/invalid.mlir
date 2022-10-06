@@ -144,3 +144,15 @@ func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
 // expected-error@below {{Expected __dict__ to refer to a dictionary}}
 py.globalValue @lol = #py.function<@foo, dict = #py.int<5>>
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type
+
+py.globalValue @lol = #py.int<5>
+
+// expected-error@below {{Incorrect normalized key entry '#py.ref<@lol>' for key-value pair '(#py.ref<@lol>, #py.int<3>)'}}
+py.globalValue @foo = #py.dict<{#py.ref<@lol> to #py.int<3>}>
