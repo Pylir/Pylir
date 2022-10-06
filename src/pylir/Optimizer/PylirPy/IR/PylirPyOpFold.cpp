@@ -704,28 +704,27 @@ mlir::OpFoldResult pylir::Py::StrConcatOp::fold(::llvm::ArrayRef<::mlir::Attribu
 mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)
 {
     auto constantDict = ref_cast_or_null<DictAttr>(operands[0]);
-    if (constantDict && constantDict.getKeyValuePairs().empty())
-    {
-        return Py::UnboundAttr::get(getContext());
-    }
     if (!constantDict)
     {
         return nullptr;
     }
-    auto resolvedKey = ref_cast_or_null<ObjectAttrInterface>(operands[1]);
-    if (!constantDict || !operands[1])
+
+    // If the dictionary is empty we don't need the key operand to be constant, it can only be unbound.
+    if (constantDict.getKeyValuePairs().empty())
+    {
+        return UnboundAttr::get(getContext());
+    }
+
+    if (!operands[1])
     {
         return nullptr;
     }
-    // TODO: Make this work in the general case for builtin types (that have a known __eq__ impl)
-    for (const auto& [key, value] : constantDict.getKeyValuePairs())
+    auto mappedValue = constantDict.lookup(operands[1]);
+    if (!mappedValue)
     {
-        if (key == operands[1] || ref_cast_or_null<ObjectAttrInterface>(key) == resolvedKey)
-        {
-            return value;
-        }
+        return UnboundAttr::get(getContext());
     }
-    return nullptr;
+    return mappedValue;
 }
 
 mlir::OpFoldResult pylir::Py::DictLenOp::fold(::llvm::ArrayRef<mlir::Attribute> operands)

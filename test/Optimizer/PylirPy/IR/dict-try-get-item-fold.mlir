@@ -3,6 +3,9 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
+py.globalValue @builtins.int = #py.type
+py.globalValue @builtins.float = #py.type
+py.globalValue @builtins.str = #py.type
 
 func.func @test(%arg0 : !py.dynamic, %arg1 : index) -> i1 {
     %0 = py.constant(#py.dict<{}>)
@@ -14,3 +17,14 @@ func.func @test(%arg0 : !py.dynamic, %arg1 : index) -> i1 {
 // CHECK-LABEL: @test
 // CHECK-DAG: %[[C1:.*]] = arith.constant true
 // CHECK: return %[[C1]]
+
+func.func @test2(%arg0 : index) -> !py.dynamic {
+    %0 = py.constant(#py.dict<{#py.int<5> to #py.str<"value">}>)
+    %1 = py.constant(#py.float<5.0>)
+    %2 = py.dict.tryGetItem %0[%1 hash(%arg0)]
+    return %2 : !py.dynamic
+}
+
+// CHECK-LABEL: @test2
+// CHECK: %[[C:.*]] = py.constant(#py.str<"value">)
+// CHECK: return %[[C]]

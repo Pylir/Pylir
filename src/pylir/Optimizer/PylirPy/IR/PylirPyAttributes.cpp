@@ -188,6 +188,10 @@ pylir::Py::DictAttr pylir::Py::DictAttr::get(mlir::MLIRContext* context, llvm::A
 
 mlir::Attribute pylir::Py::DictAttr::lookup(mlir::Attribute key) const
 {
+    if (getNormalizedKeysInternal().empty())
+    {
+        return nullptr;
+    }
     auto index = ::lookup(getNormalizedKeysInternal(), getCanonicalEqualsForm(key));
     const auto& entry = getNormalizedKeysInternal()[index];
     if (!entry.first)
