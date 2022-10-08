@@ -11,13 +11,27 @@ include "pylir/Optimizer/Util/OpVariableBase.td"
 def CaptureInterface : OpInterface<"CaptureInterface"> {
     let cppNamespace = "::pylir";
 
+    let description = [{
+        This interface allows operations to specify whether they capture an object reference. A capture is defined
+        as copying the object reference itself, making it possible for it to persist longer than its SSA value.
+        Operations that simply use an object reference as operand to read from are typical examples for operations
+        that do not capture. A store into an aggregate which copies the object reference is a typical example for
+        an operation that captures that specific value.
+
+        For the ease of definition the `Captured` annotation can be used to annotate that an operation captures the
+        value input into the annotated operand.
+    }];
+
     let methods = [
-        ExtendableInterfaceMethod<[{}], "bool", "capturesValue", (ins "::mlir::Value":$value), [{
+        ExtendableInterfaceMethod<[{
+            Returns whether the operation captures the value.
+        }], "bool", "capturesValue", (ins "::mlir::Value":$value), [{
             bool isCaptured = false;
         }], "return isCaptured;">
     ];
 }
 
+/// Op Operand annotation to specify that the value of the specific operand is captured by the operation.
 def Captured : OpVariableGen<CaptureInterface> {
     let methodGens = [
         OpVariableMethodGen<"capturesValue", [{
