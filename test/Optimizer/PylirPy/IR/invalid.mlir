@@ -15,8 +15,8 @@ func.func @test() {
 
 // -----
 
-py.globalValue const @builtins.type = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
-py.globalValue const @builtins.object = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.object>)>>
+py.globalValue const @builtins.type = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
+py.globalValue const @builtins.object = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.object>)>>
 py.globalValue const @builtins.function = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
@@ -25,7 +25,7 @@ py.globalValue const @builtins.None = #py.type
 
 func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
-py.globalValue const @Foo = #py.type<mroTuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>, slots = {
+py.globalValue const @Foo = #py.type<mro_tuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>, slots = {
     __hash__ = #py.function<@foo>
 }>
 
@@ -35,8 +35,8 @@ py.globalValue @dict = #py.dict<{#py.ref<@bar> to #py.ref<@builtins.None>}>
 
 // -----
 
-py.globalValue const @builtins.type = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
-py.globalValue const @builtins.object = #py.type<mroTuple = #py.tuple<(#py.ref<@builtins.object>)>>
+py.globalValue const @builtins.type = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
+py.globalValue const @builtins.object = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.object>)>>
 py.globalValue const @builtins.function = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.str = #py.type
@@ -45,7 +45,7 @@ py.globalValue const @builtins.None = #py.type
 
 func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
-py.globalValue @Foo = #py.type<mroTuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>>
+py.globalValue @Foo = #py.type<mro_tuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>>
 
 py.globalValue @bar = #py.obj<#py.ref<@Foo>>
 // expected-error@below {{Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.}}
@@ -99,7 +99,7 @@ func.func @foo() {
 // -----
 
 // expected-error@below {{Expected MRO to refer to a tuple}}
-py.globalValue @builtins.type = #py.type<mroTuple = #py.int<5>>
+py.globalValue @builtins.type = #py.type<mro_tuple = #py.int<5>>
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.tuple = #py.type
 
@@ -129,7 +129,7 @@ py.globalValue @builtins.function = #py.type
 func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
 // expected-error@below {{Expected __kwdefaults__ to refer to a dictionary}}
-py.globalValue @lol = #py.function<@foo, kwDefaults = #py.int<5>>
+py.globalValue @lol = #py.function<@foo, kw_defaults = #py.int<5>>
 
 // -----
 

@@ -129,7 +129,7 @@ func.func private @"builtins.type.__call__$cc[0]"(%arg0: !py.dynamic, %arg1: !py
   return %20 : !py.dynamic
 }
 
-py.globalValue "private" const @builtins.type.__call__ = #py.function<@"builtins.type.__call__$cc[0]", qualName = #py.str<"builtins.type.__call__">, defaults = #py.tuple<()>, kwDefaults = #py.dict<{}>>
+py.globalValue "private" const @builtins.type.__call__ = #py.function<@"builtins.type.__call__$cc[0]", qual_name = #py.str<"builtins.type.__call__">, defaults = #py.tuple<()>, kw_defaults = #py.dict<{}>>
 
 func.func @root() -> !py.dynamic {
     %3 = py.constant(#py.dict<{}>)

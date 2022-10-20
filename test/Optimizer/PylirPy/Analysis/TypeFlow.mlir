@@ -28,7 +28,7 @@ func.func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynami
 // CHECK: return %[[RES]]
 
 py.globalValue @builtins.int.__add__ = #py.function<@builtins.int.__add__$impl>
-py.globalValue const @builtins.int = #py.type<slots = {__add__ = #py.ref<@builtins.int.__add__>}, mroTuple = #py.tuple<(#py.ref<@builtins.int>)>>
+py.globalValue const @builtins.int = #py.type<slots = {__add__ = #py.ref<@builtins.int.__add__>}, mro_tuple = #py.tuple<(#py.ref<@builtins.int>)>>
 
 func.func @__init__() {
 	%one = py.constant(#py.int<1>)

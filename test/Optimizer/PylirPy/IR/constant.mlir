@@ -18,7 +18,7 @@ func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) ->
     return %arg0 : !py.dynamic
 }
 
-py.globalValue @test_function = #py.function<@foo, kwDefaults = #py.dict<{}>>
+py.globalValue @test_function = #py.function<@foo, kw_defaults = #py.dict<{}>>
 
 // CHECK-LABEL: test_constant_integer
 func.func @test_constant_integer() -> !py.dynamic {
