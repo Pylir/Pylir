@@ -30,7 +30,7 @@ jobs:
           path: Pylir
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4.3
         with:
           python-version: 3.9
 
@@ -97,7 +97,7 @@ jobs:
           path: Pylir
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4.3
         with:
           python-version: 3.9
 
