@@ -18,19 +18,26 @@ jobs:
       matrix:
         os: [ windows-2022, ubuntu-22.04 ]
         cxx_compiler: [ clang++, g++-10, clang-cl ]
-        sanitizer: [ "" ]
-        runtime_lib: [ "" ]
-        c_compiler: [ "" ]
+        sanitizer: [ "", "address,undefined", "thread" ]
+        runtime_lib: [ "", "MultiThreaded", "MultiThreadedDebug" ]
+        c_compiler: [ clang, gcc-10, clang-cl ]
         exclude:
           - { os: windows-2022, cxx_compiler: g++-10 }
           - { os: ubuntu-22.04, cxx_compiler: clang-cl }
-        include:
-          - { cxx_compiler: clang++, c_compiler: clang }
-          - { cxx_compiler: clang++, c_compiler: clang, sanitizer: "address,undefined" }
-          - { cxx_compiler: clang++, c_compiler: clang, sanitizer: "thread" }
-          - { cxx_compiler: clang-cl, c_compiler: clang-cl, runtime_lib: "MultiThreadedDebug" }
-          - { cxx_compiler: clang-cl, c_compiler: clang-cl, runtime_lib: "MultiThreaded" }
-          - { cxx_compiler: g++-10, c_compiler: gcc-10 }
+          - { os: ubuntu-22.04, runtime_lib: "MultiThreaded" }
+          - { os: ubuntu-22.04, runtime_lib: "MultiThreadedDebug" }
+          - { cxx_compiler: clang++, c_compiler: gcc-10 }
+          - { cxx_compiler: clang++, c_compiler: clang-cl }
+          - { cxx_compiler: clang-cl, c_compiler: clang }
+          - { cxx_compiler: clang-cl, c_compiler: gcc-10 }
+          - { cxx_compiler: g++-10, c_compiler: clang }
+          - { cxx_compiler: g++-10, c_compiler: clang-cl }
+          - { cxx_compiler: g++-10, sanitizer: "address,undefined" }
+          - { cxx_compiler: g++-10, sanitizer: "thread" }
+          - { cxx_compiler: clang-cl, sanitizer: "address,undefined" }
+          - { cxx_compiler: clang-cl, sanitizer: "thread" }
+          - { cxx_compiler: clang++, runtime_lib: "MultiThreaded" }
+          - { cxx_compiler: clang++, runtime_lib: "MultiThreadedDebug" }
 
     runs-on: ${{matrix.os}}
 
