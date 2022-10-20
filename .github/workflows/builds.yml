@@ -124,7 +124,7 @@ jobs:
         run: |
           $sanitizer_arg = ''
           if ('${{matrix.sanitizer}}') {
-            $sanitizer_arg = '-DPYLIR_SANITIZER="${{matrix.sanitizer}}"'
+            $sanitizer_arg = '-DPYLIR_SANITIZER="${{matrix.sanitizer}}" -DCMAKE_CXX_FLAGS="-g1"'
           }
           $runtime_arg = ''
           if ('${{matrix.runtime_lib}}') {
@@ -147,7 +147,6 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
-            -DCMAKE_CXX_FLAGS="-gline-tables-only" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
             -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
