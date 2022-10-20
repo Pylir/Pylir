@@ -26,7 +26,7 @@ jobs:
           sudo apt install libunwind-dev lld
           
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
 
@@ -116,7 +116,7 @@ jobs:
           sudo ./llvm.sh $LLVM_VERSION all
           
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
 

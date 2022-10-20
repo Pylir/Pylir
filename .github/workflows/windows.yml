@@ -30,7 +30,7 @@ jobs:
           path: Pylir
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
 
@@ -97,7 +97,7 @@ jobs:
           path: Pylir
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.9
 
@@ -119,16 +119,17 @@ jobs:
       # See https://github.com/actions/cache/issues/53
       - name: Sanitize key
         id: sanitize-key
-        run: echo "::set-output name=key::$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )"
+        run: |
+          "key=$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
 
       - name: Calculate cache size
         id: cache-size
         shell: pwsh
         run: |
           if ('${{matrix.sanitizer}}') {
-             echo "::set-output name=size::1.5G"
+             "size=1.5G" >> $Env:GITHUB_OUTPUT
           } else {
-             echo "::set-output name=size::0.5G"
+             "size=0.5G" >> $Env:GITHUB_OUTPUT
           }
 
       - name: Install CCache

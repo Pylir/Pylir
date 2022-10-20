@@ -121,4 +121,5 @@ runs:
     - name: Output build dir
       id: output-build-dir
       shell: pwsh
-      run: echo "::set-output name=build-dir::${{github.workspace}}/llvm-build"
+      run: |
+        "build-dir=${{github.workspace}}/llvm-build" >> $Env:GITHUB_OUTPUT
