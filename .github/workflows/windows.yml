@@ -53,8 +53,8 @@ jobs:
         id: llvm-build
         uses: ./Pylir/.github/actions/llvm-build
         with:
-          c-compiler: cl
-          cpp-compiler: cl
+          c-compiler: clang-cl
+          cpp-compiler: clang-cl
           runtime_lib: ${{matrix.runtime_lib}}
 
       - name: Configure Pylir
@@ -64,6 +64,8 @@ jobs:
             -DPYLIR_EMBED_LLD=ON `
             -DCMAKE_CXX_COMPILER=clang-cl `
             -DCMAKE_C_COMPILER=clang-cl `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DCMAKE_LINKER=link `
