@@ -13,7 +13,7 @@ on:
     branches: [ "master" ]
 
 jobs:
-  builds:
+  Builds:
     strategy:
       matrix:
         os: [ windows-2022, ubuntu-22.04 ]
@@ -26,6 +26,7 @@ jobs:
           - { os: ubuntu-22.04, cxx_compiler: clang-cl }
           - { os: ubuntu-22.04, runtime_lib: "MultiThreaded" }
           - { os: ubuntu-22.04, runtime_lib: "MultiThreadedDebug" }
+          - { os: windows-2022, sanitizer: "thread" }
           - { cxx_compiler: clang++, c_compiler: gcc-10 }
           - { cxx_compiler: clang++, c_compiler: clang-cl }
           - { cxx_compiler: clang-cl, c_compiler: clang }
@@ -35,7 +36,6 @@ jobs:
           - { cxx_compiler: g++-10, sanitizer: "address,undefined" }
           - { cxx_compiler: g++-10, sanitizer: "thread" }
           - { cxx_compiler: clang-cl, sanitizer: "address,undefined" }
-          - { cxx_compiler: clang-cl, sanitizer: "thread" }
           - { cxx_compiler: clang++, runtime_lib: "MultiThreaded" }
           - { cxx_compiler: clang++, runtime_lib: "MultiThreadedDebug" }
 
