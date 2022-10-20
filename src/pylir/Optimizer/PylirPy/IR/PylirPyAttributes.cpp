@@ -498,6 +498,7 @@ void pylir::Py::TypeAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
                                                    llvm::function_ref<void(mlir::Type)>) const
 {
     walkAttrsFn(getMroTuple());
+    walkAttrsFn(getInstanceSlots());
     walkAttrsFn(getTypeObject());
     walkAttrsFn(getSlots());
 }
@@ -505,10 +506,11 @@ void pylir::Py::TypeAttr::walkImmediateSubElements(llvm::function_ref<void(mlir:
 mlir::Attribute pylir::Py::TypeAttr::replaceImmediateSubElements(llvm::ArrayRef<mlir::Attribute> replAttrs,
                                                                  llvm::ArrayRef<mlir::Type>) const
 {
-    auto value = replAttrs[0];
-    auto typeObject = replAttrs[1].cast<RefAttr>();
-    auto slots = replAttrs[2].cast<mlir::DictionaryAttr>();
-    return get(getContext(), value, typeObject, slots);
+    auto mro = replAttrs[0];
+    auto instanceSlots = replAttrs[1].cast<pylir::Py::TupleAttr>();
+    auto typeObject = replAttrs[2].cast<RefAttr>();
+    auto slots = replAttrs[3].cast<mlir::DictionaryAttr>();
+    return get(getContext(), mro, instanceSlots, typeObject, slots);
 }
 
 void pylir::Py::RefAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,

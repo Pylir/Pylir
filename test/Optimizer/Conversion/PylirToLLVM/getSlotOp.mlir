@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">)>}>
+py.globalValue @builtins.type = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">)>>
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.tuple = #py.type
@@ -8,7 +8,7 @@ py.globalValue @builtins.tuple = #py.type
 func.func @foo() -> !py.dynamic {
     %0 = py.constant(#py.ref<@builtins.type>)
     %1 = py.constant(#py.ref<@builtins.tuple>)
-    %2 = py.getSlot "__slots__" from %1 : %0
+    %2 = py.getSlot "__eq__" from %1 : %0
     return %2 : !py.dynamic
 }
 
@@ -22,12 +22,13 @@ func.func @foo() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">)>}>
+
+py.globalValue @builtins.type = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">)>>
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.getSlot "__slots__" from %arg0 : %arg1
+    %0 = py.getSlot "__eq__" from %arg0 : %arg1
     return %0 : !py.dynamic
 }
 

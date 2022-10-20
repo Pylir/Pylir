@@ -375,15 +375,16 @@ public:
     {
         if (slotSize)
         {
-            return mlir::LLVM::LLVMStructType::getLiteral(
-                &getContext(),
-                {m_objectPtrType, getIndexType(), m_objectPtrType, m_objectPtrType, getSlotEpilogue(*slotSize)});
+            return mlir::LLVM::LLVMStructType::getLiteral(&getContext(), {m_objectPtrType, getIndexType(),
+                                                                          m_objectPtrType, m_objectPtrType,
+                                                                          m_objectPtrType, getSlotEpilogue(*slotSize)});
         }
         auto pyType = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyType");
         if (!pyType.isInitialized())
         {
             [[maybe_unused]] auto result = pyType.setBody(
-                {m_objectPtrType, getIndexType(), m_objectPtrType, m_objectPtrType, getSlotEpilogue()}, false);
+                {m_objectPtrType, getIndexType(), m_objectPtrType, m_objectPtrType, m_objectPtrType, getSlotEpilogue()},
+                false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return pyType;
@@ -480,17 +481,8 @@ public:
 
     mlir::LLVM::LLVMStructType typeOf(pylir::Py::ObjectAttrInterface objectAttr)
     {
-        auto typeObject = objectAttr.getTypeObject();
-        PYLIR_ASSERT(typeObject);
-        PYLIR_ASSERT(typeObject.getSymbol().getInitializer() && "Type objects can't be declarations");
-        auto slots = typeObject.getSymbol().getInitializerAttr().getSlots();
-        unsigned count = 0;
-        auto result = slots.get("__slots__");
-        if (result)
-        {
-            auto tuple = pylir::Py::ref_cast<pylir::Py::TupleAttr>(result);
-            count = tuple.getValue().size();
-        }
+        unsigned count =
+            pylir::Py::ref_cast<pylir::Py::TypeAttr>(objectAttr.getTypeObject()).getInstanceSlots().getValue().size();
         return llvm::TypeSwitch<pylir::Py::ObjectAttrInterface, mlir::LLVM::LLVMStructType>(objectAttr)
             .Case(
                 [&](pylir::Py::TupleAttr attr)
@@ -686,7 +678,7 @@ public:
         auto typeObject = objectAttr.getTypeObject();
         PYLIR_ASSERT(typeObject);
         PYLIR_ASSERT(typeObject.getSymbol().getInitializerAttr() && "Type objects can't be a declaration");
-        auto typeObjectAttr = typeObject.getSymbol().getInitializerAttr();
+
         auto typeObj = builder.create<mlir::LLVM::AddressOfOp>(global.getLoc(), m_objectPtrType,
                                                                objectAttr.getTypeObject().getRef());
         undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, typeObj, 0);
@@ -907,6 +899,8 @@ public:
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, layoutRef, 2);
                     auto mroConstant = getConstant(global.getLoc(), attr.getMroTuple(), builder);
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, mroConstant, 3);
+                    auto instanceSlots = getConstant(global.getLoc(), attr.getInstanceSlots(), builder);
+                    undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, instanceSlots, 4);
                 })
             .Case(
                 [&](pylir::Py::FunctionAttr function)
@@ -915,26 +909,24 @@ public:
                         global.getLoc(), mlir::LLVM::LLVMPointerType::get(&getContext()), function.getValue());
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, address, 1);
                 });
-        const auto& map = typeObjectAttr.getSlots();
-        if (auto result = map.get("__slots__"))
+
+        auto initMap = objectAttr.getSlots();
+        for (auto [index, slotName] :
+             llvm::enumerate(pylir::Py::ref_cast<pylir::Py::TypeAttr>(typeObject).getInstanceSlots().getValue()))
         {
-            for (const auto& slot : llvm::enumerate(pylir::Py::ref_cast<pylir::Py::TupleAttr>(result).getValue()))
+            mlir::Value value;
+            if (auto element = initMap.get(slotName.cast<pylir::Py::StrAttr>().getValue()); !element)
             {
-                mlir::Value value;
-                auto initMap = objectAttr.getSlots();
-                if (auto element = initMap.get(slot.value().cast<pylir::Py::StrAttr>().getValue()); !element)
-                {
-                    value = builder.create<mlir::LLVM::NullOp>(global.getLoc(), m_objectPtrType);
-                }
-                else
-                {
-                    value = getConstant(global.getLoc(), element, builder);
-                }
-                auto indices = {
-                    static_cast<std::int64_t>(global.getType().cast<mlir::LLVM::LLVMStructType>().getBody().size() - 1),
-                    static_cast<std::int64_t>(slot.index())};
-                undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, value, indices);
+                value = builder.create<mlir::LLVM::NullOp>(global.getLoc(), m_objectPtrType);
             }
+            else
+            {
+                value = getConstant(global.getLoc(), element, builder);
+            }
+            auto indices = {
+                static_cast<std::int64_t>(global.getType().cast<mlir::LLVM::LLVMStructType>().getBody().size() - 1),
+                static_cast<std::int64_t>(index)};
+            undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, value, indices);
         }
 
         builder.create<mlir::LLVM::ReturnOp>(global.getLoc(), undef);
@@ -1348,6 +1340,11 @@ struct PyTypeModel : PyObjectModel
     auto mroPtr(mlir::Location loc)
     {
         return field<Pointer<PyTupleModel>>(loc, 3);
+    }
+
+    auto instanceSlotsPtr(mlir::Location loc)
+    {
+        return field<Pointer<PyTupleModel>>(loc, 4);
     }
 };
 
@@ -2219,23 +2216,15 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             return mlir::failure();
         }
 
-        auto map = typeObject.getSlots();
-        auto iter = map.get("__slots__");
-        if (!iter)
-        {
-            rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
-            return mlir::success();
-        }
-        auto tupleAttr = pylir::Py::ref_cast<pylir::Py::TupleAttr>(iter);
-        PYLIR_ASSERT(tupleAttr);
-        const auto* result = llvm::find_if(tupleAttr.getValue(),
+        auto instanceSlots = typeObject.getInstanceSlots();
+        const auto* result = llvm::find_if(instanceSlots.getValue(),
                                            [&](mlir::Attribute attribute)
                                            {
                                                auto str = pylir::Py::ref_cast<pylir::Py::StrAttr>(attribute);
                                                PYLIR_ASSERT(str);
                                                return str.getValue() == adaptor.getSlot();
                                            });
-        if (result == tupleAttr.getValue().end())
+        if (result == instanceSlots.getValue().end())
         {
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
             return mlir::success();
@@ -2260,7 +2249,7 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
 
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE), objectPtrPtr,
-            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - tupleAttr.getValue().begin()});
+            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - instanceSlots.getValue().begin()});
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep.getSourceElementType(), gep);
         return mlir::success();
     }
@@ -2286,23 +2275,15 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
             return mlir::failure();
         }
 
-        auto map = typeObject.getSlots();
-        auto iter = map.get("__slots__");
-        if (!iter)
-        {
-            rewriter.eraseOp(op);
-            return mlir::success();
-        }
-        auto tupleAttr = pylir::Py::ref_cast<pylir::Py::TupleAttr>(iter);
-        PYLIR_ASSERT(tupleAttr);
-        const auto* result = llvm::find_if(tupleAttr.getValue(),
+        auto instanceSlots = typeObject.getInstanceSlots();
+        const auto* result = llvm::find_if(instanceSlots.getValue(),
                                            [&](mlir::Attribute attribute)
                                            {
                                                auto str = pylir::Py::ref_cast<pylir::Py::StrAttr>(attribute);
                                                PYLIR_ASSERT(str);
                                                return str.getValue() == adaptor.getSlot();
                                            });
-        if (result == tupleAttr.getValue().end())
+        if (result == instanceSlots.getValue().end())
         {
             rewriter.eraseOp(op);
             return mlir::success();
@@ -2327,7 +2308,7 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
 
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE), objectPtrPtr,
-            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - tupleAttr.getValue().begin()});
+            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - instanceSlots.getValue().begin()});
         rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.getValue(), gep);
         return mlir::success();
     }
@@ -2347,12 +2328,10 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
         rewriter.setInsertionPointToEnd(block);
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
-        auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Type.name));
+
         auto slotsTuple =
-            rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
-        mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
-        len = unrealizedConversion(rewriter, len);
+            pyTypeModel(op.getLoc(), rewriter, adaptor.getTypeObject()).instanceSlotsPtr(op.getLoc()).load(op.getLoc());
+        mlir::Value len = slotsTuple.sizePtr(op.getLoc()).load(op.getLoc());
         auto* condition = new mlir::Block;
         {
             auto zero = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), getIndexType(), rewriter.getIndexAttr(0));
@@ -2370,7 +2349,8 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::GetSl
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
-        auto element = rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), slotsTuple, condition->getArgument(0));
+        auto element =
+            rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), mlir::Value{slotsTuple}, condition->getArgument(0));
         auto isEqual = rewriter.create<pylir::Py::StrEqualOp>(op.getLoc(), element, str);
         auto* foundIndex = new mlir::Block;
         auto* loop = new mlir::Block;
@@ -2412,12 +2392,9 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
         rewriter.setInsertionPointToEnd(block);
         auto str = rewriter.create<pylir::Py::ConstantOp>(op.getLoc(),
                                                           pylir::Py::StrAttr::get(getContext(), adaptor.getSlot()));
-        auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
-            rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
-        mlir::Value len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), rewriter.getIndexType(), slotsTuple);
-        len = unrealizedConversion(rewriter, len);
+            pyTypeModel(op.getLoc(), rewriter, adaptor.getTypeObject()).instanceSlotsPtr(op.getLoc()).load(op.getLoc());
+        mlir::Value len = slotsTuple.sizePtr(op.getLoc()).load(op.getLoc());
         auto* condition = new mlir::Block;
         {
             auto zero = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), getIndexType(), rewriter.getIndexAttr(0));
@@ -2434,7 +2411,8 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::SetSl
 
         body->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(body);
-        auto element = rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), slotsTuple, condition->getArgument(0));
+        auto element =
+            rewriter.create<pylir::Py::TupleGetItemOp>(op.getLoc(), mlir::Value{slotsTuple}, condition->getArgument(0));
         auto isEqual = rewriter.create<pylir::Py::StrEqualOp>(op.getLoc(), element, str);
         auto* foundIndex = new mlir::Block;
         auto* loop = new mlir::Block;
@@ -2630,13 +2608,8 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
             return mlir::failure();
         }
 
-        std::size_t slotLen = 0;
-        auto map = typeAttr.getSlots();
-        auto iter = map.get("__slots__");
-        if (iter)
-        {
-            slotLen = pylir::Py::ref_cast<pylir::Py::TupleAttr>(iter).getValue().size();
-        }
+        std::size_t slotLen = typeAttr.getInstanceSlots().getValue().size();
+
         // I could create GEP here to read the offset component of the type object, but LLVM is not aware that the size
         // component is const, even if the rest of the type isn't. So instead we calculate the size here again to have
         // it be a constant.
@@ -2674,21 +2647,9 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Mem
         endBlock->addArgument(getIndexType(), op.getLoc());
 
         rewriter.setInsertionPointToEnd(block);
-        auto typeRef = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Type.name));
         auto slotsTuple =
-            rewriter.create<pylir::Py::GetSlotOp>(op.getLoc(), adaptor.getTypeObject(), typeRef, "__slots__");
-        auto* hasSlotsBlock = new mlir::Block;
-        {
-            auto zero = createIndexConstant(rewriter, op.getLoc(), 0);
-            auto hasNoSlots = rewriter.create<pylir::Py::IsUnboundValueOp>(op.getLoc(), slotsTuple);
-            rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), hasNoSlots, endBlock, mlir::ValueRange{zero},
-                                                  hasSlotsBlock, mlir::ValueRange{});
-        }
-
-        hasSlotsBlock->insertBefore(endBlock);
-        rewriter.setInsertionPointToStart(hasSlotsBlock);
-        auto len = rewriter.create<pylir::Py::TupleLenOp>(op.getLoc(), getIndexType(), slotsTuple);
+            pyTypeModel(op.getLoc(), rewriter, adaptor.getTypeObject()).instanceSlotsPtr(op.getLoc()).load(op.getLoc());
+        auto len = slotsTuple.sizePtr(op.getLoc()).load(op.getLoc());
         rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{len}, endBlock);
 
         rewriter.setInsertionPointToStart(endBlock);

@@ -1,7 +1,8 @@
 // RUN: pylir-opt %s -convert-arith-to-llvm -convert-pylir-to-llvm='target-triple=x86_64-unknown-linux-gnu' --reconcile-unrealized-casts --split-input-file | FileCheck %s --check-prefixes=CHECK,SECTION_COFF
 // RUN: pylir-opt %s -convert-arith-to-llvm -convert-pylir-to-llvm='target-triple=x86_64-apple-darwin21.6.0' --reconcile-unrealized-casts --split-input-file | FileCheck %s --check-prefixes=CHECK,SECTION_MACHO
 
-py.globalValue @builtins.tuple = #py.tuple<()>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 
 py.global @handle : !py.dynamic
 

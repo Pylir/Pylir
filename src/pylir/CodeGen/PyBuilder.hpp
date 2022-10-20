@@ -60,9 +60,10 @@ public:
         return Py::ObjectAttr::get(context, type, slots);
     }
 
-    Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {}, mlir::DictionaryAttr slots = {})
+    Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {}, pylir::Py::TupleAttr instanceSlots = {},
+                             mlir::DictionaryAttr slots = {})
     {
-        return Py::TypeAttr::get(context, mroTuple, {}, slots);
+        return Py::TypeAttr::get(context, mroTuple, instanceSlots, {}, slots);
     }
 
     Py::IntAttr getIntAttr(BigInt bigInt)

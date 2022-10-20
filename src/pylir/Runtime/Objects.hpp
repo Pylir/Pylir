@@ -144,6 +144,7 @@ class PyTypeObject : public PyObject
     std::size_t m_offset;
     PyTypeObject* m_layoutType;
     PyTuple* m_mroTuple;
+    PyTuple* m_instanceSlots;
 
 public:
     constexpr static auto& layoutTypeObject = Builtins::Type;
@@ -162,6 +163,11 @@ public:
     [[nodiscard]] PyTuple& getMROTuple() const noexcept
     {
         return *m_mroTuple;
+    }
+
+    [[nodiscard]] PyTuple& getInstanceSlots() const noexcept
+    {
+        return *m_instanceSlots;
     }
 };
 

@@ -1,6 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.tuple = #py.tuple<()>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 
 func.func @constants() -> !py.dynamic {
     %0 = py.constant(#py.tuple<()>)
@@ -21,7 +22,8 @@ func.func @constants() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.tuple = #py.tuple<()>
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
 
 func.func @constants() -> !py.dynamic {
     %0 = py.constant(#py.tuple<(#py.unbound)>)

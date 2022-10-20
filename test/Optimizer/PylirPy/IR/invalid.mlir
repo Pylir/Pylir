@@ -156,3 +156,10 @@ py.globalValue @lol = #py.int<5>
 
 // expected-error@below {{Incorrect normalized key entry '#py.ref<@lol>' for key-value pair '(#py.ref<@lol>, #py.int<3>)'}}
 py.globalValue @foo = #py.dict<{#py.ref<@lol> to #py.int<3>}>
+
+// -----
+
+// expected-error@below {{Expected 'instance_slots' to refer to a tuple of strings}}
+py.globalValue const @builtins.type = #py.type<instance_slots = <(#py.int<5>)>>
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type

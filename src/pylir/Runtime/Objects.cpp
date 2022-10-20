@@ -25,7 +25,7 @@ PyObject* PyObject::getSlot(int index)
 
 PyObject* PyObject::getSlot(std::string_view name)
 {
-    auto& slotsTuple = type(*this).getSlot(PyTypeObject::Slots)->cast<PyTuple>();
+    auto& slotsTuple = type(*this).getInstanceSlots();
     for (std::size_t i = 0; i < slotsTuple.len(); i++)
     {
         auto& str = slotsTuple.getItem(i).cast<PyString>();

@@ -1904,7 +1904,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     }
 
     std::vector<mlir::Attribute> mroTuple{Py::RefAttr::get(m_builder.getContext(), qualifiedName)};
-    Py::TupleAttr parentSlots;
+    llvm::SmallVector<mlir::Attribute> instanceSlots;
     if (basesConst.empty())
     {
         if (qualifiedName != m_builder.getObjectBuiltin().getRef().getValue())
@@ -1919,10 +1919,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         auto baseMRO = dereference<Py::TupleAttr>(typeAttr.getMroTuple());
         PYLIR_ASSERT(baseMRO);
         mroTuple.insert(mroTuple.end(), baseMRO.getValue().begin(), baseMRO.getValue().end());
-        parentSlots = dereference<Py::TupleAttr>(typeAttr.getSlots().get("__slots__"));
+        instanceSlots = llvm::to_vector(typeAttr.getInstanceSlots().getValue());
     }
 
-    bool hadSlotsSlot = false;
     llvm::SmallVector<mlir::NamedAttribute> slots;
     for (auto& [key, value] : functionScope->identifiers)
     {
@@ -1962,46 +1961,24 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                 PYLIR_UNREACHABLE;
             }
         }
+
         if (key == "__slots__")
         {
-            if (auto str = attr.dyn_cast<Py::StrAttr>())
+            if (attr.isa<Py::StrAttr>())
             {
-                attr = m_builder.getTupleAttr({str});
+                instanceSlots.push_back(attr);
+                continue;
             }
-            if (!attr.isa<Py::TupleAttr>())
+            auto tuple = dereference<Py::TupleAttr>(attr);
+            if (!tuple)
             {
                 // TODO: diagnostic
                 PYLIR_UNREACHABLE;
             }
-        }
-        if (key != "__slots__" || !parentSlots)
-        {
-            if (key == "__slots__")
-            {
-                hadSlotsSlot = true;
-            }
-            slots.emplace_back(m_builder.getStringAttr(key), attr);
+            instanceSlots.append(tuple.getValue().begin(), tuple.getValue().end());
             continue;
         }
-        auto origTuple = dereference<Py::TupleAttr>(attr);
-        if (!origTuple)
-        {
-            // TODO: diagnostic
-            PYLIR_UNREACHABLE;
-        }
-        auto vector = llvm::to_vector(origTuple.getValue());
-        vector.append(parentSlots.getValue().begin(), parentSlots.getValue().end());
-        slots.emplace_back(m_builder.getStringAttr("__slots__"), m_builder.getTupleAttr(vector));
-        parentSlots = nullptr;
-        hadSlotsSlot = true;
-    }
-    if (parentSlots)
-    {
-        slots.emplace_back(m_builder.getStringAttr("__slots__"), parentSlots);
-    }
-    else if (!hadSlotsSlot)
-    {
-        slots.emplace_back(m_builder.getStringAttr("__slots__"), m_builder.getTupleAttr());
+        slots.emplace_back(m_builder.getStringAttr(key), attr);
     }
     slots.emplace_back(m_builder.getStringAttr("__name__"), m_builder.getStrAttr(classDef.className.getValue()));
 
@@ -2009,9 +1986,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     {
         mlir::OpBuilder::InsertionGuard guard{m_builder};
         m_builder.setInsertionPointToEnd(m_module.getBody());
-        valueOp = m_builder.createGlobalValue(
-            qualifiedName, true,
-            m_builder.getTypeAttr(m_builder.getTupleAttr(mroTuple), m_builder.getDictionaryAttr(slots)), true);
+        valueOp = m_builder.createGlobalValue(qualifiedName, true,
+                                              m_builder.getTypeAttr(m_builder.getTupleAttr(mroTuple),
+                                                                    m_builder.getTupleAttr(instanceSlots),
+                                                                    m_builder.getDictionaryAttr(slots)),
+                                              true);
     }
     writeIdentifier(classDef.className.getValue(), m_builder.createConstant(Py::RefAttr::get(valueOp)));
 }

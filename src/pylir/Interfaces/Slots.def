@@ -35,7 +35,6 @@
 TYPE_SLOT(__name__, Name)
 TYPE_SLOT(__new__, New)
 TYPE_SLOT(__init__, Init)
-TYPE_SLOT(__slots__, Slots)
 TYPE_SLOT_REV_BIN_OP(__eq__, __eq__, Eq)
 TYPE_SLOT_REV_BIN_OP(__ne__, __ne__, Ne)
 TYPE_SLOT_REV_BIN_OP(__lt__, __gt__, Lt)

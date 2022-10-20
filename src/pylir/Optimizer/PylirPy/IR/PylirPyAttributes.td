@@ -245,10 +245,36 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 }
 
 def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
-	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctxt, {})">, "mroTuple">],
+	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctxt, {})">, "mroTuple">,
+	 ParamSpec<DefaultValuedParameter<"::pylir::Py::TupleAttr", "::pylir::Py::TupleAttr::get($_ctxt, {})">,
+	                                                                                                "instance_slots">],
 	[ImmutableAttr]> {
 	let mnemonic = "type";
 	let summary = "python type";
+
+    let description = [{
+        Attribute for representing Python `type` objects and subclasses. For the most part, it acts as any other
+        object attribute, having both a customizable type object as well as slots.
+
+        Additionally, it contains two parameters. `mroTuple` is a tuple of type objects (or references to type objects)
+        forming the order in which method lookups are resolved. `instance_slots` is a tuple of strings, which denotes
+        the slots an instance of this type has.
+        If neither of the two parameters are specified (in the C++ builder or in IR syntax), they default to an empty
+        tuple.
+
+        Syntax:
+        ```
+        optional-attrs ::= (`typeObject` | `slots` | `mroTuple` | `instance_slots`) `=` attr
+        dict ::= `#py.type` [ `<` optional-attrs { `,` optional-attrs} ] `>` ]
+        ```
+
+        Examples:
+        ```
+        #py.type
+        #py.type<instance_slots = #py.tuple<(#py.str<"lol">)>>
+        #py.type<mroTuple = #py.tuple<(#py.ref<@lol>)>>
+        ```
+    }];
 
 	let assemblyFormat = "(`<`struct(params)^`>`)?";
 }

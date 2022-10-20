@@ -68,9 +68,8 @@ void introspectObject(pylir::rt::PyObject* object, F f)
             }
         }
     }
-    auto* slots = type(*object).getSlot(pylir::rt::PyTypeObject::Slots);
-    auto slotCount = slots ? slots->cast<pylir::rt::PyTuple>().len() : 0;
-    for (std::size_t i = 0; i < slotCount; i++)
+    auto& slots = type(*object).getInstanceSlots();
+    for (std::size_t i = 0; i < slots.len(); i++)
     {
         if (auto* slot = object->getSlot(i))
         {
