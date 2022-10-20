@@ -70,18 +70,18 @@ py.global @lol3 : !py.dynamic = 5 : index
 
 py.global @lol : !py.dynamic
 
-// expected-error@below {{RefAttr does not refer to a 'py.globalValue'}}
+// expected-error@below {{RefAttr '@lol' does not refer to a 'py.globalValue'}}
 py.global @lol4 : !py.dynamic = #py.ref<@lol>
 
 // -----
 
-// expected-error@below {{RefAttr does not refer to a 'py.globalValue'}}
+// expected-error@below {{RefAttr '@lol' does not refer to a 'py.globalValue'}}
 py.global @lol5: !py.dynamic = #py.ref<@lol>
 
 // -----
 
 func.func @foo() {
-    // expected-error@below {{RefAttr does not refer to a 'py.globalValue'}}
+    // expected-error@below {{RefAttr '@lol' does not refer to a 'py.globalValue'}}
     %0 = py.constant(#py.ref<@lol>)
     return
 }
@@ -91,7 +91,7 @@ func.func @foo() {
 py.global @lol : index = 5 : index
 
 func.func @foo() {
-    // expected-error@below {{RefAttr does not refer to a 'py.globalValue'}}
+    // expected-error@below {{RefAttr '@lol' does not refer to a 'py.globalValue'}}
     %0 = py.constant(#py.ref<@lol>)
     return
 }

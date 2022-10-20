@@ -39,7 +39,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
         {
             if (!ref.getSymbol())
             {
-                return op->emitOpError("RefAttr does not refer to a 'py.globalValue'");
+                return op->emitOpError("RefAttr '") << ref.getRef() << "' does not refer to a 'py.globalValue'";
             }
             return mlir::success();
         }
