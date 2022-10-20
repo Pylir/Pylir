@@ -20,6 +20,7 @@ jobs:
         cxx_compiler: [ clang++, g++-10, clang-cl ]
         sanitizer: [ "" ]
         runtime_lib: [ "" ]
+        c_compiler: [ "" ]
         exclude:
           - { os: windows-2022, cxx_compiler: g++-10 }
           - { os: ubuntu-22.04, cxx_compiler: clang-cl }
