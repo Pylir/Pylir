@@ -1,4 +1,4 @@
-name: Windows
+name: Builds
 
 permissions:
   contents: read
@@ -13,113 +13,73 @@ on:
     branches: [ "master" ]
 
 jobs:
-  msvc-build:
-    runs-on: windows-2022
+  builds:
     strategy:
       matrix:
-        runtime_lib: [ "MultiThreadedDebug", "MultiThreaded" ]
+        os: [ windows-2022, ubuntu-22.04 ]
+        cxx_compiler: [ clang++, g++-10, clang-cl ]
+        sanitizer: [ "", "address,undefined", "thread" ]
+        exclude:
+          - { os: windows-2022, cxx_compiler: g++-10 }
+          - { os: ubuntu-22.04, cxx_compiler: clang-cl }
+          - { sanitizer: "address,undefined", cxx_compiler: clang-cl }
+          - { sanitizer: "address,undefined", cxx_compiler: g++-10 }
+          - { sanitizer: "thread", cxx_compiler: clang-cl }
+          - { sanitizer: "thread", cxx_compiler: g++-10 }
+        include:
+          - { cxx_compiler: clang++, c_compiler: clang }
+          - { cxx_compiler: clang-cl, c_compiler: clang-cl, runtime_lib: "MultiThreadedDebug" }
+          - { cxx_compiler: clang-cl, c_compiler: clang-cl, runtime_lib: "MultiThreaded" }
+          - { cxx_compiler: g++-10, c_compiler: gcc-10 }
+
+    runs-on: ${{matrix.os}}
 
     steps:
 
       - name: Install Ninja
         uses: ashutoshvarma/setup-ninja@v1.1
 
-      - name: Checkout Pylir
-        uses: actions/checkout@v3
-        with:
-          path: Pylir
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: 3.9
+
+      - name: Install dependencies
+        if: ${{ contains(matrix.os, 'ubuntu') }}
+        run: |
+          sudo apt update
+          sudo apt install libunwind-dev g++-10 lld clang
 
       - name: Use developer command prompt
+        if: ${{ matrix.cxx_compiler == 'clang-cl' }}
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install Python depends
-        run: |
-          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
-
-      - name: Install CCache
-        uses: Chocobo1/setup-ccache-action@v1
-        with:
-          ccache_options: |
-            max_size=0.5G
-          override_cache_key: ${{runner.os}}-${{matrix.runtime_lib}}-msvc
-          windows_compile_environment: msvc
-
-      - name: Build LLVM
-        id: llvm-build
-        uses: ./Pylir/.github/actions/llvm-build
-        with:
-          c-compiler: clang-cl
-          cpp-compiler: clang-cl
-          runtime_lib: ${{matrix.runtime_lib}}
-
-      - name: Configure Pylir
-        run: |
-          cmake -GNinja -Bpylir-build `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DPYLIR_EMBED_LLD=ON `
-            -DCMAKE_CXX_COMPILER=clang-cl `
-            -DCMAKE_C_COMPILER=clang-cl `
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
-            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -DPYLIR_ENABLE_ASSERTIONS=ON `
-            -DCMAKE_LINKER=link `
-            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{matrix.runtime_lib}} `
-            -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
-            -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
-            -DLLD_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/lld/" `
-            -S ${{github.workspace}}/Pylir
-
-      - name: Build Pylir
-        run: |
-          cmake --build pylir-build
-
-      - name: Test
-        working-directory: ${{github.workspace}}/pylir-build
-        run: ctest --extra-verbose
-
-  mingw-build:
-    runs-on: windows-2022
-    strategy:
-      matrix:
-        sanitizer: [ "address,undefined", "" ]
-
-    steps:
-      - name: Install Ninja
-        uses: ashutoshvarma/setup-ninja@v1.1
-
-      - name: Checkout Pylir
-        uses: actions/checkout@v3
-        with:
-          path: Pylir
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.9
-
       - uses: msys2/setup-msys2@v2
+        if: ${{ matrix.cxx_compiler == 'clang++' && contains(matrix.os, 'windows') }}
         with:
           msystem: clang64
           update: true
           pacboy: >-
             toolchain:p
           location: D:\
-            
+
       - name: Prepend Msys2 to path
+        if: ${{ matrix.cxx_compiler == 'clang++' && contains(matrix.os, 'windows') }}
         run: echo "D:\msys64\clang64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
 
+      - name: Checkout Pylir
+        uses: actions/checkout@v3
+        with:
+          path: Pylir
+
       - name: Install Python depends
+        shell: pwsh
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
-      # See https://github.com/actions/cache/issues/53
+      # See https://github.com/actions/cache/issues/53.
       - name: Sanitize key
+        shell: pwsh
         id: sanitize-key
         run: |
           "key=$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
@@ -139,35 +99,47 @@ jobs:
         with:
           ccache_options: |
             max_size=${{steps.cache-size.outputs.size}}
-          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-clang64
-          # Lying here because I am not running within msys2
+          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}
           windows_compile_environment: msvc
 
       - name: Build LLVM
         id: llvm-build
         uses: ./Pylir/.github/actions/llvm-build
         with:
-          c-compiler: clang
-          cpp-compiler: clang++
+          c-compiler: ${{matrix.c_compiler}}
+          cpp-compiler: ${{matrix.cxx_compiler}}
           sanitizers: ${{matrix.sanitizer}}
+          runtime_lib: ${{matrix.runtime_lib}}
 
       - name: Configure Pylir
+        shell: pwsh
         run: |
           $sanitizer_arg = ''
           if ('${{matrix.sanitizer}}') {
             $sanitizer_arg = '-DPYLIR_SANITIZER="${{matrix.sanitizer}}"'
           }
+          $runtime_arg = ''
+          if ('${{matrix.runtime_lib}}') {
+            $runtime_arg = '-DCMAKE_MSVC_RUNTIME_LIBRARY=${{matrix.runtime_lib}}'
+          }
+          $sys_root = ''
+          if ($IsWindows && '${{matrix.cxx_compiler}}' == 'clang++') {
+            $sys_root = '-DPYLIR_DEFAULT_SYSROOT="D:/msys64/clang64"'
+          }
+          
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
             -DPYLIR_EMBED_LLD=ON `
-            -DCMAKE_CXX_COMPILER=clang++ `
-            -DCMAKE_C_COMPILER=clang `
+            -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} `
+            -DCMAKE_C_COMPILER=${{matrix.c_compiler}} `
             $sanitizer_arg `
-            -DPYLIR_DEFAULT_SYSROOT="D:/msys64/clang64" `
+            $runtime_arg `
+            $sys_root `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
+            -DCMAKE_CXX_FLAGS="-g1" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
             -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
@@ -183,7 +155,9 @@ jobs:
         run: ctest --extra-verbose
 
       - name: Cleanup disk space
+        shell: pwsh
         run: |
           Remove-Item -Recurse -Force llvm-optimized-tblgen
           Remove-Item -Recurse -Force llvm-build
           Remove-Item -Recurse -Force pylir-build
+
