@@ -30,6 +30,7 @@ jobs:
           - { cxx_compiler: clang++, c_compiler: gcc-10 }
           - { cxx_compiler: clang++, c_compiler: clang-cl }
           - { cxx_compiler: clang-cl, c_compiler: clang }
+          - { cxx_compiler: clang-cl, runtime_lib: "" }
           - { cxx_compiler: clang-cl, c_compiler: gcc-10 }
           - { cxx_compiler: g++-10, c_compiler: clang }
           - { cxx_compiler: g++-10, c_compiler: clang-cl }
