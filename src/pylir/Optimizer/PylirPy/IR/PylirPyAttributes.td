@@ -165,7 +165,7 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElem
 
         Syntax:
         ```
-        optional-attrs ::= (`typeObject` | `slots`) `=` attr
+        optional-attrs ::= (`type_object` | `slots`) `=` attr
         dict ::= `#py.dict` `<` `{` { attr [`norm` attr] `to` attr } `}` [`,` optional-attrs { `,` optional-attrs} ] `>`
         ```
 
@@ -264,7 +264,7 @@ def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
 
         Syntax:
         ```
-        optional-attrs ::= (`typeObject` | `slots` | `mroTuple` | `instance_slots`) `=` attr
+        optional-attrs ::= (`type_object` | `slots` | `mro_tuple` | `instance_slots`) `=` attr
         dict ::= `#py.type` [ `<` optional-attrs { `,` optional-attrs} ] `>` ]
         ```
 
