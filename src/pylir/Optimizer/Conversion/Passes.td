@@ -24,7 +24,7 @@ def ConvertPylirToLLVMPass : Pass<"convert-pylir-to-llvm", "::mlir::ModuleOp"> {
 def ConvertPylirPyToPylirMemPass : Pass<"convert-pylirPy-to-pylirMem", "::mlir::ModuleOp"> {
     let summary = "Convert Pylir Py dialect to Pylir Mem dialect";
 
-    let dependentDialects = ["::pylir::Mem::PylirMemDialect", "::mlir::arith::ArithmeticDialect"];
+    let dependentDialects = ["::pylir::Mem::PylirMemDialect", "::mlir::arith::ArithDialect"];
 }
 
 #endif

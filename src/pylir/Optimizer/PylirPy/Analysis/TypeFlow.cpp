@@ -287,7 +287,7 @@ pylir::Py::TypeFlow::TypeFlow(mlir::Operation* operation)
     };
 
     llvm::DenseSet<mlir::Value> foldEdges;
-    for (auto& block : func.getBody())
+    for (auto& block : func.getFunctionBody())
     {
         auto* mappedBlock = getBlockMapping(&block);
         if (!mappedBlock->getParent())

@@ -6,10 +6,10 @@
 
 #include <mlir/Bytecode/BytecodeReader.h>
 #include <mlir/Bytecode/BytecodeWriter.h>
-#include <mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h>
+#include <mlir/Conversion/ArithToLLVM/ArithToLLVM.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
-#include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
-#include <mlir/Dialect/Arithmetic/Transforms/Passes.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/DLTI/DLTI.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -460,8 +460,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             auto* nested = &manager.nestAny();
-            nested->addPass(mlir::arith::createArithmeticExpandOpsPass());
-            nested->addPass(mlir::createArithmeticToLLVMConversionPass());
+            nested->addPass(mlir::arith::createArithExpandOpsPass());
+            nested->addPass(mlir::createArithToLLVMConversionPass());
             manager.addPass(
                 pylir::createConvertPylirToLLVMPass({m_targetMachine->getTargetTriple().str(),
                                                      m_targetMachine->createDataLayout().getStringRepresentation()}));
@@ -641,7 +641,7 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<pylir::Py::PylirPyDialect>();
     registry.insert<pylir::Mem::PylirMemDialect>();
     registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::LLVM::LLVMDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<mlir::DLTIDialect>();

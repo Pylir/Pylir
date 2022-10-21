@@ -2,7 +2,7 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <mlir/Dialect/Arithmetic/IR/Arithmetic.h>
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>

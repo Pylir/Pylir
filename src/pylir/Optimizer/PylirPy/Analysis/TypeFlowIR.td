@@ -74,14 +74,14 @@ def TypeFlow_FuncOp : TypeFlow_Op<"func", [Symbol, FunctionOpInterface, Isolated
 	let hasCustomAssemblyFormat = 1;
 }
 
-def TypeFlow_UndefOp : TypeFlow_Op<"undef", [NoSideEffect]> {
+def TypeFlow_UndefOp : TypeFlow_Op<"undef", [NoMemoryEffect]> {
 	let arguments = (ins);
 	let results = (outs TypeFlow_MetaType:$result);
 
 	let assemblyFormat = "attr-dict";
 }
 
-def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoSideEffect, ConstantLike]> {
+def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoMemoryEffect, ConstantLike]> {
 	let arguments = (ins AnyAttr:$input);
 	let results = (outs TypeFlow_MetaType:$result);
 
@@ -120,7 +120,7 @@ mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 }
 }];
 
-def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
+def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoMemoryEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
 	DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$instruction);
 	let results = (outs TypeFlow_MetaType:$result);
@@ -132,7 +132,7 @@ def TypeFlow_TypeOfOp : TypeFlow_Op<"typeOf", [NoSideEffect, DeclareOpInterfaceM
 	let extraClassDefinition = foldAsExec;
 }
 
-def TypeFlow_TupleLenOp : TypeFlow_Op<"tupleLen", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
+def TypeFlow_TupleLenOp : TypeFlow_Op<"tupleLen", [NoMemoryEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
 	DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins TypeFlow_MetaType:$input, TypeFlow_InstructionAttr:$instruction);
 	let results = (outs TypeFlow_MetaType:$result);
@@ -144,7 +144,7 @@ def TypeFlow_TupleLenOp : TypeFlow_Op<"tupleLen", [NoSideEffect, DeclareOpInterf
 	let extraClassDefinition = foldAsExec;
 }
 
-def TypeFlow_IsOp : TypeFlow_Op<"is", [NoSideEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
+def TypeFlow_IsOp : TypeFlow_Op<"is", [NoMemoryEffect, DeclareOpInterfaceMethods<TypeFlowExecInterface>,
 	DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins TypeFlow_MetaType:$lhs, TypeFlow_MetaType:$rhs, TypeFlow_InstructionAttr:$instruction);
 	let results = (outs TypeFlow_MetaType:$result);
@@ -156,7 +156,7 @@ def TypeFlow_IsOp : TypeFlow_Op<"is", [NoSideEffect, DeclareOpInterfaceMethods<T
 	let extraClassDefinition = foldAsExec;
 }
 
-def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoSideEffect,
+def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOpInterface>, NoMemoryEffect,
 	DeclareOpInterfaceMethods<TypeFlowExecInterface>, DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins Variadic<TypeFlow_MetaType>:$input,
 	                     TypeFlow_InstructionAttr:$instruction,
@@ -175,7 +175,7 @@ def TypeFlow_CalcOp : TypeFlow_Op<"calc", [DeclareOpInterfaceMethods<InferTypeOp
 }
 
 def TypeFlow_BranchOp : TypeFlow_Op<"branch",
-	[Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, NoSideEffect]> {
+	[Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, NoMemoryEffect]> {
 	let arguments = (ins VariadicOfVariadic<TypeFlow_MetaType, "arg_sizes">:$branch_args, DenseI32ArrayAttr:$arg_sizes);
 	let results = (outs);
 
@@ -184,7 +184,7 @@ def TypeFlow_BranchOp : TypeFlow_Op<"branch",
 	let assemblyFormat = "$successors (`,` $branch_args^)? attr-dict";
 }
 
-def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
+def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoMemoryEffect,
 	DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments]> {
 	let arguments = (ins TypeFlow_MetaType:$condition,
 						 Variadic<TypeFlow_MetaType>:$true_args,
@@ -198,7 +198,7 @@ def TypeFlow_CondBranchOp : TypeFlow_Op<"cond_br", [Terminator, NoSideEffect,
 	}];
 }
 
-def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEffect]> {
+def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoMemoryEffect]> {
 	let arguments = (ins Variadic<TypeFlow_MetaType>:$values);
 	let results = (outs);
 
@@ -207,7 +207,7 @@ def TypeFlow_ReturnOp : TypeFlow_Op<"return", [Terminator, ReturnLike, NoSideEff
 
 
 class TypeFlow_CallBase<string name, Constraint calleeType> : TypeFlow_Op<name,
-	[DeclareOpInterfaceMethods<CallOpInterface>, NoSideEffect,
+	[DeclareOpInterfaceMethods<CallOpInterface>, NoMemoryEffect,
 	 DeclareOpInterfaceMethods<TypeFlowValueMappingInterface>]> {
 	let arguments = (ins calleeType:$callee, Variadic<TypeFlow_MetaType>:$arguments,
 	                     TypeFlow_InstructionAttr:$instruction);

@@ -24,8 +24,8 @@ target_link_libraries(PylirMain
   PRIVATE
   ${llvm_all}
   MLIRReconcileUnrealizedCasts
-  MLIRArithmeticTransforms
-  MLIRArithmeticToLLVM
+  MLIRArithTransforms
+  MLIRArithToLLVM
   MLIRToLLVMIRTranslationRegistration
   MLIRDLTIDialect
   MLIRBytecodeReader

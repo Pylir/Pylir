@@ -26,7 +26,7 @@ void maybeAddAccess(mlir::ImplicitLocOpBuilder& builder, mlir::Operation* operat
     {
         memoryEffectOpInterface.getEffects(effects);
     }
-    if (!memoryEffectOpInterface && operation->hasTrait<mlir::OpTrait::HasRecursiveSideEffects>())
+    if (!memoryEffectOpInterface && operation->hasTrait<mlir::OpTrait::HasRecursiveMemoryEffects>())
     {
         // Ops with recursive side effects contain regions with side effects which will be inlined later anyway.
         // Nothing to do here.

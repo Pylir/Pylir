@@ -6,7 +6,7 @@
 #define PYLIR_PY_PATTERNS_TABLEGEN
 
 include "mlir/IR/PatternBase.td"
-include "mlir/Dialect/Arithmetic/IR/ArithmeticOps.td"
+include "mlir/Dialect/Arith/IR/ArithOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
 class ResolvesTo<int constOnly = 1>

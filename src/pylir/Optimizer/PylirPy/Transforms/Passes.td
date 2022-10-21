@@ -17,7 +17,7 @@ def ExpandPyDialectPass : Pass<"pylir-expand-py-dialect"> {
     let summary = "Expands ops of the Py dialect to operations that can be lowered";
 
     let dependentDialects = ["::pylir::Py::PylirPyDialect",
-                             "::mlir::arith::ArithmeticDialect",
+                             "::mlir::arith::ArithDialect",
                              "::mlir::cf::ControlFlowDialect"];
 }
 

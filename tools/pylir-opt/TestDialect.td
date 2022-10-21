@@ -19,7 +19,7 @@ def TestDialect : Dialect {
 
 class Test_Op<string mnemonic, list <Trait> traits = []> : Op<TestDialect, mnemonic, traits>;
 
-def RandomOp : Test_Op<"random", [NoSideEffect]> {
+def RandomOp : Test_Op<"random", [NoMemoryEffect]> {
     let arguments = (ins);
     let results = (outs I1:$result);
 

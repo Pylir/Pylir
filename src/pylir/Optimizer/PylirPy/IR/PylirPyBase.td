@@ -15,7 +15,7 @@ def PylirPy_Dialect : Dialect {
     }];
     let cppNamespace = "::pylir::Py";
 
-    let dependentDialects = ["::mlir::arith::ArithmeticDialect", "::mlir::cf::ControlFlowDialect"];
+    let dependentDialects = ["::mlir::arith::ArithDialect", "::mlir::cf::ControlFlowDialect"];
 
     let hasConstantMaterializer = 1;
     let hasCanonicalizer = 1;

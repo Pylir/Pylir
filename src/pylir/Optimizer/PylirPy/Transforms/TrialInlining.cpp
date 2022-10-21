@@ -215,7 +215,7 @@ class TrialInliner : public pylir::Py::impl::TrialInlinerPassBase<TrialInliner>
             m_callsInlined++;
             return TrialDataBase::Result::Profitable;
         }
-        functionOpInterface.getBody().takeBody(rollback->getBody());
+        functionOpInterface.getFunctionBody().takeBody(rollback->getFunctionBody());
         return TrialDataBase::Result::NotProfitable;
     }
 
