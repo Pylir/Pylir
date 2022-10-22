@@ -156,7 +156,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
                 {
                     return op->emitOpError("Expected MRO to refer to a tuple\n");
                 }
-                if (!llvm::all_of(typeAttr.getInstanceSlots().getValue(),
+                if (!llvm::all_of(typeAttr.getInstanceSlots(),
                                   [](mlir::Attribute attr) { return attr.isa<pylir::Py::StrAttr>(); }))
                 {
                     return op->emitOpError("Expected 'instance_slots' to refer to a tuple of strings\n");

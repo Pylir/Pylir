@@ -1918,8 +1918,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         auto typeAttr = basesConst[0].getSymbol().getInitializerAttr().cast<pylir::Py::TypeAttr>();
         auto baseMRO = dereference<Py::TupleAttr>(typeAttr.getMroTuple());
         PYLIR_ASSERT(baseMRO);
-        mroTuple.insert(mroTuple.end(), baseMRO.getValue().begin(), baseMRO.getValue().end());
-        instanceSlots = llvm::to_vector(typeAttr.getInstanceSlots().getValue());
+        mroTuple.insert(mroTuple.end(), baseMRO.begin(), baseMRO.end());
+        instanceSlots = llvm::to_vector(typeAttr.getInstanceSlots());
     }
 
     llvm::SmallVector<mlir::NamedAttribute> slots;
@@ -1975,7 +1975,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
                 // TODO: diagnostic
                 PYLIR_UNREACHABLE;
             }
-            instanceSlots.append(tuple.getValue().begin(), tuple.getValue().end());
+            instanceSlots.append(tuple.begin(), tuple.end());
             continue;
         }
         slots.emplace_back(m_builder.getStringAttr(key), attr);

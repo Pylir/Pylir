@@ -88,7 +88,7 @@ pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute, llvm::S
     {
         return pylir::Py::BuiltinMethodKind::Unknown;
     }
-    for (const auto& iter : mro.getValue())
+    for (const auto& iter : mro)
     {
         if (!iter)
         {

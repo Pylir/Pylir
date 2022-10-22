@@ -97,7 +97,7 @@ class PylirTypeConverter : public mlir::LLVMTypeConverter
 
     bool isSubtype(pylir::Py::TypeAttr subType, pylir::Py::RefAttr base)
     {
-        auto tuple = pylir::Py::ref_cast<pylir::Py::TupleAttr>(subType.getMroTuple()).getValue();
+        auto tuple = pylir::Py::ref_cast<pylir::Py::TupleAttr>(subType.getMroTuple());
         return std::any_of(tuple.begin(), tuple.end(), [base](mlir::Attribute attr) { return attr == base; });
     }
 
@@ -481,14 +481,13 @@ public:
 
     mlir::LLVM::LLVMStructType typeOf(pylir::Py::ObjectAttrInterface objectAttr)
     {
-        unsigned count =
-            pylir::Py::ref_cast<pylir::Py::TypeAttr>(objectAttr.getTypeObject()).getInstanceSlots().getValue().size();
+        unsigned count = pylir::Py::ref_cast<pylir::Py::TypeAttr>(objectAttr.getTypeObject()).getInstanceSlots().size();
         return llvm::TypeSwitch<pylir::Py::ObjectAttrInterface, mlir::LLVM::LLVMStructType>(objectAttr)
             .Case(
                 [&](pylir::Py::TupleAttr attr)
                 {
                     PYLIR_ASSERT(count == 0);
-                    return getPyTupleType(attr.getValue().size());
+                    return getPyTupleType(attr.size());
                 })
             .Case([&](pylir::Py::ListAttr) { return getPyListType(count); })
             .Case([&](pylir::Py::StrAttr) { return getPyStringType(count); })
@@ -719,10 +718,10 @@ public:
             .Case(
                 [&](pylir::Py::TupleAttr attr)
                 {
-                    auto sizeConstant = builder.create<mlir::LLVM::ConstantOp>(
-                        global.getLoc(), getIndexType(), builder.getI64IntegerAttr(attr.getValue().size()));
+                    auto sizeConstant = builder.create<mlir::LLVM::ConstantOp>(global.getLoc(), getIndexType(),
+                                                                               builder.getI64IntegerAttr(attr.size()));
                     undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, sizeConstant, 1);
-                    for (const auto& iter : llvm::enumerate(attr.getValue()))
+                    for (const auto& iter : llvm::enumerate(attr))
                     {
                         auto constant = getConstant(global.getLoc(), iter.value(), builder);
                         undef = builder.create<mlir::LLVM::InsertValueOp>(
@@ -912,7 +911,7 @@ public:
 
         auto initMap = objectAttr.getSlots();
         for (auto [index, slotName] :
-             llvm::enumerate(pylir::Py::ref_cast<pylir::Py::TypeAttr>(typeObject).getInstanceSlots().getValue()))
+             llvm::enumerate(pylir::Py::ref_cast<pylir::Py::TypeAttr>(typeObject).getInstanceSlots()))
         {
             mlir::Value value;
             if (auto element = initMap.get(slotName.cast<pylir::Py::StrAttr>().getValue()); !element)
@@ -2217,14 +2216,14 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         }
 
         auto instanceSlots = typeObject.getInstanceSlots();
-        const auto* result = llvm::find_if(instanceSlots.getValue(),
+        const auto* result = llvm::find_if(instanceSlots,
                                            [&](mlir::Attribute attribute)
                                            {
                                                auto str = pylir::Py::ref_cast<pylir::Py::StrAttr>(attribute);
                                                PYLIR_ASSERT(str);
                                                return str.getValue() == adaptor.getSlot();
                                            });
-        if (result == instanceSlots.getValue().end())
+        if (result == instanceSlots.end())
         {
             rewriter.replaceOpWithNewOp<mlir::LLVM::NullOp>(op, typeConverter->convertType(op.getType()));
             return mlir::success();
@@ -2249,7 +2248,7 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
 
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE), objectPtrPtr,
-            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - instanceSlots.getValue().begin()});
+            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - instanceSlots.begin()});
         rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, gep.getSourceElementType(), gep);
         return mlir::success();
     }
@@ -2276,14 +2275,14 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         }
 
         auto instanceSlots = typeObject.getInstanceSlots();
-        const auto* result = llvm::find_if(instanceSlots.getValue(),
+        const auto* result = llvm::find_if(instanceSlots,
                                            [&](mlir::Attribute attribute)
                                            {
                                                auto str = pylir::Py::ref_cast<pylir::Py::StrAttr>(attribute);
                                                PYLIR_ASSERT(str);
                                                return str.getValue() == adaptor.getSlot();
                                            });
-        if (result == instanceSlots.getValue().end())
+        if (result == instanceSlots.end())
         {
             rewriter.eraseOp(op);
             return mlir::success();
@@ -2308,7 +2307,7 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
 
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(
             op.getLoc(), objectPtrPtr.getType(), pointer(REF_ADDRESS_SPACE), objectPtrPtr,
-            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - instanceSlots.getValue().begin()});
+            llvm::ArrayRef<mlir::LLVM::GEPArg>{result - instanceSlots.begin()});
         rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.getValue(), gep);
         return mlir::success();
     }
@@ -2608,7 +2607,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
             return mlir::failure();
         }
 
-        std::size_t slotLen = typeAttr.getInstanceSlots().getValue().size();
+        std::size_t slotLen = typeAttr.getInstanceSlots().size();
 
         // I could create GEP here to read the offset component of the type object, but LLVM is not aware that the size
         // component is const, even if the rest of the type isn't. So instead we calculate the size here again to have

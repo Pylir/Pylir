@@ -216,7 +216,7 @@ llvm::SmallVector<mlir::OpFoldResult> resolveTupleOperands(mlir::Operation* cont
             result.emplace_back(nullptr);
             return result;
         }
-        result.insert(result.end(), tuple.getValue().begin(), tuple.getValue().end());
+        result.insert(result.end(), tuple.begin(), tuple.end());
         return result;
     }
     if (!operand.getDefiningOp())
@@ -336,7 +336,7 @@ mlir::OpFoldResult pylir::Py::TupleLenOp::fold(llvm::ArrayRef<mlir::Attribute> o
     }
     if (auto tuple = ref_cast_or_null<TupleAttr>(operands[0]))
     {
-        return mlir::IntegerAttr::get(getType(), tuple.getValue().size());
+        return mlir::IntegerAttr::get(getType(), tuple.size());
     }
     return nullptr;
 }
@@ -351,7 +351,7 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
     if (auto tuple = ref_cast_or_null<TupleAttr>(operands[1]))
     {
         llvm::SmallVector<mlir::Attribute> values{element};
-        values.append(tuple.getValue().begin(), tuple.getValue().end());
+        values.append(tuple.begin(), tuple.end());
         return Py::TupleAttr::get(getContext(), values);
     }
     return nullptr;
@@ -360,7 +360,7 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 ::mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     auto constant = ref_cast_or_null<TupleAttr>(operands[1]);
-    if (constant && constant.getValue().empty())
+    if (constant && constant.empty())
     {
         return Py::TupleAttr::get(getContext());
     }
@@ -369,7 +369,7 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
     {
         return nullptr;
     }
-    if (index.getValue().getZExtValue() > constant.getValue().size())
+    if (index.getValue().getZExtValue() > constant.size())
     {
         return Py::TupleAttr::get(getContext());
     }
@@ -619,7 +619,7 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
 {
     if (auto tuple = ref_cast_or_null<TupleAttr>(operands[0]))
     {
-        for (auto iter : tuple.getValue())
+        for (auto iter : tuple)
         {
             auto object = ref_cast_or_null<ObjectAttrInterface>(iter);
             if (!object)
@@ -662,7 +662,7 @@ mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(::llvm::ArrayRef<::mlir::Att
     {
         if (auto element = operands[1])
         {
-            return mlir::BoolAttr::get(getContext(), llvm::is_contained(tuple.getValue(), element));
+            return mlir::BoolAttr::get(getContext(), llvm::is_contained(tuple, element));
         }
     }
     auto tupleOperands = resolveTupleOperands(*this, getTuple());
@@ -1223,7 +1223,7 @@ pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Locatio
                                          mlir::Attribute attr)
 {
     llvm::SmallVector<mlir::Value> arguments{input};
-    for (const auto& iter : attr.cast<pylir::Py::TupleAttr>().getValue())
+    for (const auto& iter : attr.cast<pylir::Py::TupleAttr>())
     {
         arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
     }

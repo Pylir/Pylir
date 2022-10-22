@@ -105,14 +105,40 @@ def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
 	let mnemonic = "tuple";
 	let summary = "python tuple";
 
-	let extraClassDeclaration = [{
-		::mlir::DictionaryAttr getSlots() const
-    	{
-            return ::mlir::DictionaryAttr::getWithSorted(getContext(), {});
-		}
-	}];
-
 	let assemblyFormat = "`<` $value ( `,` struct($type_object)^)? `>`";
+
+	let extraClassDeclaration = [{
+
+        /// Returns all slots of the tuple in a dictionary, which is always empty.
+	    ::mlir::DictionaryAttr getSlots() const
+        {
+            return ::mlir::DictionaryAttr::getWithSorted(getContext(), {});
+        }
+
+	    /// Returns true if the tuple contains no elements.
+	    [[nodiscard]] bool empty() const
+	    {
+	        return getValue().empty();
+	    }
+
+        /// Returns the amount of elements within the tuple.
+	    [[nodiscard]] std::size_t size() const
+	    {
+	        return getValue().size();
+	    }
+
+        /// Returns the begin iterator to the first element in the tuple.
+        [[nodiscard]] auto begin() const
+        {
+            return getValue().begin();
+        }
+
+        /// Returns the end iterator past the last element in the tuple.
+        [[nodiscard]] auto end() const
+        {
+            return getValue().end();
+        }
+	}];
 }
 
 def PylirPy_ListAttr : TypeObjectSlotsAttr<"List",

@@ -151,7 +151,7 @@ pylir::Py::ObjectTypeInterface pylir::Py::typeOfConstant(mlir::Attribute constan
     if (auto tuple = constant.dyn_cast<TupleAttr>())
     {
         llvm::SmallVector<ObjectTypeInterface> elementTypes;
-        for (const auto& iter : tuple.getValue())
+        for (const auto& iter : tuple)
         {
             elementTypes.push_back(typeOfConstant(iter));
         }

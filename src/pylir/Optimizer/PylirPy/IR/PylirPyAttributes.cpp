@@ -418,7 +418,7 @@ mlir::Attribute pylir::Py::StrAttr::replaceImmediateSubElements(llvm::ArrayRef<m
 void pylir::Py::TupleAttr::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
                                                     llvm::function_ref<void(mlir::Type)>) const
 {
-    for (const auto& iter : getValue())
+    for (mlir::Attribute iter : *this)
     {
         walkAttrsFn(iter);
     }
