@@ -15,7 +15,7 @@
 
 bool pylir::EscapeAnalysis::escapes(mlir::Value value)
 {
-    constexpr std::size_t rootValueIndex = static_cast<std::size_t>(-1);
+    constexpr auto rootValueIndex = static_cast<std::size_t>(-1);
 
     llvm::SmallVector<std::pair<mlir::Value, std::size_t>> dfsStack;
     dfsStack.emplace_back(value, rootValueIndex);
