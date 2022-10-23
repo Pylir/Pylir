@@ -483,6 +483,22 @@ def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoMemoryEffect, AlwaysBound, Ret
 	let hasFolder = 1;
 }
 
+def PylirPy_TypeSlotsOp : PylirPy_Op<"type.slots", [NoMemoryEffect, AlwaysBound, ReturnsImmutable,
+												    RefinedTypeTupleApproximate,
+												    DeclareOpInterfaceMethods<CaptureInterface>]> {
+	let arguments = (ins DynamicType:$type_object);
+	let results = (outs DynamicType:$result);
+
+	let description = [{
+	    Returns the tuple containing the names of all slots of an instance of `$type_object` as strings.
+	    If `$type_object` is not really a type (or a subclass of) the behaviour is undefined.
+	}];
+
+	let assemblyFormat = "$type_object attr-dict";
+
+	let hasFolder = 1;
+}
+
 // Str ops
 
 def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<CaptureInterface>,

@@ -615,6 +615,16 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(::llvm::ArrayRef<::mlir::Attribute
     return object.getMroTuple();
 }
 
+mlir::OpFoldResult pylir::Py::TypeSlotsOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    auto object = ref_cast_or_null<TypeAttr>(operands[0]);
+    if (!object)
+    {
+        return nullptr;
+    }
+    return object.getInstanceSlots();
+}
+
 ::mlir::OpFoldResult pylir::Py::MROLookupOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
 {
     if (auto tuple = ref_cast_or_null<TupleAttr>(operands[0]))
