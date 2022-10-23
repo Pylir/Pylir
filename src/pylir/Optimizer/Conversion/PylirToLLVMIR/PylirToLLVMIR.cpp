@@ -2112,6 +2112,20 @@ struct TypeMROOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TypeM
     }
 };
 
+struct TypeSlotsOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::TypeSlotsOp>
+{
+    using ConvertPylirOpToLLVMPattern<pylir::Py::TypeSlotsOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(pylir::Py::TypeSlotsOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOp(op, mlir::Value{pyTypeModel(op.getLoc(), rewriter, adaptor.getTypeObject())
+                                               .instanceSlotsPtr(op.getLoc())
+                                               .load(op.getLoc())});
+        return mlir::success();
+    }
+};
+
 struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>
 {
     using ConvertPylirOpToLLVMPattern<pylir::Py::StrEqualOp>::ConvertPylirOpToLLVMPattern;
@@ -3188,6 +3202,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
     patternSet.insert<TupleContainsOpConversion>(converter);
     patternSet.insert<InitTupleCopyOpConversion>(converter);
     patternSet.insert<MROLookupOpConversion>(converter);
+    patternSet.insert<TypeSlotsOpConversion>(converter);
     patternSet.insert<InitFloatOpConversion>(converter);
     patternSet.insert<FloatToF64OpConversion>(converter);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
