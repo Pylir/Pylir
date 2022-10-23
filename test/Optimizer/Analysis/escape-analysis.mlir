@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s --test-escape-analysis --split-input-file 2>&1>/dev/null | FileCheck %s
+// RUN: pylir-opt %s --test-escape-analysis --split-input-file 2>&1 >/dev/null | FileCheck %s
 
 func.func @test() {
     %0 = py.makeTuple ()
