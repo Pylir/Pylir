@@ -46,4 +46,6 @@ def TestAddChangePass : Pass<"test-add-change", "::mlir::ModuleOp"> {
     let dependentDialects = ["::pylir::test::TestDialect"];
 }
 
+def TestEscapeAnalysisPass : Pass<"test-escape-analysis", "::mlir::ModuleOp">;
+
 #endif
