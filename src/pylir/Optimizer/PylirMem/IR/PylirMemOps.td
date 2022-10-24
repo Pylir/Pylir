@@ -25,10 +25,19 @@ class PylirMem_Op<string mnemonic, list<Trait> traits = []> :
     Op<PylirMem_Dialect, mnemonic, traits>;
 
 def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {
-    let arguments = (ins DynamicType:$type_object);
+    let arguments = (ins DynamicType:$type_object, Index:$trailing_items);
     let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
 
-    let assemblyFormat = "$type_object attr-dict";
+    let description = [{
+        Allocates an object with the layout type given by the `$type_object` with `$trailing_items`. These trailing
+        items correspond to the amount of elements in a tuple for tuple objects, for all other objects they correspond
+        to the amount of slots allocated.
+
+        Items allocated by the operation are tracked by the garbage collector and guaranteed to be life as long as they
+        are reachable.
+    }];
+
+    let assemblyFormat = "$type_object`[` $trailing_items `]` attr-dict";
 }
 
 def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
@@ -36,13 +45,6 @@ def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
     let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
 
     let assemblyFormat = "$type_object attr-dict";
-}
-
-def PylirMem_GCAllocTupleOp : PylirMem_Op<"gcAllocTuple"> {
-    let arguments = (ins DynamicType:$type_object, Index:$length);
-    let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
-
-    let assemblyFormat = "$type_object `[` $length `]` attr-dict";
 }
 
 def PylirMem_StackAllocTupleOp : PylirMem_Op<"stackAllocTuple"> {

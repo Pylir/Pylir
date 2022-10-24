@@ -32,7 +32,9 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
     {
         auto dict = rewriter.create<pylir::Py::ConstantOp>(
             op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Dict.name));
-        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict);
+        auto slotCount = rewriter.create<pylir::Py::TupleLenOp>(
+            op.getLoc(), rewriter.create<pylir::Py::TypeSlotsOp>(op.getLoc(), dict));
+        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict, slotCount);
         auto init = rewriter.replaceOpWithNewOp<pylir::Mem::InitDictOp>(op, op.getType(), mem);
         for (auto arg : op.getDictArgs())
         {

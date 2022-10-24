@@ -13,6 +13,8 @@ func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[STR:.*]] = py.constant(#py.ref<@builtins.str>)
-// CHECK-NEXT: %[[MEMORY:.*]] = pyMem.gcAllocObject %[[STR]]
+// CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[STR]]
+// CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
+// CHECK-NEXT: %[[MEMORY:.*]] = pyMem.gcAllocObject %[[STR]][%[[LEN]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initStr %[[MEMORY]] to %[[ARG0]]
 // CHECK-NEXT: return %[[RESULT]]

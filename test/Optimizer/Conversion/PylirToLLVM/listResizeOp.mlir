@@ -25,11 +25,10 @@ func.func @foo(%list : !py.dynamic, %length : index) {
 // CHECK-NEXT: ^[[GROW_BLOCK]]:
 // CHECK-NEXT: %[[SHL:.*]] = llvm.shl %[[CAPACITY]], %[[ONE_INDEX]]
 // CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.umax"(%[[SHL]], %[[NEW_LENGTH]])
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_PTR]][0, 0]
-// CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
+// CHECK-NEXT: %[[HEADER_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[TRAILING_SIZE:.*]] = llvm.mul %[[NEW_CAP]], %[[ELEMENT_SIZE]]
-// CHECK-NEXT: %[[HEADER_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[TRAILING_SIZE]], %[[HEADER_SIZE]]
 // CHECK-NEXT: %[[TUPLE_MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
