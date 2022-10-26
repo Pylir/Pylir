@@ -42,16 +42,17 @@ def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {
 
 /// Object layouts known to the compiler with a static size. May be replaced with some kind of type descriptors if
 /// we ever introduce custom object layouts as an optimization.
-def PylirMem_LayoutTypeAttr : I32EnumAttr<"StackLayout", "Enum of types with known object layouts", [
+def PylirMem_LayoutTypeAttr : I32EnumAttr<"LayoutType", "Enum of types with known object layouts", [
     I32EnumAttrCase<"Object", 0, "object">,
     I32EnumAttrCase<"Type", 1, "type">,
-    I32EnumAttrCase<"Function", 2, "function">,
-    I32EnumAttrCase<"Tuple", 3, "tuple">,
-    I32EnumAttrCase<"List", 4, "list">,
-    I32EnumAttrCase<"String", 5, "string">,
-    I32EnumAttrCase<"Dict", 6, "dict">,
-    I32EnumAttrCase<"Int", 7, "int">,
-    I32EnumAttrCase<"BaseException", 8>,
+    I32EnumAttrCase<"Float", 2, "float">,
+    I32EnumAttrCase<"Function", 3, "function">,
+    I32EnumAttrCase<"Tuple", 4, "tuple">,
+    I32EnumAttrCase<"List", 5, "list">,
+    I32EnumAttrCase<"String", 6, "string">,
+    I32EnumAttrCase<"Dict", 7, "dict">,
+    I32EnumAttrCase<"Int", 8, "int">,
+    I32EnumAttrCase<"BaseException", 9>,
 ]> {
     let cppNamespace = "pylir::Mem";
 }
