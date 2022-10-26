@@ -2140,7 +2140,7 @@ struct GetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         {
             return mlir::failure();
         }
-        pylir::Py::TypeAttr typeObject = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
+        auto typeObject = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
             return mlir::failure();
@@ -2194,7 +2194,7 @@ struct SetSlotOpConstantConversion : public ConvertPylirOpToLLVMPattern<pylir::P
         {
             return mlir::failure();
         }
-        pylir::Py::TypeAttr typeObject = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
+        auto typeObject = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeObject)
         {
             return mlir::failure();
@@ -2499,7 +2499,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<pyl
         {
             return mlir::failure();
         }
-        pylir::Py::TypeAttr typeAttr = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
+        auto typeAttr = pylir::Py::ref_cast<pylir::Py::TypeAttr>(constant.getConstant());
         if (!typeAttr)
         {
             return mlir::failure();
