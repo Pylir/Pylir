@@ -19,6 +19,7 @@
 
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.cpp.inc"
+#include "pylir/Optimizer/PylirMem/IR/PylirMemEnums.cpp.inc"
 
 void pylir::Mem::PylirMemDialect::initialize()
 {

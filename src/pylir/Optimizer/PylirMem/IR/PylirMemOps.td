@@ -29,9 +29,9 @@ def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {
     let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
 
     let description = [{
-        Allocates an object with the layout type given by the `$type_object` with `$trailing_items`. These trailing
-        items correspond to the amount of elements in a tuple for tuple objects, for all other objects they correspond
-        to the amount of slots allocated.
+        Allocates an object with the layout type and type given by the `$type_object` with `$trailing_items`. These
+        trailing items correspond to the amount of elements in a tuple for tuple objects, for all other objects they
+        correspond to the amount of slots allocated.
 
         Items allocated by the operation are tracked by the garbage collector and guaranteed to be life as long as they
         are reachable.
@@ -40,18 +40,38 @@ def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {
     let assemblyFormat = "$type_object`[` $trailing_items `]` attr-dict";
 }
 
-def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
-    let arguments = (ins ObjectAttr:$type_object);
-    let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
-
-    let assemblyFormat = "$type_object attr-dict";
+/// Object layouts known to the compiler with a static size. May be replaced with some kind of type descriptors if
+/// we ever introduce custom object layouts as an optimization.
+def PylirMem_LayoutTypeAttr : I32EnumAttr<"StackLayout", "Enum of types with known object layouts", [
+    I32EnumAttrCase<"Object", 0, "object">,
+    I32EnumAttrCase<"Type", 1, "type">,
+    I32EnumAttrCase<"Function", 2, "function">,
+    I32EnumAttrCase<"Tuple", 3, "tuple">,
+    I32EnumAttrCase<"List", 4, "list">,
+    I32EnumAttrCase<"String", 5, "string">,
+    I32EnumAttrCase<"Dict", 6, "dict">,
+    I32EnumAttrCase<"Int", 7, "int">,
+    I32EnumAttrCase<"BaseException", 8>,
+]> {
+    let cppNamespace = "pylir::Mem";
 }
 
-def PylirMem_StackAllocTupleOp : PylirMem_Op<"stackAllocTuple"> {
-    let arguments = (ins DynamicType:$type_object, IndexAttr:$length);
+def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
+    let arguments = (ins DynamicType:$type_object, PylirMem_LayoutTypeAttr:$layout, IndexAttr:$trailing_items);
     let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
 
-    let assemblyFormat = "$type_object `[` $length `]` attr-dict";
+    let description = [{
+        Allocates an object with the layout given by `$layout` with `$trailing_items` and the type `$type_object`. These
+        trailing items correspond to the amount of elements in a tuple for tuple objects, for all other objects they
+        correspond to the amount of slots allocated.
+
+        Due to the use of attributes for the layout and amount of trailing items, the amount of memory allocated by
+        this operation is known ahead of time and statically allocated within a functions frame.
+        The lifetime of this object is therefore also equal to the frame of the function call. If any references to
+        a destroyed object still exist it is undefined behaviour.
+    }];
+
+    let assemblyFormat = "$layout $type_object`[`$trailing_items`]` attr-dict";
 }
 
 def PylirMem_InitIntSignedOp : PylirMem_Op<"initIntSigned", [AlwaysBound]> {
@@ -86,7 +106,7 @@ def PylirMem_InitTupleOp : PylirMem_Op<"initTuple", [AlwaysBound]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer);
     let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$memory `to` ` ` `(` $initializer `)` attr-dict";
+    let assemblyFormat = "$memory `to` ` ` `(` (`)`) : (`` $initializer^ `)`)?  attr-dict";
 }
 
 def PylirMem_InitTuplePrependOp : PylirMem_Op<"initTuplePrepend", [AlwaysBound]> {
