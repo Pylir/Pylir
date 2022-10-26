@@ -24,6 +24,7 @@
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
+#include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
@@ -193,6 +194,7 @@ int main(int argc, char** argv)
     pylir::registerConversionPasses();
     pylir::registerTransformPasses();
     pylir::Py::registerTransformPasses();
+    pylir::Mem::registerTransformsPasses();
     pylir::test::registerTestPasses();
 
     // Reimplementation of MlirOptMain overload that sets up all the command line options. The purpose of doing so is
