@@ -31,6 +31,11 @@ def CaptureInterface : OpInterface<"CaptureInterface"> {
     ];
 }
 
+/// Alias for 'DeclareOpInterfaceMethods<CaptureInterface>' with a more descriptive name indicating that an Op does not
+/// capture anything. Prefer to use this name over 'DeclareOpInterfaceMethods<CaptureInterface>' if and only if
+/// 'Captured' will not be used on any operands.
+defvar NoCaptures = DeclareOpInterfaceMethods<CaptureInterface>;
+
 /// Op Operand annotation to specify that the value of the specific operand is captured by the operation.
 def Captured : OpVariableGen<CaptureInterface> {
     let methodGens = [
