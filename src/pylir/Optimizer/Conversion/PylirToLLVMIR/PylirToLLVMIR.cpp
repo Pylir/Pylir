@@ -2562,13 +2562,21 @@ struct StackAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<pylir::
     mlir::LogicalResult matchAndRewrite(pylir::Mem::StackAllocObjectOp op, OpAdaptor adaptor,
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
-        mlir::Type elementType = mapLayoutTypeToLLVM(adaptor.getLayout(), adaptor.getTrailingItems().getZExtValue());
-        auto one =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(), rewriter.getI32IntegerAttr(1));
-        mlir::Value memory =
-            rewriter.create<mlir::LLVM::AllocaOp>(op.getLoc(), pointer(REF_ADDRESS_SPACE), elementType, one);
-        auto inBytes = createIndexConstant(rewriter, op.getLoc(), sizeOf(elementType));
+        mlir::Type elementType;
+        mlir::Value memory;
+        {
+            mlir::OpBuilder::InsertionGuard guard{rewriter};
+            rewriter.setInsertionPointToStart(&op->getParentRegion()->getBlocks().front());
 
+            elementType = mapLayoutTypeToLLVM(adaptor.getLayout(), adaptor.getTrailingItems().getZExtValue());
+            auto one = rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI32Type(),
+                                                               rewriter.getI32IntegerAttr(1));
+            memory = rewriter.create<mlir::LLVM::AllocaOp>(op.getLoc(), pointer(REF_ADDRESS_SPACE), elementType, one);
+        }
+
+        rewriter.create<mlir::LLVM::LifetimeStartOp>(op.getLoc(), sizeOf(elementType), memory);
+
+        auto inBytes = createIndexConstant(rewriter, op.getLoc(), sizeOf(elementType));
         auto zeroI8 =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
         auto falseC =

@@ -12,9 +12,10 @@ func.func @foo() -> index {
 }
 
 // CHECK-LABEL: llvm.func @foo
-// CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i{{.*}})
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.alloca %[[ONE]] x !llvm.struct<(ptr<1>, i64, array<0 x ptr<1>>)> : (i{{.*}}) -> !llvm.ptr<1>
+// CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
+// CHECK-NEXT: llvm.intr.lifetime.start {{[0-9]+}}, %[[MEMORY]]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant
