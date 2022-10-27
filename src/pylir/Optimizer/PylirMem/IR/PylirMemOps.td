@@ -5,6 +5,7 @@
 #ifndef PYLIR_OPS_TABLEGEN
 #define PYLIR_OPS_TABLEGEN
 
+include "pylir/Optimizer/Interfaces/CaptureInterface.td"
 include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.td"
 include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
@@ -24,8 +25,9 @@ defvar MemoryType = PylirMem_MemoryType;
 class PylirMem_Op<string mnemonic, list<Trait> traits = []> :
     Op<PylirMem_Dialect, mnemonic, traits>;
 
-def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject"> {
-    let arguments = (ins DynamicType:$type_object, Index:$trailing_items);
+def PylirMem_GCAllocObjectOp : PylirMem_Op<"gcAllocObject", [DeclareOpInterfaceMethods<CaptureInterface>]> {
+
+    let arguments = (ins Arg<DynamicType, "", [Captured]>:$type_object, Index:$trailing_items);
     let results = (outs Arg<MemoryType, "", [MemAlloc]>:$result);
 
     let description = [{
@@ -57,8 +59,12 @@ def PylirMem_LayoutTypeAttr : I32EnumAttr<"LayoutType", "Enum of types with know
     let cppNamespace = "pylir::Mem";
 }
 
-def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
-    let arguments = (ins DynamicType:$type_object, PylirMem_LayoutTypeAttr:$layout, IndexAttr:$trailing_items);
+def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject", [DeclareOpInterfaceMethods<CaptureInterface>]> {
+
+    let arguments = (ins Arg<DynamicType, "", [Captured]>:$type_object,
+                         PylirMem_LayoutTypeAttr:$layout,
+                         IndexAttr:$trailing_items);
+
     let results = (outs Arg<MemoryType, "", [MemAlloc<AutomaticAllocationScopeResource>]>:$result);
 
     let description = [{
@@ -75,112 +81,125 @@ def PylirMem_StackAllocObjectOp : PylirMem_Op<"stackAllocObject"> {
     let assemblyFormat = "$layout $type_object`[`$trailing_items`]` attr-dict";
 }
 
-def PylirMem_InitIntSignedOp : PylirMem_Op<"initIntSigned", [AlwaysBound]> {
+def PylirMem_InitIntSignedOp : PylirMem_Op<"initIntSigned", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Index:$initializer);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` $initializer attr-dict";
 }
 
-def PylirMem_InitIntUnsignedOp : PylirMem_Op<"initIntUnsigned", [AlwaysBound]> {
+def PylirMem_InitIntUnsignedOp : PylirMem_Op<"initIntUnsigned", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Index:$initializer);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` $initializer attr-dict";
 }
 
-def PylirMem_InitIntAddOp : PylirMem_Op<"initIntAdd", [AlwaysBound]> {
+def PylirMem_InitIntAddOp : PylirMem_Op<"initIntAdd", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$lhs, DynamicType:$rhs);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` $lhs `+` $rhs attr-dict";
 }
 
-def PylirMem_InitFloatOp : PylirMem_Op<"initFloat", [AlwaysBound]> {
+def PylirMem_InitFloatOp : PylirMem_Op<"initFloat", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, F64:$initializer);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` $initializer attr-dict";
 }
 
-def PylirMem_InitTupleOp : PylirMem_Op<"initTuple", [AlwaysBound]> {
-    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer);
+def PylirMem_InitTupleOp : PylirMem_Op<"initTuple", [AlwaysBound, DeclareOpInterfaceMethods<CaptureInterface>]> {
+
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory,
+                         Arg<Variadic<DynamicType>, "", [Captured]>:$initializer);
+
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` ` ` `(` (`)`) : (`` $initializer^ `)`)?  attr-dict";
 }
 
-def PylirMem_InitTuplePrependOp : PylirMem_Op<"initTuplePrepend", [AlwaysBound]> {
-    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$element, DynamicType:$tuple);
+def PylirMem_InitTuplePrependOp : PylirMem_Op<"initTuplePrepend", [AlwaysBound,
+                                                                   DeclareOpInterfaceMethods<CaptureInterface>]> {
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory,
+                         Arg<DynamicType, "", [Captured]>:$element,
+                         DynamicType:$tuple);
+
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` ` ` `(` $element `,` $tuple `)` attr-dict";
 }
 
-def PylirMem_InitTupleDropFrontOp : PylirMem_Op<"initTupleDropFront", [AlwaysBound]> {
+def PylirMem_InitTupleDropFrontOp : PylirMem_Op<"initTupleDropFront", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Index:$count, DynamicType:$tuple);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` ` ` $count `(` $tuple `)` attr-dict";
 }
 
-def PylirMem_InitTupleCopyOp : PylirMem_Op<"initTupleCopy"> {
+def PylirMem_InitTupleCopyOp : PylirMem_Op<"initTupleCopy", [NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$initializer);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` ` ` `(` `*` $initializer `)` attr-dict";
 }
 
-def PylirMem_InitTupleFromListOp : PylirMem_Op<"initTupleFromList"> {
+def PylirMem_InitTupleFromListOp : PylirMem_Op<"initTupleFromList", [NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$initializer);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` ` ` `(` `*` $initializer `)` attr-dict";
 }
 
-def PylirMem_InitListOp : PylirMem_Op<"initList", [AlwaysBound]> {
-    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer);
+def PylirMem_InitListOp : PylirMem_Op<"initList", [AlwaysBound, DeclareOpInterfaceMethods<CaptureInterface>]> {
+
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory,
+                         Arg<Variadic<DynamicType>, "", [Captured]>:$initializer);
+
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` ` ` `[` $initializer `]` attr-dict";
 }
 
-def PylirMem_InitSetOp : PylirMem_Op<"initSet", [AlwaysBound]> {
-    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$initializer);
+def PylirMem_InitSetOp : PylirMem_Op<"initSet", [AlwaysBound, DeclareOpInterfaceMethods<CaptureInterface>]> {
+
+    let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory,
+                         Arg<Variadic<DynamicType>, "", [Captured]>:$initializer);
+
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` ` ` `{` $initializer `}` attr-dict";
 }
 
-def PylirMem_InitDictOp : PylirMem_Op<"initDict", [AlwaysBound]> {
+def PylirMem_InitDictOp : PylirMem_Op<"initDict", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory attr-dict";
 }
 
-def PylirMem_InitStrOp : PylirMem_Op<"initStr", [AlwaysBound]> {
+def PylirMem_InitStrOp : PylirMem_Op<"initStr", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, Variadic<DynamicType>:$strings);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory (`to` $strings^)? attr-dict";
 }
 
-def PylirMem_InitStrFromIntOp : PylirMem_Op<"initStrFromInt", [AlwaysBound]> {
+def PylirMem_InitStrFromIntOp : PylirMem_Op<"initStrFromInt", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, DynamicType:$integer);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` $integer attr-dict";
 }
 
-def PylirMem_InitFuncOp : PylirMem_Op<"initFunc", [AlwaysBound]> {
+def PylirMem_InitFuncOp : PylirMem_Op<"initFunc", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory, FlatSymbolRefAttr:$initializer);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$memory `to` $initializer attr-dict";
 }
 
-def PylirMem_InitObjectOp : PylirMem_Op<"initObject", [AlwaysBound]> {
+def PylirMem_InitObjectOp : PylirMem_Op<"initObject", [AlwaysBound, NoCaptures]> {
     let arguments = (ins Arg<MemoryType, "", [MemWrite]>:$memory);
     let results = (outs DynamicType:$result);
 
