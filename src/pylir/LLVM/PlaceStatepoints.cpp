@@ -447,6 +447,9 @@ static BaseDefiningValueResult findBaseDefiningValue(Value* I)
         // We should have never reached here if this argument isn't an gc value
         return BaseDefiningValueResult(I, true);
 
+    if (isa<AllocaInst>(I))
+        return BaseDefiningValueResult(I, true);
+
     if (isa<Constant>(I))
     {
         // We assume that objects with a constant base (e.g. a global) can't move
