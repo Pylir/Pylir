@@ -34,6 +34,7 @@ target_link_libraries(PylirMain
   PylirLinker
   PylirToLLVMIR
   PylirPyTransforms
+  PylirMemTransforms
   PylirPyToPylirMem
   PylirTransforms
   PylirLLVMPasses)

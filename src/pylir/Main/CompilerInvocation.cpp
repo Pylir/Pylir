@@ -48,6 +48,7 @@
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/Linker/Linker.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
+#include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
@@ -851,6 +852,10 @@ void pylir::CompilerInvocation::addOptimizationPasses(llvm::StringRef level, mli
     manager.addPass(pylir::createConvertPylirPyToPylirMemPass());
     nested = &manager.nestAny();
     nested->addPass(mlir::createCanonicalizerPass());
+    if (level != "0")
+    {
+        nested->addPass(pylir::Mem::createHeapToStackPass());
+    }
 }
 
 mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::opt::InputArgList& args,
