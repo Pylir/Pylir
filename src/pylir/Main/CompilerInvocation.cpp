@@ -207,9 +207,13 @@ mlir::LogicalResult pylir::CompilerInvocation::executeAction(llvm::opt::Arg* inp
     {
         // The very first document is the main input file which build systems already depend on. Hence, there is no
         // need to add it to the output.
-        std::vector<std::string> additionalInputFiles(m_documents.size() - 1);
-        llvm::transform(llvm::drop_begin(m_documents), additionalInputFiles.begin(),
-                        [](const Diag::Document& document) { return document.getFilename(); });
+        std::vector<std::string> additionalInputFiles;
+        if (!m_documents.empty())
+        {
+            additionalInputFiles.resize(m_documents.size() - 1);
+            llvm::transform(llvm::drop_begin(m_documents), additionalInputFiles.begin(),
+                            [](const Diag::Document& document) { return document.getFilename(); });
+        }
 
         // The document order is non-deterministic when multi threading is enabled. Sort them to make it deterministic
         // again.
