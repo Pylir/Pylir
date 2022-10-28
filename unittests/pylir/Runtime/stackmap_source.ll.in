@@ -1,0 +1,62 @@
+
+declare void @pylir_test_stack_escape(ptr addrspace(1))
+
+@builtins.str = external addrspace(1) global i8
+
+%PyString = type { ptr addrspace(1), i@SIZE_T_SIZE@, i@SIZE_T_SIZE@, ptr }
+
+@.str = private unnamed_addr constant [9 x i8] c"sixteenth", align 1
+
+define void @pylir_test_stack_read(ptr %closure, ptr %closure_call,
+ptr addrspace(1) %0,
+ptr addrspace(1) %1,
+ptr addrspace(1) %2,
+ptr addrspace(1) %3,
+ptr addrspace(1) %4,
+ptr addrspace(1) %5,
+ptr addrspace(1) %6,
+ptr addrspace(1) %7,
+ptr addrspace(1) %8,
+ptr addrspace(1) %9,
+ptr addrspace(1) %10,
+ptr addrspace(1) %11,
+ptr addrspace(1) %12,
+ptr addrspace(1) %13,
+ptr addrspace(1) %14,
+ptr addrspace(1) %15
+) gc "pylir-gc" {
+entry:
+    %a = alloca %PyString, addrspace (1)
+
+    %gep0 = getelementptr %PyString, ptr addrspace(1) %a, i32 0, i32 0
+    store ptr addrspace(1) @builtins.str, ptr addrspace(1) %gep0
+
+    %gep1 = getelementptr %PyString, ptr addrspace(1) %a, i32 0, i32 1
+    store i@SIZE_T_SIZE@ 9, ptr addrspace(1) %gep1
+
+    %gep2 = getelementptr %PyString, ptr addrspace(1) %a, i32 0, i32 2
+    store i@SIZE_T_SIZE@ 9, ptr addrspace(1) %gep2
+
+    %gep3 = getelementptr %PyString, ptr addrspace(1) %a, i32 0, i32 3
+    store ptr @.str, ptr addrspace(1) %gep3
+
+    call void (ptr) %closure_call(ptr %closure)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %a)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %0)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %1)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %2)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %3)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %4)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %5)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %6)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %7)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %8)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %9)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %10)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %11)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %12)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %13)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %14)
+    call void @pylir_test_stack_escape(ptr addrspace(1) %15)
+    ret void
+}

@@ -19,7 +19,8 @@ macro(pylir_obj_compile TARGET SOURCE)
     get_filename_component(SourceAbs ${SOURCE} REALPATH)
     add_custom_command(
       OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}
-      COMMAND pylir ${SourceAbs} -fpie -c -o ${TargetRel} $<$<CONFIG:Release>:-O3> -I ${PROJECT_SOURCE_DIR}/src/python ${depfile_cmd}
+      COMMAND pylir ${SourceAbs} -fpie -c -o ${TargetRel} $<$<CONFIG:Release>:-O3> -I ${PROJECT_SOURCE_DIR}/src/python
+                ${ARGN} ${depfile_cmd}
       COMMENT "Building PY object ${TargetRel}"
       DEPENDS ${SourceAbs} pylir ${depends_extra}
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

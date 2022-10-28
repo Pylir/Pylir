@@ -13,6 +13,7 @@
 #include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCStreamer.h>
 #include <llvm/MC/MCValue.h>
+#include <llvm/Support/CommandLine.h>
 #include <llvm/Target/TargetLoweringObjectFile.h>
 #include <llvm/Target/TargetMachine.h>
 
@@ -20,6 +21,10 @@
 
 namespace
 {
+
+// NOLINTNEXTLINE(cert-err58-cpp)
+llvm::cl::opt<bool> emitStackMap("pylir-emit-stackmap", llvm::cl::Hidden, llvm::cl::init(true));
+
 class PylirGCStrategy final : public llvm::GCStrategy
 {
 public:
@@ -227,6 +232,11 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
 public:
     bool emitStackMaps(llvm::StackMaps& stackMaps, llvm::AsmPrinter& printer) override
     {
+        if (!emitStackMap)
+        {
+            // We claim to have handled the stack map emission anyway, since we explicitly do not want one.
+            return true;
+        }
         writeStackMap(stackMaps, printer);
         writeGlobalMap(printer);
         return true;
