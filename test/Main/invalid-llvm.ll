@@ -4,4 +4,4 @@
 #
 
 ; SYNTAX: error: expected top-level entity
-; IO: error: Could not open input file: No such file or directory
+; IO: error: Could not open input file:
