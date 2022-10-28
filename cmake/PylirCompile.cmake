@@ -2,9 +2,21 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-macro(pylir_obj_compile TARGET SOURCE)
+# Use pylir to create an object file from any kind of source file supported by the compiler.
+#
+# pylir_obj_compile(
+#   TARGET name
+#       Filename of the object file that should be created
+#   SOURCE file
+#       Sourcefile that should be compiled
+#   FLAGS flags...
+#       Optional list of extra flags that should be passed to pylir
+#   DEPENDS
+#       Optional list of extra dependencies
+macro(pylir_obj_compile)
+    cmake_parse_arguments(ARG "" "TARGET;SOURCE" "FLAGS;DEPENDS" ${ARGN})
 
-    file(RELATIVE_PATH TargetRel "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}")
+    file(RELATIVE_PATH TargetRel "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}")
 
     if (CMAKE_GENERATOR MATCHES "Ninja")
         # See https://cmake.org/cmake/help/latest/policy/CMP0116.html as to why this is currently relative.
@@ -16,16 +28,25 @@ macro(pylir_obj_compile TARGET SOURCE)
         list(TRANSFORM depends_extra PREPEND "${targetSourceDir}/")
     endif ()
 
-    get_filename_component(SourceAbs ${SOURCE} REALPATH)
+    get_filename_component(SourceExt ${ARG_SOURCE} EXT)
+    if (${SourceExt} STREQUAL ".ll")
+        set(LANG "LLVM")
+    elseif (${SourceExt} STREQUAL ".mlir")
+        set(LANG "MLIR")
+    else ()
+        set(LANG "PY")
+    endif ()
+
+    get_filename_component(SourceAbs ${ARG_SOURCE} REALPATH)
     add_custom_command(
-      OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${TARGET}
-      COMMAND pylir ${SourceAbs} -fpie -c -o ${TargetRel} $<$<CONFIG:Release>:-O3> -I ${PROJECT_SOURCE_DIR}/src/python
-                ${ARGN} ${depfile_cmd}
-      COMMENT "Building PY object ${TargetRel}"
-      DEPENDS ${SourceAbs} pylir ${depends_extra}
-      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-      ${custom_command_extra}
-      USES_TERMINAL
+            OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}
+            COMMAND pylir ${SourceAbs} -fpie -c -o ${TargetRel} $<$<CONFIG:Release>:-O3> -I ${PROJECT_SOURCE_DIR}/src/python
+            ${ARG_FLAGS} ${depfile_cmd}
+            COMMENT "Building ${LANG} object ${TargetRel}"
+            DEPENDS ${SourceAbs} pylir ${depends_extra} ${ARG_DEPENDS}
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            ${custom_command_extra}
+            USES_TERMINAL
     )
-    set_source_files_properties(${TARGET} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
+    set_source_files_properties(${ARG_TARGET} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
 endmacro()
