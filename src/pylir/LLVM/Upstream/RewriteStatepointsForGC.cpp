@@ -9,9 +9,14 @@
 // Rewrite call/invoke instructions so as to make potential relocations
 // performed by the garbage collector explicit in the IR.
 //
+// Modified for the use in Pylir. Pylir's GC is currently not relocating but
+// precise on the stack. This file should contain the minimum amount of changes
+// required to make our use cases work. Additionally, changes in this file
+// should follow LLVMs style guide, clang-format settings and clang-tidy lints.
+//
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Transforms/Scalar/RewriteStatepointsForGC.h"
+#include "../PlaceStatepoints.hpp"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -81,20 +86,20 @@
 using namespace llvm;
 
 // Print the liveset found at the insert location
-static cl::opt<bool> PrintLiveSet("spp-print-liveset", cl::Hidden,
+static cl::opt<bool> PrintLiveSet("pylir-spp-print-liveset", cl::Hidden,
                                   cl::init(false));
-static cl::opt<bool> PrintLiveSetSize("spp-print-liveset-size", cl::Hidden,
-                                      cl::init(false));
+static cl::opt<bool> PrintLiveSetSize("pylir-spp-print-liveset-size",
+                                      cl::Hidden, cl::init(false));
 
 // Print out the base pointers for debugging
-static cl::opt<bool> PrintBasePointers("spp-print-base-pointers", cl::Hidden,
-                                       cl::init(false));
+static cl::opt<bool> PrintBasePointers("pylir-spp-print-base-pointers",
+                                       cl::Hidden, cl::init(false));
 
 // Cost threshold measuring when it is profitable to rematerialize value instead
 // of relocating it
 static cl::opt<unsigned>
-RematerializationThreshold("spp-rematerialization-threshold", cl::Hidden,
-                           cl::init(6));
+    RematerializationThreshold("pylir-spp-rematerialization-threshold",
+                               cl::Hidden, cl::init(6));
 
 #ifdef EXPENSIVE_CHECKS
 static bool ClobberNonLive = true;
@@ -102,13 +107,13 @@ static bool ClobberNonLive = true;
 static bool ClobberNonLive = false;
 #endif
 
-static cl::opt<bool, true> ClobberNonLiveOverride("rs4gc-clobber-non-live",
-                                                  cl::location(ClobberNonLive),
-                                                  cl::Hidden);
+static cl::opt<bool, true>
+    ClobberNonLiveOverride("pylir-rs4gc-clobber-non-live",
+                           cl::location(ClobberNonLive), cl::Hidden);
 
-static cl::opt<bool>
-    AllowStatepointWithNoDeoptInfo("rs4gc-allow-statepoint-with-no-deopt-info",
-                                   cl::Hidden, cl::init(true));
+static cl::opt<bool> AllowStatepointWithNoDeoptInfo(
+    "pylir-rs4gc-allow-statepoint-with-no-deopt-info", cl::Hidden,
+    cl::init(true));
 
 /// The IR fed into RewriteStatepointsForGC may have had attributes and
 /// metadata implying dereferenceability that are no longer valid/correct after
@@ -125,8 +130,8 @@ static void stripNonValidData(Module &M);
 
 static bool shouldRewriteStatepointsIn(Function &F);
 
-PreservedAnalyses RewriteStatepointsForGC::run(Module &M,
-                                               ModuleAnalysisManager &AM) {
+PreservedAnalyses pylir::PlaceStatepointsPass::run(Module &M,
+                                                   ModuleAnalysisManager &AM) {
   bool Changed = false;
   auto &FAM = AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
   for (Function &F : M) {
@@ -157,76 +162,6 @@ PreservedAnalyses RewriteStatepointsForGC::run(Module &M,
   PA.preserve<TargetLibraryAnalysis>();
   return PA;
 }
-
-namespace {
-
-class RewriteStatepointsForGCLegacyPass : public ModulePass {
-  RewriteStatepointsForGC Impl;
-
-public:
-  static char ID; // Pass identification, replacement for typeid
-
-  RewriteStatepointsForGCLegacyPass() : ModulePass(ID), Impl() {
-    initializeRewriteStatepointsForGCLegacyPassPass(
-        *PassRegistry::getPassRegistry());
-  }
-
-  bool runOnModule(Module &M) override {
-    bool Changed = false;
-    for (Function &F : M) {
-      // Nothing to do for declarations.
-      if (F.isDeclaration() || F.empty())
-        continue;
-
-      // Policy choice says not to rewrite - the most common reason is that
-      // we're compiling code without a GCStrategy.
-      if (!shouldRewriteStatepointsIn(F))
-        continue;
-
-      TargetTransformInfo &TTI =
-          getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
-      const TargetLibraryInfo &TLI =
-          getAnalysis<TargetLibraryInfoWrapperPass>().getTLI(F);
-      auto &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
-
-      Changed |= Impl.runOnFunction(F, DT, TTI, TLI);
-    }
-
-    if (!Changed)
-      return false;
-
-    // stripNonValidData asserts that shouldRewriteStatepointsIn
-    // returns true for at least one function in the module.  Since at least
-    // one function changed, we know that the precondition is satisfied.
-    stripNonValidData(M);
-    return true;
-  }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    // We add and rewrite a bunch of instructions, but don't really do much
-    // else.  We could in theory preserve a lot more analyses here.
-    AU.addRequired<DominatorTreeWrapperPass>();
-    AU.addRequired<TargetTransformInfoWrapperPass>();
-    AU.addRequired<TargetLibraryInfoWrapperPass>();
-  }
-};
-
-} // end anonymous namespace
-
-char RewriteStatepointsForGCLegacyPass::ID = 0;
-
-ModulePass *llvm::createRewriteStatepointsForGCLegacyPass() {
-  return new RewriteStatepointsForGCLegacyPass();
-}
-
-INITIALIZE_PASS_BEGIN(RewriteStatepointsForGCLegacyPass,
-                      "rewrite-statepoints-for-gc",
-                      "Make relocations explicit at statepoints", false, false)
-INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(TargetTransformInfoWrapperPass)
-INITIALIZE_PASS_END(RewriteStatepointsForGCLegacyPass,
-                    "rewrite-statepoints-for-gc",
-                    "Make relocations explicit at statepoints", false, false)
 
 namespace {
 
@@ -1792,8 +1727,8 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
   GCStatepointInst *Token = nullptr;
   if (auto *CI = dyn_cast<CallInst>(Call)) {
     CallInst *SPCall = Builder.CreateGCStatepointCall(
-        StatepointID, NumPatchBytes, CallTarget, Flags, CallArgs,
-        TransitionArgs, DeoptArgs, GCArgs, "safepoint_token");
+        StatepointID, NumPatchBytes, CallTarget, CallArgs,
+        makeArrayRef(BasePtrs), {}, "safepoint_token");
 
     SPCall->setTailCallKind(CI->getTailCallKind());
     SPCall->setCallingConv(CI->getCallingConv());
@@ -1820,7 +1755,7 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
     // original block.
     InvokeInst *SPInvoke = Builder.CreateGCStatepointInvoke(
         StatepointID, NumPatchBytes, CallTarget, II->getNormalDest(),
-        II->getUnwindDest(), Flags, CallArgs, TransitionArgs, DeoptArgs, GCArgs,
+        II->getUnwindDest(), CallArgs, makeArrayRef(BasePtrs), {},
         "statepoint_token");
 
     SPInvoke->setCallingConv(II->getCallingConv());
@@ -1843,12 +1778,13 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
     Builder.SetInsertPoint(&*UnwindBlock->getFirstInsertionPt());
     Builder.SetCurrentDebugLocation(II->getDebugLoc());
 
+#if 0
     // Attach exceptional gc relocates to the landingpad.
     Instruction *ExceptionalToken = UnwindBlock->getLandingPadInst();
     Result.UnwindToken = ExceptionalToken;
 
     CreateGCRelocates(LiveVariables, BasePtrs, ExceptionalToken, Builder);
-
+#endif
     // Generate gc relocates and returns for normal block
     BasicBlock *NormalDest = II->getNormalDest();
     assert(!isa<PHINode>(NormalDest->begin()) &&
@@ -1891,9 +1827,10 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
   }
 
   Result.StatepointToken = Token;
-
+#if 0
   // Second, create a gc.relocate for every live variable
   CreateGCRelocates(LiveVariables, BasePtrs, Token, Builder);
+#endif
 }
 
 // Replace an existing gc.statepoint with a new one and a set of gc.relocates
@@ -2694,6 +2631,7 @@ static bool insertParsePoints(Function &F, DominatorTree &DT,
 
   Holders.clear();
 
+#if 0
   // Compute the cost of possible re-materialization of derived pointers.
   RematCandTy RematerizationCandidates;
   findRematerializationCandidates(PointerToBase, RematerizationCandidates, TTI);
@@ -2704,7 +2642,7 @@ static bool insertParsePoints(Function &F, DominatorTree &DT,
   for (size_t i = 0; i < Records.size(); i++)
     rematerializeLiveValues(ToUpdate[i], Records[i], PointerToBase,
                             RematerizationCandidates, TTI);
-
+#endif
   // We need this to safely RAUW and delete call or invoke return values that
   // may themselves be live over a statepoint.  For details, please see usage in
   // makeStatepointExplicitImpl.
@@ -2779,7 +2717,9 @@ static bool insertParsePoints(Function &F, DominatorTree &DT,
            "must be a gc pointer type");
 #endif
 
+#if 0
   relocationViaAlloca(F, DT, Live, Records);
+#endif
   return !Records.empty();
 }
 
@@ -2910,8 +2850,9 @@ static bool shouldRewriteStatepointsIn(Function &F) {
     const auto &FunctionGCName = F.getGC();
     const StringRef StatepointExampleName("statepoint-example");
     const StringRef CoreCLRName("coreclr");
+    const StringRef PylirName("pylir-gc");
     return (StatepointExampleName == FunctionGCName) ||
-           (CoreCLRName == FunctionGCName);
+           (CoreCLRName == FunctionGCName) || (PylirName == FunctionGCName);
   } else
     return false;
 }
@@ -2928,9 +2869,9 @@ static void stripNonValidData(Module &M) {
     stripNonValidDataFromBody(F);
 }
 
-bool RewriteStatepointsForGC::runOnFunction(Function &F, DominatorTree &DT,
-                                            TargetTransformInfo &TTI,
-                                            const TargetLibraryInfo &TLI) {
+bool pylir::PlaceStatepointsPass::runOnFunction(Function &F, DominatorTree &DT,
+                                                TargetTransformInfo &TTI,
+                                                const TargetLibraryInfo &TLI) {
   assert(!F.isDeclaration() && !F.empty() &&
          "need function body to rewrite statepoints in");
   assert(shouldRewriteStatepointsIn(F) && "mismatch in rewrite decision");
