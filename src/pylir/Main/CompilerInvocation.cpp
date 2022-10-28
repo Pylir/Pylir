@@ -514,6 +514,12 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 {
                     llvmModule->setDataLayout(m_targetMachine->createDataLayout());
                 }
+                if (triple.empty())
+                {
+                    // Clang warns about this case by default, which I personally think is odd. Something to consider
+                    // in the future if convinced otherwise however.
+                    llvmModule->setTargetTriple(m_targetMachine->getTargetTriple().str());
+                }
             }
 
             llvm::LoopAnalysisManager lam;
