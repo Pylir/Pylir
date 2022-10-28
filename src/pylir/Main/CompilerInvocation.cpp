@@ -496,7 +496,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 }
                 llvm::SMDiagnostic diag;
                 llvmModule = llvm::parseIRFile(inputFile->getValue(), diag, *m_llvmContext);
-                if (diag.getSourceMgr())
+                if (!llvmModule)
                 {
                     std::string progName = llvm::sys::path::filename(commandLine.getExecutablePath()).str();
                     diag.print(progName.c_str(), llvm::errs());
