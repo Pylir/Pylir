@@ -28,6 +28,52 @@ define void @test2() gc "pylir-gc" {
 
 ; CHECK-LABEL: define void @test2()
 ; CHECK-NEXT: %[[ALLOCA:.*]] = alloca
-; FIXME: This should be an empty deopt. The alloca is not yet live when 'builtins.__init__' gets called, and not even
-;        initialized. Accessing it at that point in time would read undef.
+; CHECK-NEXT: store ptr addrspace(1) null, ptr addrspace(1) %[[ALLOCA]]
 ; CHECK-NEXT: %{{.*}} = call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"(ptr addrspace(1) %[[ALLOCA]]) ]
+
+declare i1 @random() "gc-leaf-function"
+
+define void @test3() gc "pylir-gc" {
+    %a = alloca { ptr addrspace(1), [0 x ptr addrspace(1)] }, addrspace(1)
+    call void @builtins.__init__()
+    %c = call i1 @random()
+    br i1 %c, label %true, label %false
+
+true:
+    call void @llvm.lifetime.start.p1(i64 -1, ptr addrspace(1) %a)
+    call void @escape(ptr addrspace(1) %a)
+    br label %merge
+
+false:
+    br label %merge
+
+merge:
+    ret void
+}
+
+; CHECK-LABEL: define void @test3()
+; CHECK-NEXT: %[[ALLOCA:.*]] = alloca
+; CHECK-NEXT: store ptr addrspace(1) null, ptr addrspace(1) %[[ALLOCA]]
+; CHECK-NEXT: call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"(ptr addrspace(1) %[[ALLOCA]]) ]
+
+define void @test4() gc "pylir-gc" {
+    %a = alloca { ptr addrspace(1), [0 x ptr addrspace(1)] }, addrspace(1)
+    call void @builtins.__init__()
+    %c = call i1 @random()
+    br i1 %c, label %true, label %false
+
+true:
+    call void @escape(ptr addrspace(1) %a)
+    br label %merge
+
+false:
+    br label %merge
+
+merge:
+    ret void
+}
+
+; CHECK-LABEL: define void @test4()
+; CHECK-NEXT: %[[ALLOCA:.*]] = alloca
+; CHECK-NEXT: store ptr addrspace(1) null, ptr addrspace(1) %[[ALLOCA]]
+; CHECK-NEXT: call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"(ptr addrspace(1) %[[ALLOCA]]) ]
