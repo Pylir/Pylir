@@ -3089,6 +3089,14 @@ static void computeLiveInValues(BasicBlock::reverse_iterator Begin,
     // KILL/Def - Remove this definition from LiveIn
     LiveTmp.remove(&I);
 
+    if (auto *Intr = dyn_cast<IntrinsicInst>(&I))
+      if (Intr->getIntrinsicID() == Intrinsic::lifetime_start) {
+        // lifetime.start acts as starting the lifetime of the alloca.
+        // We therefore remove it from the LiveIn from this point on.
+        LiveTmp.remove(Intr->getArgOperand(1));
+        continue;
+      }
+
     // Don't consider *uses* in PHI nodes, we handle their contribution to
     // predecessor blocks when we seed the LiveOut sets
     if (isa<PHINode>(I))
@@ -3133,9 +3141,14 @@ static void computeLiveOutSeed(BasicBlock *BB, SetVector<Value *> &LiveTmp) {
 
 static SetVector<Value *> computeKillSet(BasicBlock *BB) {
   SetVector<Value *> KillSet;
-  for (Instruction &I : *BB)
+  for (Instruction &I : *BB) {
+    if (auto *Intr = dyn_cast<IntrinsicInst>(&I))
+      if (Intr->getIntrinsicID() == Intrinsic::lifetime_start)
+        KillSet.insert(Intr->getArgOperand(1));
+
     if (isHandledGCPointerType(I.getType()))
       KillSet.insert(&I);
+  }
   return KillSet;
 }
 
