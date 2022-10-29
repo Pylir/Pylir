@@ -519,6 +519,12 @@ static Value *findBaseDefiningValue(Value *I, DefiningValueMapTy &Cache,
     return I;
   }
 
+  if (isa<AllocaInst>(I)) {
+    Cache[I] = I;
+    setKnownBase(I, true, KnownBases);
+    return I;
+  }
+
   if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(I)) {
     // The base of this GEP is the base
     auto *BDV =
