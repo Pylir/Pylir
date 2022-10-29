@@ -39,6 +39,7 @@
 #include <llvm/Support/Program.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/ThreadPool.h>
+#include <llvm/Transforms/Scalar/DeadStoreElimination.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
@@ -528,8 +529,16 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             llvm::ModuleAnalysisManager mam;
             llvm::PassBuilder passBuilder(m_targetMachine.get());
 
-            passBuilder.registerOptimizerLastEPCallback([](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
-                                                        { mpm.addPass(pylir::PlaceStatepointsPass{}); });
+            passBuilder.registerOptimizerLastEPCallback(
+                [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
+                {
+                    mpm.addPass(pylir::PlaceStatepointsPass{});
+                    if (args.getLastArgValue(OPT_O, "0") != "0")
+                    {
+                        // Cleanup redundant stores to allocas inserted when statepoints were placed.
+                        mpm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::DSEPass{}));
+                    }
+                });
 
             fam.registerPass([&] { return passBuilder.buildDefaultAAPipeline(); });
             passBuilder.registerModuleAnalyses(mam);

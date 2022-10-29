@@ -3026,6 +3026,51 @@ bool pylir::PlaceStatepointsPass::runOnFunction(Function &F, DominatorTree &DT,
     MadeChange |=
         insertParsePoints(F, DT, TTI, ParsePointNeeded, DVCache, KnownBases);
 
+  // Work around state points potentially reading undefined values in allocas.
+  // Since state points can't conditionally include an alloca in the stack map
+  // based on a runtime condition this is necessary. Consider the following
+  // Construct:
+  //
+  //    %a = alloca %PyObject, addrspace(1)
+  //    %r = call i1 @random()
+  //    br i1 %r label %init, label %merge
+  //
+  //init:
+  //    store %PyObject %some_init_value, ptr %a
+  //    br label merge
+  //
+  //merge:
+  //    call void @foo()
+  //    ... some use of %r that is only reachable if %r is true
+  //
+  // The call to @foo would be transformed to include %a in the stack map since
+  // it is alive at the call (due to usage afterwards) and also defined before
+  // (through either the alloca or the store, depending how you want to model
+  // it). If at runtime we were to read %a when uninitialized it'd be immediate
+  // undefined behaviour and almost certainly invalid memory accesses.
+  //
+  // The workaround to this issue is that we initialize all allocas that may
+  // occur within a stackmap with a nullptr as first byte. The runtime
+  // then recognizes this pattern and skips the object.
+  // We can't do this transform from frontend generated code either, as dead
+  // store elimination may eliminate these required stores. For that reason
+  // we insert them here. After the state points have been set, they'll act
+  // as reads and make sure the stores are not eliminated.
+  //
+  // It is recommended to run dead store elimination afterwards anyhow, as the
+  // stores are quite likely to be redundant, if either an alloca is not
+  // live/used in any statepoint or if the object is always initialized anyway.
+  IRBuilder<> Builder(F.getContext());
+  Builder.SetInsertPointPastAllocas(&F);
+  for (auto &Instr :
+       make_filter_range(F.getEntryBlock(), [](const Instruction &Inst) {
+         auto *Alloca = dyn_cast<AllocaInst>(&Inst);
+         return Alloca && isGCPointerType(Alloca->getType());
+       })) {
+    Builder.CreateStore(
+        ConstantPointerNull::get(cast<PointerType>(Instr.getType())), &Instr);
+  }
+
   return MadeChange;
 }
 
