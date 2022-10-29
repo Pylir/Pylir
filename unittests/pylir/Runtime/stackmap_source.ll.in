@@ -1,5 +1,5 @@
 
-declare void @pylir_test_stack_escape(ptr addrspace(1)) "gc-leaf-function"
+declare void @pylir_test_stack_escape(ptr addrspace(1))
 
 @builtins.str = external addrspace(1) global i8
 
@@ -27,7 +27,6 @@ ptr addrspace(1) %15
 ) gc "pylir-gc" {
 entry:
     %a = alloca %PyString, addrspace (1)
-    %undef_alloca = alloca %PyString, addrspace (1)
 
     %gep0 = getelementptr %PyString, ptr addrspace(1) %a, i32 0, i32 0
     store ptr addrspace(1) @builtins.str, ptr addrspace(1) %gep0
@@ -43,7 +42,6 @@ entry:
 
     call void (ptr) %closure_call(ptr %closure)
     call void @pylir_test_stack_escape(ptr addrspace(1) %a)
-    call void @pylir_test_stack_escape(ptr addrspace(1) %undef_alloca)
     call void @pylir_test_stack_escape(ptr addrspace(1) %0)
     call void @pylir_test_stack_escape(ptr addrspace(1) %1)
     call void @pylir_test_stack_escape(ptr addrspace(1) %2)

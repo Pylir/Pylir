@@ -121,13 +121,6 @@ std::pair<std::uintptr_t, std::uintptr_t> pylir::rt::collectStackRoots(std::vect
                     unw_word_t rp;
                     unw_get_reg(&cursor, iter.regNumber, &rp);
                     auto* object = reinterpret_cast<pylir::rt::PyObject*>(rp + iter.offset);
-                    std::uintptr_t sentinel;
-                    std::memcpy(&sentinel, object, sizeof(std::uintptr_t));
-                    if (!sentinel)
-                    {
-                        break;
-                    }
-
                     results.push_back(object);
                     stackLowerBound = std::min(stackLowerBound, reinterpret_cast<std::uintptr_t>(object));
                     stackUpperBound = std::max(stackUpperBound, reinterpret_cast<std::uintptr_t>(object));
