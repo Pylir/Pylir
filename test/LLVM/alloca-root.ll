@@ -77,3 +77,24 @@ merge:
 ; CHECK-NEXT: %[[ALLOCA:.*]] = alloca
 ; CHECK-NEXT: store ptr addrspace(1) null, ptr addrspace(1) %[[ALLOCA]]
 ; CHECK-NEXT: call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"(ptr addrspace(1) %[[ALLOCA]]) ]
+
+define void @test5() gc "pylir-gc" {
+    %a = alloca { ptr addrspace(1), [0 x ptr addrspace(1)] }, addrspace(1)
+    %c = call i1 @random()
+    br i1 %c, label %bb0, label %false
+
+bb0:
+    call void @escape(ptr addrspace(1) %a)
+    call void @llvm.lifetime.start.p1(i64 -1, ptr addrspace(1) %a)
+    call void @builtins.__init__()
+    call void @escape(ptr addrspace(1) %a)
+    ret void
+
+false:
+    ret void
+}
+
+; CHECK-LABEL: define void @test5()
+; CHECK-NEXT: %[[ALLOCA:.*]] = alloca
+; CHECK-NEXT: store ptr addrspace(1) null, ptr addrspace(1) %[[ALLOCA]]
+; CHECK: call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"(ptr addrspace(1) %[[ALLOCA]]) ]
