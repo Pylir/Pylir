@@ -28,6 +28,9 @@ jobs:
           - { os: ubuntu-22.04, cxx_compiler: g++-10, c_compiler: gcc-10 }
 
     runs-on: ${{matrix.os}}
+    defaults:
+      run:
+        shell: pwsh
 
     steps:
 
@@ -41,6 +44,7 @@ jobs:
 
       - name: Install dependencies
         if: ${{ contains(matrix.os, 'ubuntu') }}
+        shell: bash
         run: |
           sudo apt update
           sudo apt install libunwind-dev g++-10 lld clang
@@ -68,20 +72,17 @@ jobs:
           path: Pylir
 
       - name: Install Python depends
-        shell: pwsh
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
       # See https://github.com/actions/cache/issues/53.
       - name: Sanitize key
-        shell: pwsh
         id: sanitize-key
         run: |
           "key=$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
 
       - name: Calculate cache size
         id: cache-size
-        shell: pwsh
         run: |
           if ('${{matrix.sanitizer}}') {
              "size=1.5G" >> $Env:GITHUB_OUTPUT
@@ -107,7 +108,6 @@ jobs:
           runtime_lib: ${{matrix.runtime_lib}}
 
       - name: Configure Pylir
-        shell: pwsh
         run: |
           $sanitizer_arg = ''
           if ('${{matrix.sanitizer}}') {
@@ -149,7 +149,6 @@ jobs:
         run: ctest --extra-verbose
 
       - name: Cleanup disk space
-        shell: pwsh
         run: |
           Remove-Item -Recurse -Force llvm-optimized-tblgen
           Remove-Item -Recurse -Force llvm-build
