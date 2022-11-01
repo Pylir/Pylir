@@ -31,6 +31,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Analysis/DomTreeUpdater.h"
+#include "llvm/Analysis/StackLifetime.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Argument.h"
@@ -1848,7 +1849,8 @@ static void
 makeStatepointExplicit(DominatorTree &DT, CallBase *Call,
                        PartiallyConstructedSafepointRecord &Result,
                        std::vector<DeferredReplacement> &Replacements,
-                       const PointerToBaseTy &PointerToBase) {
+                       const PointerToBaseTy &PointerToBase,
+                       StackLifetime &SL) {
   const auto &LiveSet = Result.LiveSet;
 
   // Convert to vector for efficient cross referencing.
@@ -1856,6 +1858,15 @@ makeStatepointExplicit(DominatorTree &DT, CallBase *Call,
   LiveVec.reserve(LiveSet.size());
   BaseVec.reserve(LiveSet.size());
   for (Value *L : LiveSet) {
+    if (auto *Alloca = dyn_cast<AllocaInst>(L))
+      // Filter any allocas not alive at the Call.
+      // We are misleadingly using 'isAliveAfter' here, even though the real
+      // criteria should be whether the alloca is alive at the Call itself.
+      // 'StackLifetime' only interpolates between lifetime markers and
+      // beginning of basic blocks, however so this "should" be fine.
+      if (!SL.isAliveAfter(Alloca, Call))
+        continue;
+
     LiveVec.push_back(L);
     assert(PointerToBase.count(L));
     Value *Base = PointerToBase.find(L)->second;
@@ -2649,6 +2660,17 @@ static bool insertParsePoints(Function &F, DominatorTree &DT,
     rematerializeLiveValues(ToUpdate[i], Records[i], PointerToBase,
                             RematerizationCandidates, TTI);
 #endif
+
+  auto TrackedAllocas = to_vector(map_range(
+      make_filter_range(F.getEntryBlock(),
+                        [](const Instruction &Inst) {
+                          auto *Alloca = dyn_cast<AllocaInst>(&Inst);
+                          return Alloca && isGCPointerType(Alloca->getType());
+                        }),
+      [](const Instruction &Inst) { return cast<AllocaInst>(&Inst); }));
+  StackLifetime SL(F, TrackedAllocas, StackLifetime::LivenessType::May);
+  SL.run();
+
   // We need this to safely RAUW and delete call or invoke return values that
   // may themselves be live over a statepoint.  For details, please see usage in
   // makeStatepointExplicitImpl.
@@ -2662,7 +2684,7 @@ static bool insertParsePoints(Function &F, DominatorTree &DT,
   // the old statepoint calls as we go.)
   for (size_t i = 0; i < Records.size(); i++)
     makeStatepointExplicit(DT, ToUpdate[i], Records[i], Replacements,
-                           PointerToBase);
+                           PointerToBase, SL);
 
   ToUpdate.clear(); // prevent accident use of invalid calls.
 

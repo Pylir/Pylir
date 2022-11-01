@@ -29,7 +29,7 @@ define void @test2() gc "pylir-gc" {
 ; CHECK-LABEL: define void @test2()
 ; CHECK-NEXT: %[[ALLOCA:.*]] = alloca
 ; CHECK-NEXT: store ptr addrspace(1) null, ptr addrspace(1) %[[ALLOCA]]
-; CHECK-NEXT: %{{.*}} = call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"(ptr addrspace(1) %[[ALLOCA]]) ]
+; CHECK-NEXT: %{{.*}} = call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"() ]
 
 declare i1 @random() "gc-leaf-function"
 
@@ -54,7 +54,7 @@ merge:
 ; CHECK-LABEL: define void @test3()
 ; CHECK-NEXT: %[[ALLOCA:.*]] = alloca
 ; CHECK-NEXT: store ptr addrspace(1) null, ptr addrspace(1) %[[ALLOCA]]
-; CHECK-NEXT: call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"(ptr addrspace(1) %[[ALLOCA]]) ]
+; CHECK-NEXT: call token ({{.*}}) @llvm.experimental.gc.statepoint{{.*}}({{.*}}@builtins.__init__{{.*}}) [ "deopt"() ]
 
 define void @test4() gc "pylir-gc" {
     %a = alloca { ptr addrspace(1), [0 x ptr addrspace(1)] }, addrspace(1)
