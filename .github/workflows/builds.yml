@@ -149,6 +149,7 @@ jobs:
         run: ctest --extra-verbose
 
       - name: Cleanup disk space
+        if: always()
         run: |
           Remove-Item -Recurse -Force llvm-optimized-tblgen
           Remove-Item -Recurse -Force llvm-build
