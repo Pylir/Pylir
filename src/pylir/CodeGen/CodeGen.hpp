@@ -250,7 +250,7 @@ class CodeGen
     mlir::Value intrinsicConstant(Intrinsic&& intrinsic);
 
     std::optional<bool> checkDecoratorIntrinsics(llvm::ArrayRef<Syntax::Decorator> decorators,
-                                                 bool additionalConstCondition);
+                                                 bool additionalConstCondition, const BaseToken& location);
 
     template <class T>
     T dereference(mlir::Attribute attr)
@@ -361,7 +361,8 @@ class CodeGen
 
     mlir::Value visitFunction(llvm::ArrayRef<Syntax::Decorator> decorators,
                               llvm::ArrayRef<Syntax::Parameter> parameterList, llvm::StringRef funcName,
-                              const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody);
+                              const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody,
+                              const BaseToken& location);
 
     template <class T, std::enable_if_t<IsAbstractVariantConcrete<T>{}>* = nullptr>
     decltype(auto) visit(const T& variant)

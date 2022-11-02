@@ -219,4 +219,10 @@ constexpr auto INVALID_ENUM_VALUE_N_FOR_ENUM_N_ARGUMENT = FMT_STRING("invalid en
 
 constexpr auto VALID_VALUES_ARE_N = FMT_STRING("valid values are: {}");
 
+constexpr auto CONST_EXPORT_OBJECT_MUST_BE_DEFINED_IN_GLOBAL_SCOPE =
+    FMT_STRING("'pylir.intr.const_export' object must be defined in global scope");
+
+constexpr auto DECORATORS_ON_A_CONST_EXPORT_OBJECT_ARE_NOT_SUPPORTED =
+    FMT_STRING("Decorators on a 'const_export' object are not supported");
+
 } // namespace pylir::Diag

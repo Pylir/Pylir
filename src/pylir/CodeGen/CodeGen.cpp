@@ -1508,7 +1508,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::WithStmt&)
 }
 
 std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(llvm::ArrayRef<Syntax::Decorator> decorators,
-                                                             bool additionalConstCondition)
+                                                             bool additionalConstCondition, const BaseToken& location)
 {
     bool constExport = false;
     for (const auto& iter : decorators)
@@ -1522,8 +1522,10 @@ std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(llvm::ArrayRef<Synt
         {
             if (!inGlobalScope())
             {
-                // TODO: emit error as required
-                PYLIR_UNREACHABLE;
+                createError(location, Diag::CONST_EXPORT_OBJECT_MUST_BE_DEFINED_IN_GLOBAL_SCOPE)
+                    .addHighlight(location)
+                    .addHighlight(iter, Diag::flags::secondaryColour);
+                return {};
             }
             constExport = true;
         }
@@ -1537,8 +1539,10 @@ std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(llvm::ArrayRef<Synt
             {
                 continue;
             }
-            // TODO: emit error as unsupported
-            PYLIR_UNREACHABLE;
+            createError(iter, Diag::DECORATORS_ON_A_CONST_EXPORT_OBJECT_ARE_NOT_SUPPORTED)
+                .addHighlight(iter)
+                .addHighlight(location, Diag::flags::secondaryColour);
+            return {};
         }
     }
     return constExport;
@@ -1546,9 +1550,10 @@ std::optional<bool> pylir::CodeGen::checkDecoratorIntrinsics(llvm::ArrayRef<Synt
 
 mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> decorators,
                                           llvm::ArrayRef<Syntax::Parameter> parameterList, llvm::StringRef funcName,
-                                          const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody)
+                                          const Syntax::Scope& scope, llvm::function_ref<void()> emitFunctionBody,
+                                          const BaseToken& location)
 {
-    auto constExport = checkDecoratorIntrinsics(decorators, m_constantClass);
+    auto constExport = checkDecoratorIntrinsics(decorators, m_constantClass, location);
     if (!constExport)
     {
         return {};
@@ -1795,8 +1800,9 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
 void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 {
     auto locExit = changeLoc(funcDef);
-    auto function = visitFunction(funcDef.decorators, funcDef.parameterList, funcDef.funcName.getValue(), funcDef.scope,
-                                  [&] { visit(*funcDef.suite); });
+    auto function = visitFunction(
+        funcDef.decorators, funcDef.parameterList, funcDef.funcName.getValue(), funcDef.scope,
+        [&] { visit(*funcDef.suite); }, funcDef.funcName);
     if (!function)
     {
         return;
@@ -1806,7 +1812,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::FuncDef& funcDef)
 
 void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
 {
-    auto constExport = checkDecoratorIntrinsics(classDef.decorators, false);
+    auto constExport = checkDecoratorIntrinsics(classDef.decorators, false, classDef.className);
     if (!constExport)
     {
         return;
@@ -2343,12 +2349,14 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Slice&)
 mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda)
 {
     auto locExit = changeLoc(lambda);
-    return visitFunction({}, lambda.parameters, "<lambda>", lambda.scope,
-                         [&]
-                         {
-                             auto value = visit(*lambda.expression);
-                             m_builder.create<mlir::func::ReturnOp>(value);
-                         });
+    return visitFunction(
+        {}, lambda.parameters, "<lambda>", lambda.scope,
+        [&]
+        {
+            auto value = visit(*lambda.expression);
+            m_builder.create<mlir::func::ReturnOp>(value);
+        },
+        lambda.lambdaKeyword);
 }
 
 mlir::Value pylir::CodeGen::visit(const Syntax::AttributeRef& attributeRef)
