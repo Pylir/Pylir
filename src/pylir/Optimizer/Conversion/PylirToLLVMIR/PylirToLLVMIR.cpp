@@ -30,6 +30,7 @@
 
 #include "WinX64.hpp"
 #include "X86_64.hpp"
+#include "ARM64.hpp"
 
 namespace pylir
 {
@@ -126,6 +127,12 @@ public:
                 }
                 break;
             }
+            case llvm::Triple::aarch64:
+            {
+                m_cabi = std::make_unique<pylir::ARM64>(mlir::DataLayout{moduleOp});
+                m_exceptionModel = ExceptionModel::Dwarf;
+                break;
+            }
             default: llvm::errs() << triple.str() << " not yet implemented"; std::abort();
         }
 
@@ -137,7 +144,7 @@ public:
         // https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html
         if (triple.isOSBinFormatMachO())
         {
-            constSectionPrefix = "__TEXT,";
+            constSectionPrefix = "__DATA,";
             dataSectionPrefix = "__DATA,";
         }
 

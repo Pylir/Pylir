@@ -8,6 +8,10 @@
 #include "API.hpp"
 #include "Support.hpp"
 
+#if __APPLE__
+#define _Unwind_Exception_Class uint64_t
+#endif
+
 void pylir_raise(pylir::rt::PyBaseException& exception)
 {
     auto& header = exception.getUnwindHeader();
@@ -172,7 +176,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
     {
         return {_URC_FATAL_PHASE1_ERROR, 0, 0};
     }
-    const auto* exceptionTable = static_cast<const uint8_t*>(_Unwind_GetLanguageSpecificData(context));
+    const auto* exceptionTable = reinterpret_cast<const uint8_t*>(_Unwind_GetLanguageSpecificData(context));
     if (!exceptionTable)
     {
         return {_URC_CONTINUE_UNWIND, 0, 0};

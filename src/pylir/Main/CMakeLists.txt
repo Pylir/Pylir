@@ -16,6 +16,7 @@ add_library(PylirMain
   MinGWToolchain.cpp
   MSVCToolchain.cpp
   LinuxToolchain.cpp
+  DarwinToolchain.cpp
   Version.cpp
   Distro.cpp
   CompilerInvocation.cpp DiagnosticsVerifier.cpp DiagnosticsVerifier.hpp)

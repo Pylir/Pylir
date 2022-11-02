@@ -22,6 +22,7 @@
 #include "LinuxToolchain.hpp"
 #include "MSVCToolchain.hpp"
 #include "MinGWToolchain.hpp"
+#include "DarwinToolchain.hpp"
 #include "Toolchain.hpp"
 
 using namespace pylir::cli;
@@ -43,6 +44,10 @@ std::unique_ptr<pylir::Toolchain> createToolchainForTriple(const pylir::cli::Com
     if (triple.isOSLinux())
     {
         return std::make_unique<pylir::LinuxToolchain>(triple, commandLine);
+    }
+    if (triple.isOSDarwin())
+    {
+        return std::make_unique<pylir::DarwinToolchain>(triple, commandLine);
     }
     return {};
 }
