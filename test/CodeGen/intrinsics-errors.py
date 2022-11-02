@@ -25,8 +25,6 @@ pylir.intr.mroLookup(d, args)
 
 # expected-error@below {{invalid enum value 'lol' for enum 'IntCmpKind' argument}}
 pylir.intr.int.cmp('lol', d, args)
-
-
 # expected-note@above {{valid values are: eq, ne, lt, le, gt, ge}}
 
 
