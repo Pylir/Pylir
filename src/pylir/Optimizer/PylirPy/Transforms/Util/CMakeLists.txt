@@ -3,4 +3,4 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_library(PylirPyTransformsUtil InlinerUtil.cpp)
-target_link_libraries(PylirPyTransformsUtil PRIVATE PylirPyDialect)
+target_link_libraries(PylirPyTransformsUtil PUBLIC MLIRCallInterfaces PRIVATE PylirPyDialect MLIRControlFlowDialect)

@@ -6,7 +6,7 @@ add_pylir_rewriter(PylirPyToPylirMem)
 
 add_library(PylirPyToPylirMem PylirPyToPylirMem.cpp)
 add_dependencies(PylirPyToPylirMem PylirConversionPassIncGen PylirPyToPylirMemIncGen)
-target_link_libraries(PylirPyToPylirMem PUBLIC PylirPyDialect PylirMemDialect MLIRPass MLIRTransforms)
+target_link_libraries(PylirPyToPylirMem PUBLIC PylirPyDialect PylirMemDialect MLIRPass MLIRTransforms MLIRArithDialect)
 set_property(GLOBAL APPEND PROPERTY MLIR_CONVERSION_LIBS PylirPyToPylirMem)
 
 if (PYLIR_USE_PCH)
