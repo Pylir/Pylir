@@ -528,7 +528,14 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             llvm::FunctionAnalysisManager fam;
             llvm::CGSCCAnalysisManager cgam;
             llvm::ModuleAnalysisManager mam;
-            llvm::PassBuilder passBuilder(m_targetMachine.get());
+
+            llvm::PipelineTuningOptions options;
+            options.LoopInterleaving = true;
+            options.LoopUnrolling = true;
+            options.LoopVectorization = true;
+            options.SLPVectorization = true;
+            options.MergeFunctions = true;
+            llvm::PassBuilder passBuilder(m_targetMachine.get(), options);
 
             passBuilder.registerOptimizerLastEPCallback(
                 [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
