@@ -209,7 +209,7 @@ CheckOptions:
   - key: readability-identifier-naming.ClassIgnoredRegexp
     # Attempt to ignore cases such as X86_64. clang-tidy wants to turn it to CamelCase by simply removing the
     # underscore. I'd rather it keep it as is.
-    value: '[[:alnum:]]*[0-9]+_[0-9]+'
+    value: '[[:alnum:]]*[0-9]+_[0-9]+|(const_)?iterator'
   - key: readability-identifier-naming.UnionCase
     value: CamelCase
   - key: readability-identifier-naming.TypeTemplateParameterCase

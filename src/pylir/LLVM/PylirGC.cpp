@@ -4,6 +4,7 @@
 
 #include "PylirGC.hpp"
 
+#include <llvm/ADT/SetVector.h>
 #include <llvm/CodeGen/AsmPrinter.h>
 #include <llvm/CodeGen/GCMetadataPrinter.h>
 #include <llvm/CodeGen/StackMaps.h>
@@ -67,6 +68,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
         os.emitValueToAlignment(alignment.value());
     }
 
+    /// Writes out the stack map in our custom format. See pylir/Runtime/Stack.cpp for details of the format.
     void writeStackMap(llvm::StackMaps& stackMaps, llvm::AsmPrinter& printer)
     {
         llvm::MCContext& context = printer.OutContext;
@@ -76,37 +78,49 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
         os.emitSymbolAttribute(symbol, llvm::MCSA_Global);
         switchToPointerAlignedReadOnly(os, printer);
         os.emitLabel(symbol);
+        // File magic 'PYLR' as uint32_t
         os.emitInt32(0x50594C52);
+
+        auto stackMapLocComp = [](const llvm::StackMaps::Location& lhs, const llvm::StackMaps::Location& rhs) {
+            return std::tie(lhs.Type, lhs.Reg, lhs.Offset, lhs.Size)
+                   < std::tie(rhs.Type, rhs.Reg, rhs.Offset, rhs.Size);
+        };
+
+        auto locNoConstantPred = [](const llvm::StackMaps::Location& location)
+        {
+            return location.Type != llvm::StackMaps::Location::Constant
+                   && location.Type != llvm::StackMaps::Location::ConstantIndex;
+        };
+
+        std::vector<llvm::StackMaps::Location> allLocations;
+        for (llvm::StackMaps::CallsiteInfo& iter : stackMaps.getCSInfos())
+        {
+            // First three entries always contain metadata about things like calling convention used, that we just
+            // aren't interested in.
+            auto ref = llvm::makeArrayRef(iter.Locations).drop_front(3);
+
+            llvm::copy_if(ref, std::back_inserter(allLocations), locNoConstantPred);
+        }
+
+        // There are a lot of locations across all call sites that are of the same type, size, register, offset etc.
+        // We therefore unique them all, put them in a single large array and have the callsites reference them via
+        // index.
+        llvm::sort(allLocations, stackMapLocComp);
+        allLocations.erase(llvm::unique(allLocations,
+                                        [](const llvm::StackMaps::Location& lhs, const llvm::StackMaps::Location& rhs) {
+                                            return std::tie(lhs.Type, lhs.Size, lhs.Reg, lhs.Offset)
+                                                   == std::tie(rhs.Type, rhs.Size, rhs.Reg, rhs.Offset);
+                                        }),
+                           allLocations.end());
+        allLocations.shrink_to_fit();
+
+        auto getLocIndex = [&](const llvm::StackMaps::Location& location)
+        { return llvm::lower_bound(allLocations, location, stackMapLocComp) - allLocations.begin(); };
 
         struct CallSiteInfo
         {
             const llvm::MCExpr* programCounter;
-            llvm::SmallVector<llvm::StackMaps::Location> locations;
-
-            CallSiteInfo(const llvm::MCExpr* programCounter, llvm::ArrayRef<llvm::StackMaps::Location> locations)
-                : programCounter(programCounter)
-            {
-                this->locations.reserve(locations.size());
-                std::copy_if(locations.begin(), locations.end(), std::back_inserter(this->locations),
-                             [](const llvm::StackMaps::Location& location)
-                             {
-                                 PYLIR_ASSERT(location.Type != llvm::StackMaps::Location::Unprocessed);
-                                 return location.Type != llvm::StackMaps::Location::Constant
-                                        && location.Type != llvm::StackMaps::Location::ConstantIndex;
-                             });
-                std::sort(this->locations.begin(), this->locations.end(),
-                          [](const llvm::StackMaps::Location& lhs, const llvm::StackMaps::Location& rhs) {
-                              return std::tie(lhs.Type, lhs.Size, lhs.Reg, lhs.Offset)
-                                     < std::tie(rhs.Type, rhs.Size, rhs.Reg, rhs.Offset);
-                          });
-                this->locations.erase(
-                    std::unique(this->locations.begin(), this->locations.end(),
-                                [](const llvm::StackMaps::Location& lhs, const llvm::StackMaps::Location& rhs) {
-                                    return std::tie(lhs.Type, lhs.Size, lhs.Reg, lhs.Offset)
-                                           == std::tie(rhs.Type, rhs.Size, rhs.Reg, rhs.Offset);
-                                }),
-                    this->locations.end());
-            }
+            std::vector<std::uint32_t> locationIndices;
         };
 
         std::vector<CallSiteInfo> callSiteInfos;
@@ -123,20 +137,44 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
                 recordCount = 0;
             }
 
-            PYLIR_ASSERT(iter.Locations.size() >= 3);
-            auto ref = llvm::makeArrayRef(iter.Locations).drop_front(3);
-            if (ref.empty())
+            std::vector<std::uint32_t> locIndices;
+            llvm::transform(llvm::make_filter_range(iter.Locations, locNoConstantPred), std::back_inserter(locIndices),
+                            getLocIndex);
+            if (locIndices.empty())
             {
                 continue;
             }
-            callSiteInfos.emplace_back(programCounter, ref);
+
+            // Sort the indices for a better access pattern. This also has the nice side effect of making
+            // similar location types be right after each other as well. E.g. multiple 'Indirect' accesses right after
+            // each other. This is due to 'allLocations' being sorted.
+            llvm::sort(locIndices);
+            locIndices.erase(llvm::unique(locIndices, std::equal_to<>{}), locIndices.end());
+            locIndices.shrink_to_fit();
+
+            callSiteInfos.push_back({programCounter, std::move(locIndices)});
         }
 
         auto pointerSize = printer.getDataLayout().getPointerSize();
 
-        PYLIR_ASSERT(callSiteInfos.size() <= std::numeric_limits<std::uint32_t>::max());
-        os.emitInt32(callSiteInfos.size());
+        os.emitULEB128IntValue(allLocations.size());
+        for (auto& iter : allLocations)
+        {
+            PYLIR_ASSERT(iter.Size % pointerSize == 0 && "Expected only pointers (or a vector of) in stackmap entry");
+            os.emitInt8(iter.Type);
+            os.emitULEB128IntValue(iter.Reg);
+            if (iter.Type != llvm::StackMaps::Location::Register)
+            {
+                os.emitSLEB128IntValue(iter.Offset);
+            }
+            if (iter.Type == llvm::StackMaps::Location::Indirect)
+            {
+                PYLIR_ASSERT(iter.Size / pointerSize <= std::numeric_limits<std::uint8_t>::max());
+                os.emitInt8(iter.Size / pointerSize);
+            }
+        }
 
+        os.emitULEB128IntValue(callSiteInfos.size());
         for (auto& iter : callSiteInfos)
         {
             // Mach-O arm64, seem to require that relocations are placed with proper alignment. Documentation is
@@ -144,21 +182,11 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
             // we'll just require this everywhere. At worst, we are wasting pointerSize-1 bytes per call site.
             // TODO: Reference documentation for alignment requirement.
             os.emitValueToAlignment(pointerSize);
-
             os.emitValue(iter.programCounter, pointerSize);
-            PYLIR_ASSERT(iter.locations.size() <= std::numeric_limits<std::uint32_t>::max());
-            os.emitULEB128IntValue(iter.locations.size());
-            for (const auto& location : iter.locations)
+            os.emitULEB128IntValue(iter.locationIndices.size());
+            for (std::uint32_t index : iter.locationIndices)
             {
-                PYLIR_ASSERT(location.Size == pointerSize);
-                os.emitInt8(location.Type);
-                os.emitULEB128IntValue(location.Reg);
-                switch (location.Type)
-                {
-                    case llvm::StackMaps::Location::Direct:
-                    case llvm::StackMaps::Location::Indirect: os.emitSLEB128IntValue(location.Offset); break;
-                    default: break;
-                }
+                os.emitULEB128IntValue(index);
             }
         }
     }

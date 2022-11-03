@@ -16,8 +16,8 @@ include(CheckTypeSize)
 
 # stackmap_source.ll.in is relatively target independent, except that it "makes use of" size_t. We configure and
 # and substitute the integer width of it here.
-check_type_size(size_t SIZE_T_SIZE)
-math(EXPR SIZE_T_SIZE "${SIZE_T_SIZE} * 8")
+check_type_size(size_t SIZE_T_BYTES)
+math(EXPR SIZE_T_BITS "${SIZE_T_BYTES} * 8")
 
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/stackmap_source.ll.in

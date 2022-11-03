@@ -22,8 +22,5 @@ declare token @llvm.experimental.gc.statepoint.p0(i64 immarg, i32 immarg, ptr, i
 ; CHECK-LABEL: pylir_stack_map:
 ; Magic PYLR
 ; CHECK-NEXT: .long 1348029522
-; Loc count
-; CHECK-NEXT: .long 1
-; Alignment for relocation
-; CHECK-NEXT: .p2align 3
+; CHECK: .p2align 3
 ; CHECK-NEXT: .quad _foo+(L[[LABEL]]-_foo)

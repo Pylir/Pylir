@@ -28,7 +28,8 @@ extern "C" void pylir_test_stack_read(void* closure, void (*closureCall)(void*),
                                       pylir::rt::PyObject& e, pylir::rt::PyObject& f, pylir::rt::PyObject& g,
                                       pylir::rt::PyObject& h, pylir::rt::PyObject& i, pylir::rt::PyObject& j,
                                       pylir::rt::PyObject& k, pylir::rt::PyObject& l, pylir::rt::PyObject& m,
-                                      pylir::rt::PyObject& n, pylir::rt::PyObject& o, pylir::rt::PyObject& p);
+                                      pylir::rt::PyObject& n, pylir::rt::PyObject& o, pylir::rt::PyObject& p,
+                                      pylir::rt::PyObject** vec);
 
 TEST_CASE("Stackmap reader")
 {
@@ -39,6 +40,9 @@ TEST_CASE("Stackmap reader")
         pylir::rt::PyString("ninth"),    pylir::rt::PyString("tenth"),      pylir::rt::PyString("eleventh"),
         pylir::rt::PyString("twelfth"),  pylir::rt::PyString("thirteenth"), pylir::rt::PyString("fourteenth"),
         pylir::rt::PyString("fifteenth")};
+    auto el1 = pylir::rt::PyString("seventeenth");
+    auto el2 = pylir::rt::PyString("eighteenth");
+    std::array<pylir::rt::PyObject*, 2> vec = {&el1, &el2};
     std::vector<std::string> result;
     auto impl = [&]()
     {
@@ -53,25 +57,11 @@ TEST_CASE("Stackmap reader")
     pylir_test_stack_read(
         reinterpret_cast<void*>(&impl), +[](void* lambda) { (*reinterpret_cast<decltype(impl)*>(lambda))(); }, array[0],
         array[1], array[2], array[3], array[4], array[5], array[6], array[7], array[8], array[9], array[10], array[11],
-        array[12], array[13], array[14], array[15]);
+        array[12], array[13], array[14], array[15], vec.data());
 
     CHECK_THAT(result, Catch::Matchers::UnorderedEquals<std::string>({
-                           "zero",
-                           "first",
-                           "second",
-                           "third",
-                           "fourth",
-                           "fifth",
-                           "sixth",
-                           "seventh",
-                           "eighth",
-                           "ninth",
-                           "tenth",
-                           "eleventh",
-                           "twelfth",
-                           "thirteenth",
-                           "fourteenth",
-                           "fifteenth",
-                           "sixteenth",
+                           "zero",       "first",     "second",    "third",       "fourth",     "fifth",   "sixth",
+                           "seventh",    "eighth",    "ninth",     "tenth",       "eleventh",   "twelfth", "thirteenth",
+                           "fourteenth", "fifteenth", "sixteenth", "seventeenth", "eighteenth",
                        }));
 }
