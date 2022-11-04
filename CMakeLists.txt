@@ -93,6 +93,14 @@ if (PYLIR_USE_PCH)
     target_precompile_headers(COMMON_PCH INTERFACE <type_traits> <functional> <tuple> <optional> <variant> <memory> <string> <string_view> <charconv> <array> <vector> <set> <map> <unordered_set> <unordered_map> <iterator> <algorithm> <numeric> <tcb/span.hpp>)
 endif ()
 
+# Pass -Wl,-z,defs. This makes sure all symbols are defined. Otherwise a DSO
+# build might work on ELF but fail on MachO/COFF.
+if (NOT (CMAKE_SYSTEM_NAME MATCHES "Darwin|FreeBSD|OpenBSD|DragonFly|AIX|OS390" OR
+        WIN32 OR CYGWIN) AND
+        NOT PYLIR_SANITIZER)
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,defs")
+endif ()
+
 if (POLICY CMP0116)
     cmake_policy(SET CMP0116 OLD)
 endif ()
