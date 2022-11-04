@@ -15,6 +15,10 @@ inputs:
   runtime_lib:
     description: 'Runtime lib to use. MSVC environment only. Uses cmake name'
     required: false
+  shared_libs:
+    description: 'Whether to build shared libraries. Probably only works on Linux'
+    required: false
+    default: 'OFF'
 
 outputs:
   install-dir:
@@ -95,6 +99,7 @@ runs:
         -DCMAKE_BUILD_TYPE=Release `
         -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
         -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
+        -DBUILD_SHARED_LIBS=${{inputs.shared_libs}} `
         -DLLVM_CCACHE_BUILD=ON `
         -DLLVM_ENABLE_ASSERTIONS=ON `
         -DLLVM_BUILD_TOOLS=OFF `

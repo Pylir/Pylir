@@ -23,6 +23,7 @@ jobs:
           - { os: windows-2022, cxx_compiler: clang++, c_compiler: clang }
           - { os: windows-2022, cxx_compiler: clang++, c_compiler: clang, sanitizer: "address,undefined" }
           - { os: ubuntu-22.04, cxx_compiler: clang++, c_compiler: clang }
+          - { os: ubuntu-22.04, cxx_compiler: clang++, c_compiler: clang, shared_libs: "ON" }
           - { os: ubuntu-22.04, cxx_compiler: clang++, c_compiler: clang, sanitizer: "thread" }
           - { os: ubuntu-22.04, cxx_compiler: clang++, c_compiler: clang, sanitizer: "address,undefined" }
           - { os: ubuntu-22.04, cxx_compiler: g++-10, c_compiler: gcc-10 }
@@ -95,7 +96,7 @@ jobs:
         with:
           ccache_options: |
             max_size=${{steps.cache-size.outputs.size}}
-          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}
+          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
           windows_compile_environment: msvc
 
       - name: Build LLVM
@@ -106,6 +107,7 @@ jobs:
           cpp-compiler: ${{matrix.cxx_compiler}}
           sanitizers: ${{matrix.sanitizer}}
           runtime_lib: ${{matrix.runtime_lib}}
+          shared_libs: ${{matrix.shared_libs}}
 
       - name: Configure Pylir
         run: |
@@ -121,6 +123,10 @@ jobs:
           if ($IsWindows -and ('${{matrix.cxx_compiler}}' -eq 'clang++')) {
             $sys_root = '-DPYLIR_DEFAULT_SYSROOT="D:/msys64/clang64"'
           }
+          $shared_libs = ''
+          if ('${{matrix.shared_libs}}') {
+            $shared_libs = '-DBUILD_SHARED_LIBS=ON'
+          }
           
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
@@ -130,6 +136,7 @@ jobs:
             $sanitizer_arg `
             $runtime_arg `
             $sys_root `
+            $shared_libs `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
