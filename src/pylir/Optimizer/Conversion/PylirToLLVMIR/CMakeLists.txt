@@ -7,8 +7,3 @@ add_dependencies(PylirToLLVMIR PylirConversionPassIncGen)
 target_link_libraries(PylirToLLVMIR PUBLIC PylirMemDialect MLIRLLVMDialect MLIRPass MLIRTransforms MLIRFuncToLLVM
   MLIRControlFlowToLLVM)
 set_property(GLOBAL APPEND PROPERTY MLIR_CONVERSION_LIBS PylirToLLVMIR)
-
-if (PYLIR_USE_PCH)
-  target_link_libraries(PylirToLLVMIR PRIVATE COMMON_PCH)
-  target_precompile_headers(PylirToLLVMIR PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
-endif ()

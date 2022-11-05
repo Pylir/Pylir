@@ -34,8 +34,3 @@ target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpI
   PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface PylirSROAInterfaces
   PRIVATE MLIRArithDialect MLIRControlFlowDialect PylirTransformsUtils MLIRDataLayoutInterfaces)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
-if (PYLIR_USE_PCH)
-  target_link_libraries(PylirPyDialect PRIVATE COMMON_PCH)
-  target_precompile_headers(PylirPyDialect PRIVATE <mlir/IR/Operation.h> <mlir/IR/BuiltinOps.h>)
-endif ()
-
