@@ -1,4 +1,6 @@
 
+include(CheckCXXCompilerFlag)
+
 if (NOT MSVC)
     # GNU style flags.
     add_compile_options(-pedantic -Wall -Wextra $<$<COMPILE_LANGUAGE:CXX>:-Wnon-virtual-dtor>)
@@ -103,6 +105,19 @@ if (NOT (CMAKE_SYSTEM_NAME MATCHES "Darwin|FreeBSD|OpenBSD|DragonFly|AIX|OS390" 
         NOT PYLIR_SANITIZER)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,defs")
 endif ()
+
+# Matching LLVMs visibility option here. Mismatch of visibility can cause linker warnings on macOS.
+if((NOT (${CMAKE_SYSTEM_NAME} MATCHES "AIX")) AND
+(NOT (WIN32 OR CYGWIN) OR (MINGW AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")))
+    # GCC for MinGW does nothing about -fvisibility-inlines-hidden, but warns
+    # about use of the attributes. As long as we don't use the attributes (to
+    # override the default) we shouldn't set the command line options either.
+    # GCC on AIX warns if -fvisibility-inlines-hidden is used and Clang on AIX doesn't currently support visibility.
+    check_cxx_compiler_flag("-fvisibility-inlines-hidden" SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
+    if (SUPPORTS_FVISIBILITY_INLINES_HIDDEN_FLAG)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fvisibility-inlines-hidden")
+    endif ()
+endif()
 
 if (POLICY CMP0116)
     # TODO: Reevaluate once minimum version is 3.20. Affects the way depfiles are handled in cmake. Setting it to OLD
