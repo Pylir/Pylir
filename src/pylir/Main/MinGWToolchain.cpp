@@ -130,9 +130,8 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     linkerInvocation.addArg(findOnBuiltinPaths("crt2.o"))
         .addArg(findOnBuiltinPaths("crtbegin.o"))
         .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
-        .addLibrarySearchDirs(m_builtinLibrarySearchDirs);
-
-    linkerInvocation.addArg(objectFile);
+        .addLibrarySearchDirs(m_builtinLibrarySearchDirs)
+        .addArg(objectFile);
 
     for (auto* arg : args)
     {
