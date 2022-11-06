@@ -14,11 +14,11 @@ class MinGWToolchain : public Toolchain
     std::string m_subdir;
 
 protected:
-    [[nodiscard]] Stdlib defaultStdlib() const override;
 
-    [[nodiscard]] RTLib defaultRTLib() const override;
-
-    [[nodiscard]] bool defaultsToPIC() const override;
+    [[nodiscard]] bool defaultsToPIC() const override
+    {
+        return true;
+    }
 
 public:
     explicit MinGWToolchain(const llvm::Triple& triple, const cli::CommandLine& commandLine);

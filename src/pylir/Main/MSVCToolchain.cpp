@@ -77,8 +77,3 @@ bool pylir::MSVCToolchain::link(cli::CommandLine& commandLine, llvm::StringRef o
 
     return callLinker(commandLine, Toolchain::LinkerStyle::MSVC, arguments);
 }
-
-bool pylir::MSVCToolchain::defaultsToPIC() const
-{
-    return true;
-}

@@ -12,18 +12,10 @@ namespace pylir
 class MSVCToolchain : public Toolchain
 {
 protected:
-    // These values don't actually matter for MSVC toolchains
-
-    [[nodiscard]] Stdlib defaultStdlib() const override
+    [[nodiscard]] bool defaultsToPIC() const override
     {
-        return Stdlib::Libcpp;
+        return true;
     }
-    [[nodiscard]] RTLib defaultRTLib() const override
-    {
-        return RTLib::CompilerRt;
-    }
-
-    [[nodiscard]] bool defaultsToPIC() const override;
 
 public:
     explicit MSVCToolchain(const llvm::Triple& triple, const cli::CommandLine& commandLine);

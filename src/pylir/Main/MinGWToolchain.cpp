@@ -244,30 +244,17 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     arguments.emplace_back("--no-whole-archive");
     arguments.emplace_back("--end-group");
 
-    switch (getStdlib(commandLine))
-    {
-        case Stdlib::Libstdcpp: arguments.emplace_back("-lstdc++"); break;
-        case Stdlib::Libcpp: arguments.emplace_back("-lc++"); break;
-    }
+    arguments.emplace_back("-lc++");
 
     arguments.emplace_back("--start-group");
     arguments.emplace_back("-lmingw32");
-    switch (getRTLib(commandLine))
+    if (!clangRTPath || llvm::sys::fs::exists(*clangRTPath + sep + "libclang_rt.builtins.a"))
     {
-        case RTLib::CompilerRt:
-            if (!clangRTPath || llvm::sys::fs::exists(*clangRTPath + sep + "libclang_rt.builtins.a"))
-            {
-                arguments.emplace_back("-lclang_rt.builtins");
-            }
-            else
-            {
-                arguments.push_back(("-lclang_rt.builtins-" + m_triple.getArchName()).str());
-            }
-            break;
-        case RTLib::Libgcc:
-            arguments.emplace_back("-lgcc");
-            arguments.emplace_back("-lgcc_eh");
-            break;
+        arguments.emplace_back("-lclang_rt.builtins");
+    }
+    else
+    {
+        arguments.push_back(("-lclang_rt.builtins-" + m_triple.getArchName()).str());
     }
     arguments.emplace_back("-lmoldname");
     arguments.emplace_back("-lmingwex");
@@ -286,30 +273,4 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     arguments.emplace_back((path + sep + "crtend.o").str());
 
     return callLinker(commandLine, Toolchain::LinkerStyle::GNU, arguments);
-}
-
-// Prefer LLVM tooling for native Windows. Cross compilers from Linux are more likely to have MinGW GCC installed
-// however.
-
-pylir::Toolchain::Stdlib pylir::MinGWToolchain::defaultStdlib() const
-{
-#ifdef _WIN32
-    return Stdlib::Libcpp;
-#else
-    return Stdlib::Libstdcpp;
-#endif
-}
-
-pylir::Toolchain::RTLib pylir::MinGWToolchain::defaultRTLib() const
-{
-#ifdef _WIN32
-    return RTLib::CompilerRt;
-#else
-    return RTLib::Libgcc;
-#endif
-}
-
-bool pylir::MinGWToolchain::defaultsToPIC() const
-{
-    return true;
 }

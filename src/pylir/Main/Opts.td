@@ -68,10 +68,6 @@ def Wl : CommaJoined<["-"], "Wl,">, HelpText<"Flags to forward to the linker">, 
 def fno_integrated_lld : F<"fno-integrated-lld", "Don't use the builtin version of lld">, Group<grp_link>;
 def fintegrated_lld : F<"fintegrated-lld", "Use the builtin version of lld (default)">, Group<grp_link>;
 defm sysroot : Eq<"sysroot", "Root directory of the system libraries">, Group<grp_link>;
-defm stdlib : Eq<"stdlib", "C++ standard library to use">, MetaVarName<"<name>">, Values<"libc++,libstdc++">,
-    Group<grp_link>;
-defm rtlib : Eq<"rtlib", "Compiler runtime library to use">, MetaVarName<"<name>">, Values<"compiler-rt,libgcc">,
-    Group<grp_link>;
 
 def grp_internal : OptionGroup<"Internal"> {
     let Flags = [HelpHidden];

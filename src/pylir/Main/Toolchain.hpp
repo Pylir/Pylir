@@ -27,26 +27,6 @@ protected:
     [[nodiscard]] bool callLinker(cli::CommandLine& commandLine, LinkerStyle style,
                                   llvm::ArrayRef<std::string> arguments) const;
 
-    enum class Stdlib
-    {
-        Libstdcpp,
-        Libcpp,
-    };
-
-    [[nodiscard]] virtual Stdlib defaultStdlib() const = 0;
-
-    [[nodiscard]] Stdlib getStdlib(const pylir::cli::CommandLine& commandLine) const;
-
-    enum class RTLib
-    {
-        CompilerRt,
-        Libgcc,
-    };
-
-    [[nodiscard]] virtual RTLib defaultRTLib() const = 0;
-
-    [[nodiscard]] RTLib getRTLib(const pylir::cli::CommandLine& commandLine) const;
-
     [[nodiscard]] virtual bool defaultsToPIE() const
     {
         return false;

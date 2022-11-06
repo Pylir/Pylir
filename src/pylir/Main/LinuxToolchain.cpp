@@ -12,12 +12,6 @@
 
 namespace
 {
-struct Multilib
-{
-    std::string gccSuffix;
-    std::string osSuffix;
-    std::string includeSuffix;
-};
 
 struct GCCInstallation
 {
@@ -304,19 +298,13 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     arguments.emplace_back("--end-group");
     arguments.emplace_back("-lunwind");
 
-    switch (getStdlib(commandLine))
-    {
-        case Stdlib::Libstdcpp: arguments.emplace_back("-lstdc++"); break;
-        case Stdlib::Libcpp: arguments.emplace_back("-lc++"); break;
-    }
+    arguments.emplace_back("-lstdc++");
 
     arguments.emplace_back("-lm");
 
     arguments.emplace_back("-lgcc_s");
     arguments.emplace_back("-lgcc");
     arguments.emplace_back("-lc");
-    //    arguments.emplace_back("-lgcc_s");
-    //    arguments.emplace_back("-lgcc");
 
     arguments.push_back(findOnBuiltinPath("crtend.o"));
     arguments.push_back(findOnBuiltinPath("crtn.o"));
