@@ -4,6 +4,7 @@
 
 #include "Toolchain.hpp"
 
+#include <llvm/Support/Path.h>
 #include <llvm/Support/Program.h>
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
@@ -12,8 +13,31 @@
     #include <lld/Common/Driver.h>
 #endif
 
-bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle style,
-                                  llvm::ArrayRef<std::string> arguments) const
+pylir::Toolchain::Toolchain(llvm::Triple triple, const cli::CommandLine& commandLine) : m_triple(std::move(triple))
+{
+    // Runtime directory where our runtime libraries are placed.
+    llvm::SmallString<10> pylirRuntimeDir = commandLine.getExecutablePath();
+    llvm::sys::path::remove_filename(pylirRuntimeDir);
+    llvm::sys::path::append(pylirRuntimeDir, "..", "lib", "pylir", m_triple.str());
+    m_builtinLibrarySearchDirs.emplace_back(pylirRuntimeDir);
+
+    if (!commandLine.getArgs().hasArg(cli::OPT_sysroot_EQ))
+    {
+        // Sysroot for the target relative to the executable if present.
+        pylirRuntimeDir = commandLine.getExecutablePath();
+        llvm::sys::path::remove_filename(pylirRuntimeDir);
+        llvm::sys::path::append(pylirRuntimeDir, "..", m_triple.str());
+        m_builtinLibrarySearchDirs.emplace_back(pylirRuntimeDir);
+    }
+
+    // Directories where to search for a linker.
+    llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
+    llvm::sys::path::remove_filename(executablePath);
+    m_programPaths.emplace_back(executablePath);
+}
+
+bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine,
+                                  LinkerInvocationBuilder&& linkerInvocationBuilder) const
 {
     const auto& args = commandLine.getArgs();
     std::string linkerPath;
@@ -28,10 +52,11 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle sty
 #endif
     {
         std::vector<llvm::StringRef> candidates;
-        switch (style)
+        switch (linkerInvocationBuilder.getLinkerStyle())
         {
             case LinkerStyle::MSVC: candidates = {"lld-link"}; break;
-            case LinkerStyle::GNU: candidates = {"ld.lld"}; break;
+            case LinkerStyle::MinGW:
+            case LinkerStyle::ELF: candidates = {"ld.lld"}; break;
             case LinkerStyle::Mac: candidates = {"ld64.lld"}; break;
             case LinkerStyle::Wasm: candidates = {"wasm-lld"}; break;
         }
@@ -81,15 +106,16 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle sty
         if (commandLine.verbose() || commandLine.onlyPrint())
         {
             llvm::errs() << "<builtin-";
-            switch (style)
+            switch (linkerInvocationBuilder.getLinkerStyle())
             {
                 case LinkerStyle::MSVC: llvm::errs() << "lld-link"; break;
-                case LinkerStyle::GNU: llvm::errs() << "ld.lld"; break;
+                case LinkerStyle::MinGW:
+                case LinkerStyle::ELF: llvm::errs() << "ld.lld"; break;
                 case LinkerStyle::Mac: llvm::errs() << "ld64.lld"; break;
                 case LinkerStyle::Wasm: llvm::errs() << "wasm-lld"; break;
             }
             llvm::errs() << ">";
-            for (const auto& iter : arguments)
+            for (const auto& iter : linkerInvocationBuilder.getArgs())
             {
                 llvm::errs() << " " << iter;
             }
@@ -99,19 +125,15 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle sty
                 return true;
             }
         }
-        std::vector<const char*> refs(1 + arguments.size());
+        std::vector<const char*> refs(1 + linkerInvocationBuilder.getArgs().size());
         refs[0] = "pylir";
-        std::transform(arguments.begin(), arguments.end(), 1 + refs.begin(),
-                       [](const std::string& string) { return string.c_str(); });
-        switch (style)
+        llvm::transform(linkerInvocationBuilder.getArgs(), 1 + refs.begin(),
+                        [](const std::string& string) { return string.c_str(); });
+        switch (linkerInvocationBuilder.getLinkerStyle())
         {
             case LinkerStyle::MSVC: return lld::coff::link(refs, llvm::outs(), llvm::errs(), false, false);
-            case LinkerStyle::GNU:
-                if (m_triple.isOSCygMing())
-                {
-                    return lld::mingw::link(refs, llvm::outs(), llvm::errs(), false, false);
-                }
-                return lld::elf::link(refs, llvm::outs(), llvm::errs(), false, false);
+            case LinkerStyle::MinGW: return lld::mingw::link(refs, llvm::outs(), llvm::errs(), false, false);
+            case LinkerStyle::ELF: return lld::elf::link(refs, llvm::outs(), llvm::errs(), false, false);
             case LinkerStyle::Mac: return lld::macho::link(refs, llvm::outs(), llvm::errs(), false, false);
             case LinkerStyle::Wasm: return lld::wasm::link(refs, llvm::outs(), llvm::errs(), false, false);
         }
@@ -121,7 +143,7 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle sty
     if (commandLine.verbose() || commandLine.onlyPrint())
     {
         llvm::errs() << linkerPath;
-        for (const auto& iter : arguments)
+        for (const auto& iter : linkerInvocationBuilder.getArgs())
         {
             llvm::errs() << " " << iter;
         }
@@ -130,7 +152,8 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine, LinkerStyle sty
             return true;
         }
     }
-    std::vector<llvm::StringRef> refs(arguments.begin(), arguments.end());
+    std::vector<llvm::StringRef> refs(linkerInvocationBuilder.getArgs().begin(),
+                                      linkerInvocationBuilder.getArgs().end());
     return llvm::sys::ExecuteAndWait(linkerPath, refs) == 0;
 }
 

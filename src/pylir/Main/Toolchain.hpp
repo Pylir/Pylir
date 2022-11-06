@@ -7,6 +7,7 @@
 #include <llvm/ADT/Triple.h>
 
 #include "CommandLine.hpp"
+#include "LinkerInvocation.hpp"
 
 namespace pylir
 {
@@ -15,17 +16,10 @@ class Toolchain
 protected:
     llvm::Triple m_triple;
     std::vector<std::string> m_programPaths;
+    std::vector<std::string> m_builtinLibrarySearchDirs;
 
-    enum class LinkerStyle
-    {
-        MSVC,
-        GNU,
-        Mac,
-        Wasm,
-    };
-
-    [[nodiscard]] bool callLinker(cli::CommandLine& commandLine, LinkerStyle style,
-                                  llvm::ArrayRef<std::string> arguments) const;
+    [[nodiscard]] bool callLinker(cli::CommandLine& commandLine,
+                                  LinkerInvocationBuilder&& linkerInvocationBuilder) const;
 
     [[nodiscard]] virtual bool defaultsToPIE() const
     {
@@ -33,7 +27,7 @@ protected:
     }
 
 public:
-    explicit Toolchain(llvm::Triple triple) : m_triple(std::move(triple)) {}
+    explicit Toolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
 
     virtual ~Toolchain() = default;
 

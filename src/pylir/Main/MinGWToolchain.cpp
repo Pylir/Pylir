@@ -35,10 +35,10 @@ std::optional<std::string> relativeSubdir(const llvm::Triple& triple, const pyli
 }
 } // namespace
 
-pylir::MinGWToolchain::MinGWToolchain(const llvm::Triple& triple, const cli::CommandLine& commandLine)
-    : Toolchain(triple)
+pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
+    : Toolchain(std::move(triple), commandLine)
 {
-    m_sysroot = commandLine.getArgs().getLastArgValue(pylir::cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
+    m_sysroot = commandLine.getArgs().getLastArgValue(cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
     if (m_sysroot.empty() || !llvm::sys::fs::is_directory(m_sysroot))
     {
         if (auto opt = relativeSubdir(m_triple, commandLine, m_subdir))
@@ -50,7 +50,7 @@ pylir::MinGWToolchain::MinGWToolchain(const llvm::Triple& triple, const cli::Com
             std::string gccName = (m_triple.getArchName() + "-w64-mingw32-gcc").str();
             if (auto result = llvm::sys::findProgramByName(gccName))
             {
-                m_subdir = (triple.getArchName() + "-w64-ming32").str();
+                m_subdir = (m_triple.getArchName() + "-w64-ming32").str();
                 m_sysroot = llvm::sys::path::parent_path(gccName);
             }
         }
@@ -58,8 +58,8 @@ pylir::MinGWToolchain::MinGWToolchain(const llvm::Triple& triple, const cli::Com
     else
     {
         llvm::SmallVector<llvm::SmallString<32>, 2> subdirs;
-        subdirs.emplace_back(triple.str());
-        subdirs.emplace_back(triple.getArchName());
+        subdirs.emplace_back(m_triple.str());
+        subdirs.emplace_back(m_triple.getArchName());
         subdirs[1] += "-w64-mingw32";
         for (auto& candidateSubdir : subdirs)
         {
@@ -146,39 +146,24 @@ std::optional<std::string> findClangResourceDir(const llvm::Triple& triple, llvm
 bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
-    std::vector<std::string> arguments;
-    if (!m_sysroot.empty())
-    {
-        arguments.push_back("--sysroot=" + m_sysroot);
-    }
-    arguments.emplace_back("-m");
-    switch (m_triple.getArch())
-    {
-        case llvm::Triple::x86: arguments.emplace_back("i386pe"); break;
-        case llvm::Triple::x86_64: arguments.emplace_back("i386pep"); break;
-        case llvm::Triple::aarch64: arguments.emplace_back("arm64pe"); break;
-        default: PYLIR_UNREACHABLE;
-    }
 
-    for (auto& iter : getLLVMOptions(args))
-    {
-        arguments.push_back("--Xlink=/mllvm:" + iter);
-    }
+    auto linkerInvocation = LinkerInvocationBuilder(LinkerStyle::MinGW)
+                                .addArg("--sysroot=" + m_sysroot, !m_sysroot.empty())
+                                .addEmulation(m_triple)
+                                .addLLVMOptions(getLLVMOptions(args))
+                                .addArg("-Bstatic");
 
-    arguments.emplace_back("-Bstatic");
-
-    if (auto* output = args.getLastArg(pylir::cli::OPT_o))
+    if (auto* output = args.getLastArg(cli::OPT_o))
     {
-        arguments.emplace_back("-o");
-        arguments.emplace_back(output->getValue());
+        linkerInvocation.addOutputFile(output->getValue());
     }
-    else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
+    else if (auto* input = args.getLastArg(cli::OPT_INPUT))
     {
         llvm::SmallString<20> path(llvm::sys::path::stem(input->getValue()));
         llvm::sys::path::replace_extension(path, ".exe");
-        arguments.emplace_back("-o");
-        arguments.emplace_back(path);
+        linkerInvocation.addOutputFile(path);
     }
+
     auto gccLib = findGCCLib(m_triple, m_sysroot);
     auto sep = llvm::sys::path::get_separator();
     llvm::SmallString<20> sysRootAndSubDir(m_sysroot);
@@ -191,86 +176,73 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     sysRootAndSubDir += "lib";
 
     llvm::SmallString<20> path(gccLib.value_or(static_cast<std::string>(sysRootAndSubDir)));
-    arguments.emplace_back((path + sep + "crt2.o").str());
-    arguments.emplace_back((path + sep + "crtbegin.o").str());
+    linkerInvocation.addArg(path + sep + "crt2.o")
+        .addArg(path + sep + "crtbegin.o")
+        .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L));
 
-    for (auto& iter : args.getAllArgValues(pylir::cli::OPT_L))
-    {
-        arguments.push_back("-L" + iter);
-    }
     if (gccLib)
     {
-        arguments.push_back("-L" + *gccLib);
+        linkerInvocation.addLibrarySearchDir(*gccLib);
     }
-    arguments.push_back(("-L" + sysRootAndSubDir).str());
-    arguments.push_back(("-L" + m_sysroot + sep + "lib").str());
-    arguments.push_back(("-L" + m_sysroot + sep + "lib" + sep + m_triple.str()).str());
-    arguments.push_back(("-L" + m_sysroot + sep + "sys-root" + sep + "mingw" + sep + "lib").str());
+    linkerInvocation.addLibrarySearchDir(sysRootAndSubDir)
+        .addLibrarySearchDir(m_sysroot, "lib")
+        .addLibrarySearchDir(m_sysroot, "lib", m_triple.str())
+        .addLibrarySearchDir(m_sysroot, "sys-root", "mingw", "lib");
+
     auto clangRTPath = findClangResourceDir(m_triple, m_sysroot);
     if (clangRTPath)
     {
-        arguments.push_back("-L" + *clangRTPath);
+        linkerInvocation.addLibrarySearchDir(*clangRTPath);
     }
-    arguments.push_back(objectFile.str());
+
+    linkerInvocation.addArg(objectFile);
 
     for (auto* arg : args)
     {
-        if (arg->getOption().matches(pylir::cli::OPT_l))
+        if (arg->getOption().matches(cli::OPT_l))
         {
-            arguments.push_back("-l" + std::string(arg->getValue()));
+            linkerInvocation.addLibrary(arg->getValue());
             continue;
         }
-        if (arg->getOption().matches(pylir::cli::OPT_Wl))
+        if (arg->getOption().matches(cli::OPT_Wl))
         {
-            std::copy(arg->getValues().begin(), arg->getValues().end(), std::back_inserter(arguments));
+            linkerInvocation.addArgs(arg->getValues());
             continue;
         }
     }
 
-    arguments.emplace_back("--start-group");
-    llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
-    llvm::sys::path::remove_filename(executablePath);
-    llvm::sys::path::append(executablePath, "..", "lib", "pylir", m_triple.str());
-    llvm::sys::path::append(executablePath, "libPylirRuntime.a");
-    arguments.emplace_back(executablePath);
-    llvm::sys::path::remove_filename(executablePath);
-    // TODO: Change to respect the command line option
-    llvm::sys::path::append(executablePath, "libPylirMarkAndSweep.a");
-    arguments.emplace_back(executablePath);
-    llvm::sys::path::remove_filename(executablePath);
-    llvm::sys::path::append(executablePath, "libPylirRuntimeMain.a");
-    arguments.emplace_back("--whole-archive");
-    arguments.emplace_back(executablePath);
-    arguments.emplace_back("--no-whole-archive");
-    arguments.emplace_back("--end-group");
+    linkerInvocation.addArg("--start-group")
+        .addLibrary("PylirRuntime")
+        .addLibrary("PylirMarkAndSweep")
+        .addLibrary("PylirRuntimeMain")
+        .addArg("--end-group")
+        .addLibrary("c++")
+        .addArg("--start-group")
+        .addLibrary("mingw32");
 
-    arguments.emplace_back("-lc++");
-
-    arguments.emplace_back("--start-group");
-    arguments.emplace_back("-lmingw32");
     if (!clangRTPath || llvm::sys::fs::exists(*clangRTPath + sep + "libclang_rt.builtins.a"))
     {
-        arguments.emplace_back("-lclang_rt.builtins");
+        linkerInvocation.addLibrary("clang-rt.builtins");
     }
     else
     {
-        arguments.push_back(("-lclang_rt.builtins-" + m_triple.getArchName()).str());
+        linkerInvocation.addLibrary("clang-rt.builtins-" + m_triple.getArchName());
     }
-    arguments.emplace_back("-lmoldname");
-    arguments.emplace_back("-lmingwex");
-    auto argValues = args.getAllArgValues(pylir::cli::OPT_l);
+
+    linkerInvocation.addLibrary("moldname").addLibrary("mingwex");
+
+    auto argValues = args.getAllArgValues(cli::OPT_l);
     if (std::none_of(argValues.begin(), argValues.end(),
                      [](llvm::StringRef ref) { return ref.startswith("msvcr") || ref.startswith("ucrt"); }))
     {
-        arguments.emplace_back("-lmsvcrt");
+        linkerInvocation.addLibrary("msvcrt");
     }
-    arguments.emplace_back("-ladvapi32");
-    arguments.emplace_back("-lshell32");
-    arguments.emplace_back("-luser32");
-    arguments.emplace_back("-lkernel32");
-    arguments.emplace_back("--end-group");
+    linkerInvocation.addLibrary("advapi32")
+        .addLibrary("shell32")
+        .addLibrary("user32")
+        .addLibrary("kernel32")
+        .addArg("--end-group")
+        .addArg(path + sep + "crtend.o");
 
-    arguments.emplace_back((path + sep + "crtend.o").str());
-
-    return callLinker(commandLine, Toolchain::LinkerStyle::GNU, arguments);
+    return callLinker(commandLine, std::move(linkerInvocation));
 }

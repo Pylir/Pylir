@@ -116,15 +116,6 @@ std::optional<GCCInstallation> findGCCInstallation(const llvm::Triple& triple,
     return GCCInstallation{std::move(libPath), std::move(gccLibPath), std::move(resultTriple)};
 }
 
-const char* getEmulation(const llvm::Triple& triple, const pylir::cli::CommandLine&)
-{
-    switch (triple.getArch())
-    {
-        case llvm::Triple::x86_64: return "elf_x86_64";
-        default: return nullptr;
-    }
-}
-
 const char* getDynamicLinker(const llvm::Triple& triple, const pylir::cli::CommandLine&)
 {
     switch (triple.getArch())
@@ -136,7 +127,10 @@ const char* getDynamicLinker(const llvm::Triple& triple, const pylir::cli::Comma
 
 } // namespace
 
-pylir::LinuxToolchain::LinuxToolchain(const llvm::Triple& triple, const cli::CommandLine&) : Toolchain(triple) {}
+pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
+    : Toolchain(std::move(triple), commandLine)
+{
+}
 
 bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
@@ -147,75 +141,51 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         commandLine.createError("Failed to find a GCC installation");
         return false;
     }
-    std::vector<std::string> arguments;
-    auto sysroot = commandLine.getArgs().getLastArgValue(pylir::cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
-    if (!sysroot.empty())
-    {
-        arguments.push_back(("--sysroot=" + sysroot).str());
-    }
-    if (isPIE(commandLine))
-    {
-        arguments.emplace_back("-pie");
-    }
+
+    auto sysroot = commandLine.getArgs().getLastArgValue(cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
+
+    auto linkerInvocation = LinkerInvocationBuilder(LinkerStyle::ELF);
+    linkerInvocation.addArg("--sysroot=" + sysroot, !sysroot.empty()).addArg("-pie", isPIE(commandLine));
+
     Distro distro(m_triple);
     if (distro.isAlpineLinux())
     {
-        arguments.emplace_back("-z");
-        arguments.emplace_back("now");
+        linkerInvocation.addArgs("-z", "now");
     }
     if (distro.isOpenSuse() || distro.isUbuntu() || distro.isAlpineLinux())
     {
-        arguments.emplace_back("-z");
-        arguments.emplace_back("relro");
+        linkerInvocation.addArgs("-z", "relro");
     }
 
     if (distro.isRedhat() || distro.isOpenSuse() || distro.isAlpineLinux()
         || (distro.isUbuntu() && distro >= Distro::UbuntuMaverick))
     {
-        arguments.emplace_back("--hash-style=gnu");
+        linkerInvocation.addArg("--hash-style=gnu");
     }
 
     if (distro.isDebian() || distro.isOpenSuse() || distro == Distro::UbuntuLucid || distro == Distro::UbuntuJaunty
         || distro == Distro::UbuntuKarmic)
     {
-        arguments.emplace_back("--hash-style=both");
+        linkerInvocation.addArg("--hash-style=both");
     }
 
-    if (distro.isOpenSuse())
+    linkerInvocation.addArg("--enable-new-dtags", distro.isOpenSuse())
+        .addArg("--eh-frame-hdr")
+        .addEmulation(m_triple)
+        .addArgs("-dynamic-linker", getDynamicLinker(m_triple, commandLine))
+        .addLLVMOptions(getLLVMOptions(args));
+
+    if (auto* output = args.getLastArg(cli::OPT_o))
     {
-        arguments.emplace_back("--enable-new-dtags");
+        linkerInvocation.addOutputFile(output->getValue());
+    }
+    else if (auto* input = args.getLastArg(cli::OPT_INPUT))
+    {
+        linkerInvocation.addOutputFile(llvm::sys::path::stem(input->getValue()));
     }
 
-    arguments.emplace_back("--eh-frame-hdr");
-    const auto* emulation = getEmulation(m_triple, commandLine);
-    if (!emulation)
-    {
-        commandLine.createError("Missing emulation for target '{}'", m_triple.str());
-        return false;
-    }
-    arguments.emplace_back("-m");
-    arguments.emplace_back(emulation);
-
-    arguments.emplace_back("-dynamic-linker");
-    arguments.emplace_back(getDynamicLinker(m_triple, commandLine));
-
-    for (auto& iter : getLLVMOptions(args))
-    {
-        arguments.push_back("--mllvm=" + iter);
-    }
-
-    if (auto* output = args.getLastArg(pylir::cli::OPT_o))
-    {
-        arguments.emplace_back("-o");
-        arguments.emplace_back(output->getValue());
-    }
-    else if (auto* input = args.getLastArg(pylir::cli::OPT_INPUT))
-    {
-        arguments.emplace_back("-o");
-        arguments.emplace_back(llvm::sys::path::stem(input->getValue()));
-    }
     auto sep = llvm::sys::path::get_separator();
-    std::vector<llvm::SmallString<32>> builtinPaths;
+    std::vector<std::string> builtinPaths;
     builtinPaths.emplace_back(gccInstall->libPath);
     builtinPaths.emplace_back(gccInstall->gccLibPath);
     if (m_triple.isArch64Bit())
@@ -251,63 +221,42 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         return builtin.str();
     };
 
-    arguments.push_back(findOnBuiltinPath("crt1.o"));
-    arguments.push_back(findOnBuiltinPath("crti.o"));
-    arguments.push_back(findOnBuiltinPath("crtbegin.o"));
+    linkerInvocation.addArg(findOnBuiltinPath("crt1.o"))
+        .addArg(findOnBuiltinPath("crti.o"))
+        .addArg(findOnBuiltinPath("crtbegin.o"))
+        .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
+        .addLibrarySearchDirs(m_builtinLibrarySearchDirs)
+        .addLibrarySearchDirs(builtinPaths);
 
-    for (auto& iter : args.getAllArgValues(pylir::cli::OPT_L))
-    {
-        arguments.push_back("-L" + iter);
-    }
-
-    for (auto& iter : builtinPaths)
-    {
-        arguments.push_back(("-L" + iter).str());
-    }
-
+    // Make sure the order of -l and -Wl are preserved.
     for (auto* arg : args)
     {
-        if (arg->getOption().matches(pylir::cli::OPT_l))
+        if (arg->getOption().matches(cli::OPT_l))
         {
-            arguments.push_back("-l" + std::string(arg->getValue()));
+            linkerInvocation.addLibrary(arg->getValue());
             continue;
         }
-        if (arg->getOption().matches(pylir::cli::OPT_Wl))
+        if (arg->getOption().matches(cli::OPT_Wl))
         {
-            std::copy(arg->getValues().begin(), arg->getValues().end(), std::back_inserter(arguments));
+            linkerInvocation.addArgs(arg->getValues());
             continue;
         }
     }
 
-    arguments.push_back(objectFile.str());
-    llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
-    llvm::sys::path::remove_filename(executablePath);
-    llvm::sys::path::append(executablePath, "..", "lib", "pylir", m_triple.str());
-    llvm::sys::path::append(executablePath, "libPylirRuntime.a");
-    arguments.emplace_back("--start-group");
-    arguments.emplace_back(executablePath);
-    llvm::sys::path::remove_filename(executablePath);
-    // TODO: Change to respect the command line option
-    llvm::sys::path::append(executablePath, "libPylirMarkAndSweep.a");
-    arguments.emplace_back(executablePath);
-    llvm::sys::path::remove_filename(executablePath);
-    llvm::sys::path::append(executablePath, "libPylirRuntimeMain.a");
-    arguments.emplace_back("--whole-archive");
-    arguments.emplace_back(executablePath);
-    arguments.emplace_back("--no-whole-archive");
-    arguments.emplace_back("--end-group");
-    arguments.emplace_back("-lunwind");
+    linkerInvocation.addArg(objectFile)
+        .addArg("--start-group")
+        .addLibrary("PylirRuntime")
+        .addLibrary("PylirMarkAndSweep")
+        .addLibrary("PylirRuntimeMain")
+        .addArg("--end-group")
+        .addLibrary("unwind")
+        .addLibrary("stdc++")
+        .addLibrary("m")
+        .addLibrary("gcc_s")
+        .addLibrary("gcc")
+        .addLibrary("c")
+        .addArg(findOnBuiltinPath("crtend.o"))
+        .addArg(findOnBuiltinPath("crtn.o"));
 
-    arguments.emplace_back("-lstdc++");
-
-    arguments.emplace_back("-lm");
-
-    arguments.emplace_back("-lgcc_s");
-    arguments.emplace_back("-lgcc");
-    arguments.emplace_back("-lc");
-
-    arguments.push_back(findOnBuiltinPath("crtend.o"));
-    arguments.push_back(findOnBuiltinPath("crtn.o"));
-
-    return callLinker(commandLine, Toolchain::LinkerStyle::GNU, arguments);
+    return callLinker(commandLine, std::move(linkerInvocation));
 }
