@@ -1,7 +1,7 @@
 # RUN: pylir %s --sysroot=%S/Inputs/mingw-single-target-sysroot -### --target=x86_64-w64-windows-gnu 2>&1 | FileCheck %s --check-prefix=SINGLE
 # RUN: pylir %s --sysroot=%S/Inputs/mingw-per-target-sysroot -### --target=x86_64-w64-windows-gnu 2>&1 | FileCheck %s --check-prefix=PER_TARGET
 
-# SINGLE: -L{{.*}}mingw-single-target-sysroot{{[/\\]+}}lib{{[/\\]+}}clang{{[/\\]+}}15.0.4{{[/\\]+}}lib{{[/\\]+}}windows{{[[:space:]]}}
+# SINGLE: -L{{.*}}mingw-single-target-sysroot{{[/\\]+}}lib{{[/\\]+}}clang{{[/\\]+}}99.0.0{{[/\\]+}}lib{{[/\\]+}}windows{{[[:space:]]}}
 # SINGLE: -L{{.*}}mingw-single-target-sysroot{{[/\\]+}}lib{{[[:space:]]}}
 # SINGLE: -L{{.*}}mingw-single-target-sysroot{{[/\\]+}}x86_64-w64-mingw32{{[[:space:]]}}
 # SINGLE: -L{{.*}}mingw-single-target-sysroot{{[/\\]+}}x86_64-w64-windows-gnu{{[[:space:]]}}

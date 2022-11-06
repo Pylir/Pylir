@@ -49,9 +49,9 @@ void pylir::MinGWToolchain::searchForClangInstallation(const pylir::cli::Command
 
         // There is no concept of a sysroot on Windows. Aka, there is no fixed directory where we'll find an
         // installation of clang. Instead, we search on the PATH.
-        addClangFromPath(m_triple.getArchName() + "-w64-mingw32-clang++.exe");
-        addClangFromPath(m_triple.str() + "-clang++.exe");
-        addClangFromPath("clang++.exe");
+        addClangFromPath(m_triple.getArchName() + "-w64-mingw32-clang++");
+        addClangFromPath(m_triple.str() + "-clang++");
+        addClangFromPath("clang++");
 #endif
     }
 
