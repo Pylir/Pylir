@@ -178,7 +178,8 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
     llvm::SmallString<20> path(gccLib.value_or(static_cast<std::string>(sysRootAndSubDir)));
     linkerInvocation.addArg(path + sep + "crt2.o")
         .addArg(path + sep + "crtbegin.o")
-        .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L));
+        .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
+        .addLibrarySearchDirs(m_builtinLibrarySearchDirs);
 
     if (gccLib)
     {
@@ -222,11 +223,11 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
 
     if (!clangRTPath || llvm::sys::fs::exists(*clangRTPath + sep + "libclang_rt.builtins.a"))
     {
-        linkerInvocation.addLibrary("clang-rt.builtins");
+        linkerInvocation.addLibrary("clang_rt.builtins");
     }
     else
     {
-        linkerInvocation.addLibrary("clang-rt.builtins-" + m_triple.getArchName());
+        linkerInvocation.addLibrary("clang_rt.builtins-" + m_triple.getArchName());
     }
 
     linkerInvocation.addLibrary("moldname").addLibrary("mingwex");
