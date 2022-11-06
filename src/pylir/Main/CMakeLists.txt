@@ -37,11 +37,12 @@ target_link_libraries(PylirMain
   PylirMemTransforms
   PylirPyToPylirMem
   PylirTransforms
-  PylirLLVMPasses)
+  PylirLLVMPasses
+  lldCOFF
+  lldELF
+  lldWasm
+  lldMachO
+  lldMinGW)
 add_dependencies(PylirMain PylirMainOptsTableGen)
-target_compile_definitions(PylirMain PRIVATE PYLIR_VERSION="${PROJECT_VERSION}" PYLIR_DEFAULT_SYSROOT="${PYLIR_DEFAULT_SYSROOT}")
-if (PYLIR_EMBED_LLD)
-  target_compile_definitions(PylirMain PRIVATE PYLIR_EMBEDDED_LLD)
-  target_link_libraries(PylirMain PRIVATE lldCOFF lldELF lldWasm lldMachO lldMinGW)
-  target_include_directories(PylirMain PRIVATE ${LLD_INCLUDE_DIRS})
-endif ()
+target_compile_definitions(PylirMain PRIVATE PYLIR_VERSION="${PROJECT_VERSION}")
+target_include_directories(PylirMain PRIVATE ${LLD_INCLUDE_DIRS})

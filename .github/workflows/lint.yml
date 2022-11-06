@@ -64,7 +64,6 @@ jobs:
         run: |
           cmake -GNinja -Bpylir-build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DPYLIR_EMBED_LLD=ON \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
             -DPython3_EXECUTABLE="$(which python)" \

@@ -10,7 +10,6 @@ set(CMAKE_CXX_STANDARD 17)
 option(PYLIR_BUILD_TESTS "Build tests" ON)
 option(PYLIR_FUZZER "Build fuzzers" OFF)
 option(PYLIR_COVERAGE "Compile with coverage" OFF)
-set(PYLIR_DEFAULT_SYSROOT "" CACHE STRING "Default sysroot to find system libraries")
 
 if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
     option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" OFF)

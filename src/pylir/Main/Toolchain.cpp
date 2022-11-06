@@ -9,9 +9,7 @@
 
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 
-#ifdef PYLIR_EMBEDDED_LLD
-    #include <lld/Common/Driver.h>
-#endif
+#include <lld/Common/Driver.h>
 
 pylir::Toolchain::Toolchain(llvm::Triple triple, const cli::CommandLine& commandLine) : m_triple(std::move(triple))
 {
@@ -36,11 +34,7 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine,
     {
         linkerPath = arg->getValue();
     }
-#ifndef PYLIR_EMBEDDED_LLD
-    else
-#else
     else if (!args.hasFlag(pylir::cli::OPT_fintegrated_lld, pylir::cli::OPT_fno_integrated_lld, true))
-#endif
     {
         std::vector<llvm::StringRef> candidates;
         switch (linkerInvocationBuilder.getLinkerStyle())
@@ -91,7 +85,6 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine,
             return false;
         }
     }
-#ifdef PYLIR_EMBEDDED_LLD
     if (linkerPath.empty())
     {
         if (commandLine.verbose() || commandLine.onlyPrint())
@@ -130,7 +123,6 @@ bool pylir::Toolchain::callLinker(cli::CommandLine& commandLine,
         }
         PYLIR_UNREACHABLE;
     }
-#endif
     if (commandLine.verbose() || commandLine.onlyPrint())
     {
         llvm::errs() << linkerPath;

@@ -119,10 +119,6 @@ jobs:
           if ('${{matrix.runtime_lib}}') {
             $runtime_arg = '-DCMAKE_MSVC_RUNTIME_LIBRARY=${{matrix.runtime_lib}}'
           }
-          $sys_root = ''
-          if ($IsWindows -and ('${{matrix.cxx_compiler}}' -eq 'clang++')) {
-            $sys_root = '-DPYLIR_DEFAULT_SYSROOT="D:/msys64/clang64"'
-          }
           $shared_libs = ''
           if ('${{matrix.shared_libs}}') {
             $shared_libs = '-DBUILD_SHARED_LIBS=ON'
@@ -130,12 +126,10 @@ jobs:
           
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
-            -DPYLIR_EMBED_LLD=ON `
             -DCMAKE_CXX_COMPILER=${{matrix.cxx_compiler}} `
             -DCMAKE_C_COMPILER=${{matrix.c_compiler}} `
             $sanitizer_arg `
             $runtime_arg `
-            $sys_root `
             $shared_libs `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
