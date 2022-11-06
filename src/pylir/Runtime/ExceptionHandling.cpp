@@ -172,7 +172,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
     {
         return {_URC_FATAL_PHASE1_ERROR, 0, 0};
     }
-    const auto* exceptionTable = static_cast<const uint8_t*>(_Unwind_GetLanguageSpecificData(context));
+    const auto* exceptionTable = reinterpret_cast<const uint8_t*>(_Unwind_GetLanguageSpecificData(context));
     if (!exceptionTable)
     {
         return {_URC_CONTINUE_UNWIND, 0, 0};
@@ -264,7 +264,7 @@ Result findLandingPad(_Unwind_Action actions, bool nativeException, _Unwind_Exce
     PYLIR_UNREACHABLE;
 }
 
-_Unwind_Reason_Code personalityImpl(int version, _Unwind_Action actions, _Unwind_Exception_Class clazz,
+_Unwind_Reason_Code personalityImpl(int version, _Unwind_Action actions, std::uint64_t clazz,
                                     _Unwind_Exception* exceptionInfo, _Unwind_Context* context)
 {
     if (version != 1 || !exceptionInfo || !context)
@@ -324,8 +324,7 @@ extern "C" EXCEPTION_DISPOSITION pylir_personality_function(PEXCEPTION_RECORD ms
 
 #elif !defined(__USING_SJLJ_EXCEPTIONS__)
 
-extern "C" _Unwind_Reason_Code pylir_personality_function(int version, _Unwind_Action action,
-                                                          _Unwind_Exception_Class clazz,
+extern "C" _Unwind_Reason_Code pylir_personality_function(int version, _Unwind_Action action, std::uint64_t clazz,
                                                           _Unwind_Exception* exceptionInfo, _Unwind_Context* context)
 {
     return personalityImpl(version, action, clazz, exceptionInfo, context);
