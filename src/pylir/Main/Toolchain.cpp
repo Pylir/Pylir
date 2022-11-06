@@ -21,15 +21,6 @@ pylir::Toolchain::Toolchain(llvm::Triple triple, const cli::CommandLine& command
     llvm::sys::path::append(pylirRuntimeDir, "..", "lib", "pylir", m_triple.str());
     m_builtinLibrarySearchDirs.emplace_back(pylirRuntimeDir);
 
-    if (!commandLine.getArgs().hasArg(cli::OPT_sysroot_EQ))
-    {
-        // Sysroot for the target relative to the executable if present.
-        pylirRuntimeDir = commandLine.getExecutablePath();
-        llvm::sys::path::remove_filename(pylirRuntimeDir);
-        llvm::sys::path::append(pylirRuntimeDir, "..", m_triple.str());
-        m_builtinLibrarySearchDirs.emplace_back(pylirRuntimeDir);
-    }
-
     // Directories where to search for a linker.
     llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
     llvm::sys::path::remove_filename(executablePath);
@@ -176,4 +167,17 @@ std::vector<std::string> pylir::Toolchain::getLLVMOptions(const llvm::opt::Input
     auto options = args.getAllArgValues(pylir::cli::OPT_mllvm);
     result.insert(result.end(), std::move_iterator(options.begin()), std::move_iterator(options.end()));
     return result;
+}
+
+std::string pylir::Toolchain::findOnBuiltinPaths(llvm::StringRef file) const
+{
+    auto sep = llvm::sys::path::get_separator();
+    for (const auto& iter : m_builtinLibrarySearchDirs)
+    {
+        if (llvm::sys::fs::exists(iter + sep + file))
+        {
+            return (iter + sep + file).str();
+        }
+    }
+    return file.str();
 }

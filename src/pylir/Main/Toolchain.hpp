@@ -5,6 +5,7 @@
 #pragma once
 
 #include <llvm/ADT/Triple.h>
+#include <llvm/Support/FileSystem.h>
 
 #include "CommandLine.hpp"
 #include "LinkerInvocation.hpp"
@@ -17,6 +18,21 @@ protected:
     llvm::Triple m_triple;
     std::vector<std::string> m_programPaths;
     std::vector<std::string> m_builtinLibrarySearchDirs;
+
+    ///
+    std::string findOnBuiltinPaths(llvm::StringRef file) const;
+
+    ///
+    template <class... Args>
+    void addIfExists(Args&&... args)
+    {
+        llvm::SmallString<100> temp;
+        llvm::sys::path::append(temp, std::forward<Args>(args)...);
+        if (llvm::sys::fs::exists(temp))
+        {
+            m_builtinLibrarySearchDirs.emplace_back(temp);
+        }
+    }
 
     [[nodiscard]] bool callLinker(cli::CommandLine& commandLine,
                                   LinkerInvocationBuilder&& linkerInvocationBuilder) const;

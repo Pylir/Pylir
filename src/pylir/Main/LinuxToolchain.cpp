@@ -55,17 +55,25 @@ std::optional<GCCInstallation> findGCCInstallation(const llvm::Triple& triple,
     collectLibDirsAndTriples(triple, candidateLibDirs, candidateTriples);
 
     llvm::SmallVector<std::string, 8> prefixes;
-    auto sysroot = commandLine.getArgs().getLastArgValue(pylir::cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
-    if (!sysroot.empty())
+    // Always respect the users wish of the sysroot if present.
+    if (auto* arg = commandLine.getArgs().getLastArg(pylir::cli::OPT_sysroot_EQ))
     {
-        prefixes.push_back(sysroot.str());
-        prefixes.push_back((sysroot + llvm::sys::path::get_separator() + "usr").str());
+        llvm::SmallString<32> temp;
+        llvm::sys::path::append(temp, arg->getValue());
+        prefixes.emplace_back(temp);
+        llvm::sys::path::append(temp, "usr");
+        prefixes.emplace_back(temp);
     }
-    llvm::SmallString<32> executablePath = commandLine.getExecutablePath();
-    llvm::sys::path::remove_filename(executablePath);
-    prefixes.push_back(llvm::sys::path::parent_path(executablePath).str());
-    if (sysroot.empty())
+    else
     {
+        // Otherwise, we check two default locations: The system sysroot and the sysroot in the compiler installation.
+        llvm::SmallString<32> executablePath = commandLine.getExecutablePath();
+        llvm::sys::path::remove_filename(executablePath);
+        llvm::sys::path::append(executablePath, "..", triple.str());
+        prefixes.emplace_back(executablePath);
+        llvm::sys::path::append(executablePath, "usr");
+        prefixes.emplace_back(executablePath);
+        prefixes.push_back("/");
         prefixes.push_back("/usr");
     }
 
@@ -101,7 +109,9 @@ std::optional<GCCInstallation> findGCCInstallation(const llvm::Triple& triple,
                     if (currentVersion < *newVersion)
                     {
                         currentVersion = std::move(*newVersion);
-                        libPath = (prefix + llvm::sys::path::get_separator() + suffix).str();
+                        llvm::SmallString<32> temp(prefix);
+                        llvm::sys::path::append(temp, suffix);
+                        libPath = temp.str();
                         gccLibPath = iter->path();
                         resultTriple = llvm::Triple(gccTriple);
                     }
@@ -130,22 +140,35 @@ const char* getDynamicLinker(const llvm::Triple& triple, const pylir::cli::Comma
 pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
+    auto gccInstall = findGCCInstallation(m_triple, commandLine);
+    if (!gccInstall)
+    {
+        return;
+    }
+    m_sysroot = llvm::sys::path::parent_path(gccInstall->libPath);
+    if (llvm::sys::path::filename(m_sysroot) == "usr")
+    {
+        m_sysroot = llvm::sys::path::parent_path(m_sysroot);
+    }
+
+    m_builtinLibrarySearchDirs.emplace_back(gccInstall->libPath);
+    m_builtinLibrarySearchDirs.emplace_back(gccInstall->gccLibPath);
+
+    if (m_triple.isArch64Bit())
+    {
+        addIfExists(gccInstall->libPath, "..", "lib64");
+        addIfExists(gccInstall->libPath, "..", gccInstall->gccTriple.str(), "lib64");
+    }
+    addIfExists(m_sysroot, "lib", gccInstall->gccTriple.str());
+    addIfExists(m_sysroot, "usr", "lib", gccInstall->gccTriple.str());
 }
 
 bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
-    auto gccInstall = findGCCInstallation(m_triple, commandLine);
-    if (!gccInstall)
-    {
-        commandLine.createError("Failed to find a GCC installation");
-        return false;
-    }
-
-    auto sysroot = commandLine.getArgs().getLastArgValue(cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
 
     auto linkerInvocation = LinkerInvocationBuilder(LinkerStyle::ELF);
-    linkerInvocation.addArg("--sysroot=" + sysroot, !sysroot.empty()).addArg("-pie", isPIE(commandLine));
+    linkerInvocation.addArg("--sysroot=" + m_sysroot, !m_sysroot.empty()).addArg("-pie", isPIE(commandLine));
 
     Distro distro(m_triple);
     if (distro.isAlpineLinux())
@@ -184,49 +207,11 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         linkerInvocation.addOutputFile(llvm::sys::path::stem(input->getValue()));
     }
 
-    auto sep = llvm::sys::path::get_separator();
-    std::vector<std::string> builtinPaths;
-    builtinPaths.emplace_back(gccInstall->libPath);
-    builtinPaths.emplace_back(gccInstall->gccLibPath);
-    if (m_triple.isArch64Bit())
-    {
-        if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + "lib64"))
-        {
-            builtinPaths.emplace_back((gccInstall->libPath + sep + ".." + sep + "lib64").str());
-        }
-        if (llvm::sys::fs::exists(gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64"))
-        {
-            builtinPaths.emplace_back(
-                (gccInstall->libPath + sep + ".." + sep + gccInstall->gccTriple.str() + sep + "lib64").str());
-        }
-    }
-    if (llvm::sys::fs::exists("/lib/" + gccInstall->gccTriple.str()))
-    {
-        builtinPaths.emplace_back("/lib/" + gccInstall->gccTriple.str());
-    }
-    if (llvm::sys::fs::exists("/usr/lib/" + gccInstall->gccTriple.str()))
-    {
-        builtinPaths.emplace_back("/usr/lib/" + gccInstall->gccTriple.str());
-    }
-
-    auto findOnBuiltinPath = [&](llvm::StringRef builtin) -> std::string
-    {
-        for (auto& iter : builtinPaths)
-        {
-            if (llvm::sys::fs::exists(iter + sep + builtin))
-            {
-                return (iter + sep + builtin).str();
-            }
-        }
-        return builtin.str();
-    };
-
-    linkerInvocation.addArg(findOnBuiltinPath("crt1.o"))
-        .addArg(findOnBuiltinPath("crti.o"))
-        .addArg(findOnBuiltinPath("crtbegin.o"))
+    linkerInvocation.addArg(findOnBuiltinPaths("crt1.o"))
+        .addArg(findOnBuiltinPaths("crti.o"))
+        .addArg(findOnBuiltinPaths("crtbegin.o"))
         .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
-        .addLibrarySearchDirs(m_builtinLibrarySearchDirs)
-        .addLibrarySearchDirs(builtinPaths);
+        .addLibrarySearchDirs(m_builtinLibrarySearchDirs);
 
     // Make sure the order of -l and -Wl are preserved.
     for (auto* arg : args)
@@ -255,8 +240,8 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addLibrary("gcc_s")
         .addLibrary("gcc")
         .addLibrary("c")
-        .addArg(findOnBuiltinPath("crtend.o"))
-        .addArg(findOnBuiltinPath("crtn.o"));
+        .addArg(findOnBuiltinPaths("crtend.o"))
+        .addArg(findOnBuiltinPaths("crtn.o"));
 
     return callLinker(commandLine, std::move(linkerInvocation));
 }

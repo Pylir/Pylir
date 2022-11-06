@@ -11,7 +11,7 @@ namespace pylir
 {
 class LinuxToolchain : public Toolchain
 {
-
+    std::string m_sysroot;
 public:
     explicit LinuxToolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
 
