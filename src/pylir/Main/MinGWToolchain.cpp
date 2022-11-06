@@ -11,137 +11,100 @@
 
 #include "Version.hpp"
 
-namespace
+std::string pylir::MinGWToolchain::getRuntimeLibname(llvm::StringRef name) const
 {
-std::optional<std::string> relativeSubdir(const llvm::Triple& triple, const pylir::cli::CommandLine& commandLine,
-                                          std::string& subdir)
-{
-    llvm::SmallVector<llvm::SmallString<32>, 2> subdirs;
-    subdirs.emplace_back(triple.str());
-    subdirs.emplace_back(triple.getArchName());
-    subdirs[1] += "-w64-mingw32";
-    llvm::SmallString<10> executablePath = commandLine.getExecutablePath();
-    executablePath = llvm::sys::path::parent_path(executablePath).str();
-    executablePath = llvm::sys::path::parent_path(executablePath).str();
-    for (auto& candidateSubdir : subdirs)
+    if (m_perTargetRuntimeDir)
     {
-        if (llvm::sys::fs::is_directory(executablePath + llvm::sys::path::get_separator() + candidateSubdir))
+        return "clang_rt." + name.str();
+    }
+    return ("clang_rt." + name.str() + "-" + m_triple.getArchName()).str();
+}
+
+void pylir::MinGWToolchain::searchForClangInstallation(const pylir::cli::CommandLine& commandLine)
+{
+    std::vector<std::string> candidates;
+    // Always respect the users wish of the sysroot if present.
+    if (auto* arg = commandLine.getArgs().getLastArg(pylir::cli::OPT_sysroot_EQ))
+    {
+        llvm::SmallString<32> temp;
+        llvm::sys::path::append(temp, arg->getValue());
+        candidates.emplace_back(temp);
+    }
+    else
+    {
+        llvm::SmallString<32> executablePath = commandLine.getExecutablePath();
+        llvm::sys::path::remove_filename(executablePath);
+        llvm::sys::path::append(executablePath, "..", m_triple.str());
+        candidates.emplace_back(executablePath);
+
+#ifdef _WIN32
+        auto addClangFromPath = [&](llvm::Twine name)
         {
-            subdir = candidateSubdir.str();
-            return (executablePath + llvm::sys::path::get_separator() + candidateSubdir).str();
+            if (auto result = llvm::sys::findProgramByName(name.str()))
+            {
+                // Strip filename and get out of bin.
+                candidates.emplace_back(llvm::sys::path::parent_path(llvm::sys::path::parent_path(*result)));
+            }
+        };
+
+        // There is no concept of a sysroot on Windows. Aka, there is no fixed directory where we'll find an
+        // installation of clang. Instead, we search on the PATH.
+        addClangFromPath(m_triple.getArchName() + "-w64-mingw32-clang++.exe");
+        addClangFromPath(m_triple.str() + "-clang++.exe");
+        addClangFromPath("clang++.exe");
+#endif
+    }
+
+    pylir::Version currentVersion;
+    for (auto& iter : candidates)
+    {
+        llvm::SmallString<32> path{iter};
+        llvm::sys::path::append(path, "lib", "clang");
+        if (!llvm::sys::fs::exists(path))
+        {
+            continue;
+        }
+        std::error_code ec;
+        for (llvm::sys::fs::directory_iterator begin(path, ec), end; !ec && begin != end; begin = begin.increment(ec))
+        {
+            auto newVersion = pylir::Version::parse(llvm::sys::path::filename(begin->path()));
+            if (!newVersion)
+            {
+                continue;
+            }
+            if (currentVersion > *newVersion)
+            {
+                continue;
+            }
+            currentVersion = std::move(*newVersion);
+            m_sysroot = iter;
+            llvm::SmallString<32> temp{begin->path()};
+            llvm::sys::path::append(temp, "lib", m_triple.str());
+            m_perTargetRuntimeDir = llvm::sys::fs::exists(temp);
+            if (!m_perTargetRuntimeDir)
+            {
+                llvm::sys::path::remove_filename(temp);
+                llvm::sys::path::append(temp, "windows");
+            }
+            m_runtimeDir = temp.str();
         }
     }
-    return {};
 }
-} // namespace
 
 pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
-    m_sysroot = commandLine.getArgs().getLastArgValue(cli::OPT_sysroot_EQ, PYLIR_DEFAULT_SYSROOT);
-    if (m_sysroot.empty() || !llvm::sys::fs::is_directory(m_sysroot))
+    searchForClangInstallation(commandLine);
+    if (m_sysroot.empty())
     {
-        if (auto opt = relativeSubdir(m_triple, commandLine, m_subdir))
-        {
-            m_sysroot = std::move(*opt);
-        }
-        else
-        {
-            std::string gccName = (m_triple.getArchName() + "-w64-mingw32-gcc").str();
-            if (auto result = llvm::sys::findProgramByName(gccName))
-            {
-                m_subdir = (m_triple.getArchName() + "-w64-ming32").str();
-                m_sysroot = llvm::sys::path::parent_path(gccName);
-            }
-        }
+        return;
     }
-    else
-    {
-        llvm::SmallVector<llvm::SmallString<32>, 2> subdirs;
-        subdirs.emplace_back(m_triple.str());
-        subdirs.emplace_back(m_triple.getArchName());
-        subdirs[1] += "-w64-mingw32";
-        for (auto& candidateSubdir : subdirs)
-        {
-            if (llvm::sys::fs::is_directory(m_sysroot + llvm::sys::path::get_separator() + candidateSubdir))
-            {
-                m_subdir = candidateSubdir.str();
-                break;
-            }
-        }
-    }
+
+    m_builtinLibrarySearchDirs.emplace_back(m_runtimeDir);
+    addIfExists(m_sysroot, "lib");
+    addIfExists(m_sysroot, m_triple.getArchName() + "-w64-mingw32");
+    addIfExists(m_sysroot, m_triple.str());
 }
-
-namespace
-{
-
-std::optional<std::string> findGCCLib(const llvm::Triple& triple, llvm::StringRef sysroot)
-{
-    llvm::SmallVector<llvm::SmallString<32>> gccLibCandidates;
-    gccLibCandidates.emplace_back(triple.getArchName());
-    gccLibCandidates[0] += "-w64-mingw32";
-    gccLibCandidates.emplace_back("ming32");
-    for (const auto& libCandidate : {"lib", "lib64"})
-    {
-        for (auto& gccLib : gccLibCandidates)
-        {
-            llvm::SmallString<1024> libdir{sysroot};
-            llvm::sys::path::append(libdir, libCandidate, "gcc", gccLib);
-            pylir::Version version;
-            std::error_code ec;
-            for (llvm::sys::fs::directory_iterator iter(libdir, ec), end; !ec && iter != end; iter = iter.increment(ec))
-            {
-                auto newVersion = pylir::Version::parse(llvm::sys::path::filename(iter->path()));
-                if (!newVersion)
-                {
-                    continue;
-                }
-                version = std::max(version, *newVersion);
-            }
-            if (version.majorVersion == -1)
-            {
-                continue;
-            }
-            llvm::sys::path::append(libdir, version.original);
-            return std::optional<std::string>{std::in_place, libdir};
-        }
-    }
-    return {};
-}
-
-std::optional<std::string> findClangResourceDir(const llvm::Triple& triple, llvm::StringRef sysroot)
-{
-    llvm::SmallString<1024> path{sysroot};
-    llvm::sys::path::append(path, "lib", "clang");
-    pylir::Version version;
-    std::error_code ec;
-    for (llvm::sys::fs::directory_iterator iter(path, ec), end; !ec && iter != end; iter = iter.increment(ec))
-    {
-        auto newVersion = pylir::Version::parse(llvm::sys::path::filename(iter->path()));
-        if (!newVersion)
-        {
-            continue;
-        }
-        version = std::max(version, *newVersion);
-    }
-    if (version.majorVersion == -1)
-    {
-        return {};
-    }
-    llvm::sys::path::append(path, version.original, "lib");
-    auto sep = llvm::sys::path::get_separator();
-    if (llvm::sys::fs::exists(path + sep + triple.str()))
-    {
-        return (path + sep + triple.str()).str();
-    }
-    if (llvm::sys::fs::exists(path + sep + triple.getOSName()))
-    {
-        return (path + sep + triple.getOSName()).str();
-    }
-    return {};
-}
-
-} // namespace
 
 bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
@@ -164,37 +127,10 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         linkerInvocation.addOutputFile(path);
     }
 
-    auto gccLib = findGCCLib(m_triple, m_sysroot);
-    auto sep = llvm::sys::path::get_separator();
-    llvm::SmallString<20> sysRootAndSubDir(m_sysroot);
-    if (!m_subdir.empty())
-    {
-        sysRootAndSubDir += sep;
-        sysRootAndSubDir += m_subdir;
-    }
-    sysRootAndSubDir += sep;
-    sysRootAndSubDir += "lib";
-
-    llvm::SmallString<20> path(gccLib.value_or(static_cast<std::string>(sysRootAndSubDir)));
-    linkerInvocation.addArg(path + sep + "crt2.o")
-        .addArg(path + sep + "crtbegin.o")
+    linkerInvocation.addArg(findOnBuiltinPaths("crt2.o"))
+        .addArg(findOnBuiltinPaths("crtbegin.o"))
         .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
         .addLibrarySearchDirs(m_builtinLibrarySearchDirs);
-
-    if (gccLib)
-    {
-        linkerInvocation.addLibrarySearchDir(*gccLib);
-    }
-    linkerInvocation.addLibrarySearchDir(sysRootAndSubDir)
-        .addLibrarySearchDir(m_sysroot, "lib")
-        .addLibrarySearchDir(m_sysroot, "lib", m_triple.str())
-        .addLibrarySearchDir(m_sysroot, "sys-root", "mingw", "lib");
-
-    auto clangRTPath = findClangResourceDir(m_triple, m_sysroot);
-    if (clangRTPath)
-    {
-        linkerInvocation.addLibrarySearchDir(*clangRTPath);
-    }
 
     linkerInvocation.addArg(objectFile);
 
@@ -219,18 +155,10 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addArg("--end-group")
         .addLibrary("c++")
         .addArg("--start-group")
-        .addLibrary("mingw32");
-
-    if (!clangRTPath || llvm::sys::fs::exists(*clangRTPath + sep + "libclang_rt.builtins.a"))
-    {
-        linkerInvocation.addLibrary("clang_rt.builtins");
-    }
-    else
-    {
-        linkerInvocation.addLibrary("clang_rt.builtins-" + m_triple.getArchName());
-    }
-
-    linkerInvocation.addLibrary("moldname").addLibrary("mingwex");
+        .addLibrary("mingw32")
+        .addLibrary(getRuntimeLibname("builtins"))
+        .addLibrary("moldname")
+        .addLibrary("mingwex");
 
     auto argValues = args.getAllArgValues(cli::OPT_l);
     if (std::none_of(argValues.begin(), argValues.end(),
@@ -243,7 +171,7 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addLibrary("user32")
         .addLibrary("kernel32")
         .addArg("--end-group")
-        .addArg(path + sep + "crtend.o");
+        .addArg(findOnBuiltinPaths("crtend.o"));
 
     return callLinker(commandLine, std::move(linkerInvocation));
 }

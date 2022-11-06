@@ -11,7 +11,12 @@ namespace pylir
 class MinGWToolchain : public Toolchain
 {
     std::string m_sysroot;
-    std::string m_subdir;
+    bool m_perTargetRuntimeDir{};
+    std::string m_runtimeDir;
+
+    [[nodiscard]] std::string getRuntimeLibname(llvm::StringRef name) const;
+
+    void searchForClangInstallation(const cli::CommandLine& commandLine);
 
 protected:
 
