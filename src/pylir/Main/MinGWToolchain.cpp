@@ -102,8 +102,9 @@ pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, const cli::CommandLin
 
     m_builtinLibrarySearchDirs.emplace_back(m_runtimeDir);
     addIfExists(m_sysroot, "lib");
-    addIfExists(m_sysroot, m_triple.getArchName() + "-w64-mingw32");
-    addIfExists(m_sysroot, m_triple.str());
+    addIfExists(m_sysroot, m_triple.getArchName() + "-w64-mingw32", "lib");
+    addIfExists(m_sysroot, m_triple.str(), "lib");
+    addIfExists(m_sysroot, "lib", m_triple.str());
 }
 
 bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
