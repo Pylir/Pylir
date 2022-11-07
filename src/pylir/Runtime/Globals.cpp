@@ -4,15 +4,12 @@
 
 #include "Globals.hpp"
 
-extern "C" pylir::rt::PyObject*** const pylir_roots_default = nullptr;
-extern "C" pylir::rt::PyObject** const pylir_others_default = nullptr;
-
-extern "C" pylir::rt::PyObject*** const PYLIR_WEAK_VAR(pylir_roots_start, pylir_roots_default);
-extern "C" pylir::rt::PyObject*** const PYLIR_WEAK_VAR(pylir_roots_end, pylir_roots_default);
-extern "C" pylir::rt::PyObject** const PYLIR_WEAK_VAR(pylir_collections_start, pylir_others_default);
-extern "C" pylir::rt::PyObject** const PYLIR_WEAK_VAR(pylir_collections_end, pylir_others_default);
-extern "C" pylir::rt::PyObject** const PYLIR_WEAK_VAR(pylir_constants_start, pylir_others_default);
-extern "C" pylir::rt::PyObject** const PYLIR_WEAK_VAR(pylir_constants_end, pylir_others_default);
+extern "C" pylir::rt::PyObject*** const pylir_roots_start;
+extern "C" pylir::rt::PyObject*** const pylir_roots_end;
+extern "C" pylir::rt::PyObject** const pylir_collections_start;
+extern "C" pylir::rt::PyObject** const pylir_collections_end;
+extern "C" pylir::rt::PyObject** const pylir_constants_start;
+extern "C" pylir::rt::PyObject** const pylir_constants_end;
 
 bool pylir::rt::isGlobal(PyObject* object)
 {

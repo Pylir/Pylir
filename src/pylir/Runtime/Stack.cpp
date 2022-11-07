@@ -76,27 +76,12 @@
 
 namespace
 {
-
 /// Magic appearing at the beginning of the stack map as a simple integrity test.
 constexpr std::uint32_t PYLR_MAGIC = 0x50594C52;
-
-class EmptyStackMap
-{
-    [[maybe_unused]] std::uint32_t m_magic{PYLR_MAGIC};
-    [[maybe_unused]] std::uint8_t m_locationCount{0};
-    [[maybe_unused]] std::uint8_t m_callSiteCount{0};
-
-public:
-    constexpr EmptyStackMap() = default;
-};
-
 } // namespace
 
-/// Empty stack map used as alternative if linked without a compiler generated stack map.
-extern "C" const EmptyStackMap pylir_default_stack_map{};
-
 /// The stack map symbol with the name used by the compiler.
-extern "C" const std::uint8_t PYLIR_WEAK_VAR(pylir_stack_map, pylir_default_stack_map);
+extern "C" const std::uint8_t pylir_stack_map;
 
 namespace
 {

@@ -4,9 +4,7 @@
 
 include(PylirCompile)
 
-# '-mllvm -pylir-emit-stackmap=0' disables the generation of all the stack map related variables. Necessary for a few
-# tests that create their own stackmap.
-pylir_obj_compile(TARGET builtins.o SOURCE empty.py FLAGS -mllvm -pylir-emit-stackmap=0)
+pylir_obj_compile(TARGET builtins.o SOURCE empty.py)
 add_library(PylirTestRuntime STATIC builtins.o)
 target_link_libraries(PylirTestRuntime PUBLIC PylirRuntime)
 
@@ -25,7 +23,15 @@ configure_file(
         @ONLY
 )
 
+
+# '-mllvm -pylir-emit-stackmap=0' disables the generation of all the stack map related variables. Necessary for a few
+# tests that create their own stackmap.
+pylir_obj_compile(TARGET empty.o SOURCE empty.py FLAGS -mllvm -pylir-emit-stackmap=0)
+add_library(PylirTestNoStackMapRuntime STATIC empty.o)
+target_link_libraries(PylirTestNoStackMapRuntime PUBLIC PylirRuntime)
+
+
 pylir_obj_compile(TARGET stackmap_source.o SOURCE ${CMAKE_CURRENT_BINARY_DIR}/stackmap_source.ll FLAGS -O3)
 add_executable(stackmap_reader stackmap_reader.cpp stackmap_source.o)
-target_link_libraries(stackmap_reader PRIVATE Catch2::Catch2WithMain PylirTestRuntime PylirMarkAndSweep)
+target_link_libraries(stackmap_reader PRIVATE Catch2::Catch2WithMain PylirTestNoStackMapRuntime PylirMarkAndSweep)
 catch_discover_tests(stackmap_reader)

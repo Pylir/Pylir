@@ -95,11 +95,3 @@ std::uintptr_t readULEB128(const std::uint8_t** data);
 std::intptr_t readSLEB128(const std::uint8_t** data);
 
 } // namespace pylir::rt
-
-#ifdef _MSC_VER
-    #define PYLIR_WEAK_VAR(variable, alternative) \
-        variable;                                 \
-        __pragma(comment(linker, "/alternatename:" #variable "=" #alternative))
-#else
-    #define PYLIR_WEAK_VAR(variable, alternative) variable __attribute__((weak, alias(#alternative)))
-#endif
