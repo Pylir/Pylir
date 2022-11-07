@@ -66,7 +66,7 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
     {
         return true;
     }
-#ifdef PYLIR_EMBEDDED_LLD
+
     // --lld-path overrides -f[no-]integrated-lld unconditionally. If the embedded lld
     // is used and -O4 enable LTO
     bool enable = !args.hasArg(OPT_lld_path_EQ) && args.getLastArgValue(OPT_O, "0") == "4"
@@ -84,9 +84,6 @@ bool enableLTO(const pylir::cli::CommandLine& commandLine)
         }
     }
     return enable;
-#else
-    return false;
-#endif
 }
 
 // https://cmake.org/cmake/help/latest/command/add_custom_command.html for format

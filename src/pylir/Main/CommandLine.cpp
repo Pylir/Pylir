@@ -74,9 +74,7 @@ void pylir::cli::CommandLine::printVersion(llvm::raw_ostream& out) const
     out << "pylir " PYLIR_VERSION "\n";
     out << "LLVM " LLVM_VERSION_STRING "\n";
     out << "MLIR " LLVM_VERSION_STRING "\n";
-#ifdef PYLIR_EMBEDDED_LLD
     out << "lld " LLVM_VERSION_STRING "\n";
-#endif
 }
 
 bool pylir::cli::CommandLine::verbose() const
