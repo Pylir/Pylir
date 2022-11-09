@@ -11,15 +11,6 @@
 
 #include "Version.hpp"
 
-std::string pylir::MinGWToolchain::getRuntimeLibname(llvm::StringRef name) const
-{
-    if (m_perTargetRuntimeDir)
-    {
-        return "clang_rt." + name.str();
-    }
-    return ("clang_rt." + name.str() + "-" + m_triple.getArchName()).str();
-}
-
 void pylir::MinGWToolchain::searchForClangInstallation(const pylir::cli::CommandLine& commandLine)
 {
     std::vector<std::string> candidates;
@@ -55,67 +46,36 @@ void pylir::MinGWToolchain::searchForClangInstallation(const pylir::cli::Command
 #endif
     }
 
-    pylir::Version currentVersion;
-    for (auto& iter : candidates)
-    {
-        llvm::SmallString<32> path{iter};
-        llvm::sys::path::append(path, "lib", "clang");
-        if (!llvm::sys::fs::exists(path))
-        {
-            continue;
-        }
-        std::error_code ec;
-        for (llvm::sys::fs::directory_iterator begin(path, ec), end; !ec && begin != end; begin = begin.increment(ec))
-        {
-            auto newVersion = pylir::Version::parse(llvm::sys::path::filename(begin->path()));
-            if (!newVersion)
-            {
-                continue;
-            }
-            if (currentVersion > *newVersion)
-            {
-                continue;
-            }
-            currentVersion = std::move(*newVersion);
-            m_sysroot = iter;
-            llvm::SmallString<32> temp{begin->path()};
-            llvm::sys::path::append(temp, "lib", m_triple.str());
-            m_perTargetRuntimeDir = llvm::sys::fs::exists(temp);
-            if (!m_perTargetRuntimeDir)
-            {
-                llvm::sys::path::remove_filename(temp);
-                llvm::sys::path::append(temp, "windows");
-            }
-            m_runtimeDir = temp.str();
-        }
-    }
+    m_clangInstallation = ClangInstallation::searchForClangInstallation(candidates, m_triple);
 }
 
 pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
     searchForClangInstallation(commandLine);
-    if (m_sysroot.empty())
+    if (m_clangInstallation.getRootDir().empty())
     {
         return;
     }
 
-    m_builtinLibrarySearchDirs.emplace_back(m_runtimeDir);
-    addIfExists(m_sysroot, "lib");
-    addIfExists(m_sysroot, m_triple.getArchName() + "-w64-mingw32", "lib");
-    addIfExists(m_sysroot, m_triple.str(), "lib");
-    addIfExists(m_sysroot, "lib", m_triple.str());
+    // The root dir of the clang installation is our sysroot.
+    m_builtinLibrarySearchDirs.emplace_back(m_clangInstallation.getRuntimeDir());
+    addIfExists(m_clangInstallation.getRootDir(), "lib");
+    addIfExists(m_clangInstallation.getRootDir(), m_triple.getArchName() + "-w64-mingw32", "lib");
+    addIfExists(m_clangInstallation.getRootDir(), m_triple.str(), "lib");
+    addIfExists(m_clangInstallation.getRootDir(), "lib", m_triple.str());
 }
 
 bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();
 
-    auto linkerInvocation = LinkerInvocationBuilder(LinkerStyle::MinGW)
-                                .addArg("--sysroot=" + m_sysroot, !m_sysroot.empty())
-                                .addEmulation(m_triple)
-                                .addLLVMOptions(getLLVMOptions(args))
-                                .addArg("-Bstatic");
+    auto linkerInvocation =
+        LinkerInvocationBuilder(LinkerStyle::MinGW)
+            .addArg("--sysroot=" + m_clangInstallation.getRootDir(), !m_clangInstallation.getRootDir().empty())
+            .addEmulation(m_triple)
+            .addLLVMOptions(getLLVMOptions(args))
+            .addArg("-Bstatic");
 
     if (auto* output = args.getLastArg(cli::OPT_o))
     {
@@ -156,7 +116,7 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addLibrary("c++")
         .addArg("--start-group")
         .addLibrary("mingw32")
-        .addLibrary(getRuntimeLibname("builtins"))
+        .addLibrary(m_clangInstallation.getRuntimeLibname("builtins", m_triple))
         .addLibrary("moldname")
         .addLibrary("mingwex");
 

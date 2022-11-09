@@ -63,4 +63,53 @@ public:
         return false;
     }
 };
+
+/// Class containing information about a Clang installation installed on the users system.
+class ClangInstallation
+{
+    /// Whether the clang installation has a per-target runtime directory layout.
+    bool m_perTargetRuntimeDir{};
+    /// The runtime directory of the clang installation where clangs runtimes are installed.
+    std::string m_runtimeDir;
+    /// The root directory of the clang installation. It contains the 'bin' and 'lib' directories.
+    std::string m_rootDir;
+
+    ClangInstallation(bool perTargetRuntimeDir, std::string runtimeDir, std::string rootDir)
+        : m_perTargetRuntimeDir(perTargetRuntimeDir), m_runtimeDir(std::move(runtimeDir)), m_rootDir(std::move(rootDir))
+    {
+    }
+
+public:
+    ClangInstallation() = default;
+
+    /// Searches for the newest Clang installation (that is, newest version), within all 'rootDirCandidates'. These are
+    /// assumed to be the root directory of the clang installation. In other words, clang itself would be in the 'bin'
+    /// of the root directory.
+    /// 'triple' is used to return the runtime directory for the given target triple.
+    static ClangInstallation searchForClangInstallation(llvm::ArrayRef<std::string> rootDirCandidates,
+                                                        const llvm::Triple& triple);
+
+    /// Returns true if the clang installation has a per target runtime directory.
+    [[nodiscard]] bool hasPerTargetRuntimeDir() const
+    {
+        return m_perTargetRuntimeDir;
+    }
+
+    /// Returns the runtime directory of the clang installation.
+    [[nodiscard]] llvm::StringRef getRuntimeDir() const
+    {
+        return m_runtimeDir;
+    }
+
+    /// Returns the root directory of the clang installation.
+    [[nodiscard]] llvm::StringRef getRootDir() const
+    {
+        return m_rootDir;
+    }
+
+    /// Forms the library name for one of clangs runtime libraries called 'name'. The exact name may differ in suffixes
+    /// and prefixes, based on clang installation, but generally has the form: clang_rt.<name>.
+    [[nodiscard]] std::string getRuntimeLibname(llvm::StringRef name, const llvm::Triple& triple) const;
+};
+
 } // namespace pylir

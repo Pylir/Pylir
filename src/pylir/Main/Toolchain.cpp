@@ -11,6 +11,8 @@
 
 #include <lld/Common/Driver.h>
 
+#include "Version.hpp"
+
 pylir::Toolchain::Toolchain(llvm::Triple triple, const cli::CommandLine& commandLine) : m_triple(std::move(triple))
 {
     // Runtime directory where our runtime libraries are placed.
@@ -172,4 +174,58 @@ std::string pylir::Toolchain::findOnBuiltinPaths(llvm::StringRef file) const
         }
     }
     return file.str();
+}
+
+pylir::ClangInstallation
+    pylir::ClangInstallation::searchForClangInstallation(llvm::ArrayRef<std::string> rootDirCandidates,
+                                                         const llvm::Triple& triple)
+{
+    std::string rootDir;
+    std::string runtimeDir;
+    bool perTargetRuntimeDir = false;
+
+    pylir::Version currentVersion;
+    for (const auto& iter : rootDirCandidates)
+    {
+        llvm::SmallString<32> path{iter};
+        llvm::sys::path::append(path, "lib", "clang");
+        if (!llvm::sys::fs::exists(path))
+        {
+            continue;
+        }
+        std::error_code ec;
+        for (llvm::sys::fs::directory_iterator begin(path, ec), end; !ec && begin != end; begin = begin.increment(ec))
+        {
+            auto newVersion = pylir::Version::parse(llvm::sys::path::filename(begin->path()));
+            if (!newVersion)
+            {
+                continue;
+            }
+            if (currentVersion > *newVersion)
+            {
+                continue;
+            }
+            currentVersion = std::move(*newVersion);
+            rootDir = iter;
+            llvm::SmallString<32> temp{begin->path()};
+            llvm::sys::path::append(temp, "lib", triple.str());
+            perTargetRuntimeDir = llvm::sys::fs::exists(temp);
+            if (!perTargetRuntimeDir)
+            {
+                llvm::sys::path::remove_filename(temp);
+                llvm::sys::path::append(temp, "windows");
+            }
+            runtimeDir = temp.str();
+        }
+    }
+    return ClangInstallation(perTargetRuntimeDir, std::move(runtimeDir), std::move(rootDir));
+}
+
+std::string pylir::ClangInstallation::getRuntimeLibname(llvm::StringRef name, const llvm::Triple& triple) const
+{
+    if (m_perTargetRuntimeDir)
+    {
+        return "clang_rt." + name.str();
+    }
+    return ("clang_rt." + name.str() + "-" + triple.getArchName()).str();
 }
