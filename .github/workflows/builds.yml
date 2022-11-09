@@ -27,6 +27,7 @@ jobs:
           - { os: ubuntu-22.04, cxx_compiler: clang++, c_compiler: clang, sanitizer: "thread" }
           - { os: ubuntu-22.04, cxx_compiler: clang++, c_compiler: clang, sanitizer: "address,undefined" }
           - { os: ubuntu-22.04, cxx_compiler: g++-10, c_compiler: gcc-10 }
+          - { os: macos-12, cxx_compiler: clang++, c_compiler: clang }
 
     runs-on: ${{matrix.os}}
     defaults:
@@ -83,19 +84,29 @@ jobs:
           "key=$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
 
       - name: Calculate cache size
-        id: cache-size
+        id: cache-opts
         run: |
           if ('${{matrix.sanitizer}}') {
              "size=1.5G" >> $Env:GITHUB_OUTPUT
           } else {
              "size=0.5G" >> $Env:GITHUB_OUTPUT
           }
+          
+          # Using the compilers mtime is not reliable on MacOS for some reason. As a workaround we do the following to
+          # key ccache on the compiler: We just use the output of the compilers '-v' command. That should only change
+          # during new releases and therefore preserve the cache. Might also be faster this way since ccache does not
+          # have to do anything except compare the keys given here to the one used to produce the files.
+          $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
+          $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
+          $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
+          "check=string:$hash" >> $Env:GITHUB_OUTPUT
 
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=${{steps.cache-size.outputs.size}}
+            max_size=${{steps.cache-opts.outputs.size}}
+            compiler_check=${{steps.cache-opts.outputs.check}}
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
           windows_compile_environment: msvc
 
@@ -123,6 +134,10 @@ jobs:
           if ('${{matrix.shared_libs}}') {
             $shared_libs = '-DBUILD_SHARED_LIBS=ON'
           }
+          $use_lld = ''
+          if (!$IsMacOs) {
+            $use_lld = '-DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"'
+          }
           
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
@@ -134,7 +149,7 @@ jobs:
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
-            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
+            $use_lld `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
             -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
@@ -152,7 +167,7 @@ jobs:
       - name: Cleanup disk space
         if: always()
         run: |
-          Remove-Item -Recurse -Force llvm-optimized-tblgen
-          Remove-Item -Recurse -Force llvm-build
-          Remove-Item -Recurse -Force pylir-build
+          Remove-Item -Recurse -Force llvm-optimized-tblgen -ErrorAction Ignore
+          Remove-Item -Recurse -Force llvm-build -ErrorAction Ignore
+          Remove-Item -Recurse -Force pylir-build -ErrorAction Ignore
 
