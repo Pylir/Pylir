@@ -75,7 +75,7 @@ if (MSVC)
     "$<TARGET_LINKER_FILE:PylirRuntime>"
     "$<TARGET_LINKER_FILE:unwind_static>")
   add_dependencies(PylirRuntime unwind_static)
-elseif (UNIX)
+elseif (LINUX)
   find_path(LIBUNWIND_INCLUDE_DIR libunwind.h REQUIRED)
   find_library(LIBUNWIND_LIB unwind REQUIRED)
   target_link_libraries(PylirRuntime PRIVATE ${LIBUNWIND_LIB})

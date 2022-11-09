@@ -4,4 +4,4 @@
 # Check that the backend also passes it to LLD
 # RUN: pylir %s -mllvm -print-isel-input -o %t -v -### 2>&1 \
 # RUN: | FileCheck %s --check-prefix=LLD
-# LLD: {{(\/mllvm:|--mllvm=)}}-print-isel-input
+# LLD: {{(\/mllvm:|--mllvm=|-mllvm )}}-print-isel-input

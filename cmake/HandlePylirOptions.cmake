@@ -20,7 +20,7 @@ elseif (MSVC)
     endif ()
 endif ()
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "(Apple)?Clang")
     # Flags for both clang-cl and normal clang.
     add_compile_options(-Wno-nullability-completeness -Wno-nullability-extension -Wno-assume
             $<$<COMPILE_LANGUAGE:CXX>:-Wno-return-type-c-linkage>)

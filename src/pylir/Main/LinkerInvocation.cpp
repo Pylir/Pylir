@@ -43,6 +43,13 @@ pylir::LinkerInvocationBuilder& pylir::LinkerInvocationBuilder::addLLVMOptions(l
                 m_args.push_back("--mllvm=" + iter);
             }
             break;
+        case LinkerStyle::Mac:
+            for (const auto& iter : options)
+            {
+                m_args.emplace_back("-mllvm");
+                m_args.push_back(iter);
+            }
+            break;
         case LinkerStyle::MinGW:
         {
             for (const auto& iter : options)
@@ -70,6 +77,7 @@ pylir::LinkerInvocationBuilder& pylir::LinkerInvocationBuilder::addLibrarySearch
     switch (m_linkerStyle)
     {
         case LinkerStyle::MSVC: m_args.push_back(("-libpath:" + directory).str()); break;
+        case LinkerStyle::Mac:
         case LinkerStyle::MinGW:
         case LinkerStyle::ELF: m_args.push_back(("-L" + directory).str()); break;
         default: PYLIR_UNREACHABLE;
@@ -82,6 +90,7 @@ pylir::LinkerInvocationBuilder& pylir::LinkerInvocationBuilder::addOutputFile(ll
     switch (m_linkerStyle)
     {
         case LinkerStyle::MSVC: m_args.emplace_back(("-out:" + outputFile).str()); break;
+        case LinkerStyle::Mac:
         case LinkerStyle::MinGW:
         case LinkerStyle::ELF:
             m_args.emplace_back("-o");
@@ -106,6 +115,7 @@ pylir::LinkerInvocationBuilder& pylir::LinkerInvocationBuilder::addLibrary(llvm:
             m_args.push_back(std::move(str));
             break;
         }
+        case LinkerStyle::Mac:
         case LinkerStyle::MinGW:
         case LinkerStyle::ELF: m_args.emplace_back(("-l" + library).str()); break;
         default: PYLIR_UNREACHABLE;
