@@ -38,6 +38,10 @@ runs:
     - name: Configure Optimized TableGen
       shell: pwsh
       run: |
+        $use_lld = ''
+        if (!$IsMacOs) {
+          $use_lld = '-DLLVM_ENABLE_LLD=ON'
+        }
         cmake -GNinja -Bllvm-optimized-tblgen `
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
@@ -49,7 +53,7 @@ runs:
           -DLLVM_INSTALL_UTILS=ON `
           -DLLVM_ENABLE_PROJECTS="mlir" `
           -DLLVM_TARGETS_TO_BUILD=host `
-          -DLLVM_ENABLE_LLD=ON `
+          $use_lld `
           -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
           -S ${{github.workspace}}/llvm-project/llvm
 
@@ -87,6 +91,11 @@ runs:
           }
         }
         
+        $use_lld = ''
+        if (!$IsMacOs) {
+          $use_lld = '-DLLVM_ENABLE_LLD=ON'
+        }
+        
         $exe_suffix = ''
         if ($IsWindows) {
           $exe_suffix = '.exe'
@@ -108,7 +117,7 @@ runs:
         -DLLVM_INSTALL_UTILS=ON `
         -DLLVM_ENABLE_PROJECTS="mlir;lld" `
         -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
-        -DLLVM_ENABLE_LLD=ON `
+        $use_lld `
         -DLLVM_BUILD_LLVM_C_DYLIB=OFF `
         -DLLVM_INCLUDE_BENCHMARKS=OFF `
         -DLLVM_APPEND_VC_REV=OFF `
