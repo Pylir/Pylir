@@ -8,6 +8,31 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/Program.h>
 
+namespace
+{
+std::unique_ptr<llvm::MemoryBuffer> getXCRunOutput(std::vector<llvm::StringRef> arguments)
+{
+    llvm::SmallString<64> outputFile;
+    llvm::sys::fs::createTemporaryFile("xcrun-output", "", outputFile);
+
+    llvm::Optional<llvm::StringRef> redirects[] = {{""}, outputFile.str(), {""}};
+
+    arguments.insert(arguments.begin(), "/usr/bin/xcrun");
+    auto result = llvm::sys::ExecuteAndWait("/usr/bin/xcrun", arguments, llvm::None, redirects, 0, 0);
+    if (result != 0)
+    {
+        return nullptr;
+    }
+
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> outputBuffer = llvm::MemoryBuffer::getFile(outputFile, true);
+    if (!outputBuffer)
+    {
+        return nullptr;
+    }
+    return std::move(*outputBuffer);
+}
+} // namespace
+
 void pylir::DarwinToolchain::deduceSDKRoot(const pylir::cli::CommandLine& commandLine)
 {
     const auto& args = commandLine.getArgs();
@@ -31,10 +56,6 @@ void pylir::DarwinToolchain::deduceSDKRoot(const pylir::cli::CommandLine& comman
     }
 
     // As a last resort we attempt to run 'xcrun --show-sdk-path' to get the path.
-    llvm::SmallString<64> outputFile;
-    llvm::sys::fs::createTemporaryFile("print-sdk-path", "", outputFile);
-
-    llvm::Optional<llvm::StringRef> redirects[] = {{""}, outputFile.str(), {""}};
 
     llvm::Optional<llvm::StringRef> sdkName;
     switch (m_triple.getOS())
@@ -48,19 +69,40 @@ void pylir::DarwinToolchain::deduceSDKRoot(const pylir::cli::CommandLine& comman
         return;
     }
 
-    auto result = llvm::sys::ExecuteAndWait("/usr/bin/xcrun", {"/usr/bin/xcrun", "--sdk", *sdkName, "--show-sdk-path"},
-                                            llvm::None, redirects, 0, 0);
-    if (result != 0)
-    {
-        return;
-    }
-
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> outputBuffer = llvm::MemoryBuffer::getFile(outputFile, true);
+    auto outputBuffer = getXCRunOutput({"--sdk", *sdkName, "--show-sdk-path"});
     if (!outputBuffer)
     {
         return;
     }
-    m_sdkRoot = (*outputBuffer)->getBuffer().trim();
+    m_sdkRoot = outputBuffer->getBuffer().trim();
+}
+
+void pylir::DarwinToolchain::searchForClangInstallation()
+{
+    std::vector<std::string> clangInstallationCandidates;
+    if (!m_sdkRoot.empty())
+    {
+        clangInstallationCandidates.push_back(m_sdkRoot);
+    }
+
+#ifdef __APPLE__
+
+    if (auto result = llvm::sys::findProgramByName("clang"))
+    {
+        // Strip filename and get out of bin.
+        clangInstallationCandidates.emplace_back(llvm::sys::path::parent_path(llvm::sys::path::parent_path(*result)));
+    }
+
+    if (auto appleClangInstall = getXCRunOutput({"--find", "clang"}))
+    {
+        // Strip filename and get out of bin.
+        clangInstallationCandidates.emplace_back(
+            llvm::sys::path::parent_path(llvm::sys::path::parent_path(appleClangInstall->getBuffer().trim())));
+    }
+
+#endif
+
+    m_clangInstallation = ClangInstallation::searchForClangInstallation(clangInstallationCandidates, m_triple);
 }
 
 bool pylir::DarwinToolchain::readSDKSettings(llvm::MemoryBuffer& buffer)
@@ -101,6 +143,8 @@ pylir::DarwinToolchain::DarwinToolchain(llvm::Triple triple, const pylir::cli::C
     : Toolchain(std::move(triple), commandLine)
 {
     deduceSDKRoot(commandLine);
+    searchForClangInstallation();
+    addIfExists(m_clangInstallation.getRuntimeDir());
     if (m_sdkRoot.empty())
     {
         return;
@@ -204,15 +248,13 @@ bool pylir::DarwinToolchain::link(pylir::cli::CommandLine& commandLine, llvm::St
         }
     }
 
-    linkerInvocation
-        .addArg(objectFile)
+    linkerInvocation.addArg(objectFile)
         .addLibrary("PylirRuntime")
         .addLibrary("PylirMarkAndSweep")
         .addLibrary("PylirRuntimeMain")
         .addLibrary("c++")
         .addLibrary("System")
-        //TODO:
-        .addArg("/Library/Developer/CommandLineTools/usr/lib/clang/14.0.0/lib/darwin/libclang_rt.osx.a");
+        .addLibrary(m_clangInstallation.getRuntimeLibname("builtins", m_triple));
 
     return callLinker(commandLine, std::move(linkerInvocation));
 }

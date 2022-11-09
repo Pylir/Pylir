@@ -176,6 +176,25 @@ std::string pylir::Toolchain::findOnBuiltinPaths(llvm::StringRef file) const
     return file.str();
 }
 
+namespace
+{
+llvm::StringRef getOSLibName(const llvm::Triple& triple)
+{
+    if (triple.isOSDarwin())
+        return "darwin";
+
+    switch (triple.getOS())
+    {
+        case llvm::Triple::FreeBSD: return "freebsd";
+        case llvm::Triple::NetBSD: return "netbsd";
+        case llvm::Triple::OpenBSD: return "openbsd";
+        case llvm::Triple::Solaris: return "sunos";
+        case llvm::Triple::AIX: return "aix";
+        default: return triple.getOSName();
+    }
+}
+} // namespace
+
 pylir::ClangInstallation
     pylir::ClangInstallation::searchForClangInstallation(llvm::ArrayRef<std::string> rootDirCandidates,
                                                          const llvm::Triple& triple)
@@ -205,16 +224,16 @@ pylir::ClangInstallation
             {
                 continue;
             }
-            currentVersion = std::move(*newVersion);
-            rootDir = iter;
             llvm::SmallString<32> temp{begin->path()};
             llvm::sys::path::append(temp, "lib", triple.str());
             perTargetRuntimeDir = llvm::sys::fs::exists(temp);
             if (!perTargetRuntimeDir)
             {
                 llvm::sys::path::remove_filename(temp);
-                llvm::sys::path::append(temp, "windows");
+                llvm::sys::path::append(temp, getOSLibName(triple));
             }
+            currentVersion = std::move(*newVersion);
+            rootDir = iter;
             runtimeDir = temp.str();
         }
     }
@@ -223,9 +242,28 @@ pylir::ClangInstallation
 
 std::string pylir::ClangInstallation::getRuntimeLibname(llvm::StringRef name, const llvm::Triple& triple) const
 {
+    // Darwin platforms are a bit extra special here. The builtins library simply has the 'builtins' component missing.
+    std::string libName = "clang_rt";
+    if (!triple.isOSDarwin() || name != "builtins")
+    {
+        libName += '.' + name.str();
+    }
+
     if (m_perTargetRuntimeDir)
     {
-        return "clang_rt." + name.str();
+        return libName;
     }
-    return ("clang_rt." + name.str() + "-" + triple.getArchName()).str();
+
+    // Darwin platforms also do not use the arch name as suffix, but the OS instead.
+    if (!triple.isOSDarwin())
+    {
+        return libName + '-' + triple.getArchName().str();
+    }
+
+    llvm::StringRef suffix;
+    if (triple.isMacOSX())
+    {
+        suffix = "osx";
+    }
+    return libName + '.' + suffix.str();
 }

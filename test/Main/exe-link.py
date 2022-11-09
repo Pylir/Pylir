@@ -63,9 +63,10 @@
 # MAC: -syslibroot{{.*}}Inputs{{[/\\]+}}MacOSX10.14.sdk{{[[:blank:]]}}
 # MAC: -o test
 # MAC: -L{{.*}}lib{{[/\\]+}}pylir{{[/\\]+}}x86_64-apple-darwin{{[[:blank:]]}}
+# MAC: -L{{.*}}lib{{[/\\]+}}clang{{[/\\]+[0-9]+(\.[0-9]+(\.[0-9]+)?)?[/\\]+}}lib{{[/\\]+}}darwin
 # MAC: -lPylirRuntime
 # MAC: -lPylirMarkAndSweep
 # MAC: -lPylirRuntimeMain
 # MAC: -lc++
 # MAC: -lSystem
-# MAC: clang{{[/\\]+[0-9]+(\.[0-9]+(\.[0-9]+)?)?[/\\]+}}lib{{[/\\]+}}darwin{{[/\\]+}}libclang_rt.osx.a
+# MAC: -lclang_rt.osx

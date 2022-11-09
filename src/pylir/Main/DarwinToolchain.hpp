@@ -15,8 +15,11 @@ class DarwinToolchain : public Toolchain
 {
     std::string m_sdkRoot;
     llvm::Optional<llvm::VersionTuple> m_sdkVersion;
+    ClangInstallation m_clangInstallation;
 
     void deduceSDKRoot(const cli::CommandLine& commandLine);
+
+    void searchForClangInstallation();
 
     bool readSDKSettings(llvm::MemoryBuffer& buffer);
 
