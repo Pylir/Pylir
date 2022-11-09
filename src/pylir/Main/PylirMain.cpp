@@ -18,6 +18,7 @@
 
 #include "CommandLine.hpp"
 #include "CompilerInvocation.hpp"
+#include "DarwinToolchain.hpp"
 #include "DiagnosticsVerifier.hpp"
 #include "LinuxToolchain.hpp"
 #include "MSVCToolchain.hpp"
@@ -43,6 +44,10 @@ std::unique_ptr<pylir::Toolchain> createToolchainForTriple(const pylir::cli::Com
     if (triple.isOSLinux())
     {
         return std::make_unique<pylir::LinuxToolchain>(triple, commandLine);
+    }
+    if (triple.isOSDarwin())
+    {
+        return std::make_unique<pylir::DarwinToolchain>(triple, commandLine);
     }
     return {};
 }

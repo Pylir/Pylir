@@ -8,7 +8,7 @@
 
 # RUN: rm -f %t
 # RUN: pylir %s -emit-mlir -o %t -c
-# RUN: od -x -N 4 %t | grep "4c4d 52ef"
+# RUN: od -x -N 4 %t | grep "4c4d *52ef"
 
 # RUN: rm -f %t
 # RUN: pylir %s -emit-pylir -o %t -S
@@ -16,11 +16,12 @@
 
 # RUN: rm -f %t
 # RUN: pylir %s -emit-pylir -o %t -c
-# RUN: od -x -N 4 %t | grep "4c4d 52ef"
+# RUN: od -x -N 4 %t | grep "4c4d *52ef"
 
 # RUN: rm -f %t
 # RUN: pylir %s -emit-llvm -c -o %t
-# RUN: od -x -N 4 %t | grep "4342 dec0"
+# TODO: Why does this differ on Mac?
+# RUN: od -x -N 4 %t | grep "\(4342 *dec0\)\|\(c0de *0b17\)"
 
 # RUN: rm -f %t
 # RUN: pylir %s -S -o %t
