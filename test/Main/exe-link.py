@@ -2,6 +2,7 @@
 # RUN: pylir %s -o test --target=x86_64-w64-windows-gnu -### 2>&1 | FileCheck %s --check-prefix=MINGW
 # RUN: pylir %s -g -o test --target=x86_64-pc-windows-msvc -### 2>&1 | FileCheck %s --check-prefix=MSVC
 # RUN: pylir %s -g0 -o test --target=x86_64-pc-windows-msvc -### 2>&1 | FileCheck %s --check-prefix=MSVC_NDEBUG
+# RUN: pylir %s --sysroot=%S/Inputs/MacOSX10.14.sdk -o test --target=x86_64-apple-darwin -### 2>&1 | FileCheck %s --check-prefix=MAC
 
 # LINUX: --sysroot={{.*}}/Inputs/fedora-sysroot{{[[:blank:]]}}
 # LINUX: --eh-frame-hdr
@@ -55,3 +56,16 @@
 # MSVC: PylirRuntimeMain.lib
 
 # MSVC_NDEBUG-NOT: /debug
+
+# MAC: -dynamic
+# MAC: -arch x86_64
+# MAC: -platform_version macos {{[0-9]+(\.[0-9]+(\.[0-9]+)?)?}} {{[0-9]+(\.[0-9]+(\.[0-9]+)?)?}}
+# MAC: -syslibroot{{.*}}Inputs{{[/\\]+}}MacOSX10.14.sdk{{[[:blank:]]}}
+# MAC: -o test
+# MAC: -L{{.*}}lib{{[/\\]+}}pylir{{[/\\]+}}x86_64-apple-darwin{{[[:blank:]]}}
+# MAC: -lPylirRuntime
+# MAC: -lPylirMarkAndSweep
+# MAC: -lPylirRuntimeMain
+# MAC: -lc++
+# MAC: -lSystem
+# MAC: clang{{[/\\]+[0-9]+(\.[0-9]+(\.[0-9]+)?)?[/\\]+}}lib{{[/\\]+}}darwin{{[/\\]+}}libclang_rt.osx.a

@@ -4,6 +4,7 @@
 
 #include "DarwinToolchain.hpp"
 
+#include <llvm/Support/JSON.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/Program.h>
 
@@ -62,10 +63,60 @@ void pylir::DarwinToolchain::deduceSDKRoot(const pylir::cli::CommandLine& comman
     m_sdkRoot = (*outputBuffer)->getBuffer().trim();
 }
 
+bool pylir::DarwinToolchain::readSDKSettings(llvm::MemoryBuffer& buffer)
+{
+    auto json = llvm::json::parse(buffer.getBuffer());
+    if (!json)
+    {
+        llvm::consumeError(json.takeError());
+        return false;
+    }
+
+    auto* obj = json->getAsObject();
+    if (!obj)
+    {
+        return false;
+    }
+
+    auto readVersion = [](const llvm::json::Object& object, llvm::StringRef key) -> llvm::Optional<llvm::VersionTuple>
+    {
+        auto val = object.getString(key);
+        if (!val)
+        {
+            return llvm::None;
+        }
+        llvm::VersionTuple version;
+        if (version.tryParse(*val))
+        {
+            return llvm::None;
+        }
+        return version;
+    };
+
+    m_sdkVersion = readVersion(*obj, "Version");
+    return m_sdkVersion.has_value();
+}
+
 pylir::DarwinToolchain::DarwinToolchain(llvm::Triple triple, const pylir::cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
     deduceSDKRoot(commandLine);
+    if (m_sdkRoot.empty())
+    {
+        return;
+    }
+
+    llvm::SmallString<256> path(m_sdkRoot);
+    llvm::sys::path::append(path, "SDKSettings.json");
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> file = llvm::MemoryBuffer::getFile(path, true);
+    if (!file)
+    {
+        return;
+    }
+    if (!readSDKSettings(**file))
+    {
+        // TODO: emit warning with 'commandLine' SDKSettings.json is invalid.
+    }
 }
 
 namespace
@@ -100,19 +151,27 @@ bool pylir::DarwinToolchain::link(pylir::cli::CommandLine& commandLine, llvm::St
         targetVersion = minTargetVersion;
     }
 
-    linkerInvocation.addArg("-no_deduplicate")
-        .addArg("-dynamic")
+    llvm::VersionTuple sdkVersion = targetVersion;
+    if (m_sdkVersion)
+    {
+        sdkVersion = *m_sdkVersion;
+        if (!sdkVersion.getMinor())
+        {
+            sdkVersion = llvm::VersionTuple(sdkVersion.getMajor(), 0);
+        }
+    }
+
+    linkerInvocation.addArg("-dynamic")
         .addArg("-arch")
         .addArg(getMachOArchName(m_triple))
         .addArg("-platform_version")
         .addArg("macos")
         .addArg(targetVersion.getAsString())
-        .addArg("13.0")
-        // TODO: deploy version
+        .addArg(sdkVersion.getAsString())
         .addArg("-pie", isPIE(commandLine))
         .addLLVMOptions(getLLVMOptions(args))
-        .addArg("-syslibroot")
-        .addArg(m_sdkRoot);
+        .addArg("-syslibroot", !m_sdkRoot.empty())
+        .addArg(m_sdkRoot, !m_sdkRoot.empty());
 
     if (auto* output = args.getLastArg(cli::OPT_o))
     {
@@ -123,10 +182,12 @@ bool pylir::DarwinToolchain::link(pylir::cli::CommandLine& commandLine, llvm::St
         linkerInvocation.addOutputFile(llvm::sys::path::stem(input->getValue()));
     }
 
-    linkerInvocation
-        .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
+    linkerInvocation.addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
         .addLibrarySearchDirs(m_builtinLibrarySearchDirs)
-        .addLibrarySearchDir("/","usr", "local", "lib");
+#ifdef __APPLE__
+        .addLibrarySearchDir("/", "usr", "local", "lib")
+#endif
+        ;
 
     // Make sure the order of -l and -Wl are preserved.
     for (auto* arg : args)

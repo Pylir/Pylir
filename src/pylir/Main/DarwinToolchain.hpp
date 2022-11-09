@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/VersionTuple.h>
 
 #include "Toolchain.hpp"
@@ -13,13 +14,13 @@ namespace pylir
 class DarwinToolchain : public Toolchain
 {
     std::string m_sdkRoot;
-    llvm::VersionTuple m_sdkVersion;
-    llvm::VersionTuple m_maxDeployVersion;
+    llvm::Optional<llvm::VersionTuple> m_sdkVersion;
 
     void deduceSDKRoot(const cli::CommandLine& commandLine);
 
-public:
+    bool readSDKSettings(llvm::MemoryBuffer& buffer);
 
+public:
     [[nodiscard]] bool defaultsToPIC() const override;
 
     DarwinToolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
