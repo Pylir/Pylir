@@ -9,7 +9,7 @@ py.globalValue @bar = #py.tuple<(#py.ref<@foo>, #py.ref<@builtins.type>)>
 
 // CHECK-LABEL: llvm.mlir.global external constant @foo
 // SECTION_COFF-SAME: section = "py_const"
-// SECTION_MACHO-SAME: section = "__TEXT,py_const"
+// SECTION_MACHO-SAME: section = "__DATA,py_const"
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
@@ -19,7 +19,7 @@ py.globalValue @bar = #py.tuple<(#py.ref<@foo>, #py.ref<@builtins.type>)>
 
 // CHECK-LABEL: llvm.mlir.global external constant @bar
 // SECTION_COFF-SAME: section = "py_const"
-// SECTION_MACHO-SAME: section = "__TEXT,py_const"
+// SECTION_MACHO-SAME: section = "__DATA,py_const"
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
@@ -43,7 +43,7 @@ py.globalValue @foo = #py.str<"test">
 
 // CHECK-LABEL: llvm.mlir.global external constant @foo
 // SECTION_COFF-SAME: section = "py_const"
-// SECTION_MACHO-SAME: section = "__TEXT,py_const"
+// SECTION_MACHO-SAME: section = "__DATA,py_const"
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.str
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
@@ -70,13 +70,13 @@ py.globalValue "private" const @barfoo = #py.list<[]>
 // SECTION_MACHO-SAME: section = "__DATA,py_coll"
 // CHECK: llvm.mlir.global external constant @foo
 // SECTION_COFF-SAME: section = "py_const"
-// SECTION_MACHO-SAME: section = "__TEXT,py_const"
+// SECTION_MACHO-SAME: section = "__DATA,py_const"
 // CHECK: llvm.mlir.global internal @foobar
 // SECTION_COFF-SAME: section = "py_coll"
 // SECTION_MACHO-SAME: section = "__DATA,py_coll"
 // CHECK: llvm.mlir.global internal constant @barfoo
 // SECTION_COFF-SAME: section = "py_const"
-// SECTION_MACHO-SAME: section = "__TEXT,py_const"
+// SECTION_MACHO-SAME: section = "__DATA,py_const"
 
 // -----
 

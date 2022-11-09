@@ -131,13 +131,14 @@ public:
 
         llvm::StringRef constSectionPrefix;
         llvm::StringRef dataSectionPrefix;
-        // MachO requires a segment prefix in front of sections to denote their permissions. constants go into
-        // __TEXT, which is read-only, while __DATA, has read-write permission.
+        // MachO requires a segment prefix in front of sections to denote their permissions. constants without
+        // relocations go into __TEXT, which is read-only, while __DATA, has read-write permission.
         // See
         // https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html
         if (triple.isOSBinFormatMachO())
         {
-            constSectionPrefix = "__TEXT,";
+            // Pretty much all our constants contain relocations. We therefore put them into __DATA.
+            constSectionPrefix = "__DATA,";
             dataSectionPrefix = "__DATA,";
         }
 
