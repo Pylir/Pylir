@@ -23,7 +23,7 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh $LLVM_VERSION all
           sudo apt update
-          sudo apt install libunwind-dev lld
+          sudo apt install libunwind-dev lld llvm
           
       - name: Set up Python
         uses: actions/setup-python@v4

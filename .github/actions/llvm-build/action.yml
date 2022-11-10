@@ -69,6 +69,10 @@ runs:
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
+        $use_lld = ''
+        if (!$IsMacOs) {
+          $use_lld = '-DLLVM_ENABLE_LLD=ON'
+        }
         cmake -GNinja -Bllvm-optimized-tblgen `
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
@@ -79,7 +83,7 @@ runs:
           -DLLVM_INSTALL_UTILS=ON `
           -DLLVM_ENABLE_PROJECTS="mlir" `
           -DLLVM_TARGETS_TO_BUILD=host `
-          -DLLVM_ENABLE_LLD=ON `
+          $use_lld `
           -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
           -S ${{github.workspace}}/llvm-project/llvm
 
@@ -124,10 +128,15 @@ runs:
           $exe_suffix = '.exe'
         }
         
-        if ('${{inputs.cpp-compiler}}') {
-          $thing_flags = "-DCMAKE_AR=$((Get-Command llvm-ar).Path.replace('\', '/')) -DCMAKE_STATIC_LINKER_FLAGS=/llvmlibthing"
-        } else {
-          $thing_flags = "-DCMAKE_CXX_ARCHIVE_CREATE='$((Get-Command llvm-ar).Path) cr --thin <TARGET> <OBJECTS>' -DCMAKE_CXX_ARCHIVE_FINISH=:"
+        $use_lld = ''
+        $thin_flags = ''
+        if (!$IsMacOs) {
+          $use_lld = '-DLLVM_ENABLE_LLD=ON'
+          if ('${{inputs.cpp-compiler}}') {
+            $thing_flags = "-DCMAKE_AR=$((Get-Command llvm-ar).Path.replace('\', '/')) -DCMAKE_STATIC_LINKER_FLAGS=/llvmlibthing"
+          } else {
+            $thing_flags = "-DCMAKE_CXX_ARCHIVE_CREATE='$((Get-Command llvm-ar).Path) cr --thin <TARGET> <OBJECTS>' -DCMAKE_CXX_ARCHIVE_FINISH=:"
+          }
         }
         
         cmake -GNinja -Bllvm-build `
