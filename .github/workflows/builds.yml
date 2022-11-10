@@ -53,10 +53,9 @@ jobs:
 
       - name: Install ld64.lld
         if: ${{ contains(matrix.os, 'macos') }}
-        shell: bash
         run: |
           brew install llvm
-          New-Item -ItemType SymbolicLink -Path $(brew --prefix llvm)/bin/ld64.lld -Target /usr/local/bin/ld64.lld
+          ln /usr/local/bin/ld64.lld $(brew --prefix llvm)/bin/ld64.lld
 
       - name: Use developer command prompt
         if: ${{ matrix.cxx_compiler == 'clang-cl' }}
