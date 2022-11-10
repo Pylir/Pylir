@@ -181,7 +181,9 @@ namespace
 llvm::StringRef getOSLibName(const llvm::Triple& triple)
 {
     if (triple.isOSDarwin())
+    {
         return "darwin";
+    }
 
     switch (triple.getOS())
     {
