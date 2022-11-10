@@ -55,7 +55,7 @@ jobs:
         if: ${{ contains(matrix.os, 'macos') }}
         run: |
           brew install llvm
-          ln /usr/local/bin/ld64.lld $(brew --prefix llvm)/bin/ld64.lld
+          ln /usr/local/bin/ld64.lld /usr/local/opt/llvm/bin/ld64.lld
 
       - name: Use developer command prompt
         if: ${{ matrix.cxx_compiler == 'clang-cl' }}

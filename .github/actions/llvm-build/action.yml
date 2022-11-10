@@ -47,7 +47,7 @@ runs:
           $key += '${{inputs.runtime_lib}}'
         }
         
-        $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
+        $compiler_version = ${{inputs.cpp-compiler}} -v 2>&1 | Out-String
         $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
         $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
         $key += '-' + $hash

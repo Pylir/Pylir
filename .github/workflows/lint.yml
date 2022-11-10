@@ -45,19 +45,19 @@ jobs:
           # Depth 2 because we use git diff HEAD^ later.
           fetch-depth: 2
 
-      - name: Install CCache
-        uses: Chocobo1/setup-ccache-action@v1
-        with:
-          ccache_options: |
-            max_size=0.5G
-          override_cache_key: ${{runner.os}}-clang-tidy
-
       - name: Build LLVM
         id: llvm-build
         uses: ./Pylir/.github/actions/llvm-build
         with:
           c-compiler: clang
           cpp-compiler: clang++
+
+      - name: Install CCache
+        uses: Chocobo1/setup-ccache-action@v1
+        with:
+          ccache_options: |
+            max_size=0.5G
+          override_cache_key: ${{runner.os}}-clang-tidy
 
       - name: Configure Pylir
         run: |
