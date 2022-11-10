@@ -97,7 +97,7 @@ jobs:
         with:
           ccache_options: |
             max_size=${{steps.cache-size.outputs.size}}
-            debug=true
+            debug=${{contains(matrix.os, 'macos')}}
             debug_dir=${{github.workspace}}/CCacheLog
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
           windows_compile_environment: msvc
@@ -159,12 +159,12 @@ jobs:
       - name: Cleanup disk space
         if: always()
         run: |
-          Remove-Item -Recurse -Force llvm-optimized-tblgen
-          Remove-Item -Recurse -Force llvm-build
-          Remove-Item -Recurse -Force pylir-build
+          Remove-Item -Recurse -Force llvm-optimized-tblgen -ErrorAction Ignore
+          Remove-Item -Recurse -Force llvm-build -ErrorAction Ignore
+          Remove-Item -Recurse -Force pylir-build -ErrorAction Ignore
 
       - name: Upload ccache debug output
-        if: always()
+        if: always() && contains(matrix.os, 'macos')
         uses: actions/upload-artifact@v3
         with:
           name: CCacheLog
