@@ -28,11 +28,16 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Set LLVM Revision
+      shell: pwsh
+      run: |
+        "LLVM_REVISION=830b5e823af00dfca2de361019bfeb98846bca06" >> $Env:GITHUB_ENV
+
     - name: Checkout LLVM
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: 830b5e823af00dfca2de361019bfeb98846bca06
+        ref: ${{ env.LLVM_REVISION }}
         path: llvm-project
 
     - name: Calculate cache key
@@ -56,7 +61,7 @@ runs:
           $key += '-shared'
         }
         
-        "key=$key" >> $Env:GITHUB_OUTPUT
+        "key=$key" >> $Env:GITHUB_OUTPUT # -$Env:GITHUB_ENV
 
     - name: Cache LLVM Build
       id: cache-llvm-build
