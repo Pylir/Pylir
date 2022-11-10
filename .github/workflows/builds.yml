@@ -49,7 +49,14 @@ jobs:
         shell: bash
         run: |
           sudo apt update
-          sudo apt install libunwind-dev g++-10 lld clang
+          sudo apt install libunwind-dev g++-10 lld clang llvm
+
+      - name: Install ld64.lld
+        if: ${{ contains(matrix.os, 'macos') }}
+        shell: bash
+        run: |
+          brew install llvm
+          New-Item -ItemType SymbolicLink -Path $(brew --prefix llvm)/bin/ld64.lld -Target /usr/local/bin/ld64.lld
 
       - name: Use developer command prompt
         if: ${{ matrix.cxx_compiler == 'clang-cl' }}
@@ -134,10 +141,6 @@ jobs:
           if ('${{matrix.shared_libs}}') {
             $shared_libs = '-DBUILD_SHARED_LIBS=ON'
           }
-          $use_lld = ''
-          if (!$IsMacOs) {
-            $use_lld = '-DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld"'
-          }
           
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
@@ -149,7 +152,7 @@ jobs:
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
-            $use_lld `
+            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
             -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
