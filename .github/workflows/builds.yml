@@ -91,6 +91,11 @@ jobs:
           } else {
              "size=0.5G" >> $Env:GITHUB_OUTPUT
           }
+          
+          # Using the compilers mtime is not reliable on MacOS for some reason. As a workaround we do the following to
+          # key ccache on the compiler: We just use the output of the compilers '-v' command. That should only change
+          # during new releases and therefore preserve the cache. Might also be faster this way since ccache does not
+          # have to do anything except compare the keys given here to the one used to produce the files.
           $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
           $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
           $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
