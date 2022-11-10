@@ -77,6 +77,16 @@ jobs:
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
+      - name: Build LLVM
+        id: llvm-build
+        uses: ./Pylir/.github/actions/llvm-build
+        with:
+          c-compiler: ${{matrix.c_compiler}}
+          cpp-compiler: ${{matrix.cxx_compiler}}
+          sanitizers: ${{matrix.sanitizer}}
+          runtime_lib: ${{matrix.runtime_lib}}
+          shared_libs: ${{matrix.shared_libs}}
+
       # See https://github.com/actions/cache/issues/53.
       - name: Sanitize key
         id: sanitize-key
@@ -91,7 +101,7 @@ jobs:
           } else {
              "size=0.5G" >> $Env:GITHUB_OUTPUT
           }
-          
+
           # Using the compilers mtime is not reliable on MacOS for some reason. As a workaround we do the following to
           # key ccache on the compiler: We just use the output of the compilers '-v' command. That should only change
           # during new releases and therefore preserve the cache. Might also be faster this way since ccache does not
@@ -109,16 +119,6 @@ jobs:
             compiler_check=${{steps.cache-opts.outputs.check}}
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
           windows_compile_environment: msvc
-
-      - name: Build LLVM
-        id: llvm-build
-        uses: ./Pylir/.github/actions/llvm-build
-        with:
-          c-compiler: ${{matrix.c_compiler}}
-          cpp-compiler: ${{matrix.cxx_compiler}}
-          sanitizers: ${{matrix.sanitizer}}
-          runtime_lib: ${{matrix.runtime_lib}}
-          shared_libs: ${{matrix.shared_libs}}
 
       - name: Configure Pylir
         run: |
@@ -167,7 +167,6 @@ jobs:
       - name: Cleanup disk space
         if: always()
         run: |
-          Remove-Item -Recurse -Force llvm-optimized-tblgen -ErrorAction Ignore
           Remove-Item -Recurse -Force llvm-build -ErrorAction Ignore
           Remove-Item -Recurse -Force pylir-build -ErrorAction Ignore
 

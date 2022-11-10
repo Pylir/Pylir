@@ -35,7 +35,21 @@ runs:
         ref: 830b5e823af00dfca2de361019bfeb98846bca06
         path: llvm-project
 
+    - name: Sanitize key
+      id: sanitize-key
+      shell: pwsh
+      run: |
+        "key=$( '${{inputs.sanitizers}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
+
+    - name: Cache LLVM Build
+      id: cache-llvm-build
+      uses: actions/cache@v3
+      with:
+        path: llvm-build
+        key: LLVM-${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{inputs.runtime_lib}}-${{inputs.cxx_compiler}}${{inputs.shared_libs}}
+
     - name: Configure Optimized TableGen
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
         $use_lld = ''
@@ -58,11 +72,13 @@ runs:
           -S ${{github.workspace}}/llvm-project/llvm
 
     - name: Build Optimized TableGen
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
         cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
 
     - name: Configure LLVM
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
         $work_space = "${{github.workspace}}".replace('\', '/') 
@@ -101,6 +117,12 @@ runs:
           $exe_suffix = '.exe'
         }
         
+        if ('${{inputs.cpp-compiler}}') {
+          $thing_flags = "-DCMAKE_AR=$((Get-Command llvm-ar).Path.replace('\', '/')) -DCMAKE_STATIC_LINKER_FLAGS=/llvmlibthing"
+        } else {
+          $thing_flags = "-DCMAKE_CXX_ARCHIVE_CREATE='$((Get-Command llvm-ar).Path) cr --thin <TARGET> <OBJECTS>' -DCMAKE_CXX_ARCHIVE_FINISH=:"
+        }
+        
         cmake -GNinja -Bllvm-build `
         -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen$exe_suffix" `
         -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen$exe_suffix" `
@@ -118,6 +140,7 @@ runs:
         -DLLVM_ENABLE_PROJECTS="mlir;lld" `
         -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
         $use_lld `
+        $thin_flags `
         -DLLVM_BUILD_LLVM_C_DYLIB=OFF `
         -DLLVM_INCLUDE_BENCHMARKS=OFF `
         -DLLVM_APPEND_VC_REV=OFF `
@@ -128,9 +151,16 @@ runs:
         -S ${{github.workspace}}/llvm-project/llvm
 
     - name: Build LLVM
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       shell: pwsh
       run: |
         cmake --build llvm-build
+
+    - name: Clean disk space
+      shell: pwsh
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true' && always()
+      run: |
+        Remove-Item -Recurse -Force llvm-optimized-tblgen -ErrorAction Ignore
 
     - name: Output build dir
       id: output-build-dir
