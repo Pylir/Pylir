@@ -45,9 +45,11 @@ runs:
       shell: pwsh
       run: |
         $key = 'LLVM-${{runner.os}}'
+        
         if ('${{inputs.sanitizer}}') {
           $key += '-${{inputs.sanitizers}}'.Replace(',', '_and_')
         }
+        
         if ('${{inputs.runtime_lib}}') {
           $key += '${{inputs.runtime_lib}}'
         }
