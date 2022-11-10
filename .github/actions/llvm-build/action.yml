@@ -60,7 +60,6 @@ runs:
           -DCMAKE_BUILD_TYPE=Release `
           -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
           -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
-          -DLLVM_CCACHE_BUILD=ON `
           -DLLVM_BUILD_TOOLS=OFF `
           -DLLVM_BUILD_UTILS=ON `
           -DLLVM_INCLUDE_TESTS=OFF `
@@ -131,7 +130,6 @@ runs:
         -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
         -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
         -DBUILD_SHARED_LIBS=${{inputs.shared_libs}} `
-        -DLLVM_CCACHE_BUILD=ON `
         -DLLVM_ENABLE_ASSERTIONS=ON `
         -DLLVM_BUILD_TOOLS=OFF `
         -DLLVM_BUILD_UTILS=ON `
