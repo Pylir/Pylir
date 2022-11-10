@@ -84,21 +84,24 @@ jobs:
           "key=$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
 
       - name: Calculate cache size
-        id: cache-size
+        id: cache-opts
         run: |
           if ('${{matrix.sanitizer}}') {
              "size=1.5G" >> $Env:GITHUB_OUTPUT
           } else {
              "size=0.5G" >> $Env:GITHUB_OUTPUT
           }
+          $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
+          $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
+          $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
+          "check=string:$hash" >> $Env:GITHUB_OUTPUT
 
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=${{steps.cache-size.outputs.size}}
-            debug=${{contains(matrix.os, 'macos')}}
-            debug_dir=${{github.workspace}}/CCacheLog
+            max_size=${{steps.cache-opts.outputs.size}}
+            compiler_check=${{steps.cache-opts.outputs.check}}
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
           windows_compile_environment: msvc
 
