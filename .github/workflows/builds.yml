@@ -97,6 +97,8 @@ jobs:
         with:
           ccache_options: |
             max_size=${{steps.cache-size.outputs.size}}
+            debug=true
+            debug_dir=${{github.workspace}}/CCacheLog
           override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
           windows_compile_environment: msvc
 
@@ -160,4 +162,11 @@ jobs:
           Remove-Item -Recurse -Force llvm-optimized-tblgen
           Remove-Item -Recurse -Force llvm-build
           Remove-Item -Recurse -Force pylir-build
+
+      - name: Upload ccache debug output
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: CCacheLog
+          path: ${{github.workspace}}/CCacheLog/
 
