@@ -62,6 +62,13 @@ runs:
       run: |
         cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
 
+    - name: Upload ccache debug output
+      if: contains(matrix.os, 'macos')
+      uses: actions/upload-artifact@v3
+      with:
+        name: CCacheLog
+        path: ${{github.workspace}}/CCacheLog/
+
     - name: Configure LLVM
       shell: pwsh
       run: |

@@ -163,10 +163,3 @@ jobs:
           Remove-Item -Recurse -Force llvm-build -ErrorAction Ignore
           Remove-Item -Recurse -Force pylir-build -ErrorAction Ignore
 
-      - name: Upload ccache debug output
-        if: always() && contains(matrix.os, 'macos')
-        uses: actions/upload-artifact@v3
-        with:
-          name: CCacheLog
-          path: ${{github.workspace}}/CCacheLog/
-
