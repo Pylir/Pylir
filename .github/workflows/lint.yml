@@ -59,7 +59,6 @@ jobs:
           c-compiler: clang
           cpp-compiler: clang++
 
-      # Since we are reusing the cache from the normal build we should also use the same compiler options here.
       - name: Configure Pylir
         run: |
           cmake -GNinja -Bpylir-build \
