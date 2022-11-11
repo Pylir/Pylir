@@ -83,21 +83,21 @@ jobs:
         run: |
           $key = 'LLVM-${{runner.os}}'
           
-          if ('${{inputs.sanitizer}}') {
-          $key += '-${{inputs.sanitizers}}'.Replace(',', '_and_')
+          if ('${{matrix.sanitizer}}') {
+            $key += '-${{matrix.sanitizer}}'.Replace(',', '_and_')
           }
           
-          if ('${{inputs.runtime_lib}}') {
-          $key += '${{inputs.runtime_lib}}'
+          if ('${{matrix.runtime_lib}}') {
+            $key += '${{matrix.runtime_lib}}'
           }
           
-          $compiler_version = ${{inputs.cpp-compiler}} -v 2>&1 | Out-String
+          $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
           $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
           $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
           $key += '-' + $hash
           
-          if ('${{inputs.shared-libs}}') {
-          $key += '-shared'
+          if ('${{matrix.shared-libs}}') {
+            $key += '-shared'
           }
           
           "key=$key" >> $Env:GITHUB_OUTPUT # -$Env:GITHUB_ENV
