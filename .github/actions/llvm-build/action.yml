@@ -69,7 +69,9 @@ runs:
       id: cache-llvm-build
       uses: actions/cache@v3
       with:
-        path: llvm-build
+        path: |
+          llvm-build 
+          llvm-optimized-tblgen
         key: ${{steps.cache-key.outputs.key}}
 
     - name: Configure Optimized TableGen
@@ -89,7 +91,7 @@ runs:
           -DLLVM_INCLUDE_TESTS=OFF `
           -DLLVM_INSTALL_UTILS=ON `
           -DLLVM_ENABLE_PROJECTS="mlir" `
-          -DLLVM_TARGETS_TO_BUILD=host `
+          -DLLVM_TARGETS_TO_BUILD="" `
           $use_lld `
           -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
           -S ${{github.workspace}}/llvm-project/llvm
@@ -177,12 +179,6 @@ runs:
       shell: pwsh
       run: |
         cmake --build llvm-build
-
-    - name: Clean disk space
-      shell: pwsh
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true' && always()
-      run: |
-        Remove-Item -Recurse -Force llvm-optimized-tblgen -ErrorAction Ignore
 
     - name: Output build dir
       id: output-build-dir
