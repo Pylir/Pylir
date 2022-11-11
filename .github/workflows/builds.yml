@@ -68,6 +68,13 @@ jobs:
         if: ${{ matrix.cxx_compiler == 'clang++' && contains(matrix.os, 'windows') }}
         run: echo "D:\msys64\clang64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
 
+      - if: ${{ runner.os == 'Windows' }}
+        name: Use GNU tar for caching
+        shell: cmd
+        run: |
+          echo "Adding GNU tar to PATH"
+          echo C:\Program Files\Git\usr\bin>>"%GITHUB_PATH%"
+
       - name: Checkout Pylir
         uses: actions/checkout@v3
         with:
@@ -77,38 +84,31 @@ jobs:
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
-      # See https://github.com/actions/cache/issues/53.
-      - name: Sanitize key
-        id: sanitize-key
+      - name: Calculate cache key
+        id: cache-key
+        shell: pwsh
         run: |
-          "key=$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
-
-      - name: Calculate cache size
-        id: cache-opts
-        run: |
+          $key = '${{runner.os}}'
+          
           if ('${{matrix.sanitizer}}') {
-             "size=1.5G" >> $Env:GITHUB_OUTPUT
-          } else {
-             "size=0.5G" >> $Env:GITHUB_OUTPUT
+            $key += '-${{matrix.sanitizer}}'.Replace(',', '_and_')
           }
           
-          # Using the compilers mtime is not reliable on MacOS for some reason. As a workaround we do the following to
-          # key ccache on the compiler: We just use the output of the compilers '-v' command. That should only change
-          # during new releases and therefore preserve the cache. Might also be faster this way since ccache does not
-          # have to do anything except compare the keys given here to the one used to produce the files.
+          if ('${{matrix.runtime_lib}}') {
+            $key += '${{matrix.runtime_lib}}'
+          }
+          
           $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
           $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
           $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
-          "check=string:$hash" >> $Env:GITHUB_OUTPUT
-
-      - name: Install CCache
-        uses: Chocobo1/setup-ccache-action@v1
-        with:
-          ccache_options: |
-            max_size=${{steps.cache-opts.outputs.size}}
-            compiler_check=${{steps.cache-opts.outputs.check}}
-          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
-          windows_compile_environment: msvc
+          $key += '-' + $hash
+          "compiler_check=string:$hash" >> $Env:GITHUB_OUTPUT
+          
+          if ('${{matrix.shared_libs}}') {
+            $key += '-shared'
+          }
+          
+          "key=$key" >> $Env:GITHUB_OUTPUT
 
       - name: Build LLVM
         id: llvm-build
@@ -119,6 +119,16 @@ jobs:
           sanitizers: ${{matrix.sanitizer}}
           runtime_lib: ${{matrix.runtime_lib}}
           shared_libs: ${{matrix.shared_libs}}
+          cache-key: LLVM-${{steps.cache-key.outputs.key}}
+
+      - name: Install CCache
+        uses: Chocobo1/setup-ccache-action@v1
+        with:
+          ccache_options: |
+            max_size=50M
+            compiler_check=${{steps.cache-key.outputs.compiler_check}}
+          override_cache_key: ${{steps.cache-key.outputs.key}}
+          windows_compile_environment: msvc
 
       - name: Configure Pylir
         run: |
@@ -167,7 +177,5 @@ jobs:
       - name: Cleanup disk space
         if: always()
         run: |
-          Remove-Item -Recurse -Force llvm-optimized-tblgen -ErrorAction Ignore
-          Remove-Item -Recurse -Force llvm-build -ErrorAction Ignore
           Remove-Item -Recurse -Force pylir-build -ErrorAction Ignore
 
