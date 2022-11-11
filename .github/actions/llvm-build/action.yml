@@ -70,8 +70,8 @@ runs:
       uses: actions/cache@v3
       with:
         path: |
-          llvm-build 
-          llvm-optimized-tblgen
+          ${{github.workspace}}/llvm-build 
+          ${{github.workspace}}/llvm-optimized-tblgen
         key: ${{steps.cache-key.outputs.key}}
 
     - name: Configure Optimized TableGen
@@ -164,7 +164,6 @@ runs:
         -DLLVM_ENABLE_PROJECTS="mlir;lld" `
         -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
         $use_lld `
-        $thin_flags `
         -DLLVM_BUILD_LLVM_C_DYLIB=OFF `
         -DLLVM_INCLUDE_BENCHMARKS=OFF `
         -DLLVM_APPEND_VC_REV=OFF `
@@ -182,7 +181,7 @@ runs:
 
     - name: Remove Object files when not using thing archives
       shell: pwsh
-      if: steps.cache-llvm-build.outputs.cache-hit != 'true' && contains('${{runner.os}}', 'macos')
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
         $ext = 'o'
         if ($IsWindows) {
