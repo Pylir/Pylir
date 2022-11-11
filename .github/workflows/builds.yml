@@ -114,20 +114,11 @@ jobs:
           shared_libs: ${{matrix.shared_libs}}
           cache-key: LLVM-${{steps.cache-key.outputs.key}}
 
-      - name: Calculate CCache size
-        id: ccache-size
-        run: |
-          if ('${{matrix.sanitizer}}') {
-             "size=1.5G" >> $Env:GITHUB_OUTPUT
-          } else {
-             "size=50M" >> $Env:GITHUB_OUTPUT
-          }
-
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=${{steps.ccache-size.outputs.size}}
+            max_size=50M
             compiler_check=${{steps.cache-key.outputs.compiler_check}}
           override_cache_key: ${{steps.cache-key.outputs.key}}
           windows_compile_environment: msvc
