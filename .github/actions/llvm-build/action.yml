@@ -116,14 +116,8 @@ runs:
         }
         
         $use_lld = ''
-        $thin_flags = ''
         if (!$IsMacOs) {
           $use_lld = '-DLLVM_ENABLE_LLD=ON'
-          if ('${{inputs.cpp-compiler}}') {
-            $thing_flags = "-DCMAKE_AR=$((Get-Command llvm-ar).Path.replace('\', '/')) -DCMAKE_STATIC_LINKER_FLAGS=/llvmlibthing"
-          } else {
-            $thing_flags = "-DCMAKE_CXX_ARCHIVE_CREATE='$((Get-Command llvm-ar).Path) cr --thin <TARGET> <OBJECTS>' -DCMAKE_CXX_ARCHIVE_FINISH=:"
-          }
         }
         
         cmake -GNinja -Bllvm-build `
