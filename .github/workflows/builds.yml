@@ -167,7 +167,5 @@ jobs:
       - name: Cleanup disk space
         if: always()
         run: |
-          Remove-Item -Recurse -Force llvm-optimized-tblgen -ErrorAction Ignore
-          Remove-Item -Recurse -Force llvm-build -ErrorAction Ignore
           Remove-Item -Recurse -Force pylir-build -ErrorAction Ignore
 

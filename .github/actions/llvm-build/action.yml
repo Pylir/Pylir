@@ -70,8 +70,8 @@ runs:
       uses: actions/cache@v3
       with:
         path: |
-          ${{github.workspace}}/llvm-build 
-          ${{github.workspace}}/llvm-optimized-tblgen
+          llvm-build 
+          llvm-optimized-tblgen
         key: ${{steps.cache-key.outputs.key}}
 
     - name: Configure Optimized TableGen
