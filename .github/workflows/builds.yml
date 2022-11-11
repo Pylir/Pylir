@@ -96,7 +96,7 @@ jobs:
           $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
           $key += '-' + $hash
           
-          if ('${{matrix.shared-libs}}') {
+          if ('${{matrix.shared_libs}}') {
             $key += '-shared'
           }
           
