@@ -180,6 +180,17 @@ runs:
       run: |
         cmake --build llvm-build
 
+    - name: Remove Object files when not using thing archives
+      shell: pwsh
+      if: steps.cache-llvm-build.outputs.cache-hit != 'true' && contains('${{runner.os}}', 'macos')
+      run: |
+        $ext = 'o'
+        if ($IsWindows) {
+          $ext = 'obj'
+        }
+        Remove-Item '${{github.workspace}}/llvm-build' -Recurse -Include "*.$ext"
+        Remove-Item '${{github.workspace}}/llvm-optimized-tblgen' -Recurse -Include "*.$ext"
+
     - name: Output build dir
       id: output-build-dir
       shell: pwsh
