@@ -49,7 +49,7 @@ jobs:
         shell: bash
         run: |
           sudo apt update
-          sudo apt install libunwind-dev g++-10 lld clang llvm
+          sudo apt install libunwind-dev g++-10 lld clang
 
       - name: Use developer command prompt
         if: ${{ matrix.cxx_compiler == 'clang-cl' }}
@@ -95,12 +95,13 @@ jobs:
           $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
           $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
           $key += '-' + $hash
+          "compiler_check=string:$hash" >> $Env:GITHUB_OUTPUT
           
           if ('${{matrix.shared_libs}}') {
             $key += '-shared'
           }
           
-          "key=$key" >> $Env:GITHUB_OUTPUT # -$Env:GITHUB_ENV
+          "key=$key" >> $Env:GITHUB_OUTPUT
 
       - name: Build LLVM
         id: llvm-build
@@ -113,30 +114,21 @@ jobs:
           shared_libs: ${{matrix.shared_libs}}
           cache-key: LLVM-${{steps.cache-key.outputs.key}}
 
-      - name: Calculate cache size
-        id: cache-opts
+      - name: Calculate CCache size
+        id: ccache-size
         run: |
           if ('${{matrix.sanitizer}}') {
              "size=1.5G" >> $Env:GITHUB_OUTPUT
           } else {
-             "size=0.5G" >> $Env:GITHUB_OUTPUT
+             "size=50M" >> $Env:GITHUB_OUTPUT
           }
-
-          # Using the compilers mtime is not reliable on MacOS for some reason. As a workaround we do the following to
-          # key ccache on the compiler: We just use the output of the compilers '-v' command. That should only change
-          # during new releases and therefore preserve the cache. Might also be faster this way since ccache does not
-          # have to do anything except compare the keys given here to the one used to produce the files.
-          $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
-          $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
-          $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
-          "check=string:$hash" >> $Env:GITHUB_OUTPUT
 
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
         with:
           ccache_options: |
-            max_size=${{steps.cache-opts.outputs.size}}
-            compiler_check=${{steps.cache-opts.outputs.check}}
+            max_size=${{steps.ccache-size.outputs.size}}
+            compiler_check=${{steps.cache-key.outputs.compiler_check}}
           override_cache_key: ${{steps.cache-key.outputs.key}}
           windows_compile_environment: msvc
 
