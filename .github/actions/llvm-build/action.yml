@@ -19,6 +19,9 @@ inputs:
     description: 'Whether to build shared libraries. Probably only works on Linux'
     required: false
     default: 'OFF'
+  cache-key:
+    description: 'Key to use to cache LLVM compilation. Should encode build config details'
+    required: true
 
 outputs:
   install-dir:
@@ -40,31 +43,6 @@ runs:
         ref: ${{ env.LLVM_REVISION }}
         path: llvm-project
 
-    - name: Calculate cache key
-      id: cache-key
-      shell: pwsh
-      run: |
-        $key = 'LLVM-${{runner.os}}'
-        
-        if ('${{inputs.sanitizer}}') {
-          $key += '-${{inputs.sanitizers}}'.Replace(',', '_and_')
-        }
-        
-        if ('${{inputs.runtime_lib}}') {
-          $key += '${{inputs.runtime_lib}}'
-        }
-        
-        $compiler_version = ${{inputs.cpp-compiler}} -v 2>&1 | Out-String
-        $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
-        $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
-        $key += '-' + $hash
-        
-        if ('${{inputs.shared-libs}}') {
-          $key += '-shared'
-        }
-        
-        "key=$key" >> $Env:GITHUB_OUTPUT # -$Env:GITHUB_ENV
-
     - name: Cache LLVM Build
       id: cache-llvm-build
       uses: actions/cache@v3
@@ -72,7 +50,7 @@ runs:
         path: |
           llvm-build 
           llvm-optimized-tblgen
-        key: ${{steps.cache-key.outputs.key}}
+        key: ${{inputs.cache-key}}-${{env.LLVM_REVISION}}
 
     - name: Configure Optimized TableGen
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'

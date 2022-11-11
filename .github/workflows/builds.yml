@@ -77,6 +77,31 @@ jobs:
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
+      - name: Calculate cache key
+        id: cache-key
+        shell: pwsh
+        run: |
+          $key = 'LLVM-${{runner.os}}'
+          
+          if ('${{inputs.sanitizer}}') {
+          $key += '-${{inputs.sanitizers}}'.Replace(',', '_and_')
+          }
+          
+          if ('${{inputs.runtime_lib}}') {
+          $key += '${{inputs.runtime_lib}}'
+          }
+          
+          $compiler_version = ${{inputs.cpp-compiler}} -v 2>&1 | Out-String
+          $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
+          $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
+          $key += '-' + $hash
+          
+          if ('${{inputs.shared-libs}}') {
+          $key += '-shared'
+          }
+          
+          "key=$key" >> $Env:GITHUB_OUTPUT # -$Env:GITHUB_ENV
+
       - name: Build LLVM
         id: llvm-build
         uses: ./Pylir/.github/actions/llvm-build
@@ -86,12 +111,7 @@ jobs:
           sanitizers: ${{matrix.sanitizer}}
           runtime_lib: ${{matrix.runtime_lib}}
           shared_libs: ${{matrix.shared_libs}}
-
-      # See https://github.com/actions/cache/issues/53.
-      - name: Sanitize key
-        id: sanitize-key
-        run: |
-          "key=$( '${{matrix.sanitizer}}'.Replace(',', '_and_') )" >> $Env:GITHUB_OUTPUT
+          cache-key: ${{steps.cache-key.outputs.key}}
 
       - name: Calculate cache size
         id: cache-opts
@@ -117,7 +137,7 @@ jobs:
           ccache_options: |
             max_size=${{steps.cache-opts.outputs.size}}
             compiler_check=${{steps.cache-opts.outputs.check}}
-          override_cache_key: ${{runner.os}}-${{steps.sanitize-key.outputs.key}}-${{matrix.runtime_lib}}-${{matrix.cxx_compiler}}${{matrix.shared_libs}}
+          override_cache_key: ${{steps.cache-key.outputs.key}}
           windows_compile_environment: msvc
 
       - name: Configure Pylir

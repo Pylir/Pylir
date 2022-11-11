@@ -51,6 +51,7 @@ jobs:
         with:
           c-compiler: clang
           cpp-compiler: clang++
+          cache-key: clang-tidy
 
       - name: Install CCache
         uses: Chocobo1/setup-ccache-action@v1
