@@ -81,7 +81,7 @@ jobs:
         id: cache-key
         shell: pwsh
         run: |
-          $key = 'LLVM-${{runner.os}}'
+          $key = '${{runner.os}}'
           
           if ('${{matrix.sanitizer}}') {
             $key += '-${{matrix.sanitizer}}'.Replace(',', '_and_')
@@ -111,7 +111,7 @@ jobs:
           sanitizers: ${{matrix.sanitizer}}
           runtime_lib: ${{matrix.runtime_lib}}
           shared_libs: ${{matrix.shared_libs}}
-          cache-key: ${{steps.cache-key.outputs.key}}
+          cache-key: LLVM-${{steps.cache-key.outputs.key}}
 
       - name: Calculate cache size
         id: cache-opts
