@@ -9,7 +9,7 @@ goals is to achieve as high of language conformance as is possible and reasonabl
 
 `pylir` has a GCC style command line interface, with all options listable via `pylir --help`.
 To compile a python program, simply pass the main module of your python program to the compiler: `pylir test.py`. 
-This will then produce an executable called `test` (`test.exe` on Windows). Using the `-o` flag you can change the name 
+This will then produce an executable called `test` (`test.exe` on Windows). Using the `-o` flag you can change the name of 
 the binary. 
 
 The current default is to not apply any optimizations. To enable optimizations pass `-O3` as a command line flag. 
