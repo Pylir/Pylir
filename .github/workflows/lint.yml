@@ -15,28 +15,13 @@ env:
 jobs:
   lint-run:
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Install dependencies
+
+      - name: Install clang-tidy
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh $LLVM_VERSION all
-          sudo apt update
-          sudo apt install libunwind-dev lld
-          
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.9
-
-      # Required by clang-tidy-diff.py.
-      - name: Install Python depends
-        run: |
-          python -m pip install pyyaml
-
-      - name: Install Ninja
-        uses: ashutoshvarma/setup-ninja@v1.1
 
       - name: Checkout Pylir
         uses: actions/checkout@v3
@@ -44,6 +29,17 @@ jobs:
           path: Pylir
           # Depth 2 because we use git diff HEAD^ later.
           fetch-depth: 2
+
+      - name: Install Dependencies
+        uses: ./Pylir/.github/actions/dependencies
+        with:
+          cxx-compiler: clang++
+          ccache-key: clang-tidy
+
+      # Required by clang-tidy-diff.py.
+      - name: Install Python depends
+        run: |
+          python -m pip install pyyaml
 
       - name: Build LLVM
         id: llvm-build
@@ -53,20 +49,14 @@ jobs:
           cpp-compiler: clang++
           cache-key: clang-tidy
 
-      - name: Install CCache
-        uses: Chocobo1/setup-ccache-action@v1
-        with:
-          ccache_options: |
-            max_size=50M
-          override_cache_key: ${{runner.os}}-clang-tidy
-
       - name: Configure Pylir
         run: |
           cmake -GNinja -Bpylir-build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER=clang \
-            -DPython3_EXECUTABLE="$(which python)" \
+            -DPython3_ROOT_DIR="$pythonLocation" \
+            -DPython3_FIND_STRATEGY=LOCATION \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \

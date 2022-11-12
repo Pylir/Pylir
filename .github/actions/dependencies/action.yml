@@ -1,0 +1,74 @@
+name: "Install build dependencies"
+description: "Installs all dependencies on all platforms that are generally required to compile Pylir"
+
+inputs:
+  cxx-compiler:
+    description: "C++ compiler that will be used for compilation"
+    required: true
+  ccache-key:
+    description: "Key to cache the ccache cache"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9
+
+    - name: Install minimum required cmake and ninja
+      uses: lukka/get-cmake@latest
+      with:
+        cmakeVersion: 3.20.6
+
+    - name: Install Ubuntu dependencies
+      if: ${{ runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        sudo apt update
+        sudo apt install libunwind-dev lld clang g++-10
+
+    - name: Use MSVC developer command prompt
+      if: ${{ inputs.cxx-compiler == 'clang-cl' }}
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install clang from MSYS2
+      uses: msys2/setup-msys2@v2
+      if: ${{ inputs.cxx-compiler == 'clang++' && runner.os == 'Windows' }}
+      with:
+        msystem: clang64
+        update: true
+        pacboy: >-
+          toolchain:p
+        location: D:\
+
+    - name: Prepend Msys2 to path
+      shell: pwsh
+      if: ${{ inputs.cxx-compiler == 'clang++' && runner.os == 'Windows' }}
+      run: echo "D:\msys64\clang64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+
+    - if: ${{ runner.os == 'Windows' }}
+      name: Use GNU tar for caching
+      shell: cmd
+      run: |
+        echo "Adding GNU tar to PATH"
+        echo C:\Program Files\Git\usr\bin>>"%GITHUB_PATH%"
+
+    - name: Generate compiler hash
+      id: compiler-hash
+      shell: pwsh
+      run: |
+        $compiler_version = ${{inputs.cxx-compiler}} -v 2>&1 | Out-String
+        $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
+        $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
+        "hash=$hash" >> $Env:GITHUB_OUTPUT
+
+    - name: Install CCache
+      uses: Chocobo1/setup-ccache-action@v1
+      with:
+        ccache_options: |
+          max_size=50M
+          compiler_check=string:${{steps.compiler-hash.outputs.hash}}
+        override_cache_key: ${{inputs.ccache-key}}
+        windows_compile_environment: msvc
