@@ -43,7 +43,7 @@ Pylir is written from scratch in C++17 and uses following notable technologies:
 Building from Source requires a C++17 Compiler, `cmake` and the correct version of MLIR, LLVM and LLD.
 MLIR is currently a very fast moving project and Pylirs source code tries to closely track tip of the tree. The
 required revision tested to build a specific version of pylir is always documented
-[here](https://github.com/zero9178/Pylir/blob/master/.github/actions/llvm-build/action.yml#L34).
+[here](https://github.com/zero9178/Pylir/blob/master/.github/actions/llvm-build/action.yml#L37).
 Pylir requires LLVM, MLIR and LLD to be built at this revision, and then be able to be found via cmake. Via the
 `CMAKE_PREFIX_PATH` variable, one can point cmake at the LLVM and MLIR installation.
 
