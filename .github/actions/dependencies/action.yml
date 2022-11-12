@@ -1,0 +1,48 @@
+name: "Install build dependencies"
+description: "Installs all dependencies on all platforms that are generally required to compile Pylir"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9
+
+    - name: Install minimum required cmake and ninja
+      uses: lukka/get-cmake@latest
+      with:
+        cmakeVersion: 3.20.6
+
+    - name: Install Ubuntu dependencies
+      if: ${{ contains(matrix.os, 'ubuntu') }}
+      shell: bash
+      run: |
+        sudo apt update
+        sudo apt install libunwind-dev g++-10 lld clang
+
+    - name: Use MSVC developer command prompt
+      if: ${{ matrix.cxx_compiler == 'clang-cl' }}
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install clang from MSYS2
+      uses: msys2/setup-msys2@v2
+      if: ${{ matrix.cxx_compiler == 'clang++' && contains(matrix.os, 'windows') }}
+      with:
+        msystem: clang64
+        update: true
+        pacboy: >-
+          toolchain:p
+        location: D:\
+
+    - name: Prepend Msys2 to path
+      shell: pwsh
+      if: ${{ matrix.cxx_compiler == 'clang++' && contains(matrix.os, 'windows') }}
+      run: echo "D:\msys64\clang64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
+
+    - if: ${{ runner.os == 'Windows' }}
+      name: Use GNU tar for caching
+      shell: cmd
+      run: |
+        echo "Adding GNU tar to PATH"
+        echo C:\Program Files\Git\usr\bin>>"%GITHUB_PATH%"

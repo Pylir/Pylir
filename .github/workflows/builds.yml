@@ -36,44 +36,8 @@ jobs:
 
     steps:
 
-      - name: Install Ninja
-        uses: ashutoshvarma/setup-ninja@v1.1
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.9
-
-      - name: Install dependencies
-        if: ${{ contains(matrix.os, 'ubuntu') }}
-        shell: bash
-        run: |
-          sudo apt update
-          sudo apt install libunwind-dev g++-10 lld clang
-
-      - name: Use developer command prompt
-        if: ${{ matrix.cxx_compiler == 'clang-cl' }}
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - uses: msys2/setup-msys2@v2
-        if: ${{ matrix.cxx_compiler == 'clang++' && contains(matrix.os, 'windows') }}
-        with:
-          msystem: clang64
-          update: true
-          pacboy: >-
-            toolchain:p
-          location: D:\
-
-      - name: Prepend Msys2 to path
-        if: ${{ matrix.cxx_compiler == 'clang++' && contains(matrix.os, 'windows') }}
-        run: echo "D:\msys64\clang64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
-
-      - if: ${{ runner.os == 'Windows' }}
-        name: Use GNU tar for caching
-        shell: cmd
-        run: |
-          echo "Adding GNU tar to PATH"
-          echo C:\Program Files\Git\usr\bin>>"%GITHUB_PATH%"
+      - name: Install Dependencies
+        uses: ./Pylir/.github/actions/dependencies
 
       - name: Checkout Pylir
         uses: actions/checkout@v3
