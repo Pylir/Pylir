@@ -70,5 +70,5 @@ runs:
         ccache_options: |
           max_size=50M
           compiler_check=string:${{steps.compiler-hash.outputs.hash}}
-        override_cache_key: ${{input.ccache-key}}
+        override_cache_key: ${{inputs.ccache-key}}
         windows_compile_environment: msvc
