@@ -9,6 +9,11 @@ inputs:
     description: "Key to cache the ccache cache"
     required: true
 
+outputs:
+  key:
+    value: ${{steps.compiler-hash.outputs.key}}
+    description: "ccache-key concatenated with a hash specific to the cxx-compilers version"
+
 runs:
   using: composite
   steps:
@@ -62,13 +67,13 @@ runs:
         $compiler_version = ${{inputs.cxx-compiler}} -v 2>&1 | Out-String
         $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
         $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
-        "hash=$hash" >> $Env:GITHUB_OUTPUT
+        "key=${{inputs.ccache-key}}-$hash" >> $Env:GITHUB_OUTPUT
 
     - name: Install CCache
       uses: Chocobo1/setup-ccache-action@v1
       with:
         ccache_options: |
           max_size=50M
-          compiler_check=string:${{steps.compiler-hash.outputs.hash}}
-        override_cache_key: ${{inputs.ccache-key}}
+          compiler_check=none
+        override_cache_key: ${{steps.compiler-hash.outputs.key}}
         windows_compile_environment: msvc

@@ -40,8 +40,8 @@ jobs:
         with:
           path: Pylir
 
-      - name: Calculate cache key
-        id: cache-key
+      - name: Calculate ccache key
+        id: ccache-key
         shell: pwsh
         run: |
           $key = '${{runner.os}}'
@@ -53,12 +53,7 @@ jobs:
           if ('${{matrix.runtime_lib}}') {
             $key += '${{matrix.runtime_lib}}'
           }
-
-          $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
-          $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
-          $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
-          $key += '-' + $hash
-
+          
           if ('${{matrix.shared_libs}}') {
             $key += '-shared'
           }
@@ -66,10 +61,11 @@ jobs:
           "key=$key" >> $Env:GITHUB_OUTPUT
 
       - name: Install Dependencies
+        id: dep-install
         uses: ./Pylir/.github/actions/dependencies
         with:
           cxx-compiler: ${{matrix.cxx_compiler}}
-          ccache-key: ${{steps.cache-key.outputs.key}}
+          ccache-key: ${{steps.ccache-key.outputs.key}}
 
       - name: Install Python depends
         run: |
@@ -84,7 +80,7 @@ jobs:
           sanitizers: ${{matrix.sanitizer}}
           runtime_lib: ${{matrix.runtime_lib}}
           shared_libs: ${{matrix.shared_libs}}
-          cache-key: LLVM-${{steps.cache-key.outputs.key}}
+          cache-key: LLVM-${{steps.dep-install.outputs.key}}
 
       - name: Configure Pylir
         run: |
