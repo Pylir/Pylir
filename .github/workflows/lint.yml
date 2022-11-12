@@ -26,6 +26,9 @@ jobs:
 
       - name: Install Dependencies
         uses: ./Pylir/.github/actions/dependencies
+        with:
+          cxx_compiler: clang++
+          ccache-key: clang-tidy
 
       - name: Install clang-tidy
         run: |
@@ -45,13 +48,6 @@ jobs:
           c-compiler: clang
           cpp-compiler: clang++
           cache-key: clang-tidy
-
-      - name: Install CCache
-        uses: Chocobo1/setup-ccache-action@v1
-        with:
-          ccache_options: |
-            max_size=50M
-          override_cache_key: ${{runner.os}}-clang-tidy
 
       - name: Configure Pylir
         run: |

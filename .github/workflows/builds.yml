@@ -40,38 +40,40 @@ jobs:
         with:
           path: Pylir
 
-      - name: Install Dependencies
-        uses: ./Pylir/.github/actions/dependencies
-
-      - name: Install Python depends
-        run: |
-          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
-
       - name: Calculate cache key
         id: cache-key
         shell: pwsh
         run: |
           $key = '${{runner.os}}'
-          
+
           if ('${{matrix.sanitizer}}') {
             $key += '-${{matrix.sanitizer}}'.Replace(',', '_and_')
           }
-          
+
           if ('${{matrix.runtime_lib}}') {
             $key += '${{matrix.runtime_lib}}'
           }
-          
+
           $compiler_version = ${{matrix.cxx_compiler}} -v 2>&1 | Out-String
           $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
           $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
           $key += '-' + $hash
-          "compiler_check=string:$hash" >> $Env:GITHUB_OUTPUT
-          
+
           if ('${{matrix.shared_libs}}') {
             $key += '-shared'
           }
-          
+
           "key=$key" >> $Env:GITHUB_OUTPUT
+
+      - name: Install Dependencies
+        uses: ./Pylir/.github/actions/dependencies
+        with:
+          cxx-compiler: ${{matrix.cxx_compiler}}
+          ccache-key: ${{steps.cache-key.outputs.key}}
+
+      - name: Install Python depends
+        run: |
+          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/test/requirements.txt"
 
       - name: Build LLVM
         id: llvm-build
@@ -83,15 +85,6 @@ jobs:
           runtime_lib: ${{matrix.runtime_lib}}
           shared_libs: ${{matrix.shared_libs}}
           cache-key: LLVM-${{steps.cache-key.outputs.key}}
-
-      - name: Install CCache
-        uses: Chocobo1/setup-ccache-action@v1
-        with:
-          ccache_options: |
-            max_size=50M
-            compiler_check=${{steps.cache-key.outputs.compiler_check}}
-          override_cache_key: ${{steps.cache-key.outputs.key}}
-          windows_compile_environment: msvc
 
       - name: Configure Pylir
         run: |
