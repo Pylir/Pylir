@@ -27,7 +27,7 @@ runs:
       shell: bash
       run: |
         sudo apt update
-        sudo apt install libunwind-dev lld ${{inputs.cxx-compiler}}
+        sudo apt install libunwind-dev lld clang g++-10
 
     - name: Use MSVC developer command prompt
       if: ${{ inputs.cxx-compiler == 'clang-cl' }}
