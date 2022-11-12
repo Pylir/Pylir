@@ -17,6 +17,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
 
+      - name: Install clang-tidy
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh $LLVM_VERSION all
+
       - name: Checkout Pylir
         uses: actions/checkout@v3
         with:
@@ -29,12 +35,6 @@ jobs:
         with:
           cxx-compiler: clang++
           ccache-key: clang-tidy
-
-      - name: Install clang-tidy
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh $LLVM_VERSION all
 
       # Required by clang-tidy-diff.py.
       - name: Install Python depends
