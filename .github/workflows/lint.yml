@@ -27,7 +27,7 @@ jobs:
       - name: Install Dependencies
         uses: ./Pylir/.github/actions/dependencies
         with:
-          cxx_compiler: clang++
+          cxx-compiler: clang++
           ccache-key: clang-tidy
 
       - name: Install clang-tidy
