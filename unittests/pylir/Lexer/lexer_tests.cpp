@@ -11,6 +11,15 @@
 
 #include <fmt/format.h>
 
+template <>
+struct Catch::StringMaker<pylir::TokenType>
+{
+    static std::string convert(pylir::TokenType token)
+    {
+        return fmt::format("{}", token);
+    }
+};
+
 #define LEXER_EMITS(source, ...)                                                         \
     [](std::string_view str)                                                             \
     {                                                                                    \
@@ -936,6 +945,23 @@ TEST_CASE("Lex indentation", "[Lexer]")
         CHECK(result[1] == pylir::TokenType::IntegerLiteral);
         CHECK(result[2] == pylir::TokenType::CloseSquareBracket);
         CHECK(result[3] == pylir::TokenType::Newline);
+    }
+    SECTION("Trailing spaces")
+    {
+        pylir::Diag::Document document("return item \n"
+                                       "except");
+        auto docManager = manager.createSubDiagnosticManager(document);
+        pylir::Lexer lexer(docManager);
+        std::vector<pylir::TokenType> result;
+        std::transform(lexer.begin(), lexer.end(), std::back_inserter(result),
+                       [](const pylir::Token& token) { return token.getTokenType(); });
+        CHECK_THAT(result, Catch::Matchers::Equals<pylir::TokenType>({
+                               pylir::TokenType::ReturnKeyword,
+                               pylir::TokenType::Identifier,
+                               pylir::TokenType::Newline,
+                               pylir::TokenType::ExceptKeyword,
+                               pylir::TokenType::Newline,
+                           }));
     }
     LEXER_EMITS("foo\n"
                 "    bar\n"

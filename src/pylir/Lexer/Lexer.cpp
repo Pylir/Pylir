@@ -730,7 +730,8 @@ bool pylir::Lexer::parseNext()
             {
                 if (Text::isWhitespace(*m_current))
                 {
-                    m_current = std::find_if_not(m_current, m_diagManager->getDocument().end(), Text::isWhitespace);
+                    m_current = std::find_if_not(m_current, m_diagManager->getDocument().end(),
+                                                 [](char32_t c) { return Text::isWhitespace(c) && c != U'\n'; });
                     continue;
                 }
                 parseIdentifier();
