@@ -63,7 +63,9 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                 return interface->materializeUndefined(builder, type, loc);
             });
 
-        llvm::DenseMap<std::pair<mlir::Value, mlir::Attribute>, pylir::SSABuilder::DefinitionsMap> definitions;
+        llvm::DenseMap<std::tuple<mlir::Value, mlir::Attribute, mlir::SideEffects::Resource*>,
+                       pylir::SSABuilder::DefinitionsMap>
+            definitions;
         pylir::updateSSAinRegion(
             ssaBuilder, region,
             [&](mlir::Block* block)
@@ -79,10 +81,11 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                             continue;
                         }
                         // Not yet deleting the aggregate here as we have to wait till all its uses have been replaced.
-                        allocOp.replaceAggregate(builder,
-                                                 [&](mlir::Attribute attr, mlir::Value val) {
-                                                     definitions[{currAggregate, attr}][allocOp->getBlock()] = val;
-                                                 });
+                        allocOp.replaceAggregate(
+                            builder,
+                            [&](mlir::Attribute attr, mlir::SideEffects::Resource* resource, mlir::Value val) {
+                                definitions[{currAggregate, attr, resource}][allocOp->getBlock()] = val;
+                            });
                         continue;
                     }
 
@@ -96,14 +99,15 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                         mlir::Attribute optionalKey = *readWriteOp.getSROAKey();
                         readWriteOp.replaceAggregate(
                             builder, optionalKey,
-                            [&](mlir::Attribute attr, mlir::Type type) -> mlir::Value
+                            [&](mlir::Attribute attr, mlir::SideEffects::Resource* resource,
+                                mlir::Type type) -> mlir::Value
                             {
                                 return ssaBuilder.readVariable(readWriteOp->getLoc(), type,
-                                                               definitions[{currAggregate, attr}],
+                                                               definitions[{currAggregate, attr, resource}],
                                                                readWriteOp->getBlock());
                             },
-                            [&](mlir::Attribute attr, mlir::Value val) {
-                                definitions[{currAggregate, attr}][readWriteOp->getBlock()] = val;
+                            [&](mlir::Attribute attr, mlir::SideEffects::Resource* resource, mlir::Value val) {
+                                definitions[{currAggregate, attr, resource}][readWriteOp->getBlock()] = val;
                             });
                         iter.erase();
                         m_readWriteOpsRemoved++;

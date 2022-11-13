@@ -5,6 +5,7 @@
 #pragma once
 
 #include <mlir/IR/OpDefinition.h>
+#include <mlir/Interfaces/SideEffectInterfaces.h>
 
 #include <pylir/Optimizer/Transforms/Util/SSABuilder.hpp>
 

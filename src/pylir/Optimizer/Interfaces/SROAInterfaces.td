@@ -28,14 +28,17 @@ def SROAAllocOpInterface : OpInterface<"SROAAllocOpInterface"> {
         }]>,
         InterfaceMethod<[{
             Called during replacement of the aggregate. The purpose of this method is to be able to initialize the
-            values of the aggregate. This is done via the callback `write`, which takes two arguments. The first is the
-            key, which is used by all participating 'SROAReadWriteOpInterface' operations and this operation to
-            identity a value within the aggregate. The second argument is the value that should be written to the value
-            within the aggregate.
+            values of the aggregate. This is done via the callback `write`, which takes three arguments. The first is
+            the key, which is used by all participating 'SROAReadWriteOpInterface' operations and this operation to
+            identity a value within the aggregate. The second argument is a memory resource, which acts as an additional
+            scoping mechanism when later retrieving a value. To read a value written here, using the same key and scope
+            is required.
+            The last argument is the value that should be written to the value within the aggregate.
             If any operations should be created during the process `builder` may be used, which has its insertion point
             set to right before the operation.
-        }], "void", "replaceAggregate", (ins "::mlir::OpBuilder&":$builder,
-                                             "::llvm::function_ref<void(mlir::Attribute, mlir::Value)>":$write), "", [{
+        }], "void", "replaceAggregate", (ins
+            "::mlir::OpBuilder&":$builder,
+            "::llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>":$write), "", [{
             // define nothing by default.
         }]>,
     ];
@@ -80,17 +83,18 @@ def SROAReadWriteOpInterface : OpInterface<"SROAReadWriteOpInterface"> {
         InterfaceMethod<[{
             Called during the replacement of the aggregate. Using the callbacks `read` and `write` one can make reads
             and writes to specific values within the aggregate. These values are located via the `Attribute` passed
-            as the first argument to each callbacks respectively. `read`s second argument is the type of the value
-            to be read. It then returns the given value.
-            `write`s second argument is the value that should be written to the value within the aggregate.
+            as the first argument and the 'Resource' passed as the second argument to each callback respectively.
+            `read`s third argument is the type of the value to be read. It then returns the given value.
+            `write`s third argument is the value that should be written to the value within the aggregate.
             `builder` may be used in case any operations are to be created and has its insertion point set before this
-            operation. `optionalKey` is the static value of the `SROAKey` operand returned by `getOptionalKeyOperand` or
+            operation. `optionalKey` is the static value of the `SROAKey` operand returned by `getSROAKey` or
             a null attribute if no operand was annotated as such.
 
             If this operation has any results they're required to have no uses after this operations.
-        }], "void", "replaceAggregate", (ins "::mlir::OpBuilder&":$builder, "::mlir::Attribute":$optionalKey,
-                                             "::llvm::function_ref<mlir::Value(mlir::Attribute, mlir::Type)>":$read,
-                                             "::llvm::function_ref<void(mlir::Attribute, mlir::Value)>":$write)>,
+        }], "void", "replaceAggregate", (ins
+            "::mlir::OpBuilder&":$builder, "::mlir::Attribute":$optionalKey,
+            "::llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>":$read,
+            "::llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>":$write)>,
     ];
 }
 
@@ -127,11 +131,13 @@ def SROAAttrInterface : AttrInterface<"SROAAttrInterface"> {
             Method to initialize the scalar values of an aggregate that is initialized by an attribute. This works
             similarly to the callbacks with `replaceAggregate` of `SROAAllocOpInterface` and `SROAReadWriteOpInterface`
             respectively.
-            `write` is used to initialize the values within the aggregate. The first parameter `key` denotes the
+            `write` is used to initialize the values within the aggregate. The first and second parameters denote the
             location within the attribute, and initializes it with `value`. Additionally the MLIR `type` of the value
             has to be passed as second argument.
         }], "void", "destructureAggregate",
-            (ins "::llvm::function_ref<void(mlir::Attribute key, mlir::Type type, mlir::Attribute value)>":$write)>
+        (ins
+        "::llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type, mlir::Attribute)>":$write
+        )>
     ];
 }
 

@@ -116,11 +116,12 @@ void GlobalSROAPass::runOnOperation()
 
             // Destructing here so to say, by replacing all read writes and creating the placeholders. Afterwards
             // we have all the keys to create the actual symbols.
-            llvm::MapVector<mlir::Attribute, LoadStorePlaceHolders> placeHolders;
+            llvm::MapVector<std::pair<mlir::Attribute, mlir::SideEffects::Resource*>, LoadStorePlaceHolders>
+                placeHolders;
             aggregate.globalValue.getInitializerAttr().cast<pylir::Py::SROAAttrInterface>().destructureAggregate(
-                [&](mlir::Attribute key, mlir::Type type, mlir::Attribute value)
+                [&](mlir::Attribute key, mlir::SideEffects::Resource* resource, mlir::Type type, mlir::Attribute value)
                 {
-                    auto& placeHolder = placeHolders[key];
+                    auto& placeHolder = placeHolders[{key, resource}];
                     placeHolder.maybeType = type;
                     placeHolder.maybeInitializer = value;
                 });
@@ -145,18 +146,18 @@ void GlobalSROAPass::runOnOperation()
                 mlir::OpBuilder builder(readWrite);
                 readWrite.replaceAggregate(
                     builder, key,
-                    [&](mlir::Attribute key, mlir::Type type) -> mlir::Value
+                    [&](mlir::Attribute key, mlir::SideEffects::Resource* resource, mlir::Type type) -> mlir::Value
                     {
-                        auto& placeHolder = placeHolders[key];
+                        auto& placeHolder = placeHolders[{key, resource}];
                         PYLIR_ASSERT(consistentType(placeHolder, type));
                         return placeHolder.loads
                             .emplace_back(builder.create<mlir::UnrealizedConversionCastOp>(readWrite->getLoc(), type,
                                                                                            mlir::ValueRange{}))
                             .getResult(0);
                     },
-                    [&](mlir::Attribute key, mlir::Value value)
+                    [&](mlir::Attribute key, mlir::SideEffects::Resource* resource, mlir::Value value)
                     {
-                        auto& placeHolder = placeHolders[key];
+                        auto& placeHolder = placeHolders[{key, resource}];
                         PYLIR_ASSERT(consistentType(placeHolder, value.getType()));
                         placeHolder.stores.emplace_back(builder.create<mlir::UnrealizedConversionCastOp>(
                             readWrite->getLoc(), mlir::TypeRange{}, value));
@@ -173,21 +174,21 @@ void GlobalSROAPass::runOnOperation()
                 // The produced symbol retains the private visibility, and the insert into the symbol table guarantees
                 // the uniqueness of the symbol.
                 std::string suffix;
-                if (auto str = attr.dyn_cast_or_null<mlir::StringAttr>())
+                if (auto str = attr.first.dyn_cast_or_null<mlir::StringAttr>())
                 {
                     suffix = str.getValue();
                 }
-                else if (auto pyStr = attr.dyn_cast_or_null<pylir::Py::StrAttr>())
+                else if (auto pyStr = attr.first.dyn_cast_or_null<pylir::Py::StrAttr>())
                 {
                     suffix = pyStr.getValue();
                 }
-                else if (auto integer = attr.dyn_cast_or_null<mlir::IntegerAttr>())
+                else if (auto integer = attr.first.dyn_cast_or_null<mlir::IntegerAttr>())
                 {
                     llvm::SmallString<10> temp;
                     integer.getValue().toStringSigned(temp);
                     suffix = temp.str();
                 }
-                else if (auto pyInt = attr.dyn_cast_or_null<pylir::Py::IntAttr>())
+                else if (auto pyInt = attr.first.dyn_cast_or_null<pylir::Py::IntAttr>())
                 {
                     suffix = pyInt.getValue().toString();
                 }
