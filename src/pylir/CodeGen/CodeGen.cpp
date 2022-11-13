@@ -568,22 +568,24 @@ mlir::Value pylir::CodeGen::visit(const Syntax::BinOp& binOp)
 
 mlir::Value pylir::CodeGen::visit(const Syntax::UnaryOp& unaryOp)
 {
+    auto locExit = changeLoc(unaryOp);
+    mlir::Value expr = visit(*unaryOp.expression);
+    if (!expr)
+    {
+        return expr;
+    }
     switch (unaryOp.operation.getTokenType())
     {
         case TokenType::NotKeyword:
         {
-            auto locExit = changeLoc(unaryOp);
-            auto value = toI1(visit(*unaryOp.expression));
+            auto value = toI1(expr);
             auto one = m_builder.create<mlir::arith::ConstantOp>(m_builder.getBoolAttr(true));
             auto inverse = m_builder.create<mlir::arith::XOrIOp>(one, value);
             return m_builder.createBoolFromI1(inverse);
         }
-        case TokenType::Minus:
-            return m_builder.createPylirNegIntrinsic(visit(*unaryOp.expression), m_currentExceptBlock);
-        case TokenType::Plus:
-            return m_builder.createPylirPosIntrinsic(visit(*unaryOp.expression), m_currentExceptBlock);
-        case TokenType::BitNegate:
-            return m_builder.createPylirInvertIntrinsic(visit(*unaryOp.expression), m_currentExceptBlock);
+        case TokenType::Minus: return m_builder.createPylirNegIntrinsic(expr, m_currentExceptBlock);
+        case TokenType::Plus: return m_builder.createPylirPosIntrinsic(expr, m_currentExceptBlock);
+        case TokenType::BitNegate: return m_builder.createPylirInvertIntrinsic(expr, m_currentExceptBlock);
         default: PYLIR_UNREACHABLE;
     }
 }
