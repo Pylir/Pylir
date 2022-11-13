@@ -2,9 +2,9 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <mlir/IR/Matchers.h>
 #include <mlir/Pass/Pass.h>
 
+#include <pylir/Optimizer/Interfaces/DialectUndefInterface.hpp>
 #include <pylir/Optimizer/Interfaces/SROAInterfaces.hpp>
 #include <pylir/Optimizer/Transforms/Util/SSAUpdater.hpp>
 
@@ -52,13 +52,15 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
 {
     for (auto& region : getOperation()->getRegions())
     {
-        mlir::Value currAggregate;
         pylir::SSABuilder ssaBuilder(
-            [&currAggregate](mlir::Block* block, mlir::Type type, mlir::Location loc)
+            [](mlir::Block* block, mlir::Type type, mlir::Location loc)
             {
                 auto builder = mlir::OpBuilder::atBlockBegin(block);
-                return currAggregate.getDefiningOp<pylir::SROAAllocOpInterface>().materializeUndefined(builder, type,
-                                                                                                       loc);
+                auto* interface = type.getDialect().getRegisteredInterface<pylir::DialectUndefInterface>();
+                PYLIR_ASSERT(
+                    interface && "SROA pass currently only supports materializing undefined values through the "
+                                 "DialectUndefInterface of the dialect of the type that should be materialized.");
+                return interface->materializeUndefined(builder, type, loc);
             });
 
         llvm::DenseMap<std::pair<mlir::Value, mlir::Attribute>, pylir::SSABuilder::DefinitionsMap> definitions;
@@ -71,7 +73,7 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
                     mlir::OpBuilder builder(&iter);
                     if (auto allocOp = mlir::dyn_cast<pylir::SROAAllocOpInterface>(iter))
                     {
-                        currAggregate = allocOp->getResult(0);
+                        mlir::Value currAggregate = allocOp->getResult(0);
                         if (!aggregates.contains(currAggregate))
                         {
                             continue;
@@ -86,7 +88,7 @@ void SROA::doAggregateReplacement(const llvm::DenseSet<mlir::Value>& aggregates)
 
                     if (auto readWriteOp = mlir::dyn_cast<pylir::SROAReadWriteOpInterface>(iter))
                     {
-                        currAggregate = readWriteOp.getAggregateOperand().get();
+                        mlir::Value currAggregate = readWriteOp.getAggregateOperand().get();
                         if (!aggregates.contains(currAggregate))
                         {
                             continue;

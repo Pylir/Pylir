@@ -27,15 +27,6 @@ def SROAAllocOpInterface : OpInterface<"SROAAllocOpInterface"> {
             return ::mlir::success();
         }]>,
         InterfaceMethod<[{
-            Called by the SSABuilder in the case that a value within the aggregate created by this operation is being
-            read without ever having been written to. In this case an "undefined" value of some kind should be
-            materialized by this operation.
-
-            `builder` is an `OpBuilder` with an insertion point dominating all uses of the read. `type` is the expected
-            type and `loc` is the location that should be used when creating operations.
-        }], "::mlir::Value", "materializeUndefined", (ins "::mlir::OpBuilder&":$builder, "::mlir::Type":$type,
-                                                          "::mlir::Location":$loc)>,
-        InterfaceMethod<[{
             Called during replacement of the aggregate. The purpose of this method is to be able to initialize the
             values of the aggregate. This is done via the callback `write`, which takes two arguments. The first is the
             key, which is used by all participating 'SROAReadWriteOpInterface' operations and this operation to

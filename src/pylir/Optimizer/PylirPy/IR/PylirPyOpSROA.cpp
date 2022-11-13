@@ -10,11 +10,6 @@
 
 namespace
 {
-mlir::Value materializeUndefined(mlir::OpBuilder& builder, mlir::Type type, mlir::Location loc)
-{
-    PYLIR_ASSERT(type.isa<pylir::Py::DynamicType>());
-    return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());
-}
 
 mlir::FailureOr<mlir::Attribute> getDictKey(mlir::Value keyOperand)
 {
@@ -69,21 +64,9 @@ mlir::LogicalResult pylir::Py::MakeDictOp::canParticipateInSROA()
     return dictOpCanParticipateInSROA(*this);
 }
 
-mlir::Value pylir::Py::MakeDictOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                        ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
-}
-
 mlir::LogicalResult pylir::Py::MakeDictExOp::canParticipateInSROA()
 {
     return dictOpCanParticipateInSROA(*this);
-}
-
-mlir::Value pylir::Py::MakeDictExOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                          ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
 }
 
 mlir::LogicalResult pylir::Py::MakeListOp::canParticipateInSROA()
@@ -91,45 +74,9 @@ mlir::LogicalResult pylir::Py::MakeListOp::canParticipateInSROA()
     return mlir::success(getIterExpansion().empty());
 }
 
-mlir::Value pylir::Py::MakeListOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                        ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
-}
-
 mlir::LogicalResult pylir::Py::MakeListExOp::canParticipateInSROA()
 {
     return mlir::success(getIterExpansion().empty());
-}
-
-mlir::Value pylir::Py::MakeListExOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                          ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
-}
-
-mlir::Value pylir::Py::MakeObjectOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                          ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
-}
-
-mlir::Value pylir::Py::TupleCopyOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                         ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
-}
-
-mlir::Value pylir::Py::StrCopyOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                       ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
-}
-
-mlir::Value pylir::Py::MakeFuncOp::materializeUndefined(::mlir::OpBuilder& builder, ::mlir::Type type,
-                                                        ::mlir::Location loc)
-{
-    return ::materializeUndefined(builder, type, loc);
 }
 
 namespace

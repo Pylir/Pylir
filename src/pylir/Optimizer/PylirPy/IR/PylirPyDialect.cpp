@@ -6,17 +6,16 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
-#include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
 #include <mlir/IR/Matchers.h>
 
 #include <llvm/ADT/TypeSwitch.h>
 
 #include <pylir/Optimizer/Interfaces/DialectCostInterface.hpp>
+#include <pylir/Optimizer/Interfaces/DialectUndefInterface.hpp>
 
 #include "PylirPyAttributes.hpp"
 #include "PylirPyOps.hpp"
 #include "PylirPyTypes.hpp"
-#include "TypeRefineableInterface.hpp"
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyDialect.cpp.inc"
 
@@ -30,9 +29,6 @@ struct PylirPyCostInterface : public pylir::DialectCostInterface
     std::size_t getCost(mlir::Operation* op) const override
     {
         return llvm::TypeSwitch<mlir::Operation*, std::size_t>(op)
-            .Case<pylir::Py::GetSlotOp, pylir::Py::SetSlotOp, pylir::Py::ObjectFromTypeObjectInterface>(
-                [](auto typeObjectUsers)
-                { return mlir::matchPattern(typeObjectUsers.getTypeObject(), mlir::m_Constant()) ? 1 : 10; })
             .Case([](pylir::Py::UnreachableOp) { return 0; })
             .Case([](pylir::Py::RaiseOp) { return 5; })
             .Case<pylir::Py::FunctionCallOp, pylir::Py::FunctionInvokeOp>([](auto) { return 10; })
@@ -43,6 +39,17 @@ struct PylirPyCostInterface : public pylir::DialectCostInterface
             .Case<pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>([](auto op)
                                                                   { return op.getMappingExpansion().empty() ? 2 : 30; })
             .Default(std::size_t{1});
+    }
+};
+
+struct PylirPyUndefInterface : public pylir::DialectUndefInterface
+{
+    using pylir::DialectUndefInterface::DialectUndefInterface;
+
+    mlir::Value materializeUndefined(mlir::OpBuilder& builder, mlir::Type type, mlir::Location loc) const override
+    {
+        PYLIR_ASSERT(type.isa<pylir::Py::DynamicType>());
+        return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());
     }
 };
 } // namespace
@@ -56,7 +63,7 @@ void pylir::Py::PylirPyDialect::initialize()
     initializeTypes();
     initializeAttributes();
     initializeExternalModels();
-    addInterfaces<PylirPyCostInterface>();
+    addInterfaces<PylirPyCostInterface, PylirPyUndefInterface>();
 }
 
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,
