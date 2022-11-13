@@ -955,6 +955,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
     Diag::DiagnosticsDocManager& mainModuleDiagManager)
 {
     pylir::CodeGenOptions options{};
+    options.implicitBuiltinsImport = args.hasFlag(OPT_Xbuiltins, OPT_Xno_builtins, true);
     std::vector<std::string> importPaths;
     {
         llvm::SmallString<100> docPath{m_documents.front().getFilename()};

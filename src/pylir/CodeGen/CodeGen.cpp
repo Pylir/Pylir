@@ -76,7 +76,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         m_functionScope.reset();
 
         // Initialize builtins from main module.
-        if (m_qualifiers.empty())
+        if (m_qualifiers.empty() && m_options.implicitBuiltinsImport)
         {
             importModules({ModuleSpec({ModuleSpec::Component{"builtins", {0, 1}}})});
             m_builder.create<Py::CallOp>(mlir::TypeRange{}, "builtins.__init__");

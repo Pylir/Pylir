@@ -41,6 +41,7 @@ struct CodeGenOptions
     };
     std::function<void(LoadRequest&&)> moduleLoadCallback;
     std::string qualifier;
+    bool implicitBuiltinsImport;
 };
 
 class CodeGen

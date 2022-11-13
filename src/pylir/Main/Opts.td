@@ -77,6 +77,8 @@ def Xstatistics : F<"Xstatistics", "Show pass statistics">, Group<grp_internal>;
 def Xtiming : F<"Xtiming", "Show pass timing">, Group<grp_internal>;
 def Xsingle_threaded : F<"Xsingle-threaded", "Run in single threaded mode">, Group<grp_internal>;
 def Xmulti_threaded : F<"Xmulti-threaded", "Run in multi threaded mode (Default)">, Group<grp_internal>;
+def Xbuiltins : F<"Xbuiltins", "Enables the implicit import of 'builtins' (Default)">, Group<grp_internal>;
+def Xno_builtins : F<"Xno-builtins", "Disable the implicit import of 'builtins'">, Group<grp_internal>;
 def Xprint_before : Joined<["-"], "Xprint-before=">, Group<grp_internal>;
 def Xprint_after : Joined<["-"], "Xprint-after=">, Group<grp_internal>;
 def Xprint_after_all : F<"Xprint-after-all", "Print IR to stderr after every pass">, Group<grp_internal>;
