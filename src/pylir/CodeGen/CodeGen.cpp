@@ -1828,6 +1828,10 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         if (classDef.inheritance)
         {
             std::tie(bases, keywords) = visit(classDef.inheritance->argumentList);
+            if (!bases || !keywords)
+            {
+                return;
+            }
         }
         else
         {
@@ -2025,15 +2029,20 @@ std::pair<mlir::Value, mlir::Value> pylir::CodeGen::visit(llvm::ArrayRef<pylir::
             dictArgs.emplace_back(Py::DictEntry{key, hash, visit(*iter.expression)});
             continue;
         }
+        mlir::Value args = visit(*iter.expression);
+        if (!args)
+        {
+            return {nullptr, nullptr};
+        }
         if (!iter.maybeExpansionsOrEqual)
         {
-            iterArgs.emplace_back(visit(*iter.expression));
+            iterArgs.emplace_back(args);
             continue;
         }
         switch (iter.maybeExpansionsOrEqual->getTokenType())
         {
-            case TokenType::Star: iterArgs.emplace_back(Py::IterExpansion{visit(*iter.expression)}); break;
-            case TokenType::PowerOf: dictArgs.emplace_back(Py::MappingExpansion{visit(*iter.expression)}); break;
+            case TokenType::Star: iterArgs.emplace_back(Py::IterExpansion{args}); break;
+            case TokenType::PowerOf: dictArgs.emplace_back(Py::MappingExpansion{args}); break;
             default: PYLIR_UNREACHABLE;
         }
     }
