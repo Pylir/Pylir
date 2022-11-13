@@ -82,9 +82,10 @@ mlir::Value pylir::SSABuilder::replaceBlockArgument(mlir::BlockArgument argument
         {
             continue;
         }
-        auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber());
-        PYLIR_ASSERT(ops && *ops != argument);
-        dependentBlockArgs.emplace_back(*ops);
+        if (auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber()))
+        {
+            dependentBlockArgs.emplace_back(*ops);
+        }
     }
 
     argument.replaceAllUsesWith(replacement);
