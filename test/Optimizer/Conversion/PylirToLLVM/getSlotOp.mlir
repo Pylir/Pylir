@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
+// RUN: pylir-opt %s  -convert-arith-to-llvm -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">)>>
 py.globalValue @builtins.str = #py.type
@@ -6,30 +6,20 @@ py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func.func @foo() -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.type>)
-    %1 = py.constant(#py.ref<@builtins.tuple>)
-    %2 = py.getSlot "__eq__" from %1 : %0
+    %0 = py.constant(#py.ref<@builtins.tuple>)
+    %c0 = arith.constant 0 : index
+    %2 = py.getSlot %0[%c0]
     return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @foo
-// CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.type
 // CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
-// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][{{[0-9]+}}] : {{.*}}, i8
-// CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP]][0]
-// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP2]]
+// CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : {{.*}}) : i{{[0-9]+}}
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][0, 0]
+// CHECK-NEXT: %[[TYPE:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TYPE]][0, 1]
+// CHECK-NEXT: %[[OFFSET:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[ADD:.*]] = llvm.add %[[OFFSET]], %[[ZERO]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][%[[ADD]]]
+// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: llvm.return %[[LOAD]]
-
-// -----
-
-
-py.globalValue @builtins.type = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">)>>
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
-
-func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.getSlot "__eq__" from %arg0 : %arg1
-    return %0 : !py.dynamic
-}
-
-// CHECK-LABEL: llvm.func @foo

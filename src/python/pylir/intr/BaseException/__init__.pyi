@@ -3,3 +3,5 @@
 #  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 __slots__: tuple[str]
+
+args: int

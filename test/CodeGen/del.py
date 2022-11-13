@@ -13,7 +13,7 @@ def g():
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.NameError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
+# CHECK: %[[NEW:.*]] = py.mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: py.raise %[[EXC]]
 
@@ -34,7 +34,7 @@ def local():
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.UnboundLocalError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
+# CHECK: %[[NEW:.*]] = py.mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: py.raise %[[EXC]]
 
@@ -51,20 +51,20 @@ def closure():
 
 # CHECK-LABEL: func.func private @"closure.<locals>.inner$impl[0]"
 # CHECK-SAME: %[[FUNC_OBJ:[[:alnum:]]+]]
-# CHECK: %[[CLOSURE:.*]] = py.getSlot "__closure__" from %[[FUNC_OBJ]]
+# CHECK: %[[CLOSURE:.*]] = py.getSlot %[[FUNC_OBJ]][%{{.*}}]
 # CHECK: %[[ZERO:.*]] = arith.constant 0
 # CHECK: %[[A_CELL:.*]] = py.tuple.getItem %[[CLOSURE]][%[[ZERO]]]
-# CHECK: %[[A:.*]] = py.getSlot "cell_contents" from %[[A_CELL]]
+# CHECK: %[[A:.*]] = py.getSlot %[[A_CELL]][%{{.*}}]
 # CHECK: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[A:.*]]
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.UnboundLocalError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]] = py.mroLookup "__new__" in %[[MRO]]
+# CHECK: %[[NEW:.*]] = py.mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: py.raise %[[EXC]]
 
 # CHECK: ^[[DEL_BLOCK]]:
 # CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: py.setSlot "cell_contents" of %[[A_CELL]] : %{{.*}} to %[[UNBOUND]]
+# CHECK: py.setSlot %[[A_CELL]][%{{.*}}] to %[[UNBOUND]]

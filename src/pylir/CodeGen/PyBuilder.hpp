@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -246,14 +247,17 @@ public:
         return create<Py::TypeOfOp>(value);
     }
 
-    Py::GetSlotOp createGetSlot(mlir::Value object, mlir::Value typeObject, llvm::StringRef slot)
+    template <class T, std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>* = nullptr>
+    Py::GetSlotOp createGetSlot(mlir::Value object, T slot)
     {
-        return create<Py::GetSlotOp>(object, typeObject, slot);
+        return create<Py::GetSlotOp>(object, create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)));
     }
 
-    Py::SetSlotOp createSetSlot(mlir::Value object, mlir::Value typeObject, llvm::StringRef slot, mlir::Value value)
+    template <class T, std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>* = nullptr>
+    Py::SetSlotOp createSetSlot(mlir::Value object, T slot, mlir::Value value)
     {
-        return create<Py::SetSlotOp>(object, typeObject, slot, value);
+        return create<Py::SetSlotOp>(object, create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)),
+                                     value);
     }
 
     Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index, mlir::Value hash)
@@ -356,9 +360,10 @@ public:
         return create<Py::StrConcatOp>(strings);
     }
 
-    Py::MROLookupOp createMROLookup(mlir::Value mroTuple, llvm::StringRef attribute)
+    template <class T, std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>* = nullptr>
+    Py::MROLookupOp createMROLookup(mlir::Value mroTuple, T slot)
     {
-        return create<Py::MROLookupOp>(mroTuple, attribute);
+        return create<Py::MROLookupOp>(mroTuple, create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)));
     }
 
     Py::TupleContainsOp createTupleContains(mlir::Value tuple, mlir::Value element)

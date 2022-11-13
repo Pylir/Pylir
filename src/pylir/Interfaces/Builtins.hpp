@@ -30,4 +30,22 @@ constexpr std::array allBuiltins = {
 #define COMPILER_BUILTIN(cppName, ...) Pylir##cppName,
 #include "CompilerBuiltins.def"
 };
+
+enum class TypeSlots
+{
+#define TYPE_SLOT(pythonName, cppName) cppName,
+#include "Slots.def"
+};
+
+enum class FunctionSlots
+{
+#define FUNCTION_SLOT(pythonName, cppName) cppName,
+#include "Slots.def"
+};
+
+enum class BaseExceptionSlots
+{
+#define BASEEXCEPTION_SLOT(pythonName, cppName) cppName,
+#include "Slots.def"
+};
 } // namespace pylir::Builtins

@@ -7,13 +7,6 @@ def foo():
     pass
 
 t = pylir.intr.typeOf(foo)
-print(pylir.intr.getSlot(foo, t, "__qualname__"))
-
-# CHECK: %[[PRINT:.*]] = py.constant(#py.ref<@builtins.print>)
-# CHECK: %[[FOO:.*]] = py.load @foo$handle
-# CHECK: %[[NAME:.*]] = py.getSlot "__qualname__" from %[[FOO]]
-# CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[NAME]])
-# CHECK: py.call @pylir__call__(%[[PRINT]], %[[TUPLE]], %{{.*}})
 
 pylir.intr.int.cmp("ne", 0, 1)
 

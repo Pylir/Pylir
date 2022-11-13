@@ -90,7 +90,7 @@ std::string genAttrConversion(mlir::raw_indented_ostream& os, std::string inputV
     {
         auto failureScope = os.scope("{\n", "}\n");
         os << llvm::formatv(
-            "createError(arguments[{0}], Diag::ARGUMENT_N_OF_INTRINSIC_N_HAS_TO_BE_A_CONSTANT_STRING, {0}, intrName)\n"
+            "createError(arguments[{0}], Diag::ARGUMENT_N_OF_INTRINSIC_N_HAS_TO_BE_A_CONSTANT_STRING, {0} + 1, intrName)\n"
             ".addHighlight(arguments[{0}])\n"
             ".addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back(), Diag::flags::secondaryColour);\n",
             cppArgIndex);

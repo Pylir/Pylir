@@ -25,8 +25,7 @@ def bar(a, *args, k, **kwd):
 # ... processing of a
 
 # processing of *args
-# CHECK: %[[START:.*]] = arith.constant 1
-# CHECK: %[[TUPLE_ARG:.*]] = py.tuple.dropFront %[[START]], %[[TUPLE]]
+# CHECK: %[[TUPLE_ARG:.*]] = py.tuple.dropFront %{{.*}}, %[[TUPLE]]
 
 # processing of k...
 # CHECK: %[[CONSTANT:.*]] = py.constant(#py.str<"k">)

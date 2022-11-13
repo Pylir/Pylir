@@ -14,11 +14,11 @@ def makeObject(cls: type) -> type:
     pass
 
 
-def getSlot(obj: object, type: type, slot: str):
+def getSlot(obj: object, slot: int):
     pass
 
 
-def setSlot(obj: object, type: type, slot: str, value: object):
+def setSlot(obj: object, slot: int, value: object):
     pass
 
 
@@ -26,5 +26,5 @@ def isUnboundValue(obj: object) -> bool:
     pass
 
 
-def mroLookup(mro_tuple, slot: str):
+def mroLookup(mro_tuple, slot: int):
     pass

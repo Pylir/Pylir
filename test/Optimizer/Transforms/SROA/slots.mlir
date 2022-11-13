@@ -10,15 +10,19 @@ func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     %1 = py.constant(#py.str<" ">)
     %2 = py.constant(#py.str<"World">)
     %c = py.constant(#py.ref<@builtins.type>)
+    %c0 = arith.constant 0 : index
+    %c1 = arith.constant 1 : index
+    %c2 = arith.constant 2 : index
+    %c3 = arith.constant 3 : index
     %l = py.makeObject %c
-    py.setSlot "zero" of %l : %c to %0
-    py.setSlot "one" of %l : %c to %1
-    py.setSlot "two" of %l : %c to %2
-    py.setSlot "three" of %l : %c to %arg0
-    %3 = py.getSlot "zero" from %l : %c
-    %4 = py.getSlot "one" from %l : %c
-    %5 = py.getSlot "two" from %l : %c
-    %6 = py.getSlot "three" from %l : %c
+    py.setSlot %l[%c0] to %0
+    py.setSlot %l[%c1] to %1
+    py.setSlot %l[%c2] to %2
+    py.setSlot %l[%c3] to %arg0
+    %3 = py.getSlot %l[%c0]
+    %4 = py.getSlot %l[%c1]
+    %5 = py.getSlot %l[%c2]
+    %6 = py.getSlot %l[%c3]
     %7 = py.str.concat %3, %4, %5, %6
     return %7 : !py.dynamic
 }
@@ -40,8 +44,8 @@ py.globalValue @builtins.int = #py.type
 
 func.func @test_neg(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.typeOf %arg0
-    %1 = py.typeOf %0
-    %2 = py.getSlot "zero" from %0 : %1
+    %c0= arith.constant 0 : index
+    %2 = py.getSlot %0[%c0]
     return %2 : !py.dynamic
 }
 
@@ -49,6 +53,6 @@ func.func @test_neg(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: func.func @test_neg
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[TYPE:.*]] = py.typeOf %[[ARG0]]
-// CHECK-NEXT: %[[METATYPE:.*]] = py.typeOf %[[TYPE]]
-// CHECK-NEXT: %[[SLOT:.*]] = py.getSlot "zero" from %[[TYPE]] : %[[METATYPE]]
+// CHECK-NEXT: %[[ZERO:.*]] = arith.constant 0
+// CHECK-NEXT: %[[SLOT:.*]] = py.getSlot %[[TYPE]][%[[ZERO]]]
 // CHECK-NEXT: return %[[SLOT]]

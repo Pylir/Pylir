@@ -137,8 +137,7 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
 
         {
             implementBlock(typeError);
-            auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
-                                            m_currentExceptBlock);
+            auto exception = buildException(m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
             raiseException(exception);
         }
 
@@ -159,8 +158,7 @@ void pylir::CodeGen::visit(const Syntax::RaiseStmt& raiseStmt)
 
     {
         implementBlock(typeError);
-        auto exception =
-            buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
+        auto exception = buildException(m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
         raiseException(exception);
     }
 
@@ -315,7 +313,7 @@ void pylir::CodeGen::delTarget(const Syntax::Atom& atom)
         m_builder.create<mlir::cf::CondBranchOp>(existed, existedBlock, raiseBlock);
 
         implementBlock(raiseBlock);
-        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
+        auto exception = buildException(m_builder, Builtins::NameError.name,
                                         /*TODO: string arg*/ {}, m_currentExceptBlock);
         raiseException(exception);
 
@@ -757,11 +755,7 @@ void pylir::CodeGen::writeIdentifier(std::string_view text, mlir::Value value)
     pylir::match(
         result->second.kind,
         [&](mlir::Operation* global) { m_builder.createStore(value, mlir::FlatSymbolRefAttr::get(global)); },
-        [&](mlir::Value cell)
-        {
-            auto cellType = m_builder.createCellRef();
-            m_builder.createSetSlot(cell, cellType, "cell_contents", value);
-        },
+        [&](mlir::Value cell) { m_builder.createSetSlot(cell, 0, value); },
         [&](SSABuilder::DefinitionsMap& localMap) { localMap[m_builder.getBlock()] = value; });
 }
 
@@ -807,7 +801,7 @@ mlir::Value pylir::CodeGen::readIdentifier(std::string_view name)
             implementBlock(classNamespaceFound);
             return classNamespaceFound->getArgument(0);
         }
-        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
+        auto exception = buildException(m_builder, Builtins::NameError.name,
                                         /*TODO: string arg*/ {}, m_currentExceptBlock);
         raiseException(exception);
         if (!m_classNamespace)
@@ -831,16 +825,14 @@ mlir::Value pylir::CodeGen::readIdentifier(std::string_view name)
             break;
         case Identifier::Cell:
         {
-            auto cellType = m_builder.createCellRef();
-            auto getAttrOp =
-                m_builder.createGetSlot(pylir::get<mlir::Value>(result->second.kind), cellType, "cell_contents");
+            auto getAttrOp = m_builder.createGetSlot(pylir::get<mlir::Value>(result->second.kind), 0);
             auto successBlock = BlockPtr{};
             auto failureBlock = BlockPtr{};
             auto failure = m_builder.createIsUnboundValue(getAttrOp);
             m_builder.create<mlir::cf::CondBranchOp>(failure, failureBlock, successBlock);
 
             implementBlock(failureBlock);
-            auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::UnboundLocalError.name,
+            auto exception = buildException(m_builder, Builtins::UnboundLocalError.name,
                                             /*TODO: string arg*/ {}, m_currentExceptBlock);
             raiseException(exception);
 
@@ -856,13 +848,13 @@ mlir::Value pylir::CodeGen::readIdentifier(std::string_view name)
     implementBlock(unbound);
     if (result->second.kind.index() == Identifier::Global)
     {
-        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::NameError.name,
+        auto exception = buildException(m_builder, Builtins::NameError.name,
                                         /*TODO: string arg*/ {}, m_currentExceptBlock);
         raiseException(exception);
     }
     else
     {
-        auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::UnboundLocalError.name,
+        auto exception = buildException(m_builder, Builtins::UnboundLocalError.name,
                                         /*TODO: string arg*/ {}, m_currentExceptBlock);
         raiseException(exception);
     }
@@ -1416,8 +1408,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
             m_builder.create<mlir::cf::CondBranchOp>(isSubclass, noTypeErrorBlock, raiseBlock);
 
             implementBlock(raiseBlock);
-            auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
-                                            m_currentExceptBlock);
+            auto exception = buildException(m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
             raiseException(exception);
 
             implementBlock(noTypeErrorBlock);
@@ -1439,8 +1430,8 @@ void pylir::CodeGen::visit(const pylir::Syntax::TryStmt& tryStmt)
                                   m_builder.create<mlir::cf::CondBranchOp>(isSubclass, noTypeErrorBlock, raiseBlock);
 
                                   implementBlock(raiseBlock);
-                                  auto exception = buildException(m_builder.getCurrentLoc(), m_builder,
-                                                                  Builtins::TypeError.name, {}, m_currentExceptBlock);
+                                  auto exception =
+                                      buildException(m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
                                   raiseException(exception);
 
                                   implementBlock(noTypeErrorBlock);
@@ -1617,8 +1608,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                 auto closureType = m_builder.createCellRef();
                 auto tuple = m_builder.createMakeTuple({closureType, value}, m_currentExceptBlock);
                 auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
-                auto metaType = m_builder.createTypeOf(closureType);
-                auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
+                auto newMethod = m_builder.createGetSlot(closureType, Builtins::TypeSlots::New);
                 mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
                 m_functionScope->identifiers.emplace(name->getValue(), Identifier{cell});
             }
@@ -1632,8 +1622,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
         mlir::Value closureTuple;
         {
             auto self = func.getArgument(0);
-            auto metaType = m_builder.createFunctionRef();
-            closureTuple = m_builder.createGetSlot(self, metaType, "__closure__");
+            closureTuple = m_builder.createGetSlot(self, Builtins::FunctionSlots::Closure);
         }
 
         for (const auto& [iter, kind] : scope.identifiers)
@@ -1652,8 +1641,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                     auto closureType = m_builder.createCellRef();
                     auto tuple = m_builder.createMakeTuple({closureType}, m_currentExceptBlock);
                     auto emptyDict = m_builder.createConstant(m_builder.getDictAttr());
-                    auto metaType = m_builder.createTypeOf(closureType);
-                    auto newMethod = m_builder.createGetSlot(closureType, metaType, "__new__");
+                    auto newMethod = m_builder.createGetSlot(closureType, Builtins::TypeSlots::New);
                     mlir::Value cell = m_builder.createFunctionCall(newMethod, {newMethod, tuple, emptyDict});
                     m_functionScope->identifiers.emplace(iter.getValue(), Identifier{cell});
                     break;
@@ -1734,8 +1722,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
     }
 
     mlir::Value value = m_builder.createMakeFunc(mlir::FlatSymbolRefAttr::get(func));
-    auto type = m_builder.createTypeOf(value);
-    m_builder.createSetSlot(value, type, "__qualname__", m_builder.createConstant(qualifiedName));
+    m_builder.createSetSlot(value, Builtins::FunctionSlots::QualName, m_builder.createConstant(qualifiedName));
     {
         mlir::Value defaults;
         if (defaultParameters.empty())
@@ -1746,7 +1733,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
         {
             defaults = m_builder.createMakeTuple(defaultParameters, m_currentExceptBlock);
         }
-        m_builder.createSetSlot(value, type, "__defaults__", defaults);
+        m_builder.createSetSlot(value, Builtins::FunctionSlots::Defaults, defaults);
     }
     {
         mlir::Value kwDefaults;
@@ -1758,7 +1745,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
         {
             kwDefaults = m_builder.createMakeDict(keywordOnlyDefaultParameters, m_currentExceptBlock);
         }
-        m_builder.createSetSlot(value, type, "__kwdefaults__", kwDefaults);
+        m_builder.createSetSlot(value, Builtins::FunctionSlots::KwDefaults, kwDefaults);
     }
     {
         mlir::Value closure;
@@ -1778,7 +1765,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
                            });
             closure = m_builder.createMakeTuple(args, m_currentExceptBlock);
         }
-        m_builder.createSetSlot(value, type, "__closure__", closure);
+        m_builder.createSetSlot(value, Builtins::FunctionSlots::Closure, closure);
     }
     for (const auto& iter : llvm::reverse(decorators))
     {
@@ -2143,8 +2130,7 @@ std::vector<pylir::CodeGen::UnpackResults> pylir::CodeGen::unpackArgsKeywords(
                         isUnbound, resultBlock, mlir::ValueRange{lookup.getResult()}, boundBlock, mlir::ValueRange{});
 
                     implementBlock(boundBlock);
-                    auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
-                                                    m_currentExceptBlock);
+                    auto exception = buildException(m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
                     raiseException(exception);
                 }
                 else
@@ -2185,8 +2171,7 @@ std::vector<pylir::CodeGen::UnpackResults> pylir::CodeGen::unpackArgsKeywords(
                 implementBlock(unboundBlock);
                 if (!iter.hasDefaultParam)
                 {
-                    auto exception = buildException(m_builder.getCurrentLoc(), m_builder, Builtins::TypeError.name, {},
-                                                    m_currentExceptBlock);
+                    auto exception = buildException(m_builder, Builtins::TypeError.name, {}, m_currentExceptBlock);
                     raiseException(exception);
                 }
                 else
@@ -2239,9 +2224,8 @@ mlir::func::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::func:
     auto tuple = cc.getArgument(1);
     auto dict = cc.getArgument(2);
 
-    auto functionType = m_builder.createFunctionRef();
-    auto defaultTuple = m_builder.createGetSlot(closure, functionType, "__defaults__");
-    auto kwDefaultDict = m_builder.createGetSlot(closure, functionType, "__kwdefaults__");
+    auto defaultTuple = m_builder.createGetSlot(closure, Builtins::FunctionSlots::Defaults);
+    auto kwDefaultDict = m_builder.createGetSlot(closure, Builtins::FunctionSlots::KwDefaults);
 
     auto unpacked = unpackArgsKeywords(
         tuple, dict, parameters,
@@ -2719,26 +2703,48 @@ mlir::Value pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrin
         return m_builder.createConstant(m_builder.getTupleAttr(attrs));
     }
 
+#define TYPE_SLOT(pySlotName, cppSlotName)                                                                          \
+    if (intrName == "pylir.intr.type." #pySlotName)                                                                 \
+    {                                                                                                               \
+        return m_builder.createConstant(BigInt(static_cast<std::size_t>(pylir::Builtins::TypeSlots::cppSlotName))); \
+    }
+#include <pylir/Interfaces/Slots.def>
+
+#define FUNCTION_SLOT(pySlotName, cppSlotName)                                              \
+    if (intrName == "pylir.intr.function." #pySlotName)                                     \
+    {                                                                                       \
+        return m_builder.createConstant(                                                    \
+            BigInt(static_cast<std::size_t>(pylir::Builtins::FunctionSlots::cppSlotName))); \
+    }
+#include <pylir/Interfaces/Slots.def>
+
+#define BASEEXCEPTION_SLOT(pySlotName, cppSlotName)                                              \
+    if (intrName == "pylir.intr.BaseException." #pySlotName)                                     \
+    {                                                                                            \
+        return m_builder.createConstant(                                                         \
+            BigInt(static_cast<std::size_t>(pylir::Builtins::BaseExceptionSlots::cppSlotName))); \
+    }
+#include <pylir/Interfaces/Slots.def>
+
     createError(intrinsic.identifiers.front(), Diag::UNKNOWN_INTRINSIC_N, intrName)
         .addHighlight(intrinsic.identifiers.front(), intrinsic.identifiers.back());
     return {};
 }
 
-mlir::Value pylir::buildException(mlir::Location loc, PyBuilder& builder, std::string_view kind,
-                                  std::vector<Py::IterArg> args, mlir::Block* exceptionHandler)
+mlir::Value pylir::buildException(PyBuilder& builder, std::string_view kind, std::vector<Py::IterArg> args,
+                                  mlir::Block* exceptionHandler)
 {
     auto typeObj = builder.createConstant(Py::RefAttr::get(builder.getContext(), kind));
     args.emplace(args.begin(), typeObj);
     mlir::Value tuple = builder.createMakeTuple(args, exceptionHandler);
     auto dict = builder.createConstant(builder.getDictAttr());
     auto mro = builder.createTypeMRO(typeObj);
-    auto newMethod = builder.createMROLookup(mro, "__new__").getResult();
+    auto newMethod = builder.createMROLookup(mro, Builtins::TypeSlots::New).getResult();
 
     auto obj = builder.createFunctionCall(newMethod, {newMethod, tuple, dict});
-    auto objType = builder.createTypeOf(obj);
     auto context = builder.createNoneRef();
-    builder.create<Py::SetSlotOp>(loc, obj, objType, "__context__", context);
+    builder.createSetSlot(obj, Builtins::BaseExceptionSlots::Context, context);
     auto cause = builder.createNoneRef();
-    builder.create<Py::SetSlotOp>(loc, obj, objType, "__cause__", cause);
+    builder.createSetSlot(obj, Builtins::BaseExceptionSlots::Cause, cause);
     return obj;
 }

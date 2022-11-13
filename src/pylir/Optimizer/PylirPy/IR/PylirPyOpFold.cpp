@@ -294,20 +294,49 @@ mlir::OpFoldResult pylir::Py::TypeOfOp::fold(llvm::ArrayRef<mlir::Attribute> ope
     return getTypeOf(getObject());
 }
 
-mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+namespace
 {
-    auto object = ref_cast_or_null<ObjectAttrInterface>(operands[0]);
+mlir::Attribute foldGetSlot(mlir::MLIRContext* context, mlir::Attribute objectOp, mlir::Attribute slot)
+{
+    using namespace pylir::Py;
+
+    auto intAttr = slot.dyn_cast_or_null<mlir::IntegerAttr>();
+    if (!intAttr)
+    {
+        return nullptr;
+    }
+    auto index = intAttr.getValue();
+
+    auto object = ref_cast_or_null<ObjectAttrInterface>(objectOp);
     if (!object)
     {
         return nullptr;
     }
+
+    auto typeAttr = ref_cast_or_null<TypeAttr>(object.getTypeObject());
+    if (!typeAttr)
+    {
+        return nullptr;
+    }
+
+    if (index.uge(typeAttr.getInstanceSlots().size()))
+    {
+        return nullptr;
+    }
+
     const auto& map = object.getSlots();
-    auto result = map.get(getSlotAttr());
+    auto result = map.get(mlir::cast<StrAttr>(typeAttr.getInstanceSlots()[index.getZExtValue()]).getValue());
     if (!result)
     {
-        return Py::UnboundAttr::get(getContext());
+        return UnboundAttr::get(context);
     }
     return result;
+}
+} // namespace
+
+mlir::OpFoldResult pylir::Py::GetSlotOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+{
+    return foldGetSlot(getContext(), operands[0], operands[1]);
 }
 
 mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -631,13 +660,12 @@ mlir::OpFoldResult pylir::Py::TypeSlotsOp::fold(::llvm::ArrayRef<::mlir::Attribu
     {
         for (auto iter : tuple)
         {
-            auto object = ref_cast_or_null<ObjectAttrInterface>(iter);
-            if (!object)
+            auto result = foldGetSlot(getContext(), iter, operands[1]);
+            if (!result)
             {
                 return nullptr;
             }
-            const auto& map = object.getSlots();
-            if (auto result = map.get(getSlotAttr()))
+            if (!result.isa<UnboundAttr>())
             {
                 return result;
             }
@@ -651,14 +679,12 @@ mlir::OpFoldResult pylir::Py::TypeSlotsOp::fold(::llvm::ArrayRef<::mlir::Attribu
         {
             return nullptr;
         }
-        auto object = ref_cast_or_null<ObjectAttrInterface>(iter.get<mlir::Attribute>());
-        if (!object)
+        auto result = foldGetSlot(getContext(), iter.get<mlir::Attribute>(), operands[1]);
+        if (!result)
         {
             return nullptr;
         }
-        const auto& map = object.getSlots();
-        auto result = map.get(getSlotAttr());
-        if (result)
+        if (!result.isa<UnboundAttr>())
         {
             return result;
         }
@@ -827,7 +853,7 @@ mlir::LogicalResult pylir::Py::GetSlotOp::foldUsage(mlir::Operation* lastClobber
         }
         return mlir::failure();
     }
-    if (setSlotOp.getSlotAttr() == getSlotAttr())
+    if (setSlotOp.getSlot() == getSlot())
     {
         results.emplace_back(setSlotOp.getValue());
         return mlir::success();
@@ -1238,15 +1264,6 @@ pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder, mlir::Locatio
         arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
     }
     return builder.create<pylir::Py::MakeTupleOp>(loc, input.getType(), arguments, builder.getDenseI32ArrayAttr({}));
-}
-
-bool isTypeSlot(llvm::StringRef ref)
-{
-    static llvm::StringSet<> set = {
-#define TYPE_SLOT(x, ...) #x,
-#include <pylir/Interfaces/Slots.def>
-    };
-    return set.contains(ref);
 }
 
 pylir::Py::IntCmpKindAttr invertPredicate(pylir::Py::IntCmpKindAttr kind)

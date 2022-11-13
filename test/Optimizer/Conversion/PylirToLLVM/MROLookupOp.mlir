@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file | FileCheck %s
+// RUN: pylir-opt %s -convert-arith-to-llvm -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">)>}>
 py.globalValue @builtins.str = #py.type
@@ -6,12 +6,14 @@ py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 func.func @test(%tuple : !py.dynamic) -> !py.dynamic {
-    %0 = py.mroLookup "__call__" in %tuple
+    %c0 = arith.constant 0 : index
+    %0 = py.mroLookup %c0 in %tuple
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @test
 // CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
+// CHECK-NEXT: %[[ZERO_I:.*]] = llvm.mlir.constant(0 : {{.*}}) : i{{[0-9]+}}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][0, 1]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.load %[[GEP]]
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : i{{.*}})
@@ -27,10 +29,12 @@ func.func @test(%tuple : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[ELEMENT:.*]] = llvm.load %[[GEP_2]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ELEMENT]][0, 0]
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.load %[[GEP]]
-
-// impl of getSlotOp follows...
-
-// CHECK: %[[FOUND:.*]] = llvm.icmp "eq" %[[RES:.*]], %[[NULL]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TYPE]][0, 1]
+// CHECK-NEXT: %[[OFFSET:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[ADD:.*]] = llvm.add %[[OFFSET]], %[[ZERO_I]]
+// CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[ELEMENT]]
+// CHECK-NEXT: %[[RES:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[FOUND:.*]] = llvm.icmp "eq" %[[RES]], %[[NULL]]
 // CHECK-NEXT: llvm.cond_br %[[FOUND]], ^[[INCR:.*]], ^[[EXIT]](%[[RES]] : {{.*}})
 // CHECK-NEXT: ^[[INCR]]:
 // CHECK-NEXT: %[[ONE:.*]] = llvm.mlir.constant(1 : i{{.*}})

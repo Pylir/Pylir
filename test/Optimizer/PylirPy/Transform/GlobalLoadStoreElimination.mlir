@@ -238,8 +238,6 @@ module {
   ^bb3:  // pred: ^bb2
     %18 = py.call @"builtins.BaseException.__new__$cc[0]"(%11, %10, %2) : (!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
     %19 = py.typeOf %18
-    py.setSlot "__context__" of %18 : %19 to %7
-    py.setSlot "__cause__" of %18 : %19 to %7
     cf.br ^bb6(%18 : !py.dynamic)
   ^bb4:  // pred: ^bb2
     %20 = py.makeTuple (%16)
@@ -267,8 +265,6 @@ module {
   ^bb10:  // 3 preds: ^bb9, ^bb14, ^bb19
     %31 = py.call @"builtins.BaseException.__new__$cc[0]"(%11, %10, %2) : (!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
     %32 = py.typeOf %31
-    py.setSlot "__context__" of %31 : %32 to %7
-    py.setSlot "__cause__" of %31 : %32 to %7
     py.raise %31
   ^bb11:  // pred: ^bb9
     %33 = py.makeTuple (%29, %7)

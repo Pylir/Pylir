@@ -109,6 +109,11 @@ def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
 
 	let extraClassDeclaration = [{
 
+        [[nodiscard]] mlir::Attribute operator[](std::size_t index) const
+        {
+            return getValue()[index];
+        }
+
         /// Returns all slots of the tuple in a dictionary, which is always empty.
 	    ::mlir::DictionaryAttr getSlots() const
         {

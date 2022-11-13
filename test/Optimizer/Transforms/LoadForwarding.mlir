@@ -3,14 +3,15 @@
 py.globalValue @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">)>}>
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.tuple = #py.type
-py.globalValue @foo = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"test">)>}>
+py.globalValue @foo = #py.type<slots = {instance_slots = #py.tuple<(#py.str<"test">)>}>
 
 func.func @test_get_slot() -> !py.dynamic {
     %0 = py.constant(#py.ref<@foo>)
     %1 = py.makeObject %0
     %2 = py.constant(#py.str<"value">)
-    py.setSlot "test" of %1 : %0 to %2
-    %3 = py.getSlot "test" from %1 : %0
+    %c0 = arith.constant 0 : index
+    py.setSlot %1[%c0] to %2
+    %3 = py.getSlot %1[%c0]
     return %3 : !py.dynamic
 }
 
@@ -28,23 +29,24 @@ func.func private @bar()
 
 func.func @test_get_slot_clobbered(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
-    %1 = py.typeOf %arg0
-    py.setSlot "test" of %arg0 : %1 to %0
+    %c0 = arith.constant 0 : index
+    py.setSlot %arg0[%c0] to %0
     call @bar() : () -> ()
-    %2 = py.getSlot "test" from %arg0 : %1
+    %2 = py.getSlot %arg0[%c0]
     return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test_get_slot_clobbered
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[SLOT:.*]] = py.getSlot "test" from %[[ARG0]]
+// CHECK: %[[SLOT:.*]] = py.getSlot %[[ARG0]]
 // CHECK: return %[[SLOT]]
 
 // -----
 
 func.func @test_get_slot_new_object(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.makeObject %arg0
-    %1 = py.getSlot "test" from %0 : %arg0
+    %c0 = arith.constant 0 : index
+    %1 = py.getSlot %0[%c0]
     return %1 : !py.dynamic
 }
 
@@ -147,7 +149,8 @@ func.func @test_resources(%arg0 : !py.dynamic) -> index {
     py.list.resize %arg0 to %0
     %1 = py.typeOf %arg0
     %2 = py.constant(#py.str<"mhm">)
-    py.setSlot "lol" of %arg0 : %1 to %2
+    %c0 = arith.constant 0 : index
+    py.setSlot %arg0[%c0] to %2
     %3 = py.list.len %arg0
     return %3 : index
 }

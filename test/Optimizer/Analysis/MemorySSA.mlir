@@ -96,10 +96,10 @@ func.func private @bar()
 
 func.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.constant(#py.str<"value">)
-    %1 = py.typeOf %arg0
-    py.setSlot "test" of %arg0 : %1 to %0
+    %c0 = arith.constant 0 : index
+    py.setSlot %arg0[%c0] to %0
     call @bar() : () -> ()
-    %2 = py.getSlot "test" from %arg0 : %1
+    %2 = py.getSlot %arg0[%c0]
     return %2 : !py.dynamic
 }
 
@@ -109,13 +109,13 @@ func.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF:.*]] = def(%[[LIVE_ON_ENTRY]])
-// CHECK-NEXT: py.setSlot "test"
+// CHECK-NEXT: py.setSlot
 // CHECK-NEXT: %[[DEF_ALL:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: call @bar()
 // CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[DEF]])
 // CHECK-NEXT: call @bar()
 // CHECK-NEXT: use(%[[DEF_OBJECT]])
-// CHECK-NEXT: py.getSlot "test"
+// CHECK-NEXT: py.getSlot
 
 // -----
 

@@ -9,12 +9,13 @@ py.globalValue const @builtins.int = #py.type
 func.func @__init__() {
 	%one = py.constant(#py.int<1>)
 	%zero = py.constant(#py.int<0>)
+	%c0 = arith.constant 0 : index
 	cf.br ^loop(%zero : !py.dynamic)
 
 ^loop(%iter : !py.dynamic):
 	%0 = py.typeOf %iter
 	%1 = py.type.mro %0
-	%2 = py.mroLookup "__add__" in %1
+	%2 = py.mroLookup %c0 in %1
 	%3 = py.makeTuple (%iter, %one)
 	%4 = py.constant(#py.dict<{}>)
 	%5 = py.function.call %2(%2, %3, %4)

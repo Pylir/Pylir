@@ -12,6 +12,8 @@
 namespace
 {
 
+using namespace pylir::Builtins;
+
 void implementBlock(mlir::OpBuilder& builder, mlir::Block* block)
 {
     PYLIR_ASSERT(block);
@@ -26,21 +28,20 @@ void implementBlock(mlir::OpBuilder& builder, mlir::Block* block)
     builder.setInsertionPointToStart(block);
 }
 
-mlir::Value buildTrySpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine methodName, mlir::Value args,
-                                      mlir::Value kws, mlir::Block* notFoundPath,
-                                      mlir::Block* callIntrException = nullptr)
+mlir::Value buildTrySpecialMethodCall(pylir::PyBuilder& builder, TypeSlots method, mlir::Value args, mlir::Value kws,
+                                      mlir::Block* notFoundPath, mlir::Block* callIntrException = nullptr)
 {
     auto element = builder.createTupleGetItem(args, builder.create<mlir::arith::ConstantIndexOp>(0));
     auto elementType = builder.createTypeOf(element);
     auto mroTuple = builder.createTypeMRO(elementType);
-    auto lookup = builder.createMROLookup(mroTuple, methodName.str());
+    auto lookup = builder.createMROLookup(mroTuple, method);
     auto failure = builder.createIsUnboundValue(lookup);
     auto* exec = new mlir::Block;
     builder.create<mlir::cf::CondBranchOp>(builder.getCurrentLoc(), failure, notFoundPath, exec);
 
     implementBlock(builder, exec);
     mroTuple = builder.createTypeMRO(builder.createTypeOf(lookup.getResult()));
-    auto getMethod = builder.createMROLookup(mroTuple, "__get__");
+    auto getMethod = builder.createMROLookup(mroTuple, TypeSlots::Get);
     failure = builder.createIsUnboundValue(getMethod);
     auto* isDescriptor = new mlir::Block;
     auto* mergeBlock = new mlir::Block;
@@ -60,32 +61,30 @@ mlir::Value buildTrySpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine met
     return builder.createPylirCallIntrinsic(mergeBlock->getArgument(0), args, kws, callIntrException);
 }
 
-mlir::Value buildSpecialMethodCall(pylir::PyBuilder& builder, llvm::Twine methodName, mlir::Value args, mlir::Value kws,
+mlir::Value buildSpecialMethodCall(pylir::PyBuilder& builder, TypeSlots method, mlir::Value args, mlir::Value kws,
                                    mlir::Block* callIntrException = nullptr)
 {
     auto* notFound = new mlir::Block;
-    auto result = buildTrySpecialMethodCall(builder, methodName, args, kws, notFound, callIntrException);
+    auto result = buildTrySpecialMethodCall(builder, method, args, kws, notFound, callIntrException);
     mlir::OpBuilder::InsertionGuard guard{builder};
     implementBlock(builder, notFound);
-    auto exception =
-        pylir::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+    auto exception = pylir::buildException(builder, TypeError.name, {}, nullptr);
     builder.createRaise(exception);
     return result;
 }
 
-mlir::Value binOp(pylir::PyBuilder& builder, llvm::StringRef method, llvm::StringRef revMethod, mlir::Value lhs,
-                  mlir::Value rhs)
+mlir::Value binOp(pylir::PyBuilder& builder, TypeSlots method, TypeSlots revMethod, mlir::Value lhs, mlir::Value rhs)
 {
     auto trueC = builder.create<mlir::arith::ConstantIntOp>(true, 1);
     auto falseC = builder.create<mlir::arith::ConstantIntOp>(false, 1);
     auto* endBlock = new mlir::Block;
     endBlock->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
-    if (method == "__eq__" || method == "__ne__")
+    if (method == TypeSlots::Eq || method == TypeSlots::Ne)
     {
         auto isSame = builder.createIs(lhs, rhs);
         auto* continueNormal = new mlir::Block;
         builder.create<mlir::cf::CondBranchOp>(isSame, endBlock,
-                                               mlir::ValueRange{builder.createConstant(method == "__eq__")},
+                                               mlir::ValueRange{builder.createConstant(method == TypeSlots::Eq)},
                                                continueNormal, mlir::ValueRange{});
         implementBlock(builder, continueNormal);
     }
@@ -153,16 +152,15 @@ mlir::Value binOp(pylir::PyBuilder& builder, llvm::StringRef method, llvm::Strin
     builder.create<mlir::cf::CondBranchOp>(isNotImplemented, typeErrorBlock, endBlock, mlir::ValueRange{reverseResult});
 
     implementBlock(builder, typeErrorBlock);
-    if (method != "__eq__" && method != "__ne__")
+    if (method != TypeSlots::Eq && method != TypeSlots::Ne)
     {
-        auto typeError =
-            pylir::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+        auto typeError = pylir::buildException(builder, TypeError.name, {}, nullptr);
         builder.createRaise(typeError);
     }
     else
     {
         mlir::Value isEqual = builder.createIs(lhs, rhs);
-        if (method == "__ne__")
+        if (method == TypeSlots::Ne)
         {
             isEqual = builder.create<mlir::arith::XOrIOp>(isEqual, trueC);
         }
@@ -174,8 +172,8 @@ mlir::Value binOp(pylir::PyBuilder& builder, llvm::StringRef method, llvm::Strin
     return endBlock->getArgument(0);
 }
 
-void buildRevBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method,
-                                  llvm::StringRef revMethod)
+void buildRevBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method,
+                                  TypeSlots revMethod)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -186,7 +184,7 @@ void buildRevBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef fun
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -201,7 +199,7 @@ void buildBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functi
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildUnaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildUnaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName, builder.getFunctionType({builder.getDynamicType()}, builder.getDynamicType()));
@@ -213,7 +211,7 @@ void buildUnaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef func
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildCallOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef)
+void buildCallOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -238,11 +236,11 @@ void buildCallOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef funct
     builder.create<mlir::func::ReturnOp>(result);
 
     implementBlock(builder, notFunctionBlock);
-    result = buildSpecialMethodCall(builder, "__call__", builder.createTuplePrepend(self, args), kws);
+    result = buildSpecialMethodCall(builder, TypeSlots::Call, builder.createTuplePrepend(self, args), kws);
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildTernaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildTernaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -256,7 +254,7 @@ void buildTernaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef fu
     builder.create<mlir::func::ReturnOp>(result);
 }
 
-void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method,
+void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method,
                               mlir::Value (pylir::PyBuilder::*normalOp)(mlir::Value, mlir::Value, mlir::Block*))
 {
     auto func = builder.create<mlir::func::FuncOp>(
@@ -290,15 +288,14 @@ void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functio
     builder.create<mlir::cf::CondBranchOp>(isNotImplemented, throwBlock, returnBlock, res);
 
     implementBlock(builder, throwBlock);
-    auto typeError =
-        pylir::buildException(builder.getCurrentLoc(), builder, pylir::Builtins::TypeError.name, {}, nullptr);
+    auto typeError = pylir::buildException(builder, TypeError.name, {}, nullptr);
     builder.createRaise(typeError);
 
     implementBlock(builder, returnBlock);
     builder.create<mlir::func::ReturnOp>(builder.getCurrentLoc(), returnBlock->getArgument(0));
 }
 
-void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, llvm::StringRef method)
+void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
     auto func = builder.create<mlir::func::FuncOp>(
         functionName,
@@ -342,26 +339,27 @@ void pylir::CodeGen::createCompilerBuiltinsImpl()
     m_builder.createGlobalValue(Builtins::NotImplemented.name, true,
                                 m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
 
-#define COMPILER_BUILTIN_REV_BIN_OP(name, slotName, revSlotName) \
-    buildRevBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName, #revSlotName);
+#define COMPILER_BUILTIN_REV_BIN_OP(name, slotName, revSlotName)                                          \
+    buildRevBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name, \
+                                 TypeSlots::revSlotName);
 #define COMPILER_BUILTIN_BIN_OP(name, slotName)            \
     if (#slotName != std::string_view{"__getattribute__"}) \
-        buildBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
+        buildBinOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name);
 
 #define COMPILER_BUILTIN_UNARY_OP(name, slotName) \
-    buildUnaryOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
+    buildUnaryOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name);
 
 #define COMPILER_BUILTIN_TERNARY_OP(name, slotName) \
     if (#slotName != std::string_view{"__call__"})  \
-        buildTernaryOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName);
+        buildTernaryOpCompilerBuiltin(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name);
 
-    buildCallOpCompilerBuiltin(m_builder, "pylir__call__", "__call__");
+    buildCallOpCompilerBuiltin(m_builder, "pylir__call__");
 
-#define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                                          \
-    buildIOpCompilerBuiltins(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), #slotName, \
+#define COMPILER_BUILTIN_IOP(name, slotName, normalOp)                                                \
+    buildIOpCompilerBuiltins(m_builder, COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), TypeSlots::name, \
                              &::pylir::PyBuilder::createPylir##normalOp##Intrinsic);
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
 
-    buildGetAttributeOpCompilerBuiltin(m_builder, "pylir__getattribute__", "__getattribute__");
+    buildGetAttributeOpCompilerBuiltin(m_builder, "pylir__getattribute__", TypeSlots::GetAttribute);
 }

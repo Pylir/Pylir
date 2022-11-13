@@ -20,8 +20,8 @@ pylir.intr.typeOf(i for i in d)
 # expected-error@below {{intrinsic 'pylir.intr.typeOf' expects 1 argument(s) not 0}}
 pylir.intr.typeOf()
 
-# expected-error@below {{argument 1 of intrinsic 'pylir.intr.mroLookup' has to be a constant string}}
-pylir.intr.mroLookup(d, args)
+# expected-error@below {{argument 1 of intrinsic 'pylir.intr.int.cmp' has to be a constant string}}
+pylir.intr.int.cmp(args, d, args)
 
 # expected-error@below {{invalid enum value 'lol' for enum 'IntCmpKind' argument}}
 pylir.intr.int.cmp('lol', d, args)

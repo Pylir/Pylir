@@ -579,8 +579,8 @@ public:
     std::pair<mlir::Value, mlir::Value> visit(llvm::ArrayRef<Syntax::Argument> argumentList);
 };
 
-mlir::Value buildException(mlir::Location loc, PyBuilder& builder, std::string_view kind, std::vector<Py::IterArg> args,
-                           mlir::Block* PYLIR_NULLABLE exceptionHandler);
+mlir::Value buildException(PyBuilder& builder, std::string_view kind, std::vector<Py::IterArg> args,
+                           mlir::Block* exceptionHandler);
 
 inline mlir::OwningOpRef<mlir::ModuleOp> codegen(mlir::MLIRContext* context, const Syntax::FileInput& input,
                                                  Diag::DiagnosticsDocManager& docManager, CodeGenOptions options)

@@ -112,16 +112,16 @@ def PylirPy_GetSlotOp : PylirPy_Op<"getSlot", [DeclareOpInterfaceMethods<MemoryF
                                               ]> {
 
     let arguments = (ins Arg<DynamicType, "", [MemRead<ObjectResource>, SROAAggregate]>:$object,
-                         DynamicType:$type_object, StrAttr:$slot);
+                         Arg<Index, "", [SROAKey]>:$slot);
 
     let results = (outs DynamicType:$result);
 
-    let assemblyFormat = "$slot `from` $object `:` $type_object attr-dict";
+    let assemblyFormat = "$object `[` $slot `]` attr-dict";
 
     let description = [{
-        Retrieves the value stored in the slot named `$slot` inside of `$object`. If `$slot` is not one of the slots
-        defined in `$type_object` the result is always unbound. If `$object` is not of type `$type_object` the result is
-        undefined. `$result` will contain the value in the slot, or unbound value if it was never assigned to.
+        Retrieves the value stored in the slot with index `$slot` inside of `$object`. If `$slot` is greater or equal
+        to the amount of slots of `$object` it is undefined behaviour. `$result` will contain the value in the slot,
+        or unbound value if it was never assigned to.
     }];
 
     let hasFolder = 1;
@@ -132,16 +132,15 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
                                               ]> {
 
     let arguments = (ins Arg<DynamicType, "", [MemWrite<ObjectResource>, SROAAggregate]>:$object,
-                         DynamicType:$type_object, StrAttr:$slot,
+                         Arg<Index, "", [SROAKey]>:$slot,
                          Arg<DynamicType, "", [Captured]>:$value);
     let results = (outs);
 
-    let assemblyFormat = "$slot `of` $object `:` $type_object `to` $value attr-dict";
+    let assemblyFormat = "$object `[`$slot`]` `to` $value attr-dict";
 
     let description = [{
-        Sets the value of the slot named `$slot` inside of `$object` to `$value`. If `$slot` is not one of the slots
-        defined in `$type_object` the operation is undefined. If `$object` is not of type `$type_object` the
-        operation is undefined.
+        Sets the value of the slot with index `$slot` inside of `$object` to `$value`. If `$slot` is greater or equal
+        to the amount of slots of `$object` it is undefined behaviour.
     }];
 }
 
@@ -731,14 +730,16 @@ def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCaptures, MemoryEffects<[MemWr
 }
 
 def PylirPy_MROLookupOp : PylirPy_Op<"mroLookup", [MemoryEffects<[MemRead<ObjectResource>]>, NoCaptures]> {
-    let arguments = (ins DynamicType:$mro_tuple, StrAttr:$slot);
+    let arguments = (ins DynamicType:$mro_tuple, Index:$slot);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = "$slot `in` $mro_tuple attr-dict";
 
     let description = [{
         This op does a linear search through the given tuple, accessing the slot on every element and returning the
-        first one bound. If `$mro_tuple` is not really a tuple (or subclass of) the behaviour is undefined.
+        first one bound, not accessing any objects after. If `$mro_tuple` is not really a tuple (or subclass of) the
+        behaviour is undefined. If `$slot` is greater or equal to the amount of slots in an element accessed during
+        traversal, the behaviour is undefined.
         If a bound slot was found it is returned to `$result`, else it is unbound.
     }];
 

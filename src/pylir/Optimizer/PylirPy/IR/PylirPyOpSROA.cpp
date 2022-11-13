@@ -224,19 +224,19 @@ void pylir::Py::DictLenOp::replaceAggregate(
 }
 
 void pylir::Py::SetSlotOp::replaceAggregate(
-    mlir::OpBuilder&, mlir::Attribute,
+    mlir::OpBuilder&, mlir::Attribute key,
     llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>,
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
 {
-    write(getSlotAttr(), ObjectResource::get(), getValue());
+    write(key, ObjectResource::get(), getValue());
 }
 
 void pylir::Py::GetSlotOp::replaceAggregate(
-    mlir::OpBuilder&, mlir::Attribute,
+    mlir::OpBuilder&, mlir::Attribute key,
     llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)> read,
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>)
 {
-    replaceAllUsesWith(read(getSlotAttr(), ObjectResource::get(), getType()));
+    replaceAllUsesWith(read(key, ObjectResource::get(), getType()));
 }
 
 namespace

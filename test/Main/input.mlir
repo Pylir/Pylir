@@ -12,7 +12,8 @@ py.globalValue @builtins.dict = #py.type
 func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.typeOf %arg0
     %1 = py.typeOf %0
-    %2 = py.getSlot "__slots__" from %0 : %1
+    %c0 = arith.constant 0 : index
+    %2 = py.getSlot %0[%c0]
     return %2 : !py.dynamic
 }
 
