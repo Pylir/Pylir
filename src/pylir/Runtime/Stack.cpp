@@ -81,7 +81,7 @@ constexpr std::uint32_t PYLR_MAGIC = 0x50594C52;
 } // namespace
 
 /// The stack map symbol with the name used by the compiler.
-extern "C" const std::uint8_t pylir_stack_map;
+extern "C" const std::uint8_t pylir_stack_map[];
 
 namespace
 {
@@ -223,7 +223,7 @@ const Stackmap& getStackMap()
 {
     static Stackmap stackmap = []
     {
-        const std::uint8_t* curr = &pylir_stack_map;
+        const std::uint8_t* curr = pylir_stack_map;
         std::uint32_t magic;
         std::memcpy(&magic, curr, sizeof(std::uint32_t));
         PYLIR_ASSERT(magic == PYLR_MAGIC);

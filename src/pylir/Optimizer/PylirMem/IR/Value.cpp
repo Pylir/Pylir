@@ -106,4 +106,5 @@ pylir::Py::RefAttr pylir::Mem::layoutTypeToTypeObject(mlir::MLIRContext* context
         case pylir::Mem::LayoutType::BaseException:
             return pylir::Py::RefAttr::get(context, pylir::Builtins::BaseException.name);
     }
+    PYLIR_UNREACHABLE;
 }

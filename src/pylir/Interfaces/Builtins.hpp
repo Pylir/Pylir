@@ -23,7 +23,7 @@ struct Builtin
 #define BUILTIN(x, s, isPublic, ...) constexpr Builtin x = {s, isPublic};
 #include "BuiltinsModule.def"
 
-constexpr std::array allBuiltins = {
+[[maybe_unused]] constexpr std::array allBuiltins = {
 #define BUILTIN(x, ...) x,
 #include "BuiltinsModule.def"
 

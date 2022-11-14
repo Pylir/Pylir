@@ -221,6 +221,8 @@ private:
     }
 };
 
+llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const Diagnostic::Message& message);
+
 /// Class used to build a compiler diagnostic. It makes use of the builder pattern to be able to conveniently chain
 /// a series of method calls, modifying the result. The final diagnostic may then be emitted upon destruction.
 ///

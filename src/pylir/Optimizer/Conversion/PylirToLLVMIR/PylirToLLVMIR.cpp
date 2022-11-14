@@ -1966,6 +1966,7 @@ struct IntCmpOpConversion : public ConvertPylirOpToLLVMPattern<pylir::Py::IntCmp
                 mpOrd = MP_LT;
                 predicate = mlir::LLVM::ICmpPredicate::ne;
                 break;
+            default: PYLIR_UNREACHABLE;
         }
         rewriter.replaceOpWithNewOp<mlir::LLVM::ICmpOp>(
             op, predicate, result,

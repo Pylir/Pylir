@@ -278,7 +278,7 @@ mlir::FailureOr<std::string> readWholeFile(llvm::opt::Arg* inputFile, CommandLin
             .addHighlight(inputFile);
         return mlir::failure();
     }
-    return std::move(content);
+    return {std::move(content)};
 }
 
 mlir::ModuleOp buildModuleIfNecessary(std::unique_ptr<mlir::Block>&& block, mlir::MLIRContext* context)

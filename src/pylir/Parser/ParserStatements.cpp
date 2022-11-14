@@ -404,18 +404,21 @@ struct Visitor
                                      assignOp.getTokenType())
                         .addHighlight(tupleConstruct)
                         .addHighlight(assignOp, Diag::flags::secondaryColour);
+                    break;
                 case 1:
                     parser
                         .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_SINGLE_TUPLE_ELEMENT,
                                      assignOp.getTokenType())
                         .addHighlight(tupleConstruct)
                         .addHighlight(assignOp, Diag::flags::secondaryColour);
+                    break;
                 default:
                     parser
                         .createError(tupleConstruct, Diag::OPERATOR_N_CANNOT_ASSIGN_TO_MULTIPLE_VARIABLES,
                                      assignOp.getTokenType())
                         .addHighlight(tupleConstruct)
                         .addHighlight(assignOp, Diag::flags::secondaryColour);
+                    break;
             }
             return;
         }
