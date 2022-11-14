@@ -225,3 +225,18 @@ lambda: (x := 3) + (lambda: x)()
 # CHECK-NOT: locals
 # CHECK-NEXT: nonlocals: x
 # CHECK-NOT: cells
+
+
+def outer3():
+    l = lambda: f
+    f = 3
+
+# CHECK-LABEL: function outer3
+# CHECK-NEXT: locals: l
+# CHECK-NOT: nonlocals
+# CHECK-NEXT: cells: f
+
+# CHECK-LABEL: lambda expression
+# CHECK-NOT: locals:
+# CHECK-NEXT: nonlocals: f
+# CHECK-NOT: cells:

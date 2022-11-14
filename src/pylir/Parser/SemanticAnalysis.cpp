@@ -126,7 +126,13 @@ void pylir::SemanticAnalysis::visit(Syntax::Lambda& lambda)
         }
         visit(*lambda.expression);
     }
-    finishNamespace(&lambda);
+    if (!m_currentScopeOwner)
+    {
+        // Lambda namespaces are only finished if in the global scope or class. If nested within a function,
+        // nonlocals may still be defined below the lambda, hence name resolution must happen at the end of the
+        // outermost function.
+        finishNamespace(&lambda);
+    }
 }
 
 void pylir::SemanticAnalysis::visit(pylir::Syntax::CompFor& compFor)
