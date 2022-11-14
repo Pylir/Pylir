@@ -18,7 +18,7 @@ macro(pylir_obj_compile)
 
     file(RELATIVE_PATH TargetRel "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}")
 
-    if (CMAKE_GENERATOR MATCHES "Ninja")
+    if (CMAKE_GENERATOR MATCHES "Ninja|Makefiles")
         # See https://cmake.org/cmake/help/latest/policy/CMP0116.html as to why this is currently relative.
         set(depfile_cmd -M ${TargetRel}.d)
         set(custom_command_extra DEPFILE ${TargetRel}.d)
@@ -46,13 +46,13 @@ macro(pylir_obj_compile)
     get_filename_component(SourceAbs ${ARG_SOURCE} REALPATH)
     add_custom_command(
             OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}
-            COMMAND pylir ${SourceAbs} ${pie_arg} -c -o ${TargetRel} $<$<CONFIG:Release>:-O3> -I ${PROJECT_SOURCE_DIR}/src/python
+            COMMAND pylir ${SourceAbs} ${pie_arg} -c -o ${TargetRel} $<$<CONFIG:Release>:-O3>
+            -I ${PROJECT_SOURCE_DIR}/src/python
             ${ARG_FLAGS} ${depfile_cmd}
             COMMENT "Building ${LANG} object ${TargetRel}"
             DEPENDS ${SourceAbs} pylir ${depends_extra} ${ARG_DEPENDS}
             WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
             ${custom_command_extra}
-            USES_TERMINAL
     )
     set_source_files_properties(${ARG_TARGET} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
 endmacro()

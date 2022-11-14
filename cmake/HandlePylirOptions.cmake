@@ -119,11 +119,13 @@ if((NOT (${CMAKE_SYSTEM_NAME} MATCHES "AIX")) AND
     endif ()
 endif()
 
-if (POLICY CMP0116)
-    # TODO: Reevaluate once minimum version is 3.20. Affects the way depfiles are handled in cmake. Setting it to OLD
-    #       makes it behave the same way in all versions.
-    cmake_policy(SET CMP0116 OLD)
-endif ()
+# mlir-tblgen and llvm-tblgen cmake files still use relative paths. Changing the policy here leads to their dep file
+# not being accepted by ninja anymore, and the targets always being out of date.
+cmake_policy(SET CMP0116 OLD)
+# GENERATED source property is globally visible, not just in directory.
+cmake_policy(SET CMP0118 NEW)
+# TARGET_* generator expressions in custom commands implicitly creating a dependency is deprecated.
+cmake_policy(SET CMP0112 NEW)
 
 # Matching LLVMs RTTI setting here. Could cause linker issues otherwise.
 if (NOT LLVM_ENABLE_RTTI)
