@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s --pylir-trial-inliner='min-callee-size-reduction=0 max-recursion-depth=4' --split-input-file | FileCheck %s
+// RUN: pylir-opt %s --pylir-inliner='max-inlining-iterations=4' --split-input-file | FileCheck %s
 
 func.func @indirect(%arg0 : i32) -> i32 {
     %0 = arith.constant 1 : i32
@@ -9,7 +9,7 @@ func.func @indirect(%arg0 : i32) -> i32 {
 
 // CHECK-LABEL: func @indirect
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK-NEXT: %[[C:.*]] = arith.constant 16
+// CHECK-NEXT: %[[C:.*]] = arith.constant 1 : i32
 // CHECK-NEXT: %[[SUB:.*]] = arith.subi %[[ARG0]], %[[C]]
 // CHECK-NEXT: %[[CALL:.*]] = call @indirect(%[[SUB]])
 // CHECK-NEXT: return %[[CALL]]

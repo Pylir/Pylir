@@ -8,11 +8,13 @@
 
 namespace pylir
 {
-class DialectCostInterface : public mlir::DialectInterface::Base<DialectCostInterface>
+class DialectInlineCostInterface : public mlir::DialectInterface::Base<DialectInlineCostInterface>
 {
 public:
-    explicit DialectCostInterface(mlir::Dialect* dialect) : Base(dialect) {}
+    explicit DialectInlineCostInterface(mlir::Dialect* dialect) : Base(dialect) {}
 
+    /// Return the inline cost of this dialects op in abstract units. Should only return the ops cost and not add
+    /// up any contained regions, blocks or operations.
     virtual std::size_t getCost(mlir::Operation* op) const = 0;
 };
 } // namespace pylir

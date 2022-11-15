@@ -39,26 +39,33 @@ void pylir::registerOptimizationPipelines()
         "Optimization pipeline used by the compiler with lowering up until (exclusive) conversion to LLVM",
         [](mlir::OpPassManager& pm)
         {
+            mlir::OpPassManager inlinerNested;
+
             mlir::OpPassManager* nested;
-            pm.addPass(mlir::createCanonicalizerPass());
-            pm.nestAny().addPass(Py::createGlobalLoadStoreEliminationPass());
-            pm.addPass(Py::createFoldGlobalsPass());
-            pm.nestAny().addPass(mlir::createCSEPass());
-            pm.addPass(Py::createTrialInlinerPass());
-            pm.addPass(mlir::createSymbolDCEPass());
-            nested = &pm.nestAny();
+            inlinerNested.addPass(mlir::createCanonicalizerPass());
+            inlinerNested.nestAny().addPass(Py::createGlobalLoadStoreEliminationPass());
+            inlinerNested.addPass(Py::createFoldGlobalsPass());
+            inlinerNested.addPass(mlir::createSymbolDCEPass());
+            inlinerNested.nestAny().addPass(mlir::createCSEPass());
+            nested = &inlinerNested.nestAny();
             nested->addPass(createLoadForwardingPass());
             nested->addPass(mlir::createSCCPPass());
-            pm.addPass(Py::createMonomorphPass());
-            pm.addPass(Py::createTrialInlinerPass());
-            pm.addPass(mlir::createSymbolDCEPass());
-            nested = &pm.nestAny();
+            // inlinerNested.addPass(Py::createMonomorphPass());
+            nested = &inlinerNested.nestAny();
             nested->addPass(Py::createExpandPyDialectPass());
             nested->addPass(mlir::createCanonicalizerPass());
             nested->addPass(mlir::createCSEPass());
             nested->addPass(createLoadForwardingPass());
             nested->addPass(mlir::createSCCPPass());
             nested->addPass(mlir::createCanonicalizerPass());
+
+            Py::InlinerPassOptions options{};
+            std::string pipeline;
+            llvm::raw_string_ostream ss(pipeline);
+            inlinerNested.printAsTextualPipeline(ss);
+            options.m_optimizationPipeline = std::move(pipeline);
+            pm.addPass(Py::createInlinerPass(options));
+
             pm.addPass(createConvertPylirPyToPylirMemPass());
             nested = &pm.nestAny();
             nested->addPass(mlir::createCanonicalizerPass());

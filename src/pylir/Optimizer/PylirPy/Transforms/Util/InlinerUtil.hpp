@@ -8,5 +8,12 @@
 
 namespace pylir::Py
 {
-void inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable);
+
+struct InlinedOps
+{
+    mlir::Operation* firstOperationInFirstBlock;
+    mlir::Region::iterator endBlock;
+};
+
+InlinedOps inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable);
 } // namespace pylir::Py

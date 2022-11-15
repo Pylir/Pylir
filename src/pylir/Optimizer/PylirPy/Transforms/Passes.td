@@ -73,28 +73,32 @@ def MonomorphPass : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
     ];
 }
 
-def TrialInlinerPass : Pass<"pylir-trial-inliner", "::mlir::ModuleOp"> {
-	let summary = "Inline functions using trials";
+def InlinerPass : Pass<"pylir-inliner", "mlir::ModuleOp"> {
+    let summary = "Inline functions";
 
-	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+    let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 
-	let statistics = [
-		Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
-		Statistic<"m_cacheHits", "Cache hits", "Amount of times an inlining trial did not have to be performed due to a cache hit">,
-		Statistic<"m_cacheMisses", "Caches misses", "Amount of times an inlining trial had to be performed as it was not in cache">,
-		Statistic<"m_recursionLimitReached", "Recursion limits reached", "Amount of times a recursion chain was disabled in a caller">,
-		Statistic<"m_optimizationRun", "Optimization pipeline run", "Amount of times the optimization pipeline had to be run">,
-	];
+    let statistics = [
+    	Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
+    	Statistic<"m_optimizationRun", "Optimization pipeline run", "Amount of times the optimization pipeline was run">,
+    	Statistic<"m_directRecursionsDiscarded", "Direct recursions discarded",
+    	    "Amount of callsites not consdidered while inlining as they call themselves">,
+    	Statistic<"m_callsitesTooExpensive", "Callsites considered too expensive to inline",
+            	    "Amount of callsites whose inlining cost is greater than the threshold">,
+        Statistic<"m_inliningCyclesDetected", "Inlining cycles detected",
+            	    "Amount of inlining cycles detected, leading to a callsite not being inlined">,
+        Statistic<"m_doneEarly", "No more inlining changes to be done",
+                  "1 if the pass stopped due to not wanting to inline any more callsites instead of having reached"
+                  " the inlining iteration limit.">,
+    ];
 
-	let options = [
-		Option<"m_minCalleeSizeReduction", "min-callee-size-reduction", "std::uint32_t", "50",
-			    "Percent the callee must have decreased in size after having been inlined in the caller to be deemed profitable">,
-		Option<"m_maxRecursionDepth", "max-recursion-depth", "std::size_t", "4",
-				"Maximum amount of times a recursive function deemed profitable may be inlined">,
-        Option<"m_optimizationPipeline", "optimization-pipeline", "std::string",
-               [{"canonicalize,pylir-sroa,canonicalize"}],
-               "Optimization pipeline used to perform the inlining trials">,
-	];
+    let options = [
+        Option<"m_maxInliningIterations", "max-inlining-iterations", "std::size_t", "8",
+            			"Maximum amount of times the inliner should attempt to inline inbetween optimizations">,
+        Option<"m_threshold", "threshold", "std::uint32_t", "250", "">,
+        Option<"m_optimizationPipeline", "optimization-pipeline", "std::string", [{"any()"}],
+               "Optimization pipeline interleaved between inlining">,
+    ];
 }
 
 #endif

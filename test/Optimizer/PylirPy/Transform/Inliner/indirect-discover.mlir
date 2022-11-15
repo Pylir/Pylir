@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s --pylir-trial-inliner='min-callee-size-reduction=0' --split-input-file | FileCheck %s
+// RUN: pylir-opt %s --pylir-inliner='optimization-pipeline=any(canonicalize)' --split-input-file | FileCheck %s
 
 func.func @do_call(%arg0 : () -> i32) -> i32 {
 	%0 = call_indirect %arg0() : () -> i32

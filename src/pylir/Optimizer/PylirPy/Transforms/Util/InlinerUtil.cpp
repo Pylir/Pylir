@@ -30,7 +30,7 @@ void remapInlinedLocations(llvm::iterator_range<mlir::Region::iterator> range, m
 }
 } // namespace
 
-void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable)
+pylir::Py::InlinedOps pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable)
 {
     auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*call);
 
@@ -104,6 +104,8 @@ void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface
 
     remapInlinedLocations(inlineBlocksRange, call->getLoc());
 
+    mlir::Operation* preInlineLastOp = preBlock->empty() ? nullptr : &preBlock->back();
+
     preBlock->getOperations().splice(preBlock->end(), firstInlinedBlock->getOperations());
     firstInlinedBlock->erase();
     for (auto [res, arg] : llvm::zip(call->getResults(), postBlock->getArguments()))
@@ -118,4 +120,5 @@ void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface
             static_cast<mlir::OperandRange>(exceptionHandler.getNormalDestOperandsMutable()));
     }
     call.erase();
+    return {preInlineLastOp == nullptr ? &preBlock->front() : preInlineLastOp->getNextNode(), postBlock->getIterator()};
 }

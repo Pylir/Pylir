@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s --pylir-trial-inliner='min-callee-size-reduction=0' --split-input-file | FileCheck %s
+// RUN: pylir-opt %s --pylir-inliner --split-input-file | FileCheck %s
 
 func.func private @complex(i32) -> i32
 

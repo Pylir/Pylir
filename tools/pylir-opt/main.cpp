@@ -23,6 +23,7 @@
 #include <llvm/Support/ToolOutputFile.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
+#include <pylir/Optimizer/Models/ControlFlowInlineCostModel.hpp>
 #include <pylir/Optimizer/Optimizer.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
@@ -191,6 +192,8 @@ int main(int argc, char** argv)
     mlir::DialectRegistry registry;
     registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect, pylir::test::TestDialect>();
     mlir::registerAllDialects(registry);
+
+    pylir::registerControlFlowInlineCostModel(registry);
 
     pylir::registerConversionPasses();
     pylir::registerTransformPasses();

@@ -31,6 +31,7 @@
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <llvm/Passes/StandardInstrumentations.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Path.h>
 #include <llvm/Support/Program.h>
@@ -43,6 +44,7 @@
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/Linker/Linker.hpp>
+#include <pylir/Optimizer/Models/ControlFlowInlineCostModel.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
@@ -524,13 +526,17 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             llvm::CGSCCAnalysisManager cgam;
             llvm::ModuleAnalysisManager mam;
 
+            llvm::PassInstrumentationCallbacks pic;
+            llvm::StandardInstrumentations si(*m_llvmContext, false);
+            si.registerCallbacks(pic, &fam);
+
             llvm::PipelineTuningOptions options;
             options.LoopInterleaving = true;
             options.LoopUnrolling = true;
             options.LoopVectorization = true;
             options.SLPVectorization = true;
             options.MergeFunctions = true;
-            llvm::PassBuilder passBuilder(m_targetMachine.get(), options);
+            llvm::PassBuilder passBuilder(m_targetMachine.get(), options, std::nullopt, &pic);
 
             passBuilder.registerOptimizerLastEPCallback(
                 [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
@@ -667,6 +673,7 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::LLVM::LLVMDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<mlir::DLTIDialect>();
+    pylir::registerControlFlowInlineCostModel(registry);
     m_mlirContext.emplace(registry);
     m_mlirContext->enableMultithreading(args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
     m_mlirContext->getDiagEngine().registerHandler(

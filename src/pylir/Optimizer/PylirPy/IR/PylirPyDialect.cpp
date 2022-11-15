@@ -10,7 +10,7 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
-#include <pylir/Optimizer/Interfaces/DialectCostInterface.hpp>
+#include <pylir/Optimizer/Interfaces/DialectInlineCostInterface.hpp>
 #include <pylir/Optimizer/Interfaces/DialectUndefInterface.hpp>
 
 #include "PylirPyAttributes.hpp"
@@ -22,23 +22,23 @@
 namespace
 {
 
-struct PylirPyCostInterface : public pylir::DialectCostInterface
+struct PylirPyCostInterface : public pylir::DialectInlineCostInterface
 {
-    using pylir::DialectCostInterface::DialectCostInterface;
+    using pylir::DialectInlineCostInterface::DialectInlineCostInterface;
 
     std::size_t getCost(mlir::Operation* op) const override
     {
         return llvm::TypeSwitch<mlir::Operation*, std::size_t>(op)
             .Case([](pylir::Py::UnreachableOp) { return 0; })
-            .Case([](pylir::Py::RaiseOp) { return 5; })
-            .Case<pylir::Py::FunctionCallOp, pylir::Py::FunctionInvokeOp>([](auto) { return 10; })
+            .Case<pylir::Py::FunctionCallOp, pylir::Py::FunctionInvokeOp, pylir::Py::CallOp, pylir::Py::InvokeOp>(
+                [](auto call) { return 25 + 5 * call.getCallOperands().size(); })
             .Case([](pylir::Py::MROLookupOp) { return 20; })
             .Case<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp, pylir::Py::MakeListOp, pylir::Py::MakeListExOp,
                   pylir::Py::MakeSetOp, pylir::Py::MakeSetExOp>([](auto op)
-                                                                { return op.getIterExpansion().empty() ? 2 : 30; })
+                                                                { return op.getIterExpansion().empty() ? 5 : 50; })
             .Case<pylir::Py::MakeDictOp, pylir::Py::MakeDictExOp>([](auto op)
-                                                                  { return op.getMappingExpansion().empty() ? 2 : 30; })
-            .Default(std::size_t{1});
+                                                                  { return op.getMappingExpansion().empty() ? 5 : 50; })
+            .Default(std::size_t{5});
     }
 };
 
