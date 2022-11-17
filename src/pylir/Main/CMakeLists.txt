@@ -23,15 +23,13 @@ target_link_libraries(PylirMain
   PUBLIC Diagnostics ${llvm_options} MLIRPass
   PRIVATE
   ${llvm_all}
-  MLIRReconcileUnrealizedCasts
-  MLIRArithTransforms
-  MLIRArithToLLVM
   MLIRToLLVMIRTranslationRegistration
   MLIRDLTIDialect
   MLIRBytecodeReader
   MLIRBytecodeWriter
   CodeGen
   PylirLinker
+  PylirOptimizer
   PylirToLLVMIR
   PylirPyTransforms
   PylirMemTransforms

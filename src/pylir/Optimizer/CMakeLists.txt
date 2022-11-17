@@ -9,3 +9,19 @@ add_subdirectory(PylirPy)
 add_subdirectory(Interfaces)
 add_subdirectory(Transforms)
 add_subdirectory(Linker)
+
+add_library(PylirOptimizer Optimizer.cpp)
+target_link_libraries(PylirOptimizer
+        PRIVATE
+        MLIRArithToLLVM
+        MLIRArithTransforms
+        MLIRLLVMIRTransforms
+        MLIRPass
+        MLIRReconcileUnrealizedCasts
+        MLIRTransforms
+        PylirTransforms
+        PylirToLLVMIR
+        PylirPyTransforms
+        PylirPyToPylirMem
+        PylirMemTransforms
+        )

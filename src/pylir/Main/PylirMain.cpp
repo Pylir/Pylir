@@ -13,6 +13,7 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Diagnostics/DiagnosticsManager.hpp>
 #include <pylir/Main/Opts.inc>
+#include <pylir/Optimizer/Optimizer.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
 
@@ -77,6 +78,7 @@ int pylir::main(int argc, char** argv)
     mlir::registerSymbolDCEPass();
     pylir::registerTransformPasses();
     pylir::Py::registerTransformPasses();
+    pylir::registerOptimizationPipelines();
 
     pylir::Diag::DiagnosticsManager diagnosticManager;
     pylir::cli::CommandLine commandLine(llvm::sys::fs::getMainExecutable(argv[0], reinterpret_cast<void*>(&main)), argc,

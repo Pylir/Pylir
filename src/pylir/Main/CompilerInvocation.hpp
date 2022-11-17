@@ -72,8 +72,6 @@ private:
 
     mlir::LogicalResult finalizeOutputStream(mlir::LogicalResult result, cli::CommandLine& commandLine);
 
-    void addOptimizationPasses(llvm::StringRef level, mlir::OpPassManager& manager);
-
     mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
         codegenPythonToMLIR(const llvm::opt::InputArgList& args, const cli::CommandLine& commandLine,
                             Diag::DiagnosticsManager& diagManager, Diag::DiagnosticsDocManager& mainModuleDiagManager);

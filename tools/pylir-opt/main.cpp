@@ -23,6 +23,7 @@
 #include <llvm/Support/ToolOutputFile.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
+#include <pylir/Optimizer/Optimizer.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
@@ -196,6 +197,7 @@ int main(int argc, char** argv)
     pylir::Py::registerTransformPasses();
     pylir::Mem::registerTransformsPasses();
     pylir::test::registerTestPasses();
+    pylir::registerOptimizationPipelines();
 
     // Reimplementation of MlirOptMain overload that sets up all the command line options. The purpose of doing so is
     // to implicitly run `pylir-finalize-ref-attrs` pass over the whole module before any other compiler passes are run.
