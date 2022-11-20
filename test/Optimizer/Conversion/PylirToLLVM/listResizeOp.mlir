@@ -24,7 +24,7 @@ func.func @foo(%list : !py.dynamic, %length : index) {
 
 // CHECK-NEXT: ^[[GROW_BLOCK]]:
 // CHECK-NEXT: %[[SHL:.*]] = llvm.shl %[[CAPACITY]], %[[ONE_INDEX]]
-// CHECK-NEXT: %[[NEW_CAP:.*]] = "llvm.intr.umax"(%[[SHL]], %[[NEW_LENGTH]])
+// CHECK-NEXT: %[[NEW_CAP:.*]] = llvm.intr.umax(%[[SHL]], %[[NEW_LENGTH]])
 // CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[HEADER_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant

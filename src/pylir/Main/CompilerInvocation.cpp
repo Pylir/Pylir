@@ -25,8 +25,8 @@
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/Bitcode/BitcodeWriterPass.h>
-#include <llvm/IR/IRPrintingPasses.h>
 #include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IRPrinter/IRPrintingPasses.h>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>

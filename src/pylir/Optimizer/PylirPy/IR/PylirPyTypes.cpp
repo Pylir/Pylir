@@ -23,46 +23,6 @@ void pylir::Py::PylirPyDialect::initializeTypes()
         >();
 }
 
-void pylir::Py::ClassType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-                                                    llvm::function_ref<void(mlir::Type)>) const
-{
-    walkAttrsFn(getTypeObject());
-}
-
-mlir::Type pylir::Py::ClassType::replaceImmediateSubElements(::llvm::ArrayRef<::mlir::Attribute> replAttrs,
-                                                             ::llvm::ArrayRef<::mlir::Type>) const
-{
-    return get(replAttrs[0].cast<RefAttr>());
-}
-
-void pylir::Py::TupleType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-                                                    llvm::function_ref<void(mlir::Type)> walkTypesFn) const
-{
-    walkAttrsFn(getTypeObject());
-    llvm::for_each(getElements(), walkTypesFn);
-}
-
-mlir::Type pylir::Py::TupleType::replaceImmediateSubElements(::llvm::ArrayRef<::mlir::Attribute> replAttrs,
-                                                             ::llvm::ArrayRef<::mlir::Type> replTypes) const
-{
-    return get(
-        replAttrs[0].cast<RefAttr>(),
-        llvm::to_vector(llvm::map_range(replTypes, std::mem_fn(&mlir::Type::cast<pylir::Py::ObjectTypeInterface>))));
-}
-
-void pylir::Py::VariantType::walkImmediateSubElements(llvm::function_ref<void(mlir::Attribute)>,
-                                                      llvm::function_ref<void(mlir::Type)> walkTypesFn) const
-{
-    llvm::for_each(getElements(), walkTypesFn);
-}
-
-mlir::Type pylir::Py::VariantType::replaceImmediateSubElements(::llvm::ArrayRef<::mlir::Attribute>,
-                                                               ::llvm::ArrayRef<::mlir::Type> replTypes) const
-{
-    return get(getContext(), llvm::to_vector(llvm::map_range(
-                                 replTypes, std::mem_fn(&mlir::Type::cast<pylir::Py::ObjectTypeInterface>))));
-}
-
 pylir::Py::ObjectTypeInterface pylir::Py::joinTypes(pylir::Py::ObjectTypeInterface lhs,
                                                     pylir::Py::ObjectTypeInterface rhs)
 {

@@ -475,25 +475,25 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType, builder.getI64Type()};
                 functionName = "mp_init_u64";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_init_i64:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType, builder.getI64Type()};
                 functionName = "mp_init_i64";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_get_i64:
                 returnType = builder.getI64Type();
                 argumentTypes = {m_objectPtrType};
                 functionName = "mp_get_i64";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::pylir_str_hash:
                 returnType = getIndexType();
                 argumentTypes = {m_objectPtrType};
                 functionName = "pylir_str_hash";
-                passThroughAttributes = {"readonly", "gc-leaf-function", "nounwind"};
+                passThroughAttributes = {"nounwind"};
                 break;
             case Runtime::pylir_print:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -511,7 +511,7 @@ public:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType};
                 functionName = "mp_init";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_unpack:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
@@ -523,32 +523,32 @@ public:
                                  getIndexType(),
                                  builder.getType<mlir::LLVM::LLVMPointerType>()};
                 functionName = "mp_unpack";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_radix_size_overestimate:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType, m_cabi->getInt(&getContext()), m_objectPtrType};
                 functionName = "mp_radix_size_overestimate";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_to_radix:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType, builder.getType<mlir::LLVM::LLVMPointerType>(), getIndexType(),
                                  m_objectPtrType, m_cabi->getInt(&getContext())};
                 functionName = "mp_to_radix";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_cmp:
                 returnType = m_cabi->getInt(&getContext());
                 argumentTypes = {m_objectPtrType, m_objectPtrType};
                 functionName = "mp_cmp";
-                passThroughAttributes = {"inaccessiblemem_or_argmemonly", "gc-leaf-function", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::mp_add:
                 returnType = mlir::LLVM::LLVMVoidType::get(&getContext());
                 argumentTypes = {m_objectPtrType, m_objectPtrType, m_objectPtrType};
                 functionName = "mp_add";
-                passThroughAttributes = {"gc-leaf-function", "inaccessiblemem_or_argmemonly", "nounwind"};
+                passThroughAttributes = {"gc-leaf-function", "nounwind"};
                 break;
             case Runtime::pylir_dict_lookup:
                 returnType = m_objectPtrType;

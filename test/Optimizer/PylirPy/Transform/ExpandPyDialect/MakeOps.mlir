@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s -pass-pipeline='any(pylir-expand-py-dialect)' --split-input-file | FileCheck %s
+// RUN: pylir-opt %s -p 'builtin.module(any(pylir-expand-py-dialect))' --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type

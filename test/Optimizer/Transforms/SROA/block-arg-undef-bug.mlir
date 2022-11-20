@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s -pass-pipeline="any(pylir-sroa)" | FileCheck %s
+// RUN: pylir-opt %s -pass-pipeline="builtin.module(any(pylir-sroa))" | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type

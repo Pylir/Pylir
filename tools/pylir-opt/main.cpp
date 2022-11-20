@@ -13,7 +13,7 @@
 #include <mlir/Support/FileUtilities.h>
 #include <mlir/Support/Timing.h>
 #include <mlir/Support/ToolUtilities.h>
-#include <mlir/Tools/ParseUtilties.h>
+#include <mlir/Tools/ParseUtilities.h>
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
 
 #include <llvm/Support/CommandLine.h>
@@ -231,6 +231,9 @@ int main(int argc, char** argv)
     static llvm::cl::opt<bool> emitBytecode("emit-bytecode", llvm::cl::desc("Emit bytecode when generating output"),
                                             llvm::cl::init(false));
 
+    static llvm::cl::opt<bool> dumpPassPipeline{
+        "dump-pass-pipeline", llvm::cl::desc("Print the pipeline that will be run"), llvm::cl::init(false)};
+
     llvm::InitLLVM y(argc, argv);
 
     // Register any command line options.
@@ -239,7 +242,7 @@ int main(int argc, char** argv)
     mlir::registerPassManagerCLOptions();
     mlir::registerDefaultTimingManagerCLOptions();
     mlir::DebugCounter::registerCLOptions();
-    mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
+    mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run", "p");
 
     // Build the list of dialects as a header for the --help message.
     std::string helpHeader = "pylir-opt\nAvailable Dialects: ";
@@ -247,8 +250,65 @@ int main(int argc, char** argv)
         llvm::raw_string_ostream os(helpHeader);
         interleaveComma(registry.getDialectNames(), os, [&](auto name) { os << name; });
     }
+
+    // Form a new command line which injects the pylir-finalize-ref-attrs pass as first pass in the pipeline.
+    // This is done by detecting use of -p and -pass-pipline and inserting it as very first pass there, or by simply
+    // adding --pylir-finalize-ref-attrs as very first arg on the command line.
+    std::vector<const char*> args(argv, argv + argc);
+    std::string maybeNewPipeline;
+    bool hadPipeline = false;
+    for (auto iter = args.begin(); iter != args.end();)
+    {
+        std::string_view text = *iter;
+        std::string_view pipeline;
+        auto end = std::next(iter);
+        if (text.substr(0, std::string_view("-p=").size()) == "-p=")
+        {
+            pipeline = text.substr(std::string_view("-p=").size());
+        }
+        else if (text.substr(0, std::string_view("-pass-pipeline=").size()) == "-pass-pipeline=")
+        {
+            pipeline = text.substr(std::string_view("-pass-pipeline=").size());
+        }
+        else if (text == "-p" || text == "-pass-pipeline")
+        {
+            if (std::next(iter) == args.end())
+            {
+                iter++;
+                continue;
+            }
+            pipeline = *std::next(iter);
+            end = std::next(end);
+        }
+        else
+        {
+            iter++;
+            continue;
+        }
+
+        auto pos = pipeline.find('(');
+        if (pos == std::string_view::npos)
+        {
+            iter++;
+            continue;
+        }
+        maybeNewPipeline += "-pass-pipeline=";
+        maybeNewPipeline += pipeline.substr(0, pos);
+        maybeNewPipeline += '(';
+        maybeNewPipeline += "pylir-finalize-ref-attrs, ";
+        maybeNewPipeline += pipeline.substr(pos + 1);
+        hadPipeline = true;
+        iter = args.erase(iter, end);
+        args.insert(iter, maybeNewPipeline.c_str());
+        break;
+    }
+    if (!hadPipeline)
+    {
+        args.insert(std::next(args.begin()), "--pylir-finalize-ref-attrs");
+    }
+
     // Parse pass names in main to ensure static initialization completed.
-    llvm::cl::ParseCommandLineOptions(argc, argv, helpHeader);
+    llvm::cl::ParseCommandLineOptions(args.size(), args.data(), helpHeader);
 
     if (showDialects)
     {
@@ -278,13 +338,22 @@ int main(int argc, char** argv)
             output->os(), std::move(file),
             [&](mlir::PassManager& pm)
             {
-                pm.addPass(pylir::Py::createFinalizeRefAttrsPass());
-                return passPipeline.addToPipeline(pm,
-                                                  [&](const llvm::Twine& msg)
-                                                  {
-                                                      mlir::emitError(mlir::UnknownLoc::get(pm.getContext())) << msg;
-                                                      return mlir::failure();
-                                                  });
+                if (mlir::failed(passPipeline.addToPipeline(pm,
+                                                            [&](const llvm::Twine& msg)
+                                                            {
+                                                                mlir::emitError(mlir::UnknownLoc::get(pm.getContext()))
+                                                                    << msg;
+                                                                return mlir::failure();
+                                                            })))
+                {
+                    return mlir::failure();
+                }
+                if (dumpPassPipeline)
+                {
+                    pm.dump();
+                    llvm::errs() << "\n";
+                }
+                return mlir::success();
             },
             registry, splitInputFile, verifyDiagnostics, verifyPasses, allowUnregisteredDialects, emitBytecode)))
     {

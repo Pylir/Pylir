@@ -12,14 +12,6 @@
 namespace
 {
 
-void replaceAllUsesWith(mlir::PatternRewriter& rewriter, mlir::Value toReplace, mlir::Value replacement)
-{
-    for (auto& iter : llvm::make_early_inc_range(toReplace.getUses()))
-    {
-        rewriter.updateRootInPlace(iter.getOwner(), [&] { iter.set(replacement); });
-    }
-}
-
 void replaceAllUsesWith(mlir::PatternRewriter& rewriter, mlir::Block* toReplace, mlir::Block* replacement)
 {
     for (auto& iter : llvm::make_early_inc_range(toReplace->getUses()))
@@ -51,9 +43,10 @@ struct PassthroughArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInte
                 continue;
             }
             auto brOp = mlir::dyn_cast_or_null<mlir::BranchOpInterface>(iter.value()->getTerminator());
+            auto memoryEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(iter.value()->getTerminator());
             // If the branch op has just a single successor, no side effects, and no operands, it can only be a simple
             // branch op.
-            if (!brOp || brOp->getNumSuccessors() != 1 || !mlir::MemoryEffectOpInterface::hasNoEffect(brOp)
+            if (!brOp || !memoryEffect || brOp->getNumSuccessors() != 1 || !memoryEffect.hasNoEffect()
                 || brOp->getNumOperands() != 0)
             {
                 continue;
@@ -143,7 +136,7 @@ struct TrivialBlockArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInt
                 {
                     continue;
                 }
-                replaceAllUsesWith(rewriter, succBlockArg, same);
+                rewriter.replaceAllUsesWith(succBlockArg, same);
                 skipList.insert(succBlockArg);
             }
             if (skipList.empty())
@@ -162,7 +155,7 @@ struct TrivialBlockArgRemove : mlir::OpInterfaceRewritePattern<mlir::BranchOpInt
 
             for (auto [old, newBlockArg] : llvm::zip(llvm::to_vector(remainingBlockArgs), newSucc->getArguments()))
             {
-                replaceAllUsesWith(rewriter, old, newBlockArg);
+                rewriter.replaceAllUsesWith(old, newBlockArg);
             }
 
             for (auto pred = succ->pred_begin(); pred != succ->pred_end(); pred++)

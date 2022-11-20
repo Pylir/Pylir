@@ -1168,12 +1168,15 @@ struct ArithSelectTransform : mlir::OpRewritePattern<mlir::arith::SelectOp>
     {
         auto* lhs = op.getTrueValue().getDefiningOp();
         auto* rhs = op.getFalseValue().getDefiningOp();
-        if (!lhs || !rhs || lhs->getAttrDictionary() != rhs->getAttrDictionary() || lhs->getName() != rhs->getName()
+        auto lhsMem = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(lhs);
+        auto rhsMem = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(rhs);
+        if (!lhs || !rhs || !lhsMem || !rhsMem || lhs->getAttrDictionary() != rhs->getAttrDictionary()
+            || lhs->getName() != rhs->getName()
             || op.getTrueValue().cast<mlir::OpResult>().getResultNumber()
                    != op.getFalseValue().cast<mlir::OpResult>().getResultNumber()
             || lhs->getResultTypes() != rhs->getResultTypes() || lhs->hasTrait<mlir::OpTrait::IsTerminator>()
             || lhs->getNumRegions() != 0 || rhs->getNumRegions() != 0 || lhs->getNumOperands() != rhs->getNumOperands()
-            || !mlir::MemoryEffectOpInterface::hasNoEffect(lhs) || !mlir::MemoryEffectOpInterface::hasNoEffect(rhs))
+            || !lhsMem.hasNoEffect() || !rhsMem.hasNoEffect())
         {
             return mlir::failure();
         }
@@ -1221,7 +1224,6 @@ struct FoldOnlyReadsValueOfCopy : mlir::OpInterfaceRewritePattern<pylir::Py::Cop
     mlir::LogicalResult matchAndRewrite(pylir::Py::CopyObjectInterface op,
                                         mlir::PatternRewriter& rewriter) const override
     {
-        bool removedAll = true;
         bool changed = false;
         rewriter.startRootUpdate(op);
         for (mlir::OpResult iter : op->getResults())
@@ -1236,11 +1238,6 @@ struct FoldOnlyReadsValueOfCopy : mlir::OpInterfaceRewritePattern<pylir::Py::Cop
                                        return replaced;
                                    });
             changed = changed || replaced;
-            removedAll = removedAll && replaced;
-        }
-        if (removedAll)
-        {
-            rewriter.eraseOp(op);
         }
 
         if (changed)

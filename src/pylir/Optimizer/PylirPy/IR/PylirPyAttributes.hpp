@@ -57,3 +57,22 @@ public:
 };
 
 } // namespace pylir::Py
+
+template <class First, class Second>
+struct mlir::AttrTypeSubElementHandler<std::pair<First, Second>,
+                                       std::enable_if_t<mlir::has_sub_attr_or_type_v<First, Second>>>
+{
+    static void walk(const std::pair<First, Second>& param, AttrTypeSubElementWalker& walker)
+    {
+        AttrTypeSubElementHandler<First>::walk(param.first, walker);
+        AttrTypeSubElementHandler<Second>::walk(param.second, walker);
+    }
+
+    static std::pair<First, Second> replace(const std::pair<First, Second>& param,
+                                            AttrSubElementReplacements& attrRepls,
+                                            TypeSubElementReplacements& typeRepls)
+    {
+        return {AttrTypeSubElementHandler<First>::replace(param.first, attrRepls, typeRepls),
+                AttrTypeSubElementHandler<Second>::replace(param.second, attrRepls, typeRepls)};
+    }
+};

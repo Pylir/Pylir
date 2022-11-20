@@ -27,7 +27,7 @@ def PylirPy_UnboundType : PylirPy_ObjectType<"Unbound"> {
     }];
 }
 
-def PylirPy_ClassType : PylirPy_ObjectType<"Class", [DeclareTypeInterfaceMethods<SubElementTypeInterface>]> {
+def PylirPy_ClassType : PylirPy_ObjectType<"Class", [SubElementTypeInterface]> {
 	let mnemonic = "class";
 	let summary = "class type";
 
@@ -40,7 +40,7 @@ def PylirPy_ClassType : PylirPy_ObjectType<"Class", [DeclareTypeInterfaceMethods
 	let assemblyFormat = "`<` $typeObject `>`";
 }
 
-def PylirPy_TupleType : PylirPy_ObjectType<"Tuple", [DeclareTypeInterfaceMethods<SubElementTypeInterface>]> {
+def PylirPy_TupleType : PylirPy_ObjectType<"Tuple", [SubElementTypeInterface]> {
 	let mnemonic = "tuple";
 	let summary = "tuple type";
 
@@ -60,7 +60,7 @@ def PylirPy_TupleType : PylirPy_ObjectType<"Tuple", [DeclareTypeInterfaceMethods
 	let assemblyFormat = "`<` $elements (`,` $typeObject^)? `>`";
 }
 
-def PylirPy_VariantType : PylirPy_ObjectType<"Variant", [DeclareTypeInterfaceMethods<SubElementTypeInterface>]> {
+def PylirPy_VariantType : PylirPy_ObjectType<"Variant", [SubElementTypeInterface]> {
 	let mnemonic = "variant";
 	let summary = "variant type";
 

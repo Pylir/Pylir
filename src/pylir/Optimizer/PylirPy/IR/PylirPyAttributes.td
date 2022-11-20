@@ -31,8 +31,7 @@ class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = []
 class TypeObjectSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = [], string extraBuilderCode = "">
     : AttrSpecBuilder<name,
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "type_object">, ParamSpec<SlotsMap, "slots">]),
-    !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-										["replaceImmediateSubAttribute"]>, ObjectAttrInterface,
+    !listconcat(traits, [SubElementAttrInterface, ObjectAttrInterface,
 						 DeclareAttrInterfaceMethods<SROAAttrInterface>]),
 										extraBuilderCode>;
 
@@ -40,13 +39,11 @@ class TypeObjectSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> t
 class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = []>
     : AttrSpecBuilder<name,
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "type_object">]),
-    !listconcat(traits, [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-										["replaceImmediateSubAttribute"]>, ObjectAttrInterface,
+    !listconcat(traits, [SubElementAttrInterface, ObjectAttrInterface,
 						 DeclareAttrInterfaceMethods<SROAAttrInterface>])>;
 
 
-def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [
-	DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>]> {
+def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [SubElementAttrInterface]> {
 	let mnemonic = "obj";
 	let summary = "python object";
 
@@ -165,8 +162,8 @@ def PylirPy_SetAttr : TypeObjectSlotsAttr<"Set",
 	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DeclareAttrInterfaceMethods<SubElementAttrInterface,
-    ["replaceImmediateSubAttribute"]>, ObjectAttrInterface, DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [SubElementAttrInterface, ObjectAttrInterface,
+    DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
 
     let mnemonic = "dict";
     let summary = "python dictionary";
@@ -265,9 +262,8 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "defaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kw_defaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
-	 ], [DeclareAttrInterfaceMethods<SubElementAttrInterface, ["replaceImmediateSubAttribute"]>,
-	     DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<SROAAttrInterface>,
-	     ImmutableAttr]>
+	 ], [SubElementAttrInterface, DeclareAttrInterfaceMethods<ObjectAttrInterface>,
+	        DeclareAttrInterfaceMethods<SROAAttrInterface>, ImmutableAttr]>
 {
 	let mnemonic = "function";
 	let summary = "python function";

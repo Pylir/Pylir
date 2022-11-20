@@ -1,4 +1,4 @@
-// RUN: pylir-opt %s -pass-pipeline='any(pylir-global-load-store-elimination)' --split-input-file | FileCheck %s
+// RUN: pylir-opt %s -pass-pipeline='builtin.module(any(pylir-global-load-store-elimination))' --split-input-file | FileCheck %s
 
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
