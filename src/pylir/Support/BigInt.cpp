@@ -56,6 +56,13 @@ std::pair<pylir::BigInt, pylir::BigInt> pylir::toRatio(double value)
 
     PYLIR_ASSERT(std::isfinite(value));
 
+    // Special case below does not handle 0, as it is a special representation in the floating point representation,
+    // where mantissa and exponent are all zero.
+    if (value == 0.0)
+    {
+        return {BigInt(0), BigInt(1)};
+    }
+
     DoubleRepr bitCopy(value);
 
     // Calculate how many bits we have to shift up the fractional part, for it to become an integer. This can
@@ -69,19 +76,19 @@ std::pair<pylir::BigInt, pylir::BigInt> pylir::toRatio(double value)
     temp.setExponent(shiftRequired);
     double dest = temp.toDouble();
 
-    BigInt nominator(dest);
+    BigInt numerator(dest);
     BigInt denominator(1);
     std::int64_t exponent = bitCopy.getExponent() - static_cast<int>(shiftRequired);
     // At this point we are in the form '(nom / denom) * 2^exponent'. Based on whether the exponent is negative or not,
-    // we have to multiply either nominator or denominator with '2^abs(exponent)', which are just binary shifts.
+    // we have to multiply either numerator or denominator with '2^abs(exponent)', which are just binary shifts.
     if (exponent > 0)
     {
-        nominator <<= exponent;
+        numerator <<= exponent;
     }
     else
     {
         denominator <<= -exponent;
     }
 
-    return {std::move(nominator), std::move(denominator)};
+    return {std::move(numerator), std::move(denominator)};
 }

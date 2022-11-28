@@ -147,15 +147,19 @@ TEST_CASE("BigInt getter", "[BigInt]")
 
 TEST_CASE("BigInt toRatio", "[BigInt]")
 {
-    auto [nom, denom] = pylir::toRatio(3.14);
-    CHECK(nom == pylir::BigInt(7070651414971679));
+    auto [num, denom] = pylir::toRatio(3.14);
+    CHECK(num == pylir::BigInt(7070651414971679));
     CHECK(denom == pylir::BigInt(2251799813685248));
 
-    std::tie(nom, denom) = pylir::toRatio(-3.5);
-    CHECK(nom == pylir::BigInt(-7));
+    std::tie(num, denom) = pylir::toRatio(-3.5);
+    CHECK(num == pylir::BigInt(-7));
     CHECK(denom == pylir::BigInt(2));
 
-    std::tie(nom, denom) = pylir::toRatio(8);
-    CHECK(nom == pylir::BigInt(8));
+    std::tie(num, denom) = pylir::toRatio(8);
+    CHECK(num == pylir::BigInt(8));
+    CHECK(denom == pylir::BigInt(1));
+
+    std::tie(num, denom) = pylir::toRatio(0);
+    CHECK(num == pylir::BigInt(0));
     CHECK(denom == pylir::BigInt(1));
 }
