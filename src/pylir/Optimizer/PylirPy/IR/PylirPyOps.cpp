@@ -432,28 +432,9 @@ void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operatio
 }
 
 void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                  const std::vector<::pylir::Py::DictArg>& args)
+                                  llvm::ArrayRef<::pylir::Py::DictArg> args)
 {
-    llvm::SmallVector<mlir::Value> keys;
-    llvm::SmallVector<mlir::Value> hashes;
-    llvm::SmallVector<mlir::Value> values;
-    llvm::SmallVector<std::int32_t> mappingExpansion;
-    for (const auto& iter : llvm::enumerate(args))
-    {
-        pylir::match(
-            iter.value(),
-            [&](const DictEntry& entry)
-            {
-                keys.push_back(entry.key);
-                hashes.push_back(entry.hash);
-                values.push_back(entry.value);
-            },
-            [&](Py::MappingExpansion expansion)
-            {
-                keys.push_back(expansion.value);
-                mappingExpansion.push_back(iter.index());
-            });
-    }
+    auto [keys, hashes, values, mappingExpansion] = deconstructBuilderArg(args);
     build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion));
 }
 
@@ -561,30 +542,11 @@ void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
 }
 
 void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                    const std::vector<::pylir::Py::DictArg>& keyValues, mlir::Block* happyPath,
+                                    llvm::ArrayRef<::pylir::Py::DictArg> keyValues, mlir::Block* happyPath,
                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
                                     mlir::ValueRange unwindDestOperands)
 {
-    llvm::SmallVector<mlir::Value> keys;
-    llvm::SmallVector<mlir::Value> hashes;
-    llvm::SmallVector<mlir::Value> values;
-    llvm::SmallVector<std::int32_t> mappingExpansion;
-    for (const auto& iter : llvm::enumerate(keyValues))
-    {
-        pylir::match(
-            iter.value(),
-            [&](const DictEntry& entry)
-            {
-                keys.push_back(entry.key);
-                hashes.push_back(entry.hash);
-                values.push_back(entry.value);
-            },
-            [&](Py::MappingExpansion expansion)
-            {
-                keys.push_back(expansion.value);
-                mappingExpansion.push_back(iter.index());
-            });
-    }
+    auto [keys, hashes, values, mappingExpansion] = deconstructBuilderArg(keyValues);
     build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion),
           normalDestOperands, unwindDestOperands, happyPath, unwindPath);
 }

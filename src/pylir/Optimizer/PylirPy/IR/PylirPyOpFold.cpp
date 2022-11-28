@@ -425,6 +425,86 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(::llvm::ArrayRef<::mlir::Attr
 
 namespace
 {
+mlir::FailureOr<pylir::Py::MakeDictOp::BuilderArgs> foldMakeDict(llvm::iterator_range<pylir::Py::DictArgsIterator> args)
+{
+    llvm::SmallVector<pylir::Py::DictArg> result;
+
+    bool changed = false;
+    llvm::DenseSet<llvm::PointerUnion<mlir::Value, mlir::Attribute>> seen;
+    for (auto iter : llvm::reverse(args))
+    {
+        auto* entry = std::get_if<pylir::Py::DictEntry>(&iter);
+        if (!entry)
+        {
+            result.push_back(iter);
+            continue;
+        }
+
+        // If we can extract a canonical constant key we have the most accurate result. Otherwise, we just fall back to
+        // checking whether the value has been seen before.
+        mlir::Attribute constantKey;
+        if (mlir::matchPattern(entry->key, mlir::m_Constant(&constantKey)))
+        {
+            if (auto canonical = pylir::Py::getCanonicalEqualsForm(constantKey))
+            {
+                if (seen.insert(canonical).second)
+                {
+                    result.push_back(iter);
+                    continue;
+                }
+
+                changed = true;
+                continue;
+            }
+        }
+
+        if (seen.insert(entry->key).second)
+        {
+            result.push_back(iter);
+            continue;
+        }
+        changed = true;
+    }
+    if (!changed)
+    {
+        return mlir::failure();
+    }
+
+    // Result vector is built backwards due to backwards iteration and for amortized O(1) insertion at the back, instead
+    // of O(n) at the front.
+    // Just have to reverse it at the end.
+    return pylir::Py::MakeDictOp::deconstructBuilderArg(llvm::reverse(result));
+}
+} // namespace
+
+mlir::OpFoldResult pylir::Py::MakeDictOp::fold(llvm::ArrayRef<::mlir::Attribute>)
+{
+    if (auto value = foldMakeDict(getDictArgs()); mlir::succeeded(value))
+    {
+        getKeysMutable().assign(value->keys);
+        getHashesMutable().assign(value->hashes);
+        getValuesMutable().assign(value->values);
+        setMappingExpansion(value->mappingExpansion);
+        return mlir::Value(*this);
+    }
+    return nullptr;
+}
+
+mlir::OpFoldResult pylir::Py::MakeDictExOp::fold(llvm::ArrayRef<::mlir::Attribute>)
+{
+    if (auto value = foldMakeDict(getDictArgs()); mlir::succeeded(value))
+    {
+        getKeysMutable().assign(value->keys);
+        getHashesMutable().assign(value->hashes);
+        getValuesMutable().assign(value->values);
+        setMappingExpansion(value->mappingExpansion);
+        return mlir::Value(*this);
+    }
+    return nullptr;
+}
+
+namespace
+{
 template <class Attr>
 llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute> operands,
                                              llvm::ArrayRef<int32_t> iterExpansion, mlir::MLIRContext* context)

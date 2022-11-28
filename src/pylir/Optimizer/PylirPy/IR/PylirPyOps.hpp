@@ -23,6 +23,7 @@
 #include <pylir/Optimizer/PylirPy/Interfaces/CopyObjectInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.hpp>
 #include <pylir/Optimizer/PylirPy/Interfaces/OnlyReadsValueInterface.hpp>
+#include <pylir/Support/Variant.hpp>
 
 #include <optional>
 #include <variant>

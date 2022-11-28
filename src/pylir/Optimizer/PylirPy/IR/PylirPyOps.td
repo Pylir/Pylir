@@ -945,7 +945,7 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
     let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<DictResource>]>:$result);
 
     let builders = [
-            OpBuilder<(ins CArg<"const std::vector<::pylir::Py::DictArg>&","{}">:$args)>
+            OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::DictArg>","{}">:$args)>
     ];
 
     let assemblyFormat = [{
@@ -957,18 +957,56 @@ def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, Alway
         {
             return llvm::make_range(DictArgsIterator::begin(*this), DictArgsIterator::end(*this));
         }
+
+        struct BuilderArgs
+        {
+            llvm::SmallVector<mlir::Value> keys;
+            llvm::SmallVector<mlir::Value> hashes;
+            llvm::SmallVector<mlir::Value> values;
+            llvm::SmallVector<std::int32_t> mappingExpansion;
+        };
+
+        template <class R>
+        static BuilderArgs deconstructBuilderArg(R args)
+        {
+            llvm::SmallVector<mlir::Value> keys;
+            llvm::SmallVector<mlir::Value> hashes;
+            llvm::SmallVector<mlir::Value> values;
+            llvm::SmallVector<std::int32_t> mappingExpansion;
+            for (const auto& iter : llvm::enumerate(args))
+            {
+                pylir::match(
+                    iter.value(),
+                    [&](const DictEntry& entry)
+                    {
+                        keys.push_back(entry.key);
+                        hashes.push_back(entry.hash);
+                        values.push_back(entry.value);
+                    },
+                    [&](Py::MappingExpansion expansion)
+                    {
+                        keys.push_back(expansion.value);
+                        mappingExpansion.push_back(iter.index());
+                    });
+            }
+            return {std::move(keys), std::move(hashes), std::move(values), std::move(mappingExpansion)};
+        }
     }];
+
+    let hasFolder = 1;
 }
 
 def PylirPy_MakeDictExOp : AddExceptionHandling<PylirPy_MakeDictOp> {
     let builders = [
-        OpBuilder<(ins "const std::vector<::pylir::Py::DictArg>&":$keyValues,
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::DictArg>":$keyValues,
                        "mlir::Block*":$happyPath,
                        "mlir::ValueRange":$normalDestOperands,
                        "mlir::Block*":$unwindPath,
                        "mlir::ValueRange":$unwindDestOperands
          )>
     ];
+
+    let hasFolder = 1;
 
     let hasCanonicalizer = 1;
 }
