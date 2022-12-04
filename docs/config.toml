@@ -1,9 +1,0 @@
-baseURL = 'http://example.org/'
-languageCode = 'en-us'
-title = 'Pylir'
-theme = 'pylir'
-
-[params]
-github_doc_repository = "https://github.com/zero9178/Pylir"
-github_doc_repository_path = "docs/content/"
-menu_style = "open-menu"

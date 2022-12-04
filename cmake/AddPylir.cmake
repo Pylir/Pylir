@@ -9,7 +9,7 @@ function(add_pylir_doc td_filename output_file output_directory command)
 
   set(LLVM_TARGET_DEFINITIONS ${td_filename})
   mlir_tablegen(${output_file}.md ${command} ${ARGN})
-  set(GEN_DOC_FILE ${PYLIR_BINARY_DIR}/docs/content/${output_directory}${output_file}.md)
+  set(GEN_DOC_FILE "${PYLIR_BINARY_DIR}/docs/TableGen/${output_directory}${output_file}.md")
   add_custom_command(
           OUTPUT ${GEN_DOC_FILE}
           COMMAND ${Python3_EXECUTABLE} ${PYLIR_PREPROCESS_MLIR_MD}
