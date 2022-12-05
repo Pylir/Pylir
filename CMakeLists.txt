@@ -8,6 +8,7 @@ project(Pylir VERSION 0.0.1)
 set(CMAKE_CXX_STANDARD 17)
 
 option(PYLIR_BUILD_TESTS "Build tests" ON)
+option(PYLIR_BUILD_DOCS "Build documentation" OFF)
 option(PYLIR_FUZZER "Build fuzzers" OFF)
 option(PYLIR_COVERAGE "Compile with coverage" OFF)
 
@@ -62,6 +63,10 @@ set(PYLIR_TOOLS_DIR ${CMAKE_BINARY_DIR}/bin)
 
 # Required by tests and for some build utilities.
 find_package(Python3 3.6 COMPONENTS Interpreter REQUIRED)
+
+if (PYLIR_BUILD_DOCS)
+    add_subdirectory(docs)
+endif ()
 
 add_subdirectory(3rdParty)
 add_subdirectory(src)

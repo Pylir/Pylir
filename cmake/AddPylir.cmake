@@ -1,7 +1,30 @@
 
 include(PylirTablegen)
 
+#
+function(add_pylir_doc td_filename output_file output_directory command)
+  if (NOT PYLIR_BUILD_DOCS)
+    return()
+  endif ()
+
+  set(LLVM_TARGET_DEFINITIONS ${td_filename})
+  mlir_tablegen(${output_file}.md ${command} ${ARGN})
+  set(GEN_DOC_FILE "${PYLIR_BINARY_DIR}/docs/TableGen/${output_directory}${output_file}.md")
+  add_custom_command(
+          OUTPUT ${GEN_DOC_FILE}
+          COMMAND ${Python3_EXECUTABLE} ${PYLIR_PREPROCESS_MLIR_MD}
+          ${CMAKE_CURRENT_BINARY_DIR}/${output_file}.md
+          ${GEN_DOC_FILE}
+          DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${output_file}.md ${PYLIR_PREPROCESS_MLIR_MD})
+  add_custom_target(${output_file}DocGen DEPENDS ${GEN_DOC_FILE})
+  add_dependencies(mlir-doc ${output_file}DocGen)
+endfunction()
+
+#
 function(add_pylir_dialect dialect dialect_namespace)
+
+  cmake_parse_arguments(ARG "NO_DOC" "" "" ${ARGN})
+
   set(td_file)
   if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/${dialect}.td)
     set(td_file ${dialect}.td)
@@ -26,8 +49,14 @@ function(add_pylir_dialect dialect dialect_namespace)
   mlir_tablegen(${dialect}Enums.h.inc -gen-enum-decls)
   mlir_tablegen(${dialect}Enums.cpp.inc -gen-enum-defs)
   add_public_tablegen_target(${dialect}IncGen)
+
+  if (NOT ARG_NO_DOC)
+    get_filename_component(output_file ${td_file} NAME_WE)
+    add_pylir_doc(${td_file} ${dialect}Dialect Dialect/ -gen-dialect-doc -dialect="${dialect_namespace}")
+  endif ()
 endfunction()
 
+#
 function(add_pylir_interface kind interface)
   cmake_parse_arguments(ARG "LIBRARY" "LIB_PREFIX;FILE" "LIB_DEPS" ${ARGN})
   set(lib_prefix)
@@ -45,6 +74,8 @@ function(add_pylir_interface kind interface)
   mlir_tablegen(${interface}.h.inc -gen-${kind}-interface-decls)
   mlir_tablegen(${interface}.cpp.inc -gen-${kind}-interface-defs)
   add_public_tablegen_target(${lib_prefix}${interface}IncGen)
+
+  add_pylir_doc(${file}.td ${file}${kind} Interfaces/ -gen-${kind}-interface-docs)
 
   if (NOT ARG_LIBRARY)
     return()
@@ -64,8 +95,9 @@ function(add_pylir_rewriter patterns)
   add_public_tablegen_target(${patterns}IncGen)
 endfunction()
 
+#
 function(add_pylir_passes file name)
-  cmake_parse_arguments(ARG "" "PREFIX" "" ${ARGN})
+  cmake_parse_arguments(ARG "NO_DOC" "PREFIX" "" ${ARGN})
 
   set(prefix)
   if (ARG_PREFIX)
@@ -75,4 +107,8 @@ function(add_pylir_passes file name)
   set(LLVM_TARGET_DEFINITIONS ${file}.td)
   mlir_tablegen(${file}.h.inc -gen-pass-decls -name ${name})
   add_public_tablegen_target(${prefix}${name}PassIncGen)
+
+  if (NOT ARG_NO_DOC)
+    add_pylir_doc(${file}.td ${prefix}${name} Passes/ -gen-pass-doc)
+  endif ()
 endfunction()

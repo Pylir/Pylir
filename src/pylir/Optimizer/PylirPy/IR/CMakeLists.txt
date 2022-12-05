@@ -18,6 +18,7 @@ mlir_tablegen(PylirPyAttributes.h.inc -gen-attrdef-decls --attrdefs-dialect="py"
 set(LLVM_TARGET_DEFINITIONS PylirPyRefAttr.td)
 mlir_tablegen(PylirPyAttrBase.h.inc -gen-attrdef-decls --attrdefs-dialect="py")
 add_public_tablegen_target(PylirPyIncGen)
+add_pylir_doc(PylirPyOps.td PylirPyDialect Dialect/ -gen-dialect-doc -dialect="py")
 
 add_pylir_interface(ATTR ObjectAttrInterface)
 add_pylir_interface(TYPE ObjectTypeInterface)
