@@ -71,7 +71,7 @@ jobs:
             -S ${{github.workspace}}/Pylir
 
       - name: Build Docs
-        run: ninja docs
+        run: cmake --build pylir-build --target docs
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
