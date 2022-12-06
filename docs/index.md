@@ -14,5 +14,6 @@ hide-toc: true
 :caption: Development
 
 Dialects/index
+Passes/index
 ```
 
