@@ -11,12 +11,12 @@ of the optimizer, while the specific passes are found in the `Transforms` direct
 ```{include} ../TableGen/Passes/PylirTransform.md
 ```
 
-## {doc}`py` Transformation Passes
+## 'py' Transformation Passes
 
 ```{include} ../TableGen/Passes/PylirPyTransform.md
 ```
 
-## `pyMem` Transformation Passes
+## 'pyMem' Transformation Passes
 
 ```{include} ../TableGen/Passes/PylirMemTransforms.md
 ```

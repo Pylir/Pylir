@@ -616,8 +616,8 @@ def PylirPy_IntToIndexOp : PylirPy_Op<"int.toIndex", [NoMemoryEffect, NoCaptures
         twos complement with the bit-width of the index type. That means any python integer created via
         `py.fromUnsigned` or `py.int.fromSigned` can be converted back to the exact index value it was created with.
 
-        If `$input` is outside the range of values representable by `index`, that is less than `-2^(index_width-1)` or
-        larger than `2^(index_width)-1`, the behaviour is undefined.
+        If `$input` is outside the range of values representable by `index`, that is less than
+        $-2^{\text{index_width}-1}$ or larger than $2^{\text{index_width}}-1$, the behaviour is undefined.
         If `$input` is not really an int (or subclass of) the behaviour is undefined.
     }];
 
