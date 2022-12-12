@@ -49,7 +49,7 @@ def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref",
           ```
           Examples:
 
-          ```mlir
+          ```
           #py.ref<@builtins.int>
           ```
 

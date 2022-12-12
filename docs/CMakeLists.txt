@@ -9,7 +9,8 @@ add_custom_target(create-build-dir
         COMMENT "Copying docs sources")
 
 add_custom_target(docs
-        ${SPHINX_EXECUTABLE} -b html -Q . build
+        ${SPHINX_EXECUTABLE} -b html . build
         COMMENT "Building Sphinx docs"
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_target_properties(docs PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/build")
 add_dependencies(docs create-build-dir mlir-doc)
