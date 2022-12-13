@@ -15,5 +15,6 @@ hide-toc: true
 
 Dialects/index
 Passes/index
+Interfaces/index
 ```
 

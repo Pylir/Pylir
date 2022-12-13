@@ -7,14 +7,17 @@ function(add_pylir_doc td_filename output_file output_directory command)
     return()
   endif ()
 
+  cmake_parse_arguments(ARG "" "" "PREPROCESS_ARGS" ${ARGN})
+
   set(LLVM_TARGET_DEFINITIONS ${td_filename})
-  mlir_tablegen(${output_file}.md ${command} ${ARGN})
+  mlir_tablegen(${output_file}.md ${command} ${ARG_UNPARSED_ARGUMENTS})
   set(GEN_DOC_FILE "${PYLIR_BINARY_DIR}/docs/TableGen/${output_directory}${output_file}.md")
   add_custom_command(
           OUTPUT ${GEN_DOC_FILE}
           COMMAND ${Python3_EXECUTABLE} ${PYLIR_PREPROCESS_MLIR_MD}
           ${CMAKE_CURRENT_BINARY_DIR}/${output_file}.md
           ${GEN_DOC_FILE}
+          ${ARG_PREPROCESS_ARGS}
           DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${output_file}.md ${PYLIR_PREPROCESS_MLIR_MD})
   add_custom_target(${output_file}DocGen DEPENDS ${GEN_DOC_FILE})
   add_dependencies(mlir-doc ${output_file}DocGen)
@@ -75,7 +78,8 @@ function(add_pylir_interface kind interface)
   mlir_tablegen(${interface}.cpp.inc -gen-${kind}-interface-defs)
   add_public_tablegen_target(${lib_prefix}${interface}IncGen)
 
-  add_pylir_doc(${file}.td ${file}${kind} Interfaces/ -gen-${kind}-interface-docs)
+  add_pylir_doc(${file}.td ${file}${kind} Interfaces/ -gen-${kind}-interface-docs
+          PREPROCESS_ARGS -strip-title -title-indent=1)
 
   if (NOT ARG_LIBRARY)
     return()
