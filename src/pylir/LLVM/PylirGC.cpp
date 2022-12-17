@@ -35,11 +35,11 @@ public:
         UsesMetadata = true;
     }
 
-    llvm::Optional<bool> isGCManagedPointer(const llvm::Type* Ty) const override
+    std::optional<bool> isGCManagedPointer(const llvm::Type* Ty) const override
     {
         if (!Ty->isPointerTy())
         {
-            return llvm::None;
+            return std::nullopt;
         }
         // Keep in Sync with PylirMemToLLVMIR.cpp
         return Ty->getPointerAddressSpace() == 1;
@@ -65,7 +65,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
         auto alignment = printer.getDataLayout().getPointerABIAlignment(0);
         os.switchSection(
             printer.getObjFileLowering().getSectionForConstant(printer.getDataLayout(), kind, nullptr, alignment));
-        os.emitValueToAlignment(alignment.value());
+        os.emitValueToAlignment(alignment);
     }
 
     /// Writes out the stack map in our custom format. See pylir/Runtime/Stack.cpp for details of the format.
@@ -181,7 +181,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
             // incredibly sparse however, and I fear this might be a requirement on more platforms. For the time being,
             // we'll just require this everywhere. At worst, we are wasting pointerSize-1 bytes per call site.
             // TODO: Reference documentation for alignment requirement.
-            os.emitValueToAlignment(pointerSize);
+            os.emitValueToAlignment(llvm::Align(pointerSize));
             os.emitValue(iter.programCounter, pointerSize);
             os.emitULEB128IntValue(iter.locationIndices.size());
             for (std::uint32_t index : iter.locationIndices)

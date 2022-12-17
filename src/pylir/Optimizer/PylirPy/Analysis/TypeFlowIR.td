@@ -21,7 +21,6 @@ def TypeFlow_Dialect : Dialect {
     let name = "typeFlow";
     let cppNamespace = "::pylir::TypeFlow";
 
-    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
     let useDefaultAttributePrinterParser = 1;
     let useDefaultTypePrinterParser = 1;
 }
@@ -53,8 +52,8 @@ def DictionaryArray : TypedArrayAttrBase<DictionaryAttr, "Dictionary array attri
 
 def TypeFlow_FuncOp : TypeFlow_Op<"func", [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface]> {
 	let arguments = (ins StrAttr:$sym_name, TypeAttrOf<FunctionType>:$function_type,
-					 DictionaryArray:$arg_attrs,
-					 DictionaryArray:$res_attrs);
+					 OptionalAttr<DictionaryArray>:$arg_attrs,
+					 OptionalAttr<DictionaryArray>:$res_attrs);
 
 	let regions = (region AnyRegion:$body);
 

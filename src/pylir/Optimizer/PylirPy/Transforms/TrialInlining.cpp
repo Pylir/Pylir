@@ -33,7 +33,7 @@ namespace
 struct CallingContext
 {
     mlir::StringAttr callee;
-    std::vector<llvm::Optional<std::pair<mlir::OperationName, std::size_t>>> callArguments;
+    std::vector<std::optional<std::pair<mlir::OperationName, std::size_t>>> callArguments;
 
     explicit CallingContext(mlir::StringAttr callee) : callee(callee) {}
 

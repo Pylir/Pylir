@@ -15,7 +15,6 @@ def PylirMem_Dialect : Dialect {
     }];
     let cppNamespace = "::pylir::Mem";
 
-    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
     let useDefaultAttributePrinterParser = 0;
     let useDefaultTypePrinterParser = 1;
 }

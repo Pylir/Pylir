@@ -506,13 +506,13 @@ mlir::OpFoldResult pylir::Py::MakeDictExOp::fold(llvm::ArrayRef<::mlir::Attribut
 namespace
 {
 template <class Attr>
-llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute> operands,
-                                             llvm::ArrayRef<int32_t> iterExpansion, mlir::MLIRContext* context)
+std::optional<Attr> doConstantIterExpansion(llvm::ArrayRef<::mlir::Attribute> operands,
+                                            llvm::ArrayRef<int32_t> iterExpansion, mlir::MLIRContext* context)
 {
     if (!std::all_of(operands.begin(), operands.end(),
                      [](mlir::Attribute attr) -> bool { return static_cast<bool>(attr); }))
     {
-        return llvm::None;
+        return std::nullopt;
     }
     llvm::SmallVector<mlir::Attribute> result;
     auto range = iterExpansion;
@@ -535,7 +535,7 @@ llvm::Optional<Attr> doConstantIterExpansion(::llvm::ArrayRef<::mlir::Attribute>
                  // TODO: string attr
                  .Default(false))
         {
-            return llvm::None;
+            return std::nullopt;
         }
     }
     return Attr::get(context, result);
@@ -1004,7 +1004,7 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(mlir::Operation* last
                     {
                         return mlir::failure();
                     }
-                    llvm::Optional<bool> equal = isEqual(attr1, attr2);
+                    std::optional<bool> equal = isEqual(attr1, attr2);
                     if (!equal)
                     {
                         return mlir::failure();

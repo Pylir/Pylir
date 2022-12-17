@@ -22,11 +22,11 @@ namespace pylir::Mem
 /// For most user defined types, this simply Object, but most of the builtin types are layout types which cause any
 /// subtypes to have the same object layout.
 /// Optionally one may also pass 'cache' to memoize the computation.
-llvm::Optional<LayoutType> getLayoutType(mlir::Value value,
+std::optional<LayoutType> getLayoutType(mlir::Value value,
                                          llvm::DenseMap<mlir::Attribute, LayoutType>* cache = nullptr);
 
 /// Same as the function above but with 'attr' being the type object.
-llvm::Optional<LayoutType> getLayoutType(mlir::Attribute attr,
+std::optional<LayoutType> getLayoutType(mlir::Attribute attr,
                                          llvm::DenseMap<mlir::Attribute, LayoutType>* cache = nullptr);
 
 /// Returns the 'RefAttr' for the builtin type object corresponding to the given layout type.

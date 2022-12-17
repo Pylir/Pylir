@@ -147,7 +147,7 @@ public:
         m_constantSection = mlir::StringAttr::get(context, constSectionPrefix + "py_const");
     }
 
-    mlir::LLVM::LLVMStructType getPyObjectType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyObjectType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -163,7 +163,7 @@ public:
         return pyObject;
     }
 
-    mlir::LLVM::LLVMStructType getPyFunctionType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyFunctionType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -186,7 +186,7 @@ public:
         return pyFunction;
     }
 
-    mlir::LLVM::LLVMStructType getPyTupleType(llvm::Optional<unsigned> length = {})
+    mlir::LLVM::LLVMStructType getPyTupleType(std::optional<unsigned> length = {})
     {
         if (length)
         {
@@ -204,7 +204,7 @@ public:
         return pyTuple;
     }
 
-    mlir::LLVM::LLVMStructType getPyListType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyListType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -227,7 +227,7 @@ public:
             &getContext(), {getIndexType(), getIndexType(), mlir::LLVM::LLVMPointerType::get(&getContext())});
     }
 
-    mlir::LLVM::LLVMStructType getPyDictType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyDictType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -246,7 +246,7 @@ public:
         return pyDict;
     }
 
-    mlir::LLVM::LLVMStructType getPyStringType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyStringType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -277,7 +277,7 @@ public:
         return mpInt;
     }
 
-    mlir::LLVM::LLVMStructType getPyIntType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyIntType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -293,7 +293,7 @@ public:
         return pyType;
     }
 
-    mlir::LLVM::LLVMStructType getPyFloatType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyFloatType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -334,7 +334,7 @@ public:
         return unwindHeader;
     }
 
-    mlir::LLVM::LLVMStructType getPyBaseExceptionType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyBaseExceptionType(std::optional<unsigned> slotSize = {})
     {
         // While the itanium ABI specifies a 64 bit alignment, GCC and libunwind implementations specify the header
         // to the max alignment (16 bytes on x64). We put the landing pad which is an integer of pointer width
@@ -358,7 +358,7 @@ public:
         return pyBaseException;
     }
 
-    mlir::LLVM::LLVMStructType getPyTypeType(llvm::Optional<unsigned> slotSize = {})
+    mlir::LLVM::LLVMStructType getPyTypeType(std::optional<unsigned> slotSize = {})
     {
         if (slotSize)
         {
@@ -378,7 +378,7 @@ public:
     }
 
     mlir::LLVM::LLVMStructType mapLayoutTypeToLLVM(pylir::Mem::LayoutType builtinsName,
-                                                   llvm::Optional<unsigned> slotCount = {})
+                                                   std::optional<unsigned> slotCount = {})
     {
         switch (builtinsName)
         {
@@ -396,7 +396,7 @@ public:
         PYLIR_UNREACHABLE;
     }
 
-    llvm::Optional<pylir::Mem::LayoutType> getLayoutType(mlir::Attribute attr)
+    std::optional<pylir::Mem::LayoutType> getLayoutType(mlir::Attribute attr)
     {
         return pylir::Mem::getLayoutType(attr, &m_layoutTypeCache);
     }
@@ -1279,42 +1279,42 @@ struct ConvertPylirOpToLLVMPattern : public mlir::ConvertOpToLLVMPattern<T>
     }
 
 protected:
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyObjectType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyObjectType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyObjectType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyFunctionType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyFunctionType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyFunctionType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyTupleType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyTupleType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyTupleType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyListType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyListType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyListType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyDictType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyDictType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyDictType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyStringType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyStringType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyStringType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyIntType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyIntType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyIntType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyFloatType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyFloatType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyFloatType(slotSize);
     }
@@ -1324,12 +1324,12 @@ protected:
         return getTypeConverter()->getUnwindHeaderType();
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyBaseExceptionType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyBaseExceptionType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyBaseExceptionType(slotSize);
     }
 
-    [[nodiscard]] mlir::LLVM::LLVMStructType getPyTypeType(llvm::Optional<unsigned> slotSize = {}) const
+    [[nodiscard]] mlir::LLVM::LLVMStructType getPyTypeType(std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->getPyTypeType(slotSize);
     }
@@ -1422,12 +1422,12 @@ protected:
     }
 
     [[nodiscard]] mlir::Type mapLayoutTypeToLLVM(pylir::Mem::LayoutType layout,
-                                                 llvm::Optional<unsigned> slotSize = {}) const
+                                                 std::optional<unsigned> slotSize = {}) const
     {
         return getTypeConverter()->mapLayoutTypeToLLVM(layout, slotSize);
     }
 
-    [[nodiscard]] llvm::Optional<pylir::Mem::LayoutType> getLayoutType(mlir::Attribute attr) const
+    [[nodiscard]] std::optional<pylir::Mem::LayoutType> getLayoutType(mlir::Attribute attr) const
     {
         return getTypeConverter()->getLayoutType(attr);
     }

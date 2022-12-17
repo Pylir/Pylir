@@ -78,7 +78,7 @@ private:
 
     mlir::LogicalResult ensureTargetMachine(const llvm::opt::InputArgList& args, cli::CommandLine& commandLine,
                                             const pylir::Toolchain& toolchain,
-                                            llvm::Optional<llvm::Triple> triple = {});
+                                            std::optional<llvm::Triple> triple = {});
 
     mlir::LogicalResult compilation(llvm::opt::Arg* inputFile, cli::CommandLine& commandLine,
                                     const pylir::Toolchain& toolchain, CompilerInvocation::Action action,

@@ -210,19 +210,19 @@ public:
             std::optional<ExecutionResult> optional =
                 llvm::TypeSwitch<mlir::Operation*, std::optional<ExecutionResult>>(currOp)
                     .Case(
-                        [&](pylir::TypeFlow::ConstantOp constant)
+                        [&](pylir::TypeFlow::ConstantOp constant) -> std::optional<ExecutionResult>
                         {
                             m_values[constant] = constant.getInput();
                             return std::nullopt;
                         })
                     .Case(
-                        [&](pylir::TypeFlow::UndefOp undef)
+                        [&](pylir::TypeFlow::UndefOp undef) -> std::optional<ExecutionResult>
                         {
                             m_values[undef] = {};
                             return std::nullopt;
                         })
                     .Case(
-                        [&](pylir::TypeFlow::TypeFlowExecInterface interface)
+                        [&](pylir::TypeFlow::TypeFlowExecInterface interface) -> std::optional<ExecutionResult>
                         {
                             llvm::SmallVector<pylir::TypeFlow::OpFoldResult> result;
                             if (mlir::failed(interface.exec(

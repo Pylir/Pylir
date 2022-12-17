@@ -36,7 +36,7 @@ public:
     {
     }
 
-    explicit PyBuilder(mlir::MLIRContext* context, llvm::Optional<mlir::Location> loc = {})
+    explicit PyBuilder(mlir::MLIRContext* context, std::optional<mlir::Location> loc = {})
         : mlir::OpBuilder(context), m_loc(loc.value_or(getUnknownLoc()))
     {
     }

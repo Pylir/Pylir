@@ -8,7 +8,7 @@
 
 #include "pylir/Optimizer/PylirPy/IR/Value.hpp"
 
-llvm::Optional<pylir::Mem::LayoutType> pylir::Mem::getLayoutType(mlir::Value value,
+std::optional<pylir::Mem::LayoutType> pylir::Mem::getLayoutType(mlir::Value value,
                                                                  llvm::DenseMap<mlir::Attribute, LayoutType>* cache)
 {
     mlir::Attribute attribute;
@@ -17,25 +17,25 @@ llvm::Optional<pylir::Mem::LayoutType> pylir::Mem::getLayoutType(mlir::Value val
         return getLayoutType(attribute, cache);
     }
     // TODO: Future deduction from some kind of "makeType" op goes here.
-    return llvm::None;
+    return std::nullopt;
 }
 
 namespace
 {
-llvm::Optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr)
+std::optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr)
 {
     using namespace pylir;
     using namespace pylir::Py;
     using namespace pylir::Mem;
 
-    auto mapLayoutType = [](mlir::Attribute attribute) -> llvm::Optional<pylir::Mem::LayoutType>
+    auto mapLayoutType = [](mlir::Attribute attribute) -> std::optional<pylir::Mem::LayoutType>
     {
         auto ref = attribute.dyn_cast<RefAttr>();
         if (!ref)
         {
-            return llvm::None;
+            return std::nullopt;
         }
-        return llvm::StringSwitch<llvm::Optional<LayoutType>>(ref.getRef().getValue())
+        return llvm::StringSwitch<std::optional<LayoutType>>(ref.getRef().getValue())
             .Case(Builtins::Object.name, LayoutType::Object)
             .Case(Builtins::Type.name, LayoutType::Type)
             .Case(Builtins::Float.name, LayoutType::Float)
@@ -46,7 +46,7 @@ llvm::Optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr)
             .Case(Builtins::Dict.name, LayoutType::Dict)
             .Case(Builtins::Int.name, LayoutType::Int)
             .Case(Builtins::BaseException.name, LayoutType::BaseException)
-            .Default(llvm::None);
+            .Default(std::nullopt);
     };
 
     if (auto result = mapLayoutType(attr))
@@ -57,7 +57,7 @@ llvm::Optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr)
     auto type = ref_cast<TypeAttr>(attr);
     if (!type)
     {
-        return llvm::None;
+        return std::nullopt;
     }
     auto mro = ref_cast<TupleAttr>(type.getMroTuple());
     for (mlir::Attribute iter : mro)
@@ -71,7 +71,7 @@ llvm::Optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr)
 }
 } // namespace
 
-llvm::Optional<pylir::Mem::LayoutType> pylir::Mem::getLayoutType(mlir::Attribute attr,
+std::optional<pylir::Mem::LayoutType> pylir::Mem::getLayoutType(mlir::Attribute attr,
                                                                  llvm::DenseMap<mlir::Attribute, LayoutType>* cache)
 {
     if (cache)

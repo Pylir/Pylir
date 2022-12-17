@@ -15,10 +15,10 @@ std::unique_ptr<llvm::MemoryBuffer> getXCRunOutput(std::vector<llvm::StringRef> 
     llvm::SmallString<64> outputFile;
     llvm::sys::fs::createTemporaryFile("xcrun-output", "", outputFile);
 
-    llvm::Optional<llvm::StringRef> redirects[] = {{""}, outputFile.str(), {""}};
+    std::optional<llvm::StringRef> redirects[] = {{""}, outputFile.str(), {""}};
 
     arguments.insert(arguments.begin(), "/usr/bin/xcrun");
-    auto result = llvm::sys::ExecuteAndWait("/usr/bin/xcrun", arguments, llvm::None, redirects, 0, 0);
+    auto result = llvm::sys::ExecuteAndWait("/usr/bin/xcrun", arguments, std::nullopt, redirects, 0, 0);
     if (result != 0)
     {
         return nullptr;
@@ -57,7 +57,7 @@ void pylir::DarwinToolchain::deduceSDKRoot(const pylir::cli::CommandLine& comman
 
     // As a last resort we attempt to run 'xcrun --show-sdk-path' to get the path.
 
-    llvm::Optional<llvm::StringRef> sdkName;
+    std::optional<llvm::StringRef> sdkName;
     switch (m_triple.getOS())
     {
         case llvm::Triple::Darwin:
@@ -120,17 +120,17 @@ bool pylir::DarwinToolchain::readSDKSettings(llvm::MemoryBuffer& buffer)
         return false;
     }
 
-    auto readVersion = [](const llvm::json::Object& object, llvm::StringRef key) -> llvm::Optional<llvm::VersionTuple>
+    auto readVersion = [](const llvm::json::Object& object, llvm::StringRef key) -> std::optional<llvm::VersionTuple>
     {
         auto val = object.getString(key);
         if (!val)
         {
-            return llvm::None;
+            return std::nullopt;
         }
         llvm::VersionTuple version;
         if (version.tryParse(*val))
         {
-            return llvm::None;
+            return std::nullopt;
         }
         return version;
     };

@@ -53,14 +53,16 @@ mlir::Attribute pylir::TypeFlow::InstructionAttr::parse(::mlir::AsmParser& parse
 mlir::ParseResult pylir::TypeFlow::FuncOp::parse(::mlir::OpAsmParser& parser, ::mlir::OperationState& result)
 {
     return mlir::function_interface_impl::parseFunctionOp(
-        parser, result, false,
+        parser, result, false, getFunctionTypeAttrName(result.name),
         [](mlir::Builder& builder, llvm::ArrayRef<mlir::Type> argTypes, llvm::ArrayRef<mlir::Type> results, auto&&...)
-        { return builder.getFunctionType(argTypes, results); });
+        { return builder.getFunctionType(argTypes, results); },
+        getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
 }
 
 void pylir::TypeFlow::FuncOp::print(::mlir::OpAsmPrinter& p)
 {
-    mlir::function_interface_impl::printFunctionOp(p, *this, false);
+    mlir::function_interface_impl::printFunctionOp(p, *this, false, getFunctionTypeAttrName(), getArgAttrsAttrName(),
+                                                   getResAttrsAttrName());
 }
 
 mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
@@ -314,11 +316,11 @@ mlir::SuccessorOperands pylir::TypeFlow::CondBranchOp::getSuccessorOperands(unsi
     return mlir::SuccessorOperands(index == 0 ? getTrueArgsMutable() : getFalseArgsMutable());
 }
 
-mlir::LogicalResult
-    pylir::TypeFlow::CalcOp::inferReturnTypes(::mlir::MLIRContext* context, ::llvm::Optional<::mlir::Location>,
-                                              ::mlir::ValueRange operands, ::mlir::DictionaryAttr attributes,
-                                              ::mlir::RegionRange regions,
-                                              ::llvm::SmallVectorImpl<::mlir::Type>& inferredReturnTypes)
+mlir::LogicalResult pylir::TypeFlow::CalcOp::inferReturnTypes(mlir::MLIRContext* context, std::optional<mlir::Location>,
+                                                              mlir::ValueRange operands,
+                                                              mlir::DictionaryAttr attributes,
+                                                              mlir::RegionRange regions,
+                                                              llvm::SmallVectorImpl<mlir::Type>& inferredReturnTypes)
 {
     Adaptor adaptor(operands, attributes, regions);
     std::size_t count = adaptor.getInstruction()->getNumResults();

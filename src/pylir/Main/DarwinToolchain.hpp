@@ -14,7 +14,7 @@ namespace pylir
 class DarwinToolchain : public Toolchain
 {
     std::string m_sdkRoot;
-    llvm::Optional<llvm::VersionTuple> m_sdkVersion;
+    std::optional<llvm::VersionTuple> m_sdkVersion;
     ClangInstallation m_clangInstallation;
 
     void deduceSDKRoot(const cli::CommandLine& commandLine);

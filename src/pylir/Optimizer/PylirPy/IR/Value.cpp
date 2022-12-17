@@ -32,7 +32,7 @@ mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value)
     return nullptr;
 }
 
-llvm::Optional<bool> pylir::Py::isUnbound(mlir::Value value)
+std::optional<bool> pylir::Py::isUnbound(mlir::Value value)
 {
     mlir::Attribute constant;
     if (mlir::matchPattern(value, mlir::m_Constant(&constant)))
@@ -46,7 +46,7 @@ llvm::Optional<bool> pylir::Py::isUnbound(mlir::Value value)
         {
             return false;
         }
-        return llvm::None;
+        return std::nullopt;
     }
     // If the defining op has the AlwaysBound trait then it is false.
     auto* op = value.getDefiningOp();
@@ -55,7 +55,7 @@ llvm::Optional<bool> pylir::Py::isUnbound(mlir::Value value)
     {
         return false;
     }
-    return llvm::None;
+    return std::nullopt;
 }
 
 namespace
@@ -153,17 +153,17 @@ mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute)
     PYLIR_UNREACHABLE;
 }
 
-llvm::Optional<bool> pylir::Py::isEqual(mlir::Attribute lhs, mlir::Attribute rhs)
+std::optional<bool> pylir::Py::isEqual(mlir::Attribute lhs, mlir::Attribute rhs)
 {
     lhs = getCanonicalEqualsForm(lhs);
     if (!lhs)
     {
-        return llvm::None;
+        return std::nullopt;
     }
     rhs = getCanonicalEqualsForm(rhs);
     if (!rhs)
     {
-        return llvm::None;
+        return std::nullopt;
     }
     return lhs == rhs;
 }

@@ -502,7 +502,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 auto triple = llvmModule->getTargetTriple();
                 if (mlir::failed(
                         ensureTargetMachine(args, commandLine, toolchain,
-                                            triple.empty() ? llvm::Optional<llvm::Triple>{} : llvm::Triple(triple))))
+                                            triple.empty() ? std::optional<llvm::Triple>{} : llvm::Triple(triple))))
                 {
                     return mlir::failure();
                 }
@@ -825,7 +825,7 @@ mlir::LogicalResult pylir::CompilerInvocation::finalizeOutputStream(mlir::Logica
 mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(const llvm::opt::InputArgList& args,
                                                                    CommandLine& commandLine,
                                                                    const pylir::Toolchain& toolchain,
-                                                                   llvm::Optional<llvm::Triple> triple)
+                                                                   std::optional<llvm::Triple> triple)
 {
     if (mlir::failed(ensureLLVMInit(args, toolchain)))
     {

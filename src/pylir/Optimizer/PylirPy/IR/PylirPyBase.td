@@ -37,8 +37,6 @@ def PylirPy_Dialect : Dialect {
 
         void printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter& os) const override;
     }];
-
-    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 #endif

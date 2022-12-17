@@ -5,8 +5,6 @@ include "pylir/Optimizer/Util/OpVariableBase.td"
 
 def Test_Dialect : Dialect {
     let name = "test";
-
-    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 class Test_Op<string mnemonic, list<Trait> traits = []> : Op<Test_Dialect, mnemonic, traits>;

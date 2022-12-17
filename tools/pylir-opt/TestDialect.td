@@ -13,8 +13,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 def TestDialect : Dialect {
     let name = "test";
     let cppNamespace = "::pylir::test";
-
-    let emitAccessorPrefix = kEmitAccessorPrefix_Prefixed;
 }
 
 class Test_Op<string mnemonic, list <Trait> traits = []> : Op<TestDialect, mnemonic, traits>;

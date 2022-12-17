@@ -41,9 +41,9 @@ namespace
 /// This typically parses the main source file, runs zero or more optimization
 /// passes, then prints the output.
 ///
-mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses, llvm::SourceMgr& sourceMgr,
-                                   mlir::MLIRContext* context, mlir::PassPipelineFn passManagerSetupFn,
-                                   bool emitBytecode)
+mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses,
+                                   const std::shared_ptr<llvm::SourceMgr>& sourceMgr, mlir::MLIRContext* context,
+                                   mlir::PassPipelineFn passManagerSetupFn, bool emitBytecode)
 {
     mlir::DefaultTimingManager tm;
     applyDefaultTimingManagerCLOptions(tm);
@@ -113,8 +113,8 @@ mlir::LogicalResult processBuffer(llvm::raw_ostream& os, std::unique_ptr<llvm::M
                                   mlir::DialectRegistry& registry, llvm::ThreadPool* threadPool)
 {
     // Tell sourceMgr about this buffer, which is what the parser will pick up.
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
+    auto sourceMgr = std::make_shared<llvm::SourceMgr>();
+    sourceMgr->AddNewSourceBuffer(std::move(ownedBuffer), llvm::SMLoc());
 
     // Create a context just for the current buffer. Disable threading on creation
     // since we'll inject the thread-pool separately.
@@ -136,11 +136,11 @@ mlir::LogicalResult processBuffer(llvm::raw_ostream& os, std::unique_ptr<llvm::M
     // otherwise just perform the actions without worrying about it.
     if (!verifyDiagnostics)
     {
-        mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
+        mlir::SourceMgrDiagnosticHandler sourceMgrHandler(*sourceMgr, &context);
         return performActions(os, verifyPasses, sourceMgr, &context, passManagerSetupFn, emitBytecode);
     }
 
-    mlir::SourceMgrDiagnosticVerifierHandler sourceMgrHandler(sourceMgr, &context);
+    mlir::SourceMgrDiagnosticVerifierHandler sourceMgrHandler(*sourceMgr, &context);
 
     // Do any processing requested by command line flags.  We don't care whether
     // these actions succeed or fail, we only care what diagnostics they produce

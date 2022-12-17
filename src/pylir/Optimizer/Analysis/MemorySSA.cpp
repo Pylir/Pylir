@@ -188,7 +188,7 @@ void pylir::MemorySSA::fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuild
                 continue;
             }
             llvm::SmallVector<mlir::RegionSuccessor> successors;
-            regionBranchOp.getSuccessorRegions(llvm::None, successors);
+            regionBranchOp.getSuccessorRegions(std::nullopt, successors);
             PYLIR_ASSERT(!successors.empty());
             auto* continueRegion = new mlir::Block;
 

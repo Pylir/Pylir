@@ -18,7 +18,7 @@ mlir::OpFoldResult getTypeOf(mlir::Value value);
 
 /// Returns whether the value is definitely bound, unbound or unknown. If the optional does not have a value, it is
 /// unknown whether it's bound or not, otherwise the optional contains whether the value is unbound.
-llvm::Optional<bool> isUnbound(mlir::Value value);
+std::optional<bool> isUnbound(mlir::Value value);
 
 /// Casts the attribute to the given 'T'. It differs from 'dyn_cast' in the case that the attribute is a 'RefAttr'. It
 /// then uses the referred to 'py.globalValue' and attempts to cast its initializer to 'T' instead.
@@ -94,6 +94,6 @@ mlir::Attribute getCanonicalEqualsForm(mlir::Attribute attribute);
 /// Returns whether 'lhs' and 'rhs' are equal according to '__eq__' or an empty optional if unknown as determined
 /// by 'getCanonicalEqualsForm' for each of 'lhs' and 'rhs'.
 /// Both are required to be one of 'RefAttr', 'UnboundAttr' or 'ObjectAttrInterface'.
-llvm::Optional<bool> isEqual(mlir::Attribute lhs, mlir::Attribute rhs);
+std::optional<bool> isEqual(mlir::Attribute lhs, mlir::Attribute rhs);
 
 } // namespace pylir::Py
