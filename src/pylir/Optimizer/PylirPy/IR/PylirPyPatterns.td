@@ -16,10 +16,6 @@ def prependTupleConst : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, 
 
 def IsTypeSlot : AttrConstraint<CPred<"::isTypeSlot($_self.cast<::mlir::StringAttr>().getValue())">, "is type slot">;
 
-class DenseArrayCount<int n> : AttrConstraint<
-    CPred<"$_self.cast<::mlir::DenseArrayAttr>().size() == " #n>,
-    "with exactly " # n # " elements">;
-
 defvar TypeRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.type">;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, DenseArrayCount<0>)),

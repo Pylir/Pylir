@@ -65,9 +65,9 @@ void pylir::TypeFlow::FuncOp::print(::mlir::OpAsmPrinter& p)
                                                    getResAttrsAttrName());
 }
 
-mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult pylir::TypeFlow::ConstantOp::fold(FoldAdaptor adaptor)
 {
-    return operands[0];
+    return adaptor.getInput();
 }
 
 mlir::LogicalResult pylir::TypeFlow::TypeOfOp::exec(::llvm::ArrayRef<Py::TypeAttrUnion> operands,
@@ -271,12 +271,12 @@ mlir::LogicalResult pylir::TypeFlow::CalcOp::exec(::llvm::ArrayRef<Py::TypeAttrU
     return exec(operands, results, false);
 }
 
-mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(::llvm::ArrayRef<::mlir::Attribute> operands,
+mlir::LogicalResult pylir::TypeFlow::CalcOp::fold(FoldAdaptor adaptor,
                                                   ::llvm::SmallVectorImpl<::mlir::OpFoldResult>& results)
 {
     llvm::SmallVector<::pylir::TypeFlow::OpFoldResult> res;
     if (mlir::failed(exec(
-            llvm::to_vector(llvm::map_range(operands,
+            llvm::to_vector(llvm::map_range(adaptor.getInput(),
                                             [](mlir::Attribute attr) -> Py::TypeAttrUnion
                                             {
                                                 if (auto typeAttr = attr.dyn_cast_or_null<mlir::TypeAttr>())

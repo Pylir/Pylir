@@ -17,6 +17,7 @@ def PylirMem_Dialect : Dialect {
 
     let useDefaultAttributePrinterParser = 0;
     let useDefaultTypePrinterParser = 1;
+    let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 #endif

@@ -1732,7 +1732,7 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
   if (auto *CI = dyn_cast<CallInst>(Call)) {
     CallInst *SPCall = Builder.CreateGCStatepointCall(
         StatepointID, NumPatchBytes, CallTarget, CallArgs,
-        makeArrayRef(BasePtrs), {}, "safepoint_token");
+        ArrayRef(BasePtrs), {}, "safepoint_token");
 
     SPCall->setTailCallKind(CI->getTailCallKind());
     SPCall->setCallingConv(CI->getCallingConv());
@@ -1759,7 +1759,7 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
     // original block.
     InvokeInst *SPInvoke = Builder.CreateGCStatepointInvoke(
         StatepointID, NumPatchBytes, CallTarget, II->getNormalDest(),
-        II->getUnwindDest(), CallArgs, makeArrayRef(BasePtrs), {},
+        II->getUnwindDest(), CallArgs, ArrayRef(BasePtrs), {},
         "statepoint_token");
 
     SPInvoke->setCallingConv(II->getCallingConv());

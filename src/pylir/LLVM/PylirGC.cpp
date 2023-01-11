@@ -97,7 +97,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
         {
             // First three entries always contain metadata about things like calling convention used, that we just
             // aren't interested in.
-            auto ref = llvm::makeArrayRef(iter.Locations).drop_front(3);
+            auto ref = llvm::ArrayRef(iter.Locations).drop_front(3);
 
             llvm::copy_if(ref, std::back_inserter(allLocations), locNoConstantPred);
         }

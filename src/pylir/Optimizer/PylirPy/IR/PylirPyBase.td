@@ -37,6 +37,8 @@ def PylirPy_Dialect : Dialect {
 
         void printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter& os) const override;
     }];
+
+    let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 #endif

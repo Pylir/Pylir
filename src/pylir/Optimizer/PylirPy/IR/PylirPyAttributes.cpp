@@ -56,7 +56,7 @@ llvm::hash_code hash_value(const pylir::BigInt& bigInt)
     llvm::SmallVector<std::uint8_t, 10> data(count);
     auto result = mp_to_sbin(&bigInt.getHandle(), data.data(), count, nullptr);
     PYLIR_ASSERT(result == MP_OKAY);
-    return llvm::hash_value(makeArrayRef(data));
+    return llvm::hash_value(llvm::ArrayRef(data));
 }
 
 namespace Py::detail

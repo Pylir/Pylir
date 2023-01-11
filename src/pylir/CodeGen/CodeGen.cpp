@@ -2465,7 +2465,7 @@ std::vector<pylir::CodeGen::ModuleImport> pylir::CodeGen::importModules(llvm::Ar
                 imports.push_back({"", false, location});
                 continue;
             }
-            moduleQualifier = llvm::join(makeArrayRef(split).drop_back(iter.dots - 1), ".");
+            moduleQualifier = llvm::join(llvm::ArrayRef(split).drop_back(iter.dots - 1), ".");
         }
         else
         {

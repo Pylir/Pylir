@@ -23,6 +23,7 @@ def TypeFlow_Dialect : Dialect {
 
     let useDefaultAttributePrinterParser = 1;
     let useDefaultTypePrinterParser = 1;
+    let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 class TypeFlow_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type">
@@ -90,10 +91,10 @@ def TypeFlow_ConstantOp : TypeFlow_Op<"constant", [NoMemoryEffect, ConstantLike]
 }
 
 defvar foldAsExec = [{
-mlir::OpFoldResult $cppClass::fold(::llvm::ArrayRef<::mlir::Attribute> operands)
+mlir::OpFoldResult $cppClass::fold(FoldAdaptor adaptor)
 {
     llvm::SmallVector<::pylir::TypeFlow::OpFoldResult> res;
-    if (mlir::failed(exec(llvm::to_vector(llvm::map_range(operands, [](mlir::Attribute attr) -> ::pylir::Py::TypeAttrUnion {
+    if (mlir::failed(exec(llvm::to_vector(llvm::map_range(adaptor.getOperands(), [](mlir::Attribute attr) -> ::pylir::Py::TypeAttrUnion {
         if (auto typeAttr = attr.dyn_cast_or_null<mlir::TypeAttr>())
         {
             return typeAttr.getValue().cast<pylir::Py::ObjectTypeInterface>();
