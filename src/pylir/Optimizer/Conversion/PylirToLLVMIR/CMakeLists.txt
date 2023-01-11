@@ -5,5 +5,5 @@
 add_library(PylirToLLVMIR PylirToLLVMIR.cpp WinX64.cpp X86_64.cpp PlatformABI.cpp)
 add_dependencies(PylirToLLVMIR PylirConversionPassIncGen)
 target_link_libraries(PylirToLLVMIR PUBLIC PylirMemDialect MLIRLLVMDialect MLIRPass MLIRTransforms MLIRFuncToLLVM
-  MLIRControlFlowToLLVM)
+  MLIRControlFlowToLLVM LLVMTargetParser)
 set_property(GLOBAL APPEND PROPERTY MLIR_CONVERSION_LIBS PylirToLLVMIR)
