@@ -23,6 +23,7 @@
 #include <mlir/Transforms/Passes.h>
 
 #include <llvm/ADT/ScopeExit.h>
+#include <llvm/ADT/StringSet.h>
 #include <llvm/Analysis/AliasAnalysis.h>
 #include <llvm/Bitcode/BitcodeWriterPass.h>
 #include <llvm/IR/LegacyPassManager.h>

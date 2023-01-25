@@ -16,7 +16,7 @@
 namespace pylir::cli
 {
 
-class PylirOptTable : public llvm::opt::OptTable
+class PylirOptTable : public llvm::opt::PrecomputedOptTable
 {
 public:
     PylirOptTable();

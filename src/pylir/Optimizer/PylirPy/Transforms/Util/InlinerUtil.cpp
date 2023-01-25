@@ -5,7 +5,7 @@
 #include "InlinerUtil.hpp"
 
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/IR/BlockAndValueMapping.h>
+#include <mlir/IR/IRMapping.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 
@@ -34,7 +34,7 @@ void pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface
 {
     auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*call);
 
-    mlir::BlockAndValueMapping mapping;
+    mlir::IRMapping mapping;
     auto* callableRegion = callable.getCallableRegion();
     mapping.map(callableRegion->getArguments(), call.getArgOperands());
 

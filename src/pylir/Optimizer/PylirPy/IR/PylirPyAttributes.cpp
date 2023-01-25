@@ -211,10 +211,9 @@ namespace
 
 mlir::LogicalResult
     parseKVPair(mlir::AsmParser& parser,
-                mlir::FailureOr<llvm::SmallVector<std::pair<mlir::Attribute, mlir::Attribute>>>& values,
-                mlir::FailureOr<llvm::SmallVector<std::pair<mlir::Attribute, std::size_t>>>& normalizedKeys)
+                                llvm::SmallVector<std::pair<mlir::Attribute, mlir::Attribute>>& values,
+                                llvm::SmallVector<std::pair<mlir::Attribute, std::size_t>>& normalizedKeys)
 {
-    values.emplace();
     llvm::SmallVector<pylir::Py::DictAttr::Entry> entries;
     auto parseResult = parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces,
                                                       [&]

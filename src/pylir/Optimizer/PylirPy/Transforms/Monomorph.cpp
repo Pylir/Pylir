@@ -3,8 +3,8 @@
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Analysis/Liveness.h>
-#include <mlir/IR/BlockAndValueMapping.h>
 #include <mlir/IR/Dominance.h>
+#include <mlir/IR/IRMapping.h>
 
 #include <llvm/ADT/DepthFirstIterator.h>
 #include <llvm/ADT/TypeSwitch.h>
@@ -1451,7 +1451,7 @@ void Monomorph::runOnOperation()
     struct Clone
     {
         mlir::FunctionOpInterface function;
-        mlir::BlockAndValueMapping mapping;
+        mlir::IRMapping mapping;
     };
 
     bool changed = false;
@@ -1549,17 +1549,7 @@ void Monomorph::runOnOperation()
                     {
                         return origCall;
                     }
-                    auto& mapping = thisClone.mapping;
-                    // TODO: Map call properly (not like the following code) as soon as it is supported by
-                    // BlockAndValueMapping
-                    if (origCall->getNumResults() != 0)
-                    {
-                        return mapping.lookupOrDefault(origCall->getResult(0)).getDefiningOp();
-                    }
-
-                    auto* mappedBlock = mapping.lookupOrDefault(origCall->getBlock());
-                    auto distance = std::distance(origCall->getBlock()->begin(), mlir::Block::iterator{origCall});
-                    return &*std::next(mappedBlock->begin(), distance);
+                    return thisClone.mapping.lookupOrDefault(origCall);
                 };
 
                 auto& calleeClone = clones[func];
@@ -1585,6 +1575,7 @@ void Monomorph::runOnOperation()
                 {
                     // call is now invalid, but it's still contained within the mapping. Have to update it.
                     thisClone.mapping.map(origCall->getResults(), newCall->getResults());
+                    thisClone.mapping.map(origCall, newCall);
                 }
                 m_callsChanged++;
                 changed = true;
