@@ -85,7 +85,7 @@ runs:
       shell: pwsh
       run: |
         $work_space = "${{github.workspace}}".replace('\', '/') 
-        $assertions = 'ON'
+        $assertions = '-DLLVM_ENABLE_ASSERTIONS=ON'
         $san_flag = ''
         if ('${{inputs.sanitizers}}') {
           $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
@@ -95,7 +95,7 @@ runs:
           # of causing thread sanitizer errors due to extra reads performed in the assertions (that would otherwise
           # not be present).
           if ('${{inputs.sanitizers}}'.contains('thread')) {
-            $assertions = 'OFF'
+            $assertions = '-DLLVM_ENABLE_ASSERTIONS=OFF'
           }
         }
         $runtime_lib = ''
@@ -136,7 +136,7 @@ runs:
         -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
         -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
         -DBUILD_SHARED_LIBS=${{inputs.shared_libs}} `
-        -DLLVM_ENABLE_ASSERTIONS=$assertions `
+        $assertions `
         -DLLVM_BUILD_TOOLS=OFF `
         -DLLVM_BUILD_UTILS=ON `
         -DLLVM_INCLUDE_TESTS=OFF `
