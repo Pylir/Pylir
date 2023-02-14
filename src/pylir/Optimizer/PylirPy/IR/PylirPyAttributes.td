@@ -10,7 +10,6 @@ include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
 include "pylir/Optimizer/Util/TablegenUtil.td"
-include "mlir/IR/SubElementInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
@@ -31,7 +30,7 @@ class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = []
 class TypeObjectSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = [], string extraBuilderCode = "">
     : AttrSpecBuilder<name,
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "type_object">, ParamSpec<SlotsMap, "slots">]),
-    !listconcat(traits, [SubElementAttrInterface, ObjectAttrInterface,
+    !listconcat(traits, [ObjectAttrInterface,
 						 DeclareAttrInterfaceMethods<SROAAttrInterface>]),
 										extraBuilderCode>;
 
@@ -39,11 +38,11 @@ class TypeObjectSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> t
 class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = []>
     : AttrSpecBuilder<name,
     !listconcat(parameters, [ParamSpec<DefaultType<name>, "type_object">]),
-    !listconcat(traits, [SubElementAttrInterface, ObjectAttrInterface,
+    !listconcat(traits, [ObjectAttrInterface,
 						 DeclareAttrInterfaceMethods<SROAAttrInterface>])>;
 
 
-def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", [], [SubElementAttrInterface]> {
+def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", []> {
 	let mnemonic = "obj";
 	let summary = "python object";
 
@@ -162,7 +161,7 @@ def PylirPy_SetAttr : TypeObjectSlotsAttr<"Set",
 	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict", [SubElementAttrInterface, ObjectAttrInterface,
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ObjectAttrInterface,
     DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
 
     let mnemonic = "dict";
@@ -262,7 +261,7 @@ def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "defaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kw_defaults">,
 	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
-	 ], [SubElementAttrInterface, DeclareAttrInterfaceMethods<ObjectAttrInterface>,
+	 ], [DeclareAttrInterfaceMethods<ObjectAttrInterface>,
 	        DeclareAttrInterfaceMethods<SROAAttrInterface>, ImmutableAttr]>
 {
 	let mnemonic = "function";

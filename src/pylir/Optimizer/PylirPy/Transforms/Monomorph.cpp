@@ -1178,13 +1178,10 @@ class Scheduler
 
     [[nodiscard]] bool typeIsOverDefined(mlir::Type type) const
     {
-        auto subElements = type.dyn_cast<mlir::SubElementTypeInterface>();
-        if (!subElements)
-        {
-            return false;
-        }
         std::size_t counter = 0;
-        subElements.walkSubTypes([&](auto&&) { counter++; });
+        mlir::AttrTypeWalker walker;
+        walker.addWalk([&](mlir::Type) { counter++; });
+        walker.walk(type);
         return counter > m_maxTypeSize;
     }
 

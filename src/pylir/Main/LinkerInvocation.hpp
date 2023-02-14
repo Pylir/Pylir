@@ -7,8 +7,8 @@
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/StringRef.h>
-#include <llvm/ADT/Triple.h>
 #include <llvm/Support/Path.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include <string>
 #include <vector>

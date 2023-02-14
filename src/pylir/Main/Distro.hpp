@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include <llvm/ADT/Triple.h>
+#include <llvm/TargetParser/Triple.h>
 
 namespace pylir
 {

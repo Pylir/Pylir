@@ -6,7 +6,6 @@
 #define PYLIR_TYPES_TABLEGEN
 
 include "pylir/Optimizer/PylirMem/IR/PylirMemBase.td"
-include "mlir/IR/SubElementInterfaces.td"
 include "mlir/IR/BuiltinTypeInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 

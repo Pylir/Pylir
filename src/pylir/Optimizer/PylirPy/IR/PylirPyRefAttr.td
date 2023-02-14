@@ -11,11 +11,9 @@
 // the other headers. The implementation of this file is still contained within 'PylirPyAttributes.cpp'
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
-include "mlir/IR/SubElementInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 
-def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref",
-    [DeclareAttrInterfaceMethods<SubElementAttrInterface>]> {
+def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref"> {
     let mnemonic = "ref";
     let summary = "reference to global python value";
 

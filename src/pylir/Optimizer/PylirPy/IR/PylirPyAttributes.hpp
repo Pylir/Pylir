@@ -6,7 +6,6 @@
 
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
-#include <mlir/IR/SubElementInterfaces.h>
 
 #include <pylir/Interfaces/Builtins.hpp>
 #include <pylir/Optimizer/Interfaces/SROAInterfaces.hpp>
@@ -62,7 +61,7 @@ template <class First, class Second>
 struct mlir::AttrTypeSubElementHandler<std::pair<First, Second>,
                                        std::enable_if_t<mlir::has_sub_attr_or_type_v<First, Second>>>
 {
-    static void walk(const std::pair<First, Second>& param, AttrTypeSubElementWalker& walker)
+    static void walk(const std::pair<First, Second>& param, AttrTypeImmediateSubElementWalker& walker)
     {
         AttrTypeSubElementHandler<First>::walk(param.first, walker);
         AttrTypeSubElementHandler<Second>::walk(param.second, walker);

@@ -75,7 +75,7 @@ mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses,
     parserTiming.stop();
 
     // Prepare the pass manager, applying command-line and reproducer options.
-    mlir::PassManager pm(context, mlir::OpPassManager::Nesting::Implicit, op.get()->getName().getStringRef());
+    mlir::PassManager pm(context, op.get()->getName().getStringRef(), mlir::OpPassManager::Nesting::Implicit);
     pm.enableVerifier(verifyPasses);
     applyPassManagerCLOptions(pm);
     pm.enableTiming(timing);

@@ -34,7 +34,7 @@ runs:
     - name: Set LLVM Revision
       shell: pwsh
       run: |
-        "LLVM_REVISION=8184b563a42dafad2dc589914456028bd228429a" >> $Env:GITHUB_ENV
+        "LLVM_REVISION=147f476e851de5b6b7f405d4ae835b4a34c2e359" >> $Env:GITHUB_ENV
 
     - name: Checkout LLVM
       uses: actions/checkout@v3
@@ -85,10 +85,18 @@ runs:
       shell: pwsh
       run: |
         $work_space = "${{github.workspace}}".replace('\', '/') 
+        $assertions = 'ON'
         $san_flag = ''
         if ('${{inputs.sanitizers}}') {
           $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
           $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
+        
+          # Assertions within LLVM also enables assertions in libstdc++ and libc++, which have the negative side effect
+          # of causing thread sanitizer errors due to extra reads performed in the assertions (that would otherwise
+          # not be present).
+          if ('${{inputs.sanitizers}}'.contains('thread')) {
+            $assertions = 'OFF'
+          }
         }
         $runtime_lib = ''
         switch ('${{inputs.runtime_lib}}') {
@@ -128,7 +136,7 @@ runs:
         -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
         -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
         -DBUILD_SHARED_LIBS=${{inputs.shared_libs}} `
-        -DLLVM_ENABLE_ASSERTIONS=ON `
+        -DLLVM_ENABLE_ASSERTIONS=$assertions `
         -DLLVM_BUILD_TOOLS=OFF `
         -DLLVM_BUILD_UTILS=ON `
         -DLLVM_INCLUDE_TESTS=OFF `

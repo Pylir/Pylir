@@ -6,8 +6,8 @@
 
 #include <mlir/Pass/Pass.h>
 
-#include <llvm/ADT/Triple.h>
 #include <llvm/IR/DataLayout.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include <memory>
 

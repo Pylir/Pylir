@@ -17,8 +17,8 @@
 
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/StringSet.h>
-#include <llvm/ADT/Triple.h>
 #include <llvm/ADT/TypeSwitch.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
@@ -105,6 +105,7 @@ public:
                                       mlir::LowerToLLVMOptions options(context);
                                       options.allocLowering = mlir::LowerToLLVMOptions::AllocLowering::None;
                                       options.dataLayout = dataLayout;
+                                      options.useOpaquePointers = true;
                                       return options;
                                   }()),
           m_objectPtrType(mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE)),
@@ -174,13 +175,8 @@ public:
         auto pyFunction = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "PyFunction");
         if (!pyFunction.isInitialized())
         {
-            // TODO: Support opaque pointers in mlir::LLVM::CallOp if indirect. Until then, the below is the workaround
-            [[maybe_unused]] auto result =
-                pyFunction.setBody({m_objectPtrType,
-                                    mlir::LLVM::LLVMPointerType::get(mlir::LLVM::LLVMFunctionType::get(
-                                        m_objectPtrType, {m_objectPtrType, m_objectPtrType, m_objectPtrType})),
-                                    getSlotEpilogue()},
-                                   false);
+            [[maybe_unused]] auto result = pyFunction.setBody(
+                {m_objectPtrType, mlir::LLVM::LLVMPointerType::get(&getContext()), getSlotEpilogue()}, false);
             PYLIR_ASSERT(mlir::succeeded(result));
         }
         return pyFunction;

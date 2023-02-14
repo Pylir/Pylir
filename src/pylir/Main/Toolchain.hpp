@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <llvm/ADT/Triple.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include "CommandLine.hpp"
 #include "LinkerInvocation.hpp"
