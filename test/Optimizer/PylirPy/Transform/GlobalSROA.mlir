@@ -21,17 +21,17 @@ func.func @foo(%hash: index, %arg0 : !py.dynamic) {
     return
 }
 
-// CHECK: py.global "private" @[[DES:.*]] : !py.dynamic
+// CHECK: py.global "private" @[[$DES:.*]] : !py.dynamic
 
 // CHECK-LABEL: func.func @test
-// CHECK: %[[LOAD:.*]] = py.load @[[DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = py.load @[[$DES]] : !py.dynamic
 // CHECK-NOT: py.dict.tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
 // CHECK-LABEL: func.func @foo
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK: py.store %[[ARG1]] : !py.dynamic into @[[DES]]
+// CHECK: py.store %[[ARG1]] : !py.dynamic into @[[$DES]]
 // CHECK-NOT: py.dict.setItem
 
 // -----
@@ -50,12 +50,12 @@ func.func @store_only(%hash: index, %arg0 : !py.dynamic) {
     return
 }
 
-// CHECK: py.global "private" @[[DES:.*]] : !py.dynamic
+// CHECK: py.global "private" @[[$DES:.*]] : !py.dynamic
 
 // CHECK-LABEL: func.func @store_only
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK: py.store %[[ARG1]] : !py.dynamic into @[[DES]]
+// CHECK: py.store %[[ARG1]] : !py.dynamic into @[[$DES]]
 // CHECK-NOT: py.dict.setItem
 
 // -----
@@ -74,10 +74,10 @@ func.func @load_only(%hash: index) -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
-// CHECK: py.global "private" @[[DES:.*]] : !py.dynamic
+// CHECK: py.global "private" @[[$DES:.*]] : !py.dynamic
 
 // CHECK-LABEL: func.func @load_only
-// CHECK: %[[LOAD:.*]] = py.load @[[DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = py.load @[[$DES]] : !py.dynamic
 // CHECK-NOT: py.dict.tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
@@ -100,10 +100,10 @@ func.func @init_attr(%hash: index) -> !py.dynamic {
 
 // CHECK-NOT: py.globalValue "private" thing
 
-// CHECK: py.global "private" @[[DES:.*]] : !py.dynamic = #py.int<5>
+// CHECK: py.global "private" @[[$DES:.*]] : !py.dynamic = #py.int<5>
 
 // CHECK-LABEL: func.func @init_attr
-// CHECK: %[[LOAD:.*]] = py.load @[[DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = py.load @[[$DES]] : !py.dynamic
 // CHECK-NOT: py.dict.tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
@@ -161,9 +161,9 @@ func.func @init_attr(%hash: index) -> !py.dynamic {
 
 // CHECK-NOT: py.globalValue "private" thing
 
-// CHECK: py.global "private" @[[DES:.*]] : !py.dynamic = #py.int<5>
+// CHECK: py.global "private" @[[$DES:.*]] : !py.dynamic = #py.int<5>
 
 // CHECK-LABEL: func.func @init_attr
-// CHECK: %[[LOAD:.*]] = py.load @[[DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = py.load @[[$DES]] : !py.dynamic
 // CHECK-NOT: py.dict.tryGetItem
 // CHECK-NEXT: return %[[LOAD]]

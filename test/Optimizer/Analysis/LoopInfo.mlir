@@ -27,11 +27,11 @@ func.func @__init__() {
 	py.unreachable
 }
 
-// CHECK: Loop at depth 0 containing: ^[[HEADER:.*]]<header>
+// CHECK: Loop at depth 0 containing: ^[[$HEADER:.*]]<header>
 
 // Header appears with a block argument later
 // CHECK-LABEL: func @__init__()
-// CHECK: ^[[HEADER]](%{{.*}}: !py.dynamic):
+// CHECK: ^[[$HEADER]](%{{.*}}: !py.dynamic):
 
 // -----
 
@@ -53,14 +53,14 @@ func.func @__init__() {
 	return
 }
 
-// CHECK: Loop at depth 0 containing: ^[[HEADER_ONE:.*]]<header>, ^[[HEADER_TWO:.*]], ^[[BB3:.*]]
-// CHECK-NEXT: Loop at depth 1 containing: ^[[HEADER_TWO]]<header>
+// CHECK: Loop at depth 0 containing: ^[[$HEADER_ONE:.*]]<header>, ^[[$HEADER_TWO:.*]], ^[[$BB3:.*]]
+// CHECK-NEXT: Loop at depth 1 containing: ^[[$HEADER_TWO]]<header>
 
 // Verify the blocks above match how they appear in the IR as well
 // CHECK-LABEL: func @__init__()
-// CHECK: ^[[HEADER_ONE]]:
-// CHECK: ^[[HEADER_TWO]]:
-// CHECK: ^[[BB3]]:
+// CHECK: ^[[$HEADER_ONE]]:
+// CHECK: ^[[$HEADER_TWO]]:
+// CHECK: ^[[$BB3]]:
 
 // -----
 
@@ -79,11 +79,11 @@ func.func @__init__() {
 	return
 }
 
-// CHECK: Loop at depth 0 containing: ^[[HEADER_ONE:.*]]<header>, ^[[HEADER_TWO:.*]]
-// CHECK-NEXT: Loop at depth 1 containing: ^[[HEADER_TWO]]<header>
+// CHECK: Loop at depth 0 containing: ^[[$HEADER_ONE:.*]]<header>, ^[[$HEADER_TWO:.*]]
+// CHECK-NEXT: Loop at depth 1 containing: ^[[$HEADER_TWO]]<header>
 
 // Verify the blocks above match how they appear in the IR as well
 // CHECK-LABEL: func @__init__()
-// CHECK: ^[[HEADER_ONE]]:
-// CHECK: ^[[HEADER_TWO]]:
-// CHECK: ^[[BB3]]:
+// CHECK: ^[[$HEADER_ONE]]:
+// CHECK: ^[[$HEADER_TWO]]:
+

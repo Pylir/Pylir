@@ -39,7 +39,7 @@ py.globalValue @builtins.tuple = #py.type
 
 py.globalValue @foo = #py.str<"test">
 
-// CHECK: llvm.mlir.global private unnamed_addr constant @[[BUFFER:buffer\$[[:alnum:]]*]]("test")
+// CHECK: llvm.mlir.global private unnamed_addr constant @[[$BUFFER:buffer\$[[:alnum:]]*]]("test")
 
 // CHECK-LABEL: llvm.mlir.global external constant @foo
 // SECTION_COFF-SAME: section = "py_const"
@@ -50,7 +50,7 @@ py.globalValue @foo = #py.str<"test">
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant(4 : i64)
 // CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1, 0]
 // CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF2]][1, 1]
-// CHECK-NEXT: %[[BUFFER_ADDR:.*]] = llvm.mlir.addressof @[[BUFFER]]
+// CHECK-NEXT: %[[BUFFER_ADDR:.*]] = llvm.mlir.addressof @[[$BUFFER]]
 // CHECK-NEXT: %[[UNDEF4:.*]] = llvm.insertvalue %[[BUFFER_ADDR]], %[[UNDEF3]][1, 2]
 // CHECK-NEXT: llvm.return %[[UNDEF4]]
 

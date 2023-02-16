@@ -8,7 +8,7 @@ func.func @constants() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-// CHECK: llvm.mlir.global private unnamed_addr constant @[[CONSTANT:const\$[[:alnum:]]*]]
+// CHECK: llvm.mlir.global private unnamed_addr constant @[[$CONSTANT:const\$[[:alnum:]]*]]
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
@@ -17,7 +17,7 @@ func.func @constants() -> !py.dynamic {
 // CHECK-NEXT: llvm.return %[[UNDEF2]]
 
 // CHECK-LABEL: @constants
-// CHECK-NEXT: %[[CONSTANT_ADDRESS:.*]] = llvm.mlir.addressof @[[CONSTANT]]
+// CHECK-NEXT: %[[CONSTANT_ADDRESS:.*]] = llvm.mlir.addressof @[[$CONSTANT]]
 // CHECK-NEXT: llvm.return %[[CONSTANT_ADDRESS]]
 
 // -----
@@ -30,7 +30,7 @@ func.func @constants() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-// CHECK: llvm.mlir.global private unnamed_addr constant @[[CONSTANT:const\$[[:alnum:]]*]]
+// CHECK: llvm.mlir.global private unnamed_addr constant @[[$CONSTANT:const\$[[:alnum:]]*]]
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
@@ -41,5 +41,5 @@ func.func @constants() -> !py.dynamic {
 // CHECK-NEXT: llvm.return %[[UNDEF3]]
 
 // CHECK-LABEL: @constants
-// CHECK-NEXT: %[[CONSTANT_ADDRESS:.*]] = llvm.mlir.addressof @[[CONSTANT]]
+// CHECK-NEXT: %[[CONSTANT_ADDRESS:.*]] = llvm.mlir.addressof @[[$CONSTANT]]
 // CHECK-NEXT: llvm.return %[[CONSTANT_ADDRESS]]

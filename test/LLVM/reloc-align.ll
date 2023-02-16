@@ -13,7 +13,7 @@ define void @foo(ptr addrspace(1) %0) gc "pylir-gc" {
 }
 
 ; CHECK-LABEL: _foo
-; CHECK: {{^}}L[[LABEL:.*]]:{{[[:space:]]}}
+; CHECK: {{^}}L[[$LABEL:.*]]:{{[[:space:]]}}
 
 declare void @builtins.__init__()
 
@@ -23,4 +23,4 @@ declare token @llvm.experimental.gc.statepoint.p0(i64 immarg, i32 immarg, ptr, i
 ; Magic PYLR
 ; CHECK-NEXT: .long 1348029522
 ; CHECK: .p2align 3
-; CHECK-NEXT: .quad _foo+(L[[LABEL]]-_foo)
+; CHECK-NEXT: .quad _foo+(L[[$LABEL]]-_foo)

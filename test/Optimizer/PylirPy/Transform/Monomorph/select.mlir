@@ -22,9 +22,9 @@ func.func @__init__() -> i1 {
 	return %2 : i1
 }
 
-// CHECK: func.func @[[TEST:([[:alnum:]]|_)+]]
+// CHECK: func.func @[[$TEST:([[:alnum:]]|_)+]]
 // CHECK: %[[C:.*]] = arith.constant true
 // CHECK: return %[[C]]
 
 // CHECK-LABEL: @__init__()
-// CHECK: py.call @[[TEST]]
+// CHECK: py.call @[[$TEST]]
