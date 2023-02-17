@@ -42,4 +42,13 @@ def FixpointPass : Pass<"pylir-fixpoint"> {
     ];
 }
 
+def ConditionalsImplicationsPass : Pass<"pylir-conditionals-implications"> {
+    let summary = "Simplify boolean expressions based on conditional branch paths";
+
+    let statistics = [
+        Statistic<"m_simplificationsMade", "Number of simplifications made",
+            "Amount of simplification patterns that could be applied through the implications">,
+    ];
+}
+
 #endif

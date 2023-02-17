@@ -9,7 +9,7 @@ add_subdirectory(PylirPy)
 add_subdirectory(Interfaces)
 add_subdirectory(Transforms)
 add_subdirectory(Linker)
-add_subdirectory(Models)
+add_subdirectory(ExternalModels)
 
 add_library(PylirOptimizer Optimizer.cpp)
 target_link_libraries(PylirOptimizer

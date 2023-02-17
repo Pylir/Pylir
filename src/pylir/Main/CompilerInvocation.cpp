@@ -44,7 +44,7 @@
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/Linker/Linker.hpp>
-#include <pylir/Optimizer/Models/ControlFlowInlineCostModel.hpp>
+#include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
@@ -673,7 +673,7 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     registry.insert<mlir::LLVM::LLVMDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<mlir::DLTIDialect>();
-    pylir::registerControlFlowInlineCostModel(registry);
+    pylir::registerExternalModels(registry);
     m_mlirContext.emplace(registry);
     m_mlirContext->enableMultithreading(args.hasFlag(OPT_Xmulti_threaded, OPT_Xsingle_threaded, true));
     m_mlirContext->getDiagEngine().registerHandler(

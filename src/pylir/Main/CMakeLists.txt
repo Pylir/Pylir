@@ -36,7 +36,7 @@ target_link_libraries(PylirMain
   PylirPyToPylirMem
   PylirTransforms
   PylirLLVMPasses
-  PylirControlFlowInlineCostModel
+  PylirExternalModels
   lldCOFF
   lldELF
   lldWasm

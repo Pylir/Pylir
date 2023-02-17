@@ -9,7 +9,7 @@ add_pylir_passes(Passes Test NO_DOC)
 add_pylir_dialect(Test test NO_DOC)
 
 add_executable(pylir-opt main.cpp TestMemorySSA.cpp TestDialect.cpp TestInlinerInterface.cpp TestTypeFlow.cpp TestAliasSetTracker.cpp TestLoopInfo.cpp TestHelloWorld.cpp TestLinker.cpp TestInlineAll.cpp TestAddChange.cpp TestEscapeAnalysis.cpp)
-target_link_libraries(pylir-opt PRIVATE MLIRMlirOptMain ${dialect_libs} ${conversion_libs} PylirAnalysis PylirPyTransformsUtil PylirPyAnalysis PylirLinker PylirOptimizer PylirControlFlowInlineCostModel)
+target_link_libraries(pylir-opt PRIVATE MLIRMlirOptMain ${dialect_libs} ${conversion_libs} PylirAnalysis PylirPyTransformsUtil PylirPyAnalysis PylirLinker PylirOptimizer PylirExternalModels)
 target_include_directories(pylir-opt SYSTEM PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(pylir-opt TestPassIncGen)
 add_dependencies(pylir-opt TestIncGen)

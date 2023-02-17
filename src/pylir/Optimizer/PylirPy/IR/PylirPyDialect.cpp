@@ -10,6 +10,7 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
+#include <pylir/Optimizer/Interfaces/DialectImplicationPatternsInterface.hpp>
 #include <pylir/Optimizer/Interfaces/DialectInlineCostInterface.hpp>
 #include <pylir/Optimizer/Interfaces/DialectUndefInterface.hpp>
 
@@ -52,6 +53,34 @@ struct PylirPyUndefInterface : public pylir::DialectUndefInterface
         return builder.create<pylir::Py::ConstantOp>(loc, builder.getAttr<pylir::Py::UnboundAttr>());
     }
 };
+
+struct PylirPyImplicationPatterns : public pylir::DialectImplicationPatternsInterface
+{
+    using pylir::DialectImplicationPatternsInterface::DialectImplicationPatternsInterface;
+
+    void getImplicationPatterns(
+        pylir::PatternAllocator&, mlir::Value conditional, mlir::Attribute value,
+        llvm::function_ref<void(pylir::ImplicationPatternBase*)>,
+        llvm::function_ref<void(mlir::Value, mlir::Attribute)> implicationAddCallback) const override
+    {
+        auto boolean = mlir::dyn_cast<mlir::BoolAttr>(value);
+        if (!boolean)
+        {
+            return;
+        }
+
+        if (boolean.getValue())
+        {
+            mlir::Attribute constant;
+            mlir::Value operand;
+            if (mlir::matchPattern(conditional, mlir::m_Op<pylir::Py::IsOp>(mlir::matchers::m_Any(&operand),
+                                                                            mlir::m_Constant(&constant))))
+            {
+                implicationAddCallback(operand, constant);
+            }
+        }
+    }
+};
 } // namespace
 
 void pylir::Py::PylirPyDialect::initialize()
@@ -63,7 +92,7 @@ void pylir::Py::PylirPyDialect::initialize()
     initializeTypes();
     initializeAttributes();
     initializeExternalModels();
-    addInterfaces<PylirPyCostInterface, PylirPyUndefInterface>();
+    addInterfaces<PylirPyCostInterface, PylirPyUndefInterface, PylirPyImplicationPatterns>();
 }
 
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,

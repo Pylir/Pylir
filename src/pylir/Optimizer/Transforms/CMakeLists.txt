@@ -6,8 +6,8 @@ add_subdirectory(Util)
 
 add_pylir_passes(Passes Transform PREFIX Pylir)
 
-add_library(PylirTransforms LoadForwardingPass.cpp SROA.cpp FixpointPass.cpp)
+add_library(PylirTransforms LoadForwardingPass.cpp SROA.cpp FixpointPass.cpp ConditionalsImplications.cpp)
 add_dependencies(PylirTransforms PylirTransformPassIncGen)
 target_link_libraries(PylirTransforms PUBLIC MLIRPass PRIVATE PylirAnalysis PylirMemoryFoldInterface
-  PylirSROAInterfaces PylirTransformsUtils)
+  PylirSROAInterfaces PylirConditionalBranchInterface PylirTransformsUtils)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirTransforms)

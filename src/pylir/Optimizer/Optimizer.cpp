@@ -46,12 +46,13 @@ void pylir::registerOptimizationPipelines()
             inlinerNested.nestAny().addPass(Py::createGlobalLoadStoreEliminationPass());
             inlinerNested.addPass(Py::createFoldGlobalsPass());
             inlinerNested.addPass(mlir::createSymbolDCEPass());
-            inlinerNested.nestAny().addPass(mlir::createCSEPass());
             nested = &inlinerNested.nestAny();
+            nested->addPass(mlir::createCanonicalizerPass());
+            nested->addPass(mlir::createCSEPass());
+            nested->addPass(pylir::createConditionalsImplicationsPass());
+            nested->addPass(mlir::createCanonicalizerPass());
             nested->addPass(createLoadForwardingPass());
             nested->addPass(mlir::createSCCPPass());
-            // inlinerNested.addPass(Py::createMonomorphPass());
-            nested = &inlinerNested.nestAny();
             nested->addPass(Py::createExpandPyDialectPass());
             nested->addPass(mlir::createCanonicalizerPass());
             nested->addPass(mlir::createCSEPass());

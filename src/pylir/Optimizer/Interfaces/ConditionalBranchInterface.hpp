@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include <mlir/IR/DialectRegistry.h>
+#include <mlir/IR/OpDefinition.h>
 
-namespace pylir
-{
-void registerControlFlowInlineCostModel(mlir::DialectRegistry& registry);
-} // namespace pylir
+#include "pylir/Optimizer/Interfaces/ConditionalBranchInterface.h.inc"
