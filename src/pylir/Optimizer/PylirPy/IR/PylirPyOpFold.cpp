@@ -1383,6 +1383,40 @@ pylir::Py::IntCmpKindAttr reversePredicate(pylir::Py::IntCmpKindAttr kind)
     PYLIR_UNREACHABLE;
 }
 
+mlir::arith::CmpIPredicateAttr toArithPredicate(pylir::Py::IntCmpKindAttr kind)
+{
+    using namespace mlir::arith;
+    switch (kind.getValue())
+    {
+        case pylir::Py::IntCmpKind::eq: return CmpIPredicateAttr::get(kind.getContext(), CmpIPredicate::eq);
+        case pylir::Py::IntCmpKind::ne: return CmpIPredicateAttr::get(kind.getContext(), CmpIPredicate::ne);
+        case pylir::Py::IntCmpKind::lt: return CmpIPredicateAttr::get(kind.getContext(), CmpIPredicate::slt);
+        case pylir::Py::IntCmpKind::le: return CmpIPredicateAttr::get(kind.getContext(), CmpIPredicate::sle);
+        case pylir::Py::IntCmpKind::gt: return CmpIPredicateAttr::get(kind.getContext(), CmpIPredicate::sgt);
+        case pylir::Py::IntCmpKind::ge: return CmpIPredicateAttr::get(kind.getContext(), CmpIPredicate::sge);
+    }
+    PYLIR_UNREACHABLE;
+}
+
+mlir::IntegerAttr toBuiltinInt(mlir::Operation* operation, mlir::Attribute attr, mlir::Type integerType)
+{
+    constexpr std::size_t largestSupportedRadixByBoth = 36;
+
+    // Note using DataLayout since we currently use 'index'. When switching to fixed integer widths, this can just be a
+    // getter in 'IntegerType'.
+    auto bitWidth = mlir::DataLayout::closest(operation).getTypeSizeInBits(integerType);
+
+    std::string string = attr.cast<pylir::Py::IntAttr>().getValue().toString(largestSupportedRadixByBoth);
+    llvm::APInt integer(llvm::APInt::getSufficientBitsNeeded(string, largestSupportedRadixByBoth), string,
+                        largestSupportedRadixByBoth);
+    if (integer.getSignificantBits() > bitWidth)
+    {
+        return nullptr;
+    }
+
+    return mlir::IntegerAttr::get(integerType, integer.sextOrTrunc(bitWidth));
+}
+
 mlir::LogicalResult resolvesToPattern(mlir::Operation* operation, mlir::Attribute& result, bool constOnly)
 {
     if (!mlir::matchPattern(operation->getResult(0), mlir::m_Constant(&result)))

@@ -14,8 +14,6 @@ class ResolvesTo<int constOnly = 1>
 
 def prependTupleConst : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
-def IsTypeSlot : AttrConstraint<CPred<"::isTypeSlot($_self.cast<::mlir::StringAttr>().getValue())">, "is type slot">;
-
 defvar TypeRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.type">;
 
 def : Pat<(PylirPy_TuplePrependOp $input, (PylirPy_MakeTupleOp $args, DenseArrayCount<0>)),
@@ -74,12 +72,33 @@ def IsConstant : Constraint<CPred<"::mlir::matchPattern($0, ::mlir::m_Constant()
 
 class NotConstraint<Constraint con> : Constraint<Neg<con.predicate>, "not " # con.summary>;
 
+//===--------------------------------------------------------------------------------------------------------------===//
+// PylirPy_IntCmpOp Patterns
+//===--------------------------------------------------------------------------------------------------------------===//
+
 def : Pat<(PylirPy_IntCmpOp $kind, $lhs, $rhs),
         (PylirPy_IntCmpOp (NativeCodeCall<"reversePredicate($0)"> $kind), $rhs, $lhs),
         [(IsConstant $lhs), (NotConstraint<IsConstant> $rhs)]>;
 
 def : Pat<(Arith_XOrIOp (PylirPy_IntCmpOp $pred, $lhs, $rhs), (ConstantLikeMatcher ConstBoolAttrTrue)),
           (PylirPy_IntCmpOp (NativeCodeCall<"invertPredicate($0)"> $pred), $lhs, $rhs)>;
+
+// IntCmpOp $kind, (IntFrom(Signed|Unsigned) $lhs), (IntFrom(Signed|Unsigned) $rhs) -> Arith_CmpIOp $kind, $lhs, $rhs
+foreach lhs = [PylirPy_IntFromUnsignedOp, PylirPy_IntFromSignedOp] in {
+    foreach rhs = [PylirPy_IntFromUnsignedOp, PylirPy_IntFromSignedOp] in {
+        def : Pat<(PylirPy_IntCmpOp $kind, (lhs $lhs), (rhs $rhs)),
+            (Arith_CmpIOp (NativeCodeCall<"toArithPredicate($0)"> $kind), $lhs, $rhs)>;
+    }
+}
+
+// IntCmpOp $kind, (IntFrom(Signed|Unsigned) $lhs), Constant $rhs and $rhs in Index
+// -> Arith_CmpIOp $kind, $lhs, (index)$rhs
+foreach lhs = [PylirPy_IntFromUnsignedOp, PylirPy_IntFromSignedOp] in {
+    def : Pat<(PylirPy_IntCmpOp:$op $kind, (lhs $lhs), (ResolvesTo<0> PylirPy_IntAttr:$rhs)),
+             (Arith_CmpIOp (NativeCodeCall<"toArithPredicate($0)"> $kind), $lhs,
+                 (Arith_ConstantOp (NativeCodeCall<"toBuiltinInt($0.getOwner(), $1, $2.getType())"> $op, $rhs, $lhs))),
+             [(Constraint<CPred<"static_cast<bool>(toBuiltinInt($0.getOwner(), $1, $2.getType()))">> $op, $rhs, $lhs)]>;
+}
 
 // py.isUnboundValue (arith.select %cond, %lhs, %rhs) and %lhs and %rhs are either both definitely bound or definitely
 // not unbound -> replace with that result

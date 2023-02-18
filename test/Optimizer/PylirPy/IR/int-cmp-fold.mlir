@@ -189,3 +189,78 @@ func.func @test_eq() -> i1 {
 // CHECK-LABEL: func.func @test_eq
 // CHECK-NEXT: %[[C:.*]] = arith.constant true
 // CHECK-NEXT: return %[[C]]
+
+// -----
+
+py.globalValue @builtins.type = #py.type
+py.globalValue @builtins.tuple = #py.type
+py.globalValue @builtins.int = #py.type
+
+// CHECK-LABEL: @test_redundant_convert_1
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]: index
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]: index
+// CHECK: %[[R:.*]] = arith.cmpi eq, %[[ARG0]], %[[ARG1]]
+// CHECK: return %[[R]]
+func.func @test_redundant_convert_1(%arg0: index, %arg1: index) -> i1 {
+    %0 = py.int.fromUnsigned %arg0
+    %1 = py.int.fromUnsigned %arg1
+    %2 = py.int.cmp eq %0, %1
+    return %2 : i1
+}
+
+// CHECK-LABEL: @test_redundant_convert_2
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]: index
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]: index
+// CHECK: %[[R:.*]] = arith.cmpi slt, %[[ARG0]], %[[ARG1]]
+// CHECK: return %[[R]]
+func.func @test_redundant_convert_2(%arg0: index, %arg1: index) -> i1 {
+    %0 = py.int.fromUnsigned %arg0
+    %1 = py.int.fromSigned %arg1
+    %2 = py.int.cmp lt %0, %1
+    return %2 : i1
+}
+
+// CHECK-LABEL: @test_redundant_convert_3
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]: index
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]: index
+// CHECK: %[[R:.*]] = arith.cmpi sgt, %[[ARG0]], %[[ARG1]]
+// CHECK: return %[[R]]
+func.func @test_redundant_convert_3(%arg0: index, %arg1: index) -> i1 {
+    %0 = py.int.fromSigned %arg0
+    %1 = py.int.fromUnsigned %arg1
+    %2 = py.int.cmp gt %0, %1
+    return %2 : i1
+}
+
+// CHECK-LABEL: @test_redundant_convert_4
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]: index
+// CHECK-SAME: %[[ARG1:[[:alnum:]]+]]: index
+// CHECK: %[[R:.*]] = arith.cmpi ne, %[[ARG0]], %[[ARG1]]
+// CHECK: return %[[R]]
+func.func @test_redundant_convert_4(%arg0: index, %arg1: index) -> i1 {
+    %0 = py.int.fromSigned %arg0
+    %1 = py.int.fromSigned %arg1
+    %2 = py.int.cmp ne %0, %1
+    return %2 : i1
+}
+
+// CHECK-LABEL: @test_redundant_convert_constant
+// CHECK-SAME: %[[ARG0:[[:alnum:]]+]]: index
+// CHECK: %[[C:.*]] = arith.constant 5
+// CHECK: %[[R:.*]] = arith.cmpi sgt, %[[ARG0]], %[[C]]
+// CHECK: return %[[R]]
+func.func @test_redundant_convert_constant(%arg0: index) -> i1 {
+    %0 = py.int.fromSigned %arg0
+    %1 = py.constant(#py.int<5>)
+    %2 = py.int.cmp gt %0, %1
+    return %2 : i1
+}
+
+// CHECK-LABEL: @test_redundant_convert_constant_too_large
+// CHECK-NOT: arith.cmpi
+func.func @test_redundant_convert_constant_too_large(%arg0: index) -> i1 {
+    %0 = py.int.fromSigned %arg0
+    %1 = py.constant(#py.int<5596967597659764578954876548654865457694675736657365763575676576584678>)
+    %2 = py.int.cmp gt %0, %1
+    return %2 : i1
+}
