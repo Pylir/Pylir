@@ -166,10 +166,10 @@ std::tuple<pylir::X86_64::Adjustments::Arg, mlir::Type, mlir::Type>
 }
 
 mlir::LLVM::LLVMFuncOp pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type returnType,
-                                                  llvm::StringRef name, mlir::TypeRange inputTypes)
+                                                  llvm::StringRef name, mlir::TypeRange parameterTypes)
 {
     Adjustments adjustments;
-    adjustments.arguments.reserve(inputTypes.size());
+    adjustments.arguments.reserve(parameterTypes.size());
     adjustments.originalRetType = returnType;
 
     mlir::Type retType = returnType;
@@ -205,7 +205,7 @@ mlir::LLVM::LLVMFuncOp pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir
 
     std::uint8_t takenIntegerRegisters = 0;
     std::uint8_t takenFloatingPointRegisters = 0;
-    for (auto inputType : inputTypes)
+    for (auto inputType : parameterTypes)
     {
         if (getSizeOf(inputType) > 16)
         {
@@ -265,23 +265,23 @@ mlir::LLVM::LLVMFuncOp pylir::X86_64::declareFunc(mlir::OpBuilder& builder, mlir
 }
 
 mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
-                                    mlir::ValueRange operands)
+                                    mlir::ValueRange arguments)
 {
     auto result = m_adjustments.find(func);
     PYLIR_ASSERT(result != m_adjustments.end());
     auto& adjustments = result->second;
     mlir::LLVM::AllocaOp returnSlot;
 
-    llvm::SmallVector<mlir::Value> arguments;
+    llvm::SmallVector<mlir::Value> transformedArgs;
 
     if (std::holds_alternative<PointerToTemporary>(adjustments.returnType))
     {
         auto one = builder.create<mlir::LLVM::ConstantOp>(loc, builder.getI32Type(), builder.getI32IntegerAttr(1));
         returnSlot = builder.create<mlir::LLVM::AllocaOp>(loc, func.getFunctionType().getParams().front(), one, 1);
-        arguments.push_back(returnSlot);
+        transformedArgs.push_back(returnSlot);
     }
 
-    for (auto iter = operands.begin(); iter != operands.end(); iter++)
+    for (auto iter = arguments.begin(); iter != arguments.end(); iter++)
     {
         auto getPointerToMemory = [&](mlir::Value value) -> mlir::Value
         {
@@ -296,8 +296,8 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
             return tempAlloca;
         };
         pylir::match(
-            adjustments.arguments[iter - operands.begin()], [&](Unchanged) { arguments.push_back(*iter); },
-            [&](OnStack) { arguments.push_back(getPointerToMemory(*iter)); },
+            adjustments.arguments[iter - arguments.begin()], [&](Unchanged) { transformedArgs.push_back(*iter); },
+            [&](OnStack) { transformedArgs.push_back(getPointerToMemory(*iter)); },
             [&](MultipleArgs multipleArgs)
             {
                 auto address = getPointerToMemory(*iter);
@@ -306,7 +306,7 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
                     auto paramType = func.getFunctionType().getParamType(arguments.size());
                     auto casted = builder.create<mlir::LLVM::BitcastOp>(
                         loc, mlir::LLVM::LLVMPointerType::get(paramType), address);
-                    arguments.push_back(builder.create<mlir::LLVM::LoadOp>(loc, casted));
+                    transformedArgs.push_back(builder.create<mlir::LLVM::LoadOp>(loc, casted));
                     return;
                 }
                 auto firstType = func.getFunctionType().getParamType(arguments.size());
@@ -319,8 +319,8 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
                                                                     address, mlir::ValueRange{zero, zero});
                 auto secondValue = builder.create<mlir::LLVM::GEPOp>(loc, mlir::LLVM::LLVMPointerType::get(secondType),
                                                                      address, mlir::ValueRange{zero, one});
-                arguments.push_back(builder.create<mlir::LLVM::LoadOp>(loc, firstValue));
-                arguments.push_back(builder.create<mlir::LLVM::LoadOp>(loc, secondValue));
+                transformedArgs.push_back(builder.create<mlir::LLVM::LoadOp>(loc, firstValue));
+                transformedArgs.push_back(builder.create<mlir::LLVM::LoadOp>(loc, secondValue));
             });
     }
 
@@ -348,4 +348,15 @@ mlir::Value pylir::X86_64::callFunc(mlir::OpBuilder& builder, mlir::Location loc
         });
 }
 
-pylir::X86_64::X86_64(mlir::DataLayout dataLayout) : PlatformABI(std::move(dataLayout)) {}
+mlir::Type pylir::X86_64::getUnwindExceptionHeader(mlir::MLIRContext* context) const
+{
+    auto i64 = mlir::IntegerType::get(context, 64);
+    // See _Unwind_Exception in unwind.h
+    return mlir::LLVM::LLVMStructType::getLiteral(context,
+                                                  {
+                                                      /*exception_class*/ i64,
+                                                      /*exception_cleanup*/ mlir::LLVM::LLVMPointerType::get(context),
+                                                      /*private_1*/ i64,
+                                                      /*private_2*/ i64,
+                                                  });
+}

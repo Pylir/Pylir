@@ -29,13 +29,13 @@ class WinX64 final : public PlatformABI
     llvm::DenseMap<mlir::Operation*, Adjustments> m_adjustments;
 
 public:
-    explicit WinX64(mlir::DataLayout dataLayout);
+    using PlatformABI::PlatformABI;
 
     mlir::LLVM::LLVMFuncOp declareFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::Type returnType,
-                                       llvm::StringRef name, mlir::TypeRange inputTypes) override;
+                                       llvm::StringRef name, mlir::TypeRange parameterTypes) override;
 
     mlir::Value callFunc(mlir::OpBuilder& builder, mlir::Location loc, mlir::LLVM::LLVMFuncOp func,
-                         mlir::ValueRange operands) override;
+                         mlir::ValueRange arguments) override;
 
     mlir::Type getInt(mlir::MLIRContext* context) const override
     {
@@ -46,5 +46,7 @@ public:
     {
         return mlir::IntegerType::get(context, 64);
     }
+
+    mlir::Type getUnwindExceptionHeader(mlir::MLIRContext* context) const override;
 };
 } // namespace pylir
