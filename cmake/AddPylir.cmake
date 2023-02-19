@@ -78,7 +78,10 @@ function(add_pylir_interface kind interface)
   mlir_tablegen(${interface}.cpp.inc -gen-${kind}-interface-defs)
   add_public_tablegen_target(${lib_prefix}${interface}IncGen)
 
-  add_pylir_doc(${file}.td ${file}${kind} Interfaces/ -gen-${kind}-interface-docs
+  set(output_dir "${CMAKE_CURRENT_SOURCE_DIR}")
+  cmake_path(RELATIVE_PATH output_dir BASE_DIRECTORY ${PYLIR_SOURCE_DIR}/src)
+
+  add_pylir_doc(${file}.td ${file}${kind} ${output_dir}/ -gen-${kind}-interface-docs
           PREPROCESS_ARGS -strip-title -title-indent=1)
 
   if (NOT ARG_LIBRARY)

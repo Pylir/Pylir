@@ -2,5 +2,5 @@
 
 ## Op Interfaces
 
-```{include} ../TableGen/Interfaces/TypeFlowInterfacesop.md
+```{globinclude} ../TableGen/pylir/Optimizer/PylirPy/Analysis/TypeFlow*op.md
 ```

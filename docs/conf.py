@@ -1,6 +1,8 @@
 #  Licensed under the Apache License v2.0 with LLVM Exceptions.
 #  See https://llvm.org/LICENSE.txt for license information.
 #  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+import os.path
+import sys
 
 # Configuration file for the Sphinx documentation builder.
 #
@@ -27,11 +29,14 @@ author = 'Pylir Contributors'
 
 # -- General configuration ---------------------------------------------------
 
+sys.path.append(os.path.abspath('./_ext'))
+
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'myst_parser'
+    'myst_parser',
+    'globinclude'
 ]
 
 myst_enable_extensions = ['dollarmath']

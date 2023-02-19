@@ -2,16 +2,10 @@
 
 ## Op Interfaces
 
-```{include} ../TableGen/Interfaces/CaptureInterfaceop.md
-```
-
-```{include} ../TableGen/Interfaces/MemoryFoldInterfaceop.md
-```
-
-```{include} ../TableGen/Interfaces/SROAInterfacesop.md
+```{globinclude} ../TableGen/pylir/Optimizer/Interfaces/*op.md
 ```
 
 ## Attribute Interfaces
 
-```{include} ../TableGen/Interfaces/SROAInterfacesattr.md
+```{globinclude} ../TableGen/pylir/Optimizer/Interfaces/*attr.md
 ```
