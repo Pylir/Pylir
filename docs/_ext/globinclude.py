@@ -22,7 +22,7 @@ class GlobInclude(Directive):
         content = []
 
         for path in sorted(source_dir.glob(pattern)):
-            content += ['```{include} ' + str(path), '```']
+            content += ['```{include} ' + str(path.relative_to(source_dir)), '```']
 
         for idx, line in enumerate(content):
             self.content.data.insert(idx, line)
