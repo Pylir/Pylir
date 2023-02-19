@@ -21,8 +21,8 @@ class GlobInclude(Directive):
 
         content = []
 
-        for path in sorted(glob.glob(pattern, root_dir=source_dir)):
-            content += ['```{include} ' + path, '```']
+        for path in sorted(source_dir.glob(pattern)):
+            content += ['```{include} ' + str(path), '```']
 
         for idx, line in enumerate(content):
             self.content.data.insert(idx, line)
