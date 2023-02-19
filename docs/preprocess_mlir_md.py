@@ -1,12 +1,14 @@
 #  // Licensed under the Apache License v2.0 with LLVM Exceptions.
 #  // See https://llvm.org/LICENSE.txt for license information.
 #  // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 import argparse
 import re
 from functools import reduce
 from typing import Callable
 
 TOC_REC_REGEX = '\\[TOC]'
+INTERFACE_IMPL_NODE = '^\\s*NOTE: This method \\*must\\* be implemented by the user\\.\\s*$'
 TITLE_REC_REGEX = '^#.*$'
 STRIP_TITLE_REC_REGEX = '^#\\s.*'
 
@@ -50,6 +52,7 @@ def main():
         s = f.read()
         r = RegexReplaceFile(output_path, s)
         r.add_rule(TOC_REC_REGEX, lambda _: '')
+        r.add_rule(INTERFACE_IMPL_NODE, lambda _: '')
         if args.strip_title:
             r.add_rule(STRIP_TITLE_REC_REGEX, lambda _: '')
         if args.title_indent is not None:

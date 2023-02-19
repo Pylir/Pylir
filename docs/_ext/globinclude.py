@@ -22,6 +22,8 @@ class GlobInclude(Directive):
         content = []
 
         for path in sorted(source_dir.glob(pattern)):
+            if len(content) > 0:
+                content += ['</br>', '']
             content += ['```{include} ' + str(path.relative_to(source_dir)), '```']
 
         for idx, line in enumerate(content):
