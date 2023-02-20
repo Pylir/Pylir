@@ -195,6 +195,8 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
     {
         llvm::MCContext& context = printer.OutContext;
 
+        auto symbolComp = [](llvm::MCSymbol* lhs, llvm::MCSymbol* rhs) { return lhs->getName() < rhs->getName(); };
+
         std::vector<llvm::MCSymbol*> roots;
         std::vector<llvm::MCSymbol*> constants;
         std::vector<llvm::MCSymbol*> collections;
@@ -206,19 +208,17 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
                 continue;
             }
             auto& section = symbol->getSection();
-            auto name = section.getName();
-            if (name == "py_root")
+            auto* container = llvm::StringSwitch<std::vector<llvm::MCSymbol*>*>(section.getName())
+                                  .Case("py_root", &roots)
+                                  .Case("py_const", &constants)
+                                  .Case("py_coll", &collections)
+                                  .Default(nullptr);
+            if (!container)
             {
-                roots.push_back(symbol);
+                continue;
             }
-            else if (name == "py_const")
-            {
-                constants.push_back(symbol);
-            }
-            else if (name == "py_coll")
-            {
-                collections.push_back(symbol);
-            }
+            auto pos = std::lower_bound(container->begin(), container->end(), symbol, symbolComp);
+            container->insert(pos, symbol);
         }
 
         auto pointerSize = printer.getDataLayout().getPointerSize();
@@ -226,7 +226,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter
         auto& os = *printer.OutStreamer;
         switchToPointerAlignedReadOnly(os, printer);
 
-        auto emitMap = [&](const std::vector<llvm::MCSymbol*>& values, llvm::Twine name)
+        auto emitMap = [&](llvm::ArrayRef<llvm::MCSymbol*> values, llvm::Twine name)
         {
             auto* symbol = printer.GetExternalSymbolSymbol(("pylir$" + name).str());
             os.emitSymbolAttribute(symbol, llvm::MCSA_Internal);
