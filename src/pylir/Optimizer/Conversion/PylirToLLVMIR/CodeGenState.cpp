@@ -27,6 +27,63 @@ void pylir::CodeGenState::appendToGlobalInit(mlir::OpBuilder& builder, llvm::fun
     section();
 }
 
+mlir::ArrayAttr pylir::CodeGenState::getTBAAAccess(TbaaAccessType accessType)
+{
+    if (accessType == TbaaAccessType::None)
+    {
+        return mlir::ArrayAttr::get(&m_typeConverter.getContext(), {});
+    }
+
+    mlir::OpBuilder builder(&m_typeConverter.getContext());
+    if (!m_tbaaSymbolTable)
+    {
+        m_tbaaRegion = builder.create<mlir::LLVM::MetadataOp>(builder.getUnknownLoc(), "tbaa");
+        m_tbaaSymbolTable.emplace(*m_tbaaRegion);
+        m_tbaaRoot = builder.create<mlir::LLVM::TBAARootMetadataOp>(builder.getUnknownLoc(), "root", "Pylir TBAA Root");
+        m_tbaaSymbolTable->insert(m_tbaaRoot);
+    }
+    std::string tbaaAccessTypeString;
+    switch (accessType)
+    {
+        case TbaaAccessType::None: PYLIR_UNREACHABLE;
+        case TbaaAccessType::Slots: tbaaAccessTypeString = "Python Object Slots"; break;
+        case TbaaAccessType::TypeObject: tbaaAccessTypeString = "Python Type Object"; break;
+        case TbaaAccessType::TupleElements: tbaaAccessTypeString = "Python Tuple Elements"; break;
+        case TbaaAccessType::ListTupleMember: tbaaAccessTypeString = "Python List Tuple"; break;
+        case TbaaAccessType::TypeMroMember: tbaaAccessTypeString = "Python Type MRO"; break;
+        case TbaaAccessType::TypeSlotsMember: tbaaAccessTypeString = "Python Type Instance Slots"; break;
+        case TbaaAccessType::TypeOffset: tbaaAccessTypeString = "Python Type Offset"; break;
+        case TbaaAccessType::Handle: tbaaAccessTypeString = "Python Handle"; break;
+        case TbaaAccessType::TupleSize: tbaaAccessTypeString = "Python Tuple Size"; break;
+        case TbaaAccessType::ListSize: tbaaAccessTypeString = "Python List Size"; break;
+        case TbaaAccessType::DictSize: tbaaAccessTypeString = "Python Dict Size"; break;
+        case TbaaAccessType::StringSize: tbaaAccessTypeString = "Python String Size"; break;
+        case TbaaAccessType::StringCapacity: tbaaAccessTypeString = "Python String Capacity"; break;
+        case TbaaAccessType::StringElementPtr: tbaaAccessTypeString = "Python String Element Ptr"; break;
+        case TbaaAccessType::FloatValue: tbaaAccessTypeString = "Python Float Value"; break;
+        case TbaaAccessType::FunctionPointer: tbaaAccessTypeString = "Python Function Pointer"; break;
+    }
+
+    std::string accessName = tbaaAccessTypeString + " access";
+    std::string typeName = tbaaAccessTypeString + " type";
+    if (auto existing = m_tbaaSymbolTable->lookup<mlir::LLVM::TBAATagOp>(accessName))
+    {
+        return builder.getArrayAttr(mlir::SymbolRefAttr::get(m_tbaaRegion->getSymNameAttr(),
+                                                             mlir::FlatSymbolRefAttr::get(existing.getSymNameAttr())));
+    }
+
+    auto type = builder.create<mlir::LLVM::TBAATypeDescriptorOp>(
+        builder.getUnknownLoc(), /*sym_name=*/typeName, /*identity=*/builder.getStringAttr(typeName),
+        builder.getArrayAttr({mlir::FlatSymbolRefAttr::get(m_tbaaRoot)}), builder.getDenseI64ArrayAttr({0}));
+    m_tbaaSymbolTable->insert(type);
+
+    auto tag = builder.create<mlir::LLVM::TBAATagOp>(builder.getUnknownLoc(), /*sym_name=*/accessName,
+                                                     /*base_type=*/typeName, /*access_type=*/typeName, 0);
+    m_tbaaSymbolTable->insert(tag);
+    return builder.getArrayAttr(
+        mlir::SymbolRefAttr::get(m_tbaaRegion->getSymNameAttr(), mlir::FlatSymbolRefAttr::get(tag.getSymNameAttr())));
+}
+
 mlir::Value pylir::CodeGenState::createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder,
                                                    CodeGenState::Runtime func, mlir::ValueRange args)
 {

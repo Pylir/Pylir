@@ -10,5 +10,5 @@ func.func @test(%arg : !py.dynamic, %index : index) -> !py.dynamic {
 // CHECK-SAME: %[[INDEX:[[:alnum:]]+]]
 // CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[ARG]][0, 2]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TRAILING]][0, %[[INDEX]]]
-// CHECK-NEXT: %[[RESULT:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[RESULT:.*]] = llvm.load %[[GEP]] {tbaa = [@tbaa::@"Python Tuple Elements access"]}
 // CHECK-NEXT: llvm.return %[[RESULT]]

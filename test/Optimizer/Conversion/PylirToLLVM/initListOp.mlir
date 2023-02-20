@@ -21,7 +21,7 @@ func.func @foo() -> !py.dynamic {
 // CHECK-NEXT: llvm.store %[[LIST]], %[[GEP]]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.mlir.constant(1 : index) : i64
 // CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
-// CHECK-NEXT: llvm.store %[[LEN]], %[[SIZE_PTR]]
+// CHECK-NEXT: llvm.store %[[LEN]], %[[SIZE_PTR]] {tbaa = [@tbaa::@"Python List Size access"]}
 // CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[HEADER_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant
@@ -35,10 +35,10 @@ func.func @foo() -> !py.dynamic {
 // CHECK-NEXT: llvm.store %[[TUPLE_TYPE]], %[[GEP]]
 // CHECK-NEXT: %[[CAPACITY:.*]] = llvm.mlir.constant(1 : i{{.*}})
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 1]
-// CHECK-NEXT: llvm.store %[[CAPACITY]], %[[GEP]]
+// CHECK-NEXT: llvm.store %[[CAPACITY]], %[[GEP]] {tbaa = [@tbaa::@"Python Tuple Size access"]}
 // CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 2]
 // CHECK-NEXT: %[[FIRST:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
-// CHECK-NEXT: llvm.store %[[LIST]], %[[FIRST]]
+// CHECK-NEXT: llvm.store %[[LIST]], %[[FIRST]] {tbaa = [@tbaa::@"Python Tuple Elements access"]}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 2]
-// CHECK-NEXT: llvm.store %[[TUPLE_MEMORY]], %[[GEP]]
+// CHECK-NEXT: llvm.store %[[TUPLE_MEMORY]], %[[GEP]] {tbaa = [@tbaa::@"Python List Tuple access"]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]

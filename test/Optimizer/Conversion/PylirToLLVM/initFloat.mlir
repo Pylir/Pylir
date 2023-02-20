@@ -16,5 +16,5 @@ func.func @foo(%value : f64) -> !py.dynamic {
 // CHECK-SAME: %[[VALUE:[[:alnum:]]+]]
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc
 // CHECK: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
-// CHECK-NEXT: llvm.store %[[VALUE]], %[[GEP]]
+// CHECK-NEXT: llvm.store %[[VALUE]], %[[GEP]] {tbaa = [@tbaa::@"Python Float Value access"]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]

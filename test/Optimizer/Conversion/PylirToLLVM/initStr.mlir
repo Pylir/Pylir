@@ -24,35 +24,35 @@ func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[ZERO_I:.*]] = llvm.mlir.constant(0 : index)
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
-// CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]]
+// CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Size access"]}
 // CHECK-NEXT: %[[SIZE_SUM_0:.*]] = llvm.add %[[ZERO_I]], %[[SIZE_0]]
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
-// CHECK-NEXT: %[[SIZE_1:.*]] = llvm.load %[[GEP2]]
+// CHECK-NEXT: %[[SIZE_1:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Size access"]}
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.add %[[SIZE_SUM_0]], %[[SIZE_1]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER]][0, 0]
-// CHECK-NEXT: llvm.store %[[SIZE]], %[[GEP]]
+// CHECK-NEXT: llvm.store %[[SIZE]], %[[GEP]] {tbaa = [@tbaa::@"Python String Size access"]}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER]][0, 1]
-// CHECK-NEXT: llvm.store %[[SIZE]], %[[GEP]]
+// CHECK-NEXT: llvm.store %[[SIZE]], %[[GEP]] {tbaa = [@tbaa::@"Python String Capacity access"]}
 // CHECK-NEXT: %[[ARRAY:.*]] = llvm.call @malloc(%[[SIZE]])
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[BUFFER]][0, 2]
-// CHECK-NEXT: llvm.store %[[ARRAY]], %[[GEP]]
+// CHECK-NEXT: llvm.store %[[ARRAY]], %[[GEP]] {tbaa = [@tbaa::@"Python String Element Ptr access"]}
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant(0 : index)
 
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
-// CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]]
+// CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Size access"]}
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 2]
-// CHECK-NEXT: %[[ARRAY_0:.*]] = llvm.load %[[GEP2]]
+// CHECK-NEXT: %[[ARRAY_0:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Element Ptr access"]}
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[ARRAY_0]], %[[SIZE_0]], %[[FALSE]])
 // CHECK-NEXT: %[[SIZE_NEW:.*]] = llvm.add %[[SIZE]], %[[SIZE_0]]
 
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
-// CHECK-NEXT: %[[SIZE_1:.*]] = llvm.load %[[GEP2]]
+// CHECK-NEXT: %[[SIZE_1:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Size access"]}
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 2]
-// CHECK-NEXT: %[[ARRAY_1:.*]] = llvm.load %[[GEP2]]
+// CHECK-NEXT: %[[ARRAY_1:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Element Ptr access"]}
 // CHECK-NEXT: %[[DEST:.*]] = llvm.getelementptr %[[ARRAY]][%[[SIZE_NEW]]]
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memcpy"(%[[DEST]], %[[ARRAY_1]], %[[SIZE_1]], %[[FALSE]])

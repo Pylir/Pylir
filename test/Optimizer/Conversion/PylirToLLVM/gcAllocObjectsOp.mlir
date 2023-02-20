@@ -25,7 +25,7 @@ func.func @foo() -> !pyMem.memory {
 // CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
-// CHECK-NEXT: llvm.store %[[STR]], %[[GEP]]
+// CHECK-NEXT: llvm.store %[[STR]], %[[GEP]] {tbaa = [@tbaa::@"Python Type Object access"]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]
 
 // -----

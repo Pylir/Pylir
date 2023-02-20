@@ -16,10 +16,10 @@ func.func @foo() -> !py.dynamic {
 // CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : {{.*}}) : i{{[0-9]+}}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][0, 0]
-// CHECK-NEXT: %[[TYPE:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[TYPE:.*]] = llvm.load %[[GEP]] {tbaa = [@tbaa::@"Python Type Object access"]}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TYPE]][0, 1]
-// CHECK-NEXT: %[[OFFSET:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[OFFSET:.*]] = llvm.load %[[GEP]] {tbaa = [@tbaa::@"Python Type Offset access"]}
 // CHECK-NEXT: %[[ADD:.*]] = llvm.add %[[OFFSET]], %[[ZERO]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][%[[ADD]]]
-// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]]
+// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]] {tbaa = [@tbaa::@"Python Object Slots access"]}
 // CHECK-NEXT: llvm.return %[[LOAD]]

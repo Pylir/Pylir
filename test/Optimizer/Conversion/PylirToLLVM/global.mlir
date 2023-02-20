@@ -22,9 +22,9 @@ func.func @test() -> !py.dynamic {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.addressof @{{const\$.*}}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: llvm.return %[[VALUE]]
 
 // -----
@@ -46,9 +46,9 @@ func.func @test() -> index {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.constant(5 : i{{.*}})
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: llvm.return %[[VALUE]]
 
 // -----
@@ -70,9 +70,9 @@ func.func @test() -> index {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.constant(5 : i{{.*}})
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: llvm.return %[[VALUE]]
 
 // -----
@@ -101,7 +101,7 @@ func.func @test() -> !py.dynamic {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.addressof @{{const\$.*}}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
 // CHECK-NEXT: llvm.return %[[VALUE]]

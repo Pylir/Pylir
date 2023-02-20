@@ -74,7 +74,7 @@ protected:
 #define DEFINE_MODEL_INST(type, name)                            \
     type name(mlir::OpBuilder& builder, mlir::Value value) const \
     {                                                            \
-        return {builder, value, typeConverter};                  \
+        return {builder, value, codeGenState};                   \
     }                                                            \
     static_assert(true)
 
@@ -223,7 +223,8 @@ struct LoadOpConversion : public ConvertPylirOpToLLVMPattern<Py::LoadOp>
     {
         auto address = rewriter.create<mlir::LLVM::AddressOfOp>(
             op.getLoc(), rewriter.getType<mlir::LLVM::LLVMPointerType>(), op.getGlobalAttr());
-        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, typeConverter.convertType(op.getType()), address);
+        rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(op, typeConverter.convertType(op.getType()), address)
+            .setTbaaAttr(codeGenState.getTBAAAccess(pylir::TbaaAccessType::Handle));
         return mlir::success();
     }
 };
@@ -237,7 +238,8 @@ struct StoreOpConversion : public ConvertPylirOpToLLVMPattern<Py::StoreOp>
     {
         auto address = rewriter.create<mlir::LLVM::AddressOfOp>(
             op.getLoc(), rewriter.getType<mlir::LLVM::LLVMPointerType>(), adaptor.getGlobalAttr());
-        rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.getValue(), address);
+        rewriter.replaceOpWithNewOp<mlir::LLVM::StoreOp>(op, adaptor.getValue(), address)
+            .setTbaaAttr(codeGenState.getTBAAAccess(pylir::TbaaAccessType::Handle));
         return mlir::success();
     }
 };
@@ -766,8 +768,10 @@ struct GetSlotOpConversion : public ConvertPylirOpToLLVMPattern<Py::GetSlotOp>
 
         auto ptrType = adaptor.getObject().getType();
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), ptrType, ptrType, adaptor.getObject(), index);
-        mlir::Value slot = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep.getSourceElementType(), gep);
-        rewriter.replaceOp(op, slot);
+        auto slot = rewriter.create<mlir::LLVM::LoadOp>(op.getLoc(), gep.getSourceElementType(), gep);
+        slot.setTbaaAttr(codeGenState.getTBAAAccess(TbaaAccessType::Slots));
+
+        rewriter.replaceOp(op, mlir::Value(slot));
         return mlir::success();
     }
 };
@@ -786,7 +790,8 @@ struct SetSlotOpConversion : public ConvertPylirOpToLLVMPattern<Py::SetSlotOp>
         auto ptrType = adaptor.getObject().getType();
         auto gep = rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), ptrType, ptrType, adaptor.getObject(), index);
 
-        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.getValue(), gep);
+        rewriter.create<mlir::LLVM::StoreOp>(op.getLoc(), adaptor.getValue(), gep)
+            .setTbaaAttr(codeGenState.getTBAAAccess(TbaaAccessType::Slots));
         rewriter.eraseOp(op);
         return mlir::success();
     }
@@ -1512,6 +1517,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
                     mlir::StringAttr::get(&getContext(), m_targetTripleCLI));
     if (auto globalInit = codeGenState.getGlobalInit())
     {
+        mlir::OpBuilder::InsertionGuard guard{builder};
         builder.setInsertionPointToEnd(&globalInit.back());
         builder.create<mlir::LLVM::ReturnOp>(builder.getUnknownLoc(), mlir::ValueRange{});
 
@@ -1519,6 +1525,10 @@ void ConvertPylirToLLVMPass::runOnOperation()
         builder.create<mlir::LLVM::GlobalCtorsOp>(builder.getUnknownLoc(),
                                                   builder.getArrayAttr({mlir::FlatSymbolRefAttr::get(globalInit)}),
                                                   builder.getI32ArrayAttr({65535}));
+    }
+    if (auto tbaaRegion = codeGenState.getTBAARegion())
+    {
+        module.push_back(tbaaRegion.release());
     }
 }
 } // namespace
