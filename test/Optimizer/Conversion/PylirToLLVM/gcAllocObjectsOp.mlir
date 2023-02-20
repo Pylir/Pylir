@@ -28,6 +28,10 @@ func.func @foo() -> !pyMem.memory {
 // CHECK-NEXT: llvm.store %[[STR]], %[[GEP]] {tbaa = [@tbaa::@"Python Type Object access"]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]
 
+// CHECK: llvm.func @pylir_gc_alloc(i{{[0-9]+}}) -> (!llvm.ptr<{{[0-9]+}}> {
+// CHECK-SAME: llvm.noalias
+// CHECK-SAME: }) attributes
+
 // -----
 
 py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">,#py.str<"__eq__">,#py.str<"__hash__">)>}>

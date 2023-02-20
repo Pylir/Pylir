@@ -92,6 +92,7 @@ mlir::Value pylir::CodeGenState::createRuntimeCall(mlir::Location loc, mlir::OpB
     auto pointerType = builder.getType<mlir::LLVM::LLVMPointerType>();
 
     mlir::Type returnType;
+    mlir::NamedAttrList resultAttrs;
     llvm::SmallVector<mlir::Type> argumentTypes;
     std::string functionName;
     llvm::SmallVector<llvm::StringRef> passThroughAttributes;
@@ -111,6 +112,7 @@ mlir::Value pylir::CodeGenState::createRuntimeCall(mlir::Location loc, mlir::OpB
             returnType = m_objectPtrType;
             argumentTypes = {m_typeConverter.getIndexType()};
             functionName = "pylir_gc_alloc";
+            resultAttrs.append(mlir::LLVM::LLVMDialect::getNoAliasAttrName(), mlir::UnitAttr::get(context));
             break;
         case Runtime::mp_init_u64:
             returnType = mlir::LLVM::LLVMVoidType::get(context);
@@ -220,6 +222,10 @@ mlir::Value pylir::CodeGenState::createRuntimeCall(mlir::Location loc, mlir::OpB
         if (!passThroughAttributes.empty())
         {
             llvmFunc.setPassthroughAttr(builder.getStrArrayAttr(passThroughAttributes));
+        }
+        if (!resultAttrs.empty())
+        {
+            llvmFunc.setResultAttrs(0, resultAttrs);
         }
     }
     return abi.callFunc(builder, loc, llvmFunc, args);
