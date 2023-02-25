@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <mlir/IR/IRMapping.h>
 #include <mlir/Interfaces/CallInterfaces.h>
 
 namespace pylir::Py
@@ -17,6 +18,11 @@ struct InlinedOps
     /// End iterator of the range of blocks that were inlined.
     /// In other words, one past the last block that was inlined.
     mlir::Region::iterator endBlock{};
+    /// Mapping of the source IR entities, to the corresponding created clones.
+    /// Note that during inlining, more transformations than simply cloning may occur, making the map not perfect.
+    /// In particular, new blocks created through transformations will not be present, nor is the entry block from the
+    /// source region. A operation may also not map to an operation of the exact same kind.
+    mlir::IRMapping mapping;
 };
 
 /// Inlines 'callable' into 'call' and replaces it. 'call' is assumed to resolve to 'callable' and have matching

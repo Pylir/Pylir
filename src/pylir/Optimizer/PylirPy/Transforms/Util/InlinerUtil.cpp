@@ -11,7 +11,7 @@
 
 namespace
 {
-void remapInlinedLocations(llvm::iterator_range<mlir::Region::iterator> range, mlir::Location callerLoc)
+void remapInlinedLocations(mlir::Region& inlinedRegion, mlir::Location callerLoc)
 {
     llvm::DenseMap<mlir::Location, mlir::Location> mappedLocations;
     auto remapOpLoc = [&](mlir::Operation* op)
@@ -23,7 +23,7 @@ void remapInlinedLocations(llvm::iterator_range<mlir::Region::iterator> range, m
         }
         op->setLoc(iter->second);
     };
-    for (auto& block : range)
+    for (mlir::Block& block : inlinedRegion)
     {
         block.walk(remapOpLoc);
     }
@@ -35,78 +35,96 @@ pylir::Py::InlinedOps pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::Ca
     auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*call);
 
     mlir::IRMapping mapping;
-    auto* callableRegion = callable.getCallableRegion();
+    mlir::Region* callableRegion = callable.getCallableRegion();
     mapping.map(callableRegion->getArguments(), call.getArgOperands());
 
-    // Special case for when inlining a region into itself. This is not supported by Regions 'cloneInto'. Instead, we
-    // will create a temporary region, clone into that and then splice it into the caller position.
-    // We have to do the clone here as the block split below would otherwise be cloned as well.
-    mlir::Region selfClone;
-    if (callableRegion == call->getParentRegion())
-    {
-        callableRegion->cloneInto(&selfClone, mapping);
-        callableRegion = &selfClone;
-    }
+    // We first copy the callable into a temporary region. This is because the callable region might actually be equal
+    // to the region of the caller! This is the case when doing an inlining operation on a direct recursive function.
+    // This way we minimize the modifications visible in the caller region, while transforming the inlined ops.
+    mlir::Region tempClone;
+    callableRegion->cloneInto(&tempClone, mapping);
 
-    auto* preBlock = call->getBlock();
-    auto* postBlock = preBlock->splitBlock(call);
+    // Split the caller block as we require the successor block after the call to replace return instructions.
+    mlir::Block* preBlock = call->getBlock();
+    mlir::Block* postBlock = preBlock->splitBlock(call);
     postBlock->addArguments(
         callable.getCallableResults(),
         llvm::to_vector(llvm::map_range(call->getResults(), [](mlir::Value arg) { return arg.getLoc(); })));
 
-    if (callableRegion == &selfClone)
-    {
-        // This is more efficient and straight up moves all the blocks into the right position.
-        preBlock->getParent()->getBlocks().splice(postBlock->getIterator(), callableRegion->getBlocks());
-    }
-    else
-    {
-        callableRegion->cloneInto(preBlock->getParent(), postBlock->getIterator(), mapping);
-    }
+    // Builder constructed here as we cannot get the context from any blocks within 'tempClone'.
+    mlir::OpBuilder builder(call->getContext());
 
-    auto* firstInlinedBlock = preBlock->getNextNode();
-    auto inlineBlocksRange = llvm::make_range(firstInlinedBlock->getIterator(), postBlock->getIterator());
-    for (auto& iter : inlineBlocksRange)
+    // We iterate over the callable region (aka the source of the clone) for the simple reason that we want to update
+    // the mapper as we are transforming the inlined blocks. At this point in time the inlined ops are still
+    // structurally equal to the source ops.
+    for (auto& sourceBlock : *callableRegion)
     {
         if (exceptionHandler)
         {
-            for (auto op : llvm::make_early_inc_range(iter.getOps<pylir::Py::AddableExceptionHandlingInterface>()))
+            for (auto sourceOp : sourceBlock.getOps<Py::AddableExceptionHandlingInterface>())
             {
-                auto* successBlock = iter.splitBlock(mlir::Block::iterator{op});
-                auto builder = mlir::OpBuilder::atBlockEnd(&iter);
-                auto* newOp = op.cloneWithExceptionHandling(
-                    builder, successBlock, exceptionHandler.getExceptionPath(),
-                    static_cast<mlir::OperandRange>(exceptionHandler.getUnwindDestOperandsMutable()));
+                auto op = mlir::cast<Py::AddableExceptionHandlingInterface>(mapping.lookup(sourceOp.getOperation()));
+                mlir::Block* block = op->getBlock();
+
+                mlir::Block* successBlock = block->splitBlock(op->getIterator());
+                builder.setInsertionPointToEnd(block);
+                mlir::Operation* newOp =
+                    op.cloneWithExceptionHandling(builder, successBlock, exceptionHandler.getExceptionPath(),
+                                                  exceptionHandler.getUnwindDestOperands());
                 op->replaceAllUsesWith(newOp);
+                mapping.map(sourceOp.getOperation(), newOp);
+                mapping.map(sourceOp->getResults(), newOp->getResults());
                 op.erase();
-                break;
             }
         }
-        auto* terminator = iter.getTerminator();
-        if (auto raise = mlir::dyn_cast<pylir::Py::RaiseOp>(terminator); raise && exceptionHandler)
+        // While we are iterating over the callable region, it may actually contain empty blocks or blocks without
+        // a terminator as in a direct recursive function call, the callable region is equal to the caller region.
+        // Since we did a block split in the caller region, we may have modified the callable region as well and left
+        // it in a currently invalid state.
+        if (sourceBlock.empty())
         {
-            mlir::OpBuilder builder(raise);
-            auto ops =
-                llvm::to_vector(static_cast<mlir::OperandRange>(exceptionHandler.getUnwindDestOperandsMutable()));
+            continue;
+        }
+
+        mlir::Operation* sourceTerminator = &sourceBlock.back();
+        if (exceptionHandler && mlir::isa<Py::RaiseOp>(sourceTerminator))
+        {
+            auto raise = mlir::cast<Py::RaiseOp>(mapping.lookup(sourceTerminator));
+
+            builder.setInsertionPoint(raise);
+            auto ops = llvm::to_vector(exceptionHandler.getUnwindDestOperands());
             ops.insert(ops.begin(), raise.getException());
-            builder.create<mlir::cf::BranchOp>(raise.getLoc(), exceptionHandler.getExceptionPath(), ops);
+            auto branch = builder.create<mlir::cf::BranchOp>(raise.getLoc(), exceptionHandler.getExceptionPath(), ops);
+            mapping.map(sourceTerminator, branch.getOperation());
             raise.erase();
             continue;
         }
-        if (terminator->hasTrait<mlir::OpTrait::ReturnLike>())
+        if (sourceTerminator->hasTrait<mlir::OpTrait::ReturnLike>())
         {
-            mlir::OpBuilder builder(terminator);
-            builder.create<mlir::cf::BranchOp>(terminator->getLoc(), postBlock, terminator->getOperands());
+            mlir::Operation* terminator = mapping.lookup(sourceTerminator);
+
+            builder.setInsertionPoint(terminator);
+            auto branch =
+                builder.create<mlir::cf::BranchOp>(terminator->getLoc(), postBlock, terminator->getOperands());
+            mapping.map(sourceTerminator, branch.getOperation());
             terminator->erase();
             continue;
         }
     }
 
-    remapInlinedLocations(inlineBlocksRange, call->getLoc());
+    remapInlinedLocations(tempClone, call->getLoc());
+    // Finally move all the blocks from 'tempClone' into the caller.
+    call->getParentRegion()->getBlocks().splice(postBlock->getIterator(), tempClone.getBlocks());
 
+    mlir::Block* firstInlinedBlock = preBlock->getNextNode();
     mlir::Operation* preInlineLastOp = preBlock->empty() ? nullptr : &preBlock->back();
 
+    // Move the operations from the first inlined block into the block of the call-site. Since the first inlined block
+    // corresponds to the entry block, call-site block is the only successor and there is no need to create a branch
+    // operation here.
     preBlock->getOperations().splice(preBlock->end(), firstInlinedBlock->getOperations());
+    // Erase the firstInlinedBlock from the mapping as well since we are about to erase it.
+    mapping.erase(&callableRegion->front());
     firstInlinedBlock->erase();
     for (auto [res, arg] : llvm::zip(call->getResults(), postBlock->getArguments()))
     {
@@ -114,11 +132,12 @@ pylir::Py::InlinedOps pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::Ca
     }
     if (exceptionHandler)
     {
-        mlir::OpBuilder builder(call);
-        builder.create<mlir::cf::BranchOp>(
-            call->getLoc(), exceptionHandler.getHappyPath(),
-            static_cast<mlir::OperandRange>(exceptionHandler.getNormalDestOperandsMutable()));
+        builder.setInsertionPoint(call);
+        builder.create<mlir::cf::BranchOp>(call->getLoc(), exceptionHandler.getHappyPath(),
+                                           exceptionHandler.getNormalDestOperands());
     }
+    mapping.erase(call);
     call.erase();
-    return {preInlineLastOp == nullptr ? &preBlock->front() : preInlineLastOp->getNextNode(), postBlock->getIterator()};
+    return {preInlineLastOp == nullptr ? &preBlock->front() : preInlineLastOp->getNextNode(), postBlock->getIterator(),
+            std::move(mapping)};
 }

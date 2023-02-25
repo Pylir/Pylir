@@ -17,6 +17,18 @@ def ExceptionHandlingInterface : OpInterface<"ExceptionHandlingInterface"> {
         InterfaceMethod<[{}], "::mlir::MutableOperandRange", "getUnwindDestOperandsMutable", (ins)>,
         InterfaceMethod<[{}], "::mlir::Operation*", "cloneWithoutExceptionHandling", (ins "::mlir::OpBuilder&":$builder)>,
     ];
+
+    let extraSharedClassDeclaration = [{
+        ::mlir::OperandRange getNormalDestOperands()
+        {
+            return static_cast<mlir::OperandRange>(this->getNormalDestOperandsMutable());
+        }
+
+        ::mlir::OperandRange getUnwindDestOperands()
+        {
+            return static_cast<mlir::OperandRange>(this->getUnwindDestOperandsMutable());
+        }
+    }];
 }
 
 def AddableExceptionHandlingInterface : OpInterface<"AddableExceptionHandlingInterface"> {
