@@ -86,6 +86,8 @@ class CallSite
     // Id of this call-site if it was created through inlining.
     // Points into the inlining history.
     std::optional<std::size_t> m_inlineId;
+    // Further callsites reachable if this callsite were to be inlined.
+    std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>> m_reachableCallsites;
     // Marks the callsite as erased, causing the queue to skip and delete it.
     bool m_erased = false;
     // Cost of inlining the callee into the call in abstract units.
@@ -95,12 +97,17 @@ class CallSite
 
 public:
     CallSite(mlir::CallOpInterface call, mlir::CallableOpInterface callee, std::uint16_t cost,
-             const std::optional<std::size_t>& inlineId)
-        : m_call(call), m_callee(callee), m_inlineId(inlineId), m_cost(cost)
+             std::optional<std::size_t> inlineId,
+             std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>>&& reachableCallsites)
+        : m_call(call),
+          m_callee(callee),
+          m_inlineId(inlineId),
+          m_reachableCallsites(std::move(reachableCallsites)),
+          m_cost(cost)
     {
     }
 
-    /// Retuns the call op of the callsite.
+    /// Returns the call op of the callsite.
     [[nodiscard]] mlir::CallOpInterface getCall() const
     {
         return m_call;
@@ -120,9 +127,20 @@ public:
 
     /// Returns the inlining id of the callsite. Points into the inlining history and allows tracking back through
     /// which series of inlining operations a callsite comes from.
-    [[nodiscard]] const std::optional<std::size_t>& getInlineId() const
+    [[nodiscard]] std::optional<std::size_t> getInlineId() const
     {
         return m_inlineId;
+    }
+
+    /// Returns the list of callsites that are reachable after this callsite has been inlined.
+    llvm::ArrayRef<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>> getReachableCallsites() const
+    {
+        return m_reachableCallsites;
+    }
+
+    std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>>& getReachableCallsites()
+    {
+        return m_reachableCallsites;
     }
 
     /// Marks the callsite as erased, effectively removing it from any public APIs of the queue.
@@ -213,6 +231,12 @@ public:
     }
 };
 
+struct GradeResult
+{
+    std::uint16_t cost;
+    std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>> reachableCallsites;
+};
+
 class Inliner
 {
     mlir::ModuleOp m_module;
@@ -222,7 +246,8 @@ class Inliner
     CallSiteQueue m_queue;
 
     // Compute the inline cost estimate using of the call to the callee.
-    [[nodiscard]] std::optional<std::uint16_t> grade(mlir::CallOpInterface call, mlir::CallableOpInterface callee);
+    [[nodiscard]] std::optional<GradeResult> grade(mlir::CallOpInterface call, mlir::CallableOpInterface callee,
+                                                   mlir::SymbolTableCollection& collection);
 
 public:
     Inliner(mlir::ModuleOp moduleOp, std::uint16_t threshold, mlir::AnalysisManager analysisManager)
@@ -245,12 +270,39 @@ mlir::Operation* getNextClosestIsolatedFromAbove(mlir::Operation* op)
     return op->getParentWithTrait<mlir::OpTrait::IsIsolatedFromAbove>();
 }
 
+mlir::CallableOpInterface deduceCallableFromCall(mlir::CallOpInterface call, mlir::SymbolTableCollection& collection)
+{
+    // Try our best to get a CallableOpInterface out of the call. For direct calls this is simply looking up the
+    // symbol in the symbol table, but for indirect calls we can only check whether the indirect callee is an
+    // actual constant or possibly even the callable op itself!
+    mlir::CallInterfaceCallable callee = call.getCallableForCallee();
+    auto ref = callee.dyn_cast<mlir::SymbolRefAttr>();
+    if (!ref)
+    {
+        mlir::matchPattern(callee.get<mlir::Value>(), mlir::m_Constant(&ref));
+    }
+
+    mlir::CallableOpInterface callable;
+    if (ref)
+    {
+        callable = collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(call, ref);
+    }
+    else
+    {
+        callable = callee.get<mlir::Value>().getDefiningOp<mlir::CallableOpInterface>();
+    }
+    return callable;
+}
+
 /// Estimate the inline cost of 'code' given the values in 'knownConstants' are of the given constant values.
 /// If the cost is larger than 'threshold', the estimation calculation is cut short and a nullopt is returned.
-std::optional<std::uint16_t> gradeFromKnownConstants(llvm::DenseMap<mlir::Value, mlir::Attribute>&& knownConstants,
-                                                     mlir::CallableOpInterface code, std::uint16_t threshold)
+std::optional<GradeResult> gradeFromKnownConstants(llvm::DenseMap<mlir::Value, mlir::Attribute>&& knownConstants,
+                                                   mlir::CallableOpInterface code, std::uint16_t threshold,
+                                                   mlir::SymbolTableCollection& collection)
 {
     llvm::DenseSet<mlir::Block*> liveBlocks;
+
+    std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>> reachableCallsites;
 
     InlineCost bodySize(code->getContext());
 
@@ -293,6 +345,31 @@ std::optional<std::uint16_t> gradeFromKnownConstants(llvm::DenseMap<mlir::Value,
                 if (op.getNumResults() == 1 && knownConstants.count(op.getResult(0)))
                 {
                     continue;
+                }
+
+                if (auto call = mlir::dyn_cast<mlir::CallOpInterface>(op))
+                {
+                    auto callable = deduceCallableFromCall(call, collection);
+                    if (!callable)
+                    {
+                        // TODO: All of this is in need of an interface function or something not as hardcoded.
+                        if (auto constant = knownConstants.lookup(call.getCallableForCallee().dyn_cast<mlir::Value>()))
+                        {
+                            if (auto func = Py::ref_cast<Py::FunctionAttr>(constant))
+                            {
+                                callable = collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(
+                                    call, func.getValue());
+                            }
+                            if (auto ref = mlir::dyn_cast<mlir::SymbolRefAttr>(constant))
+                            {
+                                callable = collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(call, ref);
+                            }
+                        }
+                    }
+                    if (callable)
+                    {
+                        reachableCallsites.emplace_back(call, callable);
+                    }
                 }
 
                 auto constantOperands = llvm::to_vector(
@@ -383,10 +460,11 @@ std::optional<std::uint16_t> gradeFromKnownConstants(llvm::DenseMap<mlir::Value,
     {
         return std::nullopt;
     }
-    return cost;
+    return GradeResult{cost, std::move(reachableCallsites)};
 }
 
-std::optional<std::uint16_t> Inliner::grade(mlir::CallOpInterface call, mlir::CallableOpInterface callee)
+std::optional<GradeResult> Inliner::grade(mlir::CallOpInterface call, mlir::CallableOpInterface callee,
+                                          mlir::SymbolTableCollection& collection)
 {
     llvm::DenseMap<mlir::Value, mlir::Attribute> knownConstants;
     mlir::Region* region = callee.getCallableRegion();
@@ -410,7 +488,7 @@ std::optional<std::uint16_t> Inliner::grade(mlir::CallOpInterface call, mlir::Ca
             }
         }
     }
-    return gradeFromKnownConstants(std::move(knownConstants), callee, m_threshold);
+    return gradeFromKnownConstants(std::move(knownConstants), callee, m_threshold, collection);
 }
 
 // Formatting function for LLVM_DEBUG output.
@@ -444,50 +522,43 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
 
     mlir::SymbolTableCollection collection;
 
-    auto handleCallOp = [&](mlir::CallOpInterface call, std::optional<std::size_t> inlineId = {})
+    auto handleCallOp =
+        [&](mlir::CallOpInterface call, mlir::CallableOpInterface callable, std::optional<std::size_t> inlineId = {})
     {
-        // Try our best to get a CallableOpInterface out of the call. For direct calls this is simply looking up the
-        // symbol in the symbol table, but for indirect calls we can only check whether the indirect callee is an
-        // actual constant or possibly even the callable op itself!
-        mlir::CallInterfaceCallable callee = call.getCallableForCallee();
-        auto ref = callee.dyn_cast<mlir::SymbolRefAttr>();
-        if (!ref)
-        {
-            mlir::matchPattern(callee.get<mlir::Value>(), mlir::m_Constant(&ref));
-        }
-
-        mlir::CallableOpInterface callable;
-        if (ref)
-        {
-            callable = collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(call, ref);
-        }
-        else
-        {
-            callable = callee.get<mlir::Value>().getDefiningOp<mlir::CallableOpInterface>();
-        }
-
         // A callable without a callable region can't be inlined as it has no body.
         // This is the case for function declarations for example.
-        if (!callable || !callable.getCallableRegion())
+        if (!callable.getCallableRegion())
         {
             return;
         }
+
         // Never inline a direct recursion.
         if (callable->isAncestor(call))
         {
             directRecursionsDiscarded++;
             return;
         }
-        std::optional<std::uint16_t> score = grade(call, callable);
-        if (!score)
+
+        std::optional<GradeResult> grading = grade(call, callable, collection);
+        if (!grading)
         {
             callsitesTooExpensive++;
             return;
         }
-        m_queue.emplace(call, callable, *score, inlineId);
+
+        m_queue.emplace(call, callable, grading->cost, inlineId, std::move(grading->reachableCallsites));
     };
 
-    m_module.walk(handleCallOp);
+    m_module.walk(
+        [&](mlir::CallOpInterface callOpInterface)
+        {
+            mlir::CallableOpInterface callable = deduceCallableFromCall(callOpInterface, collection);
+            if (!callable)
+            {
+                return;
+            }
+            handleCallOp(callOpInterface, callable);
+        });
 
     // History of calls that have been inlined consisting of what the callee was, and possibly the index
     // into this history, where the call originated from, if it was created by being inlined from elsewhere.
@@ -541,7 +612,7 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
         PYLIR_ASSERT(callerCallable && "Every callsite must be within a callable");
 
         mlir::Operation* closestIsolatedFromAbove = getNextClosestIsolatedFromAbove(callSite->getCall());
-        Py::InlinedOps inlinedOps = Py::inlineCall(callSite->getCall(), callSite->getCallee());
+        mlir::IRMapping mapping = Py::inlineCall(callSite->getCall(), callSite->getCallee());
 
         // Following the inlining we have to invalidate all analysis' dependent on the structure of the IR of the
         // caller. MLIRs infrastructure currently has no such fine-grained framework of knowing which analysis' should
@@ -556,15 +627,16 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
         {
             // If the score remains the same, the callsite, or rather its position in the queue, is not out-of-date
             // and there is no need to replace it with a new one.
-            auto score = grade(existing->getCall(), existing->getCallee());
-            if (score == existing->getCost())
+            auto grading = grade(existing->getCall(), existing->getCallee(), collection);
+            if (grading && grading->cost == existing->getCost())
             {
                 continue;
             }
 
-            if (score)
+            if (grading)
             {
-                m_queue.emplace(existing->getCall(), existing->getCallee(), *score, existing->getInlineId());
+                m_queue.emplace(existing->getCall(), existing->getCallee(), grading->cost, existing->getInlineId(),
+                                std::move(existing->getReachableCallsites()));
             }
             else
             {
@@ -573,26 +645,19 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
             existing->erase();
         }
 
-        // Add any new call-sites that have been created through the inlining.
-        auto firstBlockOpRange = llvm::make_range(inlinedOps.firstOperationInFirstBlock->getIterator(),
-                                                  inlinedOps.firstOperationInFirstBlock->getBlock()->end());
-        auto inlinedBlocksAfter = llvm::make_range(
-            inlinedOps.firstOperationInFirstBlock->getBlock()->getNextNode()->getIterator(), inlinedOps.endBlock);
+        // Note that the callsite call op is not the inlined callsite, but the operation within the original callee.
+        // We use the IRMapper returned by the inlining function to map it to the inlined op.
+        for (auto [sourceCall, callable] : callSite->getReachableCallsites())
+        {
+            auto newCall =
+                mlir::dyn_cast_or_null<mlir::CallOpInterface>(mapping.lookupOrNull(sourceCall.getOperation()));
+            if (!newCall)
+            {
+                continue;
+            }
 
-        llvm::for_each(firstBlockOpRange,
-                       [&](mlir::Operation& op)
-                       {
-                           if (auto callOp = mlir::dyn_cast<mlir::CallOpInterface>(op))
-                           {
-                               handleCallOp(callOp, newInlineHistoryId);
-                           }
-                       });
-        llvm::for_each(inlinedBlocksAfter,
-                       [&](mlir::Block& block)
-                       {
-                           llvm::for_each(block.getOps<mlir::CallOpInterface>(), [&](mlir::CallOpInterface call)
-                                          { return handleCallOp(call, newInlineHistoryId); });
-                       });
+            handleCallOp(newCall, callable, newInlineHistoryId);
+        }
     }
     return changed;
 }

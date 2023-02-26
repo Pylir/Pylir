@@ -30,7 +30,7 @@ void remapInlinedLocations(mlir::Region& inlinedRegion, mlir::Location callerLoc
 }
 } // namespace
 
-pylir::Py::InlinedOps pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable)
+mlir::IRMapping pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::CallableOpInterface callable)
 {
     auto exceptionHandler = mlir::dyn_cast<pylir::Py::ExceptionHandlingInterface>(*call);
 
@@ -117,7 +117,6 @@ pylir::Py::InlinedOps pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::Ca
     call->getParentRegion()->getBlocks().splice(postBlock->getIterator(), tempClone.getBlocks());
 
     mlir::Block* firstInlinedBlock = preBlock->getNextNode();
-    mlir::Operation* preInlineLastOp = preBlock->empty() ? nullptr : &preBlock->back();
 
     // Move the operations from the first inlined block into the block of the call-site. Since the first inlined block
     // corresponds to the entry block, call-site block is the only successor and there is no need to create a branch
@@ -138,6 +137,5 @@ pylir::Py::InlinedOps pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::Ca
     }
     mapping.erase(call);
     call.erase();
-    return {preInlineLastOp == nullptr ? &preBlock->front() : preInlineLastOp->getNextNode(), postBlock->getIterator(),
-            std::move(mapping)};
+    return mapping;
 }
