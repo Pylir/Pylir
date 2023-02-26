@@ -532,17 +532,19 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
             return;
         }
 
-        // Never inline a direct recursion.
-        if (callable->isAncestor(call))
-        {
-            directRecursionsDiscarded++;
-            return;
-        }
-
         std::optional<GradeResult> grading = grade(call, callable, collection);
         if (!grading)
         {
             callsitesTooExpensive++;
+            return;
+        }
+
+        // If this is a directly recursive callsite and a recursive callsite remains after inlining, don't inline.
+        // Recursive functions must be handled specially, else-way they easily lead to exponential code explosion.
+        if (callable->isAncestor(call)
+            && llvm::is_contained(llvm::make_second_range(grading->reachableCallsites), callable))
+        {
+            directRecursionsDiscarded++;
             return;
         }
 
