@@ -686,32 +686,31 @@ mlir::OpFoldResult pylir::Py::IsUnboundValueOp::fold(FoldAdaptor adaptor)
 
 mlir::OpFoldResult pylir::Py::IsOp::fold(FoldAdaptor adaptor)
 {
-    if (adaptor.getLhs() && adaptor.getLhs() == adaptor.getRhs())
+    if (adaptor.getLhs() && adaptor.getRhs())
     {
-        return mlir::BoolAttr::get(getContext(), true);
+        return mlir::BoolAttr::get(getContext(), adaptor.getLhs() == adaptor.getRhs());
     }
     if (getLhs() == getRhs())
     {
         return mlir::BoolAttr::get(getContext(), true);
     }
+
+    auto doesNotAlias = [](mlir::Value value)
     {
-        auto lhsEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(getLhs().getDefiningOp());
-        auto rhsEffect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(getRhs().getDefiningOp());
-        bool lhsAlloc = lhsEffect && lhsEffect.hasEffect<mlir::MemoryEffects::Allocate>();
-        bool rhsAlloc = rhsEffect && rhsEffect.hasEffect<mlir::MemoryEffects::Allocate>();
-        if ((lhsAlloc && rhsAlloc) || (adaptor.getLhs().dyn_cast_or_null<RefAttr>() && rhsAlloc)
-            || (lhsAlloc && adaptor.getRhs().dyn_cast_or_null<RefAttr>()))
+        auto effect = mlir::dyn_cast_or_null<mlir::MemoryEffectOpInterface>(value.getDefiningOp());
+        if (effect && effect.hasEffect<mlir::MemoryEffects::Allocate>())
         {
-            return mlir::BoolAttr::get(getContext(), false);
+            return true;
         }
-    }
-    if (auto* lhsDef = getLhs().getDefiningOp(); lhsDef && lhsDef->hasTrait<Py::ReturnsImmutable>())
+        auto* definingOp = value.getDefiningOp();
+        return definingOp && definingOp->hasTrait<Py::ReturnsImmutable>();
+    };
+
+    if (doesNotAlias(getLhs()) && (mlir::isa_and_nonnull<RefAttr>(adaptor.getRhs()) || doesNotAlias(getRhs())))
     {
-        if (auto* rhsDef = getRhs().getDefiningOp(); rhsDef && rhsDef->hasTrait<Py::ReturnsImmutable>())
-        {
-            return mlir::BoolAttr::get(getContext(), false);
-        }
+        return mlir::BoolAttr::get(getContext(), false);
     }
+
     return nullptr;
 }
 

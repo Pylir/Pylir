@@ -75,7 +75,7 @@ def ObjectResource : Resource<"::pylir::Py::ObjectResource">;
 def ListResource : Resource<"::pylir::Py::ListResource">;
 def DictResource : Resource<"::pylir::Py::DictResource">;
 
-def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoMemoryEffect, ReturnsImmutable,
+def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoMemoryEffect,
 												 DeclareOpInterfaceMethods<TypeRefineableInterface>,
 												 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface, PylirPy_RefAttr]>:$constant);

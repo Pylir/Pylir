@@ -48,6 +48,16 @@ func.func @singletons() -> i1 {
     return %2 : i1
 }
 
+// CHECK-LABEL: @singletons_not
+// CHECK: %[[RES:.*]] = arith.constant false
+// CHECK: return %[[RES]]
+func.func @singletons_not() -> i1 {
+    %0 = py.constant(#py.ref<@builtins.bool>)
+    %1 = py.constant(#py.ref<@builtins.tuple>)
+    %2 = py.is %0, %1
+    return %2 : i1
+}
+
 // -----
 
 // Stubs
@@ -62,5 +72,7 @@ func.func @alloca_symbol(%arg0 : !py.dynamic) -> i1 {
     %0 = py.constant(#py.ref<@builtins.bool>)
     %1 = py.makeTuple (%arg0)
     %2 = py.is %0, %1
-    return %2 : i1
+    %3 = py.is %1, %0
+    %4 = arith.ori %2, %3 : i1
+    return %4 : i1
 }
