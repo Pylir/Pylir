@@ -8,5 +8,6 @@ target_link_libraries(PylirExternalModels
         PRIVATE
         MLIRControlFlowDialect
         MLIRArithDialect
+        MLIRFuncDialect
         PylirConditionalBranchInterface
         )
