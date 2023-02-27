@@ -482,6 +482,11 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             }
             mlir::registerLLVMDialectTranslation(*m_mlirContext);
             llvmModule = mlir::translateModuleToLLVMIR(*mlirModule, *m_llvmContext);
+            // Delete these now to release MLIRs resource and reduce peak memory usage.
+            mlirModule = nullptr;
+            m_mlirContext.reset();
+            m_fileInputs.clear();
+            m_documents.clear();
             [[fallthrough]];
         }
         case FileType::LLVM:
