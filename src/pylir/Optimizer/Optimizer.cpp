@@ -74,13 +74,6 @@ void pylir::registerOptimizationPipelines()
             nested->addPass(Mem::createHeapToStackPass());
         });
 
-    struct PylirLLVMOptions : public mlir::PassPipelineOptions<PylirLLVMOptions>
-    {
-        Option<std::string> targetTriple{*this, "target-triple", llvm::cl::desc("LLVM target triple"),
-                                         llvm::cl::init(LLVM_DEFAULT_TARGET_TRIPLE)};
-        Option<std::string> dataLayout{*this, "data-layout", llvm::cl::desc("LLVM data layout"), llvm::cl::init("")};
-    };
-
     mlir::PassPipelineRegistration<PylirLLVMOptions>(
         "pylir-llvm", "Pass pipeline used to lower 'pylir-minimum' and 'pylir-optimize' output to LLVM",
         [](mlir::OpPassManager& pm, const PylirLLVMOptions& options)

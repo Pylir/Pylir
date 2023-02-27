@@ -43,8 +43,9 @@
 #include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
-#include <pylir/Optimizer/Linker/Linker.hpp>
 #include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
+#include <pylir/Optimizer/Linker/Linker.hpp>
+#include <pylir/Optimizer/Optimizer.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
@@ -463,10 +464,9 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
 
-            if (mlir::failed(mlir::parsePassPipeline(
-                    "pylir-llvm{target-triple=" + m_targetMachine->getTargetTriple().str()
-                        + " data-layout=" + m_targetMachine->createDataLayout().getStringRepresentation() + "}",
-                    manager)))
+            auto options = pylir::PylirLLVMOptions(m_targetMachine->getTargetTriple().str(),
+                                                   m_targetMachine->createDataLayout().getStringRepresentation());
+            if (mlir::failed(mlir::parsePassPipeline("pylir-llvm" + options.rendered(), manager)))
             {
                 return mlir::failure();
             }

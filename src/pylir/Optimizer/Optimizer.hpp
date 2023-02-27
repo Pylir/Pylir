@@ -4,8 +4,37 @@
 
 #pragma once
 
+#include <mlir/Pass/PassOptions.h>
+
 namespace pylir
 {
+
+/// Pass options for the 'pylir-llvm' pass-pipeline.
+struct PylirLLVMOptions : public mlir::PassPipelineOptions<PylirLLVMOptions>
+{
+    Option<std::string> targetTriple{*this, "target-triple", llvm::cl::desc("LLVM target triple"),
+                                     llvm::cl::init(LLVM_DEFAULT_TARGET_TRIPLE)};
+    Option<std::string> dataLayout{*this, "data-layout", llvm::cl::desc("LLVM data layout"), llvm::cl::init("")};
+
+    PylirLLVMOptions() = default;
+
+    PylirLLVMOptions(llvm::StringRef targetTriple, llvm::StringRef dataLayout)
+    {
+        this->targetTriple = targetTriple.str();
+        this->dataLayout = dataLayout.str();
+    }
+
+    /// Prints the option struct options in a format suitable for directly appending to the pass pipeline name.
+    /// In other words, this already includes the surrounding '{}'.
+    std::string rendered()
+    {
+        std::string rendered;
+        llvm::raw_string_ostream ss(rendered);
+        print(ss);
+        return rendered;
+    }
+};
+
 /// Registers optimization pipelines used in pylir, making them available in the pass pipeline syntax.
 /// There are currently three pipelines registered:
 /// * "pylir-minimum", which does the minimum lowering of the output of pylir, to a state that can be converted to LLVM.
