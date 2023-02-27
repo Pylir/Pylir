@@ -108,9 +108,3 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
     }
     return nullptr;
 }
-
-mlir::LogicalResult pylir::Py::PylirPyDialect::verifyOperationAttribute(mlir::Operation* op,
-                                                                        mlir::NamedAttribute attribute)
-{
-    return op->emitOpError("Unknown dialect attribute ") << attribute.getName();
-}

@@ -15,6 +15,7 @@
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SparseBitVector.h>
 #include <llvm/Support/Debug.h>
 
 #include <pylir/Optimizer/Analysis/InlineCost.hpp>
@@ -83,9 +84,6 @@ class CallSite
     mlir::CallOpInterface m_call;
     // Callable callee.
     mlir::CallableOpInterface m_callee;
-    // Id of this call-site if it was created through inlining.
-    // Points into the inlining history.
-    std::optional<std::size_t> m_inlineId;
     // Further callsites reachable if this callsite were to be inlined.
     std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>> m_reachableCallsites;
     // Marks the callsite as erased, causing the queue to skip and delete it.
@@ -97,11 +95,9 @@ class CallSite
 
 public:
     CallSite(mlir::CallOpInterface call, mlir::CallableOpInterface callee, std::uint16_t cost,
-             std::optional<std::size_t> inlineId,
              std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>>&& reachableCallsites)
         : m_call(call),
           m_callee(callee),
-          m_inlineId(inlineId),
           m_reachableCallsites(std::move(reachableCallsites)),
           m_cost(cost)
     {
@@ -123,13 +119,6 @@ public:
     [[nodiscard]] std::size_t getCost() const
     {
         return m_cost;
-    }
-
-    /// Returns the inlining id of the callsite. Points into the inlining history and allows tracking back through
-    /// which series of inlining operations a callsite comes from.
-    [[nodiscard]] std::optional<std::size_t> getInlineId() const
-    {
-        return m_inlineId;
     }
 
     /// Returns the list of callsites that are reachable after this callsite has been inlined.
@@ -237,28 +226,133 @@ struct GradeResult
     std::vector<std::pair<mlir::CallOpInterface, mlir::CallableOpInterface>> reachableCallsites;
 };
 
+/// Class used for managing the inline history of an edge. For every edge, identified by the 'py.edge_id' attribute,
+/// it keeps a map of callables that have been inlined through that edge and how many times such a callable was inlined
+/// through that edge.
+class EdgeHistories
+{
+    // We use a free-list of maps to re-use the storage of dead maps across inlining iterations.
+    // For that purpose, the map itself, with a single entry is actually used to hold the index of the next free cell.
+    // The size of 2 here was carefully chosen, as it allows for that single entry to be allocated inline.
+    using Map = llvm::SmallDenseMap<mlir::StringAttr, std::size_t, 2>;
+
+    std::vector<Map> m_histories;
+    std::size_t m_nextFree = std::numeric_limits<std::size_t>::max();
+
+    void markNextFree(std::size_t index)
+    {
+        Map& map = m_histories[index];
+        // Doing this rather than shrink_and_fit leads to the de-allocation of buckets which we desire.
+        // Keeping the buckets is useless in terms of avoiding allocations, because both the copy and move assignment
+        // operators of maps do not reuse the current storage.
+        map = Map();
+        map[nullptr] = m_nextFree;
+        m_nextFree = index;
+    }
+
+public:
+    /// Adds a new edge to the history. 'call' is assumed to be a call-site that was created during the inlining of
+    /// 'originatingCallee'. The call is given a unique 'py.edge_id' and 'originatingCallee' is added to the map
+    /// of callables inlined through 'call'. If 'call' already had a history/edge id, the initial history is taken
+    /// from the existing.
+    void addNewEntry(mlir::CallOpInterface call, mlir::CallableOpInterface originatingCallee)
+    {
+        Map existing;
+        if (auto existingId = call->getAttrOfType<mlir::IntegerAttr>("py.edge_id"))
+        {
+            existing = m_histories[existingId.getValue().getZExtValue()];
+        }
+        std::size_t id;
+        if (m_nextFree == std::numeric_limits<std::size_t>::max())
+        {
+            id = m_histories.size();
+            m_histories.push_back(std::move(existing));
+        }
+        else
+        {
+            id = m_nextFree;
+            m_nextFree = m_histories[id].begin()->second;
+            m_histories[id] = std::move(existing);
+        }
+
+        call->setAttr("py.edge_id", mlir::IntegerAttr::get(mlir::IntegerType::get(call->getContext(), 32), id));
+        m_histories[id][mlir::SymbolTable::getSymbolName(originatingCallee)]++;
+    }
+
+    /// Returns how many times 'callee' has been inlined through 'call' transitively.
+    std::size_t getNumOccurrences(mlir::CallOpInterface call, mlir::CallableOpInterface callee) const
+    {
+        auto integer = call->getAttrOfType<mlir::IntegerAttr>("py.edge_id");
+        if (!integer)
+        {
+            return 0;
+        }
+        return m_histories[integer.getValue().getZExtValue()].lookup(
+            mlir::SymbolTable::getSymbolName(callee.getOperation()));
+    }
+
+    /// Returns the amount of edges whose histories have been added.
+    std::size_t size() const
+    {
+        return m_histories.size();
+    }
+
+    /// Erases the entries of all edges whose bit corresponding to its id has been set in the vector.
+    void erase(const llvm::BitVector& vector)
+    {
+        for (std::size_t i = 0; i < std::min<std::size_t>(m_histories.size(), vector.size()); i++)
+        {
+            if (!vector.test(i))
+            {
+                continue;
+            }
+            markNextFree(i);
+        }
+    }
+};
+
 class Inliner
 {
     mlir::ModuleOp m_module;
     // Maximum cost a callsite may have to still be inlined.
     std::uint16_t m_threshold;
+    std::uint16_t m_cyclePenalty;
     mlir::AnalysisManager m_analysisManager;
     CallSiteQueue m_queue;
+
+    EdgeHistories m_edgeHistories;
 
     // Compute the inline cost estimate using of the call to the callee.
     [[nodiscard]] std::optional<GradeResult> grade(mlir::CallOpInterface call, mlir::CallableOpInterface callee,
                                                    mlir::SymbolTableCollection& collection);
 
+    void pruneEgeHistory()
+    {
+        llvm::BitVector dead(m_edgeHistories.size(), true);
+        m_module->walk(
+            [&](mlir::Operation* op)
+            {
+                auto attr = op->getAttrOfType<mlir::IntegerAttr>("py.edge_id");
+                if (!attr || attr.getValue().uge(dead.size()))
+                {
+                    return;
+                }
+                dead.reset(attr.getValue().getZExtValue());
+            });
+        m_edgeHistories.erase(dead);
+    }
+
 public:
-    Inliner(mlir::ModuleOp moduleOp, std::uint16_t threshold, mlir::AnalysisManager analysisManager)
-        : m_module(moduleOp), m_threshold(threshold), m_analysisManager(analysisManager)
+    Inliner(mlir::ModuleOp moduleOp, std::uint16_t threshold, std::uint16_t cyclePenalty,
+            mlir::AnalysisManager analysisManager)
+        : m_module(moduleOp), m_threshold(threshold), m_cyclePenalty(cyclePenalty), m_analysisManager(analysisManager)
     {
     }
 
     /// Performs one iteration of inlining on the module.
     /// Returns true if at least one callsite was inlined.
     bool performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::Statistic& directRecursionsDiscarded,
-                         mlir::Pass::Statistic& callsitesTooExpensive, mlir::Pass::Statistic& inliningCyclesDetected);
+                         mlir::Pass::Statistic& callsitesTooExpensive);
 };
 
 mlir::Operation* getNextClosestIsolatedFromAbove(mlir::Operation* op)
@@ -488,7 +582,15 @@ std::optional<GradeResult> Inliner::grade(mlir::CallOpInterface call, mlir::Call
             }
         }
     }
-    return gradeFromKnownConstants(std::move(knownConstants), callee, m_threshold, collection);
+
+    std::int32_t threshold =
+        m_threshold - m_cyclePenalty * static_cast<std::ptrdiff_t>(m_edgeHistories.getNumOccurrences(call, callee));
+    if (threshold < 0)
+    {
+        return std::nullopt;
+    }
+
+    return gradeFromKnownConstants(std::move(knownConstants), callee, threshold, collection);
 }
 
 // Formatting function for LLVM_DEBUG output.
@@ -515,15 +617,13 @@ std::optional<GradeResult> Inliner::grade(mlir::CallOpInterface call, mlir::Call
 }
 
 bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::Statistic& directRecursionsDiscarded,
-                              mlir::Pass::Statistic& callsitesTooExpensive,
-                              mlir::Pass::Statistic& inliningCyclesDetected)
+                              mlir::Pass::Statistic& callsitesTooExpensive)
 {
-    m_queue.clear();
+    pruneEgeHistory();
 
     mlir::SymbolTableCollection collection;
 
-    auto handleCallOp =
-        [&](mlir::CallOpInterface call, mlir::CallableOpInterface callable, std::optional<std::size_t> inlineId = {})
+    auto handleCallOp = [&](mlir::CallOpInterface call, mlir::CallableOpInterface callable)
     {
         // A callable without a callable region can't be inlined as it has no body.
         // This is the case for function declarations for example.
@@ -535,6 +635,10 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
         std::optional<GradeResult> grading = grade(call, callable, collection);
         if (!grading)
         {
+            // TODO: Should these call-sites be added to the caller list tracked by the queue anyways? That would allow
+            //  these callsites to be reevaluated after inlining changes have happened. At the same time, inlining
+            //  operations only worsen the grade 99% of the time, and improvements are usually only visible after the
+            //  interleaved simplification passes have run, in which case all call-sites are regraded anyways.
             callsitesTooExpensive++;
             return;
         }
@@ -548,7 +652,7 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
             return;
         }
 
-        m_queue.emplace(call, callable, grading->cost, inlineId, std::move(grading->reachableCallsites));
+        m_queue.emplace(call, callable, grading->cost, std::move(grading->reachableCallsites));
     };
 
     m_module.walk(
@@ -562,39 +666,9 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
             handleCallOp(callOpInterface, callable);
         });
 
-    // History of calls that have been inlined consisting of what the callee was, and possibly the index
-    // into this history, where the call originated from, if it was created by being inlined from elsewhere.
-    std::vector<std::pair<mlir::CallableOpInterface, std::optional<std::size_t>>> inlineHistory;
-
-    auto historyFormsCycle = [&](const CallSite& callSite)
-    {
-        // Just a linear search through the history checking whether this call-site
-        // was transitively created by inlining the same callee as the call-site.
-        // This indicates a recursion.
-        for (std::optional<std::size_t> current = callSite.getInlineId(); current;
-             current = inlineHistory[*current].second)
-        {
-            if (inlineHistory[*current].first == callSite.getCallee())
-            {
-                return true;
-            }
-        }
-        return false;
-    };
-
     bool changed = false;
     while (const CallSite* callSite = m_queue.pop())
     {
-        if (historyFormsCycle(*callSite))
-        {
-            inliningCyclesDetected++;
-            LLVM_DEBUG({
-                llvm::dbgs() << "Not inlining " << formatCalleeForDebug(callSite->getCallee()) << " into "
-                             << formatCallerForDebug(callSite->getCall()) << " due to cycle\n";
-            });
-            continue;
-        }
-
         LLVM_DEBUG({
             llvm::dbgs() << "Inlining " << formatCalleeForDebug(callSite->getCallee()) << " into "
                          << formatCallerForDebug(callSite->getCall()) << " with cost " << callSite->getCost() << '\n';
@@ -602,9 +676,6 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
 
         callsInlined++;
         changed = true;
-
-        std::size_t newInlineHistoryId = inlineHistory.size();
-        inlineHistory.emplace_back(callSite->getCallee(), callSite->getInlineId());
 
         mlir::CallableOpInterface callerCallable;
         for (mlir::Operation* curr = callSite->getCall(); !callerCallable && curr; curr = curr->getParentOp())
@@ -637,7 +708,7 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
 
             if (grading)
             {
-                m_queue.emplace(existing->getCall(), existing->getCallee(), grading->cost, existing->getInlineId(),
+                m_queue.emplace(existing->getCall(), existing->getCallee(), grading->cost,
                                 std::move(existing->getReachableCallsites()));
             }
             else
@@ -658,7 +729,8 @@ bool Inliner::performInlining(mlir::Pass::Statistic& callsInlined, mlir::Pass::S
                 continue;
             }
 
-            handleCallOp(newCall, callable, newInlineHistoryId);
+            m_edgeHistories.addNewEntry(newCall, callSite->getCallee());
+            handleCallOp(newCall, callable);
         }
     }
     return changed;
@@ -674,14 +746,13 @@ void InlinerPass::runOnOperation()
         return;
     }
 
-    Inliner inliner(getOperation(), m_threshold, getAnalysisManager());
+    Inliner inliner(getOperation(), m_threshold, m_cyclePenalty, getAnalysisManager());
     bool changed = false;
     [[maybe_unused]] bool escapedEarly = false;
     for (std::size_t i = 0; i < m_maxInliningIterations; i++)
     {
         LLVM_DEBUG({ llvm::dbgs() << "Inlining iteration " << i << '\n'; });
-        if (!inliner.performInlining(m_callsInlined, m_directRecursionsDiscarded, m_callsitesTooExpensive,
-                                     m_inliningCyclesDetected))
+        if (!inliner.performInlining(m_callsInlined, m_directRecursionsDiscarded, m_callsitesTooExpensive))
         {
             m_doneEarly++;
             escapedEarly = true;
@@ -710,6 +781,9 @@ void InlinerPass::runOnOperation()
             llvm::dbgs() << "Quit inlining due iteration limit reached\n";
         }
     });
+
+    // Get rid of the intermediate id for nicer output.
+    getOperation()->walk([&](mlir::Operation* op) { op->removeAttr("py.edge_id"); });
 
     if (changed)
     {

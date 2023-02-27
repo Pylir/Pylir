@@ -889,7 +889,12 @@ mlir::LogicalResult pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op, :
         }
         callee = functionAttr.getValue();
     }
-    rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), callee, op.getCallOperands());
+    auto id = op->getAttrOfType<mlir::IntegerAttr>("py.edge_id");
+    auto call = rewriter.replaceOpWithNewOp<Py::CallOp>(op, op.getType(), callee, op.getCallOperands());
+    if (id)
+    {
+        call->setAttr("py.edge_id", id);
+    }
     return mlir::success();
 }
 
@@ -914,9 +919,14 @@ mlir::LogicalResult pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp o
         }
         callee = functionAttr.getValue();
     }
-    rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, op.getType(), callee, op.getCallOperands(),
-                                              op.getNormalDestOperands(), op.getUnwindDestOperands(), op.getHappyPath(),
-                                              op.getExceptionPath());
+    auto id = op->getAttrOfType<mlir::IntegerAttr>("py.edge_id");
+    auto invoke = rewriter.replaceOpWithNewOp<Py::InvokeOp>(op, op.getType(), callee, op.getCallOperands(),
+                                                            op.getNormalDestOperands(), op.getUnwindDestOperands(),
+                                                            op.getHappyPath(), op.getExceptionPath());
+    if (id)
+    {
+        invoke->setAttr("py.edge_id", id);
+    }
     return mlir::success();
 }
 

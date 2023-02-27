@@ -82,11 +82,9 @@ def InlinerPass : Pass<"pylir-inliner", "mlir::ModuleOp"> {
     	Statistic<"m_callsInlined", "Calls inlined", "Amount of call sites inlined">,
     	Statistic<"m_optimizationRun", "Optimization pipeline run", "Amount of times the optimization pipeline was run">,
     	Statistic<"m_directRecursionsDiscarded", "Direct recursions discarded",
-    	    "Amount of callsites not consdidered while inlining as they call themselves">,
+    	    "Amount of callsites not considered while inlining as they call themselves">,
     	Statistic<"m_callsitesTooExpensive", "Callsites considered too expensive to inline",
             	    "Amount of callsites whose inlining cost is greater than the threshold">,
-        Statistic<"m_inliningCyclesDetected", "Inlining cycles detected",
-            	    "Amount of inlining cycles detected, leading to a callsite not being inlined">,
         Statistic<"m_doneEarly", "No more inlining changes to be done",
                   "1 if the pass stopped due to not wanting to inline any more callsites instead of having reached"
                   " the inlining iteration limit.">,
@@ -95,9 +93,14 @@ def InlinerPass : Pass<"pylir-inliner", "mlir::ModuleOp"> {
     let options = [
         Option<"m_maxInliningIterations", "max-inlining-iterations", "std::size_t", "8",
             			"Maximum amount of times the inliner should attempt to inline inbetween optimizations">,
-        Option<"m_threshold", "threshold", "std::uint32_t", "250", "">,
+        Option<"m_threshold", "threshold", "std::uint32_t", "250",
+                "Cost threshold in abstract units allowing a call-site to still be inlined. "
+                "Call-sites more expensive than the threshold are not inlined">,
         Option<"m_optimizationPipeline", "optimization-pipeline", "std::string", [{"any()"}],
                "Optimization pipeline interleaved between inlining">,
+        Option<"m_cyclePenalty", "cycle-penalty", "std::uint32_t", "50",
+            "Penalty in abstract units, applied to the cost of a call-site for each occurrence of a repeated inlining "
+            "of a callable, through that call-site">,
     ];
 }
 
