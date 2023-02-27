@@ -19,7 +19,6 @@ def MemorySSA_Dialect : Dialect {
 
     let useDefaultAttributePrinterParser = 1;
     let useDefaultTypePrinterParser = 1;
-    let useFoldAPI = kEmitFoldAdaptorFolder;
 }
 
 class MemorySSA_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type">

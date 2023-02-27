@@ -8,6 +8,7 @@
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
+#include <mlir/Dialect/LLVMIR/Transforms/Passes.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Pass/PassOptions.h>
 #include <mlir/Pass/PassRegistry.h>
@@ -91,6 +92,7 @@ void pylir::registerOptimizationPipelines()
                 createConvertPylirToLLVMPass(ConvertPylirToLLVMPassOptions{options.targetTriple, options.dataLayout}));
             nested = &pm.nestAny();
             nested->addPass(mlir::createReconcileUnrealizedCastsPass());
+            nested->addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
             nested->addPass(mlir::LLVM::createLegalizeForExportPass());
         });
 }
