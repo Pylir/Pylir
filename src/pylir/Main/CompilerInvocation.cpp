@@ -40,7 +40,6 @@
 #include <llvm/Transforms/Scalar/DeadStoreElimination.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
-#include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
@@ -51,6 +50,8 @@
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Parser/Dumper.hpp>
 #include <pylir/Parser/Parser.hpp>
+
+#include "DiagnosticMessages.hpp"
 
 using namespace pylir::cli;
 

@@ -14,10 +14,14 @@ namespace pylir
 {
 class Toolchain
 {
+    std::vector<std::string> m_programPaths;
+
 protected:
     llvm::Triple m_triple;
-    std::vector<std::string> m_programPaths;
     std::vector<std::string> m_builtinLibrarySearchDirs;
+    bool m_wantsAddressSanitizer = false;
+    bool m_wantsThreadSanitizer = false;
+    bool m_wantsUndefinedSanitizer = false;
 
     ///
     std::string findOnBuiltinPaths(llvm::StringRef file) const;
@@ -44,6 +48,10 @@ protected:
 
 public:
     explicit Toolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
+
+    /// Processes any commandline flags related to enabling sanitizers and sets internal state accordingly.
+    /// Returns false if any errors were emitted.
+    bool parseSanitizers(cli::CommandLine& commandLine);
 
     virtual ~Toolchain() = default;
 

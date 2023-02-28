@@ -34,6 +34,14 @@ config.test_exec_root = os.path.join(config.pylir_obj_root, 'test')
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
 
+# Flags required to successfully link executables in our current build config.
+# Currently mostly used to add linking of sanitizers when the runtime library was built with them.
+rt_link_flags = []
+if config.pylir_sanitizers:
+    rt_link_flags.append('-Xsanitize=' + config.pylir_sanitizers)
+
+config.substitutions.append(('%rt_link_flags', ''.join(rt_link_flags)))
+
 llvm_config.with_system_environment(
     ['HOME', 'INCLUDE', 'LIB', 'TMP', 'TEMP', 'TSAN_OPTIONS', 'ASAN_OPTIONS',
      'UBSAN_OPTIONS'])
@@ -60,6 +68,11 @@ llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 tool_dirs = [
     config.pylir_tools_dir, config.mlir_tools_dir, config.llvm_tools_dir
 ]
+
+pylir_extra_args = []
+if config.pylir_sanitizers:
+    pylir_extra_args.append("-Xsanitize=" + config.pylir_sanitizers)
+
 tools = [
     'pylir', 'pylir-opt', 'pylir-translate',
     ToolSubst('pylir-tblgen',

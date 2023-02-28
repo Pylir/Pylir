@@ -17,6 +17,7 @@ config.mlir_tools_dir = "@MLIR_TOOLS_BINARY_DIR@"
 config.pylir_src_root = "@PYLIR_SOURCE_DIR@"
 config.pylir_obj_root = "@PYLIR_BINARY_DIR@"
 config.pylir_tools_dir = "@PYLIR_TOOLS_DIR@"
+config.pylir_sanitizers = "@PYLIR_SANITIZERS@"
 
 # Support substitution of the tools_dir with user parameters. This is
 # used when we can't determine the tool dir at configuration time.

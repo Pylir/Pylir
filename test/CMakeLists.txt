@@ -13,6 +13,11 @@ set(PYLIR_TEST_DEPENDS
         PylirRuntimeMain
         )
 
+# For the 'lit' config, the fuzzer is essentially equal to using ASAN and UBSAN, since that is what non-executable
+# source files are compiled with.
+if (PYLIR_FUZZER)
+    set(PYLIR_SANITIZERS "address,undefined")
+endif ()
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
         ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py

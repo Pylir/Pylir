@@ -10,7 +10,6 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/TargetSelect.h>
 
-#include <pylir/Diagnostics/DiagnosticMessages.hpp>
 #include <pylir/Diagnostics/DiagnosticsManager.hpp>
 #include <pylir/Main/Opts.inc>
 #include <pylir/Optimizer/Optimizer.hpp>
@@ -20,6 +19,7 @@
 #include "CommandLine.hpp"
 #include "CompilerInvocation.hpp"
 #include "DarwinToolchain.hpp"
+#include "DiagnosticMessages.hpp"
 #include "DiagnosticsVerifier.hpp"
 #include "LinuxToolchain.hpp"
 #include "MSVCToolchain.hpp"
@@ -111,6 +111,11 @@ int pylir::main(int argc, char** argv)
             return -1;
         }
         commandLine.createError(arg, pylir::Diag::UNSUPPORTED_TARGET_N, triple).addHighlight(arg);
+        return -1;
+    }
+
+    if (!toolchain->parseSanitizers(commandLine))
+    {
         return -1;
     }
 

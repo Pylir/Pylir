@@ -52,7 +52,7 @@ endif ()
 
 # Clang-cl is not used for linking, cmake calls lld-link directly. We have to pass the runtime directory of clang-cl
 # instead to find the directory where the runtime libraries are contained in.
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND MSVC AND (PYLIR_COVERAGE OR PYLIR_SANITIZER OR PYLIR_FUZZER))
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND MSVC AND (PYLIR_COVERAGE OR PYLIR_SANITIZERS OR PYLIR_FUZZER))
     execute_process(
             COMMAND ${CMAKE_CXX_COMPILER} /clang:-print-libgcc-file-name /clang:--rtlib=compiler-rt
             OUTPUT_VARIABLE clang_compiler_rt_file
@@ -87,14 +87,14 @@ if (PYLIR_COVERAGE)
     endif ()
 endif ()
 
-if (DEFINED PYLIR_SANITIZER)
+if (PYLIR_SANITIZERS)
     if (MSVC)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Oy- -fsanitize=${PYLIR_SANITIZER} -fno-sanitize-recover=all")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Oy- -fsanitize=${PYLIR_SANITIZERS} -fno-sanitize-recover=all")
         link_libraries(clang_rt.asan.lib)
         link_libraries(clang_rt.asan_cxx.lib)
         link_libraries(clang_rt.asan-preinit.lib)
     else ()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize=${PYLIR_SANITIZER} -fno-sanitize-recover=all")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fsanitize=${PYLIR_SANITIZERS} -fno-sanitize-recover=all")
     endif ()
 endif ()
 
@@ -102,7 +102,7 @@ endif ()
 # build might work on ELF but fail on MachO/COFF.
 if (NOT (CMAKE_SYSTEM_NAME MATCHES "Darwin|FreeBSD|OpenBSD|DragonFly|AIX|OS390" OR
         WIN32 OR CYGWIN) AND
-        NOT PYLIR_SANITIZER)
+        NOT PYLIR_SANITIZERS)
     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,defs")
 endif ()
 
@@ -137,6 +137,9 @@ if (NOT LLVM_ENABLE_RTTI)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
     endif ()
 endif ()
+
+# Always build even static libraries with PIC to be able to link them against shared libraries.
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if (PYLIR_FUZZER)
     add_compile_definitions(PYLIR_IN_FUZZER)

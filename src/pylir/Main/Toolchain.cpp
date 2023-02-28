@@ -7,10 +7,9 @@
 #include <llvm/Support/Path.h>
 #include <llvm/Support/Program.h>
 
-#include <pylir/Diagnostics/DiagnosticMessages.hpp>
-
 #include <lld/Common/Driver.h>
 
+#include "DiagnosticMessages.hpp"
 #include "Version.hpp"
 
 pylir::Toolchain::Toolchain(llvm::Triple triple, const cli::CommandLine& commandLine) : m_triple(std::move(triple))
@@ -176,6 +175,49 @@ std::string pylir::Toolchain::findOnBuiltinPaths(llvm::StringRef file) const
     return file.str();
 }
 
+bool pylir::Toolchain::parseSanitizers(cli::CommandLine& commandLine)
+{
+    const llvm::opt::Arg* lastSanArg = nullptr;
+    for (const llvm::opt::Arg* iter : commandLine.getArgs())
+    {
+        if (!iter->getOption().matches(cli::OPT_Xsanitize_EQ))
+        {
+            continue;
+        }
+        lastSanArg = iter;
+        iter->claim();
+        for (llvm::StringRef sanitizer : llvm::split(iter->getValue(), ","))
+        {
+            if (sanitizer == "address")
+            {
+                m_wantsAddressSanitizer = true;
+            }
+            else if (sanitizer == "thread")
+            {
+                m_wantsThreadSanitizer = true;
+            }
+            else if (sanitizer == "undefined")
+            {
+                m_wantsUndefinedSanitizer = true;
+            }
+            else
+            {
+                commandLine.createError(iter, Diag::UNKNOWN_SANITIZER_N, sanitizer).addHighlight(iter);
+                return false;
+            }
+        }
+    }
+    if (m_wantsThreadSanitizer && m_wantsAddressSanitizer)
+    {
+        PYLIR_ASSERT(lastSanArg);
+        commandLine.createError(lastSanArg, Diag::ADDRESS_AND_THREAD_SANITIZERS_ARE_INCOMPATIBLE_WITH_EACH_OTHER)
+            .addHighlight(lastSanArg);
+        return false;
+    }
+
+    return true;
+}
+
 namespace
 {
 llvm::StringRef getOSLibName(const llvm::Triple& triple)
@@ -209,10 +251,15 @@ pylir::ClangInstallation
     for (const auto& iter : rootDirCandidates)
     {
         llvm::SmallString<32> path{iter};
-        llvm::sys::path::append(path, "lib", "clang");
+        llvm::sys::path::append(path, "clang");
         if (!llvm::sys::fs::exists(path))
         {
-            continue;
+            path = iter;
+            llvm::sys::path::append(path, "lib", "clang");
+            if (!llvm::sys::fs::exists(path))
+            {
+                continue;
+            }
         }
         std::error_code ec;
         for (llvm::sys::fs::directory_iterator begin(path, ec), end; !ec && begin != end; begin = begin.increment(ec))

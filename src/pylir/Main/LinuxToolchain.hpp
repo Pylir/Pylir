@@ -12,6 +12,10 @@ namespace pylir
 class LinuxToolchain : public Toolchain
 {
     std::string m_sysroot;
+    ClangInstallation m_clangInstallation;
+
+    void findClangInstallation(const cli::CommandLine& commandLine);
+
 public:
     explicit LinuxToolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
 

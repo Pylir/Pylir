@@ -6,6 +6,7 @@
 
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Path.h>
+#include <llvm/Support/Program.h>
 
 #include "Distro.hpp"
 #include "Version.hpp"
@@ -137,6 +138,54 @@ const char* getDynamicLinker(const llvm::Triple& triple, const pylir::cli::Comma
 
 } // namespace
 
+void pylir::LinuxToolchain::findClangInstallation(const cli::CommandLine& commandLine)
+{
+    (void)commandLine;
+    std::vector<std::string> candidates;
+#ifdef __linux__
+    if (!commandLine.getArgs().hasArg(cli::OPT_sysroot_EQ))
+    {
+        // If on a linux system without the user having specified a custom sysroot we'll also add the path of clang++
+        // as candidate, hoping that it will lead to its install directory.
+        if (auto result = llvm::sys::findProgramByName("clang++"))
+        {
+            llvm::SmallString<32> temp;
+            if (!llvm::sys::fs::real_path(*result, temp))
+            {
+                // Strip filename and get out of bin.
+                candidates.emplace_back(llvm::sys::path::parent_path(llvm::sys::path::parent_path(temp)));
+            }
+        }
+    }
+#endif
+    llvm::append_range(candidates, m_builtinLibrarySearchDirs);
+    // Some distros put the clang resource directories within their LLVM install directories, hence we'll just add
+    // any LLVM installs in the sysroot as candidates.
+    for (llvm::StringRef dir : m_builtinLibrarySearchDirs)
+    {
+        std::error_code ec;
+        for (llvm::sys::fs::directory_iterator iter(dir, ec), end; !ec && iter != end; iter = iter.increment(ec))
+        {
+            if (iter->type() != llvm::sys::fs::file_type::directory_file)
+            {
+                continue;
+            }
+            llvm::StringRef path = iter->path();
+            llvm::StringRef fileName = llvm::sys::path::filename(path);
+            if (fileName.starts_with("llvm"))
+            {
+                candidates.emplace_back(path);
+            }
+        }
+    }
+
+    m_clangInstallation = ClangInstallation::searchForClangInstallation(candidates, m_triple);
+    if (!m_clangInstallation.getRuntimeDir().empty())
+    {
+        m_builtinLibrarySearchDirs.emplace_back(m_clangInstallation.getRuntimeDir());
+    }
+}
+
 pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
@@ -161,6 +210,8 @@ pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, const cli::CommandLin
     }
     addIfExists(m_sysroot, "lib", gccInstall->gccTriple.str());
     addIfExists(m_sysroot, "usr", "lib", gccInstall->gccTriple.str());
+
+    findClangInstallation(commandLine);
 }
 
 bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
@@ -212,6 +263,64 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addArg(findOnBuiltinPaths("crtbegin.o"))
         .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
         .addLibrarySearchDirs(m_builtinLibrarySearchDirs);
+
+    auto addSymsListForSanitizer = [&](llvm::StringRef sanitizer)
+    {
+        std::string fileName = "lib" + m_clangInstallation.getRuntimeLibname(sanitizer, m_triple) + ".a.syms";
+        if (std::string found = findOnBuiltinPaths(fileName); found != fileName)
+        {
+            linkerInvocation.addArg("--dynamic-list=" + found);
+            return true;
+        }
+        return false;
+    };
+
+    bool needsExportDynamic = m_wantsAddressSanitizer || m_wantsThreadSanitizer || m_wantsUndefinedSanitizer;
+
+    auto addSanitizer = [&](llvm::StringRef name)
+    {
+        // We need to always link the static sanitizers. The shared ones are only used when linking a shared library.
+        llvm::SmallString<64> temp = m_clangInstallation.getRuntimeDir();
+        llvm::sys::path::append(temp, "lib" + m_clangInstallation.getRuntimeLibname(name, m_triple) + ".a");
+        if (!llvm::sys::fs::exists(temp))
+        {
+            return;
+        }
+        linkerInvocation.addArg("--whole-archive").addArg(temp).addArg("--no-whole-archive");
+        if (addSymsListForSanitizer(name))
+        {
+            needsExportDynamic = false;
+        }
+    };
+
+    if (m_wantsAddressSanitizer)
+    {
+        addSanitizer("asan_static");
+        addSanitizer("asan");
+        addSanitizer("asan_cxx");
+    }
+    else if (m_wantsThreadSanitizer)
+    {
+        addSanitizer("tsan");
+        addSanitizer("tsan_cxx");
+    }
+    else if (m_wantsUndefinedSanitizer)
+    {
+        addSanitizer("ubsan_standalone");
+        addSanitizer("ubsan_standalone_cxx");
+    }
+
+    if (m_wantsAddressSanitizer || m_wantsThreadSanitizer || m_wantsUndefinedSanitizer)
+    {
+        // The sanitizers have these as link dependencies, which we currently do not otherwise.
+        linkerInvocation.addLibrary("pthread");
+        linkerInvocation.addLibrary("dl");
+    }
+
+    if (needsExportDynamic)
+    {
+        linkerInvocation.addArg("--export-dynamic");
+    }
 
     // Make sure the order of -l and -Wl are preserved.
     for (auto* arg : args)
