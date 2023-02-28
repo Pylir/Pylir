@@ -85,3 +85,5 @@ def Xprint_after_all : F<"Xprint-after-all", "Print IR to stderr after every pas
 def Xprint_pipeline : F<"Xprint-pipeline", "Print the pass pipeline to stderr">, Group<grp_internal>;
 def Xprint_module_scope : F<"Xprint-module-scope", "Use module scope for printing IR">, Group<grp_internal>;
 def verify : F<"verify", "Verify diagnostics output">, Group<grp_internal>;
+def Xsanitize_EQ : Joined<["-"], "Xsanitize=">, MetaVarName<"<sanitizers>">, Group<grp_internal>,
+    Values<"address,undefined,thread">;

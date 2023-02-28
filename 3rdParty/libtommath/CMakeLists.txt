@@ -1,5 +1,5 @@
 
-add_library(tommath mp_2expt.c mp_abs.c mp_add.c mp_add_d.c mp_addmod.c mp_and.c mp_clamp.c mp_clear.c mp_clear_multi.c
+add_library(tommath STATIC mp_2expt.c mp_abs.c mp_add.c mp_add_d.c mp_addmod.c mp_and.c mp_clamp.c mp_clear.c mp_clear_multi.c
         mp_cmp.c mp_cmp_d.c mp_cmp_mag.c mp_cnt_lsb.c mp_complement.c mp_copy.c mp_count_bits.c mp_cutoffs.c
         mp_div.c mp_div_2.c mp_div_2d.c mp_div_d.c mp_dr_is_modulus.c mp_dr_reduce.c mp_dr_setup.c
         mp_error_to_string.c mp_exch.c mp_expt_n.c mp_exptmod.c mp_exteuclid.c mp_fread.c mp_from_sbin.c

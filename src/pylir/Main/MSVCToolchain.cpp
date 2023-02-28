@@ -6,12 +6,6 @@
 
 #include <llvm/Support/Path.h>
 
-pylir::MSVCToolchain::MSVCToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
-    : Toolchain(std::move(triple), commandLine)
-{
-
-}
-
 bool pylir::MSVCToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
 {
     const auto& args = commandLine.getArgs();

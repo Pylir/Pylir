@@ -30,11 +30,11 @@ class CommandLine
     PylirOptTable m_table;
     llvm::opt::InputArgList m_args;
     std::string m_exe;
-    llvm::DenseMap<llvm::opt::Arg*, std::pair<std::size_t, std::size_t>> m_argRanges;
+    llvm::DenseMap<const llvm::opt::Arg*, std::pair<std::size_t, std::size_t>> m_argRanges;
     pylir::Diag::Document m_rendered;
     pylir::Diag::DiagnosticsDocManager m_commandLineDM;
 
-    friend struct pylir::Diag::LocationProvider<llvm::opt::Arg*>;
+    friend struct pylir::Diag::LocationProvider<const llvm::opt::Arg*>;
 
 public:
     explicit CommandLine(std::string exe, int argc, char** argv, pylir::Diag::DiagnosticsManager& diagnosticsManager);
@@ -103,12 +103,17 @@ enum ID
 namespace pylir::Diag
 {
 template <>
-struct LocationProvider<llvm::opt::Arg*>
+struct LocationProvider<const llvm::opt::Arg*>
 {
-    static std::pair<std::size_t, std::size_t> getRange(llvm::opt::Arg* value, const void* context) noexcept
+    static std::pair<std::size_t, std::size_t> getRange(const llvm::opt::Arg* value, const void* context) noexcept
     {
         const auto* commandLine = reinterpret_cast<const pylir::cli::CommandLine*>(context);
         return commandLine->m_argRanges.lookup(value);
     }
+};
+
+template <>
+struct LocationProvider<llvm::opt::Arg*> : LocationProvider<const llvm::opt::Arg*>
+{
 };
 } // namespace pylir::Diag

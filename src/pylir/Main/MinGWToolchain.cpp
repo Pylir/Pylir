@@ -49,7 +49,7 @@ void pylir::MinGWToolchain::searchForClangInstallation(const pylir::cli::Command
     m_clangInstallation = ClangInstallation::searchForClangInstallation(candidates, m_triple);
 }
 
-pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
+pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
     searchForClangInstallation(commandLine);
@@ -116,9 +116,23 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addLibrary("c++")
         .addArg("--start-group")
         .addLibrary("mingw32")
-        .addLibrary(m_clangInstallation.getRuntimeLibname("builtins", m_triple))
-        .addLibrary("moldname")
-        .addLibrary("mingwex");
+        .addLibrary(m_clangInstallation.getRuntimeLibname("builtins", m_triple));
+
+    if (useAddressSanitizer())
+    {
+        linkerInvocation.addArg("-Bdynamic")
+            .addLibrary(m_clangInstallation.getRuntimeLibname("asan_dynamic", m_triple))
+            .addLibrary(m_clangInstallation.getRuntimeLibname("asan_dynamic_runtime_thunk", m_triple))
+            .addArg("--require-defined")
+            .addArg("___asan_seh_interceptor", m_triple.getArch() == llvm::Triple::x86)
+            .addArg("__asan_seh_interceptor", m_triple.getArch() != llvm::Triple::x86)
+            .addArg("--whole-archive")
+            .addLibrary(m_clangInstallation.getRuntimeLibname("asan_dynamic_runtime_thunk", m_triple))
+            .addArg("--no-whole-archive")
+            .addArg("-Bstatic");
+    }
+
+    linkerInvocation.addLibrary("moldname").addLibrary("mingwex");
 
     auto argValues = args.getAllArgValues(cli::OPT_l);
     if (std::none_of(argValues.begin(), argValues.end(),

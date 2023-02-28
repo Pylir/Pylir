@@ -11,6 +11,7 @@ option(PYLIR_BUILD_TESTS "Build tests" ON)
 option(PYLIR_BUILD_DOCS "Build documentation" OFF)
 option(PYLIR_FUZZER "Build fuzzers" OFF)
 option(PYLIR_COVERAGE "Compile with coverage" OFF)
+set(PYLIR_SANITIZERS "" CACHE STRING "Compile with given sanitizers")
 
 if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
     option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" OFF)
