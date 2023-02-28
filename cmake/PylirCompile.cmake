@@ -43,10 +43,15 @@ macro(pylir_obj_compile)
         set(pie_arg -fpie)
     endif ()
 
+    set(sanitizer_arg)
+    if (PYLIR_SANITIZERS)
+        set(sanitizer_arg "-Xsanitize=${PYLIR_SANITIZERS}")
+    endif ()
+
     get_filename_component(SourceAbs ${ARG_SOURCE} REALPATH)
     add_custom_command(
             OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}
-            COMMAND pylir ${SourceAbs} ${pie_arg} -c -o ${TargetRel} $<$<CONFIG:Release>:-O3>
+            COMMAND pylir ${SourceAbs} ${pie_arg} ${sanitizer_arg} -c -o ${TargetRel} $<$<CONFIG:Release>:-O3>
             -I ${PROJECT_SOURCE_DIR}/src/python
             ${ARG_FLAGS} ${depfile_cmd}
             COMMENT "Building ${LANG} object ${TargetRel}"

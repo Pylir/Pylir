@@ -25,6 +25,7 @@
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Analysis/GlobalsModRef.h>
 #include <llvm/Bitcode/BitcodeWriterPass.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IRPrinter/IRPrintingPasses.h>
@@ -37,9 +38,12 @@
 #include <llvm/Support/Program.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/ThreadPool.h>
+#include <llvm/Transforms/Instrumentation/AddressSanitizer.h>
+#include <llvm/Transforms/Instrumentation/ThreadSanitizer.h>
 #include <llvm/Transforms/Scalar/DeadStoreElimination.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
+#include <pylir/LLVM/MarkSanitizersGCLeafs.hpp>
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
 #include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
@@ -297,6 +301,18 @@ mlir::ModuleOp buildModuleIfNecessary(std::unique_ptr<mlir::Block>&& block, mlir
     return mlirModule;
 }
 
+void markDefinitionsForSanitizer(llvm::Module& module, llvm::Attribute::AttrKind kind)
+{
+    for (llvm::Function& function : module.getFunctionList())
+    {
+        if (function.isDeclaration())
+        {
+            continue;
+        }
+        function.addFnAttr(kind);
+    }
+}
+
 } // namespace
 
 mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* inputFile, CommandLine& commandLine,
@@ -488,6 +504,18 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             m_mlirContext.reset();
             m_fileInputs.clear();
             m_documents.clear();
+
+            // Traditionally frontends would set this function attribute, but its more work to pipe this through
+            // to the MLIR conversion pass than just marking them all here.
+            if (toolchain.useAddressSanitizer())
+            {
+                markDefinitionsForSanitizer(*llvmModule, llvm::Attribute::SanitizeAddress);
+            }
+            if (toolchain.useThreadSanitizer())
+            {
+                markDefinitionsForSanitizer(*llvmModule, llvm::Attribute::SanitizeThread);
+            }
+
             [[fallthrough]];
         }
         case FileType::LLVM:
@@ -543,6 +571,31 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             options.SLPVectorization = true;
             options.MergeFunctions = true;
             llvm::PassBuilder passBuilder(m_targetMachine.get(), options, std::nullopt, &pic);
+
+            // The codegen output of both ASAN and TSAN are tightly coupled to the LLVM version used, and technically
+            // only configurations where both the runtime version and the compiler version match are supported.
+            // Since this is currently unlikely due to LLVM versions used it is currently an opt-in flag.
+            if (args.hasArg(cli::OPT_Xsanitize_codegen)
+                && (toolchain.useAddressSanitizer() || toolchain.useThreadSanitizer()))
+            {
+                passBuilder.registerOptimizerLastEPCallback(
+                    [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
+                    {
+                        if (toolchain.useThreadSanitizer())
+                        {
+                            mpm.addPass(llvm::ModuleThreadSanitizerPass{});
+                            mpm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::ThreadSanitizerPass{}));
+                        }
+
+                        if (toolchain.useAddressSanitizer())
+                        {
+                            llvm::AddressSanitizerOptions options;
+                            mpm.addPass(llvm::AddressSanitizerPass(options));
+                        }
+                        mpm.addPass(llvm::RequireAnalysisPass<llvm::GlobalsAA, llvm::Module>{});
+                        mpm.addPass(MarkSanitizersGCLeafsPass{});
+                    });
+            }
 
             passBuilder.registerOptimizerLastEPCallback(
                 [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
@@ -619,6 +672,15 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             }
 
             mpm.run(*llvmModule, mam);
+            if (args.hasArg(OPT_Xprint_pipeline))
+            {
+                mpm.printPipeline(llvm::errs(),
+                                  [&](llvm::StringRef className)
+                                  {
+                                      auto passName = pic.getPassNameForClassName(className);
+                                      return passName.empty() ? className : passName;
+                                  });
+            }
 
             if (shouldOutput(OPT_emit_llvm))
             {
