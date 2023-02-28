@@ -26,7 +26,7 @@ class DarwinToolchain : public Toolchain
 public:
     [[nodiscard]] bool defaultsToPIC() const override;
 
-    DarwinToolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
+    DarwinToolchain(llvm::Triple triple, cli::CommandLine& commandLine);
 
     bool link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const override;
 };

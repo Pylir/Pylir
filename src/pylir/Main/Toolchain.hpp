@@ -16,12 +16,15 @@ class Toolchain
 {
     std::vector<std::string> m_programPaths;
 
+    bool m_useAddressSanitizer = false;
+    bool m_useThreadSanitizer = false;
+    bool m_useUndefinedSanitizer = false;
+
+    void parseSanitizers(cli::CommandLine& commandLine);
+
 protected:
     llvm::Triple m_triple;
     std::vector<std::string> m_builtinLibrarySearchDirs;
-    bool m_wantsAddressSanitizer = false;
-    bool m_wantsThreadSanitizer = false;
-    bool m_wantsUndefinedSanitizer = false;
 
     ///
     std::string findOnBuiltinPaths(llvm::StringRef file) const;
@@ -47,11 +50,7 @@ protected:
     }
 
 public:
-    explicit Toolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
-
-    /// Processes any commandline flags related to enabling sanitizers and sets internal state accordingly.
-    /// Returns false if any errors were emitted.
-    bool parseSanitizers(cli::CommandLine& commandLine);
+    explicit Toolchain(llvm::Triple triple, cli::CommandLine& commandLine);
 
     virtual ~Toolchain() = default;
 
@@ -69,6 +68,35 @@ public:
     [[nodiscard]] virtual bool defaultsToPIC() const
     {
         return false;
+    }
+
+    /// Returns true if ASAN is in use.
+    bool useAddressSanitizer() const
+    {
+        return m_useAddressSanitizer;
+    }
+
+    /// Returns true if TSAN is in use.
+    bool useThreadSanitizer() const
+    {
+        return m_useThreadSanitizer;
+    }
+
+    /// Returns true if UBSAN is in use.
+    bool useUndefinedSanitizer() const
+    {
+        // These sanitizers have the UBSAN runtime built in, therefore not requiring it be linked in explicitly.
+        if (m_useAddressSanitizer || m_useThreadSanitizer)
+        {
+            return false;
+        }
+        return m_useUndefinedSanitizer;
+    }
+
+    /// Returns whether any sanitizers are in use.
+    bool useSanitizers() const
+    {
+        return m_useAddressSanitizer || m_useThreadSanitizer || m_useUndefinedSanitizer;
     }
 };
 

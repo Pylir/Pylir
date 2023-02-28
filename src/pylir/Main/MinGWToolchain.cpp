@@ -49,7 +49,7 @@ void pylir::MinGWToolchain::searchForClangInstallation(const pylir::cli::Command
     m_clangInstallation = ClangInstallation::searchForClangInstallation(candidates, m_triple);
 }
 
-pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
+pylir::MinGWToolchain::MinGWToolchain(llvm::Triple triple, cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
     searchForClangInstallation(commandLine);
@@ -118,10 +118,9 @@ bool pylir::MinGWToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addLibrary("mingw32")
         .addLibrary(m_clangInstallation.getRuntimeLibname("builtins", m_triple));
 
-    if (m_wantsAddressSanitizer)
+    if (useAddressSanitizer())
     {
-        linkerInvocation
-            .addArg("-Bdynamic")
+        linkerInvocation.addArg("-Bdynamic")
             .addLibrary(m_clangInstallation.getRuntimeLibname("asan_dynamic", m_triple))
             .addLibrary(m_clangInstallation.getRuntimeLibname("asan_dynamic_runtime_thunk", m_triple))
             .addArg("--require-defined")

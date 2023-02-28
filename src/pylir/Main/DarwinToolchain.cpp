@@ -139,7 +139,7 @@ bool pylir::DarwinToolchain::readSDKSettings(llvm::MemoryBuffer& buffer)
     return m_sdkVersion.has_value();
 }
 
-pylir::DarwinToolchain::DarwinToolchain(llvm::Triple triple, const pylir::cli::CommandLine& commandLine)
+pylir::DarwinToolchain::DarwinToolchain(llvm::Triple triple, pylir::cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
     deduceSDKRoot(commandLine);

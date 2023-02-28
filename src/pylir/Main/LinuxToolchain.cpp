@@ -186,7 +186,7 @@ void pylir::LinuxToolchain::findClangInstallation(const cli::CommandLine& comman
     }
 }
 
-pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, const cli::CommandLine& commandLine)
+pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, cli::CommandLine& commandLine)
     : Toolchain(std::move(triple), commandLine)
 {
     auto gccInstall = findGCCInstallation(m_triple, commandLine);
@@ -211,7 +211,11 @@ pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, const cli::CommandLin
     addIfExists(m_sysroot, "lib", gccInstall->gccTriple.str());
     addIfExists(m_sysroot, "usr", "lib", gccInstall->gccTriple.str());
 
-    findClangInstallation(commandLine);
+    // Clang installation is not required on Linux except for sanitizers.
+    if (useSanitizers())
+    {
+        findClangInstallation(commandLine);
+    }
 }
 
 bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const
@@ -275,7 +279,7 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         return false;
     };
 
-    bool needsExportDynamic = m_wantsAddressSanitizer || m_wantsThreadSanitizer || m_wantsUndefinedSanitizer;
+    bool needsExportDynamic = useSanitizers();
 
     auto addSanitizer = [&](llvm::StringRef name)
     {
@@ -293,24 +297,24 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         }
     };
 
-    if (m_wantsAddressSanitizer)
+    if (useAddressSanitizer())
     {
         addSanitizer("asan_static");
         addSanitizer("asan");
         addSanitizer("asan_cxx");
     }
-    else if (m_wantsThreadSanitizer)
+    if (useThreadSanitizer())
     {
         addSanitizer("tsan");
         addSanitizer("tsan_cxx");
     }
-    else if (m_wantsUndefinedSanitizer)
+    if (useUndefinedSanitizer())
     {
         addSanitizer("ubsan_standalone");
         addSanitizer("ubsan_standalone_cxx");
     }
 
-    if (m_wantsAddressSanitizer || m_wantsThreadSanitizer || m_wantsUndefinedSanitizer)
+    if (useSanitizers())
     {
         // The sanitizers have these as link dependencies, which we currently do not otherwise.
         linkerInvocation.addLibrary("pthread");

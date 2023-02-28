@@ -31,7 +31,7 @@ using namespace pylir::cli;
 namespace
 {
 
-std::unique_ptr<pylir::Toolchain> createToolchainForTriple(const pylir::cli::CommandLine& commandLine,
+std::unique_ptr<pylir::Toolchain> createToolchainForTriple(pylir::cli::CommandLine& commandLine,
                                                            const llvm::Triple& triple)
 {
     if (triple.isKnownWindowsMSVCEnvironment())
@@ -114,7 +114,7 @@ int pylir::main(int argc, char** argv)
         return -1;
     }
 
-    if (!toolchain->parseSanitizers(commandLine))
+    if (!commandLine)
     {
         return -1;
     }

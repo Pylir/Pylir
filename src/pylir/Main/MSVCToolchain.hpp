@@ -18,7 +18,7 @@ protected:
     }
 
 public:
-    MSVCToolchain(llvm::Triple triple, const cli::CommandLine& commandLine);
+    using Toolchain::Toolchain;
 
     [[nodiscard]] bool link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const override;
 };
