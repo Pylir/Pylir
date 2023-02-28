@@ -25,4 +25,4 @@ configure_file(
 )
 
 add_test(NAME lit-tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pylir-lit.py "${CMAKE_CURRENT_BINARY_DIR}" -v)
-
+set_tests_properties(lit-tests PROPERTIES TIMEOUT 3600)
