@@ -71,7 +71,8 @@ void pylir::registerOptimizationPipelines()
             pm.addPass(createConvertPylirPyToPylirMemPass());
             nested = &pm.nestAny();
             nested->addPass(mlir::createCanonicalizerPass());
-            nested->addPass(Mem::createHeapToStackPass());
+            // TODO: Re-enable once it properly supports destructors.
+            // nested->addPass(Mem::createHeapToStackPass());
         });
 
     mlir::PassPipelineRegistration<PylirLLVMOptions>(
