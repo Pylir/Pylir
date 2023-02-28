@@ -64,6 +64,9 @@ if (MSVC)
   set(msvc_arg "--msvc")
 endif ()
 
+if (APPLE)
+  set(MERGE_ARCHIVES_LIBTOOL "--use-libtool" "--libtool" "${CMAKE_LIBTOOL}")
+endif()
 add_custom_command(TARGET PylirRuntime POST_BUILD
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/merge_archives.py
         ARGS
