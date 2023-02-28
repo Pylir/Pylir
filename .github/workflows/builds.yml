@@ -2,6 +2,7 @@ name: Builds
 
 permissions:
   contents: read
+  actions: write
 
 on:
   push:
