@@ -65,7 +65,7 @@ if (MSVC)
 endif ()
 
 if (APPLE)
-  cmake_path(GET ${CMAKE_CXX_COMPILER} PARENT_PATH path_hint)
+  cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH path_hint)
   find_program(CMAKE_LIBTOOL NAMES llvm-libtool-darwin libtool HINTS ${path_hint} REQUIRED)
 
   set(MERGE_ARCHIVES_LIBTOOL "--use-libtool" "--libtool" "${CMAKE_LIBTOOL}")
