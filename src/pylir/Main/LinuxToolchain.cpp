@@ -180,10 +180,6 @@ void pylir::LinuxToolchain::findClangInstallation(const cli::CommandLine& comman
     }
 
     m_clangInstallation = ClangInstallation::searchForClangInstallation(candidates, m_triple);
-    if (!m_clangInstallation.getRuntimeDir().empty())
-    {
-        m_builtinLibrarySearchDirs.emplace_back(m_clangInstallation.getRuntimeDir());
-    }
 }
 
 pylir::LinuxToolchain::LinuxToolchain(llvm::Triple triple, cli::CommandLine& commandLine)
@@ -268,17 +264,6 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
         .addLibrarySearchDirs(args.getAllArgValues(cli::OPT_L))
         .addLibrarySearchDirs(m_builtinLibrarySearchDirs);
 
-    auto addSymsListForSanitizer = [&](llvm::StringRef sanitizer)
-    {
-        std::string fileName = "lib" + m_clangInstallation.getRuntimeLibname(sanitizer, m_triple) + ".a.syms";
-        if (std::string found = findOnBuiltinPaths(fileName); found != fileName)
-        {
-            linkerInvocation.addArg("--dynamic-list=" + found);
-            return true;
-        }
-        return false;
-    };
-
     bool needsExportDynamic = useSanitizers();
 
     auto addSanitizer = [&](llvm::StringRef name)
@@ -291,8 +276,9 @@ bool pylir::LinuxToolchain::link(cli::CommandLine& commandLine, llvm::StringRef 
             return;
         }
         linkerInvocation.addArg("--whole-archive").addArg(temp).addArg("--no-whole-archive");
-        if (addSymsListForSanitizer(name))
+        if (llvm::sys::fs::exists(temp + ".syms"))
         {
+            linkerInvocation.addArg("--dynamic-list=" + temp + ".syms");
             needsExportDynamic = false;
         }
     };
