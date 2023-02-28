@@ -54,31 +54,11 @@ endif ()
 collect_libs(PylirRuntime LIBS)
 # First one is always 'PylirRuntime' itself.
 list(POP_FRONT LIBS)
+list(TRANSFORM LIBS REPLACE "(.+)" "$<TARGET_OBJECTS:\\1>")
+target_sources(PylirRuntime PRIVATE ${LIBS})
 
 add_subdirectory(MarkAndSweep)
 
-list(TRANSFORM LIBS REPLACE "(.+)" "$<TARGET_LINKER_FILE:\\1>")
-
-set(msvc_arg "")
-if (MSVC)
-  set(msvc_arg "--msvc")
-endif ()
-
-if (APPLE)
-  cmake_path(GET CMAKE_CXX_COMPILER PARENT_PATH path_hint)
-  find_program(CMAKE_LIBTOOL NAMES llvm-libtool-darwin libtool HINTS ${path_hint} REQUIRED)
-
-  set(MERGE_ARCHIVES_LIBTOOL "--use-libtool" "--libtool" "${CMAKE_LIBTOOL}")
-endif()
-add_custom_command(TARGET PylirRuntime POST_BUILD
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/util/merge_archives.py
-        ARGS
-        -o "$<TARGET_LINKER_FILE:PylirRuntime>"
-        --ar "${CMAKE_AR}"
-        ${msvc_arg}
-        ${MERGE_ARCHIVES_LIBTOOL}
-        "$<TARGET_LINKER_FILE:PylirRuntime>"
-        ${LIBS})
 
 add_library(PylirRuntimeMain STATIC PylirRuntimeMain.cpp)
 
