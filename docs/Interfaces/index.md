@@ -16,6 +16,7 @@ are found in the top level `Interfaces` directory of the optimizer.
 :caption: Interfaces
 
 GenericInterfaces
+PylirHIRInterfaces
 PylirPyInterfaces
 TypeFlowInterfaces
 ```

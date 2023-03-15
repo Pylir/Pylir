@@ -25,6 +25,7 @@
 #include <pylir/Optimizer/Conversion/Passes.hpp>
 #include <pylir/Optimizer/ExternalModels/ExternalModels.hpp>
 #include <pylir/Optimizer/Optimizer.hpp>
+#include <pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.hpp>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.hpp>
 #include <pylir/Optimizer/PylirMem/Transforms/Passes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
@@ -189,7 +190,8 @@ int main(int argc, char** argv)
     mlir::registerAllPasses();
 
     mlir::DialectRegistry registry;
-    registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect, pylir::test::TestDialect>();
+    registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect, pylir::test::TestDialect,
+                    pylir::HIR::PylirHIRDialect>();
     mlir::registerAllDialects(registry);
 
     pylir::registerExternalModels(registry);

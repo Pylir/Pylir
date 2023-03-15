@@ -4,6 +4,7 @@
 
 add_subdirectory(Analysis)
 add_subdirectory(Conversion)
+add_subdirectory(PylirHIR)
 add_subdirectory(PylirMem)
 add_subdirectory(PylirPy)
 add_subdirectory(Interfaces)
