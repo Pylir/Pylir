@@ -7,7 +7,7 @@ py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.function = #py.type
 py.globalValue const @builtins.None = #py.type
 
-func.func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynamic, %dict : !py.dynamic) -> !py.dynamic {
+py.func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynamic, %dict : !py.dynamic) -> !py.dynamic {
 	%zero = arith.constant 0 : index
 	%one = arith.constant 1 : index
 	%first = py.tuple.getItem %tuple[%zero]
@@ -30,18 +30,18 @@ func.func @builtins.int.__add__$impl(%closure : !py.dynamic, %tuple : !py.dynami
 py.globalValue @builtins.int.__add__ = #py.function<@builtins.int.__add__$impl>
 py.globalValue const @builtins.int = #py.type<slots = {__add__ = #py.ref<@builtins.int.__add__>}, mro_tuple = #py.tuple<(#py.ref<@builtins.int>)>>
 
-func.func @__init__() {
-	%one = py.constant(#py.int<1>)
-	%zero = py.constant(#py.int<0>)
+py.func @__init__() {
+	%one = constant(#py.int<1>)
+	%zero = constant(#py.int<0>)
 	%c0 = arith.constant 0 : index
 	cf.br ^loop(%zero : !py.dynamic)
 
 ^loop(%iter : !py.dynamic):
-	%0 = py.typeOf %iter
+	%0 = typeOf %iter
 	%1 = py.type.mro %0
-	%2 = py.mroLookup %c0 in %1
-	%3 = py.makeTuple (%iter, %one)
-	%4 = py.constant(#py.dict<{}>)
+	%2 = mroLookup %c0 in %1
+	%3 = makeTuple (%iter, %one)
+	%4 = constant(#py.dict<{}>)
 	%5 = py.function.call %2(%2, %3, %4)
 	%6 = test.random
 	cf.cond_br %6, ^loop(%5 : !py.dynamic), ^exit
@@ -61,9 +61,9 @@ func.func @__init__() {
 // CHECK-NEXT: %[[MRO:.*]] = calc value %[[TYPE]]
 // CHECK-SAME: py.type.mro
 // CHECK-NEXT: %[[RESULT:.*]] = calc value %[[MRO]]
-// CHECK-SAME: py.mroLookup
+// CHECK-SAME: mroLookup
 // CHECK-NEXT: %[[TUPLE:.*]] = calc %[[ITER]], %[[C0]]
-// CHECK-SAME: py.makeTuple
+// CHECK-SAME: makeTuple
 // CHECK-NEXT: %[[C2:.*]] = constant #py.dict<{}>
 // CHECK-NEXT: %[[RES:.*]] = call_indirect %[[RESULT]](%[[RESULT]], %[[TUPLE]], %[[C2]])
 // CHECK-NEXT: branch ^[[BODY]], ^[[EXIT:[[:alnum:]]+]], (%[[RES]])
@@ -72,22 +72,22 @@ func.func @__init__() {
 
 // -----
 
-func.func @create1(%0 : !py.dynamic) -> !py.dynamic {
-	%1 = py.makeObject %0
+py.func @create1(%0 : !py.dynamic) -> !py.dynamic {
+	%1 = makeObject %0
 	return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: typeFlow.func @create1
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK: %[[OBJ:.*]] = calc %[[ARG]]
-// CHECK-SAME: py.makeObject
+// CHECK-SAME: makeObject
 // CHECK-NEXT: return %[[OBJ]]
 
 py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func.func @create2(%0 : !py.dynamic) -> !py.dynamic {
-	%2 = py.constant(#py.tuple<()>)
+py.func @create2(%0 : !py.dynamic) -> !py.dynamic {
+	%2 = constant(#py.tuple<()>)
 	%1 = py.tuple.copy %2 : %0
 	return %1 : !py.dynamic
 }

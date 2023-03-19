@@ -10,6 +10,6 @@ add_library(PylirToLLVMIR
         PylirTypeConverter.cpp
         CodeGenState.cpp)
 add_dependencies(PylirToLLVMIR PylirConversionPassIncGen)
-target_link_libraries(PylirToLLVMIR PUBLIC PylirMemDialect MLIRLLVMDialect MLIRPass MLIRTransforms MLIRFuncToLLVM
+target_link_libraries(PylirToLLVMIR PUBLIC PylirMemDialect MLIRLLVMDialect MLIRPass MLIRTransforms
   MLIRControlFlowToLLVM LLVMTargetParser)
 set_property(GLOBAL APPEND PROPERTY MLIR_CONVERSION_LIBS PylirToLLVMIR)

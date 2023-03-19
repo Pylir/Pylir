@@ -18,6 +18,7 @@ include "pylir/Optimizer/Interfaces/MemoryFoldInterface.td"
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/EnumAttr.td"
@@ -1174,7 +1175,9 @@ def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
     }];
 }
 
-// Control Flow
+//===--------------------------------------------------------------------------------------------------------------===//
+// (Inter-procedural) Control flow Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
     DeclareOpInterfaceMethods<CallOpInterface>, AlwaysBound, AddableExceptionHandling<"InvokeOp">]> {
@@ -1205,6 +1208,71 @@ def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<SymbolUserOpI
 
 def PylirPy_InvokeOp : AddExceptionHandling<PylirPy_CallOp, "invoke"> {
 	let summary = "invoke operation";
+}
+
+def PylirPy_FuncOp : PylirPy_Op<"func", [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface,
+                                         AutomaticAllocationScope, CallableOpInterface]> {
+	let arguments = (ins StrAttr:$sym_name, TypeAttrOf<FunctionType>:$function_type,
+	                 OptionalAttr<StrAttr>:$sym_visibility,
+					 OptionalAttr<DictArrayAttr>:$arg_attrs,
+					 OptionalAttr<DictArrayAttr>:$res_attrs);
+
+	let regions = (region AnyRegion:$body);
+
+    let builders = [
+        OpBuilder<(ins "llvm::Twine":$name, "mlir::FunctionType":$type), [{
+            build($_builder, $_state, $_builder.getStringAttr(name), mlir::TypeAttr::get(type), nullptr, nullptr, nullptr);
+        }]>
+    ];
+
+	let extraClassDeclaration = [{
+        /// Returns the argument types of this function.
+        llvm::ArrayRef<mlir::Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+
+        /// Returns the result types of this function.
+        llvm::ArrayRef<mlir::Type> getResultTypes() { return getFunctionType().getResults(); }
+
+        static llvm::StringRef getDefaultDialect()
+        {
+            return pylir::Py::PylirPyDialect::getDialectNamespace();
+        }
+
+        static FuncOp create(mlir::Location loc, llvm::Twine name, mlir::FunctionType type)
+        {
+            mlir::OpBuilder builder(loc.getContext());
+            return builder.create<FuncOp>(loc, name, type);
+        }
+
+        mlir::Region *getCallableRegion() { return isExternal() ? nullptr : &getBody(); }
+
+        llvm::ArrayRef<mlir::Type> getCallableResults() { return getFunctionType().getResults(); }
+
+        mlir::ArrayAttr getCallableArgAttrs() {
+            return getArgAttrs().value_or(nullptr);
+        }
+
+        mlir::ArrayAttr getCallableResAttrs() {
+            return getResAttrs().value_or(nullptr);
+        }
+
+        bool isDeclaration() { return isExternal(); }
+	}];
+
+	let hasCustomAssemblyFormat = 1;
+}
+
+def PylirPy_ReturnOp : PylirPy_Op<"return", [HasParent<"FuncOp">, Terminator, ReturnLike]> {
+    let arguments = (ins Variadic<AnyType>:$arguments);
+
+    let assemblyFormat = "($arguments^ `:` type($arguments))? attr-dict";
+
+    let builders = [
+        OpBuilder<(ins), [{
+            build($_builder, $_state, mlir::ValueRange{});
+        }]>
+    ];
+
+    let hasVerifier = 1;
 }
 
 def PylirPy_UnreachableOp : PylirPy_Op<"unreachable", [Terminator]> {

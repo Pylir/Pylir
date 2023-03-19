@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func.func @test(%arg : !py.dynamic, %index : index) -> !py.dynamic {
+py.func @test(%arg : !py.dynamic, %index : index) -> !py.dynamic {
     %0 = py.list.getItem %arg[%index]
     return %0 : !py.dynamic
 }

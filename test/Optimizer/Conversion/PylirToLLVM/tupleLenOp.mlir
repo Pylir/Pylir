@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func.func @test(%arg : !py.dynamic) -> index {
+py.func @test(%arg : !py.dynamic) -> index {
     %0 = py.tuple.len %arg
     return %0 : index
 }

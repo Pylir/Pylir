@@ -13,8 +13,8 @@ py.globalValue @g3 = #py.bool<True>
 py.globalValue @g4 = #py.str<"text">
 py.globalValue @g5 = #py.tuple<(#py.ref<@g1>, #py.ref<@g2>, #py.ref<@g3>, #py.ref<@g4>)>
 
-// CHECK: py.globalValue const @g1
-// CHECK: py.globalValue const @g2
-// CHECK: py.globalValue const @g3
-// CHECK: py.globalValue const @g4
-// CHECK: py.globalValue const @g5
+// CHECK: globalValue const @g1
+// CHECK: globalValue const @g2
+// CHECK: globalValue const @g3
+// CHECK: globalValue const @g4
+// CHECK: globalValue const @g5

@@ -5,9 +5,9 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 py.global @foo : !py.dynamic
 
-func.func @test() -> !py.dynamic {
-  %0 = py.constant(#py.str<"value">)
-  py.store %0 : !py.dynamic into @foo
+py.func @test() -> !py.dynamic {
+  %0 = constant(#py.str<"value">)
+  store %0 : !py.dynamic into @foo
   cf.br ^bb1(%0 : !py.dynamic)
 
 ^bb1(%1: !py.dynamic):
@@ -18,8 +18,8 @@ func.func @test() -> !py.dynamic {
   return %1 : !py.dynamic
 }
 
-// CHECK-LABEL: func.func @test
-// CHECK: %[[C:.*]] = py.constant(#py.str<"value">)
+// CHECK-LABEL: py.func @test
+// CHECK: %[[C:.*]] = constant(#py.str<"value">)
 // CHECK: cf.br ^[[BB1:[[:alnum:]]+]]
 // CHECK-NOT: (
 
@@ -31,9 +31,9 @@ func.func @test() -> !py.dynamic {
 
 // -----
 
-func.func private @foo()
+py.func private @foo()
 
-func.func @test(%arg1 : i32) -> i32 {
+py.func @test(%arg1 : i32) -> i32 {
 	py.invoke @foo() : () -> ()
 		label ^bb2 unwind ^bb1(%arg1 : i32)
 
@@ -47,7 +47,7 @@ func.func @test(%arg1 : i32) -> i32 {
 
 // CHECK-LABEL: @test
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK-NEXT: py.invoke
+// CHECK-NEXT: invoke
 // CHECK-NEXT: label ^{{.*}} unwind ^[[BB1:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[BB1]]
 // CHECK-SAME: %{{[[:alnum:]]+}}
@@ -56,9 +56,9 @@ func.func @test(%arg1 : i32) -> i32 {
 
 // -----
 
-func.func private @foo()
+py.func private @foo()
 
-func.func @test(%arg1 : i32, %arg2 : i32) -> (i32, i32) {
+py.func @test(%arg1 : i32, %arg2 : i32) -> (i32, i32) {
 	py.invoke @foo() : () -> ()
 		label ^bb2 unwind ^bb1(%arg1, %arg2 : i32, i32)
 
@@ -74,7 +74,7 @@ func.func @test(%arg1 : i32, %arg2 : i32) -> (i32, i32) {
 // CHECK-LABEL: @test
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
-// CHECK-NEXT: py.invoke
+// CHECK-NEXT: invoke
 // CHECK-NEXT: label ^{{.*}} unwind ^[[BB1:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[BB1]]
 // CHECK-SAME: %{{[[:alnum:]]+}}

@@ -29,6 +29,7 @@
 #include <variant>
 
 #include "PylirPyAttributes.hpp"
+#include "PylirPyDialect.hpp"
 #include "PylirPyTraits.hpp"
 #include "PylirPyTypes.hpp"
 

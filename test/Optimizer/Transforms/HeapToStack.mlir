@@ -3,9 +3,9 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @test() {
+py.func @test() {
     %c0 = arith.constant 0 : index
-    %t = py.constant(#py.ref<@builtins.tuple>)
+    %t = constant(#py.ref<@builtins.tuple>)
     %m0 = pyMem.gcAllocObject %t[%c0]
     %0 = pyMem.initTuple %m0 to ()
     %m1 = pyMem.gcAllocObject %t[%c0]
@@ -24,15 +24,15 @@ func.func @test() {
 
 // CHECK-LABEL: @test
 // CHECK: %[[C:.*]] = arith.constant 0
-// CHECK: %[[T:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[T:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK: pyMem.stackAllocObject tuple %[[T]][0]
 // CHECK: pyMem.gcAllocObject %[[T]][%[[C]]]
 // CHECK: pyMem.stackAllocObject tuple %[[T]][0]
 // CHECK: pyMem.gcAllocObject %[[T]][%[[C]]]
 
-func.func @too_large() {
+py.func @too_large() {
     %c = arith.constant 128 : index
-    %t = py.constant(#py.ref<@builtins.tuple>)
+    %t = constant(#py.ref<@builtins.tuple>)
     %m0 = pyMem.gcAllocObject %t[%c]
     %0 = pyMem.initTuple %m0 to ()
     return
@@ -40,5 +40,5 @@ func.func @too_large() {
 
 // CHECK-LABEL: @too_large
 // CHECK: %[[C:.*]] = arith.constant 128
-// CHECK: %[[T:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[T:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK: pyMem.gcAllocObject %[[T]][%[[C]]]

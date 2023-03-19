@@ -2,9 +2,9 @@
 
 py.global @handle : !py.dynamic
 
-func.func @test() -> i1 {
-    %0 = py.load @handle : !py.dynamic
-    %1 = py.isUnboundValue %0
+py.func @test() -> i1 {
+    %0 = load @handle : !py.dynamic
+    %1 = isUnboundValue %0
     return %1 : i1
 }
 

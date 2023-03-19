@@ -12,6 +12,11 @@
 namespace
 {
 
+bool typesAreCompatible(mlir::Type lhs, mlir::Type rhs)
+{
+    return lhs == rhs || (lhs.isa<pylir::Py::DynamicType>() && rhs.isa<pylir::Py::DynamicType>());
+}
+
 template <class SymbolOp>
 mlir::FailureOr<SymbolOp> verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
                                           mlir::SymbolTableCollection& symbolTable,
@@ -290,6 +295,21 @@ mlir::LogicalResult pylir::Py::UnpackExOp::verify()
     if (!getAfter().empty() && !getRest())
     {
         return emitOpError("'after_rest' results specified, without a rest argument");
+    }
+    return mlir::success();
+}
+
+mlir::LogicalResult pylir::Py::ReturnOp::verify()
+{
+    auto funcOp = (*this)->getParentOfType<FuncOp>();
+    llvm::ArrayRef<mlir::Type> resultTypes = funcOp.getResultTypes();
+    auto argumentTypes =
+        llvm::to_vector(llvm::map_range(getArguments(), [](mlir::Value value) { return value.getType(); }));
+    if (!std::equal(resultTypes.begin(), resultTypes.end(), argumentTypes.begin(), argumentTypes.end(),
+                    typesAreCompatible))
+    {
+        return emitOpError("return value types '")
+               << argumentTypes << "' incompatible with result types of function '" << resultTypes << "'";
     }
     return mlir::success();
 }

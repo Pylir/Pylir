@@ -5,41 +5,41 @@ def g():
     del a
 
 
-# CHECK-LABEL: func.func private @"g$impl[0]"
-# CHECK: %[[LOAD:.*]] = py.load @a$handle
-# CHECK: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[LOAD]]
+# CHECK-LABEL: py.func private @"g$impl[0]"
+# CHECK: %[[LOAD:.*]] = load @a$handle
+# CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[LOAD]]
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.NameError>)
+# CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.NameError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]] = py.mroLookup %{{.*}} in %[[MRO]]
+# CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
-# CHECK: py.raise %[[EXC]]
+# CHECK: raise %[[EXC]]
 
 # CHECK: ^[[DEL_BLOCK]]:
-# CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: py.store %[[UNBOUND]] : !py.dynamic into @a$handle
+# CHECK: %[[UNBOUND:.*]] = constant(#py.unbound)
+# CHECK: store %[[UNBOUND]] : !py.dynamic into @a$handle
 
 def local():
     del a
     return a
 
 
-# CHECK-LABEL: func.func private @"local$impl[0]"
-# CHECK: %[[A:.*]] = py.constant(#py.unbound)
-# CHECK: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[A:.*]]
+# CHECK-LABEL: py.func private @"local$impl[0]"
+# CHECK: %[[A:.*]] = constant(#py.unbound)
+# CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[A:.*]]
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.UnboundLocalError>)
+# CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.UnboundLocalError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]] = py.mroLookup %{{.*}} in %[[MRO]]
+# CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
-# CHECK: py.raise %[[EXC]]
+# CHECK: raise %[[EXC]]
 
 # CHECK: ^[[DEL_BLOCK]]:
-# CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
+# CHECK: %[[UNBOUND:.*]] = constant(#py.unbound)
 # CHECK: return %[[UNBOUND]]
 
 def closure():
@@ -49,22 +49,22 @@ def closure():
         nonlocal a
         del a
 
-# CHECK-LABEL: func.func private @"closure.<locals>.inner$impl[0]"
+# CHECK-LABEL: py.func private @"closure.<locals>.inner$impl[0]"
 # CHECK-SAME: %[[FUNC_OBJ:[[:alnum:]]+]]
-# CHECK: %[[CLOSURE:.*]] = py.getSlot %[[FUNC_OBJ]][%{{.*}}]
+# CHECK: %[[CLOSURE:.*]] = getSlot %[[FUNC_OBJ]][%{{.*}}]
 # CHECK: %[[ZERO:.*]] = arith.constant 0
 # CHECK: %[[A_CELL:.*]] = py.tuple.getItem %[[CLOSURE]][%[[ZERO]]]
-# CHECK: %[[A:.*]] = py.getSlot %[[A_CELL]][%{{.*}}]
-# CHECK: %[[IS_UNBOUND:.*]] = py.isUnboundValue %[[A:.*]]
+# CHECK: %[[A:.*]] = getSlot %[[A_CELL]][%{{.*}}]
+# CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[A:.*]]
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = py.constant(#py.ref<@builtins.UnboundLocalError>)
+# CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.UnboundLocalError>)
 # CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
-# CHECK: %[[NEW:.*]] = py.mroLookup %{{.*}} in %[[MRO]]
+# CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
-# CHECK: py.raise %[[EXC]]
+# CHECK: raise %[[EXC]]
 
 # CHECK: ^[[DEL_BLOCK]]:
-# CHECK: %[[UNBOUND:.*]] = py.constant(#py.unbound)
-# CHECK: py.setSlot %[[A_CELL]][%{{.*}}] to %[[UNBOUND]]
+# CHECK: %[[UNBOUND:.*]] = constant(#py.unbound)
+# CHECK: setSlot %[[A_CELL]][%{{.*}}] to %[[UNBOUND]]

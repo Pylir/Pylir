@@ -5,9 +5,9 @@
 
 import foo.bar.baz
 
-# CHECK: py.call @foo.__init__
-# CHECK: py.call @foo.bar.__init__
-# CHECK: py.call @foo.bar.baz.__init__
+# CHECK: call @foo.__init__
+# CHECK: call @foo.bar.__init__
+# CHECK: call @foo.bar.baz.__init__
 
 #--- right/foo/__init__.py
 
@@ -17,8 +17,8 @@ import foo.bar.baz
 
 print(True)
 
-# CHECK: func.func @foo.bar.baz.__init__()
-# CHECK: py.constant(#py.bool<True>)
+# CHECK: py.func @foo.bar.baz.__init__()
+# CHECK: constant(#py.bool<True>)
 
 #--- wrong/foo/bar/baz.py
 

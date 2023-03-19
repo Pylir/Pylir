@@ -5,8 +5,8 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.str = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.str>)
+py.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.str>)
     %c0 = arith.constant 0 : index
     %1 = pyMem.gcAllocObject %0[%c0]
     %2 = pyMem.initStr %1 to %arg0, %arg1

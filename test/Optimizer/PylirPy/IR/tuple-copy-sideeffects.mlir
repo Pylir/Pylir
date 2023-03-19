@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -cse --split-input-file | FileCheck %s
 
-func.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> (!py.dynamic, !py.dynamic) {
+py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> (!py.dynamic, !py.dynamic) {
     %0 = py.tuple.copy %arg0 : %arg1
     %1 = py.tuple.copy %arg0 : %arg1
     return %0, %1 : !py.dynamic, !py.dynamic

@@ -4,10 +4,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test(%arg : !py.dynamic, %hash : index) {
-    %0 = py.makeDict ()
+py.func @test(%arg : !py.dynamic, %hash : index) {
+    %0 = makeDict ()
     %c0 = arith.constant 2 : index
-    %1 = py.constant(#py.str<"item">)
+    %1 = constant(#py.str<"item">)
     cf.br ^bb37(%arg : !py.dynamic)
 
 ^bb37(%iter : !py.dynamic):
@@ -17,4 +17,4 @@ func.func @test(%arg : !py.dynamic, %hash : index) {
 }
 
 // CHECK-LABEL: @test
-// CHECK-NOT: py.makeDict
+// CHECK-NOT: makeDict

@@ -3,31 +3,31 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @test() -> !py.dynamic {
-    %0 = py.constant(#py.tuple<(#py.ref<@builtins.tuple>)>)
+py.func @test() -> !py.dynamic {
+    %0 = constant(#py.tuple<(#py.ref<@builtins.tuple>)>)
     %1 = arith.constant 0 : index
     %2 = py.tuple.getItem %0[%1]
     return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test
-// CHECK-DAG: %[[C1:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK-DAG: %[[C1:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK: return %[[C1]]
 
-func.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.tuple>)
-    %1 = py.makeTuple (%0, * %arg0)
+py.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.tuple>)
+    %1 = makeTuple (%0, * %arg0)
     %2 = arith.constant 0 : index
     %3 = py.tuple.getItem %1[%2]
     return %3 : !py.dynamic
 }
 
 // CHECK-LABEL: @test2
-// CHECK-DAG: %[[C1:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK-DAG: %[[C1:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK: return %[[C1]]
 
-func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.tuple>)
+py.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.tuple>)
     %1 = py.tuple.prepend %0, %arg0
     %2 = arith.constant 0 : index
     %3 = py.tuple.getItem %1[%2]
@@ -35,5 +35,5 @@ func.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
 }
 
 // CHECK-LABEL: @test3
-// CHECK-DAG: %[[C1:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK-DAG: %[[C1:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK: return %[[C1]]

@@ -13,10 +13,10 @@ def outer():
 
 # CHECK-LABEL: outer
 
-# CHECK-DAG: %[[BASES:.*]] = py.constant #py.tuple<()>
-# CHECK-DAG: %[[KEYWORDS:.*]] = py.constant #py.dict<{}>
-# CHECK-DAG: %[[NAME:.*]] = py.constant #py.str<"outer.<locals>.Foo">
-# CHECK: py.makeClass %[[NAME]], @[[FUNC:.*]], %[[BASES]], %[[KEYWORDS]]
+# CHECK-DAG: %[[BASES:.*]] = constant #py.tuple<()>
+# CHECK-DAG: %[[KEYWORDS:.*]] = constant #py.dict<{}>
+# CHECK-DAG: %[[NAME:.*]] = constant #py.str<"outer.<locals>.Foo">
+# CHECK: makeClass %[[NAME]], @[[FUNC:.*]], %[[BASES]], %[[KEYWORDS]]
 
 # CHECK: func private @[[FUNC]]
 # CHECK-SAME: %[[CELL:[[:alnum:]]+]]: !py.dynamic
@@ -26,22 +26,22 @@ def outer():
 # CHECK: cond_br %[[COND]], ^[[TRUE:.*]], ^[[FALSE:[[:alnum:]]+]]
 
 # CHECK: ^[[TRUE]]:
-# CHECK: %[[THREE:.*]] = py.constant #py.int<3>
-# CHECK: %[[X:.*]] = py.constant #py.str<"x">
+# CHECK: %[[THREE:.*]] = constant #py.int<3>
+# CHECK: %[[X:.*]] = constant #py.str<"x">
 # CHECK: py.dict.setItem %[[DICT]][%[[X]]] to %[[THREE]]
 
 # CHECK: ^[[FALSE]]:
-# CHECK: %[[X:.*]] = py.constant #py.str<"x">
+# CHECK: %[[X:.*]] = constant #py.str<"x">
 # CHECK: %[[ITEM:.*]], %[[FOUND:.*]] = py.dict.tryGetItem %[[DICT]][%[[X]]]
 # CHECK: cond_br %[[FOUND]], ^[[DICT_FOUND:.*]](%[[ITEM]] : !py.dynamic), ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[ELSE]]:
-# CHECK: py.load @x
+# CHECK: load @x
 # ...
 # CHECK: br ^[[DICT_FOUND]]
 
 # CHECK: ^[[DICT_FOUND]](%[[RESULT:[[:alnum:]]+]]: !py.dynamic {{.*}}):
-# CHECK: %[[Y:.*]] = py.constant #py.str<"y">
+# CHECK: %[[Y:.*]] = constant #py.str<"y">
 # CHECK: py.dict.setItem %[[DICT]][%[[Y]]] to %[[RESULT]]
 
 # CHECK: return %[[DICT]]

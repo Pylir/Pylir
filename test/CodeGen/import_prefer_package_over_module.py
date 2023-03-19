@@ -6,7 +6,7 @@
 
 import foo
 
-# CHECK: py.call @foo.__init__
+# CHECK: call @foo.__init__
 
 #--- foo/__init__.py
 
@@ -16,5 +16,5 @@ print("Package")
 
 print("Module")
 
-# CHECK: func.func @foo.__init__
-# CHECK: py.constant(#py.str<"Package">)
+# CHECK: py.func @foo.__init__
+# CHECK: constant(#py.str<"Package">)

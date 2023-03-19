@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s --pylir-inliner='max-inlining-iterations=1 optimization-pipeline=any(canonicalize)' --split-input-file | FileCheck %s
 
-func.func @indirect(%arg0 : i32) -> i32 {
+py.func @indirect(%arg0 : i32) -> i32 {
     %0 = arith.constant 1 : i32
     %1 = arith.subi %arg0, %0 : i32
     %2 = call @indirect(%1) : (i32) -> i32
@@ -14,7 +14,7 @@ func.func @indirect(%arg0 : i32) -> i32 {
 // CHECK-NEXT: %[[CALL:.*]] = call @indirect(%[[SUB]])
 // CHECK-NEXT: return %[[CALL]]
 
-func.func @recursion_base_case(%arg0 : i32) -> i32 {
+py.func @recursion_base_case(%arg0 : i32) -> i32 {
     %0 = arith.constant 1 : i32
     %1 = arith.subi %arg0, %0 : i32
     %2 = arith.cmpi slt, %1, %0 : i32

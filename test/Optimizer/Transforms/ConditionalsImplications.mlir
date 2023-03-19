@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -split-input-file -pass-pipeline='builtin.module(any(pylir-conditionals-implications))' | FileCheck %s
 
-func.func @contradiction(%c : i1) -> i1 {
+py.func @contradiction(%c : i1) -> i1 {
     cf.cond_br %c, ^bb1, ^bb1
 
 ^bb1:
@@ -13,7 +13,7 @@ func.func @contradiction(%c : i1) -> i1 {
 
 // -----
 
-func.func @path_sensitivity(%c: i1) -> i1 {
+py.func @path_sensitivity(%c: i1) -> i1 {
     cf.cond_br %c, ^bb0, ^bb1
 
 ^bb0:
@@ -32,7 +32,7 @@ func.func @path_sensitivity(%c: i1) -> i1 {
 
 // -----
 
-func.func @test(%c: i1) -> i1 {
+py.func @test(%c: i1) -> i1 {
     %0 = arith.constant true
     cf.cond_br %c, ^bb1, ^bb2
 
@@ -66,9 +66,9 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.None = #py.type
 
-func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.None>)
-    %1 = py.is %arg0, %0
+py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.None>)
+    %1 = is %arg0, %0
     cf.cond_br %1, ^bb1, ^bb2
 
 ^bb1:
@@ -80,7 +80,7 @@ func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-func.func @loop_implications(%arg0 : i1) -> i1 {
+py.func @loop_implications(%arg0 : i1) -> i1 {
     cf.br ^bb1
 
 ^bb1:
@@ -103,7 +103,7 @@ func.func @loop_implications(%arg0 : i1) -> i1 {
 
 // -----
 
-func.func @not_implications(%arg0 : i1) -> i1 {
+py.func @not_implications(%arg0 : i1) -> i1 {
     %0 = arith.constant true
     %1 = arith.xori %arg0, %0 : i1
     cf.cond_br %1, ^bb1, ^bb2
@@ -126,7 +126,7 @@ func.func @not_implications(%arg0 : i1) -> i1 {
 
 // -----
 
-func.func @and_implications(%arg0 : i1, %arg1 : i1) -> i1 {
+py.func @and_implications(%arg0 : i1, %arg1 : i1) -> i1 {
     %1 = arith.andi %arg0, %arg1 : i1
     cf.cond_br %1, ^bb1, ^bb2
 
@@ -148,7 +148,7 @@ func.func @and_implications(%arg0 : i1, %arg1 : i1) -> i1 {
 
 // -----
 
-func.func @or_implications(%arg0 : i1, %arg1 : i1) -> i1 {
+py.func @or_implications(%arg0 : i1, %arg1 : i1) -> i1 {
     %1 = arith.ori %arg0, %arg1 : i1
     cf.cond_br %1, ^bb1, ^bb2
 
@@ -170,7 +170,7 @@ func.func @or_implications(%arg0 : i1, %arg1 : i1) -> i1 {
 
 // -----
 
-func.func @facts_in_loop_body(%arg0 : i1) -> i1 {
+py.func @facts_in_loop_body(%arg0 : i1) -> i1 {
     cf.cond_br %arg0, ^bb1, ^bb2
 
 ^bb1:

@@ -1,9 +1,9 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-func.func private @foo() -> i32
+py.func private @foo() -> i32
 
-func.func @test(%arg1 : i32) -> i32 {
-	%0 = py.invoke @foo() : () -> i32
+py.func @test(%arg1 : i32) -> i32 {
+	%0 = invoke @foo() : () -> i32
 		label ^bb1 unwind ^bb2
 
 ^bb1:
@@ -19,17 +19,17 @@ func.func @test(%arg1 : i32) -> i32 {
 }
 
 // CHECK-LABEL: @test
-// CHECK: %[[VALUE:.*]] = py.invoke
+// CHECK: %[[VALUE:.*]] = invoke
 // CHECK-NEXT: label ^[[BB1:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[BB1]]:
 // CHECK-NEXT: cf.br ^{{.*}}(%[[VALUE]] : i32)
 
 // -----
 
-func.func private @foo() -> i32
+py.func private @foo() -> i32
 
-func.func @test(%arg1 : i32) {
-	%0 = py.invoke @foo() : () -> i32
+py.func @test(%arg1 : i32) {
+	%0 = invoke @foo() : () -> i32
 		label ^bb1 unwind ^bb2
 
 ^bb1:
@@ -43,7 +43,7 @@ func.func @test(%arg1 : i32) {
 }
 
 // CHECK-LABEL: @test
-// CHECK: %[[VALUE:.*]] = py.invoke
+// CHECK: %[[VALUE:.*]] = invoke
 // CHECK-NEXT: label ^[[BB3:[[:alnum:]]+]] unwind ^[[BB2:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[BB2]](%{{.*}}: !py.dynamic):
 // CHECK-NEXT: cf.br ^[[BB3]]

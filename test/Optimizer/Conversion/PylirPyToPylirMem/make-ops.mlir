@@ -3,14 +3,14 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0)
+py.func @make_tuple(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0)
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_tuple
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[TUPLE:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK-NEXT: %[[TUPLE:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK-NEXT: %[[SIZE:.*]] = arith.constant 1
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[TUPLE]][%[[SIZE]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initTuple %[[MEM]] to (%[[ARG]])
@@ -22,14 +22,14 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.list = #py.type
 
-func.func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeList (%arg0)
+py.func @make_list(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeList (%arg0)
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_list
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[LIST:.*]] = py.constant(#py.ref<@builtins.list>)
+// CHECK-NEXT: %[[LIST:.*]] = constant(#py.ref<@builtins.list>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[LIST]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[LIST]][%[[LEN]]]
@@ -42,14 +42,14 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.set = #py.type
 
-func.func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeSet (%arg0)
+py.func @make_set(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeSet (%arg0)
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_set
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[SET:.*]] = py.constant(#py.ref<@builtins.set>)
+// CHECK-NEXT: %[[SET:.*]] = constant(#py.ref<@builtins.set>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[SET]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[SET]][%[[LEN]]]
@@ -62,8 +62,8 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 
-func.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeDict (%arg0 hash(%arg1) : %arg2)
+py.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> !py.dynamic {
+    %0 = makeDict (%arg0 hash(%arg1) : %arg2)
     return %0 : !py.dynamic
 }
 
@@ -71,7 +71,7 @@ func.func @make_dict(%arg0 : !py.dynamic, %arg1: index, %arg2 : !py.dynamic) -> 
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
-// CHECK-NEXT: %[[DICT:.*]] = py.constant(#py.ref<@builtins.dict>)
+// CHECK-NEXT: %[[DICT:.*]] = constant(#py.ref<@builtins.dict>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[DICT]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[DICT]][%[[LEN]]]
@@ -86,15 +86,15 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.function = #py.type
 
-func.func private @test(!py.dynamic,!py.dynamic,!py.dynamic) -> !py.dynamic
+py.func private @test(!py.dynamic,!py.dynamic,!py.dynamic) -> !py.dynamic
 
-func.func @make_function() -> !py.dynamic {
-    %0 = py.makeFunc @test
+py.func @make_function() -> !py.dynamic {
+    %0 = makeFunc @test
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_function
-// CHECK-NEXT: %[[FUNCTION:.*]] = py.constant(#py.ref<@builtins.function>)
+// CHECK-NEXT: %[[FUNCTION:.*]] = constant(#py.ref<@builtins.function>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[FUNCTION]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[FUNCTION]][%[[LEN]]]
@@ -103,8 +103,8 @@ func.func @make_function() -> !py.dynamic {
 
 // -----
 
-func.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeObject %arg0
+py.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeObject %arg0
     return %0 : !py.dynamic
 }
 
@@ -121,14 +121,14 @@ func.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
+py.func @make_tuple_from_list(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.list.toTuple %arg0
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_tuple_from_list
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[TUPLE:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK-NEXT: %[[TUPLE:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK-NEXT: %[[SIZE:.*]] = py.list.len %[[ARG]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[TUPLE]][%[[SIZE]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initTupleFromList %[[MEM]] to (* %[[ARG]])
@@ -140,7 +140,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.bool = #py.type
 
-func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
+py.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
     %0 = py.bool.fromI1 %arg0
     return %0 : !py.dynamic
 }
@@ -149,7 +149,7 @@ func.func @make_bool_from_i1(%arg0 : i1) -> !py.dynamic {
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: %[[EXT:.*]] = arith.extui %[[ARG]] : i1 to i{{[0-9]+}}
 // CHECK-NEXT: %[[INDEX:.*]] = arith.index_cast %[[EXT]]
-// CHECK-NEXT: %[[BOOL:.*]] = py.constant(#py.ref<@builtins.bool>)
+// CHECK-NEXT: %[[BOOL:.*]] = constant(#py.ref<@builtins.bool>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[BOOL]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]][%[[LEN]]]
@@ -162,14 +162,14 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_int_fromInteger(%arg0 : index) -> !py.dynamic {
+py.func @make_int_fromInteger(%arg0 : index) -> !py.dynamic {
     %0 = py.int.fromUnsigned %arg0
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_int_fromInteger
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[BOOL:.*]] = py.constant(#py.ref<@builtins.int>)
+// CHECK-NEXT: %[[BOOL:.*]] = constant(#py.ref<@builtins.int>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[BOOL]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[BOOL]][%[[LEN]]]
@@ -184,14 +184,14 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
+py.func @make_str_fromInt(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = py.int.toStr %arg0
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_str_fromInt
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[STR:.*]] = py.constant(#py.ref<@builtins.str>)
+// CHECK-NEXT: %[[STR:.*]] = constant(#py.ref<@builtins.str>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[STR]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[STR]][%[[LEN]]]
@@ -204,7 +204,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+py.func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.int.add %arg0, %arg1
     return %0 : !py.dynamic
 }
@@ -212,7 +212,7 @@ func.func @make_int_from_add(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dy
 // CHECK-LABEL: @make_int_from_add
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK-NEXT: %[[INT:.*]] = py.constant(#py.ref<@builtins.int>)
+// CHECK-NEXT: %[[INT:.*]] = constant(#py.ref<@builtins.int>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[INT]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[INT]][%[[LEN]]]
@@ -225,14 +225,14 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.float = #py.type
 
-func.func @make_float_fromF64(%arg0 : f64) -> !py.dynamic {
+py.func @make_float_fromF64(%arg0 : f64) -> !py.dynamic {
     %0 = py.float.fromF64 %arg0
     return %0 : !py.dynamic
 }
 
 // CHECK-LABEL: @make_float_fromF64
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
-// CHECK-NEXT: %[[FLOAT:.*]] = py.constant(#py.ref<@builtins.float>)
+// CHECK-NEXT: %[[FLOAT:.*]] = constant(#py.ref<@builtins.float>)
 // CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[FLOAT]]
 // CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
 // CHECK-NEXT: %[[MEM:.*]] = pyMem.gcAllocObject %[[FLOAT]][%[[LEN]]]

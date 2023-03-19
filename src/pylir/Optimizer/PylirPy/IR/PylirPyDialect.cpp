@@ -30,7 +30,7 @@ struct PylirPyCostInterface : public pylir::DialectInlineCostInterface
     std::size_t getCost(mlir::Operation* op) const override
     {
         return llvm::TypeSwitch<mlir::Operation*, std::size_t>(op)
-            .Case([](pylir::Py::UnreachableOp) { return 0; })
+            .Case<pylir::Py::UnreachableOp, pylir::Py::ReturnOp>([](auto) { return 0; })
             .Case<pylir::Py::FunctionCallOp, pylir::Py::FunctionInvokeOp, pylir::Py::CallOp, pylir::Py::InvokeOp>(
                 [](auto call) { return 25 + 5 * call.getCallOperands().size(); })
             .Case([](pylir::Py::MROLookupOp) { return 20; })

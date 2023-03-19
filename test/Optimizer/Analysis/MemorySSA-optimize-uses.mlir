@@ -5,11 +5,11 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.dict = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test() -> index {
-    %0 = py.constant(#py.str<"test">)
+py.func @test() -> index {
+    %0 = constant(#py.str<"test">)
     %hash = py.str.hash %0
-    %1 = py.makeDict ()
-    %2 = py.makeDict ()
+    %1 = makeDict ()
+    %2 = makeDict ()
     py.dict.setItem %1[%0 hash(%hash)] to %0
     py.dict.setItem %2[%0 hash(%hash)] to %0
     %3 = py.dict.len %1

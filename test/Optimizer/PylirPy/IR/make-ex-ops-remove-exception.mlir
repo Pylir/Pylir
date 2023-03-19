@@ -5,10 +5,10 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
-func.func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0)
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeTupleEx (*%0, %1)
+py.func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0)
+    %1 = constant(#py.int<3>)
+    %2 = makeTupleEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
@@ -20,8 +20,8 @@ func.func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_tuple_ex_op_unique
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ARG0]], %[[THREE]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[TUPLE:.*]] = makeTuple (%[[ARG0]], %[[THREE]])
 // CHECK: return %[[TUPLE]]
 
 // -----
@@ -30,10 +30,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0)
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeTupleEx (*%0, %1)
+py.func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0)
+    %1 = constant(#py.int<3>)
+    %2 = makeTupleEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
@@ -45,8 +45,8 @@ func.func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_tuple_ex_op
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[TUPLE:.*]] = py.makeTuple (%[[ARG0]], %[[THREE]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[TUPLE:.*]] = makeTuple (%[[ARG0]], %[[THREE]])
 // CHECK: return %[[TUPLE]]
 
 // -----
@@ -55,10 +55,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0)
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeListEx (*%0, %1)
+py.func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0)
+    %1 = constant(#py.int<3>)
+    %2 = makeListEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
@@ -70,8 +70,8 @@ func.func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_list_ex_op_unique
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[LIST:.*]] = py.makeList (%[[ARG0]], %[[THREE]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[LIST:.*]] = makeList (%[[ARG0]], %[[THREE]])
 // CHECK: return %[[LIST]]
 
 // -----
@@ -80,10 +80,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0)
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeListEx (*%0, %1)
+py.func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0)
+    %1 = constant(#py.int<3>)
+    %2 = makeListEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
@@ -95,8 +95,8 @@ func.func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_list_ex_op
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[LIST:.*]] = py.makeList (%[[ARG0]], %[[THREE]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[LIST:.*]] = makeList (%[[ARG0]], %[[THREE]])
 // CHECK: return %[[LIST]]
 
 // -----
@@ -105,10 +105,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0)
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeSetEx (*%0, %1)
+py.func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0)
+    %1 = constant(#py.int<3>)
+    %2 = makeSetEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
@@ -120,8 +120,8 @@ func.func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_set_ex_op_unique
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[SET:.*]] = py.makeSet (%[[ARG0]], %[[THREE]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[SET:.*]] = makeSet (%[[ARG0]], %[[THREE]])
 // CHECK: return %[[SET]]
 
 // -----
@@ -130,10 +130,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0)
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeSetEx (*%0, %1)
+py.func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0)
+    %1 = constant(#py.int<3>)
+    %2 = makeSetEx (*%0, %1)
         label ^happy unwind ^failure
 
 ^happy:
@@ -145,8 +145,8 @@ func.func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @make_set_ex_op
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[SET:.*]] = py.makeSet (%[[ARG0]], %[[THREE]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[SET:.*]] = makeSet (%[[ARG0]], %[[THREE]])
 // CHECK: return %[[SET]]
 
 // -----
@@ -155,9 +155,9 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_dict_ex_op_unique(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeDictEx (%1 hash(%hash) : %arg0)
+py.func @make_dict_ex_op_unique(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
+    %1 = constant(#py.int<3>)
+    %2 = makeDictEx (%1 hash(%hash) : %arg0)
         label ^happy unwind ^failure
 
 ^happy:
@@ -170,8 +170,8 @@ func.func @make_dict_ex_op_unique(%arg0 : !py.dynamic, %hash : index) -> !py.dyn
 // CHECK-LABEL: @make_dict_ex_op_unique
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[HASH:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[DICT:.*]] = py.makeDict (%[[THREE]] hash(%[[HASH]]) : %[[ARG0]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[DICT:.*]] = makeDict (%[[THREE]] hash(%[[HASH]]) : %[[ARG0]])
 // CHECK: return %[[DICT]]
 
 // -----
@@ -180,9 +180,9 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @make_dict_ex_op(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
-    %1 = py.constant(#py.int<3>)
-    %2 = py.makeDictEx (%1 hash(%hash) : %arg0)
+py.func @make_dict_ex_op(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
+    %1 = constant(#py.int<3>)
+    %2 = makeDictEx (%1 hash(%hash) : %arg0)
         label ^happy unwind ^failure
 
 ^happy:
@@ -195,8 +195,8 @@ func.func @make_dict_ex_op(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 // CHECK-LABEL: @make_dict_ex_op
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[HASH:[[:alnum:]]+]]
-// CHECK: %[[THREE:.*]] = py.constant(#py.int<3>)
-// CHECK: %[[DICT:.*]] = py.makeDict (%[[THREE]] hash(%[[HASH]]) : %[[ARG0]])
+// CHECK: %[[THREE:.*]] = constant(#py.int<3>)
+// CHECK: %[[DICT:.*]] = makeDict (%[[THREE]] hash(%[[HASH]]) : %[[ARG0]])
 // CHECK: return %[[DICT]]
 
 // -----

@@ -4,10 +4,10 @@
 
 object
 
-# CHECK: py.constant(#py.ref<@builtins.object>)
+# CHECK: constant(#py.ref<@builtins.object>)
 
-# CHECK: %[[VALUE:.*]] = py.load @BaseException
-# CHECK: py.store %[[VALUE]] : !py.dynamic into @x
+# CHECK: %[[VALUE:.*]] = load @BaseException
+# CHECK: store %[[VALUE]] : !py.dynamic into @x
 x = BaseException
 
 BaseException = True
@@ -19,5 +19,5 @@ def foo():
 
 # CHECK-LABEL: func private @"foo$impl[0]"
 
-# CHECK: %[[FIVE:.*]] = py.constant(#py.int<5>)
+# CHECK: %[[FIVE:.*]] = constant(#py.int<5>)
 # CHECK: return %[[FIVE]]

@@ -9,7 +9,6 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/DLTI/DLTI.h>
-#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/Diagnostics.h>
@@ -738,7 +737,6 @@ void pylir::CompilerInvocation::ensureMLIRContext(const llvm::opt::InputArgList&
     mlir::DialectRegistry registry;
     registry.insert<pylir::Py::PylirPyDialect>();
     registry.insert<pylir::Mem::PylirMemDialect>();
-    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<mlir::LLVM::LLVMDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();

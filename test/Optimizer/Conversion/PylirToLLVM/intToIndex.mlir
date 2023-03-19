@@ -4,7 +4,7 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.int = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func.func @foo(%value : !py.dynamic) -> index {
+py.func @foo(%value : !py.dynamic) -> index {
     %0 = py.int.toIndex %value
     return %0 : index
 }

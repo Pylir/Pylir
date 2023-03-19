@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s --test-memory-ssa
 
-func.func private @"builtins.object.__str__$cc[0]"(%arg1: !py.dynamic) {
+py.func private @"builtins.object.__str__$cc[0]"(%arg1: !py.dynamic) {
   %false = arith.constant false
   cf.br ^bb6
 

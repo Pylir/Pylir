@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func.func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+py.func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp eq %lhs, %rhs
     return %0 : i1
 }
@@ -15,7 +15,7 @@ func.func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func.func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+py.func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp ne %lhs, %rhs
     return %0 : i1
 }
@@ -30,7 +30,7 @@ func.func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func.func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+py.func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp lt %lhs, %rhs
     return %0 : i1
 }
@@ -45,7 +45,7 @@ func.func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func.func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+py.func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp le %lhs, %rhs
     return %0 : i1
 }
@@ -60,7 +60,7 @@ func.func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "ne" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func.func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+py.func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp gt %lhs, %rhs 
     return %0 : i1
 }
@@ -75,7 +75,7 @@ func.func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: %[[CMP:.*]] = llvm.icmp "eq" %[[RESULT]], %[[C]]
 // CHECK-NEXT: llvm.return %[[CMP]]
 
-func.func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
+py.func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
     %0 = py.int.cmp ge %lhs, %rhs 
     return %0 : i1
 }

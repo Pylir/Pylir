@@ -5,5 +5,5 @@ def foo():
     1 + 2
 
 # CHECK: func private @"foo$impl[0]"
-# CHECK: %[[NONE:.*]] = py.constant(#py.ref<@builtins.None>)
+# CHECK: %[[NONE:.*]] = constant(#py.ref<@builtins.None>)
 # CHECK-NEXT: return %[[NONE]]

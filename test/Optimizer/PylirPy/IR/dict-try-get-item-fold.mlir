@@ -7,10 +7,10 @@ py.globalValue @builtins.int = #py.type
 py.globalValue @builtins.float = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test(%arg0 : !py.dynamic, %arg1 : index) -> i1 {
-    %0 = py.constant(#py.dict<{}>)
+py.func @test(%arg0 : !py.dynamic, %arg1 : index) -> i1 {
+    %0 = constant(#py.dict<{}>)
     %2 = py.dict.tryGetItem %0[%arg0 hash(%arg1)]
-    %3 = py.isUnboundValue %2
+    %3 = isUnboundValue %2
     return %3 : i1
 }
 
@@ -18,13 +18,13 @@ func.func @test(%arg0 : !py.dynamic, %arg1 : index) -> i1 {
 // CHECK-DAG: %[[C1:.*]] = arith.constant true
 // CHECK: return %[[C1]]
 
-func.func @test2(%arg0 : index) -> !py.dynamic {
-    %0 = py.constant(#py.dict<{#py.int<5> to #py.str<"value">}>)
-    %1 = py.constant(#py.float<5.0>)
+py.func @test2(%arg0 : index) -> !py.dynamic {
+    %0 = constant(#py.dict<{#py.int<5> to #py.str<"value">}>)
+    %1 = constant(#py.float<5.0>)
     %2 = py.dict.tryGetItem %0[%1 hash(%arg0)]
     return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test2
-// CHECK: %[[C:.*]] = py.constant(#py.str<"value">)
+// CHECK: %[[C:.*]] = constant(#py.str<"value">)
 // CHECK: return %[[C]]

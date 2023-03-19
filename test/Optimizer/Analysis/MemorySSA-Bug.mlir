@@ -5,8 +5,8 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.list = #py.type
 
-func.func @test4(%length : index) -> index {
-    %1 = py.makeList ()
+py.func @test4(%length : index) -> index {
+    %1 = makeList ()
     cf.br ^condition
 
 ^condition: // pred: ^bb0, ^bb2
@@ -33,7 +33,7 @@ func.func @test4(%length : index) -> index {
 // CHECK-LABEL: memSSA.module @test4
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF1:.*]] = def(%[[LIVE_ON_ENTRY]])
-// CHECK-NEXT: %[[LIST_DEF:.*]] = py.makeList
+// CHECK-NEXT: %[[LIST_DEF:.*]] = makeList
 // CHECK: use(%[[DEF1]])
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 // CHECK: %[[DEF2:.*]] = def(%[[DEF1]])
@@ -42,8 +42,8 @@ func.func @test4(%length : index) -> index {
 // CHECK-NEXT: use(%[[MEM_MERGE]])
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
-func.func @test5() -> index {
-    %1 = py.makeList ()
+py.func @test5() -> index {
+    %1 = makeList ()
     cf.br ^back1
 
 ^back1: // pred: ^bb0, ^bb2
@@ -68,13 +68,13 @@ func.func @test5() -> index {
 // CHECK-LABEL: memSSA.module @test5
 // CHECK-NEXT: %[[LIVE_ON_ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF1:.*]] = def(%[[LIVE_ON_ENTRY]])
-// CHECK-NEXT: %[[LIST_DEF:.*]] = py.makeList
+// CHECK-NEXT: %[[LIST_DEF:.*]] = makeList
 // CHECK: use(%[[DEF1]])
 // CHECK-NEXT: py.list.len %[[LIST_DEF]]
 
-func.func @test6() {
-    %0 = py.constant(#py.str<"test">)
-    %1 = py.makeList ()
+py.func @test6() {
+    %0 = constant(#py.str<"test">)
+    %1 = makeList ()
     cf.br ^bb2
 
 ^exit1:

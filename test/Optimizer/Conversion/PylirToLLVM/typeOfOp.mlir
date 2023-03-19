@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-func.func @test(%arg : !py.dynamic) -> !py.dynamic {
-    %0 = py.typeOf %arg
+py.func @test(%arg : !py.dynamic) -> !py.dynamic {
+    %0 = typeOf %arg
     return %0 : !py.dynamic
 }
 

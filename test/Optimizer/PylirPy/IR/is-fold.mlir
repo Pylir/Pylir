@@ -8,9 +8,9 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @same_value
 // CHECK: %[[RES:.*]] = arith.constant true
 // CHECK: return %[[RES]]
-func.func @same_value() -> i1 {
-    %0 = py.makeTuple ()
-    %1 = py.is %0, %0
+py.func @same_value() -> i1 {
+    %0 = makeTuple ()
+    %1 = is %0, %0
     return %1 : i1
 }
 
@@ -24,10 +24,10 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @two_allocs
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
-func.func @two_allocs(%arg0 : !py.dynamic) -> i1 {
-    %0 = py.makeTuple (%arg0)
-    %1 = py.makeTuple (%arg0)
-    %2 = py.is %0, %1
+py.func @two_allocs(%arg0 : !py.dynamic) -> i1 {
+    %0 = makeTuple (%arg0)
+    %1 = makeTuple (%arg0)
+    %2 = is %0, %1
     return %2 : i1
 }
 
@@ -41,20 +41,20 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @singletons
 // CHECK: %[[RES:.*]] = arith.constant true
 // CHECK: return %[[RES]]
-func.func @singletons() -> i1 {
-    %0 = py.constant(#py.ref<@builtins.bool>)
-    %1 = py.constant(#py.ref<@builtins.bool>)
-    %2 = py.is %0, %1
+py.func @singletons() -> i1 {
+    %0 = constant(#py.ref<@builtins.bool>)
+    %1 = constant(#py.ref<@builtins.bool>)
+    %2 = is %0, %1
     return %2 : i1
 }
 
 // CHECK-LABEL: @singletons_not
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
-func.func @singletons_not() -> i1 {
-    %0 = py.constant(#py.ref<@builtins.bool>)
-    %1 = py.constant(#py.ref<@builtins.tuple>)
-    %2 = py.is %0, %1
+py.func @singletons_not() -> i1 {
+    %0 = constant(#py.ref<@builtins.bool>)
+    %1 = constant(#py.ref<@builtins.tuple>)
+    %2 = is %0, %1
     return %2 : i1
 }
 
@@ -68,11 +68,11 @@ py.globalValue @builtins.bool = #py.type
 // CHECK-LABEL: @alloca_symbol
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
-func.func @alloca_symbol(%arg0 : !py.dynamic) -> i1 {
-    %0 = py.constant(#py.ref<@builtins.bool>)
-    %1 = py.makeTuple (%arg0)
-    %2 = py.is %0, %1
-    %3 = py.is %1, %0
+py.func @alloca_symbol(%arg0 : !py.dynamic) -> i1 {
+    %0 = constant(#py.ref<@builtins.bool>)
+    %1 = makeTuple (%arg0)
+    %2 = is %0, %1
+    %3 = is %1, %0
     %4 = arith.ori %2, %3 : i1
     return %4 : i1
 }

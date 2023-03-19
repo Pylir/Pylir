@@ -4,7 +4,7 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.float = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func.func @foo(%value : !py.dynamic) -> f64 {
+py.func @foo(%value : !py.dynamic) -> f64 {
     %2 = py.float.toF64 %value
     return %2 : f64
 }

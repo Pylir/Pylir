@@ -1,13 +1,13 @@
 // RUN: pylir-opt %s -split-input-file -verify-diagnostics
 
-func.func @test() {
+py.func @test() {
 	py.call @foo() : () -> () // expected-error {{'py.call' op failed to find function named '@foo'}}
 	return
 }
 
 // -----
 
-func.func @test() {
+py.func @test() {
 	%0 = arith.constant true
 	py.call @test(%0) : (i1) -> () // expected-error {{call operand types are not compatible with argument types of '@test'}}
 	return
@@ -23,7 +23,7 @@ py.globalValue const @builtins.str = #py.type
 py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.None = #py.type
 
-func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+py.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
 py.globalValue const @Foo = #py.type<mro_tuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>, slots = {
     __hash__ = #py.function<@foo>
@@ -43,7 +43,7 @@ py.globalValue const @builtins.str = #py.type
 py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.None = #py.type
 
-func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+py.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
 py.globalValue @Foo = #py.type<mro_tuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>>
 
@@ -80,9 +80,9 @@ py.global @lol5: !py.dynamic = #py.ref<@lol>
 
 // -----
 
-func.func @foo() {
+py.func @foo() {
     // expected-error@below {{RefAttr '@lol' does not refer to a 'py.globalValue'}}
-    %0 = py.constant(#py.ref<@lol>)
+    %0 = constant(#py.ref<@lol>)
     return
 }
 
@@ -90,9 +90,9 @@ func.func @foo() {
 
 py.global @lol : index = 5 : index
 
-func.func @foo() {
+py.func @foo() {
     // expected-error@below {{RefAttr '@lol' does not refer to a 'py.globalValue'}}
-    %0 = py.constant(#py.ref<@lol>)
+    %0 = constant(#py.ref<@lol>)
     return
 }
 
@@ -112,7 +112,7 @@ py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.function = #py.type
 
-func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+py.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
 // expected-error@below {{Expected __defaults__ to refer to a tuple}}
 py.globalValue @lol = #py.function<@foo, defaults = #py.int<5>>
@@ -126,7 +126,7 @@ py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.function = #py.type
 
-func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+py.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
 // expected-error@below {{Expected __kwdefaults__ to refer to a dictionary}}
 py.globalValue @lol = #py.function<@foo, kw_defaults = #py.int<5>>
@@ -140,7 +140,7 @@ py.globalValue @builtins.None = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.function = #py.type
 
-func.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
+py.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
 
 // expected-error@below {{Expected __dict__ to refer to a dictionary}}
 py.globalValue @lol = #py.function<@foo, dict = #py.int<5>>

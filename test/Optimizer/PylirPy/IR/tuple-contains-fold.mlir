@@ -3,9 +3,9 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @test1(%arg0 : !py.dynamic) -> i1 {
-    %0 = py.constant(#py.ref<@builtins.tuple>)
-    %1 = py.makeTuple (* %arg0, %0)
+py.func @test1(%arg0 : !py.dynamic) -> i1 {
+    %0 = constant(#py.ref<@builtins.tuple>)
+    %1 = makeTuple (* %arg0, %0)
     %2 = py.tuple.contains %0 in %1
     return %2 : i1
 }
@@ -14,8 +14,8 @@ func.func @test1(%arg0 : !py.dynamic) -> i1 {
 // CHECK-DAG: %[[C1:.*]] = arith.constant true
 // CHECK: return %[[C1]]
 
-func.func @test2(%arg0 : !py.dynamic) -> i1 {
-    %0 = py.constant(#py.ref<@builtins.tuple>)
+py.func @test2(%arg0 : !py.dynamic) -> i1 {
+    %0 = constant(#py.ref<@builtins.tuple>)
     %1 = py.tuple.prepend %0, %arg0
     %2 = py.tuple.contains %0 in %1
     return %2 : i1

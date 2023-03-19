@@ -6,10 +6,10 @@ py.globalValue @builtins.tuple = #py.type
 
 py.global @handle : !py.dynamic
 
-func.func @test() -> !py.dynamic {
-    %0 = py.constant(#py.tuple<()>)
-    py.store %0 : !py.dynamic into @handle
-    %1 = py.load @handle : !py.dynamic
+py.func @test() -> !py.dynamic {
+    %0 = constant(#py.tuple<()>)
+    store %0 : !py.dynamic into @handle
+    %1 = load @handle : !py.dynamic
     return %1 : !py.dynamic
 }
 
@@ -31,10 +31,10 @@ func.func @test() -> !py.dynamic {
 
 py.global @handle : index
 
-func.func @test() -> index {
+py.func @test() -> index {
     %0 = arith.constant 5 : index
-    py.store %0 : index into @handle
-    %1 = py.load @handle : index
+    store %0 : index into @handle
+    %1 = load @handle : index
     return %1 : index
 }
 
@@ -55,10 +55,10 @@ func.func @test() -> index {
 
 py.global @handle : index = 3 : index
 
-func.func @test() -> index {
+py.func @test() -> index {
     %0 = arith.constant 5 : index
-    py.store %0 : index into @handle
-    %1 = py.load @handle : index
+    store %0 : index into @handle
+    %1 = load @handle : index
     return %1 : index
 }
 
@@ -85,10 +85,10 @@ py.globalValue @builtins.str = #py.type
 
 py.global @handle : !py.dynamic = #py.dict<{}>
 
-func.func @test() -> !py.dynamic {
-    %0 = py.constant(#py.tuple<()>)
-    py.store %0 : !py.dynamic into @handle
-    %1 = py.load @handle : !py.dynamic
+py.func @test() -> !py.dynamic {
+    %0 = constant(#py.tuple<()>)
+    store %0 : !py.dynamic into @handle
+    %1 = load @handle : !py.dynamic
     return %1 : !py.dynamic
 }
 

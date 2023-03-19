@@ -4,9 +4,9 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue const @builtins.int = #py.type
 
-func.func @__init__() -> !py.dynamic {
-	%zero = py.constant(#py.int<0>)
-	%one = py.constant(#py.int<1>)
+py.func @__init__() -> !py.dynamic {
+	%zero = constant(#py.int<0>)
+	%one = constant(#py.int<1>)
 	cf.br ^loop
 
 ^loop:
@@ -19,11 +19,11 @@ func.func @__init__() -> !py.dynamic {
     cf.cond_br %2, ^loop, ^exit
 
 ^exit:
-    %3 = py.typeOf %1
+    %3 = typeOf %1
 	return %3 : !py.dynamic
 }
 
-// CHECK-LABEL: func.func @__init__
-// CHECK: %[[TYPE:.*]] = py.constant(#py.ref<@builtins.int>)
+// CHECK-LABEL: py.func @__init__
+// CHECK: %[[TYPE:.*]] = constant(#py.ref<@builtins.int>)
 // CHECK: return %[[TYPE]]
 

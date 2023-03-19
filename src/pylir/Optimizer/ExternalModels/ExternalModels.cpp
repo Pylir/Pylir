@@ -91,19 +91,6 @@ struct ArithImplicationPatterns : public pylir::DialectImplicationPatternsInterf
     }
 };
 
-struct FuncInlineCostInterface : public pylir::DialectInlineCostInterface
-{
-    using pylir::DialectInlineCostInterface::DialectInlineCostInterface;
-
-    std::size_t getCost(mlir::Operation* op) const override
-    {
-        return llvm::TypeSwitch<mlir::Operation*, std::size_t>(op)
-            .Case<mlir::func::ReturnOp>([](auto) { return 0; })
-            .Case<mlir::func::CallOp, mlir::func::CallIndirectOp>([](auto call)
-                                                                  { return 25 + 5 * call.getArgOperands().size(); })
-            .Default(std::size_t{5});
-    }
-};
 } // namespace
 
 void pylir::registerExternalModels(mlir::DialectRegistry& registry)
@@ -116,6 +103,4 @@ void pylir::registerExternalModels(mlir::DialectRegistry& registry)
                           });
     registry.addExtension(+[](mlir::MLIRContext*, mlir::arith::ArithDialect* dialect)
                           { dialect->addInterface<ArithImplicationPatterns>(); });
-    registry.addExtension(+[](mlir::MLIRContext*, mlir::func::FuncDialect* dialect)
-                          { dialect->addInterface<FuncInlineCostInterface>(); });
 }

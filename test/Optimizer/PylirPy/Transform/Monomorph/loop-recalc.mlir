@@ -4,11 +4,11 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.int = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func.func @__init__() {
+py.func @__init__() {
 	%one = arith.constant 1 : index
 	%zero = arith.constant 0 : index
-	%random = py.constant(#py.int<69>)
-	%tuple = py.makeTuple (%random)
+	%random = constant(#py.int<69>)
+	%tuple = makeTuple (%random)
 	%len = py.tuple.len %tuple
 	cf.br ^header(%zero : index)
 

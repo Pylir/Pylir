@@ -6,18 +6,18 @@ py.globalValue const @builtins.tuple = #py.type
 py.globalValue const @builtins.dict = #py.type
 py.globalValue const @builtins.int = #py.type
 
-func.func @__init__() {
-	%one = py.constant(#py.int<1>)
-	%zero = py.constant(#py.int<0>)
+py.func @__init__() {
+	%one = constant(#py.int<1>)
+	%zero = constant(#py.int<0>)
 	%c0 = arith.constant 0 : index
 	cf.br ^loop(%zero : !py.dynamic)
 
 ^loop(%iter : !py.dynamic):
-	%0 = py.typeOf %iter
+	%0 = typeOf %iter
 	%1 = py.type.mro %0
-	%2 = py.mroLookup %c0 in %1
-	%3 = py.makeTuple (%iter, %one)
-	%4 = py.constant(#py.dict<{}>)
+	%2 = mroLookup %c0 in %1
+	%3 = makeTuple (%iter, %one)
+	%4 = constant(#py.dict<{}>)
 	%5 = py.function.call %2(%2, %3, %4)
 	%6 = test.random
 	cf.cond_br %6, ^loop(%5 : !py.dynamic), ^exit
@@ -35,7 +35,7 @@ func.func @__init__() {
 
 // -----
 
-func.func @__init__() {
+py.func @__init__() {
 	cf.br ^headerOne
 
 ^headerOne:
@@ -64,7 +64,7 @@ func.func @__init__() {
 
 // -----
 
-func.func @__init__() {
+py.func @__init__() {
 	cf.br ^headerOne
 
 ^headerOne:

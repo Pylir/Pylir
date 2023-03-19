@@ -3,7 +3,6 @@
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h>
-#include <mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h>
 #include <mlir/Conversion/LLVMCommon/ConversionTarget.h>
 #include <mlir/Conversion/LLVMCommon/Pattern.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
@@ -1444,6 +1443,48 @@ struct MROLookupOpConversion : ConvertPylirOpToLLVMPattern<Py::MROLookupOp>
     }
 };
 
+struct FuncOpConversion : ConvertPylirOpToLLVMPattern<Py::FuncOp>
+{
+    using ConvertPylirOpToLLVMPattern<Py::FuncOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(Py::FuncOp op, OpAdaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        mlir::LLVM::Linkage linkage = mlir::LLVM::Linkage::External;
+        if (!op.isPublic())
+        {
+            linkage = mlir::LLVM::Linkage::Internal;
+        }
+
+        // TODO: It might be required to be doing function type/argument conversions here in the future based on ABI.
+        mlir::TypeConverter::SignatureConversion result(op.getNumArguments());
+        mlir::Type llvmType =
+            typeConverter.convertFunctionSignature(op.getFunctionType(), /*isVariadic=*/false, result);
+
+        auto newFunc = rewriter.create<mlir::LLVM::LLVMFuncOp>(op.getLoc(), op.getName(), llvmType, linkage,
+                                                               /*dsoLocal=*/true);
+        rewriter.inlineRegionBefore(op.getBody(), newFunc.getBody(), newFunc.end());
+        if (mlir::failed(rewriter.convertRegionTypes(&newFunc.getBody(), typeConverter, &result)))
+        {
+            return mlir::failure();
+        }
+        rewriter.eraseOp(op);
+        return mlir::success();
+    }
+};
+
+struct ReturnOpConversion : ConvertPylirOpToLLVMPattern<Py::ReturnOp>
+{
+    using ConvertPylirOpToLLVMPattern<Py::ReturnOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(Py::ReturnOp op, OpAdaptor adaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        rewriter.replaceOpWithNewOp<mlir::LLVM::ReturnOp>(op, adaptor.getArguments());
+        return mlir::success();
+    }
+};
+
 class ConvertPylirToLLVMPass : public impl::ConvertPylirToLLVMPassBase<ConvertPylirToLLVMPass>
 {
 protected:
@@ -1456,17 +1497,6 @@ public:
 void ConvertPylirToLLVMPass::runOnOperation()
 {
     auto module = getOperation();
-    // For now, map all functions that are private to internal. Public functions are external. In Python code
-    // these are all functions that are not __init__
-    for (auto iter : module.getOps<mlir::func::FuncOp>())
-    {
-        if (iter.isPublic())
-        {
-            continue;
-        }
-        iter->setAttr("llvm.linkage",
-                      mlir::LLVM::LinkageAttr::get(&getContext(), mlir::LLVM::linkage::Linkage::Internal));
-    }
 
     PylirTypeConverter converter(&getContext(), llvm::Triple(m_targetTripleCLI), llvm::DataLayout(m_dataLayoutCLI),
                                  mlir::DataLayout(module));
@@ -1477,7 +1507,6 @@ void ConvertPylirToLLVMPass::runOnOperation()
     conversionTarget.addLegalOp<mlir::ModuleOp>();
 
     mlir::RewritePatternSet patternSet(&getContext());
-    mlir::populateFuncToLLVMConversionPatterns(converter, patternSet);
     mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
     patternSet.insert<
         ConstantOpConversion, GlobalValueOpConversion, GlobalOpConversion, StoreOpConversion, LoadOpConversion,
@@ -1493,7 +1522,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
         InitTuplePrependOpConversion, InitTupleDropFrontOpConversion, IntToIndexOpConversion, IntCmpOpConversion,
         InitIntAddOpConversion, UnreachableOpConversion, TypeMROOpConversion, ArithmeticSelectOpConversion,
         TupleContainsOpConversion, InitTupleCopyOpConversion, MROLookupOpConversion, TypeSlotsOpConversion,
-        InitFloatOpConversion, FloatToF64OpConversion>(converter, codeGenState);
+        InitFloatOpConversion, FloatToF64OpConversion, FuncOpConversion, ReturnOpConversion>(converter, codeGenState);
     patternSet.insert<GCAllocObjectConstTypeConversion>(converter, codeGenState, 2);
     if (mlir::failed(mlir::applyFullConversion(module, conversionTarget, std::move(patternSet))))
     {

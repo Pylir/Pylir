@@ -5,7 +5,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
 
-#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Block.h>
 #include <mlir/IR/ImplicitLocOpBuilder.h>
 #include <mlir/IR/MLIRContext.h>
@@ -16,9 +15,9 @@
 TEST_CASE("IR DictArgsIterator", "[IR]")
 {
     mlir::MLIRContext context;
-    context.loadDialect<pylir::Py::PylirPyDialect, mlir::func::FuncDialect>();
+    context.loadDialect<pylir::Py::PylirPyDialect>();
     auto loc = mlir::UnknownLoc::get(&context);
-    mlir::OwningOpRef<mlir::func::FuncOp> func = mlir::OpBuilder(&context).create<mlir::func::FuncOp>(
+    mlir::OwningOpRef<pylir::Py::FuncOp> func = mlir::OpBuilder(&context).create<pylir::Py::FuncOp>(
         loc, "test",
         mlir::FunctionType::get(&context, std::vector<mlir::Type>(8, pylir::Py::DynamicType::get(&context)), {}));
     auto* block = func->addEntryBlock();

@@ -9,12 +9,12 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.function = #py.type
 py.globalValue @builtins.dict = #py.type
 
-func.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.typeOf %arg0
-    %1 = py.typeOf %0
+py.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = typeOf %arg0
+    %1 = typeOf %0
     %c0 = arith.constant 0 : index
-    %2 = py.getSlot %0[%c0]
+    %2 = getSlot %0[%c0]
     return %2 : !py.dynamic
 }
 
-// CHECK-LABEL: define ptr addrspace({{[0-9]+}}) @foo(ptr addrspace({{[0-9]+}}) %{{.*}})
+// CHECK-LABEL: define {{.*}} ptr addrspace({{[0-9]+}}) @foo(ptr addrspace({{[0-9]+}}) %{{.*}})

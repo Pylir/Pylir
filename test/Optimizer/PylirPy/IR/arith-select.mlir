@@ -1,6 +1,6 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-func.func @test(%arg0 : index, %arg1 : index, %arg2 : i1) -> !py.dynamic {
+py.func @test(%arg0 : index, %arg1 : index, %arg2 : i1) -> !py.dynamic {
     %0 = py.int.fromUnsigned %arg0
     %1 = py.int.fromUnsigned %arg1
     %2 = arith.select %arg2, %0, %1 : !py.dynamic

@@ -4,11 +4,11 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test(%arg0 : !py.dynamic) -> (!py.dynamic, index) {
-    %0 = py.constant(#py.str<"Hello">)
-    %1 = py.constant(#py.str<" ">)
-    %2 = py.constant(#py.str<"World">)
-    %l = py.makeList (%0, %1, %2, %arg0)
+py.func @test(%arg0 : !py.dynamic) -> (!py.dynamic, index) {
+    %0 = constant(#py.str<"Hello">)
+    %1 = constant(#py.str<" ">)
+    %2 = constant(#py.str<"World">)
+    %l = makeList (%0, %1, %2, %arg0)
     %zero = arith.constant 0 : index
     %one = arith.constant 1 : index
     %two = arith.constant 2 : index
@@ -22,11 +22,11 @@ func.func @test(%arg0 : !py.dynamic) -> (!py.dynamic, index) {
     return %7, %8 : !py.dynamic, index
 }
 
-// CHECK-LABEL: func.func @test
+// CHECK-LABEL: py.func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK-DAG: %[[H:.*]] = py.constant(#py.str<"Hello">)
-// CHECK-DAG: %[[S:.*]] = py.constant(#py.str<" ">)
-// CHECK-DAG: %[[W:.*]] = py.constant(#py.str<"World">)
+// CHECK-DAG: %[[H:.*]] = constant(#py.str<"Hello">)
+// CHECK-DAG: %[[S:.*]] = constant(#py.str<" ">)
+// CHECK-DAG: %[[W:.*]] = constant(#py.str<"World">)
 // CHECK-DAG: %[[L:.*]] = arith.constant 4
 // CHECK: %[[R:.*]] = py.str.concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
 // CHECK: return %[[R]], %[[L]]
@@ -37,10 +37,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(#py.str<"Hello">)
+py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = constant(#py.str<"Hello">)
     %zero = arith.constant 0 : index
-    %l = py.makeList (%arg0)
+    %l = makeList (%arg0)
     %1 = test.random
     cf.cond_br %1, ^bb0, ^bb1
 
@@ -53,9 +53,9 @@ func.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
-// CHECK-LABEL: func.func @test
+// CHECK-LABEL: py.func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[H:.*]] = py.constant(#py.str<"Hello">)
+// CHECK: %[[H:.*]] = constant(#py.str<"Hello">)
 // CHECK: cf.cond_br %{{.*}}, ^[[COND:.*]], ^[[RET:.*]](%[[ARG0]] : !py.dynamic)
 
 // CHECK: ^[[COND]]:
@@ -71,11 +71,11 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @neg_test(%arg0 : !py.dynamic, %arg1 : index) -> (!py.dynamic, index) {
-    %0 = py.constant(#py.str<"Hello">)
-    %1 = py.constant(#py.str<" ">)
-    %2 = py.constant(#py.str<"World">)
-    %l = py.makeList (%0, %1, %2, %arg0)
+py.func @neg_test(%arg0 : !py.dynamic, %arg1 : index) -> (!py.dynamic, index) {
+    %0 = constant(#py.str<"Hello">)
+    %1 = constant(#py.str<" ">)
+    %2 = constant(#py.str<"World">)
+    %l = makeList (%0, %1, %2, %arg0)
     %zero = arith.constant 0 : index
     %one = arith.constant 1 : index
     %two = arith.constant 2 : index
@@ -88,8 +88,8 @@ func.func @neg_test(%arg0 : !py.dynamic, %arg1 : index) -> (!py.dynamic, index) 
     return %7, %8 : !py.dynamic, index
 }
 
-// CHECK-LABEL: func.func @neg_test
-// CHECK: %[[L:.*]] = py.makeList
+// CHECK-LABEL: py.func @neg_test
+// CHECK: %[[L:.*]] = makeList
 // CHECK: %[[ZERO:.*]] = py.list.getItem %[[L]]
 // CHECK: %[[ONE:.*]] = py.list.getItem %[[L]]
 // CHECK: %[[TWO:.*]] = py.list.getItem %[[L]]

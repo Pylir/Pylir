@@ -17,7 +17,6 @@ target_link_libraries(PylirPyTransforms
   PylirPyTransformsUtil
   MLIRTransforms
   MLIRAnalysis
-  MLIRFuncDialect
   )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)
 

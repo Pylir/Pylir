@@ -6,6 +6,7 @@
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
+#include <mlir/IR/FunctionImplementation.h>
 #include <mlir/IR/OpImplementation.h>
 
 #include <llvm/ADT/ScopeExit.h>
@@ -592,6 +593,21 @@ void pylir::Py::UnpackExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
     build(odsBuilder, odsState, llvm::SmallVector(beforeCount, dynamicType), restIndex ? dynamicType : nullptr,
           llvm::SmallVector(afterCount, dynamicType), iterable, normal_dest_operands, unwind_dest_operands, happy_path,
           unwindPath);
+}
+
+mlir::ParseResult pylir::Py::FuncOp::parse(::mlir::OpAsmParser& parser, ::mlir::OperationState& result)
+{
+    return mlir::function_interface_impl::parseFunctionOp(
+        parser, result, false, getFunctionTypeAttrName(result.name),
+        [](mlir::Builder& builder, llvm::ArrayRef<mlir::Type> argTypes, llvm::ArrayRef<mlir::Type> results, auto&&...)
+        { return builder.getFunctionType(argTypes, results); },
+        getArgAttrsAttrName(result.name), getResAttrsAttrName(result.name));
+}
+
+void pylir::Py::FuncOp::print(::mlir::OpAsmPrinter& p)
+{
+    mlir::function_interface_impl::printFunctionOp(p, *this, false, getFunctionTypeAttrName(), getArgAttrsAttrName(),
+                                                   getResAttrsAttrName());
 }
 
 namespace

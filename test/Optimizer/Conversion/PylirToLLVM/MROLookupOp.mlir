@@ -5,9 +5,9 @@ py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.object = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @test(%tuple : !py.dynamic) -> !py.dynamic {
+py.func @test(%tuple : !py.dynamic) -> !py.dynamic {
     %c0 = arith.constant 0 : index
-    %0 = py.mroLookup %c0 in %tuple
+    %0 = mroLookup %c0 in %tuple
     return %0 : !py.dynamic
 }
 

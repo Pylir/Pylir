@@ -4,8 +4,8 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.int = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
-func.func @foo(%value : index) -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.int>)
+py.func @foo(%value : index) -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.int>)
     %c0 = arith.constant 0 : index
     %1 = pyMem.gcAllocObject %0[%c0]
     %2 = pyMem.initIntUnsigned %1 to %value
@@ -19,8 +19,8 @@ func.func @foo(%value : index) -> !py.dynamic {
 // CHECK-NEXT: llvm.call @mp_init_u64(%[[GEP]], %[[VALUE]])
 // CHECK-NEXT: llvm.return %[[MEMORY]]
 
-func.func @bar(%value : index) -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.int>)
+py.func @bar(%value : index) -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.int>)
      %c0 = arith.constant 0 : index
     %1 = pyMem.gcAllocObject %0[%c0]
     %2 = pyMem.initIntSigned %1 to %value

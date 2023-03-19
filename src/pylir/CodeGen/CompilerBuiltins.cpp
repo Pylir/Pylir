@@ -175,18 +175,18 @@ mlir::Value binOp(pylir::PyBuilder& builder, TypeSlots method, TypeSlots revMeth
 void buildRevBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method,
                                   TypeSlots revMethod)
 {
-    auto func = builder.create<mlir::func::FuncOp>(
+    auto func = builder.create<pylir::Py::FuncOp>(
         functionName,
         builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType()}, builder.getDynamicType()));
     mlir::OpBuilder::InsertionGuard guard{builder};
     builder.setInsertionPointToStart(func.addEntryBlock());
     auto result = binOp(builder, method, revMethod, func.getArgument(0), func.getArgument(1));
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 }
 
 void buildBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
-    auto func = builder.create<mlir::func::FuncOp>(
+    auto func = builder.create<pylir::Py::FuncOp>(
         functionName,
         builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType()}, builder.getDynamicType()));
     mlir::OpBuilder::InsertionGuard guard{builder};
@@ -196,24 +196,24 @@ void buildBinOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functi
     auto tuple = builder.createMakeTuple({lhs, rhs}, nullptr);
     auto dict = builder.createMakeDict();
     auto result = buildSpecialMethodCall(builder, method, tuple, dict);
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 }
 
 void buildUnaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
-    auto func = builder.create<mlir::func::FuncOp>(
+    auto func = builder.create<pylir::Py::FuncOp>(
         functionName, builder.getFunctionType({builder.getDynamicType()}, builder.getDynamicType()));
     mlir::OpBuilder::InsertionGuard guard{builder};
     builder.setInsertionPointToStart(func.addEntryBlock());
     auto tuple = builder.createMakeTuple({func.getArgument(0)}, nullptr);
     auto dict = builder.createMakeDict();
     auto result = buildSpecialMethodCall(builder, method, tuple, dict);
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 }
 
 void buildCallOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName)
 {
-    auto func = builder.create<mlir::func::FuncOp>(
+    auto func = builder.create<pylir::Py::FuncOp>(
         functionName,
         builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
                                 builder.getDynamicType()));
@@ -233,16 +233,16 @@ void buildCallOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef funct
 
     implementBlock(builder, isFunctionBlock);
     mlir::Value result = builder.createFunctionCall(self, {self, args, kws});
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 
     implementBlock(builder, notFunctionBlock);
     result = buildSpecialMethodCall(builder, TypeSlots::Call, builder.createTuplePrepend(self, args), kws);
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 }
 
 void buildTernaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
-    auto func = builder.create<mlir::func::FuncOp>(
+    auto func = builder.create<pylir::Py::FuncOp>(
         functionName,
         builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType(), builder.getDynamicType()},
                                 builder.getDynamicType()));
@@ -251,13 +251,13 @@ void buildTernaryOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef fu
     auto tuple = builder.createMakeTuple({func.getArgument(0), func.getArgument(1), func.getArgument(2)}, nullptr);
     auto dict = builder.createMakeDict();
     auto result = buildSpecialMethodCall(builder, method, tuple, dict);
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 }
 
 void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method,
                               mlir::Value (pylir::PyBuilder::*normalOp)(mlir::Value, mlir::Value, mlir::Block*))
 {
-    auto func = builder.create<mlir::func::FuncOp>(
+    auto func = builder.create<pylir::Py::FuncOp>(
         functionName,
         builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType()}, builder.getDynamicType()));
     mlir::OpBuilder::InsertionGuard guard{builder};
@@ -292,12 +292,12 @@ void buildIOpCompilerBuiltins(pylir::PyBuilder& builder, llvm::StringRef functio
     builder.createRaise(typeError);
 
     implementBlock(builder, returnBlock);
-    builder.create<mlir::func::ReturnOp>(builder.getCurrentLoc(), returnBlock->getArgument(0));
+    builder.create<pylir::Py::ReturnOp>(builder.getCurrentLoc(), returnBlock->getArgument(0));
 }
 
 void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringRef functionName, TypeSlots method)
 {
-    auto func = builder.create<mlir::func::FuncOp>(
+    auto func = builder.create<pylir::Py::FuncOp>(
         functionName,
         builder.getFunctionType({builder.getDynamicType(), builder.getDynamicType()}, builder.getDynamicType()));
     mlir::OpBuilder::InsertionGuard guard{builder};
@@ -310,7 +310,7 @@ void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringR
     auto* attrError = new mlir::Block;
     attrError->addArgument(builder.getDynamicType(), builder.getCurrentLoc());
     auto result = buildSpecialMethodCall(builder, method, tuple, dict, attrError);
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 
     // If __getattribute__ raises an AttributeError we have to automatically call __getattr__.
     implementBlock(builder, attrError);
@@ -327,7 +327,7 @@ void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder, llvm::StringR
 
     implementBlock(builder, getattrBlock);
     result = builder.createPylirGetAttrIntrinsic(lhs, rhs);
-    builder.create<mlir::func::ReturnOp>(result);
+    builder.create<pylir::Py::ReturnOp>(result);
 }
 
 } // namespace

@@ -4,8 +4,8 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test(%arg0 : i1, %length : index) -> index {
-    %2 = py.makeList ()
+py.func @test(%arg0 : i1, %length : index) -> index {
+    %2 = makeList ()
     scf.if %arg0 {
     } else {
         py.list.resize %2 to %length
@@ -17,9 +17,9 @@ func.func @test(%arg0 : i1, %length : index) -> index {
 // CHECK-LABEL: memSSA.module
 // CHECK-NEXT: %[[ENTRY:.*]] = liveOnEntry
 // CHECK-NEXT: %[[DEF_OBJECT:.*]] = def(%[[ENTRY]])
-// CHECK-NEXT: py.makeList
+// CHECK-NEXT: makeList
 // CHECK-NEXT: %[[DEF_LIST:.*]] = def(%[[ENTRY]])
-// CHECK-NEXT: py.makeList
+// CHECK-NEXT: makeList
 // CHECK-NEXT: br ^[[REGION1:.*]], ^[[REGION2:.*]] (), ()
 // CHECK-NEXT: ^[[REGION1]]:
 // CHECK-NEXT: br ^[[END:.*]] (%[[DEF_LIST]])

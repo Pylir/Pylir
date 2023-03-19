@@ -5,9 +5,9 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 py.globalValue @builtins.int = #py.type
 
-func.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
-    %zero = py.constant(#py.int<0>)
-    %l = py.makeDict (%zero hash(%hash) : %arg0)
+py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
+    %zero = constant(#py.int<0>)
+    %l = makeDict (%zero hash(%hash) : %arg0)
     cf.br ^bb0
 
 ^bb1:
@@ -22,7 +22,7 @@ func.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     cf.br ^bb1
 }
 
-// CHECK-LABEL: func.func @test
+// CHECK-LABEL: py.func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK: test.use(%[[ARG0]])
 // CHECK: test.use(%[[ARG0]])

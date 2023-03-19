@@ -6,7 +6,6 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlowOps.h>
-#include <mlir/Dialect/Func/IR/FuncOps.h>
 
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
@@ -30,7 +29,6 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context, Diag::DiagnosticsDocManager&
           [&]
           {
               context->loadDialect<pylir::Py::PylirPyDialect>();
-              context->loadDialect<mlir::func::FuncDialect>();
               return context;
           }()),
       m_module(mlir::ModuleOp::create(m_builder.getUnknownLoc())),
@@ -69,8 +67,8 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
             m_globalScope.identifiers.emplace(token.getValue(), Identifier{op});
         }
 
-        auto initFunc = mlir::func::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__",
-                                                   m_builder.getFunctionType({}, {}));
+        auto initFunc = pylir::Py::FuncOp::create(m_builder.getUnknownLoc(), m_qualifiers + "__init__",
+                                                  m_builder.getFunctionType({}, {}));
         auto reset = implementFunction(initFunc);
         // We aren't actually at function scope, even if we are implementing a function
         m_functionScope.reset();
@@ -92,7 +90,7 @@ mlir::ModuleOp pylir::CodeGen::visit(const pylir::Syntax::FileInput& fileInput)
         visit(fileInput.input);
         if (needsTerminator())
         {
-            m_builder.create<mlir::func::ReturnOp>();
+            m_builder.create<Py::ReturnOp>();
         }
     }
 
@@ -173,7 +171,7 @@ void pylir::CodeGen::visit(const Syntax::ReturnStmt& returnStmt)
     {
         executeFinallyBlocks(false);
         auto none = m_builder.createNoneRef();
-        m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{none});
+        m_builder.create<Py::ReturnOp>(mlir::ValueRange{none});
         m_builder.clearInsertionPoint();
         return;
     }
@@ -183,7 +181,7 @@ void pylir::CodeGen::visit(const Syntax::ReturnStmt& returnStmt)
         return;
     }
     executeFinallyBlocks(true);
-    m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{value});
+    m_builder.create<Py::ReturnOp>(mlir::ValueRange{value});
     m_builder.clearInsertionPoint();
 }
 
@@ -1583,17 +1581,16 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
 
     auto qualifiedName = m_qualifiers + std::string(funcName);
     std::vector<IdentifierToken> usedCells;
-    mlir::func::FuncOp func;
+    Py::FuncOp func;
     {
         pylir::ValueReset constantReset(m_constantClass);
         m_constantClass = false;
         pylir::ValueReset namespaceReset(m_classNamespace);
         m_classNamespace = {};
-        func =
-            mlir::func::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
-                                       m_builder.getFunctionType(std::vector<mlir::Type>(1 + functionParameters.size(),
-                                                                                         m_builder.getDynamicType()),
-                                                                 {m_builder.getDynamicType()}));
+        func = Py::FuncOp::create(m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
+                                  m_builder.getFunctionType(std::vector<mlir::Type>(1 + functionParameters.size(),
+                                                                                    m_builder.getDynamicType()),
+                                                            {m_builder.getDynamicType()}));
         func.setPrivate();
         auto reset = implementFunction(func);
 
@@ -1662,7 +1659,7 @@ mlir::Value pylir::CodeGen::visitFunction(llvm::ArrayRef<Syntax::Decorator> deco
 
         if (needsTerminator())
         {
-            m_builder.create<mlir::func::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
+            m_builder.create<pylir::Py::ReturnOp>(mlir::ValueRange{m_builder.createNoneRef()});
         }
         func = buildFunctionCC(formImplName(qualifiedName + "$cc"), func, functionParameters);
     }
@@ -1830,9 +1827,9 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
     auto name = m_builder.createConstant(qualifiedName);
 
     std::optional<CodeGen::Scope> functionScope;
-    mlir::func::FuncOp func;
+    pylir::Py::FuncOp func;
     {
-        func = mlir::func::FuncOp::create(
+        func = pylir::Py::FuncOp::create(
             m_builder.getCurrentLoc(), formImplName(qualifiedName + "$impl"),
             m_builder.getFunctionType(
                 std::vector<mlir::Type>(2 /* cell tuple + namespace dict */, m_builder.getDynamicType()),
@@ -1851,11 +1848,11 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef)
         if (*constExport)
         {
             functionScope = std::move(m_functionScope);
-            m_builder.create<mlir::func::ReturnOp>();
+            m_builder.create<Py::ReturnOp>();
         }
         else
         {
-            m_builder.create<mlir::func::ReturnOp>(m_classNamespace);
+            m_builder.create<Py::ReturnOp>(m_classNamespace);
         }
     }
 
@@ -2209,10 +2206,10 @@ std::vector<pylir::CodeGen::UnpackResults> pylir::CodeGen::unpackArgsKeywords(
     return args;
 }
 
-mlir::func::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
-                                                   const std::vector<FunctionParameter>& parameters)
+pylir::Py::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, Py::FuncOp implementation,
+                                                  const std::vector<FunctionParameter>& parameters)
 {
-    auto cc = mlir::func::FuncOp::create(
+    auto cc = Py::FuncOp::create(
         m_builder.getCurrentLoc(), name.str(),
         mlir::FunctionType::get(m_builder.getContext(),
                                 {m_builder.getDynamicType(), m_builder.getDynamicType(), m_builder.getDynamicType()},
@@ -2250,7 +2247,7 @@ mlir::func::FuncOp pylir::CodeGen::buildFunctionCC(llvm::Twine name, mlir::func:
                    [](const UnpackResults& unpackResults) { return unpackResults.parameterValue; });
 
     auto result = m_builder.create<Py::CallOp>(implementation, args);
-    m_builder.create<mlir::func::ReturnOp>(result->getResults());
+    m_builder.create<Py::ReturnOp>(result->getResults());
     return cc;
 }
 
@@ -2349,7 +2346,7 @@ mlir::Value pylir::CodeGen::visit(const Syntax::Lambda& lambda)
         [&]
         {
             auto value = visit(*lambda.expression);
-            m_builder.create<mlir::func::ReturnOp>(value);
+            m_builder.create<Py::ReturnOp>(value);
         },
         lambda.lambdaKeyword);
 }

@@ -5,6 +5,6 @@
 
 import foo
 
-# CHECK: py.call @foo.__init__
+# CHECK: call @foo.__init__
 
 #--- foo/__init__.py

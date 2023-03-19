@@ -4,8 +4,8 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @test(%length : index) -> index {
-    %1 = py.makeList ()
+py.func @test(%length : index) -> index {
+    %1 = makeList ()
     py.list.resize %1 to %length
     %2 = py.list.len %1
     return %2 : index
@@ -22,8 +22,8 @@ func.func @test(%length : index) -> index {
 // CHECK-NEXT: use(%[[RESIZE]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
-func.func @test2(%arg0 : i1, %length : index) -> index {
-    %1 = py.makeList ()
+py.func @test2(%arg0 : i1, %length : index) -> index {
+    %1 = makeList ()
     cf.cond_br %arg0, ^bb1, ^bb2
 
 ^bb1:
@@ -51,8 +51,8 @@ func.func @test2(%arg0 : i1, %length : index) -> index {
 // CHECK-NEXT: use(%[[MERGE]])
 // CHECK-NEXT: // {{.*}} py.list.len
 
-func.func @test3(%length : index) -> index {
-    %1 = py.makeList ()
+py.func @test3(%length : index) -> index {
+    %1 = makeList ()
     cf.br ^condition
 
 ^condition:
@@ -92,14 +92,14 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func private @bar()
+py.func private @bar()
 
-func.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.constant(#py.str<"value">)
+py.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = constant(#py.str<"value">)
     %c0 = arith.constant 0 : index
-    py.setSlot %arg0[%c0] to %0
+    setSlot %arg0[%c0] to %0
     call @bar() : () -> ()
-    %2 = py.getSlot %arg0[%c0]
+    %2 = getSlot %arg0[%c0]
     return %2 : !py.dynamic
 }
 
@@ -119,7 +119,7 @@ func.func @test4(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-func.func @test5(%arg0 : !py.dynamic) {
+py.func @test5(%arg0 : !py.dynamic) {
     test.writeSymbol @foo
     test.writeSymbol @bar
     test.readSymbol @foo

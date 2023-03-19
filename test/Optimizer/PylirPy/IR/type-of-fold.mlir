@@ -1,8 +1,8 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-func.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeObject %arg0
-    %1 = py.typeOf %0
+py.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
+    %0 = makeObject %arg0
+    %1 = typeOf %0
     return %1 : !py.dynamic
 }
 
@@ -16,14 +16,14 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @a = #py.type
 
-func.func @constant_obj() -> !py.dynamic {
-    %0 = py.constant(#py.obj<#py.ref<@a>>)
-    %1 = py.typeOf %0
+py.func @constant_obj() -> !py.dynamic {
+    %0 = constant(#py.obj<#py.ref<@a>>)
+    %1 = typeOf %0
     return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @constant_obj
-// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@a>)
+// CHECK: %[[CONST:.*]] = constant(#py.ref<@a>)
 // CHECK: return %[[CONST]]
 
 // -----
@@ -32,14 +32,14 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @a = #py.type
 
-func.func @global_value() -> !py.dynamic {
-    %0 = py.constant(#py.ref<@a>)
-    %1 = py.typeOf %0
+py.func @global_value() -> !py.dynamic {
+    %0 = constant(#py.ref<@a>)
+    %1 = typeOf %0
     return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @global_value
-// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@builtins.type>)
+// CHECK: %[[CONST:.*]] = constant(#py.ref<@builtins.type>)
 // CHECK: return %[[CONST]]
 
 // -----
@@ -48,9 +48,9 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
-func.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+py.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.str.copy %arg0 : %arg1
-    %1 = py.typeOf %0
+    %1 = typeOf %0
     return %1 : !py.dynamic
 }
 
@@ -64,14 +64,14 @@ func.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.makeTuple (%arg0, %arg1)
-    %1 = py.typeOf %0
+py.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+    %0 = makeTuple (%arg0, %arg1)
+    %1 = typeOf %0
     return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @type_refineable
-// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[CONST:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK: return %[[CONST]]
 
 // -----
@@ -79,12 +79,12 @@ func.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dyna
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
+py.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = py.tuple.prepend %arg0, %arg1
-    %1 = py.typeOf %0
+    %1 = typeOf %0
     return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: @tuple_prepend
-// CHECK: %[[CONST:.*]] = py.constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[CONST:.*]] = constant(#py.ref<@builtins.tuple>)
 // CHECK: return %[[CONST]]

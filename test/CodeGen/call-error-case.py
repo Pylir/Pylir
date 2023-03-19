@@ -4,4 +4,4 @@ print(a)
 
 # CHECK-LABEL: func @__init__()
 # CHECK-NOT: ^{{[[:alnum:]]+}}
-# CHECK: py.raise
+# CHECK: raise

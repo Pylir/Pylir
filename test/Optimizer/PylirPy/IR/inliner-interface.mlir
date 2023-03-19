@@ -5,10 +5,10 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.BaseException = #py.type
 
-func.func private @create_exception() -> !py.dynamic
+py.func private @create_exception() -> !py.dynamic
 
-func.func @inline_foo(%arg0 : i1) -> !py.dynamic {
-	%0 = py.call @create_exception() : () -> !py.dynamic
+py.func @inline_foo(%arg0 : i1) -> !py.dynamic {
+	%0 = call @create_exception() : () -> !py.dynamic
 	cf.cond_br %arg0, ^throw, ^normal_return
 
 ^throw:
@@ -18,11 +18,11 @@ func.func @inline_foo(%arg0 : i1) -> !py.dynamic {
 	return %0 : !py.dynamic
 }
 
-func.func @__init__() -> !py.dynamic {
+py.func @__init__() -> !py.dynamic {
 	%0 = test.random
-	%1 = py.call @inline_foo(%0) : (i1) -> !py.dynamic
+	%1 = call @inline_foo(%0) : (i1) -> !py.dynamic
 	test.use(%1) : !py.dynamic
-	%2 = py.invoke @inline_foo(%0) : (i1) -> !py.dynamic
+	%2 = invoke @inline_foo(%0) : (i1) -> !py.dynamic
 		label ^continue unwind ^retException
 
 ^continue:
@@ -34,17 +34,17 @@ func.func @__init__() -> !py.dynamic {
 
 // CHECK-LABEL: @__init__
 // CHECK-NEXT: %[[RANDOM:.*]] = test.random
-// CHECK-NEXT: %[[EX:.*]] = py.call @create_exception()
+// CHECK-NEXT: %[[EX:.*]] = call @create_exception()
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
-// CHECK-NEXT: py.raise %[[EX]]
+// CHECK-NEXT: raise %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]:
 // CHECK-NEXT: cf.br ^[[CONTINUE:.*]](
 // CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
 // CHECK-NEXT: test.use(%[[EX]])
-// CHECK-NEXT: %[[EX:.*]] = py.invoke @create_exception()
+// CHECK-NEXT: %[[EX:.*]] = invoke @create_exception()
 // CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[HANDLER:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[SUCCESS]]
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
@@ -74,8 +74,8 @@ py.globalValue const @builtins.None = #py.type
 
 py.globalValue "private" @function
 
-func.func @inline_foo(%arg0 : i1) -> !py.dynamic {
-    %f = py.constant(#py.ref<@function>)
+py.func @inline_foo(%arg0 : i1) -> !py.dynamic {
+    %f = constant(#py.ref<@function>)
 	%0 = py.function.call %f()
 	cf.cond_br %arg0, ^throw, ^normal_return
 
@@ -86,11 +86,11 @@ func.func @inline_foo(%arg0 : i1) -> !py.dynamic {
 	return %0 : !py.dynamic
 }
 
-func.func @__init__() -> !py.dynamic {
+py.func @__init__() -> !py.dynamic {
 	%0 = test.random
-	%1 = py.call @inline_foo(%0) : (i1) -> !py.dynamic
+	%1 = call @inline_foo(%0) : (i1) -> !py.dynamic
 	test.use(%1) : !py.dynamic
-	%2 = py.invoke @inline_foo(%0) : (i1) -> !py.dynamic
+	%2 = invoke @inline_foo(%0) : (i1) -> !py.dynamic
 		label ^continue unwind ^retException
 
 ^continue:
@@ -102,18 +102,18 @@ func.func @__init__() -> !py.dynamic {
 
 // CHECK-LABEL: @__init__
 // CHECK-NEXT: %[[RANDOM:.*]] = test.random
-// CHECK-NEXT: %[[F:.*]] = py.constant(#py.ref<@function>)
+// CHECK-NEXT: %[[F:.*]] = constant(#py.ref<@function>)
 // CHECK-NEXT: %[[EX:.*]] = py.function.call %[[F]]()
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
-// CHECK-NEXT: py.raise %[[EX]]
+// CHECK-NEXT: raise %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]:
 // CHECK-NEXT: cf.br ^[[CONTINUE:.*]](
 // CHECK-SAME: %[[EX]]
 // CHECK-NEXT: ^[[CONTINUE]]
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
 // CHECK-NEXT: test.use(%[[EX]])
-// CHECK-NEXT: %[[F:.*]] = py.constant(#py.ref<@function>)
+// CHECK-NEXT: %[[F:.*]] = constant(#py.ref<@function>)
 // CHECK-NEXT: %[[EX:.*]] = py.function.invoke %[[F]]()
 // CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[HANDLER:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[SUCCESS]]
@@ -144,21 +144,21 @@ py.globalValue const @builtins.None = #py.type
 
 py.globalValue "private" @function
 
-func.func @inline_foo() -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.BaseException>) loc("source.mlir":146:69)
-    %1 = py.makeObject %0 loc("source.mlir":147:49)
+py.func @inline_foo() -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.BaseException>) loc("source.mlir":146:69)
+    %1 = makeObject %0 loc("source.mlir":147:49)
 	py.raise %1
 }
 
-func.func @test_loc() -> !py.dynamic {
-	%1 = py.call @inline_foo() : () -> !py.dynamic loc("source.mlir":152:74)
+py.func @test_loc() -> !py.dynamic {
+	%1 = call @inline_foo() : () -> !py.dynamic loc("source.mlir":152:74)
 	return %1 : !py.dynamic
 }
 
 // INLINE-LOC-LABEL: @test_loc
-// INLINE-LOC-NEXT: %[[TYPE:.*]] = py.constant(#py.ref<@builtins.BaseException>) loc(callsite("source.mlir":146:69 at "source.mlir":152:74))
-// INLINE-LOC-NEXT: %[[EX:.*]] = py.makeObject %[[TYPE]] loc(callsite("source.mlir":147:49 at "source.mlir":152:74))
-// INLINE-LOC-NEXT: py.raise %[[EX]]
+// INLINE-LOC-NEXT: %[[TYPE:.*]] = constant(#py.ref<@builtins.BaseException>) loc(callsite("source.mlir":146:69 at "source.mlir":152:74))
+// INLINE-LOC-NEXT: %[[EX:.*]] = makeObject %[[TYPE]] loc(callsite("source.mlir":147:49 at "source.mlir":152:74))
+// INLINE-LOC-NEXT: raise %[[EX]]
 
 // -----
 
@@ -172,14 +172,14 @@ py.globalValue const @builtins.None = #py.type
 
 py.globalValue "private" @function
 
-func.func @inline_foo() -> !py.dynamic {
-    %0 = py.constant(#py.ref<@builtins.BaseException>)
-    %1 = py.makeObject %0
+py.func @inline_foo() -> !py.dynamic {
+    %0 = constant(#py.ref<@builtins.BaseException>)
+    %1 = makeObject %0
 	py.raise %1
 }
 
-func.func @__init__() -> !py.dynamic {
-	%1 = py.call @inline_foo() : () -> !py.dynamic
+py.func @__init__() -> !py.dynamic {
+	%1 = call @inline_foo() : () -> !py.dynamic
     %r = test.random
     cf.cond_br %r, ^bb0, ^bb1
 
@@ -192,14 +192,14 @@ func.func @__init__() -> !py.dynamic {
 }
 
 // CHECK-LABEL: @__init__
-// CHECK-NEXT: %[[TYPE:.*]] = py.constant(#py.ref<@builtins.BaseException>)
-// CHECK-NEXT: %[[EX:.*]] = py.makeObject %[[TYPE]]
-// CHECK-NEXT: py.raise %[[EX]]
+// CHECK-NEXT: %[[TYPE:.*]] = constant(#py.ref<@builtins.BaseException>)
+// CHECK-NEXT: %[[EX:.*]] = makeObject %[[TYPE]]
+// CHECK-NEXT: raise %[[EX]]
 
 // -----
 
-func.func @inline_foo() -> !py.dynamic {
-	%1 = py.call @inline_foo() : () -> !py.dynamic
+py.func @inline_foo() -> !py.dynamic {
+	%1 = call @inline_foo() : () -> !py.dynamic
     %r = test.random
     cf.cond_br %r, ^bb0, ^bb1
 
@@ -211,8 +211,8 @@ func.func @inline_foo() -> !py.dynamic {
     return %1 : !py.dynamic
 }
 
-// CHECK-LABEL: func.func @inline_foo
-// CHECK-NEXT: %[[CALL:.*]] = py.call @inline_foo()
+// CHECK-LABEL: py.func @inline_foo
+// CHECK-NEXT: %[[CALL:.*]] = call @inline_foo()
 // CHECK-NEXT: %[[R:.*]] = test.random
 // CHECK-NEXT: cf.cond_br %[[R]], ^[[BB1:.*]], ^[[BB2:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[BB1]]:

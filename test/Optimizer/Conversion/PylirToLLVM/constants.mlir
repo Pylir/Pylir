@@ -3,8 +3,8 @@
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @constants() -> !py.dynamic {
-    %0 = py.constant(#py.tuple<()>)
+py.func @constants() -> !py.dynamic {
+    %0 = constant(#py.tuple<()>)
     return %0 : !py.dynamic
 }
 
@@ -25,8 +25,8 @@ func.func @constants() -> !py.dynamic {
 py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
-func.func @constants() -> !py.dynamic {
-    %0 = py.constant(#py.tuple<(#py.unbound)>)
+py.func @constants() -> !py.dynamic {
+    %0 = constant(#py.tuple<(#py.unbound)>)
     return %0 : !py.dynamic
 }
 

@@ -28,7 +28,7 @@ def bar(a, *args, k, **kwd):
 # CHECK: %[[TUPLE_ARG:.*]] = py.tuple.dropFront %{{.*}}, %[[TUPLE]]
 
 # processing of k...
-# CHECK: %[[CONSTANT:.*]] = py.constant(#py.str<"k">)
+# CHECK: %[[CONSTANT:.*]] = constant(#py.str<"k">)
 # CHECK: %[[CONSTANT_HASH:.*]] = py.str.hash %[[CONSTANT]]
 # CHECK: py.dict.delItem %[[CONSTANT]] hash(%[[CONSTANT_HASH]]) from %[[DICT]]
 

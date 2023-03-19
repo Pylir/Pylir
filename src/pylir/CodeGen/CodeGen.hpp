@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/OwningOpRef.h>
@@ -49,7 +48,7 @@ class CodeGen
     CodeGenOptions m_options;
     PyBuilder m_builder;
     mlir::ModuleOp m_module;
-    mlir::func::FuncOp m_currentFunc;
+    Py::FuncOp m_currentFunc;
     mlir::Region* m_currentRegion{};
     Diag::DiagnosticsDocManager* m_docManager;
     mlir::Value m_classNamespace{};
@@ -294,8 +293,8 @@ class CodeGen
                                                   llvm::function_ref<mlir::Value(std::size_t)> posDefault = {},
                                                   llvm::function_ref<mlir::Value(llvm::StringRef)> kwDefault = {});
 
-    mlir::func::FuncOp buildFunctionCC(llvm::Twine name, mlir::func::FuncOp implementation,
-                                       const std::vector<FunctionParameter>& parameters);
+    pylir::Py::FuncOp buildFunctionCC(llvm::Twine name, Py::FuncOp implementation,
+                                      const std::vector<FunctionParameter>& parameters);
 
     template <class AST>
     mlir::Location getLoc(const AST& astObject)
@@ -421,7 +420,7 @@ class CodeGen
         return exit;
     }
 
-    [[nodiscard]] auto implementFunction(mlir::func::FuncOp funcOp)
+    [[nodiscard]] auto implementFunction(Py::FuncOp funcOp)
     {
         auto tuple =
             std::make_tuple(mlir::OpBuilder::InsertionGuard(m_builder),
