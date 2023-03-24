@@ -73,5 +73,15 @@ public:
         }
         return tracker()->getInputs()[0];
     }
+
+    friend bool operator==(mlir::Value value, const ValueTracker& valueTracker)
+    {
+        return static_cast<mlir::Value>(valueTracker) == value;
+    }
+
+    friend bool operator==(const ValueTracker& valueTracker, mlir::Value value)
+    {
+        return static_cast<mlir::Value>(valueTracker) == value;
+    }
 };
 } // namespace pylir

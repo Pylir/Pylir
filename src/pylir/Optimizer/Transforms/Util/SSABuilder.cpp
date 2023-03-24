@@ -74,7 +74,7 @@ mlir::Value pylir::SSABuilder::tryRemoveTrivialBlockArgument(mlir::BlockArgument
 
 mlir::Value pylir::SSABuilder::replaceBlockArgument(mlir::BlockArgument argument, mlir::Value replacement)
 {
-    llvm::SmallVector<mlir::BlockArgument> dependentBlockArgs;
+    llvm::SmallVector<ValueTracker> dependentBlockArgs;
     for (auto& user : argument.getUses())
     {
         auto branch = mlir::dyn_cast<mlir::BranchOpInterface>(user.getOwner());
@@ -82,7 +82,11 @@ mlir::Value pylir::SSABuilder::replaceBlockArgument(mlir::BlockArgument argument
         {
             continue;
         }
-        if (auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber()))
+
+        // Avoid duplicates in 'dependentBlockArgs'. We could use a SetVector in the future as well, but we expect the
+        // array to be small generally speaking.
+        if (auto ops = branch.getSuccessorBlockArgument(user.getOperandNumber());
+            ops && !llvm::is_contained(dependentBlockArgs, *ops))
         {
             dependentBlockArgs.emplace_back(*ops);
         }
@@ -91,15 +95,24 @@ mlir::Value pylir::SSABuilder::replaceBlockArgument(mlir::BlockArgument argument
     argument.replaceAllUsesWith(replacement);
     argument.getOwner()->eraseArgument(argument.getArgNumber());
 
-    for (auto ba : dependentBlockArgs)
+    for (mlir::Value ba : dependentBlockArgs)
     {
-        if (ba == replacement)
+        // If the block argument was replaced (in previous iterations), it might not be a 'BlockArgument' anymore.
+        // If it was replaced with another 'BlockArgument' we are doing more necessary work here, but it does not
+        // impact optimality nor correctness.
+        auto arg = mlir::dyn_cast<mlir::BlockArgument>(ba);
+        if (!arg)
         {
-            replacement = tryRemoveTrivialBlockArgument(ba);
+            continue;
+        }
+
+        if (arg == replacement)
+        {
+            replacement = tryRemoveTrivialBlockArgument(arg);
         }
         else
         {
-            tryRemoveTrivialBlockArgument(ba);
+            tryRemoveTrivialBlockArgument(arg);
         }
     }
     return replacement;

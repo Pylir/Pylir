@@ -1,0 +1,21 @@
+// RUN: pylir-opt %s --test-memory-ssa
+
+func.func private @"builtins.object.__str__$cc[0]"(%arg1: !py.dynamic) {
+  %false = arith.constant false
+  cf.br ^bb6
+
+^bb6:
+  cf.cond_br %false, ^bb11, ^bb16
+
+^bb11:
+  return
+
+^bb16:
+  cf.br ^bb11
+
+^bb20:
+  cf.br ^bb11
+
+^bb23:
+  cf.br ^bb6
+}
