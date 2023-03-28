@@ -21,7 +21,6 @@ pylir::PylirTypeConverter::PylirTypeConverter(mlir::MLIRContext* context, const 
                                   mlir::LowerToLLVMOptions options(context);
                                   options.allocLowering = mlir::LowerToLLVMOptions::AllocLowering::None;
                                   options.dataLayout = dataLayout;
-                                  options.useOpaquePointers = true;
                                   return options;
                               }()),
       m_objectPtrType(mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE))

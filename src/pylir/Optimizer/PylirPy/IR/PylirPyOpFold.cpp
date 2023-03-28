@@ -143,9 +143,10 @@ struct MakeExOpExceptionSimplifier : mlir::OpRewritePattern<ExOp>
             rewriter.create<mlir::cf::BranchOp>(newOp->getLoc(), happyPath);
             return mlir::success();
         }
-        rewriter.mergeBlocks(happyPath, op->getBlock(), op.getNormalDestOperands());
+        mlir::ValueRange destOperands = op.getNormalDestOperands();
         auto newOp = op.cloneWithoutExceptionHandling(rewriter);
         rewriter.replaceOp(op, newOp->getResults());
+        rewriter.mergeBlocks(happyPath, newOp->getBlock(), destOperands);
         return mlir::success();
     }
 };

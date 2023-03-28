@@ -19,6 +19,7 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
+#include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Export.h>
 #include <mlir/Transforms/Passes.h>
 
@@ -498,6 +499,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
                 return mlir::failure();
             }
             mlir::registerLLVMDialectTranslation(*m_mlirContext);
+            mlir::registerBuiltinDialectTranslation(*m_mlirContext);
             llvmModule = mlir::translateModuleToLLVMIR(*mlirModule, *m_llvmContext);
             // Delete these now to release MLIRs resource and reduce peak memory usage.
             mlirModule = nullptr;
@@ -562,7 +564,7 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
 
             llvm::PassInstrumentationCallbacks pic;
             llvm::StandardInstrumentations si(*m_llvmContext, false);
-            si.registerCallbacks(pic, &fam);
+            si.registerCallbacks(pic, &mam);
 
             llvm::PipelineTuningOptions options;
             options.LoopInterleaving = true;

@@ -24,6 +24,7 @@ target_link_libraries(PylirMain
   PUBLIC Diagnostics ${llvm_options} MLIRPass
   PRIVATE
   ${llvm_all}
+  MLIRBuiltinToLLVMIRTranslation
   MLIRToLLVMIRTranslationRegistration
   MLIRDLTIDialect
   MLIRBytecodeReader

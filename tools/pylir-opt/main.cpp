@@ -3,13 +3,13 @@
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Bytecode/BytecodeWriter.h>
+#include <mlir/Debug/Counter.h>
 #include <mlir/IR/AsmState.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/InitAllDialects.h>
 #include <mlir/InitAllPasses.h>
 #include <mlir/Pass/PassManager.h>
-#include <mlir/Support/DebugCounter.h>
 #include <mlir/Support/FileUtilities.h>
 #include <mlir/Support/Timing.h>
 #include <mlir/Support/ToolUtilities.h>
@@ -131,7 +131,6 @@ mlir::LogicalResult processBuffer(llvm::raw_ostream& os, std::unique_ptr<llvm::M
     {
         context.printOpOnDiagnostic(false);
     }
-    context.getDebugActionManager().registerActionHandler<mlir::DebugCounter>();
 
     // If we are in verify diagnostics mode then we have a lot of work to do,
     // otherwise just perform the actions without worrying about it.
@@ -244,7 +243,7 @@ int main(int argc, char** argv)
     mlir::registerMLIRContextCLOptions();
     mlir::registerPassManagerCLOptions();
     mlir::registerDefaultTimingManagerCLOptions();
-    mlir::DebugCounter::registerCLOptions();
+    mlir::tracing::DebugCounter::registerCLOptions();
     mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run", "p");
 
     // Build the list of dialects as a header for the --help message.
