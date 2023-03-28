@@ -34,7 +34,7 @@ runs:
     - name: Set LLVM Revision
       shell: pwsh
       run: |
-        "LLVM_REVISION=417fe52e6fb44c727eb4a63b6eb49377b692bdd8" >> $Env:GITHUB_ENV
+        "LLVM_REVISION=132feb7c839ca1ef3bb003ff79a73261a23795a7" >> $Env:GITHUB_ENV
 
     - name: Checkout LLVM
       uses: actions/checkout@v3
