@@ -18,11 +18,21 @@ set(PYLIR_TEST_DEPENDS
 if (PYLIR_FUZZER)
     set(PYLIR_SANITIZERS "address,undefined")
 endif ()
+set(PYLIR_LIT_SITE_CFG_OUT ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py)
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
-        ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
+        ${PYLIR_LIT_SITE_CFG_OUT}
         @ONLY
 )
 
-add_test(NAME lit-tests COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pylir-lit.py "${CMAKE_CURRENT_BINARY_DIR}" -v)
+set(PYLIR_LIT_CFG ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py)
+cmake_path(RELATIVE_PATH PYLIR_LIT_SITE_CFG_OUT BASE_DIRECTORY ${PYLIR_TOOLS_DIR})
+cmake_path(RELATIVE_PATH PYLIR_LIT_CFG BASE_DIRECTORY ${PYLIR_TOOLS_DIR})
+configure_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/pylir-lit.py.in
+        ${PYLIR_TOOLS_DIR}/pylir-lit.py
+        @ONLY
+)
+
+add_test(NAME lit-tests COMMAND ${Python3_EXECUTABLE} ${PYLIR_TOOLS_DIR}/pylir-lit.py "${CMAKE_CURRENT_BINARY_DIR}" -v)
 set_tests_properties(lit-tests PROPERTIES TIMEOUT 3600)

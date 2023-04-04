@@ -1,0 +1,30 @@
+#!@Python3_EXECUTABLE@
+#  Licensed under the Apache License v2.0 with LLVM Exceptions.
+#  See https://llvm.org/LICENSE.txt for license information.
+#  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+from lit.main import main
+from pathlib import Path
+import os
+
+config_map = {}
+
+
+def map_config(source_dir, site_config):
+    global config_map
+    source_dir = os.path.realpath(source_dir)
+    source_dir = os.path.normcase(source_dir)
+    site_config = os.path.normpath(site_config)
+    config_map[source_dir] = site_config
+
+
+# Allow generated file to be relocatable.
+def path(p):
+    if not p: return ''
+    return str((Path(__file__).parent / p).resolve())
+
+
+map_config(path(r'@PYLIR_LIT_CFG@'), path(r'@PYLIR_LIT_SITE_CFG_OUT@'))
+
+if __name__ == '__main__':
+    main({'config_map' : config_map})
