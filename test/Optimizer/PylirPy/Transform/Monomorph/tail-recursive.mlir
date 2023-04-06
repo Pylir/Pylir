@@ -6,7 +6,7 @@ py.globalValue @builtins.int = #py.type
 
 py.func @foo(%arg0: !py.dynamic) -> !py.dynamic {
 	%0 = constant(#py.int<1>)
-	%1 = py.int.cmp le %arg0, %0
+	%1 = int_cmp le %arg0, %0
 	cf.cond_br %1, ^exit, ^recurse
 
 ^exit:
@@ -14,7 +14,7 @@ py.func @foo(%arg0: !py.dynamic) -> !py.dynamic {
 
 ^recurse:
 	%2 = constant(#py.int<-1>)
-	%3 = py.int.add %2, %arg0
+	%3 = int_add %2, %arg0
 	%4 = call @foo(%3) : (!py.dynamic) -> !py.dynamic
 	return %4 : !py.dynamic
 }

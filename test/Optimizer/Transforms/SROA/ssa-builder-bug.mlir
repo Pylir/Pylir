@@ -11,14 +11,14 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     cf.br ^bb0
 
 ^bb1:
-    %1 = py.dict.tryGetItem %l[%zero hash(%hash)]
+    %1 = dict_tryGetItem %l[%zero hash(%hash)]
     test.use(%1) : !py.dynamic
     cf.br ^bb0
 
 ^bb0:
-    %0 = py.dict.tryGetItem %l[%zero hash(%hash)]
+    %0 = dict_tryGetItem %l[%zero hash(%hash)]
     test.use(%0) : !py.dynamic
-    py.dict.setItem %l[%zero hash(%hash)] to %0
+    dict_setItem %l[%zero hash(%hash)] to %0
     cf.br ^bb1
 }
 

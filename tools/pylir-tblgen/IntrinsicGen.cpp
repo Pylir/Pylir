@@ -143,6 +143,7 @@ bool emitIntrinsics(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs)
         }
 
         auto opName = op.getOperationName().substr(op.getDialectName().size() + 1);
+        std::replace(opName.begin(), opName.end(), '_', '.');
         os << llvm::formatv("if(intrName == \"{0}\")\n", mlir::tblgen::escapeString("pylir.intr." + opName));
         auto isOpScope = os.scope("{\n", "}\n");
         if (op.getNumVariableLengthOperands() == 0)

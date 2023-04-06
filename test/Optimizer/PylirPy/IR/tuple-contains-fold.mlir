@@ -6,7 +6,7 @@ py.globalValue @builtins.tuple = #py.type
 py.func @test1(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.ref<@builtins.tuple>)
     %1 = makeTuple (* %arg0, %0)
-    %2 = py.tuple.contains %0 in %1
+    %2 = tuple_contains %0 in %1
     return %2 : i1
 }
 
@@ -16,8 +16,8 @@ py.func @test1(%arg0 : !py.dynamic) -> i1 {
 
 py.func @test2(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.ref<@builtins.tuple>)
-    %1 = py.tuple.prepend %0, %arg0
-    %2 = py.tuple.contains %0 in %1
+    %1 = tuple_prepend %0, %arg0
+    %2 = tuple_contains %0 in %1
     return %2 : i1
 }
 

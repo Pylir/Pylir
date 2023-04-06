@@ -54,7 +54,7 @@ py.globalValue @function = #py.function<@real>
 
 py.func @stub(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = constant(#py.ref<@function>)
-    %1 = py.function.call %0(%arg0, %arg0, %arg0)
+    %1 = function_call %0(%arg0, %arg0, %arg0)
     return %1 : !py.dynamic
 }
 

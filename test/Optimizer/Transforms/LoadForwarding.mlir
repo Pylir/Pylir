@@ -58,7 +58,7 @@ py.func @test_get_slot_new_object(%arg0 : !py.dynamic) -> !py.dynamic {
 
 py.func @test_dict_len() -> index {
     %0 = makeDict ()
-    %1 = py.dict.len %0
+    %1 = dict_len %0
     return %1 : index
 }
 
@@ -74,8 +74,8 @@ py.globalValue @builtins.str = #py.type
 
 py.func @test_dict_lookup_setitem(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %0 = constant(#py.str<"value">)
-    py.dict.setItem %arg0[%0 hash(%hash)] to %0
-    %result = py.dict.tryGetItem %arg0[%0 hash(%hash)]
+    dict_setItem %arg0[%0 hash(%hash)] to %0
+    %result = dict_tryGetItem %arg0[%0 hash(%hash)]
     return %result : !py.dynamic
 }
 
@@ -91,8 +91,8 @@ py.globalValue @builtins.str = #py.type
 
 py.func @test_dict_lookup_delitem(%arg0 : !py.dynamic, %hash: index) -> !py.dynamic {
     %0 = constant(#py.str<"value">)
-    py.dict.delItem %0 hash(%hash) from %arg0
-    %result = py.dict.tryGetItem %arg0[%0 hash(%hash)]
+    dict_delItem %0 hash(%hash) from %arg0
+    %result = dict_tryGetItem %arg0[%0 hash(%hash)]
     return %result : !py.dynamic
 }
 
@@ -109,9 +109,9 @@ py.globalValue @builtins.str = #py.type
 py.func @test_dict_lookup_makeDict(%hash : index) -> (!py.dynamic, !py.dynamic) {
     %0 = constant(#py.str<"value">)
     %1 = makeDict ()
-    %result = py.dict.tryGetItem %1[%0 hash(%hash)]
+    %result = dict_tryGetItem %1[%0 hash(%hash)]
     %2 = makeDict (%0 hash(%hash) : %0)
-    %res2 = py.dict.tryGetItem %2[%0 hash(%hash)]
+    %res2 = dict_tryGetItem %2[%0 hash(%hash)]
     return %result, %res2 : !py.dynamic, !py.dynamic
 }
 
@@ -130,7 +130,7 @@ py.func @test_list_len() -> index {
     %0 = constant(#py.str<"value">)
     %1 = makeDict ()
     %2 = makeList (%0, %1)
-    %3 = py.list.len %2
+    %3 = list_len %2
     return %3 : index
 }
 
@@ -146,18 +146,18 @@ py.globalValue @builtins.str = #py.type
 
 py.func @test_resources(%arg0 : !py.dynamic) -> index {
     %0 = arith.constant 5 : index
-    py.list.resize %arg0 to %0
+    list_resize %arg0 to %0
     %1 = typeOf %arg0
     %2 = constant(#py.str<"mhm">)
     %c0 = arith.constant 0 : index
     setSlot %arg0[%c0] to %2
-    %3 = py.list.len %arg0
+    %3 = list_len %arg0
     return %3 : index
 }
 
 // CHECK-LABEL: @test_resources
 // CHECK: %[[C:.*]] = arith.constant 5
-// CHECK-NOT: py.list.len
+// CHECK-NOT: list_len
 // CHECK: return %[[C]]
 
 // -----
@@ -171,7 +171,7 @@ py.func @test_dict_lookup_makeDict_equal(%hash : index) -> !py.dynamic {
     %0 = constant(#py.int<5>)
     %1 = constant(#py.float<5.0>)
     %2 = makeDict (%0 hash(%hash) : %0)
-    %res2 = py.dict.tryGetItem %2[%1 hash(%hash)]
+    %res2 = dict_tryGetItem %2[%1 hash(%hash)]
     return %res2 : !py.dynamic
 }
 
@@ -190,7 +190,7 @@ py.func @test_dict_lookup_makeDict_not_equal(%hash : index) -> !py.dynamic {
     %0 = constant(#py.int<5>)
     %1 = constant(#py.float<3.0>)
     %2 = makeDict (%0 hash(%hash) : %0)
-    %res2 = py.dict.tryGetItem %2[%1 hash(%hash)]
+    %res2 = dict_tryGetItem %2[%1 hash(%hash)]
     return %res2 : !py.dynamic
 }
 
@@ -208,11 +208,11 @@ py.globalValue @builtins.float = #py.type
 py.func @test_dict_lookup_makeDict_neg(%hash : index, %key : !py.dynamic) -> !py.dynamic {
     %0 = constant(#py.int<5>)
     %2 = makeDict (%key hash(%hash) : %0)
-    %res2 = py.dict.tryGetItem %2[%0 hash(%hash)]
+    %res2 = dict_tryGetItem %2[%0 hash(%hash)]
     return %res2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test_dict_lookup_makeDict_neg
 // CHECK: %[[D:.*]] = makeDict
-// CHECK-NEXT: %[[L:.*]] = py.dict.tryGetItem
+// CHECK-NEXT: %[[L:.*]] = dict_tryGetItem
 // CHECK-NEXT: return %[[L]]

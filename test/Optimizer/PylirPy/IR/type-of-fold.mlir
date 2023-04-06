@@ -49,7 +49,7 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.str.copy %arg0 : %arg1
+    %0 = str_copy %arg0 : %arg1
     %1 = typeOf %0
     return %1 : !py.dynamic
 }
@@ -80,7 +80,7 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 py.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
-    %0 = py.tuple.prepend %arg0, %arg1
+    %0 = tuple_prepend %arg0, %arg1
     %1 = typeOf %0
     return %1 : !py.dynamic
 }

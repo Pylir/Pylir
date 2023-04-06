@@ -14,11 +14,11 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %two = constant(#py.int<2>)
     %three = constant(#py.int<3>)
     %l = makeDict (%zero hash(%hash) : %0, %one hash(%hash) : %1, %two hash(%hash) : %2, %three hash(%hash) : %arg0)
-    %3 = py.dict.tryGetItem %l[%zero hash(%hash)]
-    %4 = py.dict.tryGetItem %l[%one hash(%hash)]
-    %5 = py.dict.tryGetItem %l[%two hash(%hash)]
-    %6 = py.dict.tryGetItem %l[%three hash(%hash)]
-    %7 = py.str.concat %3, %4, %5, %6
+    %3 = dict_tryGetItem %l[%zero hash(%hash)]
+    %4 = dict_tryGetItem %l[%one hash(%hash)]
+    %5 = dict_tryGetItem %l[%two hash(%hash)]
+    %6 = dict_tryGetItem %l[%three hash(%hash)]
+    %7 = str_concat %3, %4, %5, %6
     return %7 : !py.dynamic
 }
 
@@ -27,7 +27,7 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 // CHECK-DAG: %[[H:.*]] = constant(#py.str<"Hello">)
 // CHECK-DAG: %[[S:.*]] = constant(#py.str<" ">)
 // CHECK-DAG: %[[W:.*]] = constant(#py.str<"World">)
-// CHECK: %[[R:.*]] = py.str.concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
+// CHECK: %[[R:.*]] = str_concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
 // CHECK: return %[[R]]
 
 // -----
@@ -45,12 +45,12 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> (!py.dynamic, index) {
     cf.cond_br %1, ^bb0, ^bb1
 
 ^bb0:
-    py.dict.setItem %l[%zero hash(%hash)] to %0
+    dict_setItem %l[%zero hash(%hash)] to %0
     cf.br ^bb1
 
 ^bb1:
-    %2 = py.dict.tryGetItem %l[%zero hash(%hash)]
-    %3 = py.dict.len %l
+    %2 = dict_tryGetItem %l[%zero hash(%hash)]
+    %3 = dict_len %l
     return %2, %3 : !py.dynamic, index
 }
 
@@ -84,7 +84,7 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %zero = constant(#py.int<0>)
     %one = constant(#py.int<1>)
     %l = makeDict (%zero hash(%hash) : %arg0)
-    %2 = py.dict.tryGetItem %l[%one hash(%hash)]
+    %2 = dict_tryGetItem %l[%one hash(%hash)]
     return %2 : !py.dynamic
 }
 
@@ -105,12 +105,12 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> (i1, index) {
     cf.cond_br %r, ^bb1, ^bb2
 
 ^bb1:
-    py.dict.setItem %0[%1 hash(%hash)] to %arg0
+    dict_setItem %0[%1 hash(%hash)] to %arg0
     cf.br ^bb2
 
 ^bb2:
-    %res = py.dict.delItem %1 hash(%hash) from %0
-    %s = py.dict.len %0
+    %res = dict_delItem %1 hash(%hash) from %0
+    %s = dict_len %0
     return %res, %s : i1, index
 }
 
@@ -149,8 +149,8 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> i1 {
     %0 = makeDict ()
     %1 = constant(#py.int<5>)
     %2 = constant(#py.float<5.0>)
-    py.dict.setItem %0[%1 hash(%hash)] to %arg0
-    %res = py.dict.delItem %2 hash(%hash) from %0
+    dict_setItem %0[%1 hash(%hash)] to %arg0
+    %res = dict_delItem %2 hash(%hash) from %0
     return %res : i1
 }
 
@@ -188,8 +188,8 @@ py.func @test(%arg0 : !py.dynamic, %hash : index) -> i1 {
     %0 = makeDict ()
     %1 = constant(#py.int<5>)
     %2 = constant(#py.ref<@g>)
-    py.dict.setItem %0[%1 hash(%hash)] to %arg0
-    %res = py.dict.delItem %2 hash(%hash) from %0
+    dict_setItem %0[%1 hash(%hash)] to %arg0
+    %res = dict_delItem %2 hash(%hash) from %0
     return %res : i1
 }
 

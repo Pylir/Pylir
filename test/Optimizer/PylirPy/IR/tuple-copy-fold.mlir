@@ -4,8 +4,8 @@ py.globalValue @builtins.type = #py.type
 py.globalValue @builtins.tuple = #py.type
 
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
-    %2 = py.tuple.copy %arg0 : %arg1
-    %3 = py.tuple.copy %2 : %arg2
+    %2 = tuple_copy %arg0 : %arg1
+    %3 = tuple_copy %2 : %arg2
     return %3 : !py.dynamic
 }
 
@@ -13,13 +13,13 @@ py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> 
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
-// CHECK-NEXT: %[[COPY:.*]] = py.tuple.copy %[[ARG0]] : %[[ARG2]]
+// CHECK-NEXT: %[[COPY:.*]] = tuple_copy %[[ARG0]] : %[[ARG2]]
 // CHECK-NEXT: return %[[COPY]]
 
 py.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = makeTuple (%arg0)
 	%1 = constant(#py.ref<@builtins.tuple>)
-	%2 = py.tuple.copy %0 : %1
+	%2 = tuple_copy %0 : %1
 	return %2 : !py.dynamic
 }
 
@@ -29,13 +29,13 @@ py.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: return %[[TUPLE]]
 
 py.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
-	%0 = py.list.toTuple %arg0
+	%0 = list_toTuple %arg0
 	%1 = constant(#py.ref<@builtins.tuple>)
-	%2 = py.tuple.copy %0 : %1
+	%2 = tuple_copy %0 : %1
 	return %2 : !py.dynamic
 }
 
 // CHECK-LABEL: @test3
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK-NEXT: %[[TUPLE:.*]] = py.list.toTuple %[[ARG0]]
+// CHECK-NEXT: %[[TUPLE:.*]] = list_toTuple %[[ARG0]]
 // CHECK-NEXT: return %[[TUPLE]]

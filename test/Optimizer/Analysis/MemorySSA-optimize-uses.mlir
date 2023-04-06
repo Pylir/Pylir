@@ -7,12 +7,12 @@ py.globalValue @builtins.str = #py.type
 
 py.func @test() -> index {
     %0 = constant(#py.str<"test">)
-    %hash = py.str.hash %0
+    %hash = str_hash %0
     %1 = makeDict ()
     %2 = makeDict ()
-    py.dict.setItem %1[%0 hash(%hash)] to %0
-    py.dict.setItem %2[%0 hash(%hash)] to %0
-    %3 = py.dict.len %1
+    dict_setItem %1[%0 hash(%hash)] to %0
+    dict_setItem %2[%0 hash(%hash)] to %0
+    %3 = dict_len %1
     return %3 : index
 }
 
@@ -27,8 +27,8 @@ py.func @test() -> index {
 // CHECK-NEXT: %[[DEF_DICT2:.*]] = def(%[[DEF_DICT]])
 // CHECK-NEXT: %[[DICT2]] = py.makeDict ()
 // CHECK-NEXT: %[[DEF3:.*]] = def(%[[DEF_DICT2]])
-// CHECK-NEXT: py.dict.setItem %[[DICT1]]
+// CHECK-NEXT: dict_setItem %[[DICT1]]
 // CHECK-NEXT: %[[DEF4:.*]] = def(%[[DEF3]])
-// CHECK-NEXT: py.dict.setItem %[[DICT2]]
+// CHECK-NEXT: dict_setItem %[[DICT2]]
 // CHECK-NEXT: use(%[[DEF3]])
-// CHECK-NEXT: py.dict.len %[[DICT1]]
+// CHECK-NEXT: dict_len %[[DICT1]]

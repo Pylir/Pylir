@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 py.func @test(%arg : !py.dynamic) -> index {
-    %0 = py.dict.len %arg
+    %0 = dict_len %arg
     return %0 : index
 }
 

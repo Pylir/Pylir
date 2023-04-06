@@ -9,7 +9,7 @@ py.func @__init__() {
 	%zero = arith.constant 0 : index
 	%random = constant(#py.int<69>)
 	%tuple = makeTuple (%random)
-	%len = py.tuple.len %tuple
+	%len = tuple_len %tuple
 	cf.br ^header(%zero : index)
 
 ^header(%iter : index):

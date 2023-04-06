@@ -12,14 +12,14 @@ py.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^call:
 	%1 = constant(#py.int<1>)
-	%2 = py.int.add %arg0, %1
+	%2 = int_add %arg0, %1
 	%3 = call @foo(%2) : (!py.dynamic) -> !py.dynamic
 	%4 = constant(#py.ref<@test>)
 	return %4 : !py.dynamic
 
 ^exit(%5 : !py.dynamic):
 	%6 = constant(#py.int<2>)
-    %7 = py.int.add %5, %6
+    %7 = int_add %5, %6
 	return %7 : !py.dynamic
 }
 

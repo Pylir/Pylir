@@ -11,7 +11,7 @@ py.func @__init__() -> !py.dynamic {
 
 ^loop(%iter : !py.dynamic):
 	%0 = test.random
-	%1 = py.int.add %iter, %one
+	%1 = int_add %iter, %one
 	cf.cond_br %0, ^loop(%1 : !py.dynamic), ^cont
 
 ^cont:

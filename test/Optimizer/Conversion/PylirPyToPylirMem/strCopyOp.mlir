@@ -6,15 +6,15 @@ py.globalValue @builtins.str = #py.type
 
 py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = constant(#py.ref<@builtins.str>)
-    %1 = py.str.copy %arg0 : %0
+    %1 = str_copy %arg0 : %0
     return %1 : !py.dynamic
 }
 
 // CHECK-LABEL: func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[STR:.*]] = constant(#py.ref<@builtins.str>)
-// CHECK-NEXT: %[[SLOTS:.*]] = py.type.slots %[[STR]]
-// CHECK-NEXT: %[[LEN:.*]] = py.tuple.len %[[SLOTS]]
+// CHECK-NEXT: %[[SLOTS:.*]] = type_slots %[[STR]]
+// CHECK-NEXT: %[[LEN:.*]] = tuple_len %[[SLOTS]]
 // CHECK-NEXT: %[[MEMORY:.*]] = pyMem.gcAllocObject %[[STR]][%[[LEN]]]
 // CHECK-NEXT: %[[RESULT:.*]] = pyMem.initStr %[[MEMORY]] to %[[ARG0]]
 // CHECK-NEXT: return %[[RESULT]]

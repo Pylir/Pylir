@@ -16,7 +16,7 @@ py.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^body:
 	%2 = constant(#py.int<1>)
-	%3 = py.int.add %arg0, %2
+	%3 = int_add %arg0, %2
 	%4 = call @foo(%3) : (!py.dynamic) -> !py.dynamic
 	cf.br ^call
 
@@ -26,7 +26,7 @@ py.func @foo(%arg0 : !py.dynamic) -> !py.dynamic {
 
 ^exit:
 	%6 = constant(#py.int<2>)
-    %7 = py.int.add %arg0, %6
+    %7 = int_add %arg0, %6
 	return %7 : !py.dynamic
 }
 

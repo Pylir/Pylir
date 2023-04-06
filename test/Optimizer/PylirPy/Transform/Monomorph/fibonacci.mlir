@@ -6,7 +6,7 @@ py.globalValue @builtins.int = #py.type
 
 py.func @fibonacci(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = constant(#py.int<1>)
-	%1 = py.int.cmp le %arg0, %0
+	%1 = int_cmp le %arg0, %0
 	cf.cond_br %1, ^returnOne, ^recurse
 
 ^returnOne:
@@ -15,11 +15,11 @@ py.func @fibonacci(%arg0 : !py.dynamic) -> !py.dynamic {
 ^recurse:
 	%2 = constant(#py.int<-2>)
 	%3 = constant(#py.int<-1>)
-    %4 = py.int.add %arg0, %3
-    %5 = py.int.add %arg0, %2
+    %4 = int_add %arg0, %3
+    %5 = int_add %arg0, %2
     %6 = call @fibonacci(%4) : (!py.dynamic) -> !py.dynamic
     %7 = call @fibonacci(%5) : (!py.dynamic) -> !py.dynamic
-    %8 = py.int.add %6, %7
+    %8 = int_add %6, %7
 	return %8 : !py.dynamic
 }
 

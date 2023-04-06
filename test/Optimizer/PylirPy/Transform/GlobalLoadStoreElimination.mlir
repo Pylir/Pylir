@@ -229,7 +229,7 @@ module {
     store %13 : !py.dynamic into @it$handle
     cf.br ^bb1(%3 : !py.dynamic)
   ^bb1(%14: !py.dynamic):  // 2 preds: ^bb0, ^bb5
-    %15 = py.bool.toI1 %14
+    %15 = bool_toI1 %14
     cf.cond_br %15, ^bb2, ^bb8
   ^bb2:  // pred: ^bb1
     %16 = load @it$handle : !py.dynamic
@@ -249,8 +249,8 @@ module {
       label ^bb1(%3 : !py.dynamic) unwind ^bb6
   ^bb6(%24: !py.dynamic):  // 3 preds: ^bb3, ^bb4, ^bb5
     %25 = typeOf %24
-    %26 = py.type.mro %25
-    %27 = py.tuple.contains %8 in %26
+    %26 = type_mro %25
+    %27 = tuple_contains %8 in %26
     cf.cond_br %27, ^bb8, ^bb7
   ^bb7:  // pred: ^bb6
     raise %24
@@ -278,7 +278,7 @@ module {
     %38 = call @pylir__call__(%4, %37, %2) : (!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
     cf.br ^bb13(%38 : !py.dynamic)
   ^bb13(%39: !py.dynamic):  // 2 preds: ^bb11, ^bb12
-    %40 = py.bool.toI1 %39
+    %40 = bool_toI1 %39
     cf.cond_br %40, ^bb14, ^bb16(%34 : !py.dynamic)
   ^bb14:  // pred: ^bb13
     %41 = load @x$handle : !py.dynamic
@@ -287,7 +287,7 @@ module {
   ^bb15:  // pred: ^bb14
     %43 = is %41, %7
     %44 = arith.xori %43, %true : i1
-    %45 = py.bool.fromI1 %44
+    %45 = bool_fromI1 %44
     cf.br ^bb16(%45 : !py.dynamic)
   ^bb16(%46: !py.dynamic):  // 2 preds: ^bb13, ^bb15
     %47 = typeOf %46
@@ -298,7 +298,7 @@ module {
     %50 = call @pylir__call__(%4, %49, %2) : (!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
     cf.br ^bb18(%50 : !py.dynamic)
   ^bb18(%51: !py.dynamic):  // 2 preds: ^bb16, ^bb17
-    %52 = py.bool.toI1 %51
+    %52 = bool_toI1 %51
     cf.cond_br %52, ^bb19, ^bb21
   ^bb19:  // pred: ^bb18
     %53 = load @x$handle : !py.dynamic
@@ -398,7 +398,7 @@ py.global @foo : !py.dynamic
 py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     store %arg0 : !py.dynamic into @foo
     %c = arith.constant 5 : index
-    py.list.resize %arg0 to %c
+    list_resize %arg0 to %c
     %1 = load @foo : !py.dynamic
     return %1 : !py.dynamic
 }

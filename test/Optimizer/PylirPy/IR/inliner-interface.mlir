@@ -76,7 +76,7 @@ py.globalValue "private" @function
 
 py.func @inline_foo(%arg0 : i1) -> !py.dynamic {
     %f = constant(#py.ref<@function>)
-	%0 = py.function.call %f()
+	%0 = function_call %f()
 	cf.cond_br %arg0, ^throw, ^normal_return
 
 ^throw:
@@ -103,7 +103,7 @@ py.func @__init__() -> !py.dynamic {
 // CHECK-LABEL: @__init__
 // CHECK-NEXT: %[[RANDOM:.*]] = test.random
 // CHECK-NEXT: %[[F:.*]] = constant(#py.ref<@function>)
-// CHECK-NEXT: %[[EX:.*]] = py.function.call %[[F]]()
+// CHECK-NEXT: %[[EX:.*]] = function_call %[[F]]()
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
 // CHECK-NEXT: raise %[[EX]]
@@ -114,7 +114,7 @@ py.func @__init__() -> !py.dynamic {
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
 // CHECK-NEXT: test.use(%[[EX]])
 // CHECK-NEXT: %[[F:.*]] = constant(#py.ref<@function>)
-// CHECK-NEXT: %[[EX:.*]] = py.function.invoke %[[F]]()
+// CHECK-NEXT: %[[EX:.*]] = function_invoke %[[F]]()
 // CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[HANDLER:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[SUCCESS]]
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]

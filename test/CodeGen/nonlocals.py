@@ -10,7 +10,7 @@ def foo():
 # CHECK: %[[CELL:.*]] = constant(#py.ref<@builtins.cell>)
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[CELL]])
 # CHECK: %[[NEW_METHOD:.*]] = getSlot %[[CELL]][%{{.*}}]
-# CHECK: %[[X:.*]] = py.function.call %[[NEW_METHOD]](%[[NEW_METHOD]], %[[TUPLE]], %{{[[:alnum:]]+}})
+# CHECK: %[[X:.*]] = function_call %[[NEW_METHOD]](%[[NEW_METHOD]], %[[TUPLE]], %{{[[:alnum:]]+}})
 
 # CHECK: %[[BAR:.*]] = makeFunc @"foo.<locals>.bar$cc[0]"
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[X]])
@@ -21,6 +21,6 @@ def foo():
 # CHECK-SAME: %[[SELF:[[:alnum:]]+]]
 # CHECK: %[[TUPLE:.*]] = getSlot %[[SELF]][%{{.*}}]
 # CHECK: %[[ZERO:.*]] = arith.constant 0 : index
-# CHECK: %[[X:.*]] = py.tuple.getItem %[[TUPLE]][%[[ZERO]]]
+# CHECK: %[[X:.*]] = tuple_getItem %[[TUPLE]][%[[ZERO]]]
 # CHECK: %[[VALUE:.*]] = getSlot %[[X]][%{{.*}}]
 # CHECK: return %[[VALUE]]

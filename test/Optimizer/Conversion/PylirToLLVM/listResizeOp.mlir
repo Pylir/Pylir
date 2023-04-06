@@ -5,7 +5,7 @@ py.globalValue const @builtins.list = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
 py.func @foo(%list : !py.dynamic, %length : index) {
-    py.list.resize %list to %length
+    list_resize %list to %length
     return
 }
 

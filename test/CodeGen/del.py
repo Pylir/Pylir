@@ -12,9 +12,9 @@ def g():
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.NameError>)
-# CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
+# CHECK: %[[MRO:.*]] = type_mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
-# CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
+# CHECK: %[[EXC:.*]] = function_call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: raise %[[EXC]]
 
 # CHECK: ^[[DEL_BLOCK]]:
@@ -33,9 +33,9 @@ def local():
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.UnboundLocalError>)
-# CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
+# CHECK: %[[MRO:.*]] = type_mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
-# CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
+# CHECK: %[[EXC:.*]] = function_call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: raise %[[EXC]]
 
 # CHECK: ^[[DEL_BLOCK]]:
@@ -53,16 +53,16 @@ def closure():
 # CHECK-SAME: %[[FUNC_OBJ:[[:alnum:]]+]]
 # CHECK: %[[CLOSURE:.*]] = getSlot %[[FUNC_OBJ]][%{{.*}}]
 # CHECK: %[[ZERO:.*]] = arith.constant 0
-# CHECK: %[[A_CELL:.*]] = py.tuple.getItem %[[CLOSURE]][%[[ZERO]]]
+# CHECK: %[[A_CELL:.*]] = tuple_getItem %[[CLOSURE]][%[[ZERO]]]
 # CHECK: %[[A:.*]] = getSlot %[[A_CELL]][%{{.*}}]
 # CHECK: %[[IS_UNBOUND:.*]] = isUnboundValue %[[A:.*]]
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
 # CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.UnboundLocalError>)
-# CHECK: %[[MRO:.*]] = py.type.mro %[[NAME_ERROR]]
+# CHECK: %[[MRO:.*]] = type_mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
-# CHECK: %[[EXC:.*]] = py.function.call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
+# CHECK: %[[EXC:.*]] = function_call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
 # CHECK: raise %[[EXC]]
 
 # CHECK: ^[[DEL_BLOCK]]:

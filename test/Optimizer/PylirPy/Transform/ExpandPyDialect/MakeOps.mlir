@@ -40,10 +40,10 @@ py.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: label ^[[BODY:.*]] unwind ^[[EXIT:[[:alnum:]]+]]
 
 // CHECK: ^[[BODY]]:
-// CHECK: %[[LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[INC:.*]] = arith.addi %[[LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[INC]]
-// CHECK: py.list.setItem %[[LIST]][%[[LEN]]] to %[[ITEM]]
+// CHECK: list_resize %[[LIST]] to %[[INC]]
+// CHECK: list_setItem %[[LIST]][%[[LEN]]] to %[[ITEM]]
 // CHECK: cf.br ^[[COND]]
 
 // CHECK: ^[[EXIT]](%[[EXC:.*]]: !py.dynamic):
@@ -56,10 +56,10 @@ py.func @make_list_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: raise %[[EXC]]
 
 // CHECK: ^[[END]]:
-// CHECK: %[[LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[INC:.*]] = arith.addi %[[LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[INC]]
-// CHECK: py.list.setItem %[[LIST]][%[[LEN]]] to %[[FOUR]]
+// CHECK: list_resize %[[LIST]] to %[[INC]]
+// CHECK: list_setItem %[[LIST]][%[[LEN]]] to %[[FOUR]]
 // CHECK: return %[[LIST]]
 
 // -----
@@ -104,10 +104,10 @@ py.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: label ^[[BODY:.*]] unwind ^[[EXIT:[[:alnum:]]+]]
 
 // CHECK: ^[[BODY]]:
-// CHECK: %[[LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[INC:.*]] = arith.addi %[[LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[INC]]
-// CHECK: py.list.setItem %[[LIST]][%[[LEN]]] to %[[ITEM]]
+// CHECK: list_resize %[[LIST]] to %[[INC]]
+// CHECK: list_setItem %[[LIST]][%[[LEN]]] to %[[ITEM]]
 // CHECK: cf.br ^[[COND]]
 
 // CHECK: ^[[EXIT]](%[[EXC:.*]]: !py.dynamic):
@@ -120,10 +120,10 @@ py.func @make_tuple_op(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK: raise %[[EXC]]
 
 // CHECK: ^[[END]]:
-// CHECK: %[[LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[INC:.*]] = arith.addi %[[LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[INC]]
-// CHECK: py.list.setItem %[[LIST]][%[[LEN]]] to %[[FOUR]]
-// CHECK: %[[TUPLE:.*]] = py.list.toTuple %[[LIST]]
+// CHECK: list_resize %[[LIST]] to %[[INC]]
+// CHECK: list_setItem %[[LIST]][%[[LEN]]] to %[[FOUR]]
+// CHECK: %[[TUPLE:.*]] = list_toTuple %[[LIST]]
 // CHECK: return %[[TUPLE]]
 

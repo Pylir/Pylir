@@ -6,7 +6,7 @@ py.globalValue const @builtins.str = #py.type
 
 py.func @test() -> !py.dynamic {
     %0 = constant(#py.ref<@builtins.type>)
-    %1 = py.type.slots %0
+    %1 = type_slots %0
     return %1 : !py.dynamic
 }
 

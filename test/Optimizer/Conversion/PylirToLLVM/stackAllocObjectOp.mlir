@@ -7,7 +7,7 @@ py.func @foo() -> index {
     %0 = constant(#py.ref<@builtins.tuple>)
     %1 = pyMem.stackAllocObject tuple %0[0]
     %2 = pyMem.initTuple %1 to ()
-    %3 = py.tuple.len %2
+    %3 = tuple_len %2
     return %3 : index
 }
 

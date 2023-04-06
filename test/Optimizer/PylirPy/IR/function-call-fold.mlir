@@ -16,7 +16,7 @@ py.globalValue @test_function = #py.function<@foo>
 
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = constant(#py.ref<@test_function>)
-    %1 = py.function.call %0(%0, %arg0, %arg1)
+    %1 = function_call %0(%0, %arg0, %arg1)
     return %1 : !py.dynamic
 }
 
@@ -29,7 +29,7 @@ py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 
 py.func @test2(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = makeFunc @foo
-    %1 = py.function.call %0(%0, %arg0, %arg1)
+    %1 = function_call %0(%0, %arg0, %arg1)
     return %1 : !py.dynamic
 }
 

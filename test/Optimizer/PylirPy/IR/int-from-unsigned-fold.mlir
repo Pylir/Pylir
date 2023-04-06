@@ -6,7 +6,7 @@ py.globalValue @builtins.int = #py.type
 
 py.func @test() -> !py.dynamic {
     %0 = arith.constant 5 : index
-    %1 = py.int.fromUnsigned %0
+    %1 = int_fromUnsigned %0
     return %1 : !py.dynamic
 }
 
@@ -16,7 +16,7 @@ py.func @test() -> !py.dynamic {
 
 py.func @test2() -> !py.dynamic {
     %0 = arith.constant -5 : index
-    %1 = py.int.fromUnsigned %0
+    %1 = int_fromUnsigned %0
     return %1 : !py.dynamic
 }
 

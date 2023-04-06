@@ -7,7 +7,7 @@ py.globalValue @builtins.str = #py.type
 
 py.func @test() -> index {
     %0 = constant(#py.dict<{#py.str<"test"> to #py.ref<@builtins.str>}>)
-    %2 = py.dict.len %0
+    %2 = dict_len %0
     return %2 : index
 }
 

@@ -8,8 +8,8 @@ py.globalValue @builtins.str = #py.type
 py.func @test() -> (!py.dynamic, !py.dynamic) {
     %0 = constant(#py.int<5>)
     %1 = constant(#py.int<-3>)
-    %2 = py.int.toStr %0
-    %3 = py.int.toStr %1
+    %2 = int_toStr %0
+    %3 = int_toStr %1
     return %2, %3 : !py.dynamic, !py.dynamic
 }
 

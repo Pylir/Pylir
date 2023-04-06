@@ -7,32 +7,32 @@ py.globalValue @builtins.bool = #py.type
 
 py.func @test1(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
-    %1 = py.int.cmp eq %0, %arg0
+    %1 = int_cmp eq %0, %arg0
     return %1 : i1
 }
 
 // CHECK-LABEL: @test1
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp eq %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp eq %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 py.func @test2(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
-    %1 = py.int.cmp ne %0, %arg0
+    %1 = int_cmp ne %0, %arg0
     return %1 : i1
 }
 
 // CHECK-LABEL: @test2
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp ne %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp ne %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 py.func @test3(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
     %1 = arith.constant 1 : i1
-    %2 = py.int.cmp ne %0, %arg0
+    %2 = int_cmp ne %0, %arg0
     %3 = arith.xori %1, %2 : i1
     return %3 : i1
 }
@@ -40,13 +40,13 @@ py.func @test3(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test3
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp eq %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp eq %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 py.func @test4(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
     %1 = arith.constant 1 : i1
-    %2 = py.int.cmp eq %0, %arg0
+    %2 = int_cmp eq %0, %arg0
     %3 = arith.xori %1, %2 : i1
     return %3 : i1
 }
@@ -54,13 +54,13 @@ py.func @test4(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test4
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp ne %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp ne %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 py.func @test5(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
     %1 = arith.constant 1 : i1
-    %2 = py.int.cmp lt %0, %arg0
+    %2 = int_cmp lt %0, %arg0
     %3 = arith.xori %1, %2 : i1
     return %3 : i1
 }
@@ -68,14 +68,14 @@ py.func @test5(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test5
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp le %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp le %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 
 py.func @test6(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
     %1 = arith.constant 1 : i1
-    %2 = py.int.cmp le %0, %arg0
+    %2 = int_cmp le %0, %arg0
     %3 = arith.xori %1, %2 : i1
     return %3 : i1
 }
@@ -83,13 +83,13 @@ py.func @test6(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test6
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp lt %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp lt %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 py.func @test7(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
     %1 = arith.constant 1 : i1
-    %2 = py.int.cmp gt %0, %arg0
+    %2 = int_cmp gt %0, %arg0
     %3 = arith.xori %1, %2 : i1
     return %3 : i1
 }
@@ -97,14 +97,14 @@ py.func @test7(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test7
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp ge %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp ge %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 
 py.func @test8(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
     %1 = arith.constant 1 : i1
-    %2 = py.int.cmp ge %0, %arg0
+    %2 = int_cmp ge %0, %arg0
     %3 = arith.xori %1, %2 : i1
     return %3 : i1
 }
@@ -112,19 +112,19 @@ py.func @test8(%arg0 : !py.dynamic) -> i1 {
 // CHECK-LABEL: @test8
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
 // CHECK-NEXT: %[[C:.*]] = constant(#py.int<5>)
-// CHECK-NEXT: %[[RESULT:.*]] = py.int.cmp gt %[[ARG0]], %[[C]]
+// CHECK-NEXT: %[[RESULT:.*]] = int_cmp gt %[[ARG0]], %[[C]]
 // CHECK-NEXT: return %[[RESULT]]
 
 py.func @test_ne_lt() -> i1 {
     %n = arith.constant true
     %0 = constant(#py.int<1>)
     %1 = constant(#py.int<2>)
-    %2 = py.int.cmp eq %0, %1
-    %3 = py.int.cmp ne %0, %1
-    %4 = py.int.cmp lt %0, %1
-    %5 = py.int.cmp le %0, %1
-    %6 = py.int.cmp gt %0, %1
-    %7 = py.int.cmp ge %0, %1
+    %2 = int_cmp eq %0, %1
+    %3 = int_cmp ne %0, %1
+    %4 = int_cmp lt %0, %1
+    %5 = int_cmp le %0, %1
+    %6 = int_cmp gt %0, %1
+    %7 = int_cmp ge %0, %1
     %8 = arith.xori %2, %n : i1
     %9 = arith.xori %6, %n : i1
     %10 = arith.xori %7, %n : i1
@@ -144,12 +144,12 @@ py.func @test_ne_gt() -> i1 {
     %n = arith.constant true
     %0 = constant(#py.int<2>)
     %1 = constant(#py.int<1>)
-    %2 = py.int.cmp eq %0, %1
-    %3 = py.int.cmp ne %0, %1
-    %4 = py.int.cmp lt %0, %1
-    %5 = py.int.cmp le %0, %1
-    %6 = py.int.cmp gt %0, %1
-    %7 = py.int.cmp ge %0, %1
+    %2 = int_cmp eq %0, %1
+    %3 = int_cmp ne %0, %1
+    %4 = int_cmp lt %0, %1
+    %5 = int_cmp le %0, %1
+    %6 = int_cmp gt %0, %1
+    %7 = int_cmp ge %0, %1
     %8 = arith.xori %2, %n : i1
     %9 = arith.xori %4, %n : i1
     %10 = arith.xori %5, %n : i1
@@ -169,12 +169,12 @@ py.func @test_eq() -> i1 {
     %n = arith.constant true
     %0 = constant(#py.bool<True>)
     %1 = constant(#py.int<1>)
-    %2 = py.int.cmp eq %0, %1
-    %3 = py.int.cmp ne %0, %1
-    %4 = py.int.cmp lt %0, %1
-    %5 = py.int.cmp le %0, %1
-    %6 = py.int.cmp gt %0, %1
-    %7 = py.int.cmp ge %0, %1
+    %2 = int_cmp eq %0, %1
+    %3 = int_cmp ne %0, %1
+    %4 = int_cmp lt %0, %1
+    %5 = int_cmp le %0, %1
+    %6 = int_cmp gt %0, %1
+    %7 = int_cmp ge %0, %1
     %8 = arith.xori %3, %n : i1
     %9 = arith.xori %4, %n : i1
     %10 = arith.xori %6, %n : i1
@@ -202,9 +202,9 @@ py.globalValue @builtins.int = #py.type
 // CHECK: %[[R:.*]] = arith.cmpi eq, %[[ARG0]], %[[ARG1]]
 // CHECK: return %[[R]]
 py.func @test_redundant_convert_1(%arg0: index, %arg1: index) -> i1 {
-    %0 = py.int.fromUnsigned %arg0
-    %1 = py.int.fromUnsigned %arg1
-    %2 = py.int.cmp eq %0, %1
+    %0 = int_fromUnsigned %arg0
+    %1 = int_fromUnsigned %arg1
+    %2 = int_cmp eq %0, %1
     return %2 : i1
 }
 
@@ -214,9 +214,9 @@ py.func @test_redundant_convert_1(%arg0: index, %arg1: index) -> i1 {
 // CHECK: %[[R:.*]] = arith.cmpi slt, %[[ARG0]], %[[ARG1]]
 // CHECK: return %[[R]]
 py.func @test_redundant_convert_2(%arg0: index, %arg1: index) -> i1 {
-    %0 = py.int.fromUnsigned %arg0
-    %1 = py.int.fromSigned %arg1
-    %2 = py.int.cmp lt %0, %1
+    %0 = int_fromUnsigned %arg0
+    %1 = int_fromSigned %arg1
+    %2 = int_cmp lt %0, %1
     return %2 : i1
 }
 
@@ -226,9 +226,9 @@ py.func @test_redundant_convert_2(%arg0: index, %arg1: index) -> i1 {
 // CHECK: %[[R:.*]] = arith.cmpi sgt, %[[ARG0]], %[[ARG1]]
 // CHECK: return %[[R]]
 py.func @test_redundant_convert_3(%arg0: index, %arg1: index) -> i1 {
-    %0 = py.int.fromSigned %arg0
-    %1 = py.int.fromUnsigned %arg1
-    %2 = py.int.cmp gt %0, %1
+    %0 = int_fromSigned %arg0
+    %1 = int_fromUnsigned %arg1
+    %2 = int_cmp gt %0, %1
     return %2 : i1
 }
 
@@ -238,9 +238,9 @@ py.func @test_redundant_convert_3(%arg0: index, %arg1: index) -> i1 {
 // CHECK: %[[R:.*]] = arith.cmpi ne, %[[ARG0]], %[[ARG1]]
 // CHECK: return %[[R]]
 py.func @test_redundant_convert_4(%arg0: index, %arg1: index) -> i1 {
-    %0 = py.int.fromSigned %arg0
-    %1 = py.int.fromSigned %arg1
-    %2 = py.int.cmp ne %0, %1
+    %0 = int_fromSigned %arg0
+    %1 = int_fromSigned %arg1
+    %2 = int_cmp ne %0, %1
     return %2 : i1
 }
 
@@ -250,17 +250,17 @@ py.func @test_redundant_convert_4(%arg0: index, %arg1: index) -> i1 {
 // CHECK: %[[R:.*]] = arith.cmpi sgt, %[[ARG0]], %[[C]]
 // CHECK: return %[[R]]
 py.func @test_redundant_convert_constant(%arg0: index) -> i1 {
-    %0 = py.int.fromSigned %arg0
+    %0 = int_fromSigned %arg0
     %1 = constant(#py.int<5>)
-    %2 = py.int.cmp gt %0, %1
+    %2 = int_cmp gt %0, %1
     return %2 : i1
 }
 
 // CHECK-LABEL: @test_redundant_convert_constant_too_large
 // CHECK-NOT: arith.cmpi
 py.func @test_redundant_convert_constant_too_large(%arg0: index) -> i1 {
-    %0 = py.int.fromSigned %arg0
+    %0 = int_fromSigned %arg0
     %1 = constant(#py.int<5596967597659764578954876548654865457694675736657365763575676576584678>)
-    %2 = py.int.cmp gt %0, %1
+    %2 = int_cmp gt %0, %1
     return %2 : i1
 }

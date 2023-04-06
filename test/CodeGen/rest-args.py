@@ -9,7 +9,7 @@ def foo(*args, **kwd):
 # CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 # CHECK: %[[ZERO:.*]] = arith.constant 0
-# CHECK: %[[ARGS:.*]] = py.tuple.dropFront %[[ZERO]], %[[TUPLE]]
+# CHECK: %[[ARGS:.*]] = tuple_dropFront %[[ZERO]], %[[TUPLE]]
 # CHECK: call @"foo$impl[0]"(%[[SELF]], %[[ARGS]], %[[DICT]])
 
 def bar(a, *args, k, **kwd):
@@ -20,16 +20,16 @@ def bar(a, *args, k, **kwd):
 # CHECK-SAME: %[[TUPLE:[[:alnum:]]+]]
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]
 
-# CHECK: %[[TUPLE_LEN:.*]] = py.tuple.len %[[TUPLE]]
+# CHECK: %[[TUPLE_LEN:.*]] = tuple_len %[[TUPLE]]
 
 # ... processing of a
 
 # processing of *args
-# CHECK: %[[TUPLE_ARG:.*]] = py.tuple.dropFront %{{.*}}, %[[TUPLE]]
+# CHECK: %[[TUPLE_ARG:.*]] = tuple_dropFront %{{.*}}, %[[TUPLE]]
 
 # processing of k...
 # CHECK: %[[CONSTANT:.*]] = constant(#py.str<"k">)
-# CHECK: %[[CONSTANT_HASH:.*]] = py.str.hash %[[CONSTANT]]
-# CHECK: py.dict.delItem %[[CONSTANT]] hash(%[[CONSTANT_HASH]]) from %[[DICT]]
+# CHECK: %[[CONSTANT_HASH:.*]] = str_hash %[[CONSTANT]]
+# CHECK: dict_delItem %[[CONSTANT]] hash(%[[CONSTANT_HASH]]) from %[[DICT]]
 
 # CHECK: call @"bar$impl[0]"(%[[SELF]], %[[BAR_A:[[:alnum:]]+]], %[[TUPLE_ARG]], %[[BAR_K:[[:alnum:]]+]], %[[DICT]])

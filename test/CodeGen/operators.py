@@ -79,7 +79,7 @@ def boolean_ops(a, b):
     # CHECK: %[[RES_AS_BOOL:.*]] = call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
     # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
     # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
-    # CHECK: %[[RES_AS_I1:.*]] = py.bool.toI1 %[[RES_AS_BOOL]]
+    # CHECK: %[[RES_AS_I1:.*]] = bool_toI1 %[[RES_AS_BOOL]]
     # CHECK: cf.cond_br %[[RES_AS_I1]], ^[[CALCULATE_B_BLOCK:.*]], ^[[DEST:.*]](%[[RES]] : !py.dynamic)
 
     # CHECK: ^[[CALCULATE_B_BLOCK]]:
@@ -106,7 +106,7 @@ def boolean_ops(a, b):
     # CHECK: %[[RES_AS_BOOL:.*]] = call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
     # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
     # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
-    # CHECK: %[[RES_AS_I1:.*]] = py.bool.toI1 %[[RES_AS_BOOL]]
+    # CHECK: %[[RES_AS_I1:.*]] = bool_toI1 %[[RES_AS_BOOL]]
     # CHECK: cf.cond_br %[[RES_AS_I1]], ^[[DEST:.*]](%[[RES]] : !py.dynamic), ^[[CALCULATE_B_BLOCK:[[:alnum:]]+]]
 
     # CHECK: ^[[CALCULATE_B_BLOCK]]:
@@ -130,10 +130,10 @@ def boolean_ops(a, b):
     # CHECK: %[[RES_AS_BOOL:.*]] = call @pylir__call__(%[[BOOL]], %[[TUPLE]], %[[DICT]])
     # CHECK: cf.br ^[[CONTINUE]](%[[RES_AS_BOOL]] : !py.dynamic)
     # CHECK: ^[[CONTINUE]](%[[RES_AS_BOOL:.*]]: !py.dynamic loc({{.*}})):
-    # CHECK: %[[RES_AS_I1:.*]] = py.bool.toI1 %[[RES_AS_BOOL]]
+    # CHECK: %[[RES_AS_I1:.*]] = bool_toI1 %[[RES_AS_BOOL]]
     # CHECK: %[[TRUE:.*]] = arith.constant true
     # CHECK: %[[INVERTED:.*]] = arith.xori %[[TRUE]], %[[RES_AS_I1]]
-    # CHECK: %[[AS_BOOL:.*]] = py.bool.fromI1 %[[INVERTED]]
+    # CHECK: %[[AS_BOOL:.*]] = bool_fromI1 %[[INVERTED]]
     # CHECK: store %[[AS_BOOL]] : !py.dynamic into @c
 
 

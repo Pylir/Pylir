@@ -13,12 +13,12 @@ py.func @test(%arg0 : !py.dynamic) -> (!py.dynamic, index) {
     %one = arith.constant 1 : index
     %two = arith.constant 2 : index
     %three = arith.constant 3 : index
-    %3 = py.list.getItem %l[%zero]
-    %4 = py.list.getItem %l[%one]
-    %5 = py.list.getItem %l[%two]
-    %6 = py.list.getItem %l[%three]
-    %7 = py.str.concat %3, %4, %5, %6
-    %8 = py.list.len %l
+    %3 = list_getItem %l[%zero]
+    %4 = list_getItem %l[%one]
+    %5 = list_getItem %l[%two]
+    %6 = list_getItem %l[%three]
+    %7 = str_concat %3, %4, %5, %6
+    %8 = list_len %l
     return %7, %8 : !py.dynamic, index
 }
 
@@ -28,7 +28,7 @@ py.func @test(%arg0 : !py.dynamic) -> (!py.dynamic, index) {
 // CHECK-DAG: %[[S:.*]] = constant(#py.str<" ">)
 // CHECK-DAG: %[[W:.*]] = constant(#py.str<"World">)
 // CHECK-DAG: %[[L:.*]] = arith.constant 4
-// CHECK: %[[R:.*]] = py.str.concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
+// CHECK: %[[R:.*]] = str_concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
 // CHECK: return %[[R]], %[[L]]
 
 // -----
@@ -45,11 +45,11 @@ py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     cf.cond_br %1, ^bb0, ^bb1
 
 ^bb0:
-    py.list.setItem %l[%zero] to %0
+    list_setItem %l[%zero] to %0
     cf.br ^bb1
 
 ^bb1:
-    %2 = py.list.getItem %l[%zero]
+    %2 = list_getItem %l[%zero]
     return %2 : !py.dynamic
 }
 
@@ -79,21 +79,21 @@ py.func @neg_test(%arg0 : !py.dynamic, %arg1 : index) -> (!py.dynamic, index) {
     %zero = arith.constant 0 : index
     %one = arith.constant 1 : index
     %two = arith.constant 2 : index
-    %3 = py.list.getItem %l[%zero]
-    %4 = py.list.getItem %l[%one]
-    %5 = py.list.getItem %l[%two]
-    %6 = py.list.getItem %l[%arg1]
-    %7 = py.str.concat %3, %4, %5, %6
-    %8 = py.list.len %l
+    %3 = list_getItem %l[%zero]
+    %4 = list_getItem %l[%one]
+    %5 = list_getItem %l[%two]
+    %6 = list_getItem %l[%arg1]
+    %7 = str_concat %3, %4, %5, %6
+    %8 = list_len %l
     return %7, %8 : !py.dynamic, index
 }
 
 // CHECK-LABEL: py.func @neg_test
 // CHECK: %[[L:.*]] = makeList
-// CHECK: %[[ZERO:.*]] = py.list.getItem %[[L]]
-// CHECK: %[[ONE:.*]] = py.list.getItem %[[L]]
-// CHECK: %[[TWO:.*]] = py.list.getItem %[[L]]
-// CHECK: %[[THREE:.*]] = py.list.getItem %[[L]]
-// CHECK: %[[S:.*]] = py.str.concat %[[ZERO]], %[[ONE]], %[[TWO]], %[[THREE]]
-// CHECK: %[[LEN:.*]] = py.list.len %[[L]]
+// CHECK: %[[ZERO:.*]] = list_getItem %[[L]]
+// CHECK: %[[ONE:.*]] = list_getItem %[[L]]
+// CHECK: %[[TWO:.*]] = list_getItem %[[L]]
+// CHECK: %[[THREE:.*]] = list_getItem %[[L]]
+// CHECK: %[[S:.*]] = str_concat %[[ZERO]], %[[ONE]], %[[TWO]], %[[THREE]]
+// CHECK: %[[LEN:.*]] = list_len %[[L]]
 // CHECK: return %[[S]], %[[LEN]]

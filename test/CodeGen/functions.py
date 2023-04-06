@@ -25,12 +25,12 @@ def foo():
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = getSlot %[[CELL_TYPE]][%{{.*}}]
-# CHECK: %[[Y:.*]] = py.function.call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
+# CHECK: %[[Y:.*]] = function_call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
 # CHECK: %[[CELL_TYPE:.*]] = constant(#py.ref<@builtins.cell>)
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = getSlot %[[CELL_TYPE]][%{{.*}}]
-# CHECK: %[[X:.*]] = py.function.call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
+# CHECK: %[[X:.*]] = function_call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
 # CHECK: %[[FIVE:.*]] = constant(#py.int<5>)
 # CHECK: setSlot %[[Y]][%{{.*}}] to %[[FIVE]]
 # CHECK: %[[THREE:.*]] = constant(#py.int<3>)
@@ -38,7 +38,7 @@ def foo():
 # CHECK: %[[THREE:.*]] = constant(#py.int<3>)
 # CHECK: %[[ONE:.*]] = constant(#py.int<1>)
 # CHECK: %[[C:.*]] = constant(#py.str<"c">)
-# CHECK: %[[C_HASH:.*]] = py.str.hash %[[C]]
+# CHECK: %[[C_HASH:.*]] = str_hash %[[C]]
 # CHECK: %[[RES:.*]] = makeFunc @"foo.<locals>.bar$cc[0]"
 # CHECK: %[[NAME:.*]] = constant(#py.str<"foo.<locals>.bar">)
 # CHECK: setSlot %[[RES]][%{{.*}}] to %[[NAME]]
@@ -55,9 +55,9 @@ def foo():
 # CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
 # CHECK: %[[CLOSURE:.*]] = getSlot %[[ARG0]][%{{.*}}]
 # CHECK: %[[C0:.*]] = arith.constant 0
-# CHECK: %[[X_CELL:.*]] = py.tuple.getItem %[[CLOSURE]][%[[C0]]]
+# CHECK: %[[X_CELL:.*]] = tuple_getItem %[[CLOSURE]][%[[C0]]]
 # CHECK: %[[C1:.*]] = arith.constant 1
-# CHECK: %[[Y_CELL:.*]] = py.tuple.getItem %[[CLOSURE]][%[[C1]]]
+# CHECK: %[[Y_CELL:.*]] = tuple_getItem %[[CLOSURE]][%[[C1]]]
 # CHECK: %[[X:.*]] = getSlot %[[X_CELL]][%{{.*}}]
 # CHECK: %[[X_UNBOUND:.*]] = isUnboundValue %[[X]]
 # CHECK: cf.cond_br %[[X_UNBOUND]], ^[[RAISE_BLOCK:.*]], ^[[SUCCESS_BLOCK:[[:alnum:]]+]]

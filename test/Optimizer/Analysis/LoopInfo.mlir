@@ -14,11 +14,11 @@ py.func @__init__() {
 
 ^loop(%iter : !py.dynamic):
 	%0 = typeOf %iter
-	%1 = py.type.mro %0
+	%1 = type_mro %0
 	%2 = mroLookup %c0 in %1
 	%3 = makeTuple (%iter, %one)
 	%4 = constant(#py.dict<{}>)
-	%5 = py.function.call %2(%2, %3, %4)
+	%5 = function_call %2(%2, %3, %4)
 	%6 = test.random
 	cf.cond_br %6, ^loop(%5 : !py.dynamic), ^exit
 

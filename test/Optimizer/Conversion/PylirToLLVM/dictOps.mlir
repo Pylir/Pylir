@@ -7,7 +7,7 @@ py.globalValue const @builtins.str = #py.type
 
 py.func @lookup(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %0 = constant(#py.str<"key">)
-    %1 = py.dict.tryGetItem %arg0[%0 hash(%hash)]
+    %1 = dict_tryGetItem %arg0[%0 hash(%hash)]
     return %1 : !py.dynamic
 }
 
@@ -27,7 +27,7 @@ py.globalValue const @builtins.str = #py.type
 
 py.func @insert(%arg0 : !py.dynamic, %value : !py.dynamic, %hash : index) {
     %0 = constant(#py.str<"key">)
-    py.dict.setItem %arg0[%0 hash(%hash)] to %value
+    dict_setItem %arg0[%0 hash(%hash)] to %value
     return
 }
 

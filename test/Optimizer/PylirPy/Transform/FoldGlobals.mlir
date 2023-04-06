@@ -173,7 +173,7 @@ py.func @test() -> !py.dynamic {
 
 ^bb2:
     %3 = load @foo : !py.dynamic
-    %4 = py.int.add %3, %0
+    %4 = int_add %3, %0
     store %4 : !py.dynamic into @foo
     cf.br ^bb3
 
@@ -194,7 +194,7 @@ py.func @test() -> !py.dynamic {
 // CHECK-NEXT: cf.br ^[[BB3:.*]](%[[C2]] : !py.dynamic)
 
 // CHECK: ^[[BB2]]:
-// CHECK-NEXT: %[[RES:.*]] = py.int.add %[[C0]], %[[C0]]
+// CHECK-NEXT: %[[RES:.*]] = int_add %[[C0]], %[[C0]]
 // CHECK-NEXT: cf.br ^[[BB3:.*]](%[[RES]] : !py.dynamic)
 
 // CHECK: ^[[BB3]](%[[ARG:.*]]: !py.dynamic):

@@ -11,7 +11,7 @@ py.func @foo() {
 // -----
 
 py.func @test(%arg : !py.dynamic) -> index {
-    %0 = py.tuple.len %arg
+    %0 = tuple_len %arg
     return %0 : index
 }
 

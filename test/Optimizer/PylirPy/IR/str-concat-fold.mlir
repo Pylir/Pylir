@@ -9,7 +9,7 @@ py.func @test() -> !py.dynamic {
     %1 = constant(#py.str<" ">)
     %2 = constant(#py.str<"World">)
     %3 = constant(#py.str<"!">)
-    %4 = py.str.concat %0, %1, %2, %3
+    %4 = str_concat %0, %1, %2, %3
     return %4 : !py.dynamic
 }
 

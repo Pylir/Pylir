@@ -23,7 +23,7 @@ py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
     %4 = getSlot %l[%c1]
     %5 = getSlot %l[%c2]
     %6 = getSlot %l[%c3]
-    %7 = py.str.concat %3, %4, %5, %6
+    %7 = str_concat %3, %4, %5, %6
     return %7 : !py.dynamic
 }
 
@@ -32,7 +32,7 @@ py.func @test(%arg0 : !py.dynamic) -> !py.dynamic {
 // CHECK-DAG: %[[H:.*]] = constant(#py.str<"Hello">)
 // CHECK-DAG: %[[S:.*]] = constant(#py.str<" ">)
 // CHECK-DAG: %[[W:.*]] = constant(#py.str<"World">)
-// CHECK: %[[R:.*]] = py.str.concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
+// CHECK: %[[R:.*]] = str_concat %[[H]], %[[S]], %[[W]], %[[ARG0]]
 // CHECK: return %[[R]]
 
 // -----

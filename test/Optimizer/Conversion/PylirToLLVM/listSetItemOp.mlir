@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 py.func @test(%arg : !py.dynamic, %index : index, %element : !py.dynamic) {
-    py.list.setItem %arg[%index] to %element
+    list_setItem %arg[%index] to %element
     return
 }
 

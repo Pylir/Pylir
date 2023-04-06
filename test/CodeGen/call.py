@@ -24,7 +24,7 @@ x(5, k=3)
 # CHECK: ^[[HAPPY_PATH]]:
 # CHECK: %[[FIVE:.*]] = constant(#py.int<5>)
 # CHECK: %[[NAME:.*]] = constant(#py.str<"k">)
-# CHECK: %[[HASH:.*]] = py.str.hash %[[NAME]]
+# CHECK: %[[HASH:.*]] = str_hash %[[NAME]]
 # CHECK: %[[THREE:.*]] = constant(#py.int<3>)
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[FIVE]])
 # CHECK: %[[DICT:.*]] = makeDict (%[[NAME]] hash(%[[HASH]]) : %[[THREE]])

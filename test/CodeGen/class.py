@@ -22,17 +22,17 @@ def outer():
 # CHECK-SAME: %[[CELL:[[:alnum:]]+]]: !py.dynamic
 # CHECK-SAME: %[[DICT:[[:alnum:]]+]]: !py.dynamic
 
-# CHECK: %[[COND:.*]] = py.bool.toI1
+# CHECK: %[[COND:.*]] = bool_toI1
 # CHECK: cond_br %[[COND]], ^[[TRUE:.*]], ^[[FALSE:[[:alnum:]]+]]
 
 # CHECK: ^[[TRUE]]:
 # CHECK: %[[THREE:.*]] = constant #py.int<3>
 # CHECK: %[[X:.*]] = constant #py.str<"x">
-# CHECK: py.dict.setItem %[[DICT]][%[[X]]] to %[[THREE]]
+# CHECK: dict_setItem %[[DICT]][%[[X]]] to %[[THREE]]
 
 # CHECK: ^[[FALSE]]:
 # CHECK: %[[X:.*]] = constant #py.str<"x">
-# CHECK: %[[ITEM:.*]], %[[FOUND:.*]] = py.dict.tryGetItem %[[DICT]][%[[X]]]
+# CHECK: %[[ITEM:.*]], %[[FOUND:.*]] = dict_tryGetItem %[[DICT]][%[[X]]]
 # CHECK: cond_br %[[FOUND]], ^[[DICT_FOUND:.*]](%[[ITEM]] : !py.dynamic), ^[[ELSE:[[:alnum:]]+]]
 
 # CHECK: ^[[ELSE]]:
@@ -42,6 +42,6 @@ def outer():
 
 # CHECK: ^[[DICT_FOUND]](%[[RESULT:[[:alnum:]]+]]: !py.dynamic {{.*}}):
 # CHECK: %[[Y:.*]] = constant #py.str<"y">
-# CHECK: py.dict.setItem %[[DICT]][%[[Y]]] to %[[RESULT]]
+# CHECK: dict_setItem %[[DICT]][%[[Y]]] to %[[RESULT]]
 
 # CHECK: return %[[DICT]]

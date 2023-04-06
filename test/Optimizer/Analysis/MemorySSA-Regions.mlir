@@ -8,9 +8,9 @@ py.func @test(%arg0 : i1, %length : index) -> index {
     %2 = makeList ()
     scf.if %arg0 {
     } else {
-        py.list.resize %2 to %length
+        py.list_resize %2 to %length
     }
-    %3 = py.list.len %2
+    %3 = list_len %2
     return %3 : index
 }
 
@@ -25,9 +25,9 @@ py.func @test(%arg0 : i1, %length : index) -> index {
 // CHECK-NEXT: br ^[[END:.*]] (%[[DEF_LIST]])
 // CHECK-NEXT: ^[[REGION2]]:
 // CHECK-NEXT: %[[DEF2:.*]] = def(%[[DEF_LIST]])
-// CHECK-NEXT: py.list.resize
+// CHECK-NEXT: py.list_resize
 // CHECK-NEXT: br ^[[END]] (%[[DEF2]])
 // CHECK-NEXT: ^[[END]]
 // CHECK-SAME: %[[ARG:[[:alnum:]]+]]
 // CHECK-NEXT: use(%[[ARG]])
-// CHECK-NEXT: py.list.len
+// CHECK-NEXT: list_len

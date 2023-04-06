@@ -6,8 +6,8 @@ py.globalValue @builtins.str = #py.type
 
 py.func @test(%length : index) -> index {
     %1 = makeList ()
-    py.list.resize %1 to %length
-    %2 = py.list.len %1
+    list_resize %1 to %length
+    %2 = list_len %1
     return %2 : index
 }
 
@@ -18,20 +18,20 @@ py.func @test(%length : index) -> index {
 // CHECK-NEXT: %[[DEF_LIST:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: // {{.*}} py.makeList
 // CHECK-NEXT: %[[RESIZE:.*]] = def(%[[DEF_LIST]])
-// CHECK-NEXT: // py.list.resize
+// CHECK-NEXT: // py.list_resize
 // CHECK-NEXT: use(%[[RESIZE]])
-// CHECK-NEXT: // {{.*}} py.list.len
+// CHECK-NEXT: // {{.*}} py.list_len
 
 py.func @test2(%arg0 : i1, %length : index) -> index {
     %1 = makeList ()
     cf.cond_br %arg0, ^bb1, ^bb2
 
 ^bb1:
-    py.list.resize %1 to %length
+    list_resize %1 to %length
     cf.br ^bb2
 
 ^bb2:
-    %2 = py.list.len %1
+    %2 = list_len %1
     return %2 : index
 }
 
@@ -44,12 +44,12 @@ py.func @test2(%arg0 : i1, %length : index) -> index {
 // CHECK-NEXT: br ^[[FIRST:.*]], ^[[SECOND:.*]] (), (%[[DEF_LIST]])
 // CHECK-NEXT: ^[[FIRST]]:
 // CHECK-NEXT: %[[RESIZE:.*]] = def(%[[DEF_LIST]])
-// CHECK-NEXT: // py.list.resize
+// CHECK-NEXT: // py.list_resize
 // CHECK-NEXT: br ^[[SECOND]] (%[[RESIZE]])
 // CHECK-NEXT: ^[[SECOND]]
 // CHECK-SAME: %[[MERGE:[[:alnum:]]+]]
 // CHECK-NEXT: use(%[[MERGE]])
-// CHECK-NEXT: // {{.*}} py.list.len
+// CHECK-NEXT: // {{.*}} py.list_len
 
 py.func @test3(%length : index) -> index {
     %1 = makeList ()
@@ -60,11 +60,11 @@ py.func @test3(%length : index) -> index {
     cf.cond_br %2, ^bb1, ^bb2
 
 ^bb1:
-    py.list.resize %1 to %length
+    list_resize %1 to %length
     cf.br ^condition
 
 ^bb2:
-    %3 = py.list.len %1
+    %3 = list_len %1
     return %3 : index
 }
 
@@ -80,11 +80,11 @@ py.func @test3(%length : index) -> index {
 // CHECK-NEXT: br ^[[BODY:.*]], ^[[EXIT:.*]] (), ()
 // CHECK-NEXT: ^[[BODY]]:
 // CHECK-NEXT: %[[NEW_DEF:.*]] = def(%[[COND]])
-// CHECK-NEXT: // py.list.resize
+// CHECK-NEXT: // py.list_resize
 // CHECK-NEXT: br ^[[FIRST]] (%[[NEW_DEF]])
 // CHECK-NEXT: ^[[EXIT]]:
 // CHECK-NEXT: use(%[[COND]])
-// CHECK-NEXT: // {{.*}} py.list.len
+// CHECK-NEXT: // {{.*}} py.list_len
 
 // -----
 

@@ -5,10 +5,10 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic, %arg3 : !py.dynamic) -> !py.dynamic {
-    %0 = py.str.copy %arg1 : %arg0
-    %1 = py.str.copy %arg2 : %arg0
-    %2 = py.str.copy %arg3 : %arg0
-    %4 = py.str.concat %0, %1, %2
+    %0 = str_copy %arg1 : %arg0
+    %1 = str_copy %arg2 : %arg0
+    %2 = str_copy %arg3 : %arg0
+    %4 = str_concat %0, %1, %2
     return %4 : !py.dynamic
 }
 
@@ -17,7 +17,7 @@ py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic, %ar
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG3:[[:alnum:]]+]]
-// CHECK-NEXT: %[[RES:.*]] = py.str.concat %[[ARG1]], %[[ARG2]], %[[ARG3]]
+// CHECK-NEXT: %[[RES:.*]] = str_concat %[[ARG1]], %[[ARG2]], %[[ARG3]]
 // CHECK-NEXT: return %[[RES]]
 
 // -----
@@ -27,8 +27,8 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
-    %0 = py.str.copy %arg1 : %arg0
-    %1 = py.str.copy %0 : %arg2
+    %0 = str_copy %arg1 : %arg0
+    %1 = str_copy %0 : %arg2
     return %1 : !py.dynamic
 }
 
@@ -36,7 +36,7 @@ py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> 
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
-// CHECK-NEXT: %[[RES:.*]] = py.str.copy %[[ARG1]] : %[[ARG2]]
+// CHECK-NEXT: %[[RES:.*]] = str_copy %[[ARG1]] : %[[ARG2]]
 // CHECK-NEXT: return %[[RES]]
 
 // -----
@@ -46,9 +46,9 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> i1 {
-    %0 = py.str.copy %arg1 : %arg0
-    %1 = py.str.copy %arg2 : %arg0
-    %2 = py.str.equal %0, %1
+    %0 = str_copy %arg1 : %arg0
+    %1 = str_copy %arg2 : %arg0
+    %2 = str_equal %0, %1
     return %2 : i1
 }
 
@@ -56,7 +56,7 @@ py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> 
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK-SAME: %[[ARG2:[[:alnum:]]+]]
-// CHECK-NEXT: %[[RES:.*]] = py.str.equal %[[ARG1]], %[[ARG2]]
+// CHECK-NEXT: %[[RES:.*]] = str_equal %[[ARG1]], %[[ARG2]]
 // CHECK-NEXT: return %[[RES]]
 
 // -----
@@ -67,13 +67,13 @@ py.globalValue @builtins.tuple = #py.type
 py.globalValue @builtins.str = #py.type
 
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> index {
-    %0 = py.str.copy %arg1 : %arg0
-    %1 = py.str.hash %0
+    %0 = str_copy %arg1 : %arg0
+    %1 = str_hash %0
     return %1 : index
 }
 
 // CHECK-LABEL: @test
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK-NEXT: %[[RES:.*]] = py.str.hash %[[ARG1]]
+// CHECK-NEXT: %[[RES:.*]] = str_hash %[[ARG1]]
 // CHECK-NEXT: return %[[RES]]

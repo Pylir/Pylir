@@ -7,7 +7,7 @@ py.globalValue @one = #py.type
 
 py.func @linear_search(%tuple : !py.dynamic) -> i1 {
     %0 = constant(#py.ref<@one>)
-    %1 = py.tuple.contains %0 in %tuple
+    %1 = tuple_contains %0 in %tuple
     return %1 : i1
 }
 

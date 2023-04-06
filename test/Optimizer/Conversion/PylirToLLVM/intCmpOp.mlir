@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 py.func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp eq %lhs, %rhs
+    %0 = int_cmp eq %lhs, %rhs
     return %0 : i1
 }
 
@@ -16,7 +16,7 @@ py.func @test_eq(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: llvm.return %[[CMP]]
 
 py.func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp ne %lhs, %rhs
+    %0 = int_cmp ne %lhs, %rhs
     return %0 : i1
 }
 
@@ -31,7 +31,7 @@ py.func @test_ne(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: llvm.return %[[CMP]]
 
 py.func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp lt %lhs, %rhs
+    %0 = int_cmp lt %lhs, %rhs
     return %0 : i1
 }
 
@@ -46,7 +46,7 @@ py.func @test_lt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: llvm.return %[[CMP]]
 
 py.func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp le %lhs, %rhs
+    %0 = int_cmp le %lhs, %rhs
     return %0 : i1
 }
 
@@ -61,7 +61,7 @@ py.func @test_le(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: llvm.return %[[CMP]]
 
 py.func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp gt %lhs, %rhs 
+    %0 = int_cmp gt %lhs, %rhs
     return %0 : i1
 }
 
@@ -76,7 +76,7 @@ py.func @test_gt(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: llvm.return %[[CMP]]
 
 py.func @test_ge(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.int.cmp ge %lhs, %rhs 
+    %0 = int_cmp ge %lhs, %rhs
     return %0 : i1
 }
 

@@ -56,10 +56,10 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 // CHECK-NEXT: label ^[[BODY:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[BODY]]:
-// CHECK: %[[LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[NEW_LEN:.*]] = arith.addi %[[LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[NEW_LEN]]
-// CHECK: py.list.setItem %[[LIST]][%[[LEN]]] to %[[ELEMENT]]
+// CHECK: list_resize %[[LIST]] to %[[NEW_LEN]]
+// CHECK: list_setItem %[[LIST]][%[[LEN]]] to %[[ELEMENT]]
 // CHECK: cf.br ^[[REST_ARGS]]
 
 // CHECK: ^[[EXHAUSTED]](%[[EXC:.*]]: !py.dynamic):
@@ -72,7 +72,7 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 // CHECK: raise %[[EXC]]
 
 // CHECK: ^[[EXHAUSTED]]:
-// CHECK: %[[LIST_LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LIST_LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[ONE:.*]] = arith.constant 1
 // CHECK: %[[TOO_FEW:.*]] = arith.cmpi ult, %[[LIST_LEN]], %[[ONE]]
 // CHECK: cf.cond_br %[[TOO_FEW]], ^[[VALUE_ERROR_BLOCK]], ^[[CONTINUE:[[:alnum:]]+]]
@@ -80,9 +80,9 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 // CHECK: ^[[CONTINUE]]:
 // CHECK: %[[ONE_2:.*]] = arith.constant 1
 // CHECK: %[[INDEX:.*]] = arith.subi %[[LIST_LEN]], %[[ONE_2]]
-// CHECK: %[[C:.*]] = py.list.getItem %[[LIST]][%[[INDEX]]]
+// CHECK: %[[C:.*]] = list_getItem %[[LIST]][%[[INDEX]]]
 // CHECK: %[[NEW_LEN:.*]] = arith.subi %[[LIST_LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[NEW_LEN]]
+// CHECK: list_resize %[[LIST]] to %[[NEW_LEN]]
 // CHECK: return %[[A]], %[[LIST]], %[[C]]
 
 // -----
@@ -235,10 +235,10 @@ py.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !
 // CHECK-NEXT: label ^[[BODY:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[BODY]]:
-// CHECK: %[[LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[NEW_LEN:.*]] = arith.addi %[[LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[NEW_LEN]]
-// CHECK: py.list.setItem %[[LIST]][%[[LEN]]] to %[[ELEMENT]]
+// CHECK: list_resize %[[LIST]] to %[[NEW_LEN]]
+// CHECK: list_setItem %[[LIST]][%[[LEN]]] to %[[ELEMENT]]
 // CHECK: cf.br ^[[REST_ARGS]]
 
 // CHECK: ^[[EXHAUSTED]](%[[EXC:.*]]: !py.dynamic):
@@ -251,7 +251,7 @@ py.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !
 // CHECK: cf.br ^[[ERROR]](%[[EXC]] : !py.dynamic)
 
 // CHECK: ^[[EXHAUSTED]]:
-// CHECK: %[[LIST_LEN:.*]] = py.list.len %[[LIST]]
+// CHECK: %[[LIST_LEN:.*]] = list_len %[[LIST]]
 // CHECK: %[[ONE:.*]] = arith.constant 1
 // CHECK: %[[TOO_FEW:.*]] = arith.cmpi ult, %[[LIST_LEN]], %[[ONE]]
 // CHECK: cf.cond_br %[[TOO_FEW]], ^[[VALUE_ERROR_BLOCK]], ^[[CONTINUE:[[:alnum:]]+]]
@@ -259,9 +259,9 @@ py.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !
 // CHECK: ^[[CONTINUE]]:
 // CHECK: %[[ONE_2:.*]] = arith.constant 1
 // CHECK: %[[INDEX:.*]] = arith.subi %[[LIST_LEN]], %[[ONE_2]]
-// CHECK: %[[C:.*]] = py.list.getItem %[[LIST]][%[[INDEX]]]
+// CHECK: %[[C:.*]] = list_getItem %[[LIST]][%[[INDEX]]]
 // CHECK: %[[NEW_LEN:.*]] = arith.subi %[[LIST_LEN]], %[[ONE]]
-// CHECK: py.list.resize %[[LIST]] to %[[NEW_LEN]]
+// CHECK: list_resize %[[LIST]] to %[[NEW_LEN]]
 // CHECK: return %[[A]], %[[LIST]], %[[C]]
 
 // CHECK: ^[[ERROR]](%[[EXC:.*]]: !py.dynamic):

@@ -4,7 +4,7 @@ py.globalValue const @builtins.type = #py.type
 py.globalValue const @builtins.tuple = #py.type
 
 py.func @foo(%value : !py.dynamic, %arg0 : !py.dynamic) -> !py.dynamic {
-    %2 = py.function.call %value(%arg0)
+    %2 = function_call %value(%arg0)
     return %2 : !py.dynamic
 }
 

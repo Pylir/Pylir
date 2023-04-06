@@ -11,8 +11,8 @@ py.func @test(%arg : !py.dynamic, %hash : index) {
     cf.br ^bb37(%arg : !py.dynamic)
 
 ^bb37(%iter : !py.dynamic):
-    %123 = py.dict.delItem %1 hash(%hash) from %0
-    py.list.setItem %iter[%c0] to %arg
+    %123 = dict_delItem %1 hash(%hash) from %0
+    list_setItem %iter[%c0] to %arg
     cf.br ^bb37(%iter : !py.dynamic)
 }
 

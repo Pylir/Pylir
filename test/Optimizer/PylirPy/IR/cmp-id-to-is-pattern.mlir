@@ -1,8 +1,8 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
 py.func @test(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.object.id %lhs
-    %1 = py.object.id %rhs
+    %0 = object_id %lhs
+    %1 = object_id %rhs
     %2 = arith.cmpi "eq", %0, %1 : index
     return %2 : i1
 }
@@ -14,8 +14,8 @@ py.func @test(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
 // CHECK-NEXT: return %[[RESULT]]
 
 py.func @test2(%lhs : !py.dynamic, %rhs : !py.dynamic) -> i1 {
-    %0 = py.object.id %lhs
-    %1 = py.object.id %rhs
+    %0 = object_id %lhs
+    %1 = object_id %rhs
     %2 = arith.cmpi "ne", %0, %1 : index
     return %2 : i1
 }

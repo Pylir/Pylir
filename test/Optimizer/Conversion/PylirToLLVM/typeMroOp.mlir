@@ -1,7 +1,7 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
 py.func @test(%arg : !py.dynamic) -> !py.dynamic {
-    %0 = py.type.mro %arg
+    %0 = type_mro %arg
     return %0 : !py.dynamic
 }
 

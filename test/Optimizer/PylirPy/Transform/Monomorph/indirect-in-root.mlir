@@ -18,7 +18,7 @@ py.globalValue @function = #py.function<@real>
 
 py.func @__init__() -> !py.dynamic {
     %0 = constant(#py.ref<@function>)
-    %1 = py.function.call %0(%0, %0, %0)
+    %1 = function_call %0(%0, %0, %0)
     return %1 : !py.dynamic
 }
 

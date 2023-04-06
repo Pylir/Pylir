@@ -18,15 +18,15 @@ py.func @test4(%length : index) -> index {
     cf.cond_br %3, ^bb2, ^bb4
 
 ^bb2: // pred: ^bb1
-    %unused = py.list.len %1
+    %unused = list_len %1
     cf.br ^condition
 
 ^bb4: // pred: ^bb4
-    py.list.resize %1 to %length
+    list_resize %1 to %length
     cf.br ^bb5
 
 ^bb5: // pred: ^condition, ^bb4
-    %5 = py.list.len %1
+    %5 = list_len %1
     return %5 : index
 }
 
@@ -35,12 +35,12 @@ py.func @test4(%length : index) -> index {
 // CHECK-NEXT: %[[DEF1:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: %[[LIST_DEF:.*]] = makeList
 // CHECK: use(%[[DEF1]])
-// CHECK-NEXT: py.list.len %[[LIST_DEF]]
+// CHECK-NEXT: list_len %[[LIST_DEF]]
 // CHECK: %[[DEF2:.*]] = def(%[[DEF1]])
-// CHECK-NEXT: py.list.resize %[[LIST_DEF]]
+// CHECK-NEXT: list_resize %[[LIST_DEF]]
 // CHECK: ^{{.*}}(%[[MEM_MERGE:.*]]: !def)
 // CHECK-NEXT: use(%[[MEM_MERGE]])
-// CHECK-NEXT: py.list.len %[[LIST_DEF]]
+// CHECK-NEXT: list_len %[[LIST_DEF]]
 
 py.func @test5() -> index {
     %1 = makeList ()
@@ -61,7 +61,7 @@ py.func @test5() -> index {
     cf.cond_br %3, ^back1, ^bb5
 
 ^bb5: // pred: ^condition, ^bb4
-    %5 = py.list.len %1
+    %5 = list_len %1
     return %5 : index
 }
 
@@ -70,7 +70,7 @@ py.func @test5() -> index {
 // CHECK-NEXT: %[[DEF1:.*]] = def(%[[LIVE_ON_ENTRY]])
 // CHECK-NEXT: %[[LIST_DEF:.*]] = makeList
 // CHECK: use(%[[DEF1]])
-// CHECK-NEXT: py.list.len %[[LIST_DEF]]
+// CHECK-NEXT: list_len %[[LIST_DEF]]
 
 py.func @test6() {
     %0 = constant(#py.str<"test">)

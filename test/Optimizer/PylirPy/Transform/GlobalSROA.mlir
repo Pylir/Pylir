@@ -10,14 +10,14 @@ py.globalValue "private" @thing = #py.dict<{}>
 py.func @test(%hash: index) -> !py.dynamic {
     %0 = constant(#py.ref<@thing>)
     %1 = constant(#py.str<"lol">)
-    %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
+    %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
 py.func @foo(%hash: index, %arg0 : !py.dynamic) {
     %0 = constant(#py.ref<@thing>)
     %1 = constant(#py.str<"lol">)
-    py.dict.setItem %0[%1 hash(%hash)] to %arg0
+    dict_setItem %0[%1 hash(%hash)] to %arg0
     return
 }
 
@@ -25,14 +25,14 @@ py.func @foo(%hash: index, %arg0 : !py.dynamic) {
 
 // CHECK-LABEL: py.func @test
 // CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
-// CHECK-NOT: py.dict.tryGetItem
+// CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
 // CHECK-LABEL: py.func @foo
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK: store %[[ARG1]] : !py.dynamic into @[[$DES]]
-// CHECK-NOT: py.dict.setItem
+// CHECK-NOT: dict_setItem
 
 // -----
 
@@ -46,7 +46,7 @@ py.globalValue "private" @thing = #py.dict<{}>
 py.func @store_only(%hash: index, %arg0 : !py.dynamic) {
     %0 = constant(#py.ref<@thing>)
     %1 = constant(#py.str<"lol">)
-    py.dict.setItem %0[%1 hash(%hash)] to %arg0
+    dict_setItem %0[%1 hash(%hash)] to %arg0
     return
 }
 
@@ -56,7 +56,7 @@ py.func @store_only(%hash: index, %arg0 : !py.dynamic) {
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
 // CHECK: store %[[ARG1]] : !py.dynamic into @[[$DES]]
-// CHECK-NOT: py.dict.setItem
+// CHECK-NOT: dict_setItem
 
 // -----
 
@@ -70,7 +70,7 @@ py.globalValue "private" @thing = #py.dict<{}>
 py.func @load_only(%hash: index) -> !py.dynamic {
     %0 = constant(#py.ref<@thing>)
     %1 = constant(#py.str<"lol">)
-    %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
+    %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
@@ -78,7 +78,7 @@ py.func @load_only(%hash: index) -> !py.dynamic {
 
 // CHECK-LABEL: py.func @load_only
 // CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
-// CHECK-NOT: py.dict.tryGetItem
+// CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
 // -----
@@ -94,7 +94,7 @@ py.globalValue "private" @thing = #py.dict<{#py.str<"lol"> to #py.int<5>}>
 py.func @init_attr(%hash: index) -> !py.dynamic {
     %0 = constant(#py.ref<@thing>)
     %1 = constant(#py.str<"lol">)
-    %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
+    %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
@@ -104,7 +104,7 @@ py.func @init_attr(%hash: index) -> !py.dynamic {
 
 // CHECK-LABEL: py.func @init_attr
 // CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
-// CHECK-NOT: py.dict.tryGetItem
+// CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
 // -----
@@ -135,7 +135,7 @@ py.globalValue "private" @thing = #py.dict<{}>
 py.func @sub_attr(%hash: index) -> !py.dynamic {
     %0 = constant(#py.dict<{#py.int<5> to #py.ref<@thing>}>)
     %1 = constant(#py.str<"lol">)
-    %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
+    %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
@@ -155,7 +155,7 @@ py.globalValue "private" @thing = #py.dict<{#py.int<3> to #py.int<5>}>
 py.func @init_attr(%hash: index) -> !py.dynamic {
     %0 = constant(#py.ref<@thing>)
     %1 = constant(#py.float<3.0>)
-    %2 = py.dict.tryGetItem %0[%1 hash(%hash)]
+    %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
@@ -165,5 +165,5 @@ py.func @init_attr(%hash: index) -> !py.dynamic {
 
 // CHECK-LABEL: py.func @init_attr
 // CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
-// CHECK-NOT: py.dict.tryGetItem
+// CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]

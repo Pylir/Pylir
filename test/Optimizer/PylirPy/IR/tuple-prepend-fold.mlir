@@ -7,7 +7,7 @@ py.globalValue @builtins.str = #py.type
 py.func @test() -> !py.dynamic {
     %0 = constant(#py.tuple<()>)
     %1 = constant(#py.ref<@builtins.tuple>)
-    %2 = py.tuple.prepend %1, %0
+    %2 = tuple_prepend %1, %0
     return %2 : !py.dynamic
 }
 
@@ -17,7 +17,7 @@ py.func @test() -> !py.dynamic {
 
 py.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = constant(#py.tuple<(#py.str<"value">)>)
-    %2 = py.tuple.prepend %arg0, %0
+    %2 = tuple_prepend %arg0, %0
     return %2 : !py.dynamic
 }
 
