@@ -26,17 +26,21 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 
+//===--------------------------------------------------------------------------------------------------------------===//
+// Helper Classes
+//===--------------------------------------------------------------------------------------------------------------===//
+
+/// Common base class used to define an op in the PylirPy dialect.
 class PylirPy_Op<string mneomic, list<Trait> traits = []> : Op<PylirPy_Dialect, mneomic, traits>;
 
-class AddableExceptionHandling<string clazz, list<string> shape = []> : ParamNativeOpTrait<"AddableExceptionHandling",
-	"::pylir::Py::" # clazz # !foldl("", shape, acc, var, !strconcat(acc, ", ::pylir::Py::OperandShape::" # var))> {
-    let cppNamespace = "pylir::Py";
-}
-
-class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(opName), !strconcat(op.opName, "Ex"), opName),
-    !listconcat(!filter(x, op.traits, !not(!isa<AddableExceptionHandling>(x))),
-    [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments,
-        DeclareOpInterfaceMethods<ExceptionHandlingInterface>])> {
+/// Creates a new Op as a variant of the existing Op 'op', adding the required arguments, successors, traits,
+/// interface implementations and syntax automatically.
+/// If 'opName' is empty, its mnemonic is the mnemonic of 'op' with 'Ex' as suffix.
+class CreateExceptionHandlingVariant<Op op, string opName = "">
+    : PylirPy_Op<!if(!empty(opName), !strconcat(op.opName, "Ex"), opName),
+        !listconcat(!filter(x, op.traits, !not(!isa<AddableExceptionHandling>(x))),
+            [Terminator, DeclareOpInterfaceMethods<BranchOpInterface>, AttrSizedOperandSegments,
+                DeclareOpInterfaceMethods<ExceptionHandlingInterface>])> {
 
     assert !eq(!size(op.successors), 0), "Op mustn't already have successors";
 
@@ -55,6 +59,10 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
 
     let extraClassDefinition = [{
 
+        //===------------------------------------------------------------------------------------------------------===//
+        // BranchOpInterface implementation
+        //===------------------------------------------------------------------------------------------------------===//
+
         mlir::SuccessorOperands $cppClass::getSuccessorOperands(unsigned int index)
         {
             if (index == 0)
@@ -64,21 +72,30 @@ class AddExceptionHandling<Op op, string opName = ""> : PylirPy_Op<!if(!empty(op
             return mlir::SuccessorOperands(1, getUnwindDestOperandsMutable());
         }
 
+        //===------------------------------------------------------------------------------------------------------===//
+        // ExceptionHandlingInterface implementation
+        //===------------------------------------------------------------------------------------------------------===//
+
         mlir::Operation* $cppClass::cloneWithoutExceptionHandling(::mlir::OpBuilder& builder)
         {
-            return cloneWithoutExceptionHandlingImpl(builder, *this, "}] # op.opDialect.name # "." # op.opName #[{");
+            return ::cloneWithoutExceptionHandlingImpl(builder, *this, "}] # op.opDialect.name # "." # op.opName #[{");
         }
     }];
 }
 
+/// Resource declarations in ODS. See PylirPyOps.hpp for definition.
 def GlobalResource : Resource<"::pylir::Py::GlobalResource">;
 def ObjectResource : Resource<"::pylir::Py::ObjectResource">;
 def ListResource : Resource<"::pylir::Py::ListResource">;
 def DictResource : Resource<"::pylir::Py::DictResource">;
 
+//===--------------------------------------------------------------------------------------------------------------===//
+// Basic Ops
+//===--------------------------------------------------------------------------------------------------------------===//
+
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoMemoryEffect,
-												 DeclareOpInterfaceMethods<TypeRefineableInterface>,
-												 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+                                                 DeclareOpInterfaceMethods<TypeRefineableInterface>,
+                                                 DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface, PylirPy_RefAttr]>:$constant);
     let results = (outs DynamicType:$result);
 
@@ -145,7 +162,29 @@ def PylirPy_SetSlotOp : PylirPy_Op<"setSlot", [DeclareOpInterfaceMethods<Capture
     }];
 }
 
-// Dict ops
+def PylirPy_IsUnboundValueOp : PylirPy_Op<"isUnboundValue", [NoMemoryEffect, NoCaptures]> {
+    let summary = "checks whether the value is an unbound value";
+
+    let arguments = (ins DynamicType:$value);
+    let results = (outs I1:$result);
+
+    let assemblyFormat = "$value attr-dict";
+
+    let hasFolder = 1;
+}
+
+def PylirPy_IsOp : PylirPy_Op<"is", [NoMemoryEffect, Commutative]> {
+    let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
+    let results = (outs I1:$result);
+
+    let assemblyFormat = "$lhs `,` $rhs attr-dict";
+
+    let hasFolder = 1;
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// Dictionary Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_DictTryGetItemOp : PylirPy_Op<"dict.tryGetItem", [DeclareOpInterfaceMethods<MemoryFoldInterface>,
                                                               DeclareOpInterfaceMethods<SROAReadWriteOpInterface,
@@ -227,11 +266,94 @@ def PylirPy_DictLenOp : PylirPy_Op<"dict.len", [DeclareOpInterfaceMethods<Memory
     let hasFolder = 1;
 }
 
-// Tuple ops
+def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, AlwaysBound,
+                                                 AddableExceptionHandling<"MakeDictExOp">, RefinedType<"Dict">,
+                                                 DeclareOpInterfaceMethods<SROAAllocOpInterface,
+                                                   ["canParticipateInSROA", "replaceAggregate"]>,
+                                                ]> {
+    let arguments = (ins
+                        Variadic<DynamicType>:$keys,
+                        Variadic<Index>:$hashes,
+                        Variadic<DynamicType>:$values,
+                        DenseI32ArrayAttr:$mapping_expansion
+                        );
+
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<DictResource>]>:$result);
+
+    let builders = [
+            OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::DictArg>","{}">:$args)>
+    ];
+
+    let assemblyFormat = [{
+            custom<MappingArguments>($keys, $hashes, $values, $mapping_expansion) attr-dict
+    }];
+
+    let extraClassDeclaration = [{
+        llvm::iterator_range<::pylir::Py::DictArgsIterator> getDictArgs()
+        {
+            return llvm::make_range(DictArgsIterator::begin(*this), DictArgsIterator::end(*this));
+        }
+
+        struct BuilderArgs
+        {
+            llvm::SmallVector<mlir::Value> keys;
+            llvm::SmallVector<mlir::Value> hashes;
+            llvm::SmallVector<mlir::Value> values;
+            llvm::SmallVector<std::int32_t> mappingExpansion;
+        };
+
+        template <class R>
+        static BuilderArgs deconstructBuilderArg(R args)
+        {
+            llvm::SmallVector<mlir::Value> keys;
+            llvm::SmallVector<mlir::Value> hashes;
+            llvm::SmallVector<mlir::Value> values;
+            llvm::SmallVector<std::int32_t> mappingExpansion;
+            for (const auto& iter : llvm::enumerate(args))
+            {
+                pylir::match(
+                    iter.value(),
+                    [&](const DictEntry& entry)
+                    {
+                        keys.push_back(entry.key);
+                        hashes.push_back(entry.hash);
+                        values.push_back(entry.value);
+                    },
+                    [&](Py::MappingExpansion expansion)
+                    {
+                        keys.push_back(expansion.value);
+                        mappingExpansion.push_back(iter.index());
+                    });
+            }
+            return {std::move(keys), std::move(hashes), std::move(values), std::move(mappingExpansion)};
+        }
+    }];
+
+    let hasFolder = 1;
+}
+
+def PylirPy_MakeDictExOp : CreateExceptionHandlingVariant<PylirPy_MakeDictOp> {
+    let builders = [
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::DictArg>":$keyValues,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let hasFolder = 1;
+
+    let hasCanonicalizer = 1;
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// Tuple Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_TupleGetItemOp : PylirPy_Op<"tuple.getItem", [NoMemoryEffect, AlwaysBound, NoCaptures,
-														  DeclareOpInterfaceMethods<TypeRefineableInterface>,
-														  DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
+                                                          DeclareOpInterfaceMethods<TypeRefineableInterface>,
+                                                          DeclareOpInterfaceMethods<OnlyReadsValueInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [OnlyReadsValue]>:$tuple, Index:$index);
     let results = (outs DynamicType:$result);
 
@@ -266,9 +388,9 @@ def PylirPy_TupleLenOp : PylirPy_Op<"tuple.len", [NoMemoryEffect, DeclareOpInter
 
 // TODO: I don't think this should exist but don't have better option until iterators work
 def PylirPy_TuplePrependOp : PylirPy_Op<"tuple.prepend", [NoMemoryEffect, AlwaysBound, ReturnsImmutable,
-														  DeclareOpInterfaceMethods<TypeRefineableInterface>,
-														  DeclareOpInterfaceMethods<OnlyReadsValueInterface>,
-														  DeclareOpInterfaceMethods<CaptureInterface>]> {
+                                                          DeclareOpInterfaceMethods<TypeRefineableInterface>,
+                                                          DeclareOpInterfaceMethods<OnlyReadsValueInterface>,
+                                                          DeclareOpInterfaceMethods<CaptureInterface>]> {
     let arguments = (ins Arg<DynamicType, "", [Captured]>:$input, Arg<DynamicType, "", [OnlyReadsValue]>:$tuple);
     let results = (outs DynamicType:$result);
 
@@ -344,23 +466,80 @@ def PylirPy_TupleContainsOp : PylirPy_Op<"tuple.contains", [NoMemoryEffect,
     let hasFolder = 1;
 }
 
-// List ops
+def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [AlwaysBound, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+                                                    DeclareOpInterfaceMethods<TypeRefineableInterface>,
+                                                    ReturnsImmutable,
+                                                    AddableExceptionHandling<"MakeTupleExOp">]> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         DenseI32ArrayAttr:$iter_expansion
+                         );
 
-def PylirPy_ListResizeOp : PylirPy_Op<"list.resize", [DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
-                                                      NoCaptures
-                                                     ]> {
-    let arguments = (ins Arg<DynamicType, "", [MemWrite<ListResource>, SROAAggregate]>:$list, Index:$length);
-    let results = (outs);
+    let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
-        $list `to` $length attr-dict
+        custom<IterArguments>($arguments, $iter_expansion) attr-dict
+    }];
+
+    let builders = [
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
+    ];
+
+    let hasFolder = 1;
+
+    let description = [{
+        This op creates a tuple from the given arguments. If an argument is prefixed by a `*` then it must be iterable
+        and its elements will be copied into the tuple at the given position.
+        As this operation creates a tuple it can never alias another tuple created by this op unless both are turned
+        into the same constants (at which point aliasing becomes irrelevant).
+
+        This op as well as the constant op are the only ones capable of creating a tuple. After creation it is impossible
+        to be modified. If it contains objects that are mutable however, those may still be modified. This way one is
+        capable of arguing about the tuple in a typical SSA fashion.
+    }];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
+    }];
+}
+
+def PylirPy_MakeTupleExOp : CreateExceptionHandlingVariant<PylirPy_MakeTupleOp> {
+
+    let builders = [
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let hasCanonicalizer = 1;
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// List Ops
+//===--------------------------------------------------------------------------------------------------------------===//
+
+def PylirPy_ListGetItemOp : PylirPy_Op<"list.getItem", [AlwaysBound,
+                                                        NoCaptures,
+                                                        DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
+                                                       ]> {
+
+    let arguments = (ins Arg<DynamicType, "", [MemRead<ListResource>, SROAAggregate]>:$list,
+                         Arg<Index, "", [SROAKey]>:$index);
+
+    let results = (outs DynamicType:$result);
+
+    let assemblyFormat = [{
+        $list `[` $index `]` attr-dict
     }];
 
     let description = [{
-        This op resizes the `$list` to `$length` amount of elements, allowing both growing and shrinking.
-        If this op caused the `$list` to grow then the newly added accessible elements are initially undefined and
-        reading them prior to setting them is undefined behaviour.
-        If `$list` is not really a list (or subclass of) the behaviour is undefined.
+        This op gets the item referred to by the `$index` inside of the `$list`.
+        If `$list` is not really a list (or subclass of) the behaviour is undefined. If `$index` is greater or equal to
+        the length of the list the behaviour is undefined.
     }];
 }
 
@@ -385,27 +564,6 @@ def PylirPy_ListSetItemOp : PylirPy_Op<"list.setItem", [DeclareOpInterfaceMethod
     }];
 }
 
-def PylirPy_ListGetItemOp : PylirPy_Op<"list.getItem", [AlwaysBound,
-                                                        NoCaptures,
-                                                        DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
-                                                       ]> {
-
-    let arguments = (ins Arg<DynamicType, "", [MemRead<ListResource>, SROAAggregate]>:$list,
-                         Arg<Index, "", [SROAKey]>:$index);
-
-    let results = (outs DynamicType:$result);
-
-    let assemblyFormat = [{
-        $list `[` $index `]` attr-dict
-    }];
-
-    let description = [{
-        This op gets the item referred to by the `$index` inside of the `$list`.
-        If `$list` is not really a list (or subclass of) the behaviour is undefined. If `$index` is greater or equal to
-        the length of the list the behaviour is undefined.
-    }];
-}
-
 def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<MemoryFoldInterface>,
                                                 DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
                                                 NoCaptures,
@@ -424,6 +582,24 @@ def PylirPy_ListLenOp : PylirPy_Op<"list.len", [DeclareOpInterfaceMethods<Memory
     }];
 }
 
+def PylirPy_ListResizeOp : PylirPy_Op<"list.resize", [DeclareOpInterfaceMethods<SROAReadWriteOpInterface>,
+                                                      NoCaptures
+                                                     ]> {
+    let arguments = (ins Arg<DynamicType, "", [MemWrite<ListResource>, SROAAggregate]>:$list, Index:$length);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $list `to` $length attr-dict
+    }];
+
+    let description = [{
+        This op resizes the `$list` to `$length` amount of elements, allowing both growing and shrinking.
+        If this op caused the `$list` to grow then the newly added accessible elements are initially undefined and
+        reading them prior to setting them is undefined behaviour.
+        If `$list` is not really a list (or subclass of) the behaviour is undefined.
+    }];
+}
+
 def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, RefinedTypeTupleApproximate, ReturnsImmutable,
                                                         NoCaptures]> {
     let arguments = (ins Arg<DynamicType, "", [MemRead<ListResource>]>:$list);
@@ -439,10 +615,90 @@ def PylirPy_ListToTupleOp : PylirPy_Op<"list.toTuple", [AlwaysBound, RefinedType
     }];
 }
 
-// Function ops
+def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, AddableExceptionHandling<"MakeListExOp">,
+                                                 RefinedType<"List">,
+                                                 DeclareOpInterfaceMethods<SROAAllocOpInterface,
+                                                   ["canParticipateInSROA", "replaceAggregate"]>,
+                                                ]> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         DenseI32ArrayAttr:$iter_expansion
+                         );
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<ListResource>]>:$result);
+
+    let assemblyFormat = [{
+        custom<IterArguments>($arguments, $iter_expansion) attr-dict
+    }];
+
+    let builders = [
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
+    ];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
+    }];
+}
+
+def PylirPy_MakeListExOp : CreateExceptionHandlingVariant<PylirPy_MakeListOp> {
+    let builders = [
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let hasCanonicalizer = 1;
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// Set Ops
+//===--------------------------------------------------------------------------------------------------------------===//
+
+def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHandling<"MakeSetExOp">,
+                                                RefinedType<"Set">]> {
+    let arguments = (ins Variadic<DynamicType>:$arguments,
+                         DenseI32ArrayAttr:$iter_expansion
+                         );
+
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
+
+    let builders = [
+        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
+    ];
+
+    let assemblyFormat = [{
+        custom<IterArguments>($arguments, $iter_expansion) attr-dict
+    }];
+
+    let hasCanonicalizer = 1;
+
+    let extraClassDeclaration = [{
+        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
+    }];
+}
+
+def PylirPy_MakeSetExOp : CreateExceptionHandlingVariant<PylirPy_MakeSetOp> {
+    let builders = [
+        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
+                       "mlir::Block*":$happyPath,
+                       "mlir::ValueRange":$normalDestOperands,
+                       "mlir::Block*":$unwindPath,
+                       "mlir::ValueRange":$unwindDestOperands
+         )>
+    ];
+
+    let hasCanonicalizer = 1;
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// Function Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_FunctionCallOp : PylirPy_Op<"function.call", [DeclareOpInterfaceMethods<CallOpInterface>,
-	AlwaysBound, AddableExceptionHandling<"FunctionInvokeOp", ["Single", "Variadic"]>]> {
+    AlwaysBound, AddableExceptionHandling<"FunctionInvokeOp", ["Single", "Variadic"]>]> {
     let arguments = (ins DynamicType:$function, Variadic<DynamicType>:$call_operands);
     let results = (outs DynamicType:$result);
 
@@ -453,13 +709,28 @@ def PylirPy_FunctionCallOp : PylirPy_Op<"function.call", [DeclareOpInterfaceMeth
     let hasCanonicalizeMethod = 1;
 }
 
-def PylirPy_FunctionInvokeOp : AddExceptionHandling<PylirPy_FunctionCallOp, "function.invoke"> {
-	let summary = "invoke operation";
+def PylirPy_FunctionInvokeOp : CreateExceptionHandlingVariant<PylirPy_FunctionCallOp, "function.invoke"> {
+    let summary = "invoke operation";
 
-	let hasCanonicalizeMethod = 1;
+    let hasCanonicalizeMethod = 1;
 }
 
-// Object ops
+def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [AlwaysBound, RefinedType<"Function">,
+                                                 DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+                                                 DeclareOpInterfaceMethods<SROAAllocOpInterface>,
+                                                ]> {
+    let arguments = (ins FlatSymbolRefAttr:$function);
+
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
+
+    let assemblyFormat = [{
+        $function attr-dict
+    }];
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// Object Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_ObjectHashOp : PylirPy_Op<"object.hash", [NoMemoryEffect, NoCaptures]> {
     let arguments = (ins DynamicType:$object);
@@ -479,34 +750,53 @@ def PylirPy_ObjectIdOp : PylirPy_Op<"object.id", [NoMemoryEffect, NoCaptures]> {
     let assemblyFormat = "$object attr-dict";
 }
 
-// Type ops
+def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, RefinedObjectFromTypeObject,
+                                                     DeclareOpInterfaceMethods<SROAAllocOpInterface>,
+                                                    ]> {
+    let arguments = (ins DynamicType:$type_object);
+
+    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
+
+    let description = [{
+        Creates a new object of the type of the given type object. If `$type_object` is not an instance of `builtins.type`
+        the behaviour is undefined.
+    }];
+
+    let assemblyFormat = "$type_object attr-dict";
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// Type Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_TypeMROOp : PylirPy_Op<"type.mro", [NoMemoryEffect, AlwaysBound, ReturnsImmutable,
-												RefinedTypeTupleApproximate, NoCaptures]> {
-	let arguments = (ins DynamicType:$type_object);
-	let results = (outs DynamicType:$result);
+                                                RefinedTypeTupleApproximate, NoCaptures]> {
+    let arguments = (ins DynamicType:$type_object);
+    let results = (outs DynamicType:$result);
 
-	let assemblyFormat = "$type_object attr-dict";
+    let assemblyFormat = "$type_object attr-dict";
 
-	let hasFolder = 1;
+    let hasFolder = 1;
 }
 
 def PylirPy_TypeSlotsOp : PylirPy_Op<"type.slots", [NoMemoryEffect, AlwaysBound, ReturnsImmutable,
-												    RefinedTypeTupleApproximate, NoCaptures]> {
-	let arguments = (ins DynamicType:$type_object);
-	let results = (outs DynamicType:$result);
+                                                    RefinedTypeTupleApproximate, NoCaptures]> {
+    let arguments = (ins DynamicType:$type_object);
+    let results = (outs DynamicType:$result);
 
-	let description = [{
-	    Returns the tuple containing the names of all slots of an instance of `$type_object` as strings.
-	    If `$type_object` is not really a type (or a subclass of) the behaviour is undefined.
-	}];
+    let description = [{
+        Returns the tuple containing the names of all slots of an instance of `$type_object` as strings.
+        If `$type_object` is not really a type (or a subclass of) the behaviour is undefined.
+    }];
 
-	let assemblyFormat = "$type_object attr-dict";
+    let assemblyFormat = "$type_object attr-dict";
 
-	let hasFolder = 1;
+    let hasFolder = 1;
 }
 
-// Str ops
+//===--------------------------------------------------------------------------------------------------------------===//
+// String Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_StrCopyOp : PylirPy_Op<"str.copy", [DeclareOpInterfaceMethods<CaptureInterface>,
                                                 DeclareOpInterfaceMethods<CopyObjectInterface>,
@@ -574,7 +864,9 @@ def PylirPy_StrEqualOp : PylirPy_Op<"str.equal", [NoMemoryEffect, DeclareOpInter
     }];
 }
 
-// Int ops
+//===--------------------------------------------------------------------------------------------------------------===//
+// Int Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_IntFromSignedOp : PylirPy_Op<"int.fromSigned",
     [AlwaysBound, RefinedType<"Int">, ReturnsImmutable, NoMemoryEffect]> {
@@ -670,7 +962,9 @@ def PylirPy_IntToStrOp : PylirPy_Op<"int.toStr", [NoCaptures, AlwaysBound,
     let hasFolder = 1;
 }
 
-// Bool ops
+//===--------------------------------------------------------------------------------------------------------------===//
+// Bool Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_BoolToI1Op : PylirPy_Op<"bool.toI1", [NoMemoryEffect, NoCaptures]> {
     let arguments = (ins DynamicType:$input);
@@ -701,7 +995,9 @@ def PylirPy_BoolFromI1Op : PylirPy_Op<"bool.fromI1",
     }];
 }
 
-// Float ops
+//===--------------------------------------------------------------------------------------------------------------===//
+// Float Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_FloatFromF64 : PylirPy_Op<"float.fromF64",
     [AlwaysBound, RefinedType<"Float">, ReturnsImmutable, NoMemoryEffect, NoCaptures]> {
@@ -721,7 +1017,9 @@ def PylirPy_FloatToF64 : PylirPy_Op<"float.toF64", [NoCaptures, NoMemoryEffect,
     let assemblyFormat = "$input attr-dict";
 }
 
-// Intrinsics
+//===--------------------------------------------------------------------------------------------------------------===//
+// Miscellaneous Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_PrintOp : PylirPy_Op<"intr.print", [NoCaptures, MemoryEffects<[MemWrite]>]> {
     let arguments = (ins DynamicType:$string);
@@ -791,7 +1089,7 @@ def PylirPy_UnpackOp : PylirPy_Op<"unpack", [AlwaysBound, AddableExceptionHandli
     let hasVerifier = 1;
 }
 
-def PylirPy_UnpackExOp : AddExceptionHandling<PylirPy_UnpackOp> {
+def PylirPy_UnpackExOp : CreateExceptionHandlingVariant<PylirPy_UnpackOp> {
     let hasVerifier = 1;
 
     let builders = [
@@ -803,265 +1101,9 @@ def PylirPy_UnpackExOp : AddExceptionHandling<PylirPy_UnpackOp> {
     ];
 }
 
-// Make ops
-
-def PylirPy_MakeTupleOp : PylirPy_Op<"makeTuple", [AlwaysBound, DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-													DeclareOpInterfaceMethods<TypeRefineableInterface>,
-													ReturnsImmutable,
-													AddableExceptionHandling<"MakeTupleExOp">]> {
-    let arguments = (ins Variadic<DynamicType>:$arguments,
-                         DenseI32ArrayAttr:$iter_expansion
-                         );
-
-    let results = (outs DynamicType:$result);
-
-    let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict
-    }];
-
-    let builders = [
-        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
-    ];
-
-    let hasFolder = 1;
-
-    let description = [{
-        This op creates a tuple from the given arguments. If an argument is prefixed by a `*` then it must be iterable
-        and its elements will be copied into the tuple at the given position.
-        As this operation creates a tuple it can never alias another tuple created by this op unless both are turned
-        into the same constants (at which point aliasing becomes irrelevant).
-
-        This op as well as the constant op are the only ones capable of creating a tuple. After creation it is impossible
-        to be modified. If it contains objects that are mutable however, those may still be modified. This way one is
-        capable of arguing about the tuple in a typical SSA fashion.
-    }];
-
-    let hasCanonicalizer = 1;
-
-    let extraClassDeclaration = [{
-        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
-    }];
-}
-
-def PylirPy_MakeTupleExOp : AddExceptionHandling<PylirPy_MakeTupleOp> {
-
-    let builders = [
-        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happyPath,
-                       "mlir::ValueRange":$normalDestOperands,
-                       "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwindDestOperands
-         )>
-    ];
-
-    let hasCanonicalizer = 1;
-}
-
-def PylirPy_MakeListOp : PylirPy_Op<"makeList", [AlwaysBound, AddableExceptionHandling<"MakeListExOp">,
-                                                 RefinedType<"List">,
-                                                 DeclareOpInterfaceMethods<SROAAllocOpInterface,
-                                                   ["canParticipateInSROA", "replaceAggregate"]>,
-                                                ]> {
-    let arguments = (ins Variadic<DynamicType>:$arguments,
-                         DenseI32ArrayAttr:$iter_expansion
-                         );
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<ListResource>]>:$result);
-
-    let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict
-    }];
-
-    let builders = [
-        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
-    ];
-
-    let hasCanonicalizer = 1;
-
-    let extraClassDeclaration = [{
-        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
-    }];
-}
-
-def PylirPy_MakeListExOp : AddExceptionHandling<PylirPy_MakeListOp> {
-    let builders = [
-        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happyPath,
-                       "mlir::ValueRange":$normalDestOperands,
-                       "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwindDestOperands
-         )>
-    ];
-
-    let hasCanonicalizer = 1;
-}
-
-def PylirPy_MakeSetOp : PylirPy_Op<"makeSet", [AlwaysBound, AddableExceptionHandling<"MakeSetExOp">,
-												RefinedType<"Set">]> {
-    let arguments = (ins Variadic<DynamicType>:$arguments,
-                         DenseI32ArrayAttr:$iter_expansion
-                         );
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
-
-    let builders = [
-        OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::IterArg>","{}">:$args)>
-    ];
-
-    let assemblyFormat = [{
-        custom<IterArguments>($arguments, $iter_expansion) attr-dict
-    }];
-
-    let hasCanonicalizer = 1;
-
-    let extraClassDeclaration = [{
-        llvm::SmallVector<::pylir::Py::IterArg> getIterArgs();
-    }];
-}
-
-def PylirPy_MakeSetExOp : AddExceptionHandling<PylirPy_MakeSetOp> {
-    let builders = [
-        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::IterArg>":$args,
-                       "mlir::Block*":$happyPath,
-                       "mlir::ValueRange":$normalDestOperands,
-                       "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwindDestOperands
-         )>
-    ];
-
-    let hasCanonicalizer = 1;
-}
-
-def PylirPy_MakeDictOp : PylirPy_Op<"makeDict", [AttrSizedOperandSegments, AlwaysBound,
-                                                 AddableExceptionHandling<"MakeDictExOp">, RefinedType<"Dict">,
-                                                 DeclareOpInterfaceMethods<SROAAllocOpInterface,
-                                                   ["canParticipateInSROA", "replaceAggregate"]>,
-                                                ]> {
-    let arguments = (ins
-                        Variadic<DynamicType>:$keys,
-                        Variadic<Index>:$hashes,
-                        Variadic<DynamicType>:$values,
-                        DenseI32ArrayAttr:$mapping_expansion
-                        );
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>, MemWrite<DictResource>]>:$result);
-
-    let builders = [
-            OpBuilder<(ins CArg<"llvm::ArrayRef<::pylir::Py::DictArg>","{}">:$args)>
-    ];
-
-    let assemblyFormat = [{
-            custom<MappingArguments>($keys, $hashes, $values, $mapping_expansion) attr-dict
-    }];
-
-    let extraClassDeclaration = [{
-        llvm::iterator_range<::pylir::Py::DictArgsIterator> getDictArgs()
-        {
-            return llvm::make_range(DictArgsIterator::begin(*this), DictArgsIterator::end(*this));
-        }
-
-        struct BuilderArgs
-        {
-            llvm::SmallVector<mlir::Value> keys;
-            llvm::SmallVector<mlir::Value> hashes;
-            llvm::SmallVector<mlir::Value> values;
-            llvm::SmallVector<std::int32_t> mappingExpansion;
-        };
-
-        template <class R>
-        static BuilderArgs deconstructBuilderArg(R args)
-        {
-            llvm::SmallVector<mlir::Value> keys;
-            llvm::SmallVector<mlir::Value> hashes;
-            llvm::SmallVector<mlir::Value> values;
-            llvm::SmallVector<std::int32_t> mappingExpansion;
-            for (const auto& iter : llvm::enumerate(args))
-            {
-                pylir::match(
-                    iter.value(),
-                    [&](const DictEntry& entry)
-                    {
-                        keys.push_back(entry.key);
-                        hashes.push_back(entry.hash);
-                        values.push_back(entry.value);
-                    },
-                    [&](Py::MappingExpansion expansion)
-                    {
-                        keys.push_back(expansion.value);
-                        mappingExpansion.push_back(iter.index());
-                    });
-            }
-            return {std::move(keys), std::move(hashes), std::move(values), std::move(mappingExpansion)};
-        }
-    }];
-
-    let hasFolder = 1;
-}
-
-def PylirPy_MakeDictExOp : AddExceptionHandling<PylirPy_MakeDictOp> {
-    let builders = [
-        OpBuilder<(ins "llvm::ArrayRef<::pylir::Py::DictArg>":$keyValues,
-                       "mlir::Block*":$happyPath,
-                       "mlir::ValueRange":$normalDestOperands,
-                       "mlir::Block*":$unwindPath,
-                       "mlir::ValueRange":$unwindDestOperands
-         )>
-    ];
-
-    let hasFolder = 1;
-
-    let hasCanonicalizer = 1;
-}
-
-def PylirPy_MakeFuncOp : PylirPy_Op<"makeFunc", [AlwaysBound, RefinedType<"Function">,
-                                                 DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-												 DeclareOpInterfaceMethods<SROAAllocOpInterface>,
-												]> {
-    let arguments = (ins FlatSymbolRefAttr:$function);
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
-
-    let assemblyFormat = [{
-        $function attr-dict
-    }];
-}
-
-def PylirPy_MakeObjectOp : PylirPy_Op<"makeObject", [AlwaysBound, RefinedObjectFromTypeObject,
-                                                     DeclareOpInterfaceMethods<SROAAllocOpInterface>,
-                                                    ]> {
-    let arguments = (ins DynamicType:$type_object);
-
-    let results = (outs Res<DynamicType, "", [MemAlloc, MemWrite<ObjectResource>]>:$result);
-
-    let description = [{
-        Creates a new object of the type of the given type object. If `$type_object` is not an instance of `builtins.type`
-        the behaviour is undefined.
-    }];
-
-    let assemblyFormat = "$type_object attr-dict";
-}
-
-// Unary ops
-
-class PylirPy_UnaryOp<string name, list<Trait> traits = []> : PylirPy_Op<name, traits> {
-    let arguments = (ins DynamicType:$input);
-
-    let assemblyFormat = "$input attr-dict";
-
-    let hasFolder = 1;
-}
-
-// Binary ops
-
-def PylirPy_IsOp : PylirPy_Op<"is", [NoMemoryEffect, Commutative]> {
-	let arguments = (ins DynamicType:$lhs, DynamicType:$rhs);
-    let results = (outs I1:$result);
-
-	let assemblyFormat = "$lhs `,` $rhs attr-dict";
-
-    let hasFolder = 1;
-}
-
-// Memory operations
+//===--------------------------------------------------------------------------------------------------------------===//
+// Global Ops
+//===--------------------------------------------------------------------------------------------------------------===//
 
 def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>,
                                                        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
@@ -1110,25 +1152,6 @@ def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol, DeclareOpInterfaceMethods<S
     }];
 }
 
-// Memory access Operation
-
-def PylirPy_StoreOp : PylirPy_Op<"store", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-
-    let summary = "store operation";
-
-    let arguments = (ins AnyType:$value, Arg<FlatSymbolRefAttr, "", [MemWrite<GlobalResource>]>:$global);
-    let results = (outs);
-
-    let assemblyFormat = [{
-        $value `:` type($value) `into` $global attr-dict
-    }];
-
-    let description = [{
-        This op binds the value denoted by `$value` to the `$global`. Subsequent loads will return the last stored
-        values. The type of `$value` has to match up exactly with the type of `$global`.
-    }];
-}
-
 def PylirPy_LoadOp : PylirPy_Op<"load", [DeclareOpInterfaceMethods<SymbolUserOpInterface>,
                                          DeclareOpInterfaceMethods<MemoryFoldInterface>]> {
 
@@ -1151,27 +1174,20 @@ def PylirPy_LoadOp : PylirPy_Op<"load", [DeclareOpInterfaceMethods<SymbolUserOpI
     }];
 }
 
-def PylirPy_IsUnboundValueOp : PylirPy_Op<"isUnboundValue", [NoMemoryEffect, NoCaptures]> {
-    let summary = "checks whether the value is an unbound value";
+def PylirPy_StoreOp : PylirPy_Op<"store", [DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
 
-    let arguments = (ins DynamicType:$value);
-    let results = (outs I1:$result);
+    let summary = "store operation";
 
-    let assemblyFormat = "$value attr-dict";
-
-    let hasFolder = 1;
-}
-
-// Exception handling
-
-def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
-    let summary = "raise exception";
-
-    let arguments = (ins DynamicType:$exception);
+    let arguments = (ins AnyType:$value, Arg<FlatSymbolRefAttr, "", [MemWrite<GlobalResource>]>:$global);
     let results = (outs);
 
     let assemblyFormat = [{
-        $exception attr-dict
+        $value `:` type($value) `into` $global attr-dict
+    }];
+
+    let description = [{
+        This op binds the value denoted by `$value` to the `$global`. Subsequent loads will return the last stored
+        values. The type of `$value` has to match up exactly with the type of `$global`.
     }];
 }
 
@@ -1206,18 +1222,18 @@ def PylirPy_CallOp : PylirPy_Op<"call", [DeclareOpInterfaceMethods<SymbolUserOpI
         }]>];
 }
 
-def PylirPy_InvokeOp : AddExceptionHandling<PylirPy_CallOp, "invoke"> {
-	let summary = "invoke operation";
+def PylirPy_InvokeOp : CreateExceptionHandlingVariant<PylirPy_CallOp, "invoke"> {
+    let summary = "invoke operation";
 }
 
-def PylirPy_FuncOp : PylirPy_Op<"func", [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface,
+def PylirPy_FuncOp : PylirPy_Op<"func", [FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface,
                                          AutomaticAllocationScope, CallableOpInterface]> {
-	let arguments = (ins StrAttr:$sym_name, TypeAttrOf<FunctionType>:$function_type,
-	                 OptionalAttr<StrAttr>:$sym_visibility,
-					 OptionalAttr<DictArrayAttr>:$arg_attrs,
-					 OptionalAttr<DictArrayAttr>:$res_attrs);
+    let arguments = (ins StrAttr:$sym_name, TypeAttrOf<FunctionType>:$function_type,
+                     OptionalAttr<StrAttr>:$sym_visibility,
+                     OptionalAttr<DictArrayAttr>:$arg_attrs,
+                     OptionalAttr<DictArrayAttr>:$res_attrs);
 
-	let regions = (region AnyRegion:$body);
+    let regions = (region AnyRegion:$body);
 
     let builders = [
         OpBuilder<(ins "llvm::Twine":$name, "mlir::FunctionType":$type), [{
@@ -1225,23 +1241,36 @@ def PylirPy_FuncOp : PylirPy_Op<"func", [Symbol, FunctionOpInterface, IsolatedFr
         }]>
     ];
 
-	let extraClassDeclaration = [{
+    let extraClassDeclaration = [{
+
+        //===------------------------------------------------------------------------------------------------------===//
+        // FunctionOpInterface Implementation
+        //===------------------------------------------------------------------------------------------------------===//
+
         /// Returns the argument types of this function.
         llvm::ArrayRef<mlir::Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
         /// Returns the result types of this function.
         llvm::ArrayRef<mlir::Type> getResultTypes() { return getFunctionType().getResults(); }
 
-        static llvm::StringRef getDefaultDialect()
-        {
-            return pylir::Py::PylirPyDialect::getDialectNamespace();
-        }
-
         static FuncOp create(mlir::Location loc, llvm::Twine name, mlir::FunctionType type)
         {
             mlir::OpBuilder builder(loc.getContext());
             return builder.create<FuncOp>(loc, name, type);
         }
+
+        //===------------------------------------------------------------------------------------------------------===//
+        // OpAsmOpInterface Implementation
+        //===------------------------------------------------------------------------------------------------------===//
+
+        static llvm::StringRef getDefaultDialect()
+        {
+            return pylir::Py::PylirPyDialect::getDialectNamespace();
+        }
+
+        //===------------------------------------------------------------------------------------------------------===//
+        // CallableOpInterface Implementation
+        //===------------------------------------------------------------------------------------------------------===//
 
         mlir::Region *getCallableRegion() { return isExternal() ? nullptr : &getBody(); }
 
@@ -1255,10 +1284,14 @@ def PylirPy_FuncOp : PylirPy_Op<"func", [Symbol, FunctionOpInterface, IsolatedFr
             return getResAttrs().value_or(nullptr);
         }
 
-        bool isDeclaration() { return isExternal(); }
-	}];
+        //===------------------------------------------------------------------------------------------------------===//
+        // Symbol Implementation
+        //===------------------------------------------------------------------------------------------------------===//
 
-	let hasCustomAssemblyFormat = 1;
+        bool isDeclaration() { return isExternal(); }
+    }];
+
+    let hasCustomAssemblyFormat = 1;
 }
 
 def PylirPy_ReturnOp : PylirPy_Op<"return", [HasParent<"FuncOp">, Terminator, ReturnLike]> {
@@ -1279,6 +1312,17 @@ def PylirPy_UnreachableOp : PylirPy_Op<"unreachable", [Terminator]> {
     let results = (outs);
 
     let assemblyFormat = "attr-dict";
+}
+
+def PylirPy_RaiseOp : PylirPy_Op<"raise", [Terminator]> {
+    let summary = "raise exception";
+
+    let arguments = (ins DynamicType:$exception);
+    let results = (outs);
+
+    let assemblyFormat = [{
+        $exception attr-dict
+    }];
 }
 
 #endif

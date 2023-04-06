@@ -12,11 +12,6 @@
 namespace
 {
 
-bool typesAreCompatible(mlir::Type lhs, mlir::Type rhs)
-{
-    return lhs == rhs || (lhs.isa<pylir::Py::DynamicType>() && rhs.isa<pylir::Py::DynamicType>());
-}
-
 template <class SymbolOp>
 mlir::FailureOr<SymbolOp> verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
                                           mlir::SymbolTableCollection& symbolTable,
@@ -194,41 +189,66 @@ mlir::LogicalResult verifyCall(::mlir::SymbolTableCollection& symbolTable, mlir:
 
 } // namespace
 
-mlir::LogicalResult pylir::Py::CallOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+//===--------------------------------------------------------------------------------------------------------------===//
+// ConstantOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::ConstantOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return verifyCall(symbolTable, *this, getCallOperands(), getCalleeAttr());
+    return ::verify(*this, getConstantAttr(), symbolTable);
 }
 
-mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
-{
-    return verifyCall(symbolTable, *this, getCallOperands(), getCalleeAttr());
-}
-
-mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
-{
-    return verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
-}
-
-mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
-{
-    auto global = verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
-    if (mlir::failed(global))
-    {
-        return mlir::failure();
-    }
-    if (global->getType() != getValue().getType())
-    {
-        return emitOpError("Type of value to store '")
-               << getValue().getType() << "' does not match type of global '" << global->getSymName() << " : "
-               << global->getType() << "' to store into";
-    }
-    return mlir::success();
-}
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeFuncOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::LogicalResult pylir::Py::MakeFuncOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
     return verifySymbolUse<mlir::FunctionOpInterface>(*this, getFunctionAttr(), symbolTable, "FunctionOpInterface");
 }
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// UnpackOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::UnpackOp::verify()
+{
+    if (!getAfter().empty() && !getRest())
+    {
+        return emitOpError("'after_rest' results specified, without a rest argument");
+    }
+    return mlir::success();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// UnpackExOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::UnpackExOp::verify()
+{
+    if (!getAfter().empty() && !getRest())
+    {
+        return emitOpError("'after_rest' results specified, without a rest argument");
+    }
+    return mlir::success();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// GlobalValueOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::GlobalValueOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+{
+    if (!isDeclaration())
+    {
+        return ::verify(*this, getInitializerAttr(), symbolTable);
+    }
+    return mlir::success();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// GlobalOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::LogicalResult pylir::Py::GlobalOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
@@ -267,37 +287,56 @@ mlir::LogicalResult pylir::Py::GlobalOp::verifySymbolUses(::mlir::SymbolTableCol
             });
 }
 
-mlir::LogicalResult pylir::Py::ConstantOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+//===--------------------------------------------------------------------------------------------------------------===//
+// LoadOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::LoadOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    return ::verify(*this, getConstantAttr(), symbolTable);
+    return verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
 }
 
-mlir::LogicalResult pylir::Py::GlobalValueOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
+//===--------------------------------------------------------------------------------------------------------------===//
+// StoreOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::StoreOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    if (!isDeclaration())
+    auto global = verifySymbolUse<GlobalOp>(*this, getGlobalAttr(), symbolTable, GlobalOp::getOperationName());
+    if (mlir::failed(global))
     {
-        return ::verify(*this, getInitializerAttr(), symbolTable);
+        return mlir::failure();
+    }
+    if (global->getType() != getValue().getType())
+    {
+        return emitOpError("Type of value to store '")
+               << getValue().getType() << "' does not match type of global '" << global->getSymName() << " : "
+               << global->getType() << "' to store into";
     }
     return mlir::success();
 }
 
-mlir::LogicalResult pylir::Py::UnpackOp::verify()
+//===--------------------------------------------------------------------------------------------------------------===//
+// CallOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::CallOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    if (!getAfter().empty() && !getRest())
-    {
-        return emitOpError("'after_rest' results specified, without a rest argument");
-    }
-    return mlir::success();
+    return verifyCall(symbolTable, *this, getCallOperands(), getCalleeAttr());
 }
 
-mlir::LogicalResult pylir::Py::UnpackExOp::verify()
+//===--------------------------------------------------------------------------------------------------------------===//
+// InvokeOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::InvokeOp::verifySymbolUses(::mlir::SymbolTableCollection& symbolTable)
 {
-    if (!getAfter().empty() && !getRest())
-    {
-        return emitOpError("'after_rest' results specified, without a rest argument");
-    }
-    return mlir::success();
+    return verifyCall(symbolTable, *this, getCallOperands(), getCalleeAttr());
 }
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// ReturnOp verification
+//===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::LogicalResult pylir::Py::ReturnOp::verify()
 {
@@ -305,8 +344,7 @@ mlir::LogicalResult pylir::Py::ReturnOp::verify()
     llvm::ArrayRef<mlir::Type> resultTypes = funcOp.getResultTypes();
     auto argumentTypes =
         llvm::to_vector(llvm::map_range(getArguments(), [](mlir::Value value) { return value.getType(); }));
-    if (!std::equal(resultTypes.begin(), resultTypes.end(), argumentTypes.begin(), argumentTypes.end(),
-                    typesAreCompatible))
+    if (!std::equal(resultTypes.begin(), resultTypes.end(), argumentTypes.begin(), argumentTypes.end()))
     {
         return emitOpError("return value types '")
                << argumentTypes << "' incompatible with result types of function '" << resultTypes << "'";

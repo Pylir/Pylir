@@ -22,6 +22,10 @@
 namespace
 {
 
+//===--------------------------------------------------------------------------------------------------------------===//
+// ExceptionHandlingInterface implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
 template <class T>
 mlir::Operation* cloneWithoutExceptionHandlingImpl(mlir::OpBuilder& builder, T exceptionOp,
                                                    llvm::StringRef normalOpName)
@@ -57,67 +61,9 @@ mlir::Operation* cloneWithoutExceptionHandlingImpl(mlir::OpBuilder& builder, T e
 
 } // namespace
 
-namespace pylir::Py::details
-{
-mlir::Operation* cloneWithExceptionHandlingImpl(mlir::OpBuilder& builder, mlir::Operation* operation,
-                                                const mlir::OperationName& invokeVersion, ::mlir::Block* happyPath,
-                                                mlir::Block* exceptionPath, mlir::ValueRange unwindOperands,
-                                                llvm::StringRef attrSizedSegmentName,
-                                                llvm::ArrayRef<OperandShape> shape)
-{
-    mlir::OperationState state(operation->getLoc(), invokeVersion);
-    state.addTypes(operation->getResultTypes());
-    state.addSuccessors(happyPath);
-    state.addSuccessors(exceptionPath);
-    auto vector = llvm::to_vector(operation->getOperands());
-    vector.insert(vector.end(), unwindOperands.begin(), unwindOperands.end());
-    state.addOperands(vector);
-    llvm::SmallVector<mlir::NamedAttribute> attributes;
-    for (const auto& iter : operation->getAttrs())
-    {
-        attributes.push_back(iter);
-        if (iter.getName() == attrSizedSegmentName)
-        {
-            llvm::SmallVector<std::int32_t> sizes;
-            for (auto integer : iter.getValue().cast<mlir::DenseI32ArrayAttr>().asArrayRef())
-            {
-                sizes.push_back(integer);
-            }
-            sizes.push_back(0);
-            sizes.push_back(unwindOperands.size());
-            attributes.back().setValue(builder.getDenseI32ArrayAttr(sizes));
-        }
-    }
-    if (!operation->hasTrait<mlir::OpTrait::AttrSizedOperandSegments>())
-    {
-        auto numOperands = operation->getNumOperands();
-        llvm::SmallVector<std::int32_t> values;
-        while (!shape.empty() && shape.front() != OperandShape::Variadic)
-        {
-            numOperands--;
-            values.push_back(1);
-            shape = shape.drop_front();
-        }
-        auto index = values.size();
-        while (!shape.empty() && shape.back() != OperandShape::Variadic)
-        {
-            numOperands--;
-            values.insert(values.begin() + index, 1);
-            shape = shape.drop_back();
-        }
-        PYLIR_ASSERT(shape.size() <= 1);
-        if (shape.size() == 1)
-        {
-            values.insert(values.begin() + index, numOperands);
-        }
-        values.push_back(0);
-        values.push_back(unwindOperands.size());
-        attributes.emplace_back(builder.getStringAttr(attrSizedSegmentName), builder.getDenseI32ArrayAttr(values));
-    }
-    state.addAttributes(attributes);
-    return builder.create(state);
-}
-} // namespace pylir::Py::details
+//===--------------------------------------------------------------------------------------------------------------===//
+// DictArgsIterator implementation
+//===--------------------------------------------------------------------------------------------------------------===//
 
 llvm::ArrayRef<std::int32_t> pylir::Py::DictArgsIterator::getExpansion() const
 {
@@ -206,6 +152,10 @@ pylir::Py::DictArgsIterator& pylir::Py::DictArgsIterator::operator--()
     }
     return *this;
 }
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// Custom printer parsers implementation
+//===--------------------------------------------------------------------------------------------------------------===//
 
 namespace
 {
@@ -348,35 +298,56 @@ void printMappingArguments(mlir::OpAsmPrinter& printer, mlir::Operation*, mlir::
                           });
     printer << ')';
 }
+
+template <class T>
+llvm::SmallVector<pylir::Py::IterArg> getIterArgs(T op)
+{
+    llvm::SmallVector<pylir::Py::IterArg> result(op.getNumOperands());
+    auto range = op.getIterExpansion();
+    auto begin = range.begin();
+    for (const auto& pair : llvm::enumerate(op.getOperands()))
+    {
+        if (begin == range.end() || static_cast<std::size_t>(*begin) != pair.index())
+        {
+            result[pair.index()] = pair.value();
+            continue;
+        }
+        begin++;
+        result[pair.index()] = pylir::Py::IterExpansion{pair.value()};
+    }
+    return result;
+}
+
 } // namespace
 
-void pylir::Py::MakeTupleOp::getEffects(
-    ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeDictOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                  llvm::ArrayRef<::pylir::Py::DictArg> args)
 {
-    if (getIterExpansionAttr().empty())
-    {
-        return;
-    }
-    for (auto* iter : getAllResources())
-    {
-        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
-        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
-    }
+    auto [keys, hashes, values, mappingExpansion] = deconstructBuilderArg(args);
+    build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion));
 }
 
-void pylir::Py::MakeTupleExOp::getEffects(
-    ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeDictExOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                    llvm::ArrayRef<::pylir::Py::DictArg> keyValues, mlir::Block* happyPath,
+                                    mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
+                                    mlir::ValueRange unwindDestOperands)
 {
-    if (getIterExpansionAttr().empty())
-    {
-        return;
-    }
-    for (auto* iter : getAllResources())
-    {
-        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
-        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
-    }
+    auto [keys, hashes, values, mappingExpansion] = deconstructBuilderArg(keyValues);
+    build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion),
+          normalDestOperands, unwindDestOperands, happyPath, unwindPath);
 }
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeTupleOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
 
 void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                    llvm::ArrayRef<::pylir::Py::IterArg> args)
@@ -396,88 +367,28 @@ void pylir::Py::MakeTupleOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
     build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
 }
 
-void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                  llvm::ArrayRef<::pylir::Py::IterArg> args)
+void pylir::Py::MakeTupleOp::getEffects(
+    ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
 {
-    std::vector<mlir::Value> values;
-    std::vector<std::int32_t> iterExpansion;
-    for (const auto& iter : llvm::enumerate(args))
+    if (getIterExpansionAttr().empty())
     {
-        pylir::match(
-            iter.value(), [&](mlir::Value value) { values.push_back(value); },
-            [&](Py::IterExpansion expansion)
-            {
-                values.push_back(expansion.value);
-                iterExpansion.push_back(iter.index());
-            });
+        return;
     }
-    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
-}
-
-void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                 llvm::ArrayRef<::pylir::Py::IterArg> args)
-{
-    std::vector<mlir::Value> values;
-    std::vector<std::int32_t> iterExpansion;
-    for (const auto& iter : llvm::enumerate(args))
+    for (auto* iter : getAllResources())
     {
-        pylir::match(
-            iter.value(), [&](mlir::Value value) { values.push_back(value); },
-            [&](Py::IterExpansion expansion)
-            {
-                values.push_back(expansion.value);
-                iterExpansion.push_back(iter.index());
-            });
+        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
+        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
     }
-    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
 }
 
-void pylir::Py::MakeDictOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                  llvm::ArrayRef<::pylir::Py::DictArg> args)
+llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeTupleOp::getIterArgs()
 {
-    auto [keys, hashes, values, mappingExpansion] = deconstructBuilderArg(args);
-    build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion));
+    return ::getIterArgs(*this);
 }
 
-mlir::CallInterfaceCallable pylir::Py::CallOp::getCallableForCallee()
-{
-    return getCalleeAttr();
-}
-
-mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
-{
-    return getCallOperands();
-}
-
-mlir::CallInterfaceCallable pylir::Py::FunctionCallOp::getCallableForCallee()
-{
-    return getFunction();
-}
-
-mlir::Operation::operand_range pylir::Py::FunctionCallOp::getArgOperands()
-{
-    return getCallOperands();
-}
-
-mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
-{
-    return getCalleeAttr();
-}
-
-mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
-{
-    return getCallOperands();
-}
-
-mlir::CallInterfaceCallable pylir::Py::FunctionInvokeOp::getCallableForCallee()
-{
-    return getFunction();
-}
-
-mlir::Operation::operand_range pylir::Py::FunctionInvokeOp::getArgOperands()
-{
-    return getCallOperands();
-}
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeTupleExOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
 
 void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                      llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
@@ -500,6 +411,56 @@ void pylir::Py::MakeTupleExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
           unwindDestOperands, happyPath, unwindPath);
 }
 
+void pylir::Py::MakeTupleExOp::getEffects(
+    ::mlir::SmallVectorImpl<::mlir::SideEffects::EffectInstance<::mlir::MemoryEffects::Effect>>& effects)
+{
+    if (getIterExpansionAttr().empty())
+    {
+        return;
+    }
+    for (auto* iter : getAllResources())
+    {
+        effects.emplace_back(mlir::MemoryEffects::Read::get(), iter);
+        effects.emplace_back(mlir::MemoryEffects::Write::get(), iter);
+    }
+}
+
+llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeTupleExOp::getIterArgs()
+{
+    return ::getIterArgs(*this);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeListOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::MakeListOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                  llvm::ArrayRef<::pylir::Py::IterArg> args)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    for (const auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                iterExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
+}
+
+llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeListOp::getIterArgs()
+{
+    return ::getIterArgs(*this);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeListExOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
 void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                     llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
                                     mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
@@ -520,6 +481,42 @@ void pylir::Py::MakeListExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Opera
     build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion), normalDestOperands,
           unwindDestOperands, happyPath, unwindPath);
 }
+
+llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeListExOp::getIterArgs()
+{
+    return ::getIterArgs(*this);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeSetOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::MakeSetOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
+                                 llvm::ArrayRef<::pylir::Py::IterArg> args)
+{
+    std::vector<mlir::Value> values;
+    std::vector<std::int32_t> iterExpansion;
+    for (const auto& iter : llvm::enumerate(args))
+    {
+        pylir::match(
+            iter.value(), [&](mlir::Value value) { values.push_back(value); },
+            [&](Py::IterExpansion expansion)
+            {
+                values.push_back(expansion.value);
+                iterExpansion.push_back(iter.index());
+            });
+    }
+    build(odsBuilder, odsState, values, odsBuilder.getDenseI32ArrayAttr(iterExpansion));
+}
+
+llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetOp::getIterArgs()
+{
+    return ::getIterArgs(*this);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeSetExOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
 
 void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
                                    llvm::ArrayRef<::pylir::Py::IterArg> args, mlir::Block* happyPath,
@@ -542,15 +539,42 @@ void pylir::Py::MakeSetExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operat
           unwindDestOperands, happyPath, unwindPath);
 }
 
-void pylir::Py::MakeDictExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                    llvm::ArrayRef<::pylir::Py::DictArg> keyValues, mlir::Block* happyPath,
-                                    mlir::ValueRange normalDestOperands, mlir::Block* unwindPath,
-                                    mlir::ValueRange unwindDestOperands)
+llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetExOp::getIterArgs()
 {
-    auto [keys, hashes, values, mappingExpansion] = deconstructBuilderArg(keyValues);
-    build(odsBuilder, odsState, keys, hashes, values, odsBuilder.getDenseI32ArrayAttr(mappingExpansion),
-          normalDestOperands, unwindDestOperands, happyPath, unwindPath);
+    return ::getIterArgs(*this);
 }
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// FunctionCallOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::CallInterfaceCallable pylir::Py::FunctionCallOp::getCallableForCallee()
+{
+    return getFunction();
+}
+
+mlir::Operation::operand_range pylir::Py::FunctionCallOp::getArgOperands()
+{
+    return getCallOperands();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// FunctionInvokeOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::CallInterfaceCallable pylir::Py::FunctionInvokeOp::getCallableForCallee()
+{
+    return getFunction();
+}
+
+mlir::Operation::operand_range pylir::Py::FunctionInvokeOp::getArgOperands()
+{
+    return getCallOperands();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// UnpackOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
 
 void pylir::Py::UnpackOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, std::size_t count,
                                 std::optional<std::size_t> restIndex, mlir::Value iterable)
@@ -571,6 +595,10 @@ void pylir::Py::UnpackOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operation
     build(odsBuilder, odsState, llvm::SmallVector(beforeCount, dynamicType), restIndex ? dynamicType : nullptr,
           llvm::SmallVector(afterCount, dynamicType), iterable);
 }
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// UnpackExOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
 
 void pylir::Py::UnpackExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, std::size_t count,
                                   std::optional<std::size_t> restIndex, mlir::Value iterable, mlir::Block* happy_path,
@@ -595,6 +623,47 @@ void pylir::Py::UnpackExOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Operati
           unwindPath);
 }
 
+//===--------------------------------------------------------------------------------------------------------------===//
+// GlobalValueOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+bool pylir::Py::GlobalValueOp::isDeclaration()
+{
+    return !getInitializerAttr();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// CallOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::CallInterfaceCallable pylir::Py::CallOp::getCallableForCallee()
+{
+    return getCalleeAttr();
+}
+
+mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
+{
+    return getCallOperands();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// InvokeOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
+{
+    return getCalleeAttr();
+}
+
+mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
+{
+    return getCallOperands();
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// FuncOp implementations
+//===--------------------------------------------------------------------------------------------------------------===//
+
 mlir::ParseResult pylir::Py::FuncOp::parse(::mlir::OpAsmParser& parser, ::mlir::OperationState& result)
 {
     return mlir::function_interface_impl::parseFunctionOp(
@@ -608,63 +677,6 @@ void pylir::Py::FuncOp::print(::mlir::OpAsmPrinter& p)
 {
     mlir::function_interface_impl::printFunctionOp(p, *this, false, getFunctionTypeAttrName(), getArgAttrsAttrName(),
                                                    getResAttrsAttrName());
-}
-
-namespace
-{
-template <class T>
-llvm::SmallVector<pylir::Py::IterArg> getIterArgs(T op)
-{
-    llvm::SmallVector<pylir::Py::IterArg> result(op.getNumOperands());
-    auto range = op.getIterExpansion();
-    auto begin = range.begin();
-    for (const auto& pair : llvm::enumerate(op.getOperands()))
-    {
-        if (begin == range.end() || static_cast<std::size_t>(*begin) != pair.index())
-        {
-            result[pair.index()] = pair.value();
-            continue;
-        }
-        begin++;
-        result[pair.index()] = pylir::Py::IterExpansion{pair.value()};
-    }
-    return result;
-}
-} // namespace
-
-llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeTupleOp::getIterArgs()
-{
-    return ::getIterArgs(*this);
-}
-
-llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeTupleExOp::getIterArgs()
-{
-    return ::getIterArgs(*this);
-}
-
-llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeListOp::getIterArgs()
-{
-    return ::getIterArgs(*this);
-}
-
-llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeListExOp::getIterArgs()
-{
-    return ::getIterArgs(*this);
-}
-
-llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetOp::getIterArgs()
-{
-    return ::getIterArgs(*this);
-}
-
-llvm::SmallVector<pylir::Py::IterArg> pylir::Py::MakeSetExOp::getIterArgs()
-{
-    return ::getIterArgs(*this);
-}
-
-bool pylir::Py::GlobalValueOp::isDeclaration()
-{
-    return !getInitializerAttr();
 }
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyEnums.cpp.inc>

@@ -26,25 +26,6 @@ mlir::FailureOr<mlir::Attribute> getDictKey(mlir::Value keyOperand)
     return canon;
 }
 
-} // namespace
-
-mlir::FailureOr<mlir::Attribute> pylir::Py::DictSetItemOp::getSROAKey()
-{
-    return getDictKey(getKey());
-}
-
-mlir::FailureOr<mlir::Attribute> pylir::Py::DictTryGetItemOp::getSROAKey()
-{
-    return getDictKey(getKey());
-}
-
-mlir::FailureOr<mlir::Attribute> pylir::Py::DictDelItemOp::getSROAKey()
-{
-    return getDictKey(getKey());
-}
-
-namespace
-{
 template <class T>
 mlir::LogicalResult dictOpCanParticipateInSROA(T op)
 {
@@ -57,30 +38,7 @@ mlir::LogicalResult dictOpCanParticipateInSROA(T op)
                                                     && pylir::Py::getCanonicalEqualsForm(attr) != nullptr;
                                          }));
 }
-} // namespace
 
-mlir::LogicalResult pylir::Py::MakeDictOp::canParticipateInSROA()
-{
-    return dictOpCanParticipateInSROA(*this);
-}
-
-mlir::LogicalResult pylir::Py::MakeDictExOp::canParticipateInSROA()
-{
-    return dictOpCanParticipateInSROA(*this);
-}
-
-mlir::LogicalResult pylir::Py::MakeListOp::canParticipateInSROA()
-{
-    return mlir::success(getIterExpansion().empty());
-}
-
-mlir::LogicalResult pylir::Py::MakeListExOp::canParticipateInSROA()
-{
-    return mlir::success(getIterExpansion().empty());
-}
-
-namespace
-{
 template <class T>
 void replaceListAggregate(T op,
                           llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write,
@@ -93,56 +51,7 @@ void replaceListAggregate(T op,
     auto len = builder.create<mlir::arith::ConstantIndexOp>(op.getLoc(), op.getArguments().size());
     write(nullptr, pylir::Py::ListResource::get(), len);
 }
-} // namespace
 
-void pylir::Py::MakeListOp::replaceAggregate(
-    mlir::OpBuilder& builder,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
-{
-    replaceListAggregate(*this, write, builder);
-}
-
-void pylir::Py::MakeListExOp::replaceAggregate(
-    mlir::OpBuilder& builder,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
-{
-    replaceListAggregate(*this, write, builder);
-}
-
-void pylir::Py::ListSetItemOp::replaceAggregate(
-    mlir::OpBuilder&, mlir::Attribute key,
-    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
-{
-    write(key, ListResource::get(), getElement());
-}
-
-void pylir::Py::ListGetItemOp::replaceAggregate(
-    mlir::OpBuilder&, mlir::Attribute key,
-    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)> read,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>)
-{
-    replaceAllUsesWith(read(key, ListResource::get(), getType()));
-}
-
-void pylir::Py::ListResizeOp::replaceAggregate(
-    mlir::OpBuilder&, mlir::Attribute,
-    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
-{
-    write(nullptr, ListResource::get(), getLength());
-}
-
-void pylir::Py::ListLenOp::replaceAggregate(
-    mlir::OpBuilder&, mlir::Attribute,
-    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)> read,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>)
-{
-    replaceAllUsesWith(read(nullptr, ListResource::get(), getType()));
-}
-
-namespace
-{
 template <class T>
 void replaceDictAggregate(T op, mlir::OpBuilder& builder,
                           llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
@@ -157,20 +66,51 @@ void replaceDictAggregate(T op, mlir::OpBuilder& builder,
         write(pylir::Py::getCanonicalEqualsForm(attr), pylir::Py::DictResource::get(), value);
     }
 }
-} // namespace
 
-void pylir::Py::MakeDictOp::replaceAggregate(
-    mlir::OpBuilder& builder,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
+void destructureSlots(
+    pylir::Py::ObjectAttrInterface attr,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type, mlir::Attribute)> write)
 {
-    replaceDictAggregate(*this, builder, write);
+    for (const auto& iter : attr.getSlots())
+    {
+        write(iter.getName(), pylir::Py::ObjectResource::get(), pylir::Py::DynamicType::get(attr.getContext()),
+              iter.getValue());
+    }
 }
 
-void pylir::Py::MakeDictExOp::replaceAggregate(
-    mlir::OpBuilder& builder,
+} // namespace
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// GetSlotOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::GetSlotOp::replaceAggregate(
+    mlir::OpBuilder&, mlir::Attribute key,
+    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)> read,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>)
+{
+    replaceAllUsesWith(read(key, ObjectResource::get(), getType()));
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// SetSlotOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::SetSlotOp::replaceAggregate(
+    mlir::OpBuilder&, mlir::Attribute key,
+    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>,
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
 {
-    replaceDictAggregate(*this, builder, write);
+    write(key, ObjectResource::get(), getValue());
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// DictTryGetItemOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::FailureOr<mlir::Attribute> pylir::Py::DictTryGetItemOp::getSROAKey()
+{
+    return getDictKey(getKey());
 }
 
 void pylir::Py::DictTryGetItemOp::replaceAggregate(
@@ -179,6 +119,15 @@ void pylir::Py::DictTryGetItemOp::replaceAggregate(
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>)
 {
     replaceAllUsesWith(read(key, DictResource::get(), getType()));
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// DictSetItemOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::FailureOr<mlir::Attribute> pylir::Py::DictSetItemOp::getSROAKey()
+{
+    return getDictKey(getKey());
 }
 
 void pylir::Py::DictSetItemOp::replaceAggregate(
@@ -194,6 +143,15 @@ void pylir::Py::DictSetItemOp::replaceAggregate(
     write(nullptr, DictResource::get(),
           builder.create<mlir::arith::SelectOp>(getLoc(), didNotExist, incremented, size));
     write(key, DictResource::get(), getValue());
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// DictDelItemOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::FailureOr<mlir::Attribute> pylir::Py::DictDelItemOp::getSROAKey()
+{
+    return getDictKey(getKey());
 }
 
 void pylir::Py::DictDelItemOp::replaceAggregate(
@@ -215,6 +173,10 @@ void pylir::Py::DictDelItemOp::replaceAggregate(
           builder.create<mlir::arith::SelectOp>(getLoc(), didNotExist, size, decremented));
 }
 
+//===--------------------------------------------------------------------------------------------------------------===//
+// DictLenOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
 void pylir::Py::DictLenOp::replaceAggregate(
     ::mlir::OpBuilder&, ::mlir::Attribute,
     ::llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)> read,
@@ -223,35 +185,121 @@ void pylir::Py::DictLenOp::replaceAggregate(
     replaceAllUsesWith(read(nullptr, DictResource::get(), mlir::IndexType::get(getContext())));
 }
 
-void pylir::Py::SetSlotOp::replaceAggregate(
-    mlir::OpBuilder&, mlir::Attribute key,
-    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeDictOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::MakeDictOp::canParticipateInSROA()
 {
-    write(key, ObjectResource::get(), getValue());
+    return dictOpCanParticipateInSROA(*this);
 }
 
-void pylir::Py::GetSlotOp::replaceAggregate(
+void pylir::Py::MakeDictOp::replaceAggregate(
+    mlir::OpBuilder& builder,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
+{
+    replaceDictAggregate(*this, builder, write);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeDictExOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::MakeDictExOp::canParticipateInSROA()
+{
+    return dictOpCanParticipateInSROA(*this);
+}
+
+void pylir::Py::MakeDictExOp::replaceAggregate(
+    mlir::OpBuilder& builder,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
+{
+    replaceDictAggregate(*this, builder, write);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// ListGetItemOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::ListGetItemOp::replaceAggregate(
     mlir::OpBuilder&, mlir::Attribute key,
     llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)> read,
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>)
 {
-    replaceAllUsesWith(read(key, ObjectResource::get(), getType()));
+    replaceAllUsesWith(read(key, ListResource::get(), getType()));
 }
 
-namespace
+//===--------------------------------------------------------------------------------------------------------------===//
+// ListSetItemOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::ListSetItemOp::replaceAggregate(
+    mlir::OpBuilder&, mlir::Attribute key,
+    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
 {
-void destructureSlots(
-    pylir::Py::ObjectAttrInterface attr,
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type, mlir::Attribute)> write)
-{
-    for (const auto& iter : attr.getSlots())
-    {
-        write(iter.getName(), pylir::Py::ObjectResource::get(), pylir::Py::DynamicType::get(attr.getContext()),
-              iter.getValue());
-    }
+    write(key, ListResource::get(), getElement());
 }
-} // namespace
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// ListLenOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::ListLenOp::replaceAggregate(
+    mlir::OpBuilder&, mlir::Attribute,
+    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)> read,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)>)
+{
+    replaceAllUsesWith(read(nullptr, ListResource::get(), getType()));
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// ListResizeOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+void pylir::Py::ListResizeOp::replaceAggregate(
+    mlir::OpBuilder&, mlir::Attribute,
+    llvm::function_ref<mlir::Value(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type)>,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
+{
+    write(nullptr, ListResource::get(), getLength());
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeListOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::MakeListOp::canParticipateInSROA()
+{
+    return mlir::success(getIterExpansion().empty());
+}
+
+void pylir::Py::MakeListOp::replaceAggregate(
+    mlir::OpBuilder& builder,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
+{
+    replaceListAggregate(*this, write, builder);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// MakeListExOp implementation
+//===--------------------------------------------------------------------------------------------------------------===//
+
+mlir::LogicalResult pylir::Py::MakeListExOp::canParticipateInSROA()
+{
+    return mlir::success(getIterExpansion().empty());
+}
+
+void pylir::Py::MakeListExOp::replaceAggregate(
+    mlir::OpBuilder& builder,
+    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Value)> write)
+{
+    replaceListAggregate(*this, write, builder);
+}
+
+//===--------------------------------------------------------------------------------------------------------------===//
+// SROAAttrInterface implementations
+//===--------------------------------------------------------------------------------------------------------------===//
 
 void pylir::Py::ObjectAttr::destructureAggregate(
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type, mlir::Attribute)> write) const
