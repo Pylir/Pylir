@@ -4,10 +4,12 @@
 // CHECK-SAME: %{{[[:alnum:]]+}},
 // CHECK-SAME: *%[[ARG1:[[:alnum:]]+]],
 // CHECK-SAME: %{{.*}} "keyword",
-// CHECK-SAME: %{{.*}} {test.name = 0 : i32}) -> !py.dynamic {
+// CHECK-SAME: %{{.*}} {test.name = 0 : i32},
+// CHECK-SAME: %{{.*}} only "lol"
+// CHECK-SAME: ) -> !py.dynamic {
 // CHECK-NEXT: %{{.*}} = func "foo"(%{{.*}} "rest" = %[[ARG1]]) -> !py.dynamic {
 
-pyHIR.globalFunc @test(%arg0, *%arg1, %arg2 "keyword", %arg3 { test.name = 0 : i32 }) -> !py.dynamic {
+pyHIR.globalFunc @test(%arg0, *%arg1, %arg2 "keyword", %arg3 { test.name = 0 : i32 }, %arg4 only "lol") -> !py.dynamic {
     %0 = func "foo"(%ff0 "rest" = %arg1) -> !py.dynamic {
         return %ff0
     }

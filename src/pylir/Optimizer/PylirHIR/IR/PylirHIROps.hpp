@@ -34,6 +34,7 @@ class FunctionParameter
     mlir::Value m_defaultValue;
     bool m_isPosRest;
     bool m_isKeywordRest;
+    bool m_isKeywordOnly;
 
 public:
     /// Constructor creating a function parameter. 'parameter' is the block argument representing the parameter
@@ -45,7 +46,8 @@ public:
     /// 'isPosRest' is true if this parameter receives any leftover positional parameters.
     /// 'isKeywordRest' is true if this parameter receives any leftover mapping parameters.
     FunctionParameter(mlir::Value parameter, mlir::StringAttr optionalName, mlir::DictionaryAttr attrs,
-                      mlir::Value optionalDefaultValue, bool isPosRest, bool isKeywordRest);
+                      mlir::Value optionalDefaultValue, bool isPosRest, bool isKeywordRest,
+                      bool isKeywordOnly);
 
     /// Returns the parameter value, used within the function body.
     mlir::Value getParameter() const
@@ -83,6 +85,12 @@ public:
     {
         return m_isKeywordRest;
     }
+
+    /// Returns true if this parameter can only be assigned to via a keyword argument.
+    bool isKeywordOnly() const
+    {
+        return m_isKeywordOnly;
+    }
 };
 
 /// Range object used to easily iterate over all parameters of a 'pyHIR' function.
@@ -106,11 +114,11 @@ public:
 /// Struct used to build functions in the pyHIR dialect.
 class FunctionParameterSpec
 {
-    mlir::Type m_parameterType;
     mlir::StringAttr m_name;
     mlir::Value m_defaultValue;
     bool m_isPosRest = false;
     bool m_isKeywordRest = false;
+    bool m_isKeywordOnly = false;
 
 public:
     struct PosRest
@@ -120,25 +128,16 @@ public:
     {
     };
 
-    explicit FunctionParameterSpec(mlir::Type parameterType, mlir::StringAttr name = {}, mlir::Value defaultValue = {})
-        : m_parameterType(parameterType), m_name(name), m_defaultValue(defaultValue)
+    FunctionParameterSpec() = default;
+
+    explicit FunctionParameterSpec(mlir::StringAttr name, mlir::Value defaultValue, bool keywordOnly = false)
+        : m_name(name), m_defaultValue(defaultValue), m_isKeywordOnly(keywordOnly)
     {
     }
 
-    FunctionParameterSpec(mlir::MLIRContext* context, PosRest)
-        : m_parameterType(Py::DynamicType::get(context)), m_isPosRest(true)
-    {
-    }
+    explicit FunctionParameterSpec(PosRest) : m_isPosRest(true) {}
 
-    FunctionParameterSpec(mlir::MLIRContext* context, KeywordRest)
-        : m_parameterType(Py::DynamicType::get(context)), m_isKeywordRest(true)
-    {
-    }
-
-    mlir::Type getParameterType() const
-    {
-        return m_parameterType;
-    }
+    explicit FunctionParameterSpec(KeywordRest) : m_isKeywordRest(true) {}
 
     mlir::StringAttr getName() const
     {
@@ -158,6 +157,11 @@ public:
     bool isKeywordRest() const
     {
         return m_isKeywordRest;
+    }
+
+    bool isKeywordOnly() const
+    {
+        return m_isKeywordOnly;
     }
 };
 

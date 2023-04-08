@@ -14,13 +14,14 @@
 
 pylir::HIR::FunctionParameter::FunctionParameter(mlir::Value parameter, mlir::StringAttr optionalName,
                                                  mlir::DictionaryAttr attrs, mlir::Value optionalDefaultValue,
-                                                 bool isPosRest, bool isKeywordRest)
+                                                 bool isPosRest, bool isKeywordRest, bool isKeywordOnly)
     : m_parameter(parameter),
       m_name(optionalName),
       m_attrs(attrs),
       m_defaultValue(optionalDefaultValue),
       m_isPosRest(isPosRest),
-      m_isKeywordRest(isKeywordRest)
+      m_isKeywordRest(isKeywordRest),
+      m_isKeywordOnly(isKeywordOnly)
 {
 }
 
@@ -28,10 +29,11 @@ pylir::HIR::FunctionParameter pylir::HIR::FunctionParameterRange::dereference(Fu
                                                                               std::ptrdiff_t index)
 {
     mlir::ArrayAttr attr = function.getArgAttrsAttr();
-    return FunctionParameter(
-        function->getRegion(0).getArgument(index), function.getParameterName(index),
-        attr ? mlir::cast<mlir::DictionaryAttr>(attr[index]) : mlir::DictionaryAttr::get(function->getContext()),
-        function.getDefaultValue(index), function.getPosRest() == index, function.getKeywordRest() == index);
+    return FunctionParameter(function->getRegion(0).getArgument(index), function.getParameterName(index),
+                             attr ? mlir::cast<mlir::DictionaryAttr>(attr[index]) :
+                                    mlir::DictionaryAttr::get(function->getContext()),
+                             function.getDefaultValue(index), function.getPosRest() == index,
+                             function.getKeywordRest() == index, function.isKeywordOnly(index));
 }
 
 pylir::HIR::FunctionParameterRange::FunctionParameterRange(FunctionInterface function)
@@ -63,12 +65,13 @@ mlir::LogicalResult funcOpsCommonVerifier(mlir::Operation* operation, mlir::Type
 
 void funcOpsCommonBuild(mlir::OpBuilder& builder, llvm::ArrayRef<pylir::HIR::FunctionParameterSpec> parameters,
                         mlir::ArrayAttr& parameterNames, mlir::DenseI32ArrayAttr& parameterNameMapping,
-                        mlir::IntegerAttr& posRest, mlir::IntegerAttr& keywordRest,
-                        llvm::SmallVectorImpl<mlir::Value>* defaultValues = nullptr,
+                        mlir::DenseI32ArrayAttr& keywordOnlyMapping, mlir::IntegerAttr& posRest,
+                        mlir::IntegerAttr& keywordRest, llvm::SmallVectorImpl<mlir::Value>* defaultValues = nullptr,
                         mlir::DenseI32ArrayAttr* defaultValueMapping = nullptr)
 {
     llvm::SmallVector<mlir::Attribute> parameterNamesStorage;
     llvm::SmallVector<std::int32_t> parameterNameMappingStorage;
+    llvm::SmallVector<std::int32_t> keywordOnlyMappingStorage;
     llvm::SmallVector<std::int32_t> defaultValueMappingStorage;
 
     for (auto&& [index, spec] : llvm::enumerate(parameters))
@@ -91,10 +94,15 @@ void funcOpsCommonBuild(mlir::OpBuilder& builder, llvm::ArrayRef<pylir::HIR::Fun
         {
             keywordRest = builder.getI32IntegerAttr(index);
         }
+        if (spec.isKeywordOnly())
+        {
+            keywordOnlyMappingStorage.push_back(index);
+        }
     }
 
     parameterNames = builder.getArrayAttr(parameterNamesStorage);
     parameterNameMapping = builder.getDenseI32ArrayAttr(parameterNameMappingStorage);
+    keywordOnlyMapping = builder.getDenseI32ArrayAttr(keywordOnlyMappingStorage);
     if (defaultValueMapping)
     {
         *defaultValueMapping = builder.getDenseI32ArrayAttr(defaultValueMappingStorage);
@@ -124,6 +132,10 @@ void printFunction(mlir::OpAsmPrinter& printer, pylir::HIR::FunctionParameterRan
 
                               if (functionParameter.getName())
                               {
+                                  if (functionParameter.isKeywordOnly())
+                                  {
+                                      printer << " only";
+                                  }
                                   printer << ' ' << functionParameter.getName();
                               }
                               if (functionParameter.getDefaultValue())
@@ -164,6 +176,7 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser, mlir::OperationState&
     llvm::SmallVector<mlir::OpAsmParser::Argument> arguments;
     llvm::SmallVector<mlir::Value> defaultValues;
     llvm::SmallVector<std::int32_t> defaultValueMapping;
+    llvm::SmallVector<std::int32_t> keywordOnlyMapping;
     llvm::SmallVector<mlir::Attribute> argNames;
     llvm::SmallVector<std::int32_t> argMappings;
 
@@ -201,7 +214,17 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser, mlir::OperationState&
             arguments.back().type = pylir::Py::DynamicType::get(parser.getContext());
 
             std::string string;
-            if (mlir::succeeded(parser.parseOptionalString(&string)))
+            if (mlir::succeeded(parser.parseOptionalKeyword("only")))
+            {
+                keywordOnlyMapping.push_back(index);
+                if (parser.parseString(&string))
+                {
+                    return mlir::failure();
+                }
+                argNames.push_back(mlir::StringAttr::get(result.getContext(), string));
+                argMappings.push_back(index);
+            }
+            else if (mlir::succeeded(parser.parseOptionalString(&string)))
             {
                 argNames.push_back(mlir::StringAttr::get(result.getContext(), string));
                 argMappings.push_back(index);
@@ -290,6 +313,8 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser, mlir::OperationState&
     result.addAttribute(T::getParameterNamesAttrName(result.name), mlir::ArrayAttr::get(result.getContext(), argNames));
     result.addAttribute(T::getParameterNameMappingAttrName(result.name),
                         mlir::DenseI32ArrayAttr::get(result.getContext(), argMappings));
+    result.addAttribute(T::getKeywordOnlyMappingAttrName(result.name),
+                        mlir::DenseI32ArrayAttr::get(result.getContext(), keywordOnlyMapping));
 
     if constexpr (std::is_same_v<T, FuncOp>)
     {
@@ -328,15 +353,17 @@ void pylir::HIR::GlobalFuncOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
 {
     mlir::ArrayAttr parameterNames;
     mlir::DenseI32ArrayAttr parameterNameMapping;
+    mlir::DenseI32ArrayAttr keywordOnlyMapping;
     mlir::IntegerAttr posRest;
     mlir::IntegerAttr keywordRest;
-    funcOpsCommonBuild(odsBuilder, parameters, parameterNames, parameterNameMapping, posRest, keywordRest);
+    funcOpsCommonBuild(odsBuilder, parameters, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest,
+                       keywordRest);
 
     build(odsBuilder, odsState, symbolName,
           odsBuilder.getFunctionType(
               llvm::SmallVector<mlir::Type>(parameters.size(), odsBuilder.getType<Py::DynamicType>()),
               resultType ? resultType : mlir::TypeRange{}),
-          nullptr, nullptr, parameterNames, parameterNameMapping, posRest, keywordRest);
+          nullptr, nullptr, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest, keywordRest);
 }
 
 mlir::ParseResult pylir::HIR::GlobalFuncOp::parse(mlir::OpAsmParser& parser, mlir::OperationState& result)
@@ -376,18 +403,19 @@ void pylir::HIR::FuncOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationS
 {
     mlir::ArrayAttr parameterNames;
     mlir::DenseI32ArrayAttr parameterNameMapping;
+    mlir::DenseI32ArrayAttr keywordOnlyMapping;
     mlir::IntegerAttr posRest;
     mlir::IntegerAttr keywordRest;
     llvm::SmallVector<mlir::Value> defaultValues;
     mlir::DenseI32ArrayAttr defaultValueMapping;
-    funcOpsCommonBuild(odsBuilder, parameters, parameterNames, parameterNameMapping, posRest, keywordRest,
-                       &defaultValues, &defaultValueMapping);
+    funcOpsCommonBuild(odsBuilder, parameters, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest,
+                       keywordRest, &defaultValues, &defaultValueMapping);
 
     build(odsBuilder, odsState, symbolName, defaultValues, defaultValueMapping,
           odsBuilder.getFunctionType(
               llvm::SmallVector<mlir::Type>(parameters.size(), odsBuilder.getType<Py::DynamicType>()),
               resultType ? resultType : mlir::TypeRange{}),
-          nullptr, nullptr, parameterNames, parameterNameMapping, posRest, keywordRest);
+          nullptr, nullptr, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest, keywordRest);
 }
 
 mlir::ParseResult pylir::HIR::FuncOp::parse(mlir::OpAsmParser& parser, mlir::OperationState& result)

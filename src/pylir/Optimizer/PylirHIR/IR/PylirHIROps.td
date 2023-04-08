@@ -45,12 +45,13 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 
     let arguments = (ins StrAttr:$sym_name, TypeAttrOf<PylirHIR_FunctionType>:$function_type,
                          OptionalAttr<DictArrayAttr>:$arg_attrs,
-    					 OptionalAttr<DictArrayAttr>:$res_attrs,
-    					 StrArrayAttr:$parameter_names,
-    					 DenseI32ArrayAttr:$parameter_name_mapping,
-    					 OptionalAttr<I32Attr>:$pos_rest,
-    					 OptionalAttr<I32Attr>:$keyword_rest
-    					 );
+                         OptionalAttr<DictArrayAttr>:$res_attrs,
+                         StrArrayAttr:$parameter_names,
+                         DenseI32ArrayAttr:$parameter_name_mapping,
+                         DenseI32ArrayAttr:$keyword_only_mapping,
+                         OptionalAttr<I32Attr>:$pos_rest,
+                         OptionalAttr<I32Attr>:$keyword_rest
+                         );
 
     let regions = (region MinSizedRegion<1>:$body);
 
@@ -66,7 +67,7 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 
         Syntax:
         ```
-        arg ::= (`*` | `**`) value-def [string-attr] [ dictionary-attr ]
+        arg ::= (`*` | `**`) value-def [[only]string-attr] [ dictionary-attr ]
         ret-type ::= `!py.dynamic` | `(` `!py.dynamic` [ dictionary-attr ] `)`
         global_func ::= `pyHIR.global_func` sym_name `(` [ <arg> { `,` <arg> } ] `)` [`->` ret-type] attr-with-keyword
                         `{` body `}`
@@ -143,12 +144,13 @@ def PylirHIR_FuncOp : PylirHIR_Op<"func", [OpAsmOpInterface, PylirHIR_FunctionIn
                          DenseI32ArrayAttr:$default_values_mapping,
                          TypeAttrOf<PylirHIR_FunctionType>:$function_type,
                          OptionalAttr<DictArrayAttr>:$arg_attrs,
-    					 OptionalAttr<DictArrayAttr>:$res_attrs,
-    					 StrArrayAttr:$parameter_names,
-    					 DenseI32ArrayAttr:$parameter_name_mapping,
-    					 OptionalAttr<I32Attr>:$pos_rest,
-    					 OptionalAttr<I32Attr>:$keyword_rest
-    					 );
+                         OptionalAttr<DictArrayAttr>:$res_attrs,
+                         StrArrayAttr:$parameter_names,
+                         DenseI32ArrayAttr:$parameter_name_mapping,
+                         DenseI32ArrayAttr:$keyword_only_mapping,
+                         OptionalAttr<I32Attr>:$pos_rest,
+                         OptionalAttr<I32Attr>:$keyword_rest
+                         );
 
     let regions = (region MinSizedRegion<1>:$body);
 
@@ -170,7 +172,7 @@ def PylirHIR_FuncOp : PylirHIR_Op<"func", [OpAsmOpInterface, PylirHIR_FunctionIn
 
         Syntax:
         ```
-        arg ::= (`*` | `**`) value-def [string-attr] [ `=` value-use ] [ dictionary-attr ]
+        arg ::= (`*` | `**`) value-def [[only] string-attr] [ `=` value-use ] [ dictionary-attr ]
         ret-type ::= `!py.dynamic` | `(` `!py.dynamic` [ dictionary-attr ] `)`
         global_func ::= `pyHIR.func` name `(` [ <arg> { `,` <arg> } ] `)` [`->` ret-type] attr-with-keyword
                         `{` body `}`
@@ -263,6 +265,12 @@ def PylirHIR_InitOp : PylirHIR_Op<"init", [NoRegionArguments, IsolatedFromAbove,
     }];
 
     let extraClassDeclaration = [{
+
+        bool isMainModule()
+        {
+            return getName() == "__main__";
+        }
+
         //===------------------------------------------------------------------------------------------------------===//
         // OpAsmOpInterface implementation
         //===------------------------------------------------------------------------------------------------------===//

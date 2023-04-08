@@ -63,6 +63,10 @@ def PylirHIR_FunctionInterface : OpInterface<"FunctionInterface", [CallableOpInt
         }],
         "::llvm::ArrayRef<std::int32_t>", "getParameterNameMapping">,
         InterfaceMethod<[{
+            Returns a sorted range of indices of all parameters which may only be called by keyword.
+        }],
+        "::llvm::ArrayRef<std::int32_t>", "getKeywordOnlyMapping">,
+        InterfaceMethod<[{
             Returns the index of the parameter which receives any leftover positional arguments or an empty optional
             if no such parameter exists.
         }],
@@ -95,6 +99,12 @@ def PylirHIR_FunctionInterface : OpInterface<"FunctionInterface", [CallableOpInt
                 return nullptr;
             }
             return mlir::cast<mlir::StringAttr>($_op.getParameterNames()[iter - mapping.begin()]);
+        }
+
+        bool isKeywordOnly(unsigned index)
+        {
+            auto mapping = $_op.getKeywordOnlyMapping();
+            return std::binary_search(mapping.begin(), mapping.end(), index);
         }
     }];
 }
