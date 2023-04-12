@@ -109,10 +109,18 @@ void funcOpsCommonBuild(mlir::OpBuilder& builder, llvm::ArrayRef<pylir::HIR::Fun
     }
 }
 
+void createEntryBlock(mlir::Location loc, mlir::Region& region, std::size_t parameterCount)
+{
+    auto* entryBlock = new mlir::Block;
+    region.push_back(entryBlock);
+    entryBlock->addArguments(
+        llvm::SmallVector<mlir::Type>(parameterCount, pylir::Py::DynamicType::get(loc.getContext())),
+        llvm::SmallVector<mlir::Location>(parameterCount, loc));
+}
+
 void printFunction(mlir::OpAsmPrinter& printer, pylir::HIR::FunctionParameterRange parameters,
-                   mlir::TypeRange resultTypes, llvm::ArrayRef<mlir::DictionaryAttr> resultAttrs,
-                   mlir::DictionaryAttr dictionaryAttr, llvm::ArrayRef<llvm::StringRef> inherentAttributes,
-                   mlir::Region& region)
+                   llvm::ArrayRef<mlir::DictionaryAttr> resultAttrs, mlir::DictionaryAttr dictionaryAttr,
+                   llvm::ArrayRef<llvm::StringRef> inherentAttributes, mlir::Region& region)
 {
     printer << '(';
 
@@ -150,17 +158,9 @@ void printFunction(mlir::OpAsmPrinter& printer, pylir::HIR::FunctionParameterRan
 
     printer << ')';
 
-    if (!resultTypes.empty())
+    if (!resultAttrs.empty() && !resultAttrs.front().empty())
     {
-        printer << " -> ";
-        if (!resultAttrs.front().empty())
-        {
-            printer << '(' << resultTypes.front() << ' ' << resultAttrs.front() << ')';
-        }
-        else
-        {
-            printer << resultTypes.front();
-        }
+        printer << " -> " << resultAttrs.front();
     }
 
     printer << ' ';
@@ -256,24 +256,18 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser, mlir::OperationState&
     }
 
     llvm::SmallVector<mlir::Attribute> resultDictAttrs;
-    llvm::SmallVector<mlir::Type> resultTypes;
     if (mlir::succeeded(parser.parseOptionalArrow()))
     {
-        auto lParen = parser.parseOptionalLParen();
-        if (parser.parseType(resultTypes.emplace_back()))
+        mlir::DictionaryAttr resultDict;
+        if (parser.parseAttribute(resultDict))
         {
             return mlir::failure();
         }
-        mlir::NamedAttrList resultDict;
-        if (mlir::succeeded(lParen))
-        {
-            (void)parser.parseOptionalAttrDict(resultDict);
-            if (parser.parseRParen())
-            {
-                return mlir::failure();
-            }
-        }
-        resultDictAttrs.push_back(mlir::DictionaryAttr::get(result.getContext(), resultDict));
+        resultDictAttrs.push_back(resultDict);
+    }
+    else
+    {
+        resultDictAttrs.push_back(mlir::DictionaryAttr::get(result.getContext()));
     }
 
     mlir::NamedAttrList extra;
@@ -308,7 +302,7 @@ mlir::ParseResult parseFunction(mlir::OpAsmParser& parser, mlir::OperationState&
                             result.getContext(),
                             llvm::to_vector(llvm::map_range(arguments, [](const mlir::OpAsmParser::Argument& argument)
                                                             { return argument.type; })),
-                            resultTypes)));
+                            pylir::Py::DynamicType::get(result.getContext()))));
 
     result.addAttribute(T::getParameterNamesAttrName(result.name), mlir::ArrayAttr::get(result.getContext(), argNames));
     result.addAttribute(T::getParameterNameMappingAttrName(result.name),
@@ -348,8 +342,7 @@ mlir::LogicalResult pylir::HIR::GlobalFuncOp::verify()
 }
 
 void pylir::HIR::GlobalFuncOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState,
-                                     mlir::Type resultType, mlir::StringAttr symbolName,
-                                     llvm::ArrayRef<FunctionParameterSpec> parameters)
+                                     llvm::Twine symbolName, llvm::ArrayRef<FunctionParameterSpec> parameters)
 {
     mlir::ArrayAttr parameterNames;
     mlir::DenseI32ArrayAttr parameterNameMapping;
@@ -359,11 +352,11 @@ void pylir::HIR::GlobalFuncOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::Oper
     funcOpsCommonBuild(odsBuilder, parameters, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest,
                        keywordRest);
 
-    build(odsBuilder, odsState, symbolName,
-          odsBuilder.getFunctionType(
-              llvm::SmallVector<mlir::Type>(parameters.size(), odsBuilder.getType<Py::DynamicType>()),
-              resultType ? resultType : mlir::TypeRange{}),
+    auto dynamicType = odsBuilder.getType<Py::DynamicType>();
+    build(odsBuilder, odsState, odsBuilder.getStringAttr(symbolName),
+          odsBuilder.getFunctionType(llvm::SmallVector<mlir::Type>(parameters.size(), dynamicType), dynamicType),
           nullptr, nullptr, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest, keywordRest);
+    createEntryBlock(odsState.location, *odsState.regions.front(), parameters.size());
 }
 
 mlir::ParseResult pylir::HIR::GlobalFuncOp::parse(mlir::OpAsmParser& parser, mlir::OperationState& result)
@@ -385,8 +378,8 @@ void pylir::HIR::GlobalFuncOp::print(mlir::OpAsmPrinter& p)
     p << ' ';
     p.printSymbolName(getSymNameAttr());
 
-    printFunction(p, FunctionParameterRange(*this), getResultTypes(), resultAttrs, (*this)->getAttrDictionary(),
-                  getAttributeNames(), getRegion());
+    printFunction(p, FunctionParameterRange(*this), resultAttrs, (*this)->getAttrDictionary(), getAttributeNames(),
+                  getRegion());
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -398,8 +391,8 @@ mlir::LogicalResult pylir::HIR::FuncOp::verify()
     return funcOpsCommonVerifier(*this, getArgumentTypes(), getPosRest(), getKeywordRest());
 }
 
-void pylir::HIR::FuncOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, mlir::Type resultType,
-                               mlir::StringAttr symbolName, llvm::ArrayRef<FunctionParameterSpec> parameters)
+void pylir::HIR::FuncOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationState& odsState, llvm::Twine symbolName,
+                               llvm::ArrayRef<FunctionParameterSpec> parameters)
 {
     mlir::ArrayAttr parameterNames;
     mlir::DenseI32ArrayAttr parameterNameMapping;
@@ -411,11 +404,11 @@ void pylir::HIR::FuncOp::build(::mlir::OpBuilder& odsBuilder, ::mlir::OperationS
     funcOpsCommonBuild(odsBuilder, parameters, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest,
                        keywordRest, &defaultValues, &defaultValueMapping);
 
-    build(odsBuilder, odsState, symbolName, defaultValues, defaultValueMapping,
-          odsBuilder.getFunctionType(
-              llvm::SmallVector<mlir::Type>(parameters.size(), odsBuilder.getType<Py::DynamicType>()),
-              resultType ? resultType : mlir::TypeRange{}),
+    auto dynamicType = odsBuilder.getType<Py::DynamicType>();
+    build(odsBuilder, odsState, odsBuilder.getStringAttr(symbolName), defaultValues, defaultValueMapping,
+          odsBuilder.getFunctionType(llvm::SmallVector<mlir::Type>(parameters.size(), dynamicType), dynamicType),
           nullptr, nullptr, parameterNames, parameterNameMapping, keywordOnlyMapping, posRest, keywordRest);
+    createEntryBlock(odsState.location, *odsState.regions.front(), parameters.size());
 }
 
 mlir::ParseResult pylir::HIR::FuncOp::parse(mlir::OpAsmParser& parser, mlir::OperationState& result)
@@ -450,27 +443,8 @@ void pylir::HIR::FuncOp::print(mlir::OpAsmPrinter& p)
         resAttrs = llvm::to_vector(attr.getAsRange<mlir::DictionaryAttr>());
     }
 
-    printFunction(p, FunctionParameterRange(*this), getResultTypes(), resAttrs, (*this)->getAttrDictionary(),
-                  getAttributeNames(), getRegion());
-}
-
-//===--------------------------------------------------------------------------------------------------------------===//
-// ReturnOp
-//===--------------------------------------------------------------------------------------------------------------===//
-
-mlir::LogicalResult pylir::HIR::ReturnOp::verify()
-{
-    auto function = (*this)->getParentOfType<FunctionInterface>();
-    PYLIR_ASSERT(function && "should have already been verified elsewhere");
-    if (function.getResultTypes().empty() && getValue())
-    {
-        return emitOpError("expected no return value within function with no return type");
-    }
-    if (!function.getResultTypes().empty() && !getValue())
-    {
-        return emitOpError("expected return value within function with return type");
-    }
-    return mlir::success();
+    printFunction(p, FunctionParameterRange(*this), resAttrs, (*this)->getAttrDictionary(), getAttributeNames(),
+                  getRegion());
 }
 
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.cpp.inc"

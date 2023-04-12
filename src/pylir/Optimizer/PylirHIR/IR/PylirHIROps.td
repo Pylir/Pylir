@@ -27,11 +27,8 @@ class PylirHIR_Op<string mneomic, list<Trait> traits = []> : Op<PylirHIR_Dialect
 def PylirHIR_FunctionType : Type<
     And<[
         FunctionType.predicate,
-        CPred<"$_self.cast<::mlir::FunctionType>().getNumResults() <= 1">,
-        Or<[
-            CPred<"$_self.cast<::mlir::FunctionType>().getNumResults() == 0">,
-            SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getResult(0)", DynamicType.predicate>
-        ]>,
+        CPred<"$_self.cast<::mlir::FunctionType>().getNumResults() == 1">,
+        SubstLeaves<"$_self", "$_self.cast<::mlir::FunctionType>().getResult(0)", DynamicType.predicate>,
         Concat<"llvm::all_of($_self.cast<::mlir::FunctionType>().getInputs(), [](mlir::Type t) {"
             "return t && (", SubstLeaves<"$_self", "t", DynamicType.predicate>, ");"
         "})">,
@@ -40,6 +37,7 @@ def PylirHIR_FunctionType : Type<
     let summary = "python function";
     let cppClassName = FunctionType.cppClassName;
 }
+
 def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
     [Symbol, FunctionOpInterface, IsolatedFromAbove, OpAsmOpInterface, PylirHIR_FunctionInterface]> {
 
@@ -56,8 +54,7 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
     let regions = (region MinSizedRegion<1>:$body);
 
     let builders = [
-        OpBuilder<(ins "mlir::Type":$resultType, "mlir::StringAttr":$symbolName,
-                        "llvm::ArrayRef<FunctionParameterSpec>":$parameters)>
+        OpBuilder<(ins "llvm::Twine":$symbolName, "llvm::ArrayRef<FunctionParameterSpec>":$parameters)>
     ];
 
     let description = [{
@@ -67,9 +64,8 @@ def PylirHIR_GlobalFuncOp : PylirHIR_Op<"globalFunc",
 
         Syntax:
         ```
-        arg ::= (`*` | `**`) value-def [[only]string-attr] [ dictionary-attr ]
-        ret-type ::= `!py.dynamic` | `(` `!py.dynamic` [ dictionary-attr ] `)`
-        global_func ::= `pyHIR.global_func` sym_name `(` [ <arg> { `,` <arg> } ] `)` [`->` ret-type] attr-with-keyword
+        arg ::= (`*` | `**`) value-def [[`only`] string-attr] [ dictionary-attr ]
+        global_func ::= `pyHIR.global_func` sym_name `(` [ <arg> { `,` <arg> } ] `)` [ `->` dictionary-attr ] attr-with-keyword
                         `{` body `}`
         ```
     }];
@@ -157,8 +153,7 @@ def PylirHIR_FuncOp : PylirHIR_Op<"func", [OpAsmOpInterface, PylirHIR_FunctionIn
     let results = (outs DynamicType:$result);
 
     let builders = [
-        OpBuilder<(ins "mlir::Type":$resultType, "mlir::StringAttr":$name,
-                        "llvm::ArrayRef<FunctionParameterSpec>":$parameters)>
+        OpBuilder<(ins "llvm::Twine":$name, "llvm::ArrayRef<FunctionParameterSpec>":$parameters)>
     ];
 
     let description = [{
@@ -172,9 +167,8 @@ def PylirHIR_FuncOp : PylirHIR_Op<"func", [OpAsmOpInterface, PylirHIR_FunctionIn
 
         Syntax:
         ```
-        arg ::= (`*` | `**`) value-def [[only] string-attr] [ `=` value-use ] [ dictionary-attr ]
-        ret-type ::= `!py.dynamic` | `(` `!py.dynamic` [ dictionary-attr ] `)`
-        global_func ::= `pyHIR.func` name `(` [ <arg> { `,` <arg> } ] `)` [`->` ret-type] attr-with-keyword
+        arg ::= (`*` | `**`) value-def [[`only`] string-attr] [ `=` value-use ] [ dictionary-attr ]
+        global_func ::= `pyHIR.func` name `(` [ <arg> { `,` <arg> } ] `)` [ `->` dictionary-attr ] attr-with-keyword
                         `{` body `}`
         ```
     }];
@@ -231,17 +225,14 @@ def PylirHIR_FuncOp : PylirHIR_Op<"func", [OpAsmOpInterface, PylirHIR_FunctionIn
 
 def PylirHIR_ReturnOp : PylirHIR_Op<"return", [Pure, ReturnLike, Terminator,
     ParentOneOf<["FuncOp", "GlobalFuncOp"]>]> {
-    let arguments = (ins Optional<DynamicType>:$value);
+    let arguments = (ins DynamicType:$value);
 
     let description = [{
         Operation used to return from within a function.
-        Control is returned back to the caller and the results of the function call, if any, are populated with
-        `$operands`.
+        Control is returned back to the caller and the result of the function call is populated with `$value`.
     }];
 
-    let assemblyFormat = "($value^)? attr-dict";
-
-    let hasVerifier = 1;
+    let assemblyFormat = "$value attr-dict";
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
