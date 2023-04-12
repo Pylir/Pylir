@@ -9,7 +9,6 @@
 #include <mlir/IR/OwningOpRef.h>
 
 #include <llvm/ADT/ScopeExit.h>
-#include <llvm/Support/FileSystem.h>
 
 #include <pylir/Diagnostics/DiagnosticsBuilder.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
@@ -21,27 +20,11 @@
 #include <tuple>
 #include <unordered_map>
 
+#include "CodeGenOptions.hpp"
 #include "PyBuilder.hpp"
 
 namespace pylir
 {
-
-struct CodeGenOptions
-{
-    std::vector<std::string> importPaths;
-
-    struct LoadRequest
-    {
-        llvm::sys::fs::file_t handle;
-        std::string qualifier;
-        std::pair<std::size_t, std::size_t> location;
-        Diag::DiagnosticsDocManager* diagnosticsDocManager;
-        std::string filePath;
-    };
-    std::function<void(LoadRequest&&)> moduleLoadCallback;
-    std::string qualifier;
-    bool implicitBuiltinsImport;
-};
 
 class CodeGen
 {

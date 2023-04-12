@@ -43,6 +43,7 @@
 #include <llvm/Transforms/Scalar/DeadStoreElimination.h>
 
 #include <pylir/CodeGen/CodeGen.hpp>
+#include <pylir/CodeGenNew/CodeGenNew.hpp>
 #include <pylir/LLVM/MarkSanitizersGCLeafs.hpp>
 #include <pylir/LLVM/PlaceStatepoints.hpp>
 #include <pylir/LLVM/PylirGC.hpp>
@@ -1048,6 +1049,12 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
     // Protects 'm_fileInputs' and 'm_documents'.
     std::mutex sourceDSMutex;
 
+    auto codeGenBackend = pylir::codegen;
+    if (args.hasArg(OPT_Xnew_codegen))
+    {
+        codeGenBackend = pylir::codegenNew;
+    }
+
     options.moduleLoadCallback = [&](CodeGenOptions::LoadRequest&& request)
     {
         std::unique_lock lock{dataStructureMutex};
@@ -1103,7 +1110,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
 
             auto copyOption = options;
             copyOption.qualifier = std::move(request.qualifier);
-            auto res = pylir::codegen(&*m_mlirContext, fileInput, docManager, copyOption);
+            auto res = codeGenBackend(&*m_mlirContext, fileInput, docManager, copyOption);
             if (docManager.errorsOccurred())
             {
                 return nullptr;
@@ -1121,7 +1128,7 @@ mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>> pylir::CompilerInvocation::co
         }
     };
 
-    auto mainModule = pylir::codegen(&*m_mlirContext, m_fileInputs.front(), mainModuleDiagManager, options);
+    auto mainModule = codeGenBackend(&*m_mlirContext, m_fileInputs.front(), mainModuleDiagManager, options);
     if (mainModuleDiagManager.errorsOccurred())
     {
         // Despite the errors that occurred in the main module, we still want to codegen and wait for all imports

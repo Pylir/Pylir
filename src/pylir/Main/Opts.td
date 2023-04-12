@@ -88,3 +88,4 @@ def verify : F<"verify", "Verify diagnostics output">, Group<grp_internal>;
 def Xsanitize_EQ : Joined<["-"], "Xsanitize=">, MetaVarName<"<sanitizers>">, Group<grp_internal>,
     Values<"address,undefined,thread">;
 def Xsanitize_codegen : F<"Xsanitize-codegen", "Enable Sanitizers in Pylir compiled code">, Group<grp_internal>;
+def Xnew_codegen : F<"Xnew-codegen", "Enable new CodeGen using pyHIR">, Group<grp_internal>;

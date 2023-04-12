@@ -30,6 +30,7 @@ target_link_libraries(PylirMain
   MLIRBytecodeReader
   MLIRBytecodeWriter
   CodeGen
+  CodeGenNew
   PylirLinker
   PylirOptimizer
   PylirToLLVMIR

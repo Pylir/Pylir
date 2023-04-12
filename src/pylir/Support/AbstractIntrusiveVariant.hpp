@@ -155,6 +155,8 @@ namespace detail::AbstractIntrusiveVariant
 {
 template <class Base, class... Args>
 auto deduceArgs(::pylir::AbstractIntrusiveVariant<Base, Args...>*) -> ::pylir::AbstractIntrusiveVariant<Base, Args...>;
+
+void deduceArgs(...);
 } // namespace detail::AbstractIntrusiveVariant
 
 template <class T, class U = decltype(detail::AbstractIntrusiveVariant::deduceArgs(std::declval<T*>()))>

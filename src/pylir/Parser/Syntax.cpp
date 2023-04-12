@@ -257,6 +257,11 @@ std::pair<std::size_t, std::size_t> LocationProvider<Suite>::getRange(const Suit
     return {getLoc(value.statements.front()).first, getLoc(value.statements.back()).second};
 }
 
+std::pair<std::size_t, std::size_t> LocationProvider<FileInput>::getRange(const FileInput& value) noexcept
+{
+    return rangeLoc(value.input);
+}
+
 std::pair<std::size_t, std::size_t> LocationProvider<ExpressionStmt>::getRange(const ExpressionStmt& value) noexcept
 {
     return rangeLoc(*value.expression);
