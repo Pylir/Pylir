@@ -20,6 +20,7 @@ jobs:
 
       - name: Install clang-tidy
         run: |
+          sudo apt-get update
           sudo apt-get install clang-tidy-$LLVM_VERSION
 
       - name: Checkout Pylir
@@ -99,6 +100,7 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get install clang-format-$LLVM_VERSION
           
       - name: Set up Python
