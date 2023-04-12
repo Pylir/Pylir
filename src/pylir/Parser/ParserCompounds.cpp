@@ -680,14 +680,17 @@ std::optional<std::vector<pylir::Syntax::Parameter>> pylir::Parser::parseParamet
     std::optional<std::size_t> seenDefaultParam;
     std::variant<std::monostate, std::size_t, BaseToken> seenPosRest;
     std::optional<std::size_t> seenKwRest;
-    while (parameters.empty() || maybeConsume(TokenType::Comma))
+
+    bool first = true;
+    while (first || maybeConsume(TokenType::Comma))
     {
-        if (!parameters.empty())
+        if (first)
         {
-            if (m_current == m_lexer.end())
-            {
-                return parameters;
-            }
+            first = false;
+        }
+        else if (m_current == m_lexer.end())
+        {
+            return parameters;
         }
 
         std::optional<Token> stars;
