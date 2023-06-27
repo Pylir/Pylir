@@ -425,8 +425,8 @@ mlir::ParseResult pylir::HIR::FuncOp::parse(mlir::OpAsmParser& parser, mlir::Ope
     }
     llvm::SmallVector<mlir::Type> resultTypes;
     if (mlir::failed(inferReturnTypes(result.getContext(), std::nullopt, result.operands,
-                                      mlir::DictionaryAttr::get(result.getContext(), result.attributes), result.regions,
-                                      resultTypes)))
+                                      mlir::DictionaryAttr::get(result.getContext(), result.attributes),
+                                      result.getRawProperties(), result.regions, resultTypes)))
     {
         return mlir::failure();
     }

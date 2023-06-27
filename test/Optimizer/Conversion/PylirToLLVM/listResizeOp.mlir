@@ -32,8 +32,8 @@ py.func @foo(%list : !py.dynamic, %length : index) {
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[TRAILING_SIZE]], %[[HEADER_SIZE]]
 // CHECK-NEXT: %[[TUPLE_MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
-// CHECK-NEXT: %[[FALSE_C:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: "llvm.intr.memset"(%[[TUPLE_MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE_C]])
+// CHECK-NEXT: "llvm.intr.memset"(%[[TUPLE_MEMORY]], %[[ZERO_I8]], %[[BYTES]])
+// CHECK-SAME: isVolatile = false
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 0]
 // CHECK-NEXT: llvm.store %[[TUPLE_TYPE]], %[[GEP]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 1]
@@ -44,8 +44,8 @@ py.func @foo(%list : !py.dynamic, %length : index) {
 // CHECK-NEXT: %[[PREV_ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[TRAILING_SIZE:.*]] = llvm.mul %[[LEN]], %[[ELEMENT_SIZE]]
-// CHECK-NEXT: %[[FALSE_C:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[PREV_ARRAY]], %[[TRAILING_SIZE]], %[[FALSE_C]])
+// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[PREV_ARRAY]], %[[TRAILING_SIZE]])
+// CHECK-SAME: isVolatile = false
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[LIST]][0, 2]
 // CHECK-NEXT: llvm.store %[[TUPLE_MEMORY]], %[[GEP]]
 // CHECK-NEXT: llvm.br ^[[END_BLOCK]]

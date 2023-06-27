@@ -9,6 +9,12 @@
 
 #include <lld/Common/Driver.h>
 
+LLD_HAS_DRIVER(coff)
+LLD_HAS_DRIVER(mingw)
+LLD_HAS_DRIVER(elf)
+LLD_HAS_DRIVER(wasm)
+LLD_HAS_DRIVER(macho)
+
 #include "DiagnosticMessages.hpp"
 #include "Version.hpp"
 

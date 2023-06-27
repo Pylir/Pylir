@@ -22,8 +22,8 @@ py.func @foo() -> !pyMem.memory {
 // CHECK-NEXT: %[[BYTES:.*]] = llvm.add %[[MUL]], %[[INSTANCE_SIZE]]
 // CHECK-NEXT: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc(%[[BYTES]])
 // CHECK-NEXT: %[[ZERO_I8:.*]] = llvm.mlir.constant(0 : i8)
-// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]], %[[FALSE]])
+// CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]])
+// CHECK-SAME: isVolatile = false
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
 // CHECK-NEXT: llvm.store %[[STR]], %[[GEP]] {tbaa = [@tbaa::@"Python Type Object access"]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]

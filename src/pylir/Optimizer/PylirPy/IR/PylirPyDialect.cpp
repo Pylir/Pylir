@@ -104,7 +104,7 @@ mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilde
     }
     if (mlir::arith::ConstantOp::isBuildableWith(value, type))
     {
-        return builder.create<mlir::arith::ConstantOp>(loc, type, value);
+        return builder.create<mlir::arith::ConstantOp>(loc, type, mlir::cast<mlir::TypedAttr>(value));
     }
     return nullptr;
 }

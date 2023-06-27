@@ -31,6 +31,6 @@ py.func @foo(%list : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[TUPLE_PTR_PTR]]
 // CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[LOAD]][0, 2]
 // CHECK-NEXT: %[[PREV_ARRAY:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
-// CHECK-NEXT: %[[FALSE_C:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[PREV_ARRAY]], %[[BYTES]], %[[FALSE_C]])
+// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[PREV_ARRAY]], %[[BYTES]])
+// CHECK-SAME: isVolatile = false
 // CHECK-NEXT: llvm.return %[[MEMORY]]

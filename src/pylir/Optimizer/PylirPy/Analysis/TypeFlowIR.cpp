@@ -319,10 +319,11 @@ mlir::SuccessorOperands pylir::TypeFlow::CondBranchOp::getSuccessorOperands(unsi
 mlir::LogicalResult pylir::TypeFlow::CalcOp::inferReturnTypes(mlir::MLIRContext* context, std::optional<mlir::Location>,
                                                               mlir::ValueRange operands,
                                                               mlir::DictionaryAttr attributes,
+                                                              mlir::OpaqueProperties properties,
                                                               mlir::RegionRange regions,
                                                               llvm::SmallVectorImpl<mlir::Type>& inferredReturnTypes)
 {
-    Adaptor adaptor(operands, attributes, regions);
+    Adaptor adaptor(operands, attributes, properties, regions);
     std::size_t count = adaptor.getInstruction()->getNumResults();
     if (!adaptor.getValueCalc())
     {
@@ -351,6 +352,16 @@ mlir::Operation::operand_range pylir::TypeFlow::CallOp::getArgOperands()
 mlir::Operation::operand_range pylir::TypeFlow::CallIndirectOp::getArgOperands()
 {
     return getArguments();
+}
+
+void pylir::TypeFlow::CallOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
+{
+    setCalleeAttr(mlir::cast<mlir::FlatSymbolRefAttr>(callee.get<mlir::SymbolRefAttr>()));
+}
+
+void pylir::TypeFlow::CallIndirectOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
+{
+    getCalleeMutable().assign(callee.get<mlir::Value>());
 }
 
 #define GET_OP_CLASSES

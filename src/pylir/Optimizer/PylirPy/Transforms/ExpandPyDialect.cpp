@@ -225,7 +225,7 @@ struct ListUnrollPattern : mlir::OpRewritePattern<TargetOp>
         rewriter.mergeBlocks(dest, rewriter.getBlock());
 
         continueOntoHappyPath(exceptionHandler, rewriter);
-        rewriter.replaceOp(op, {list});
+        rewriter.replaceOp(op, list);
     }
 
     mlir::LogicalResult match(TargetOp op) const override

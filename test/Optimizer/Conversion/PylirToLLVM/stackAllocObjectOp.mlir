@@ -18,7 +18,7 @@ py.func @foo() -> index {
 // CHECK-NEXT: llvm.intr.lifetime.start {{[0-9]+}}, %[[MEMORY]]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant
-// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant
-// CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO]], %[[SIZE]], %[[FALSE]])
+// CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO]], %[[SIZE]])
+// CHECK-SAME: isVolatile = false
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
 // CHECK-NEXT: llvm.store %[[TUPLE]], %[[GEP]]

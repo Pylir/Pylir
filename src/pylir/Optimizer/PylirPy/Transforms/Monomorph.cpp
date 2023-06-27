@@ -1456,7 +1456,7 @@ void Monomorph::runOnOperation()
 
     auto doClone = [this, &table](Clone& clone)
     {
-        clone.function = clone.function->clone(clone.mapping);
+        clone.function = mlir::cast<mlir::FunctionOpInterface>(clone.function->clone(clone.mapping));
         mlir::cast<mlir::SymbolOpInterface>(*clone.function).setPrivate();
         table.insert(clone.function);
         m_functionsCloned++;

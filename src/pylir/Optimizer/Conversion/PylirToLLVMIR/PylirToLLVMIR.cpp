@@ -456,9 +456,7 @@ struct ListResizeOpConversion : public ConvertPylirOpToLLVMPattern<Py::ListResiz
             auto prevArray = tuplePtr.trailingArray(op.getLoc()).at(op.getLoc(), 0);
             auto elementTypeSize = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
             auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, elementTypeSize);
-            rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), array, prevArray, inBytes,
-                                                  rewriter.create<mlir::LLVM::ConstantOp>(
-                                                      op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false)));
+            rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), array, prevArray, inBytes, /*isVolatile=*/false);
             list.tuplePtr(op.getLoc()).store(op.getLoc(), newTupleModel);
         }
         rewriter.create<mlir::LLVM::BrOp>(op.getLoc(), mlir::ValueRange{}, endBlock);
@@ -954,9 +952,7 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<Mem
             codeGenState.createRuntimeCall(op.getLoc(), rewriter, CodeGenState::Runtime::pylir_gc_alloc, {inBytes});
         auto zeroI8 =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
-        auto falseC =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
-        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, falseC);
+        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, /*isVolatile=*/false);
         pyObjectModel(rewriter, memory).typePtr(op.getLoc()).store(op.getLoc(), adaptor.getTypeObject());
         rewriter.replaceOp(op, memory);
         return mlir::success();
@@ -979,9 +975,7 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<Mem::GCAll
             codeGenState.createRuntimeCall(op.getLoc(), rewriter, CodeGenState::Runtime::pylir_gc_alloc, {inBytes});
         auto zeroI8 =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
-        auto falseC =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
-        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, falseC);
+        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, /*isVolatile=*/false);
         pyObjectModel(rewriter, memory).typePtr(op.getLoc()).store(op.getLoc(), adaptor.getTypeObject());
         rewriter.replaceOp(op, memory);
         return mlir::success();
@@ -1015,9 +1009,7 @@ struct StackAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<Mem::St
         auto inBytes = createIndexConstant(rewriter, op.getLoc(), elementTypeSize);
         auto zeroI8 =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
-        auto falseC =
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
-        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, falseC);
+        rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, /*isVolatile=*/false);
         pyObjectModel(rewriter, memory).typePtr(op.getLoc()).store(op.getLoc(), adaptor.getTypeObject());
         rewriter.replaceOp(op, memory);
         return mlir::success();
@@ -1101,9 +1093,7 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<Mem::I
 
         auto array = tuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
         auto listArray = list.tuplePtr(op.getLoc()).load(op.getLoc()).trailingArray(op.getLoc()).at(op.getLoc(), 0);
-        rewriter.create<mlir::LLVM::MemcpyOp>(
-            op.getLoc(), array, listArray, inBytes,
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false)));
+        rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), array, listArray, inBytes, /*isVolatile=*/false);
 
         rewriter.replaceOp(op, adaptor.getMemory());
         return mlir::success();
@@ -1128,9 +1118,7 @@ struct InitTupleCopyOpConversion : public ConvertPylirOpToLLVMPattern<Mem::InitT
 
         auto array = destTuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
         auto listArray = sourceTuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
-        rewriter.create<mlir::LLVM::MemcpyOp>(
-            op.getLoc(), array, listArray, inBytes,
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false)));
+        rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), array, listArray, inBytes, /*isVolatile=*/false);
 
         rewriter.replaceOp(op, adaptor.getMemory());
         return mlir::success();
@@ -1157,9 +1145,7 @@ struct InitTupleDropFrontOpConversion : public ConvertPylirOpToLLVMPattern<Mem::
 
         auto array = tuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
         auto prevArray = prevTuple.trailingArray(op.getLoc()).at(op.getLoc(), adaptor.getCount());
-        rewriter.create<mlir::LLVM::MemcpyOp>(
-            op.getLoc(), array, prevArray, inBytes,
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false)));
+        rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), array, prevArray, inBytes, /*isVolatile=*/false);
         rewriter.replaceOp(op, adaptor.getMemory());
         return mlir::success();
     }
@@ -1187,9 +1173,7 @@ struct InitTuplePrependOpConversion : public ConvertPylirOpToLLVMPattern<Mem::In
 
         auto array = tuple.trailingArray(op.getLoc()).at(op.getLoc(), 1);
         auto prevArray = prevTuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
-        rewriter.create<mlir::LLVM::MemcpyOp>(
-            op.getLoc(), array, prevArray, inBytes,
-            rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false)));
+        rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), array, prevArray, inBytes, /*isVolatile=*/false);
         rewriter.replaceOp(op, adaptor.getMemory());
         return mlir::success();
     }
@@ -1265,9 +1249,7 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<Mem::InitStrOp>
             auto sourceLoaded = iterString.elementPtr(op.getLoc()).load(op.getLoc());
             auto dest =
                 rewriter.create<mlir::LLVM::GEPOp>(op.getLoc(), array.getType(), rewriter.getI8Type(), array, size);
-            auto falseC =
-                rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(false));
-            rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), dest, sourceLoaded, sizeLoaded, falseC);
+            rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), dest, sourceLoaded, sizeLoaded, /*isVolatile=*/false);
             size = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), size, sizeLoaded);
         }
         rewriter.replaceOp(op, adaptor.getMemory());
@@ -1458,8 +1440,8 @@ struct FuncOpConversion : ConvertPylirOpToLLVMPattern<Py::FuncOp>
 
         // TODO: It might be required to be doing function type/argument conversions here in the future based on ABI.
         mlir::TypeConverter::SignatureConversion result(op.getNumArguments());
-        mlir::Type llvmType =
-            typeConverter.convertFunctionSignature(op.getFunctionType(), /*isVariadic=*/false, result);
+        mlir::Type llvmType = typeConverter.convertFunctionSignature(op.getFunctionType(), /*isVariadic=*/false,
+                                                                     /*useBarePtrCallConv=*/false, result);
 
         auto newFunc = rewriter.create<mlir::LLVM::LLVMFuncOp>(op.getLoc(), op.getName(), llvmType, linkage,
                                                                /*dsoLocal=*/true);

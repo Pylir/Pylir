@@ -8,9 +8,10 @@
 #include <mlir/IR/Value.h>
 
 #include <llvm/ADT/DenseMap.h>
-#include <llvm/ADT/Optional.h>
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyRefAttr.hpp>
+
+#include <optional>
 
 #include "PylirMemAttributes.hpp"
 

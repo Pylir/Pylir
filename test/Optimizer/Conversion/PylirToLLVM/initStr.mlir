@@ -44,8 +44,8 @@ py.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Size access"]}
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 2]
 // CHECK-NEXT: %[[ARRAY_0:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Element Ptr access"]}
-// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[ARRAY_0]], %[[SIZE_0]], %[[FALSE]])
+// CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[ARRAY_0]], %[[SIZE_0]])
+// CHECK-SAME: isVolatile = false
 // CHECK-NEXT: %[[SIZE_NEW:.*]] = llvm.add %[[SIZE]], %[[SIZE_0]]
 
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
@@ -54,8 +54,8 @@ py.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 2]
 // CHECK-NEXT: %[[ARRAY_1:.*]] = llvm.load %[[GEP2]] {tbaa = [@tbaa::@"Python String Element Ptr access"]}
 // CHECK-NEXT: %[[DEST:.*]] = llvm.getelementptr %[[ARRAY]][%[[SIZE_NEW]]]
-// CHECK-NEXT: %[[FALSE:.*]] = llvm.mlir.constant(false)
-// CHECK-NEXT: "llvm.intr.memcpy"(%[[DEST]], %[[ARRAY_1]], %[[SIZE_1]], %[[FALSE]])
+// CHECK-NEXT: "llvm.intr.memcpy"(%[[DEST]], %[[ARRAY_1]], %[[SIZE_1]])
+// CHECK-SAME: isVolatile = false
 // CHECK-NEXT: llvm.add %[[SIZE_NEW]], %[[SIZE_1]]
 
 // CHECK-NEXT: llvm.return %[[MEMORY]]

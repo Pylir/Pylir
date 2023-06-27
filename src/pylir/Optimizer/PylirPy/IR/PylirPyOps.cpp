@@ -558,6 +558,11 @@ mlir::Operation::operand_range pylir::Py::FunctionCallOp::getArgOperands()
     return getCallOperands();
 }
 
+void pylir::Py::FunctionCallOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
+{
+    getFunctionMutable().assign(callee.get<mlir::Value>());
+}
+
 //===--------------------------------------------------------------------------------------------------------------===//
 // FunctionInvokeOp implementations
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -570,6 +575,11 @@ mlir::CallInterfaceCallable pylir::Py::FunctionInvokeOp::getCallableForCallee()
 mlir::Operation::operand_range pylir::Py::FunctionInvokeOp::getArgOperands()
 {
     return getCallOperands();
+}
+
+void pylir::Py::FunctionInvokeOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
+{
+    getFunctionMutable().assign(callee.get<mlir::Value>());
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -646,6 +656,11 @@ mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
     return getCallOperands();
 }
 
+void pylir::Py::CallOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
+{
+    setCalleeAttr(mlir::cast<mlir::FlatSymbolRefAttr>(callee.get<mlir::SymbolRefAttr>()));
+}
+
 //===--------------------------------------------------------------------------------------------------------------===//
 // InvokeOp implementations
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -658,6 +673,11 @@ mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
 mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
 {
     return getCallOperands();
+}
+
+void pylir::Py::InvokeOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
+{
+    setCalleeAttr(mlir::cast<mlir::FlatSymbolRefAttr>(callee.get<mlir::SymbolRefAttr>()));
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//

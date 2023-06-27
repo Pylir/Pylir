@@ -21,7 +21,7 @@ struct llvm::PointerLikeTypeTraits<pylir::Py::ObjectTypeInterface>
 
     static inline pylir::Py::ObjectTypeInterface getFromVoidPointer(void* p)
     {
-        return pylir::Py::ObjectTypeInterface::getFromOpaquePointer(p);
+        return mlir::cast<pylir::Py::ObjectTypeInterface>(pylir::Py::ObjectTypeInterface::getFromOpaquePointer(p));
     }
 
     static constexpr int NumLowBitsAvailable = llvm::PointerLikeTypeTraits<mlir::Type>::NumLowBitsAvailable;
