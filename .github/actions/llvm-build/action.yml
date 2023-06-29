@@ -88,9 +88,13 @@ runs:
         $assertions = '-DLLVM_ENABLE_ASSERTIONS=ON'
         $san_flag = ''
         if ('${{inputs.sanitizers}}') {
-          $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
-          $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
-        
+          if ($IsWindows) {
+            $san_flag = "-DCMAKE_CXX_FLAGS=""-fsanitize=${{inputs.sanitizers}} -g0 -fno-omit-frame-pointer"""
+          } else {
+            $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
+            $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
+          }
+          
           # Assertions within LLVM also enables assertions in libstdc++ and libc++, which have the negative side effect
           # of causing thread sanitizer errors due to extra reads performed in the assertions (that would otherwise
           # not be present).
@@ -159,7 +163,7 @@ runs:
       run: |
         cmake --build llvm-build
 
-    - name: Remove Object files when not using thing archives
+    - name: Remove Object files
       shell: pwsh
       if: steps.cache-llvm-build.outputs.cache-hit != 'true'
       run: |
