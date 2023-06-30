@@ -13,6 +13,9 @@
 
 #include "PylirMemAttributes.hpp"
 
+// TODO: Remove once upstream MLIR stops producing unqualified code in generated 'setPropertiesFromAttr'.
+using namespace mlir;
+
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOps.cpp.inc>
 #include <pylir/Optimizer/PylirMem/IR/PylirMemOpsExtra.cpp.inc>

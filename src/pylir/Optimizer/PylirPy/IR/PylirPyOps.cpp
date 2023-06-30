@@ -701,6 +701,9 @@ void pylir::Py::FuncOp::print(::mlir::OpAsmPrinter& p)
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyEnums.cpp.inc>
 
+// TODO: Remove once upstream MLIR stops producing unqualified code in generated 'setPropertiesFromAttr'.
+using namespace mlir;
+
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOpsExtra.cpp.inc>

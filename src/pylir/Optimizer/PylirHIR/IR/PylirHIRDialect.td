@@ -20,6 +20,7 @@ def PylirHIR_Dialect : Dialect {
 
     let cppNamespace = "::pylir::HIR";
     let dependentDialects = ["::pylir::Py::PylirPyDialect"];
+    let usePropertiesForAttributes = 1;
 }
 
 #endif

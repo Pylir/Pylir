@@ -55,7 +55,8 @@ class FixpointPass : public pylir::impl::FixpointPassBase<FixpointPass>
             [&](mlir::Operation* op)
             {
                 addToHash(op);
-                addToHash(op->getAttrDictionary());
+                addToHash(op->hashProperties());
+                addToHash(op->getDiscardableAttrDictionary());
                 for (mlir::Region& region : op->getRegions())
                 {
                     for (mlir::Block& block : region)

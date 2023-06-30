@@ -24,6 +24,8 @@ def PylirPy_Dialect : Dialect {
 
     let useDefaultTypePrinterParser = 1;
 
+    let usePropertiesForAttributes = 1;
+
     let extraClassDeclaration = [{
         void initializeAttributes();
 
