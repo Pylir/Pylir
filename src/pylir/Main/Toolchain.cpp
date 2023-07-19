@@ -4,6 +4,7 @@
 
 #include "Toolchain.hpp"
 
+#include <llvm/ADT/StringExtras.h>
 #include <llvm/Support/Path.h>
 #include <llvm/Support/Program.h>
 

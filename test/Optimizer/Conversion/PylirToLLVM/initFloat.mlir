@@ -12,9 +12,12 @@ py.func @foo(%value : f64) -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Float Value"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_FLOAT_VALUE:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+
 // CHECK-LABEL: llvm.func @foo
 // CHECK-SAME: %[[VALUE:[[:alnum:]]+]]
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc
 // CHECK: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
-// CHECK-NEXT: llvm.store %[[VALUE]], %[[GEP]] {tbaa = [@tbaa::@"Python Float Value access"]}
+// CHECK-NEXT: llvm.store %[[VALUE]], %[[GEP]] {tbaa = [#[[$PYTHON_FLOAT_VALUE]]]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]

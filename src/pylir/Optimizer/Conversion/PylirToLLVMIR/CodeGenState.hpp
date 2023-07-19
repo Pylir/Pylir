@@ -53,9 +53,7 @@ class CodeGenState
     llvm::DenseMap<pylir::Py::ObjectAttrInterface, mlir::LLVM::GlobalOp> m_globalConstants;
     llvm::DenseMap<mlir::Attribute, mlir::LLVM::GlobalOp> m_globalBuffers;
     mlir::LLVM::LLVMFuncOp m_globalInit;
-    mlir::OwningOpRef<mlir::LLVM::MetadataOp> m_tbaaRegion;
-    std::optional<mlir::SymbolTable> m_tbaaSymbolTable;
-    mlir::LLVM::TBAARootMetadataOp m_tbaaRoot;
+    mlir::LLVM::TBAARootAttr m_tbaaRoot;
 
     void appendToGlobalInit(mlir::OpBuilder& builder, llvm::function_ref<void()> section);
 
@@ -65,7 +63,9 @@ public:
     CodeGenState(PylirTypeConverter& typeConverter, mlir::SymbolTable symbolTable)
         : m_objectPtrType(mlir::LLVM::LLVMPointerType::get(&typeConverter.getContext(), REF_ADDRESS_SPACE)),
           m_typeConverter(typeConverter),
-          m_symbolTable(std::move(symbolTable))
+          m_symbolTable(std::move(symbolTable)),
+          m_tbaaRoot(mlir::LLVM::TBAARootAttr::get(
+              &typeConverter.getContext(), mlir::StringAttr::get(&typeConverter.getContext(), "Pylir TBAA Root")))
     {
     }
 
@@ -124,14 +124,6 @@ public:
     mlir::LLVM::LLVMFuncOp getGlobalInit() const
     {
         return m_globalInit;
-    }
-
-    /// Returns the Metadata region used for TBAA Metadata. This region is created lazily when TBAA metadata is first
-    /// created. If such Metadata has never been created it is null.
-    /// The region is owned by this class and not attached to any parents during dialect conversion.
-    mlir::OwningOpRef<mlir::LLVM::MetadataOp>&& getTBAARegion()
-    {
-        return std::move(m_tbaaRegion);
     }
 };
 

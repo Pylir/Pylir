@@ -13,6 +13,9 @@ py.func @foo() -> !pyMem.memory {
     return %1 : !pyMem.memory
 }
 
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Type Object"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_TYPE_OBJECT:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+
 // CHECK-LABEL: llvm.func @foo
 // CHECK-NEXT: %[[STR:.*]] = llvm.mlir.addressof @builtins.str
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : index)
@@ -25,7 +28,7 @@ py.func @foo() -> !pyMem.memory {
 // CHECK-NEXT: "llvm.intr.memset"(%[[MEMORY]], %[[ZERO_I8]], %[[BYTES]])
 // CHECK-SAME: isVolatile = false
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 0]
-// CHECK-NEXT: llvm.store %[[STR]], %[[GEP]] {tbaa = [@tbaa::@"Python Type Object access"]}
+// CHECK-NEXT: llvm.store %[[STR]], %[[GEP]] {tbaa = [#[[$PYTHON_TYPE_OBJECT]]]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]
 
 // CHECK: llvm.func @pylir_gc_alloc(i{{[0-9]+}}) -> (!llvm.ptr<{{[0-9]+}}> {

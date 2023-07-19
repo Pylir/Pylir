@@ -13,7 +13,10 @@ py.func @test() -> !py.dynamic {
     return %1 : !py.dynamic
 }
 
-// CHECK: llvm.mlir.global external @handle()
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Handle"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_HANDLE:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+
+// CHECK-LABEL: llvm.mlir.global external @handle()
 // SECTION_COFF-SAME: section = "py_root"
 // SECTION_MACHO-SAME: section = "__DATA,py_root"
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
@@ -22,9 +25,9 @@ py.func @test() -> !py.dynamic {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.addressof @{{const\$.*}}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [#[[$PYTHON_HANDLE]]]}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [#[[$PYTHON_HANDLE]]]}
 // CHECK-NEXT: llvm.return %[[VALUE]]
 
 // -----
@@ -46,9 +49,9 @@ py.func @test() -> index {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.constant(5 : i{{.*}})
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
 // CHECK-NEXT: llvm.return %[[VALUE]]
 
 // -----
@@ -70,9 +73,9 @@ py.func @test() -> index {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.constant(5 : i{{.*}})
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
 // CHECK-NEXT: llvm.return %[[VALUE]]
 
 // -----
@@ -101,7 +104,7 @@ py.func @test() -> !py.dynamic {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[CONST:.*]] = llvm.mlir.addressof @{{const\$.*}}
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: llvm.store %[[CONST]], %[[HANDLE]]
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
-// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]] {tbaa = [@tbaa::@"Python Handle access"]}
+// CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
 // CHECK-NEXT: llvm.return %[[VALUE]]

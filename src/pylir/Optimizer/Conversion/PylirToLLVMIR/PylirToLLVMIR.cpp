@@ -1537,9 +1537,5 @@ void ConvertPylirToLLVMPass::runOnOperation()
                                                   builder.getArrayAttr({mlir::FlatSymbolRefAttr::get(globalInit)}),
                                                   builder.getI32ArrayAttr({65535}));
     }
-    if (auto tbaaRegion = codeGenState.getTBAARegion())
-    {
-        module.push_back(tbaaRegion.release());
-    }
 }
 } // namespace

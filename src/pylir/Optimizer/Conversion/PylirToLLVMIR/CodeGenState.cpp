@@ -29,19 +29,12 @@ void pylir::CodeGenState::appendToGlobalInit(mlir::OpBuilder& builder, llvm::fun
 
 mlir::ArrayAttr pylir::CodeGenState::getTBAAAccess(TbaaAccessType accessType)
 {
+    mlir::MLIRContext* context = &m_typeConverter.getContext();
     if (accessType == TbaaAccessType::None)
     {
-        return mlir::ArrayAttr::get(&m_typeConverter.getContext(), {});
+        return mlir::ArrayAttr::get(context, {});
     }
 
-    mlir::OpBuilder builder(&m_typeConverter.getContext());
-    if (!m_tbaaSymbolTable)
-    {
-        m_tbaaRegion = builder.create<mlir::LLVM::MetadataOp>(builder.getUnknownLoc(), "tbaa");
-        m_tbaaSymbolTable.emplace(*m_tbaaRegion);
-        m_tbaaRoot = builder.create<mlir::LLVM::TBAARootMetadataOp>(builder.getUnknownLoc(), "root", "Pylir TBAA Root");
-        m_tbaaSymbolTable->insert(m_tbaaRoot);
-    }
     std::string tbaaAccessTypeString;
     switch (accessType)
     {
@@ -64,24 +57,12 @@ mlir::ArrayAttr pylir::CodeGenState::getTBAAAccess(TbaaAccessType accessType)
         case TbaaAccessType::FunctionPointer: tbaaAccessTypeString = "Python Function Pointer"; break;
     }
 
-    std::string accessName = tbaaAccessTypeString + " access";
-    std::string typeName = tbaaAccessTypeString + " type";
-    if (auto existing = m_tbaaSymbolTable->lookup<mlir::LLVM::TBAATagOp>(accessName))
-    {
-        return builder.getArrayAttr(mlir::SymbolRefAttr::get(m_tbaaRegion->getSymNameAttr(),
-                                                             mlir::FlatSymbolRefAttr::get(existing.getSymNameAttr())));
-    }
+    auto type = mlir::LLVM::TBAATypeDescriptorAttr::get(context, /*identity=*/tbaaAccessTypeString,
+                                                        mlir::LLVM::TBAAMemberAttr::get(m_tbaaRoot, 0));
 
-    auto type = builder.create<mlir::LLVM::TBAATypeDescriptorOp>(
-        builder.getUnknownLoc(), /*sym_name=*/typeName, /*identity=*/builder.getStringAttr(typeName),
-        builder.getArrayAttr({mlir::FlatSymbolRefAttr::get(m_tbaaRoot)}), builder.getDenseI64ArrayAttr({0}));
-    m_tbaaSymbolTable->insert(type);
+    auto tag = mlir::LLVM::TBAATagAttr::get(/*base_type=*/type, /*access_type=*/type, 0);
 
-    auto tag = builder.create<mlir::LLVM::TBAATagOp>(builder.getUnknownLoc(), /*sym_name=*/accessName,
-                                                     /*base_type=*/typeName, /*access_type=*/typeName, 0);
-    m_tbaaSymbolTable->insert(tag);
-    return builder.getArrayAttr(
-        mlir::SymbolRefAttr::get(m_tbaaRegion->getSymNameAttr(), mlir::FlatSymbolRefAttr::get(tag.getSymNameAttr())));
+    return mlir::ArrayAttr::get(context, tag);
 }
 
 mlir::Value pylir::CodeGenState::createRuntimeCall(mlir::Location loc, mlir::OpBuilder& builder,

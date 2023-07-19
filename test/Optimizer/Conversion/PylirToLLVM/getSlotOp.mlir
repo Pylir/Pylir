@@ -12,14 +12,21 @@ py.func @foo() -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Type Object"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_TYPE_OBJECT:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Type Offset"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_TYPE_OFFSET:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Object Slots"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_OBJECT_SLOTS:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+
 // CHECK-LABEL: @foo
 // CHECK-NEXT: %[[TUPLE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[ZERO:.*]] = llvm.mlir.constant(0 : {{.*}}) : i{{[0-9]+}}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][0, 0]
-// CHECK-NEXT: %[[TYPE:.*]] = llvm.load %[[GEP]] {tbaa = [@tbaa::@"Python Type Object access"]}
+// CHECK-NEXT: %[[TYPE:.*]] = llvm.load %[[GEP]] {tbaa = [#[[$PYTHON_TYPE_OBJECT]]]}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TYPE]][0, 1]
-// CHECK-NEXT: %[[OFFSET:.*]] = llvm.load %[[GEP]] {tbaa = [@tbaa::@"Python Type Offset access"]}
+// CHECK-NEXT: %[[OFFSET:.*]] = llvm.load %[[GEP]] {tbaa = [#[[$PYTHON_TYPE_OFFSET]]]}
 // CHECK-NEXT: %[[ADD:.*]] = llvm.add %[[OFFSET]], %[[ZERO]]
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][%[[ADD]]]
-// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]] {tbaa = [@tbaa::@"Python Object Slots access"]}
+// CHECK-NEXT: %[[LOAD:.*]] = llvm.load %[[GEP]] {tbaa = [#[[$PYTHON_OBJECT_SLOTS]]]}
 // CHECK-NEXT: llvm.return %[[LOAD]]

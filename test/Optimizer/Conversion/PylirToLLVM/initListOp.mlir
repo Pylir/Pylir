@@ -13,6 +13,15 @@ py.func @foo() -> !py.dynamic {
     return %2 : !py.dynamic
 }
 
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python List Size"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_LIST_SIZE:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Tuple Size"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_TUPLE_SIZE:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python Tuple Elements"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_TUPLE_ELEMENTS:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+// CHECK-DAG: #[[DESC:.*]] = #llvm.tbaa_type_desc<id = "Python List Tuple"{{.*}}>
+// CHECK-DAG: #[[$PYTHON_LIST_TUPLE:.*]] = #llvm.tbaa_tag<base_type = #[[DESC]], access_type = #[[DESC]], offset = 0>
+
 // CHECK-LABEL: llvm.func @foo
 // CHECK-NEXT: %[[LIST:.*]] = llvm.mlir.addressof @builtins.list
 // CHECK: %[[MEMORY:.*]] = llvm.call @pylir_gc_alloc
@@ -21,7 +30,7 @@ py.func @foo() -> !py.dynamic {
 // CHECK-NEXT: llvm.store %[[LIST]], %[[GEP]]
 // CHECK-NEXT: %[[LEN:.*]] = llvm.mlir.constant(1 : index) : i64
 // CHECK-NEXT: %[[SIZE_PTR:.*]] = llvm.getelementptr %[[MEMORY]][0, 1]
-// CHECK-NEXT: llvm.store %[[LEN]], %[[SIZE_PTR]] {tbaa = [@tbaa::@"Python List Size access"]}
+// CHECK-NEXT: llvm.store %[[LEN]], %[[SIZE_PTR]] {tbaa = [#[[$PYTHON_LIST_SIZE]]]}
 // CHECK-NEXT: %[[TUPLE_TYPE:.*]] = llvm.mlir.addressof @builtins.tuple
 // CHECK-NEXT: %[[HEADER_SIZE:.*]] = llvm.mlir.constant
 // CHECK-NEXT: %[[ELEMENT_SIZE:.*]] = llvm.mlir.constant
@@ -35,10 +44,10 @@ py.func @foo() -> !py.dynamic {
 // CHECK-NEXT: llvm.store %[[TUPLE_TYPE]], %[[GEP]]
 // CHECK-NEXT: %[[CAPACITY:.*]] = llvm.mlir.constant(1 : i{{.*}})
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 1]
-// CHECK-NEXT: llvm.store %[[CAPACITY]], %[[GEP]] {tbaa = [@tbaa::@"Python Tuple Size access"]}
+// CHECK-NEXT: llvm.store %[[CAPACITY]], %[[GEP]] {tbaa = [#[[$PYTHON_TUPLE_SIZE]]]}
 // CHECK-NEXT: %[[TRAILING:.*]] = llvm.getelementptr %[[TUPLE_MEMORY]][0, 2]
 // CHECK-NEXT: %[[FIRST:.*]] = llvm.getelementptr %[[TRAILING]][0, 0]
-// CHECK-NEXT: llvm.store %[[LIST]], %[[FIRST]] {tbaa = [@tbaa::@"Python Tuple Elements access"]}
+// CHECK-NEXT: llvm.store %[[LIST]], %[[FIRST]] {tbaa = [#[[$PYTHON_TUPLE_ELEMENTS]]]}
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[MEMORY]][0, 2]
-// CHECK-NEXT: llvm.store %[[TUPLE_MEMORY]], %[[GEP]] {tbaa = [@tbaa::@"Python List Tuple access"]}
+// CHECK-NEXT: llvm.store %[[TUPLE_MEMORY]], %[[GEP]] {tbaa = [#[[$PYTHON_LIST_TUPLE]]]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]

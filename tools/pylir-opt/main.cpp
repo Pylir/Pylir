@@ -78,7 +78,10 @@ mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses,
     // Prepare the pass manager, applying command-line and reproducer options.
     mlir::PassManager pm(context, op.get()->getName().getStringRef(), mlir::OpPassManager::Nesting::Implicit);
     pm.enableVerifier(verifyPasses);
-    applyPassManagerCLOptions(pm);
+    if (failed(applyPassManagerCLOptions(pm)))
+    {
+        return mlir::failure();
+    }
     pm.enableTiming(timing);
     if (failed(reproOptions.apply(pm)) || failed(passManagerSetupFn(pm)))
     {
@@ -96,7 +99,10 @@ mlir::LogicalResult performActions(llvm::raw_ostream& os, bool verifyPasses,
     if (emitBytecode)
     {
         mlir::BytecodeWriterConfig writerConfig(fallbackResourceMap);
-        writeBytecodeToFile(op.get(), os, writerConfig);
+        if (mlir::failed(writeBytecodeToFile(op.get(), os, writerConfig)))
+        {
+            return mlir::failure();
+        }
     }
     else
     {

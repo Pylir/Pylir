@@ -11,6 +11,10 @@ namespace pylir::Py
 {
 class ObjectAttrInterface;
 class GlobalValueOp;
+namespace detail
+{
+struct RefAttrStorage;
+} // namespace detail
 } // namespace pylir::Py
 
 #define GET_ATTRDEF_CLASSES
