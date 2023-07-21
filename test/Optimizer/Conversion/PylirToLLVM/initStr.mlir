@@ -54,7 +54,7 @@ py.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[ARRAY_0:.*]] = llvm.load %[[GEP2]] {tbaa = [#[[$PYTHON_STRING_ELEMENT]]]}
 // CHECK-NEXT: "llvm.intr.memcpy"(%[[ARRAY]], %[[ARRAY_0]], %[[SIZE_0]])
 // CHECK-SAME: isVolatile = false
-// CHECK-NEXT: %[[SIZE_NEW:.*]] = llvm.add %[[SIZE]], %[[SIZE_0]]
+// CHECK-NEXT: %[[SIZE_NEW:.*]] = llvm.add %[[SIZE_0]], %[[SIZE]]
 
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
