@@ -33,7 +33,7 @@ py.func @foo(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG0]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[SIZE_0:.*]] = llvm.load %[[GEP2]] {tbaa = [#[[$PYTHON_STRING_SIZE]]]}
-// CHECK-NEXT: %[[SIZE_SUM_0:.*]] = llvm.add %[[ZERO_I]], %[[SIZE_0]]
+// CHECK-NEXT: %[[SIZE_SUM_0:.*]] = llvm.add %[[SIZE_0]], %[[ZERO_I]]
 // CHECK-NEXT: %[[GEP1:.*]] = llvm.getelementptr %[[ARG1]][0, 1]
 // CHECK-NEXT: %[[GEP2:.*]] = llvm.getelementptr %[[GEP1]][0, 0]
 // CHECK-NEXT: %[[SIZE_1:.*]] = llvm.load %[[GEP2]] {tbaa = [#[[$PYTHON_STRING_SIZE]]]}
