@@ -81,8 +81,8 @@ runs:
       run: |
         $key = '${{runner.os}}'
 
-        if ('${{inputs.sanitizer}}') {
-          $key += '-${{inputs.sanitizer}}'.Replace(',', '_and_')
+        if ('${{inputs.sanitizers}}') {
+          $key += '-${{inputs.sanitizers}}'.Replace(',', '_and_')
         }
 
         if ('${{inputs.runtime_lib}}') {
