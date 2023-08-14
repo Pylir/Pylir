@@ -36,10 +36,6 @@ on:
   schedule:
     - cron: '0 0 * * 0'
 
-concurrency:
-  group: ${{ toJson(github.event.inputs) }}
-  cancel-in-progress: false
-
 jobs:
   Builds:
     runs-on: ${{inputs.os}}
