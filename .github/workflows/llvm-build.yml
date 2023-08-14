@@ -1,0 +1,196 @@
+name: Builds
+
+permissions:
+  actions: write
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      c-compiler:
+        description: 'C compiler to use'
+        required: true
+        type: string
+      cpp-compiler:
+        description: 'C++ compiler to use'
+        required: true
+        type: string
+      sanitizers:
+        description: 'Sanitizers to use, comma separated'
+        required: false
+        default: ''
+        type: string
+      runtime_lib:
+        description: 'Runtime lib to use. MSVC environment only. Uses cmake name'
+        required: false
+        type: string
+      shared_libs:
+        description: 'Whether to build shared libraries. Probably only works on Linux'
+        required: false
+        default: 'OFF'
+        type: string
+
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+jobs:
+  Builds:
+    runs-on: ${{inputs.os}}
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout Repo for Actions
+        uses: actions/checkout@v3
+        with:
+          path: Pylir
+
+      - name: Install Dependencies
+        id: dep-install
+        uses: ./Pylir/.github/actions/dependencies
+        with:
+          c-compiler: ${{inputs.c-compiler}}
+          cpp-compiler: ${{inputs.cpp-compiler}}
+          sanitizers: ${{inputs.sanitizers}}
+          runtime_lib: ${{inputs.runtime_lib}}
+          shared_libs: ${{inputs.shared_libs}}
+
+      - name: Check LLVM Cache
+        id: check-llvm-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            llvm-build 
+            llvm-optimized-tblgen
+          key: ${{steps.dep-install.outputs.key}}-${{env.LLVM_REVISION}}
+          lookup-ony: true
+
+      - name: Checkout LLVM
+        if: steps.check-llvm-cache.outputs.cache-hit != 'true'
+        uses: ./Pylir/.github/actions/llvm-checkout
+
+      - name: Configure Optimized TableGen
+        if: steps.check-llvm-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $use_lld = ''
+          if (!$IsMacOs) {
+            $use_lld = '-DLLVM_ENABLE_LLD=ON'
+          }
+          cmake -GNinja -Bllvm-optimized-tblgen `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_cpp-compiler=${{inputs.cpp-compiler}} `
+            -DCMAKE_c-compiler=${{inputs.c-compiler}} `
+            -DLLVM_BUILD_TOOLS=OFF `
+            -DLLVM_BUILD_UTILS=ON `
+            -DLLVM_INCLUDE_TESTS=OFF `
+            -DLLVM_INSTALL_UTILS=ON `
+            -DLLVM_ENABLE_PROJECTS="mlir" `
+            -DLLVM_TARGETS_TO_BUILD="" `
+            $use_lld `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+            -S ${{github.workspace}}/llvm-project/llvm
+
+      - name: Build Optimized TableGen
+        if: steps.check-llvm-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
+
+      - name: Configure LLVM
+        if: steps.check-llvm-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $work_space = "${{github.workspace}}".replace('\', '/') 
+          $assertions = '-DLLVM_ENABLE_ASSERTIONS=ON'
+          $san_flag = ''
+          if ('${{inputs.sanitizers}}') {
+            if ($IsWindows) {
+              $san_flag = "-DCMAKE_CXX_FLAGS=""-fsanitize=${{inputs.sanitizers}} -g0 -fno-omit-frame-pointer"""
+            } else {
+              $sanitizer = (Get-Culture).TextInfo.ToTitleCase('${{inputs.sanitizers}}'.replace(',', ';'))
+              $san_flag = "-DLLVM_USE_SANITIZER=""$sanitizer"""
+            }
+
+            # Assertions within LLVM also enables assertions in libstdc++ and libc++, which have the negative side effect
+            # of causing thread sanitizer errors due to extra reads performed in the assertions (that would otherwise
+            # not be present).
+            if ('${{inputs.sanitizers}}'.contains('thread')) {
+              $assertions = '-DLLVM_ENABLE_ASSERTIONS=OFF'
+            }
+          }
+          $runtime_lib = ''
+          switch ('${{inputs.runtime_lib}}') {
+            "MultiThreaded" {
+              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MT'
+            }
+            "MultiThreadedDebug" {
+              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MTd'
+            }
+            "MultiThreadedDLL" {
+              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MD'
+            }
+            "MultiThreadedDebugDLL" {
+              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MDd'
+            }
+            "" {}
+            Default {
+              throw 'Unknown runtime library ${{inputs.runtime_lib}}'
+            }
+          }
+
+          $exe_suffix = ''
+          if ($IsWindows) {
+            $exe_suffix = '.exe'
+          }
+
+          $use_lld = ''
+          if (!$IsMacOs) {
+            $use_lld = '-DLLVM_ENABLE_LLD=ON'
+          }
+
+          cmake -GNinja -Bllvm-build `
+          -DLLVM_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/llvm-tblgen$exe_suffix" `
+          -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen$exe_suffix" `
+          -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen$exe_suffix" `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_cpp-compiler=${{inputs.cpp-compiler}} `
+          -DCMAKE_c-compiler=${{inputs.c-compiler}} `
+          -DBUILD_SHARED_LIBS=${{inputs.shared_libs}} `
+          $assertions `
+          -DLLVM_BUILD_TOOLS=OFF `
+          -DLLVM_BUILD_UTILS=ON `
+          -DLLVM_INCLUDE_TESTS=OFF `
+          -DLLVM_INSTALL_UTILS=ON `
+          -DLLVM_ENABLE_PROJECTS="mlir;lld" `
+          -DLLVM_TARGETS_TO_BUILD="X86;AArch64" `
+          $use_lld `
+          -DLLVM_BUILD_LLVM_C_DYLIB=OFF `
+          -DLLVM_INCLUDE_BENCHMARKS=OFF `
+          -DLLVM_APPEND_VC_REV=OFF `
+          -DLLD_BUILD_TOOLS=OFF `
+          -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+          $san_flag `
+          $runtime_lib `
+          -S ${{github.workspace}}/llvm-project/llvm
+
+      - name: Build LLVM
+        if: steps.check-llvm-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          cmake --build llvm-build
+
+      - name: Remove Object files
+        shell: pwsh
+        if: steps.check-llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          $ext = 'o'
+          if ($IsWindows) {
+            $ext = 'obj'
+          }
+          Remove-Item '${{github.workspace}}/llvm-build' -Recurse -Include "*.$ext"
+          Remove-Item '${{github.workspace}}/llvm-optimized-tblgen' -Recurse -Include "*.$ext"
