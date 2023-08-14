@@ -81,15 +81,15 @@ runs:
       run: |
         $key = '${{runner.os}}'
 
-        if ('${{matrix.sanitizer}}') {
-          $key += '-${{matrix.sanitizer}}'.Replace(',', '_and_')
+        if ('${{inputs.sanitizer}}') {
+          $key += '-${{inputs.sanitizer}}'.Replace(',', '_and_')
         }
 
-        if ('${{matrix.runtime_lib}}') {
-          $key += '${{matrix.runtime_lib}}'
+        if ('${{inputs.runtime_lib}}') {
+          $key += '${{inputs.runtime_lib}}'
         }
         
-        if ('${{matrix.shared_libs}}') {
+        if ('${{inputs.shared_libs}}') {
           $key += '-shared'
         }
 
