@@ -19,6 +19,10 @@ inputs:
     description: 'Whether to build shared libraries. Probably only works on Linux'
     required: false
     default: 'OFF'
+  llvm-build-only:
+    description: 'Whether only dependencies for build LLVM must be installed'
+    required: false
+    default: 'OFF'
 
 outputs:
   key:
@@ -102,6 +106,7 @@ runs:
         "key=${{steps.ccache-key.outputs.key}}-$hash" >> $Env:GITHUB_OUTPUT
 
     - name: Install CCache
+      if: ${{ inputs.llvm-build-only != 'ON' }}
       uses: Chocobo1/setup-ccache-action@v1
       with:
         ccache_options: |

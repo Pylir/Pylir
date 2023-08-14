@@ -54,6 +54,7 @@ jobs:
           sanitizers: ${{inputs.sanitizers}}
           runtime_lib: ${{inputs.runtime_lib}}
           shared_libs: ${{inputs.shared_libs}}
+          llvm-build-only: 'ON'
 
       - name: Set LLVM Revision
         run: |
@@ -67,7 +68,7 @@ jobs:
             llvm-build 
             llvm-optimized-tblgen
           key: ${{steps.dep-install.outputs.key}}-${{env.LLVM_REVISION}}
-          lookup-ony: true
+          lookup-only: true
 
       - name: Checkout LLVM
         if: steps.check-llvm-cache.outputs.cache-hit != 'true'
