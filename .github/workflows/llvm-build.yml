@@ -83,8 +83,8 @@ jobs:
           }
           cmake -GNinja -Bllvm-optimized-tblgen `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_cpp-compiler=${{inputs.cpp-compiler}} `
-            -DCMAKE_c-compiler=${{inputs.c-compiler}} `
+            -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
+            -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
             -DLLVM_BUILD_TOOLS=OFF `
             -DLLVM_BUILD_UTILS=ON `
             -DLLVM_INCLUDE_TESTS=OFF `
@@ -158,8 +158,8 @@ jobs:
           -DMLIR_TABLEGEN="$work_space/llvm-optimized-tblgen/bin/mlir-tblgen$exe_suffix" `
           -DMLIR_LINALG_ODS_YAML_GEN="$work_space/llvm-optimized-tblgen/bin/mlir-linalg-ods-yaml-gen$exe_suffix" `
           -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_cpp-compiler=${{inputs.cpp-compiler}} `
-          -DCMAKE_c-compiler=${{inputs.c-compiler}} `
+          -DCMAKE_CXX_COMPILER=${{inputs.cpp-compiler}} `
+          -DCMAKE_C_COMPILER=${{inputs.c-compiler}} `
           -DBUILD_SHARED_LIBS=${{inputs.shared_libs}} `
           $assertions `
           -DLLVM_BUILD_TOOLS=OFF `
