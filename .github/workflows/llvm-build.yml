@@ -1,4 +1,4 @@
-name: Builds
+name: LLVM Build
 
 permissions:
   actions: write
@@ -32,10 +32,6 @@ on:
         default: 'OFF'
         type: string
 
-  workflow_dispatch:
-  schedule:
-    - cron: '0 0 * * 0'
-
 jobs:
   Builds:
     runs-on: ${{inputs.os}}
@@ -59,6 +55,10 @@ jobs:
           runtime_lib: ${{inputs.runtime_lib}}
           shared_libs: ${{inputs.shared_libs}}
 
+      - name: Set LLVM Revision
+        run: |
+          "LLVM_REVISION=$(Get-Content -Path ./Pylir/.pinned-llvm-revision)" >> $Env:GITHUB_ENV
+
       - name: Check LLVM Cache
         id: check-llvm-cache
         uses: actions/cache@v3
@@ -75,7 +75,6 @@ jobs:
 
       - name: Configure Optimized TableGen
         if: steps.check-llvm-cache.outputs.cache-hit != 'true'
-        shell: pwsh
         run: |
           $use_lld = ''
           if (!$IsMacOs) {
@@ -97,13 +96,11 @@ jobs:
 
       - name: Build Optimized TableGen
         if: steps.check-llvm-cache.outputs.cache-hit != 'true'
-        shell: pwsh
         run: |
           cmake --build llvm-optimized-tblgen --target mlir-tblgen llvm-tblgen mlir-linalg-ods-yaml-gen
 
       - name: Configure LLVM
         if: steps.check-llvm-cache.outputs.cache-hit != 'true'
-        shell: pwsh
         run: |
           $work_space = "${{github.workspace}}".replace('\', '/') 
           $assertions = '-DLLVM_ENABLE_ASSERTIONS=ON'
@@ -180,12 +177,10 @@ jobs:
 
       - name: Build LLVM
         if: steps.check-llvm-cache.outputs.cache-hit != 'true'
-        shell: pwsh
         run: |
           cmake --build llvm-build
 
       - name: Remove Object files
-        shell: pwsh
         if: steps.check-llvm-cache.outputs.cache-hit != 'true'
         run: |
           $ext = 'o'

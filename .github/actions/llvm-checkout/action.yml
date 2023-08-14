@@ -7,7 +7,7 @@ runs:
     - name: Set LLVM Revision
       shell: pwsh
       run: |
-        "LLVM_REVISION=822c31a0fe827a6f33601ad6b44eb2818350da36" >> $Env:GITHUB_ENV
+        "LLVM_REVISION=$(Get-Content -Path ./Pylir/.pinned-llvm-revision)" >> $Env:GITHUB_ENV
 
     - name: Checkout LLVM
       uses: actions/checkout@v3
