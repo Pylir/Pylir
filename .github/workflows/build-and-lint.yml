@@ -308,8 +308,32 @@ jobs:
         run: cmake --build pylir-build --target docs
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-pages-artifact@v1
         with:
-          name: docs
-          if-no-files-found: error
           path: ${{github.workspace}}/pylir-build/docs/build
+
+  deploy-docs:
+    needs: [ build-docs ]
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: pwsh
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    concurrency:
+      group: "pages"
+      cancel-in-progress: true
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: write
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
