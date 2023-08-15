@@ -95,8 +95,8 @@ jobs:
       - name: Configure Pylir
         run: |
           $sanitizer_arg = ''
-          if ('${{matrix.sanitizer}}') {
-            $sanitizer_arg = '-DPYLIR_SANITIZERS="${{matrix.sanitizer}}"', '-DCMAKE_CXX_FLAGS="-g1"'
+          if ('${{matrix.sanitizers}}') {
+            $sanitizer_arg = '-DPYLIR_SANITIZERS="${{matrix.sanitizers}}"', '-DCMAKE_CXX_FLAGS="-g1"'
           }
           $runtime_arg = ''
           if ('${{matrix.runtime_lib}}') {
@@ -113,14 +113,14 @@ jobs:
           
           cmake -GNinja -Bpylir-build `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_cpp-compiler=${{matrix.cpp-compiler}} `
-            -DCMAKE_c-compiler=${{matrix.c-compiler}} `
+            -DCMAKE_CXX_COMPILER=${{matrix.cpp-compiler}} `
+            -DCMAKE_C_COMPILER=${{matrix.c-compiler}} `
             @sanitizer_arg `
             $runtime_arg `
             $shared_libs `
             -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -DCMAKE_c-compiler_LAUNCHER=ccache `
-            -DCMAKE_cpp-compiler_LAUNCHER=ccache `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             $use_lld `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DLLVM_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/llvm/" `
