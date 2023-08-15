@@ -103,7 +103,7 @@ jobs:
             $runtime_arg = '-DCMAKE_MSVC_RUNTIME_LIBRARY=${{matrix.runtime_lib}}'
           }
           $shared_libs = ''
-          if ('${{matrix.shared_libs}}' == 'ON') {
+          if ('${{matrix.shared_libs}}' -eq 'ON') {
             $shared_libs = '-DBUILD_SHARED_LIBS=ON'
           }
           $use_lld = ''
