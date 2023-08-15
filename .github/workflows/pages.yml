@@ -1,9 +1,10 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [ 'main' ]
-  workflow_dispatch:
+  workflow_run:
+    types: [ completed ]
+    workflows: [ "Builds" ]
+    #branches: [main]
 
 permissions:
   contents: read
@@ -16,16 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  Build-LLVM:
-    uses: ./.github/workflows/llvm-build.yml
-    with:
-      os: ubuntu-22.04
-      c-compiler: clang
-      cpp-compiler: clang++
-
   deploy:
-    needs: [ Build-LLVM ]
-
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -36,50 +29,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Checkout Pylir
-        uses: actions/checkout@v3
-        with:
-          path: Pylir
-
       - name: Setup Pages
         uses: actions/configure-pages@v2
 
-      - name: Install Dependencies
-        id: dep-install
-        uses: ./Pylir/.github/actions/dependencies
+      - name: Fetch Website
+        uses: dawidd6/action-download-artifact@v2
         with:
-          c-compiler: clang
-          cpp-compiler: clang++
-
-      - name: Install Python depends
-        run: |
-          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/docs/requirements.txt"
-
-      - name: Fetch LLVM
-        id: llvm-fetch
-        uses: ./Pylir/.github/actions/llvm-fetch
-        with:
-          key: ${{steps.dep-install.outputs.key}}
-
-      - name: Configure Pylir
-        run: |
-          cmake -GNinja -Bpylir-build `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_CXX_COMPILER=clang++ `
-            -DCMAKE_C_COMPILER=clang `
-            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
-            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
-            -DPYLIR_ENABLE_ASSERTIONS=ON `
-            -DPYLIR_BUILD_DOCS=ON `
-            -DLLVM_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/llvm/" `
-            -DMLIR_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/mlir/" `
-            -DLLD_DIR="${{steps.llvm-build.outputs.install-dir}}/lib/cmake/lld/" `
-            -S ${{github.workspace}}/Pylir
-
-      - name: Build Docs
-        run: cmake --build pylir-build --target docs
+          workflow: "Build"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          run_id: ${{ github.event.workflow_run.id }}
+          run_number: ${{ github.event.workflow_run.run_number }}
+          name: docs
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
@@ -88,5 +48,6 @@ jobs:
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        run: ls
+        # uses: actions/deploy-pages@v1
 
