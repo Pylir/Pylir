@@ -313,8 +313,9 @@ jobs:
           path: ${{github.workspace}}/pylir-build/docs/build
 
   deploy-docs:
-    needs: [ build-docs ]
+    needs: build-docs
     runs-on: ubuntu-22.04
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     defaults:
       run:
         shell: pwsh
