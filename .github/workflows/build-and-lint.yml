@@ -256,3 +256,85 @@ jobs:
           name: clang-format.patch
           path: ${{github.workspace}}/clang-format.patch
 
+  build-docs:
+    needs: [ Build-Standard-LLVM-Linux ]
+
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout Pylir
+        uses: actions/checkout@v3
+        with:
+          path: Pylir
+
+      - name: Install Dependencies
+        id: dep-install
+        uses: ./Pylir/.github/actions/dependencies
+        with:
+          c-compiler: clang
+          cpp-compiler: clang++
+
+      - name: Install Python depends
+        run: |
+          Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/docs/requirements.txt"
+
+      - name: Fetch LLVM
+        id: llvm-fetch
+        uses: ./Pylir/.github/actions/llvm-fetch
+        with:
+          key: ${{steps.dep-install.outputs.key}}
+
+      - name: Configure Pylir
+        run: |
+          cmake -GNinja -Bpylir-build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_CXX_COMPILER=clang++ `
+            -DCMAKE_C_COMPILER=clang `
+            -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
+            -DPYLIR_ENABLE_ASSERTIONS=ON `
+            -DPYLIR_BUILD_DOCS=ON `
+            -DLLVM_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/llvm/" `
+            -DMLIR_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/mlir/" `
+            -DLLD_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/lld/" `
+            -S ${{github.workspace}}/Pylir
+
+      - name: Build Docs
+        run: cmake --build pylir-build --target docs
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ${{github.workspace}}/pylir-build/docs/build
+
+  deploy-docs:
+    needs: build-docs
+    runs-on: ubuntu-22.04
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    defaults:
+      run:
+        shell: pwsh
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    concurrency:
+      group: "pages"
+      cancel-in-progress: true
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+      actions: write
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
