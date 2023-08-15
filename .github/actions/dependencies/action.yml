@@ -2,17 +2,32 @@ name: "Install build dependencies"
 description: "Installs all dependencies on all platforms that are generally required to compile Pylir"
 
 inputs:
-  cxx-compiler:
-    description: "C++ compiler that will be used for compilation"
+  c-compiler:
+    description: 'C compiler to use'
     required: true
-  ccache-key:
-    description: "Key to cache the ccache cache"
+  cpp-compiler:
+    description: 'C++ compiler to use'
     required: true
+  sanitizers:
+    description: 'Sanitizers to use, comma separated'
+    required: false
+    default: ''
+  runtime_lib:
+    description: 'Runtime lib to use. MSVC environment only. Uses cmake name'
+    required: false
+  shared_libs:
+    description: 'Whether to build shared libraries. Probably only works on Linux'
+    required: false
+    default: 'OFF'
+  llvm-build-only:
+    description: 'Whether only dependencies for build LLVM must be installed'
+    required: false
+    default: 'OFF'
 
 outputs:
   key:
     value: ${{steps.compiler-hash.outputs.key}}
-    description: "ccache-key concatenated with a hash specific to the cxx-compilers version"
+    description: "ccache-key concatenated with a hash specific to the cpp-compilers version"
 
 runs:
   using: composite
@@ -35,12 +50,12 @@ runs:
         sudo apt install libunwind-dev lld clang g++-10
 
     - name: Use MSVC developer command prompt
-      if: ${{ inputs.cxx-compiler == 'clang-cl' }}
+      if: ${{ inputs.cpp-compiler == 'clang-cl' }}
       uses: ilammy/msvc-dev-cmd@v1
 
     - name: Install clang from MSYS2
       uses: msys2/setup-msys2@v2
-      if: ${{ inputs.cxx-compiler == 'clang++' && runner.os == 'Windows' }}
+      if: ${{ inputs.cpp-compiler == 'clang++' && runner.os == 'Windows' }}
       with:
         msystem: clang64
         update: true
@@ -50,7 +65,7 @@ runs:
 
     - name: Prepend Msys2 to path
       shell: pwsh
-      if: ${{ inputs.cxx-compiler == 'clang++' && runner.os == 'Windows' }}
+      if: ${{ inputs.cpp-compiler == 'clang++' && runner.os == 'Windows' }}
       run: echo "D:\msys64\clang64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8
 
     - if: ${{ runner.os == 'Windows' }}
@@ -60,16 +75,38 @@ runs:
         echo "Adding GNU tar to PATH"
         echo C:\Program Files\Git\usr\bin>>"%GITHUB_PATH%"
 
+    - name: Calculate ccache key
+      id: ccache-key
+      shell: pwsh
+      run: |
+        $key = '${{runner.os}}'
+
+        if ('${{inputs.sanitizers}}') {
+          $key += '-${{inputs.sanitizers}}'.Replace(',', '_and_')
+        }
+
+        if ('${{inputs.runtime_lib}}') {
+          $key += '${{inputs.runtime_lib}}'
+        }
+        
+        if ('${{inputs.shared_libs}}' -eq 'ON') {
+          $key += '-shared'
+        }
+
+        "key=$key" >> $Env:GITHUB_OUTPUT
+
+
     - name: Generate compiler hash
       id: compiler-hash
       shell: pwsh
       run: |
-        $compiler_version = ${{inputs.cxx-compiler}} -v 2>&1 | Out-String
+        $compiler_version = ${{inputs.cpp-compiler}} -v 2>&1 | Out-String
         $stream = [IO.MemoryStream]::new([byte[]][char[]]$compiler_version)
         $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
-        "key=${{inputs.ccache-key}}-$hash" >> $Env:GITHUB_OUTPUT
+        "key=${{steps.ccache-key.outputs.key}}-$hash" >> $Env:GITHUB_OUTPUT
 
     - name: Install CCache
+      if: ${{ inputs.llvm-build-only != 'ON' }}
       uses: Chocobo1/setup-ccache-action@v1
       with:
         ccache_options: |

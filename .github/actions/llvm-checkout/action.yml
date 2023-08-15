@@ -1,0 +1,17 @@
+name: "Checkout LLVM"
+description: "Checkouts LLVM at the revision required for Pylir and sets the LLVM_REVISION variable accordingly"
+
+runs:
+  using: composite
+  steps:
+    - name: Set LLVM Revision
+      shell: pwsh
+      run: |
+        "LLVM_REVISION=$(Get-Content -Path ./Pylir/.pinned-llvm-revision)" >> $Env:GITHUB_ENV
+
+    - name: Checkout LLVM
+      uses: actions/checkout@v3
+      with:
+        repository: llvm/llvm-project
+        ref: ${{ env.LLVM_REVISION }}
+        path: llvm-project

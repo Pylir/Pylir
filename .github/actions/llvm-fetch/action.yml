@@ -1,0 +1,33 @@
+name: "Fetch LLVM"
+description: "Fetches LLVM previously built by the llvm-build workflow"
+
+inputs:
+  key:
+    description: 'Key to used to cache LLVM compilations.'
+    required: true
+
+outputs:
+  install-dir:
+    value: ${{steps.output-build-dir.outputs.build-dir}}
+    description: "Location of the compiled LLVM installation"
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout LLVM
+      uses:  ./Pylir/.github/actions/llvm-checkout
+
+    - name: Restore LLVM Build
+      uses: actions/cache/restore@v3
+      with:
+        path: |
+          llvm-build 
+          llvm-optimized-tblgen
+        key: ${{inputs.key}}-${{env.LLVM_REVISION}}
+        fail-on-cache-miss: true
+
+    - name: Output build dir
+      id: output-build-dir
+      shell: pwsh
+      run: |
+        "build-dir=${{github.workspace}}/llvm-build" >> $Env:GITHUB_OUTPUT

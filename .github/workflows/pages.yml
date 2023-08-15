@@ -16,7 +16,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  Build-LLVM:
+    uses: ./.github/workflows/llvm-build.yml
+    with:
+      os: ubuntu-22.04
+      c-compiler: clang
+      cpp-compiler: clang++
+
   deploy:
+    needs: [ Build-LLVM ]
+
     runs-on: ubuntu-22.04
     defaults:
       run:
@@ -39,20 +48,18 @@ jobs:
         id: dep-install
         uses: ./Pylir/.github/actions/dependencies
         with:
-          cxx-compiler: clang++
-          ccache-key: ${{runner.os}}
+          c-compiler: clang
+          cpp-compiler: clang++
 
       - name: Install Python depends
         run: |
           Invoke-expression "$Env:pythonLocation\python -m pip install -r ${{github.workspace}}/Pylir/docs/requirements.txt"
 
-      - name: Build LLVM
-        id: llvm-build
-        uses: ./Pylir/.github/actions/llvm-build
+      - name: Fetch LLVM
+        id: llvm-fetch
+        uses: ./Pylir/.github/actions/llvm-fetch
         with:
-          c-compiler: clang
-          cpp-compiler: clang++
-          cache-key: LLVM-${{steps.dep-install.outputs.key}}
+          key: ${{steps.dep-install.outputs.key}}
 
       - name: Configure Pylir
         run: |
