@@ -89,7 +89,7 @@ runs:
           $key += '${{inputs.runtime_lib}}'
         }
         
-        if ('${{inputs.shared_libs}}') {
+        if ('${{inputs.shared_libs}}' == 'ON') {
           $key += '-shared'
         }
 
