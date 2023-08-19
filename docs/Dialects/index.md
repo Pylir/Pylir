@@ -7,6 +7,5 @@
 PylirHIR
 PylirPy
 PylirMem
-TypeFlow
 MemorySSA
 ```

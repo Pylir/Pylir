@@ -11,12 +11,13 @@ target_link_libraries(PylirPyTransforms
   MLIRPass
   PRIVATE
   PylirAnalysis
-  PylirPyAnalysis
   PylirPyDialect
   PylirTransformsUtils
   PylirPyTransformsUtil
   MLIRTransforms
   MLIRAnalysis
+  MLIRArithDialect
+  MLIRControlFlowDialect
   )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)
 
