@@ -31,9 +31,9 @@ py.func @foo() -> !pyMem.memory {
 // CHECK-NEXT: llvm.store %[[STR]], %[[GEP]] {tbaa = [#[[$PYTHON_TYPE_OBJECT]]]}
 // CHECK-NEXT: llvm.return %[[MEMORY]]
 
-// CHECK: llvm.func @pylir_gc_alloc(i{{[0-9]+}}) -> (!llvm.ptr<{{[0-9]+}}> {
-// CHECK-SAME: llvm.noalias
-// CHECK-SAME: }) attributes
+// CHECK: llvm.func @pylir_gc_alloc
+// CHECK-NOT: llvm.noalias
+// CHECK-SAME: attributes
 
 // -----
 
