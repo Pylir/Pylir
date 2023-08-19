@@ -9,7 +9,7 @@ add_custom_target(create-build-dir
         COMMENT "Copying docs sources")
 
 add_custom_target(docs
-        ${SPHINX_EXECUTABLE} -b html . build
+        ${SPHINX_EXECUTABLE} -b html . build -W --keep-going -n
         COMMENT "Building Sphinx docs"
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 set_target_properties(docs PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/build")
