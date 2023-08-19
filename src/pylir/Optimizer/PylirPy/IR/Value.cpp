@@ -6,28 +6,17 @@
 
 #include <mlir/IR/FunctionInterfaces.h>
 
-#include <pylir/Optimizer/PylirPy/Interfaces/ObjectFromTypeObjectInterface.hpp>
+#include <pylir/Optimizer/PylirPy/Interfaces/KnownTypeObjectInterface.hpp>
 #include <pylir/Support/Macros.hpp>
 
 #include "PylirPyAttributes.hpp"
-#include "PylirPyOps.hpp"
 #include "PylirPyTraits.hpp"
 
 mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value)
 {
-    if (auto op = value.getDefiningOp<pylir::Py::ObjectFromTypeObjectInterface>())
+    if (auto op = value.getDefiningOp<pylir::Py::KnownTypeObjectInterface>())
     {
-        return op.getTypeObject();
-    }
-    if (auto refineable = value.getDefiningOp<Py::TypeRefineableInterface>())
-    {
-        llvm::SmallVector<Py::TypeAttrUnion> operandTypes(refineable->getNumOperands(), nullptr);
-        llvm::SmallVector<Py::ObjectTypeInterface> res;
-        if (refineable.refineTypes(operandTypes, res) == TypeRefineResult::Failure)
-        {
-            return nullptr;
-        }
-        return res[value.cast<mlir::OpResult>().getResultNumber()].getTypeObject();
+        return op.getKnownTypeObject();
     }
     return nullptr;
 }

@@ -5,7 +5,8 @@
 #ifndef PYLIR_PY_TRAITS_TABLEGEN
 #define PYLIR_PY_TRAITS_TABLEGEN
 
-include "pylir/Optimizer/PylirPy/Interfaces/ObjectFromTypeObjectInterface.td"
+include "pylir/Optimizer/PylirPy/Interfaces/KnownTypeObjectInterface.td"
+include "pylir/Optimizer/Util/TablegenUtil.td"
 include "mlir/IR/AttrTypeBase.td"
 
 class PylirPyOpTrait<string name> : NativeOpTrait<name> {
@@ -28,19 +29,16 @@ def AlwaysBound : PylirPyOpTrait<"AlwaysBound">;
 /// identity from every other object marked 'ReturnsImmutable' or a 'MemAlloc' result.
 def ReturnsImmutable : PylirPyOpTrait<"ReturnsImmutable">;
 
-/// Automatically implements 'TypeRefineableInterface' for an operation, making it always return the builtin type
+/// Automatically implements 'KnownTypeObjectInterface' for an operation, making it always return the builtin type
 /// 'type'.
-class RefinedType<string type> : PylirPyParamOpTrait<"RefinedType", "::pylir::Builtins::" # type>;
-
-/// Automatically implements 'TypeRefineableInterface' for an operation, making it always return a tuple type as an
-/// approximate result.
-def RefinedTypeTupleApproximate : PylirPyOpTrait<"RefinedTypeTupleApproximate">;
-
-/// Automatically implements both 'ObjectFromTypeObjectInterface' and 'TypeRefineableInterface'. The former
-/// assumes that operation has an ODS operand called '$type_object', which the later interface uses and returns in its
-/// implementation.
-def RefinedObjectFromTypeObject : TraitList<[PylirPyOpTrait<"RefinedObjectFromTypeObjectImpl">,
-                                             ObjectFromTypeObjectInterface]>;
+class KnownType<string type> : OpInterfaceImplementation<KnownTypeObjectInterface, [{
+    ::mlir::OpFoldResult getKnownTypeObject();
+}], [{
+    ::mlir::OpFoldResult $cppClass::getKnownTypeObject()
+    {
+        return pylir::Py::RefAttr::get(getContext(), pylir::Builtins::}] # type # [{.name);
+    }
+}]>;
 
 /// Indicates that an attribute is of an immutable python object. This is mainly useful for the initializer of
 /// 'py.globalValue'.

@@ -3,6 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_pylir_interface(OP ExceptionHandlingInterface LIBRARY LIB_PREFIX PylirPy)
-add_pylir_interface(OP ObjectFromTypeObjectInterface LIBRARY LIB_PREFIX PylirPy)
+add_pylir_interface(OP KnownTypeObjectInterface LIBRARY LIB_PREFIX PylirPy)
 add_pylir_interface(OP CopyObjectInterface LIBRARY LIB_PREFIX PylirPy)
 add_pylir_interface(OP OnlyReadsValueInterface LIBRARY LIB_PREFIX PylirPy)
