@@ -55,24 +55,6 @@ def GlobalSROAPass : Pass<"pylir-global-sroa", "::mlir::ModuleOp"> {
     ];
 }
 
-def MonomorphPass : Pass<"pylir-monomorph", "::mlir::ModuleOp"> {
-	let summary = "Monomorph module";
-
-	let dependentDialects = ["::pylir::Py::PylirPyDialect", "::pylir::TypeFlow::TypeFlowDialect"];
-
-	let statistics = [
-		Statistic<"m_valuesReplaced", "Values replaced", "Amount of values that have been replaced with constants">,
-		Statistic<"m_callsChanged", "Calls changed", "Amount of call instructions that were changed">,
-		Statistic<"m_functionsCloned", "Function clones", "Amount of functions which have been cloned with more specific types">,
-		Statistic<"m_typesOverDefined", "Types over defined", "Amount of types that have been marked over defined">,
-	];
-
-	let options = [
-        Option<"m_maxTypeSize", "max-type-size", "std::size_t", "6",
-                "Max amount of types a recursive type can have as function argument without being marked over defined">,
-    ];
-}
-
 def InlinerPass : Pass<"pylir-inliner", "mlir::ModuleOp"> {
     let summary = "Inline functions";
 
