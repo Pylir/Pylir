@@ -18,5 +18,4 @@ are found in the top level `Interfaces` directory of the optimizer.
 GenericInterfaces
 PylirHIRInterfaces
 PylirPyInterfaces
-TypeFlowInterfaces
 ```
