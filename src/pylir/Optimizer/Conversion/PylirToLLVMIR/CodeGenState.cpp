@@ -93,7 +93,7 @@ mlir::Value pylir::CodeGenState::createRuntimeCall(mlir::Location loc, mlir::OpB
             returnType = m_objectPtrType;
             argumentTypes = {m_typeConverter.getIndexType()};
             functionName = "pylir_gc_alloc";
-            resultAttrs.append(mlir::LLVM::LLVMDialect::getNoAliasAttrName(), mlir::UnitAttr::get(context));
+            // TODO: Set allockind("alloc,zeroed") allocsize(0) LLVM attributes once supported upstream.
             break;
         case Runtime::mp_init_u64:
             returnType = mlir::LLVM::LLVMVoidType::get(context);
