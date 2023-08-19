@@ -365,13 +365,6 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(FoldAdaptor)
     return getConstantAttr();
 }
 
-pylir::Py::TypeRefineResult pylir::Py::ConstantOp::refineTypes(llvm::ArrayRef<TypeAttrUnion>,
-                                                               llvm::SmallVectorImpl<ObjectTypeInterface>& result)
-{
-    result.push_back(typeOfConstant(getConstantAttr()));
-    return TypeRefineResult::Success;
-}
-
 //===--------------------------------------------------------------------------------------------------------------===//
 // TypeOfOp fold
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -650,41 +643,6 @@ mlir::OpFoldResult pylir::Py::TupleGetItemOp::fold(FoldAdaptor adaptor)
     return ref[index];
 }
 
-pylir::Py::TypeRefineResult
-    pylir::Py::TupleGetItemOp::refineTypes(llvm::ArrayRef<Py::TypeAttrUnion> inputs,
-                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
-{
-    auto tupleType = inputs[0].dyn_cast_or_null<pylir::Py::TupleType>();
-    if (!tupleType)
-    {
-        return TypeRefineResult::Failure;
-    }
-    if (tupleType.getElements().empty())
-    {
-        result.emplace_back(UnboundType::get(getContext()));
-        return TypeRefineResult::Success;
-    }
-    auto index = inputs[1].dyn_cast_or_null<mlir::IntegerAttr>();
-    if (!index)
-    {
-        Py::ObjectTypeInterface sumType = tupleType.getElements().front();
-        for (auto iter : tupleType.getElements().drop_front())
-        {
-            sumType = joinTypes(sumType, iter);
-        }
-        result.emplace_back(sumType);
-        return TypeRefineResult::Success;
-    }
-    auto zExtValue = index.getValue().getZExtValue();
-    if (zExtValue >= tupleType.getElements().size())
-    {
-        result.emplace_back(UnboundType::get(getContext()));
-        return TypeRefineResult::Success;
-    }
-    result.emplace_back(tupleType.getElements()[zExtValue]);
-    return TypeRefineResult::Success;
-}
-
 //===--------------------------------------------------------------------------------------------------------------===//
 // TupleLenOp fold
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -723,23 +681,6 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(FoldAdaptor adaptor)
     return nullptr;
 }
 
-pylir::Py::TypeRefineResult
-    pylir::Py::TuplePrependOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> inputs,
-                                           llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
-{
-    auto tupleType = inputs[1].dyn_cast_or_null<Py::TupleType>();
-    // TODO: Once/if tuple type accepts nullptr elements (for unknown), the below or should not be necessary
-    if (!tupleType || !inputs[0].isa_and_nonnull<Py::ObjectTypeInterface>())
-    {
-        result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
-        return TypeRefineResult::Approximate;
-    }
-    llvm::SmallVector<Py::ObjectTypeInterface> elements = llvm::to_vector(tupleType.getElements());
-    elements.insert(elements.begin(), inputs[0].cast<Py::ObjectTypeInterface>());
-    result.emplace_back(Py::TupleType::get(getContext(), {}, elements));
-    return TypeRefineResult::Success;
-}
-
 //===--------------------------------------------------------------------------------------------------------------===//
 // TupleDropFrontOp fold
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -763,42 +704,6 @@ mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(FoldAdaptor adaptor)
     return Py::TupleAttr::get(getContext(), constant.getValue().drop_front(index.getValue().getZExtValue()));
 }
 
-pylir::Py::TypeRefineResult
-    pylir::Py::TupleDropFrontOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> inputs,
-                                             llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
-{
-    auto tupleType = inputs[1].dyn_cast_or_null<Py::TupleType>();
-    if (!tupleType)
-    {
-        result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
-        return TypeRefineResult::Approximate;
-    }
-    if (tupleType.getElements().empty())
-    {
-        result.emplace_back(tupleType);
-        return TypeRefineResult::Success;
-    }
-    auto index = inputs[0].dyn_cast_or_null<mlir::IntegerAttr>();
-    if (!index)
-    {
-        Py::ObjectTypeInterface sumType = tupleType.getElements().front();
-        for (auto iter : tupleType.getElements().drop_front())
-        {
-            sumType = joinTypes(sumType, iter);
-        }
-        result.emplace_back(sumType);
-        return TypeRefineResult::Success;
-    }
-    if (tupleType.getElements().size() >= index.getValue().getZExtValue())
-    {
-        result.emplace_back(Py::TupleType::get(getContext()));
-        return TypeRefineResult::Success;
-    }
-    result.emplace_back(
-        Py::TupleType::get(getContext(), {}, tupleType.getElements().drop_front(index.getValue().getZExtValue())));
-    return TypeRefineResult::Success;
-}
-
 //===--------------------------------------------------------------------------------------------------------------===//
 // TupleCopyOp fold
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -819,25 +724,6 @@ mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(FoldAdaptor adaptor)
         return nullptr;
     }
     return Py::TupleAttr::get(getContext(), constant.getValue(), type);
-}
-
-pylir::Py::TypeRefineResult
-    pylir::Py::TupleCopyOp::refineTypes(llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
-                                        llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& result)
-{
-    auto typeObject = inputs[1].dyn_cast_or_null<RefAttr>();
-    if (!typeObject)
-    {
-        return TypeRefineResult::Failure;
-    }
-    auto tuple = inputs[0].dyn_cast_or_null<pylir::Py::TupleType>();
-    if (!tuple)
-    {
-        result.emplace_back(Py::ClassType::get(getContext(), typeObject));
-        return TypeRefineResult::Approximate;
-    }
-    result.emplace_back(Py::TupleType::get(getContext(), typeObject, tuple.getElements()));
-    return TypeRefineResult::Success;
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -893,29 +779,6 @@ void pylir::Py::MakeTupleOp::getCanonicalizationPatterns(mlir::RewritePatternSet
     results.add<MakeOpTupleExpansionRemove<MakeTupleOp>>(context);
 }
 
-pylir::Py::TypeRefineResult
-    pylir::Py::MakeTupleOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion> inputs,
-                                        llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
-{
-    if (!getIterExpansionAttr().empty())
-    {
-        result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
-        return TypeRefineResult::Approximate;
-    }
-    llvm::SmallVector<pylir::Py::ObjectTypeInterface> elementTypes;
-    for (auto iter : inputs)
-    {
-        if (!iter)
-        {
-            result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
-            return TypeRefineResult::Approximate;
-        }
-        elementTypes.push_back(iter.cast<Py::ObjectTypeInterface>());
-    }
-    result.emplace_back(Py::TupleType::get(getContext(), {}, elementTypes));
-    return TypeRefineResult::Success;
-}
-
 //===--------------------------------------------------------------------------------------------------------------===//
 // MakeTupleExOp fold
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -924,14 +787,6 @@ void pylir::Py::MakeTupleExOp::getCanonicalizationPatterns(mlir::RewritePatternS
 {
     results.add<MakeExOpTupleExpansionRemove<MakeTupleExOp>>(context);
     results.add<MakeExOpExceptionSimplifier<MakeTupleExOp, &MakeTupleExOp::getIterExpansion>>(context);
-}
-
-pylir::Py::TypeRefineResult
-    pylir::Py::MakeTupleExOp::refineTypes(llvm::ArrayRef<pylir::Py::TypeAttrUnion>,
-                                          llvm::SmallVectorImpl<pylir::Py::ObjectTypeInterface>& result)
-{
-    result.emplace_back(Py::ClassType::get(RefAttr::get(getContext(), Builtins::Tuple.name)));
-    return TypeRefineResult::Approximate;
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -1346,39 +1201,6 @@ mlir::LogicalResult pylir::Py::LoadOp::foldUsage(mlir::Operation* lastClobber,
 namespace
 {
 
-struct ArithSelectTypeRefinable
-    : public pylir::Py::TypeRefineableInterface::ExternalModel<ArithSelectTypeRefinable, mlir::arith::SelectOp>
-{
-    pylir::Py::TypeRefineResult refineTypes(mlir::Operation*, llvm::ArrayRef<::pylir::Py::TypeAttrUnion> inputs,
-                                            llvm::SmallVectorImpl<::pylir::Py::ObjectTypeInterface>& resultTypes) const
-    {
-        auto lhsType = inputs[1].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
-        auto rhsType = inputs[2].dyn_cast_or_null<pylir::Py::ObjectTypeInterface>();
-        if (lhsType && rhsType && lhsType == rhsType)
-        {
-            resultTypes.emplace_back(lhsType);
-            return pylir::Py::TypeRefineResult::Success;
-        }
-        auto boolean = inputs[0].dyn_cast_or_null<mlir::BoolAttr>();
-        if (!boolean)
-        {
-            auto joined = pylir::Py::joinTypes(lhsType, rhsType);
-            if (!joined)
-            {
-                return pylir::Py::TypeRefineResult::Failure;
-            }
-            resultTypes.emplace_back(joined);
-            return pylir::Py::TypeRefineResult::Approximate;
-        }
-        if (boolean.getValue() ? !lhsType : !rhsType)
-        {
-            return pylir::Py::TypeRefineResult::Failure;
-        }
-        resultTypes.emplace_back(boolean.getValue() ? lhsType : rhsType);
-        return pylir::Py::TypeRefineResult::Success;
-    }
-};
-
 // select %con, (Op %lhs..., %x, %rhs...), (Op %lhs..., %y, %rhs...) -> Op %lhs..., (select %con, %x, %y), %rhs...
 struct ArithSelectTransform : mlir::OpRewritePattern<mlir::arith::SelectOp>
 {
@@ -1583,6 +1405,4 @@ void pylir::Py::PylirPyDialect::getCanonicalizationPatterns(mlir::RewritePattern
 }
 
 void pylir::Py::PylirPyDialect::initializeExternalModels()
-{
-    mlir::arith::SelectOp::attachInterface<ArithSelectTypeRefinable>(*getContext());
-}
+{}

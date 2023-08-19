@@ -21,17 +21,14 @@ add_public_tablegen_target(PylirPyIncGen)
 add_pylir_doc(PylirPyOps.td PylirPyDialect Dialect/ -gen-dialect-doc -dialect="py")
 
 add_pylir_interface(ATTR ObjectAttrInterface)
-add_pylir_interface(TYPE ObjectTypeInterface)
-add_pylir_interface(OP TypeRefineableInterface)
 add_pylir_rewriter(PylirPyPatterns)
 
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
-  ObjectAttrInterface.cpp ObjectTypeInterface.cpp TypeRefineableInterface.cpp Value.cpp
+  ObjectAttrInterface.cpp Value.cpp
   PylirPyOpSROA.cpp PylirPyOpsVerifier.cpp PylirPyTraits.cpp)
-add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen ObjectTypeInterfaceIncGen
-  TypeRefineableInterfaceIncGen)
+add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen)
 target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
-  PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyObjectFromTypeObjectInterface
+  PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyKnownTypeObjectInterface
   PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface PylirSROAInterfaces
   PRIVATE MLIRArithDialect MLIRControlFlowDialect PylirTransformsUtils MLIRDataLayoutInterfaces)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)

@@ -2,6 +2,6 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "ObjectTypeInterface.hpp"
+#include "KnownTypeObjectInterface.hpp"
 
-#include "pylir/Optimizer/PylirPy/IR/ObjectTypeInterface.cpp.inc"
+#include "pylir/Optimizer/PylirPy/Interfaces/KnownTypeObjectInterface.cpp.inc"
