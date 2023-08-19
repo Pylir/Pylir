@@ -1,4 +1,4 @@
-# RUN: pylir %rt_link_flags %s -o %t -O3
+# RUN: pylir %rt_link_flags %s -o %t
 # RUN: %t | FileCheck %s --match-full-lines
 
 print("Hello" + " " + "World")

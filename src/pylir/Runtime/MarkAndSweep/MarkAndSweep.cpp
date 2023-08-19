@@ -88,8 +88,8 @@ void mark(std::uintptr_t stackLowerBound, std::uintptr_t stackUpperBound, std::v
                          [&](pylir::rt::PyObject* subObject)
                          {
                              auto address = reinterpret_cast<std::uintptr_t>(subObject);
-                             if ((address >= stackLowerBound && address <= stackUpperBound) || isGlobal(subObject)
-                                 || subObject->getMark<bool>())
+                             if (!address || (address >= stackLowerBound && address <= stackUpperBound)
+                                 || isGlobal(subObject) || subObject->getMark<bool>())
                              {
                                  return;
                              }
