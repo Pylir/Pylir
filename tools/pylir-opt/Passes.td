@@ -15,10 +15,6 @@ def TestInlinerInterfacePass : Pass<"test-inliner-interface", "::mlir::ModuleOp"
 	let dependentDialects = ["::pylir::Py::PylirPyDialect"];
 }
 
-def TestTypeFlowPass : Pass<"test-type-flow", "::mlir::ModuleOp"> {
-    let dependentDialects = ["::pylir::TypeFlow::TypeFlowDialect"];
-}
-
 def TestAliasSetTrackerPass : Pass<"test-alias-set-tracker", "::mlir::ModuleOp">;
 
 def TestLoopInfoPass : Pass<"test-loop-info", "::mlir::ModuleOp">;
