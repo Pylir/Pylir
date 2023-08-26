@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <pylir/Runtime/Objects.hpp>
-
 #include "BestFitTree.hpp"
 #include "SegregatedFreeList.hpp"
 
@@ -13,11 +11,17 @@ namespace pylir::rt
 {
 class MarkAndSweep
 {
-    SegregatedFreeList m_unit2{2 * alignof(PyBaseException)};
-    SegregatedFreeList m_unit4{4 * alignof(PyBaseException)};
-    SegregatedFreeList m_unit6{6 * alignof(PyBaseException)};
-    SegregatedFreeList m_unit8{8 * alignof(PyBaseException)};
-    BestFitTree m_tree{8 * alignof(PyBaseException)};
+    // Maximum useful alignment on the target as determined by the compiler. This is what is used in libunwind for the
+    // exception object. The alignment of `std::maxalign_t` with clang-cl is notably less.
+    struct MaxAligned
+    {
+    } __attribute__((__aligned__));
+
+    SegregatedFreeList m_unit2{2 * alignof(MaxAligned)};
+    SegregatedFreeList m_unit4{4 * alignof(MaxAligned)};
+    SegregatedFreeList m_unit6{6 * alignof(MaxAligned)};
+    SegregatedFreeList m_unit8{8 * alignof(MaxAligned)};
+    BestFitTree m_tree{8 * alignof(MaxAligned)};
 
 public:
     PyObject* alloc(std::size_t count);

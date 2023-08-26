@@ -4,6 +4,8 @@
 
 #include "API.hpp"
 
+#include <pylir/Runtime/GC/GC.hpp>
+
 #include <iostream>
 #include <string_view>
 
@@ -37,4 +39,9 @@ std::size_t pylir_str_hash(PyString& string)
 void pylir_print(PyString& string)
 {
     std::cout << string.view();
+}
+
+extern "C" void* pylir_gc_alloc(std::size_t size)
+{
+    return pylir::rt::gc.alloc(size);
 }

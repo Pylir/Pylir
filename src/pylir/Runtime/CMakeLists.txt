@@ -30,14 +30,15 @@ function(collect_libs target listvar)
 endfunction()
 
 add_library(PylirRuntime STATIC
-        Stack.cpp
-        Objects.cpp
-        API.cpp
-        ExceptionHandling.cpp
-        Support.cpp
-        SysModule.cpp
-        Pages.cpp
-        Globals.cpp)
+  CAPI/API.cpp
+  ExceptionHandling/ExceptionHandling.cpp
+  GC/Globals.cpp
+  GC/Stack.cpp
+  Modules/SysModule.cpp
+  Objects/Objects.cpp
+  Objects/Support.cpp
+  Util/Pages.cpp
+)
 target_link_libraries(PylirRuntime PUBLIC PylirSupport)
 
 if (MSVC)

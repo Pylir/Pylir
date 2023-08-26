@@ -9,6 +9,8 @@
 #include <memory>
 #include <type_traits>
 
+#include "Macros.hpp"
+
 namespace pylir
 {
 /// Returns 'number' rounded up to the next multiple 'multiple'. If 'multiple' is 0, simply returns 'number'.

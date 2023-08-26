@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <vector>
+#include <pylir/Runtime/Objects/Objects.hpp>
 
-#include "Objects.hpp"
+#include <vector>
 
 namespace pylir::rt
 {

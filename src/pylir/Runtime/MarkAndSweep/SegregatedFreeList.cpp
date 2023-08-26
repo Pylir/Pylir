@@ -4,6 +4,8 @@
 
 #include "SegregatedFreeList.hpp"
 
+#include <pylir/Runtime/Objects/Objects.hpp>
+
 #include <cstring>
 
 #include "MarkAndSweep.hpp"

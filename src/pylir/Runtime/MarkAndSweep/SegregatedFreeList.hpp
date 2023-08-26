@@ -4,14 +4,15 @@
 
 #pragma once
 
-#include <pylir/Runtime/Objects.hpp>
-#include <pylir/Runtime/Pages.hpp>
+#include <pylir/Runtime/Util/Pages.hpp>
 
 #include <memory>
 #include <vector>
 
 namespace pylir::rt
 {
+
+class PyObject;
 
 class SegregatedFreeList
 {

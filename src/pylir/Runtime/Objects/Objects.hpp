@@ -8,6 +8,7 @@
 #pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wunused-private-field"
 
+#include <pylir/Runtime/GC/GC.hpp>
 #include <pylir/Support/BigInt.hpp>
 #include <pylir/Support/HashTable.hpp>
 
@@ -18,7 +19,6 @@
 #include <unwind.h>
 
 #include "Builtins.hpp"
-#include "GCInterface.hpp"
 #include "Support.hpp"
 
 namespace pylir::rt
@@ -512,7 +512,7 @@ struct AllocType
     decltype(auto) operator()(Args&&... args) const noexcept
     {
         using InstanceType = typename PyTypeTraits<type>::instanceType;
-        void* memory = pylir_gc_alloc(sizeof(InstanceType) + sizeof(PyObject*) * PyTypeTraits<type>::slotCount);
+        void* memory = gc.alloc(sizeof(InstanceType) + sizeof(PyObject*) * PyTypeTraits<type>::slotCount);
         return *new (memory) InstanceType(std::forward<Args>(args)...);
     }
 };
@@ -524,7 +524,7 @@ struct AllocType<Builtins::Tuple>
     decltype(auto) operator()(std::size_t count, Args&&... args) const noexcept
     {
         using InstanceType = typename PyTypeTraits<Builtins::Tuple>::instanceType;
-        auto* memory = reinterpret_cast<std::byte*>(pylir_gc_alloc(sizeof(InstanceType) + sizeof(PyObject*) * count));
+        auto* memory = reinterpret_cast<std::byte*>(gc.alloc(sizeof(InstanceType) + sizeof(PyObject*) * count));
         return *new (memory) InstanceType(count, std::forward<Args>(args)...);
     }
 };
