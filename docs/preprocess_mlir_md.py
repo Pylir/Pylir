@@ -3,6 +3,7 @@
 #  // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import argparse
+from pathlib import Path
 import re
 from functools import reduce
 from typing import Callable
@@ -26,7 +27,9 @@ class RegexReplaceFile:
         reg = reduce(lambda curr, r: curr + f'|({r[0]})', self.actions[1:], f'({self.actions[0][0]})') if len(
             self.actions) > 0 else ''
 
-        with open(self.output_path, 'w') as out:
+        p = Path(self.output_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open('w') as out:
             last_pos = 0
             for i in re.finditer(reg, self.input_string, flags=re.MULTILINE):
                 out.write(self.input_string[last_pos:i.start()])
