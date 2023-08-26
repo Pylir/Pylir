@@ -4,8 +4,8 @@
 
 #include "MarkAndSweep.hpp"
 
-#include <pylir/Runtime/Globals.hpp>
-#include <pylir/Runtime/Stack.hpp>
+#include <pylir/Runtime/GC/Globals.hpp>
+#include <pylir/Runtime/GC/Stack.hpp>
 #include <pylir/Support/Util.hpp>
 
 // Anything below 65535 would do basically

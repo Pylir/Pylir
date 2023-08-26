@@ -4,8 +4,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <pylir/Runtime/Objects.hpp>
-#include <pylir/Runtime/Stack.hpp>
+#include <pylir/Runtime/GC/Stack.hpp>
+#include <pylir/Runtime/Objects/Objects.hpp>
 
 #include <array>
 #include <iostream>

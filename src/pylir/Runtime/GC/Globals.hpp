@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include <tcb/span.hpp>
+#include <pylir/Runtime/Objects/Objects.hpp>
 
-#include "Objects.hpp"
+#include <tcb/span.hpp>
 
 namespace pylir::rt
 {

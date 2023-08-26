@@ -72,8 +72,6 @@
 
 #include <pylir/Support/Util.hpp>
 
-#include "API.hpp"
-
 namespace
 {
 /// Magic appearing at the beginning of the stack map as a simple integrity test.

@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <pylir/Runtime/MarkAndSweep/BestFitTree.hpp>
+#include <pylir/Runtime/Objects/Objects.hpp>
 
 // The tests are not really proper automated unit tests but more additional integration tests for the ease of debugging
 // as well as just checking that it does not crash

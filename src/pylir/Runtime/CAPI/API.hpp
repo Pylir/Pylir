@@ -4,9 +4,11 @@
 
 #pragma once
 
+#include <pylir/Runtime/Objects/Objects.hpp>
+
 #include <cstddef>
 
-#include "Objects.hpp"
+extern "C" void* pylir_gc_alloc(std::size_t);
 
 extern "C" std::size_t pylir_str_hash(pylir::rt::PyString& string);
 
