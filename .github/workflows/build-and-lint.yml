@@ -246,7 +246,7 @@ jobs:
           # Below ensures that the exit code of git-clang-format is properly propagated
           set -o pipefail
           git diff -U0 HEAD^ :^3rdParty '***.c' '***.h' '***.hpp' '***.cpp' \
-           | clang-format-diff-$LLVM_LINT_VERSION -p1 -binary $(which clang-format-$LLVM_LINT_VERSION) \
+           | ${{github.workspace}}/util/clang-format-diff.py -p1 -binary $(which clang-format-$LLVM_LINT_VERSION) \
            | tee ${{github.workspace}}/clang-format.patch
 
       - name: Upload clang-format patch
