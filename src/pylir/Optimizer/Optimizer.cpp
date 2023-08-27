@@ -86,7 +86,7 @@ void pylir::registerOptimizationPipelines()
                 createConvertPylirToLLVMPass(ConvertPylirToLLVMPassOptions{options.targetTriple, options.dataLayout}));
             nested = &pm.nestAny();
             nested->addPass(mlir::createReconcileUnrealizedCastsPass());
-            nested->addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
+            // nested->addPass(mlir::LLVM::createDIScopeForLLVMFuncOpPass());
             nested->addPass(mlir::LLVM::createLegalizeForExportPass());
         });
 }

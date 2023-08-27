@@ -442,7 +442,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             }
 
             manager.addPass(pylir::Py::createFinalizeRefAttrsPass());
-            if (args.getLastArgValue(OPT_g, "0") == llvm::StringRef{"0"})
+            bool produceDebugInfo = args.getLastArgValue(OPT_g, "0") == llvm::StringRef{"0"};
+            if (produceDebugInfo)
             {
                 manager.addPass(mlir::createStripDebugInfoPass());
             }
@@ -483,7 +484,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             }
 
             auto options = pylir::PylirLLVMOptions(m_targetMachine->getTargetTriple().str(),
-                                                   m_targetMachine->createDataLayout().getStringRepresentation());
+                                                   m_targetMachine->createDataLayout().getStringRepresentation(),
+                                                   produceDebugInfo);
             if (mlir::failed(mlir::parsePassPipeline("pylir-llvm" + options.rendered(), manager)))
             {
                 return mlir::failure();

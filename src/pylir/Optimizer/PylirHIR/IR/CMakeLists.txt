@@ -8,5 +8,5 @@ add_pylir_interface(OP PylirHIRFunctionInterface)
 
 add_library(PylirHIRDialect PylirHIRDialect.cpp PylirHIROps.cpp)
 add_dependencies(PylirHIRDialect PylirHIRIncGen PylirHIRFunctionInterfaceIncGen)
-target_link_libraries(PylirHIRDialect PUBLIC MLIRIR PylirPyDialect)
+target_link_libraries(PylirHIRDialect PUBLIC MLIRIR MLIRControlFlowInterfaces PylirPyDialect)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirHIRDialect)
