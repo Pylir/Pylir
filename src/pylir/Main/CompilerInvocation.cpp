@@ -513,10 +513,6 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             {
                 markDefinitionsForSanitizer(*llvmModule, llvm::Attribute::SanitizeAddress);
             }
-            if (toolchain.useThreadSanitizer())
-            {
-                markDefinitionsForSanitizer(*llvmModule, llvm::Attribute::SanitizeThread);
-            }
 
             [[fallthrough]];
         }
@@ -577,18 +573,13 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(llvm::opt::Arg* input
             // The codegen output of both ASAN and TSAN are tightly coupled to the LLVM version used, and technically
             // only configurations where both the runtime version and the compiler version match are supported.
             // Since this is currently unlikely due to LLVM versions used it is currently an opt-in flag.
-            if (args.hasArg(cli::OPT_Xsanitize_codegen)
-                && (toolchain.useAddressSanitizer() || toolchain.useThreadSanitizer()))
+            // This is mostly relevant for ASAN as TSAN is currently not supported for pointers with address spaces in
+            // upstream LLVM, nor does the compiler currently support multithreaded code.
+            if (args.hasArg(cli::OPT_Xsanitize_codegen) && toolchain.useAddressSanitizer())
             {
                 passBuilder.registerOptimizerLastEPCallback(
                     [&](llvm::ModulePassManager& mpm, llvm::OptimizationLevel)
                     {
-                        if (toolchain.useThreadSanitizer())
-                        {
-                            mpm.addPass(llvm::ModuleThreadSanitizerPass{});
-                            mpm.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::ThreadSanitizerPass{}));
-                        }
-
                         if (toolchain.useAddressSanitizer())
                         {
                             llvm::AddressSanitizerOptions options;
