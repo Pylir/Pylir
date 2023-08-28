@@ -24,22 +24,12 @@ static constexpr const llvm::ArrayRef<llvm::StringLiteral> PREFIX_TABLE(PREFIX_T
                                                                         std::size(PREFIX_TABLE_INIT) - 1);
 
 // Don't have much choice until this is fixed in LLVM
+using llvm::opt::DefaultVis;
 using llvm::opt::HelpHidden;
+using namespace pylir::cli;
 
 static constexpr llvm::opt::OptTable::Info INFO_TABLE[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) \
-    {PREFIX,                                                                                             \
-     NAME,                                                                                               \
-     HELPTEXT,                                                                                           \
-     METAVAR,                                                                                            \
-     ::pylir::cli::OPT_##ID,                                                                             \
-     llvm::opt::Option::KIND##Class,                                                                     \
-     PARAM,                                                                                              \
-     FLAGS,                                                                                              \
-     ::pylir::cli::OPT_##GROUP,                                                                          \
-     ::pylir::cli::OPT_##ALIAS,                                                                          \
-     ALIASARGS,                                                                                          \
-     VALUES},
+#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
 #include <pylir/Main/Opts.inc>
 #undef OPTION
 };

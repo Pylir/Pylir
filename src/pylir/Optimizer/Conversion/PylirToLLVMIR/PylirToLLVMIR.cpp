@@ -336,7 +336,7 @@ struct TupleContainsOpConversion : public ConvertPylirOpToLLVMPattern<Py::TupleC
 
         auto tupleModel = pyTupleModel(rewriter, adaptor.getTuple());
         auto size = tupleModel.size(op.getLoc()).load(op.getLoc());
-        auto zero = createIndexConstant(rewriter, op.getLoc(), 0);
+        auto zero = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 0);
 
         auto* conditionBlock = new mlir::Block;
         conditionBlock->addArgument(getIndexType(), op.getLoc());
@@ -355,7 +355,7 @@ struct TupleContainsOpConversion : public ConvertPylirOpToLLVMPattern<Py::TupleC
             tupleModel.trailingArray(op.getLoc()).at(op.getLoc(), conditionBlock->getArgument(0)).load(op.getLoc());
         auto isElement = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, element,
                                                              adaptor.getElement());
-        auto one = createIndexConstant(rewriter, op.getLoc(), 1);
+        auto one = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 1);
         mlir::Value incremented = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), conditionBlock->getArgument(0), one);
         mlir::Value trueV =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI1Type(), rewriter.getBoolAttr(true));
@@ -429,7 +429,7 @@ struct ListResizeOpConversion : public ConvertPylirOpToLLVMPattern<Py::ListResiz
         auto tuplePtr = list.tuplePtr(op.getLoc()).load(op.getLoc());
         auto sizePtr = list.size(op.getLoc());
         auto size = sizePtr.load(op.getLoc());
-        auto oneIndex = createIndexConstant(rewriter, op.getLoc(), 1);
+        auto oneIndex = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 1);
 
         auto capacityPtr = tuplePtr.size(op.getLoc());
         auto capacity = capacityPtr.load(op.getLoc());
@@ -454,7 +454,8 @@ struct ListResizeOpConversion : public ConvertPylirOpToLLVMPattern<Py::ListResiz
             auto trailingArray = newTupleModel.trailingArray(op.getLoc());
             auto array = trailingArray.at(op.getLoc(), 0);
             auto prevArray = tuplePtr.trailingArray(op.getLoc()).at(op.getLoc(), 0);
-            auto elementTypeSize = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
+            auto elementTypeSize =
+                createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), typeConverter.getPointerBitwidth() / 8);
             auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, elementTypeSize);
             rewriter.create<mlir::LLVM::MemcpyOp>(op.getLoc(), array, prevArray, inBytes, /*isVolatile=*/false);
             list.tuplePtr(op.getLoc()).store(op.getLoc(), newTupleModel);
@@ -700,7 +701,7 @@ struct StrEqualOpConversion : public ConvertPylirOpToLLVMPattern<Py::StrEqualOp>
 
         sizeEqualBlock->insertBefore(endBlock);
         rewriter.setInsertionPointToStart(sizeEqualBlock);
-        auto zeroI = createIndexConstant(rewriter, op.getLoc(), 0);
+        auto zeroI = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 0);
         auto sizeZero = rewriter.create<mlir::LLVM::ICmpOp>(op.getLoc(), mlir::LLVM::ICmpPredicate::eq, lhsLen, zeroI);
         auto* bufferCmp = new mlir::Block;
         rewriter.create<mlir::LLVM::CondBrOp>(op.getLoc(), sizeZero, endBlock, mlir::ValueRange{sizeZero}, bufferCmp,
@@ -943,9 +944,10 @@ struct GCAllocObjectConstTypeConversion : public ConvertPylirOpToLLVMPattern<Mem
             return mlir::failure();
         }
         mlir::Type instanceType = typeConverter.mapLayoutTypeToLLVM(*layoutType);
-        auto instanceSize =
-            createIndexConstant(rewriter, op.getLoc(), typeConverter.getPlatformABI().getSizeOf(instanceType));
-        auto pointerSize = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
+        auto instanceSize = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(),
+                                                    typeConverter.getPlatformABI().getSizeOf(instanceType));
+        auto pointerSize =
+            createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), typeConverter.getPointerBitwidth() / 8);
         auto slotSize = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), adaptor.getTrailingItems(), pointerSize);
         auto inBytes = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), slotSize, instanceSize);
         auto memory =
@@ -969,7 +971,8 @@ struct GCAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<Mem::GCAll
         auto len = adaptor.getTrailingItems();
         auto offset = pyTypeModel(rewriter, adaptor.getTypeObject()).offset(op.getLoc()).load(op.getLoc());
         auto size = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), offset, len);
-        auto pointerSize = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
+        auto pointerSize =
+            createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), typeConverter.getPointerBitwidth() / 8);
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, pointerSize);
         auto memory =
             codeGenState.createRuntimeCall(op.getLoc(), rewriter, CodeGenState::Runtime::pylir_gc_alloc, {inBytes});
@@ -1006,7 +1009,7 @@ struct StackAllocObjectOpConversion : public ConvertPylirOpToLLVMPattern<Mem::St
         std::size_t elementTypeSize = typeConverter.getPlatformABI().getSizeOf(elementType);
         rewriter.create<mlir::LLVM::LifetimeStartOp>(op.getLoc(), elementTypeSize, memory);
 
-        auto inBytes = createIndexConstant(rewriter, op.getLoc(), elementTypeSize);
+        auto inBytes = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), elementTypeSize);
         auto zeroI8 =
             rewriter.create<mlir::LLVM::ConstantOp>(op.getLoc(), rewriter.getI8Type(), rewriter.getI8IntegerAttr(0));
         rewriter.create<mlir::LLVM::MemsetOp>(op.getLoc(), memory, zeroI8, inBytes, /*isVolatile=*/false);
@@ -1036,7 +1039,7 @@ struct InitTupleOpConversion : public ConvertPylirOpToLLVMPattern<Mem::InitTuple
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto tuple = pyTupleModel(rewriter, adaptor.getMemory());
-        auto size = createIndexConstant(rewriter, op.getLoc(), adaptor.getInitializer().size());
+        auto size = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), adaptor.getInitializer().size());
 
         tuple.size(op.getLoc()).store(op.getLoc(), size);
         auto trailing = tuple.trailingArray(op.getLoc());
@@ -1058,7 +1061,7 @@ struct InitListOpConversion : public ConvertPylirOpToLLVMPattern<Mem::InitListOp
                                         mlir::ConversionPatternRewriter& rewriter) const override
     {
         auto list = pyListModel(rewriter, adaptor.getMemory());
-        auto size = createIndexConstant(rewriter, op.getLoc(), adaptor.getInitializer().size());
+        auto size = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), adaptor.getInitializer().size());
 
         list.size(op.getLoc()).store(op.getLoc(), size);
 
@@ -1088,7 +1091,8 @@ struct InitTupleFromListOpConversion : public ConvertPylirOpToLLVMPattern<Mem::I
         auto size = list.size(op.getLoc()).load(op.getLoc());
         tuple.size(op.getLoc()).store(op.getLoc(), size);
 
-        auto sizeOf = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
+        auto sizeOf =
+            createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), typeConverter.getPointerBitwidth() / 8);
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
 
         auto array = tuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
@@ -1113,7 +1117,8 @@ struct InitTupleCopyOpConversion : public ConvertPylirOpToLLVMPattern<Mem::InitT
         auto size = sourceTuple.size(op.getLoc()).load(op.getLoc());
         destTuple.size(op.getLoc()).store(op.getLoc(), size);
 
-        auto sizeOf = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
+        auto sizeOf =
+            createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), typeConverter.getPointerBitwidth() / 8);
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
 
         auto array = destTuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
@@ -1140,7 +1145,8 @@ struct InitTupleDropFrontOpConversion : public ConvertPylirOpToLLVMPattern<Mem::
 
         tuple.size(op.getLoc()).store(op.getLoc(), size);
 
-        auto sizeOf = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
+        auto sizeOf =
+            createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), typeConverter.getPointerBitwidth() / 8);
         auto inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
 
         auto array = tuple.trailingArray(op.getLoc()).at(op.getLoc(), 0);
@@ -1162,13 +1168,14 @@ struct InitTuplePrependOpConversion : public ConvertPylirOpToLLVMPattern<Mem::In
         auto prevTuple = pyTupleModel(rewriter, adaptor.getTuple());
 
         mlir::Value size = prevTuple.size(op.getLoc()).load(op.getLoc());
-        auto oneI = createIndexConstant(rewriter, op.getLoc(), 1);
+        auto oneI = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 1);
         auto resultSize = rewriter.create<mlir::LLVM::AddOp>(op.getLoc(), size, oneI);
 
         tuple.size(op.getLoc()).store(op.getLoc(), resultSize);
         tuple.trailingArray(op.getLoc()).at(op.getLoc(), 0).store(op.getLoc(), adaptor.getElement());
 
-        auto sizeOf = createIndexConstant(rewriter, op.getLoc(), typeConverter.getPointerBitwidth() / 8);
+        auto sizeOf =
+            createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), typeConverter.getPointerBitwidth() / 8);
         mlir::Value inBytes = rewriter.create<mlir::LLVM::MulOp>(op.getLoc(), size, sizeOf);
 
         auto array = tuple.trailingArray(op.getLoc()).at(op.getLoc(), 1);
@@ -1228,7 +1235,7 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<Mem::InitStrOp>
     {
         auto string = pyStringModel(rewriter, adaptor.getMemory()).buffer(op.getLoc());
 
-        mlir::Value size = this->createIndexConstant(rewriter, op.getLoc(), 0);
+        mlir::Value size = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 0);
         for (auto iter : adaptor.getStrings())
         {
             auto sizeLoaded = pyStringModel(rewriter, iter).buffer(op.getLoc()).size(op.getLoc()).load(op.getLoc());
@@ -1241,7 +1248,7 @@ struct InitStrOpConversion : public ConvertPylirOpToLLVMPattern<Mem::InitStrOp>
         auto array = codeGenState.createRuntimeCall(op.getLoc(), rewriter, CodeGenState::Runtime::malloc, {size});
         string.elementPtr(op.getLoc()).store(op.getLoc(), array);
 
-        size = this->createIndexConstant(rewriter, op.getLoc(), 0);
+        size = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 0);
         for (auto iter : adaptor.getStrings())
         {
             auto iterString = pyStringModel(rewriter, iter).buffer(op.getLoc());
@@ -1278,7 +1285,7 @@ struct InitStrFromIntOpConversion : public ConvertPylirOpToLLVMPattern<Mem::Init
 
         // mp_to_radix sadly includes the NULL terminator that it uses in size...
         mlir::Value size = sizePtr.load(op.getLoc());
-        auto oneI = createIndexConstant(rewriter, op.getLoc(), 1);
+        auto oneI = createIndexAttrConstant(rewriter, op.getLoc(), getIndexType(), 1);
         size = rewriter.create<mlir::LLVM::SubOp>(op.getLoc(), size, oneI);
         sizePtr.store(op.getLoc(), size);
 

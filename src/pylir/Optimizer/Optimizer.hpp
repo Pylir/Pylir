@@ -16,12 +16,15 @@ struct PylirLLVMOptions : public mlir::PassPipelineOptions<PylirLLVMOptions>
                                      llvm::cl::init(LLVM_DEFAULT_TARGET_TRIPLE)};
     Option<std::string> dataLayout{*this, "data-layout", llvm::cl::desc("LLVM data layout"), llvm::cl::init("")};
 
+    Option<bool> debugInfo{*this, "debug-info", llvm::cl::desc("Whether to produce debug info"), llvm::cl::init(false)};
+
     PylirLLVMOptions() = default;
 
-    PylirLLVMOptions(llvm::StringRef targetTriple, llvm::StringRef dataLayout)
+    PylirLLVMOptions(llvm::StringRef targetTriple, llvm::StringRef dataLayout, bool produceDebugInfo)
     {
         this->targetTriple = targetTriple.str();
         this->dataLayout = dataLayout.str();
+        this->debugInfo = produceDebugInfo;
     }
 
     /// Prints the option struct options in a format suitable for directly appending to the pass pipeline name.

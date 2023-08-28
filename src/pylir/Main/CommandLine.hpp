@@ -93,7 +93,7 @@ enum ID
 {
     /// NOLINTNEXTLINE(readability-identifier-naming): Predefined name used by llvm-tblgen.
     OPT_INVALID = 0, // This is not an option ID.
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM, HELPTEXT, METAVAR, VALUES) OPT_##ID,
+#define OPTION(...) LLVM_MAKE_OPT_ID(__VA_ARGS__),
 #include <pylir/Main/Opts.inc>
 #undef OPTION
 };

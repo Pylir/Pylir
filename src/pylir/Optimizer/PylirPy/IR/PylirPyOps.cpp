@@ -558,6 +558,11 @@ mlir::Operation::operand_range pylir::Py::FunctionCallOp::getArgOperands()
     return getCallOperands();
 }
 
+mlir::MutableOperandRange pylir::Py::FunctionCallOp::getArgOperandsMutable()
+{
+    return getCallOperandsMutable();
+}
+
 void pylir::Py::FunctionCallOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
 {
     getFunctionMutable().assign(callee.get<mlir::Value>());
@@ -575,6 +580,11 @@ mlir::CallInterfaceCallable pylir::Py::FunctionInvokeOp::getCallableForCallee()
 mlir::Operation::operand_range pylir::Py::FunctionInvokeOp::getArgOperands()
 {
     return getCallOperands();
+}
+
+mlir::MutableOperandRange pylir::Py::FunctionInvokeOp::getArgOperandsMutable()
+{
+    return getCallOperandsMutable();
 }
 
 void pylir::Py::FunctionInvokeOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
@@ -656,6 +666,11 @@ mlir::Operation::operand_range pylir::Py::CallOp::getArgOperands()
     return getCallOperands();
 }
 
+mlir::MutableOperandRange pylir::Py::CallOp::getArgOperandsMutable()
+{
+    return getCallOperandsMutable();
+}
+
 void pylir::Py::CallOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)
 {
     setCalleeAttr(mlir::cast<mlir::FlatSymbolRefAttr>(callee.get<mlir::SymbolRefAttr>()));
@@ -673,6 +688,11 @@ mlir::CallInterfaceCallable pylir::Py::InvokeOp::getCallableForCallee()
 mlir::Operation::operand_range pylir::Py::InvokeOp::getArgOperands()
 {
     return getCallOperands();
+}
+
+mlir::MutableOperandRange pylir::Py::InvokeOp::getArgOperandsMutable()
+{
+    return getCallOperandsMutable();
 }
 
 void pylir::Py::InvokeOp::setCalleeFromCallable(::mlir::CallInterfaceCallable callee)

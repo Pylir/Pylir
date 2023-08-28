@@ -93,7 +93,6 @@ Checks: >
   clang-analyzer-valist.*
   cppcoreguidelines-avoid-goto,
   cppcoreguidelines-interfaces-global-init,
-  cppcoreguidelines-prefer-member-initializer,
   cppcoreguidelines-pro-type-cstyle-cast,
   cppcoreguidelines-pro-type-member-init,
   cppcoreguidelines-pro-type-static-cast-downcast,
