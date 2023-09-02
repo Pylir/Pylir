@@ -7,8 +7,8 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 
+#include <pylir/Optimizer/PylirPy/IR/PylirPyAttrBase.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
-#include <pylir/Optimizer/PylirPy/IR/PylirPyRefAttr.hpp>
 #include <pylir/Support/BigInt.hpp>
 
 namespace pylir

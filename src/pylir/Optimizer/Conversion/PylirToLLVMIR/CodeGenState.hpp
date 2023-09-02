@@ -52,6 +52,8 @@ class CodeGenState
 
     llvm::DenseMap<pylir::Py::ObjectAttrInterface, mlir::LLVM::GlobalOp> m_globalConstants;
     llvm::DenseMap<mlir::Attribute, mlir::LLVM::GlobalOp> m_globalBuffers;
+    llvm::DenseMap<pylir::Py::GlobalValueAttr, mlir::LLVM::GlobalOp> m_globalValues;
+    llvm::DenseMap<pylir::Py::GlobalValueAttr, mlir::StringAttr> m_externalGlobalValues;
     mlir::LLVM::LLVMFuncOp m_globalInit;
     mlir::LLVM::TBAARootAttr m_tbaaRoot;
 
@@ -60,13 +62,17 @@ class CodeGenState
     mlir::LLVM::GlobalOp createGlobalConstant(mlir::OpBuilder& builder, pylir::Py::ObjectAttrInterface objectAttr);
 
 public:
-    CodeGenState(PylirTypeConverter& typeConverter, mlir::SymbolTable symbolTable)
+    CodeGenState(PylirTypeConverter& typeConverter, mlir::ModuleOp module)
         : m_objectPtrType(mlir::LLVM::LLVMPointerType::get(&typeConverter.getContext(), REF_ADDRESS_SPACE)),
           m_typeConverter(typeConverter),
-          m_symbolTable(std::move(symbolTable)),
+          m_symbolTable(module),
           m_tbaaRoot(mlir::LLVM::TBAARootAttr::get(
               &typeConverter.getContext(), mlir::StringAttr::get(&typeConverter.getContext(), "Pylir TBAA Root")))
     {
+        for (auto exportOp : module.getOps<Py::ExternalOp>())
+        {
+            m_externalGlobalValues.insert({exportOp.getAttr(), exportOp.getSymNameAttr()});
+        }
     }
 
     /// Returns an array of symbol references for the given 'TbaaAccessType', suitable for directly attaching to load or
@@ -112,6 +118,10 @@ public:
     /// Generates code to translate the compile time constant 'attribute' to an PyObject pointer in LLVM and returns it.
     /// Attribute may be any kind of attribute from the 'py' dialect.
     mlir::Value getConstant(mlir::Location loc, mlir::OpBuilder& builder, mlir::Attribute attribute);
+
+    /// Get or lower 'globalValueAttr' to a LLVM global variable using 'builder'.
+    /// Once lowered, the same global is returned for the same 'globalValueAttr'.
+    mlir::LLVM::GlobalOp getGlobalValue(mlir::OpBuilder& builder, Py::GlobalValueAttr globalValueAttr);
 
     /// Returns the type converter used.
     PylirTypeConverter& getTypeConverter() const

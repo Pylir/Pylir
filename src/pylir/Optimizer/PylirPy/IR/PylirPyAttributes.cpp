@@ -8,6 +8,7 @@
 #include <mlir/IR/DialectImplementation.h>
 
 #include <llvm/ADT/MapVector.h>
+#include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/TypeSwitch.h>
@@ -58,8 +59,9 @@ llvm::hash_code hash_value(const pylir::BigInt& bigInt)
     PYLIR_ASSERT(result == MP_OKAY);
     return llvm::hash_value(llvm::ArrayRef(data));
 }
+} // namespace pylir
 
-namespace Py::detail
+namespace pylir::Py::detail
 {
 struct RefAttrStorage : mlir::AttributeStorage
 {
@@ -85,8 +87,62 @@ struct RefAttrStorage : mlir::AttributeStorage
     mlir::SymbolRefAttr identity;
     mlir::Operation* value{};
 };
-} // namespace Py::detail
-} // namespace pylir
+
+struct GlobalValueAttrStorage : mlir::AttributeStorage
+{
+    using KeyTy = std::tuple<llvm::StringRef, bool, mlir::Attribute>;
+
+    explicit GlobalValueAttrStorage(const KeyTy& key)
+        : name(std::get<llvm::StringRef>(key)),
+          constant(std::get<bool>(key)),
+          initializer(std::get<mlir::Attribute>(key))
+    {
+    }
+
+    bool operator==(const KeyTy& key) const
+    {
+        return std::get<llvm::StringRef>(key) == name;
+    }
+
+    static llvm::hash_code hashKey(const KeyTy& key)
+    {
+        return llvm::hash_value(std::get<llvm::StringRef>(key));
+    }
+
+    static GlobalValueAttrStorage* construct(mlir::AttributeStorageAllocator& allocator, const KeyTy& key)
+    {
+        return new (allocator.allocate<GlobalValueAttrStorage>()) GlobalValueAttrStorage(std::make_tuple(
+            allocator.copyInto(std::get<llvm::StringRef>(key)), std::get<bool>(key), std::get<mlir::Attribute>(key)));
+    }
+
+    [[nodiscard]] KeyTy getAsKey() const
+    {
+        return std::make_tuple(name, constant, initializer);
+    }
+
+    static KeyTy getKey(llvm::StringRef name)
+    {
+        return std::make_tuple(name, false, nullptr);
+    }
+
+    mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&, bool c)
+    {
+        constant = c;
+        return mlir::success();
+    }
+
+    mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&, ObjectAttrInterface attribute)
+    {
+        initializer = attribute;
+        return mlir::success();
+    }
+
+    llvm::StringRef name;
+    bool constant;
+    mlir::Attribute initializer;
+};
+
+} // namespace pylir::Py::detail
 
 mlir::FlatSymbolRefAttr pylir::Py::RefAttr::getRef() const
 {
@@ -96,6 +152,130 @@ mlir::FlatSymbolRefAttr pylir::Py::RefAttr::getRef() const
 pylir::Py::GlobalValueOp pylir::Py::RefAttr::getSymbol() const
 {
     return mlir::dyn_cast_or_null<GlobalValueOp>(getImpl()->value);
+}
+
+/// global-value ::= `#py.globalValue` `<` name { (`,` `const`)? (`,` `initializer` `=` attr) }`>`
+mlir::Attribute pylir::Py::GlobalValueAttr::parse(::mlir::AsmParser& parser, ::mlir::Type)
+{
+    // Keep a thread local stack to know whether we are printing any nested `#py.globalValue`.
+    // Nested occurrences need to not print the initializer to break any potential cycles.
+    // TODO: Upstream should add support for this pattern.
+    thread_local llvm::SetVector<llvm::StringRef> seenGlobalValueAttr;
+
+    std::string name;
+    if (parser.parseLess() || parser.parseKeywordOrString(&name))
+    {
+        return nullptr;
+    }
+
+    GlobalValueAttr attr = get(parser.getContext(), name);
+
+    if (!seenGlobalValueAttr.insert(name))
+    {
+        if (parser.parseGreater())
+        {
+            return nullptr;
+        }
+        return attr;
+    }
+
+    auto exit = llvm::make_scope_exit([&] { seenGlobalValueAttr.pop_back(); });
+
+    // Default values.
+    bool constant = false;
+    ObjectAttrInterface initializer = {};
+
+    while (mlir::succeeded(parser.parseOptionalComma()))
+    {
+        llvm::StringRef keyword;
+        mlir::ParseResult result =
+            mlir::OpAsmParser::KeywordSwitch(parser, &keyword)
+                .Case("const",
+                      [&](llvm::StringRef, llvm::SMLoc loc) -> mlir::ParseResult
+                      {
+                          if (constant)
+                          {
+                              return parser.emitError(loc, "'const' cannot be specified more than once");
+                          }
+                          constant = true;
+                          return mlir::success();
+                      })
+                .Case("initializer",
+                      [&](llvm::StringRef, llvm::SMLoc loc) -> mlir::ParseResult
+                      {
+                          if (initializer)
+                          {
+                              return parser.emitError(loc, "'initializer' cannot be specified more than once");
+                          }
+                          return mlir::failure(parser.parseEqual() || parser.parseAttribute(initializer));
+                      });
+        if (result)
+        {
+            return nullptr;
+        }
+    }
+
+    if (parser.parseGreater())
+    {
+        return nullptr;
+    }
+
+    attr.setConstant(constant);
+    attr.setInitializer(initializer);
+    return attr;
+}
+
+void pylir::Py::GlobalValueAttr::print(::mlir::AsmPrinter& printer) const
+{
+    thread_local llvm::SetVector<GlobalValueAttr> seenGlobalValueAttr;
+
+    printer << '<';
+
+    printer.printKeywordOrString(getName());
+
+    // Break a potential cycle by not printing a nested `#py.globalValue`.
+    if (!seenGlobalValueAttr.insert(*this))
+    {
+        printer << '>';
+        return;
+    }
+
+    auto exit = llvm::make_scope_exit([&] { seenGlobalValueAttr.pop_back(); });
+
+    if (getConstant())
+    {
+        printer << ", const";
+    }
+    if (getInitializer())
+    {
+        printer << ", initializer = " << getInitializer();
+    }
+    printer << '>';
+}
+
+llvm::StringRef pylir::Py::GlobalValueAttr::getName() const
+{
+    return getImpl()->name;
+}
+
+bool pylir::Py::GlobalValueAttr::getConstant() const
+{
+    return getImpl()->constant;
+}
+
+void pylir::Py::GlobalValueAttr::setConstant(bool constant)
+{
+    (void)Base::mutate(constant);
+}
+
+pylir::Py::ObjectAttrInterface pylir::Py::GlobalValueAttr::getInitializer() const
+{
+    return mlir::cast_or_null<ObjectAttrInterface>(getImpl()->initializer);
+}
+
+void pylir::Py::GlobalValueAttr::setInitializer(pylir::Py::ObjectAttrInterface attrInterface)
+{
+    (void)Base::mutate(attrInterface);
 }
 
 void pylir::Py::PylirPyDialect::initializeAttributes()

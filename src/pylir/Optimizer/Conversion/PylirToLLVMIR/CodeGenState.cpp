@@ -476,19 +476,23 @@ void pylir::CodeGenState::initializeGlobal(mlir::LLVM::GlobalOp global, mlir::Op
 
 mlir::Value pylir::CodeGenState::getConstant(mlir::Location loc, mlir::OpBuilder& builder, mlir::Attribute attribute)
 {
-    mlir::LLVM::AddressOfOp address;
     if (auto ref = attribute.dyn_cast<Py::RefAttr>())
     {
         return builder.create<mlir::LLVM::AddressOfOp>(loc, m_objectPtrType, ref.getRef());
+    }
+    if (auto value = attribute.dyn_cast<Py::GlobalValueAttr>())
+    {
+        return builder.create<mlir::LLVM::AddressOfOp>(loc, m_objectPtrType,
+                                                       mlir::FlatSymbolRefAttr::get(getGlobalValue(builder, value)));
     }
     if (attribute.isa<Py::UnboundAttr>())
     {
         return builder.create<mlir::LLVM::NullOp>(loc, m_objectPtrType);
     }
 
-    return address = builder.create<mlir::LLVM::AddressOfOp>(
-               loc, m_objectPtrType,
-               mlir::FlatSymbolRefAttr::get(createGlobalConstant(builder, attribute.cast<Py::ObjectAttrInterface>())));
+    return builder.create<mlir::LLVM::AddressOfOp>(
+        loc, m_objectPtrType,
+        mlir::FlatSymbolRefAttr::get(createGlobalConstant(builder, attribute.cast<Py::ObjectAttrInterface>())));
 }
 
 mlir::LLVM::GlobalOp pylir::CodeGenState::createGlobalConstant(mlir::OpBuilder& builder,
@@ -511,5 +515,70 @@ mlir::LLVM::GlobalOp pylir::CodeGenState::createGlobalConstant(mlir::OpBuilder& 
     m_symbolTable.insert(globalOp);
     m_globalConstants.insert({objectAttr, globalOp});
     initializeGlobal(globalOp, builder, objectAttr);
+    return globalOp;
+}
+
+mlir::LLVM::GlobalOp pylir::CodeGenState::getGlobalValue(mlir::OpBuilder& builder,
+                                                         pylir::Py::GlobalValueAttr globalValueAttr)
+{
+    auto [iter, inserted] = m_globalValues.insert({globalValueAttr, nullptr});
+    if (!inserted)
+    {
+        return iter->second;
+    }
+
+    mlir::Type type;
+    if (!globalValueAttr.getInitializer())
+    {
+        // If we don't have an initializer, we use the generic PyObject layout for convenience.
+        // Semantically, the type given here has no meaning and LLVM does not care about the type of a declaration.
+        type = m_typeConverter.getPyObjectType();
+    }
+    else
+    {
+        type = m_typeConverter.typeOf(globalValueAttr.getInitializer());
+    }
+
+    // Check if the global value appeared in an `py.external`.
+    // Gives the symbol name that must be used or a null attribute if there was no such occurrence.
+    mlir::StringAttr exportedName = m_externalGlobalValues.lookup(globalValueAttr);
+
+    bool constant = globalValueAttr.getConstant();
+    if (globalValueAttr.getInitializer())
+    {
+        // If the initializer lowering requires runtime initialization we cannot mark it as constant in the LLVM sense.
+        constant = constant && !needToBeRuntimeInit(globalValueAttr.getInitializer());
+    }
+    mlir::OpBuilder::InsertionGuard guard{builder};
+    builder.setInsertionPointToEnd(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
+    auto globalOp = builder.create<mlir::LLVM::GlobalOp>(
+        builder.getUnknownLoc(), type, constant,
+        /*linkage=*/exportedName ? mlir::LLVM::linkage::Linkage::External : mlir::LLVM::linkage::Linkage::Internal,
+        /*name=*/exportedName ? exportedName : globalValueAttr.getName(), /*value=*/mlir::Attribute{}, /*alignment=*/0,
+        REF_ADDRESS_SPACE, /*dsoLocal=*/true);
+    if (!exportedName)
+    {
+        // If not meant to be exported, do an explicit insert into the symbol table.
+        // This ensures that the global has a unique name within the symbol table.
+        m_symbolTable.insert(globalOp);
+    }
+    // Set the section according to whether this is const.
+    // TODO: Evaluate whether this should be dependent on the const in the LLVM or the Pylir sense.
+    if (!globalOp.getConstant())
+    {
+        globalOp.setSectionAttr(m_typeConverter.getCollectionSection());
+    }
+    else
+    {
+        globalOp.setSectionAttr(m_typeConverter.getConstantSection());
+    }
+    iter->second = globalOp;
+
+    // Fill the initializer region.
+    if (globalValueAttr.getInitializer())
+    {
+        initializeGlobal(globalOp, builder, globalValueAttr.getInitializer());
+    }
+
     return globalOp;
 }

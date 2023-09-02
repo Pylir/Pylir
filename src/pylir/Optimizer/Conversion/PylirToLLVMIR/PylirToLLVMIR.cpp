@@ -103,6 +103,21 @@ struct ConstantOpConversion : public ConvertPylirOpToLLVMPattern<Py::ConstantOp>
     }
 };
 
+struct ExternalOpConversion : public ConvertPylirOpToLLVMPattern<Py::ExternalOp>
+{
+    using ConvertPylirOpToLLVMPattern<Py::ExternalOp>::ConvertPylirOpToLLVMPattern;
+
+    mlir::LogicalResult matchAndRewrite(Py::ExternalOp op, OpAdaptor,
+                                        mlir::ConversionPatternRewriter& rewriter) const override
+    {
+        // Get the global value to make sure it has been constructed.
+        // Nothing else has to be done but erasing this op as it is already constructed with external linkage.
+        codeGenState.getGlobalValue(rewriter, op.getAttr());
+        rewriter.eraseOp(op);
+        return mlir::success();
+    }
+};
+
 struct GlobalValueOpConversion : public ConvertPylirOpToLLVMPattern<Py::GlobalValueOp>
 {
     using ConvertPylirOpToLLVMPattern<Py::GlobalValueOp>::ConvertPylirOpToLLVMPattern;
@@ -1489,7 +1504,7 @@ void ConvertPylirToLLVMPass::runOnOperation()
 
     PylirTypeConverter converter(&getContext(), llvm::Triple(m_targetTripleCLI), llvm::DataLayout(m_dataLayoutCLI),
                                  mlir::DataLayout(module));
-    CodeGenState codeGenState(converter, mlir::SymbolTable(module));
+    CodeGenState codeGenState(converter, module);
 
     mlir::LLVMConversionTarget conversionTarget(getContext());
     conversionTarget.addIllegalDialect<Py::PylirPyDialect, Mem::PylirMemDialect>();
@@ -1498,15 +1513,15 @@ void ConvertPylirToLLVMPass::runOnOperation()
     mlir::RewritePatternSet patternSet(&getContext());
     mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
     patternSet.insert<
-        ConstantOpConversion, GlobalValueOpConversion, GlobalOpConversion, StoreOpConversion, LoadOpConversion,
-        IsOpConversion, IsUnboundValueOpConversion, TypeOfOpConversion, TupleGetItemOpConversion, TupleLenOpConversion,
-        GetSlotOpConversion, SetSlotOpConversion, StrEqualOpConversion, StackAllocObjectOpConversion,
-        GCAllocObjectOpConversion, InitObjectOpConversion, InitListOpConversion, InitTupleOpConversion,
-        InitTupleFromListOpConversion, ListLenOpConversion, ListGetItemOpConversion, ListSetItemOpConversion,
-        ListResizeOpConversion, RaiseOpConversion, InitIntUnsignedOpConversion, InitIntSignedOpConversion,
-        ObjectHashOpConversion, ObjectIdOpConversion, StrHashOpConversion, InitFuncOpConversion, InitDictOpConversion,
-        DictTryGetItemOpConversion, DictSetItemOpConversion, DictDelItemOpConversion, DictLenOpConversion,
-        InitStrOpConversion, PrintOpConversion, InitStrFromIntOpConversion, InvokeOpsConversion<Py::InvokeOp>,
+        ConstantOpConversion, GlobalValueOpConversion, ExternalOpConversion, GlobalOpConversion, StoreOpConversion,
+        LoadOpConversion, IsOpConversion, IsUnboundValueOpConversion, TypeOfOpConversion, TupleGetItemOpConversion,
+        TupleLenOpConversion, GetSlotOpConversion, SetSlotOpConversion, StrEqualOpConversion,
+        StackAllocObjectOpConversion, GCAllocObjectOpConversion, InitObjectOpConversion, InitListOpConversion,
+        InitTupleOpConversion, InitTupleFromListOpConversion, ListLenOpConversion, ListGetItemOpConversion,
+        ListSetItemOpConversion, ListResizeOpConversion, RaiseOpConversion, InitIntUnsignedOpConversion,
+        InitIntSignedOpConversion, ObjectHashOpConversion, ObjectIdOpConversion, StrHashOpConversion,
+        InitFuncOpConversion, InitDictOpConversion, DictTryGetItemOpConversion, DictSetItemOpConversion,
+        DictDelItemOpConversion, DictLenOpConversion, InitStrOpConversion, PrintOpConversion, InitStrFromIntOpConversion, InvokeOpsConversion<Py::InvokeOp>,
         InvokeOpsConversion<Py::FunctionInvokeOp>, CallOpConversion, FunctionCallOpConversion, BoolToI1OpConversion,
         InitTuplePrependOpConversion, InitTupleDropFrontOpConversion, IntToIndexOpConversion, IntCmpOpConversion,
         InitIntAddOpConversion, UnreachableOpConversion, TypeMROOpConversion, ArithmeticSelectOpConversion,
