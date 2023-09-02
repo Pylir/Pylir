@@ -13,6 +13,7 @@
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "mlir/IR/AttrTypeBase.td"
 
+
 def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref"> {
     let mnemonic = "ref";
     let summary = "reference to global python value";
@@ -86,6 +87,67 @@ def PylirPy_RefAttr : AttrDef<PylirPy_Dialect, "Ref"> {
     }];
 
     let constBuilderCall = "::pylir::Py::RefAttr::get($_builder.getContext(), $0)";
+}
+
+def PylirPy_GlobalValueAttr : AttrDef<PylirPy_Dialect, "GlobalValue", [NativeAttrTrait<"IsMutable">]> {
+    let mnemonic = "globalValue";
+
+    let description = [{
+        A `#py.globalValue` is a special kind of attribute, representing an instance of a globally accessibly Python
+        object.
+        The op is optionally initialized with `$initializer`, dictating the type and initial value of the
+        global value.
+        If no `$initializer` is given, the op must have been marked external using a `py.external` in the module.
+        It differs from other attributes in the following way:
+        * It is mutable unless marked with `const`.
+          The attribute can be turned into an SSA-value using `py.constant` and mutated with the usual operations.
+          If marked `const`, any operations writing to the `py.globalValue` leads to undefined behaviour.
+        * It has nominal identity instead of structural identity.
+          This means that two `#py.globalValue` instances that have different names are considered different objects.
+          A `py.is` operation comparing these would therefore result in `False`.
+
+        Syntax:
+        ```text
+        global-value ::= `#py.globalValue` `<` name { (`,` `const`)? (`,` `initializer` `=` attr) } `>`
+        ```
+
+        Examples:
+        ```text
+        #py.globalValue<builtins.str, const, initializer = #py.type<mro_tuple = #py.tuple<()>>>
+        #py.globalValue<builtins.list>
+        #py.globalValue<builtins.type, initializer = #py.type>
+        ```
+    }];
+
+    let parameters = (ins StringRefParameter<>:$name,
+                          DefaultValuedParameter<"bool", "false">:$constant,
+                          OptionalParameter<"pylir::Py::ObjectAttrInterface">:$initializer);
+
+    // Required to make it properly mutable.
+    let genStorageClass = 0;
+
+    // Don't want to use the default builder as it includes the mutable parameters.
+    let skipDefaultBuilders = 1;
+
+    // Have to do a completely custom parse and print for the time being as for a variety of reasons, mutable cyclic
+    // attributes cannot be parsed and printed by the ODS generated prints and parsers at this point in time.
+    let hasCustomAssemblyFormat = 1;
+
+    let extraClassDeclaration = [{
+        /// Sets whether this global value is constant or not.
+        void setConstant(bool constant);
+
+        /// Sets the initializer of this global value.
+        void setInitializer(ObjectAttrInterface initializer);
+    }];
+
+    let builders = [
+        AttrBuilder<(ins "::llvm::StringRef":$name), [{
+            return $_get($_ctxt, name);
+        }]>,
+    ];
+
+    let constBuilderCall = "::pylir::Py::GlobalValueAttr::get($_builder.getContext(), $0)";
 }
 
 #endif

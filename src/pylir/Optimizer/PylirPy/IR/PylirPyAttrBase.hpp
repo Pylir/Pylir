@@ -13,6 +13,7 @@ class ObjectAttrInterface;
 class GlobalValueOp;
 namespace detail
 {
+struct GlobalValueAttrStorage;
 struct RefAttrStorage;
 } // namespace detail
 } // namespace pylir::Py

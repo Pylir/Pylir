@@ -81,6 +81,23 @@ struct PylirPyImplicationPatterns : public pylir::DialectImplicationPatternsInte
         }
     }
 };
+
+struct PylirPyOpAsmDialectInterface : public mlir::OpAsmDialectInterface
+{
+    using mlir::OpAsmDialectInterface::OpAsmDialectInterface;
+
+    AliasResult getAlias(mlir::Attribute attr, llvm::raw_ostream& os) const override
+    {
+        auto globalValue = attr.dyn_cast<pylir::Py::GlobalValueAttr>();
+        if (!globalValue)
+        {
+            return OpAsmDialectInterface::getAlias(attr, os);
+        }
+
+        os << globalValue.getName();
+        return AliasResult::OverridableAlias;
+    }
+};
 } // namespace
 
 void pylir::Py::PylirPyDialect::initialize()
@@ -92,7 +109,8 @@ void pylir::Py::PylirPyDialect::initialize()
     initializeTypes();
     initializeAttributes();
     initializeExternalModels();
-    addInterfaces<PylirPyCostInterface, PylirPyUndefInterface, PylirPyImplicationPatterns>();
+    addInterfaces<PylirPyCostInterface, PylirPyUndefInterface, PylirPyImplicationPatterns,
+                  PylirPyOpAsmDialectInterface>();
 }
 
 mlir::Operation* pylir::Py::PylirPyDialect::materializeConstant(::mlir::OpBuilder& builder, ::mlir::Attribute value,

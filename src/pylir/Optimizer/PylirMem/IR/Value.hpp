@@ -9,7 +9,7 @@
 
 #include <llvm/ADT/DenseMap.h>
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyRefAttr.hpp>
+#include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 
 #include <optional>
 

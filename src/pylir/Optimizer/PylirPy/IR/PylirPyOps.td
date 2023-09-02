@@ -7,8 +7,8 @@
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
+include "pylir/Optimizer/PylirPy/IR/PylirPyAttrBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
-include "pylir/Optimizer/PylirPy/IR/PylirPyRefAttr.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/CopyObjectInterface.td"
@@ -94,7 +94,8 @@ def DictResource : Resource<"::pylir::Py::DictResource">;
 
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoMemoryEffect, KnownType<"Tuple">,
                                                  DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-    let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface, PylirPy_RefAttr]>:$constant);
+    let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface,
+                                    PylirPy_RefAttr, PylirPy_GlobalValueAttr]>:$constant);
     let results = (outs DynamicType:$result);
 
     let assemblyFormat = [{
@@ -1100,6 +1101,28 @@ def PylirPy_UnpackExOp : CreateExceptionHandlingVariant<PylirPy_UnpackOp> {
 // Global Ops
 //===--------------------------------------------------------------------------------------------------------------===//
 
+def PylirPy_ExternalOp : PylirPy_Op<"external", [Symbol]> {
+    let arguments = (ins SymbolNameAttr:$sym_name, PylirPy_GlobalValueAttr:$attr);
+
+    let description = [{
+        This op is used to mark a `#py.globalValue` as external. This may have one of two semantics, depending on
+        whether the `#py.globalValue` has an initializer:
+        * If it has an initializer, the attribute is visible from other modules importing it using a `py.external` op
+          with the same name and a `#py.globalValue` without an initializer.
+          This can also be used from other programming languages to import the global value given a matching
+          target dependent memory layout.
+        * Otherwise, the `#py.globalValue` is referencing a `#py.globalValue` with an initializer marked external in
+          another module, or a `#py.globalValue` defined in another programming language.
+          There must be exactly one such `#py.globalValue` in the program.
+
+        A `#py.globalValue` may only occur in a `py.external` once.
+    }];
+
+    let assemblyFormat = [{
+        $sym_name `,` $attr attr-dict
+    }];
+}
+
 def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>,
                                                        DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
     let arguments = (ins
@@ -1123,7 +1146,7 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
 }
 
 defvar GlobalOpSupportedTypes = AnyTypeOf<[DynamicType, Index, F64]>;
-defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr, F64Attr, PylirPy_RefAttr]>;
+defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr, F64Attr, PylirPy_RefAttr, PylirPy_GlobalValueAttr]>;
 
 def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
 

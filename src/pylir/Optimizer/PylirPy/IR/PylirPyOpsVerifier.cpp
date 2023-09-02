@@ -43,7 +43,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
             }
             return mlir::success();
         }
-        if (!attribute.isa<pylir::Py::UnboundAttr>())
+        if (!attribute.isa<pylir::Py::UnboundAttr, pylir::Py::GlobalValueAttr>())
         {
             return op->emitOpError("Not allowed attribute '") << attribute << "' found\n";
         }
