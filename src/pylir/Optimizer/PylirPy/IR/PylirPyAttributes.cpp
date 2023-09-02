@@ -273,9 +273,9 @@ pylir::Py::ObjectAttrInterface pylir::Py::GlobalValueAttr::getInitializer() cons
     return mlir::cast_or_null<ObjectAttrInterface>(getImpl()->initializer);
 }
 
-void pylir::Py::GlobalValueAttr::setInitializer(pylir::Py::ObjectAttrInterface attrInterface)
+void pylir::Py::GlobalValueAttr::setInitializer(pylir::Py::ObjectAttrInterface initializer)
 {
-    (void)Base::mutate(attrInterface);
+    (void)Base::mutate(initializer);
 }
 
 void pylir::Py::PylirPyDialect::initializeAttributes()
