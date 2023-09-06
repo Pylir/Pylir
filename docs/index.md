@@ -13,6 +13,7 @@ hide-toc: true
 :maxdepth: 3
 :caption: Development
 
+Development/CodingGuidelines
 Dialects/index
 Passes/index
 Interfaces/index
