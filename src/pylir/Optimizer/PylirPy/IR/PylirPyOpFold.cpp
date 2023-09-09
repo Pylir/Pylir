@@ -43,7 +43,7 @@ struct TupleExpansionRemover : mlir::OpRewritePattern<T>
                              {
                                  // TODO: StringAttr
                                  return constant.getConstant()
-                                     .template isa<pylir::Py::ListAttr, pylir::Py::TupleAttr, pylir::Py::SetAttr>();
+                                     .template isa<pylir::Py::ListAttr, pylir::Py::TupleAttr>();
                              }
                              return mlir::isa<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(definingOp);
                          }));
@@ -74,7 +74,7 @@ protected:
                     [&](pylir::Py::ConstantOp constant)
                     {
                         llvm::TypeSwitch<mlir::Attribute>(constant.getConstant())
-                            .Case<pylir::Py::ListAttr, pylir::Py::SetAttr, pylir::Py::TupleAttr>(
+                            .Case<pylir::Py::ListAttr, pylir::Py::TupleAttr>(
                                 [&](auto attr)
                                 {
                                     auto values = attr.getValue();
@@ -339,7 +339,7 @@ std::optional<Attr> doConstantIterExpansion(llvm::ArrayRef<::mlir::Attribute> op
         }
         begin++;
         if (!llvm::TypeSwitch<mlir::Attribute, bool>(pair.value())
-                 .Case<pylir::Py::TupleAttr, pylir::Py::ListAttr, pylir::Py::SetAttr>(
+                 .Case<pylir::Py::TupleAttr, pylir::Py::ListAttr>(
                      [&](auto attr)
                      {
                          result.insert(result.end(), attr.getValue().begin(), attr.getValue().end());

@@ -102,11 +102,6 @@ public:
         return Py::DictAttr::get(getContext(), value);
     }
 
-    Py::SetAttr getSetAttr(llvm::ArrayRef<mlir::Attribute> value = {})
-    {
-        return Py::SetAttr::get(getContext(), value);
-    }
-
     Py::FunctionAttr getFunctionAttr(mlir::FlatSymbolRefAttr value, mlir::Attribute qualName = {},
                                      mlir::Attribute defaults = {}, mlir::Attribute kwDefaults = {},
                                      mlir::Attribute dict = {})
