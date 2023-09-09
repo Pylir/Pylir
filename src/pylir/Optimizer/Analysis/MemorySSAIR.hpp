@@ -5,6 +5,7 @@
 #pragma once
 
 #include <mlir/Analysis/AliasAnalysis.h>
+#include <mlir/Bytecode/BytecodeOpInterface.h>
 #include <mlir/IR/OpImplementation.h>
 #include <mlir/IR/RegionKindInterface.h>
 #include <mlir/Interfaces/ControlFlowInterfaces.h>
