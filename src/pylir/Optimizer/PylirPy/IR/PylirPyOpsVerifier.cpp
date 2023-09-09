@@ -61,7 +61,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
         }
     }
     return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(object)
-        .Case<pylir::Py::TupleAttr, pylir::Py::SetAttr, pylir::Py::ListAttr>(
+        .Case<pylir::Py::TupleAttr, pylir::Py::ListAttr>(
             [&](auto sequence)
             {
                 for (auto iter : sequence.getValue())

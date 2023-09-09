@@ -59,13 +59,6 @@ py.func @test_constant_tuple() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-// CHECK-LABEL: test_constant_set
-py.func @test_constant_set() -> !py.dynamic {
-    %0 = constant(#py.set<{#py.float<433.4>, #py.int<5>}>)
-    %empty = constant(#py.set<{}>)
-    return %0 : !py.dynamic
-}
-
 // CHECK-LABEL: test_constant_dict
 py.func @test_constant_dict() -> !py.dynamic {
     %0 = constant(#py.dict<{#py.float<433.4> to #py.int<5>, #py.str<"__call__"> to #py.int<5>}>)
