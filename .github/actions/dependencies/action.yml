@@ -52,6 +52,8 @@ runs:
     - name: Use MSVC developer command prompt
       if: ${{ inputs.cpp-compiler == 'clang-cl' }}
       uses: ilammy/msvc-dev-cmd@v1
+      with:
+        toolset: 14.36
 
     - name: Install clang from MSYS2
       uses: msys2/setup-msys2@v2
