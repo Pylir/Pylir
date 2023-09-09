@@ -105,12 +105,23 @@ runs:
         $hash = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash
         "key=${{steps.ccache-key.outputs.key}}-$hash" >> $Env:GITHUB_OUTPUT
 
+    - name: Calculate ccache size
+      if: ${{ inputs.llvm-build-only != 'ON' }}
+      shell: pwsh
+      id: calculate-cache-size
+      run: |
+        if ('${{inputs.sanitizers}}') {
+          "size=100M" >> $Env:GITHUB_OUTPUT
+        } else {
+          "size=30M" >> $Env:GITHUB_OUTPUT
+        }
+
     - name: Install CCache
       if: ${{ inputs.llvm-build-only != 'ON' }}
       uses: Chocobo1/setup-ccache-action@v1
       with:
         ccache_options: |
-          max_size=50M
+          max_size=${{steps.calculate-cache-size.outputs.size}}
           compiler_check=none
         override_cache_key: ${{steps.compiler-hash.outputs.key}}
         windows_compile_environment: msvc
