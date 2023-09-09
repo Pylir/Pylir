@@ -343,13 +343,6 @@ void pylir::Py::ListAttr::destructureAggregate(
     }
 }
 
-void pylir::Py::SetAttr::destructureAggregate(
-    llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type, mlir::Attribute)> write) const
-{
-    destructureSlots(*this, write);
-    // TODO: Support SetAttr
-}
-
 void pylir::Py::DictAttr::destructureAggregate(
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type, mlir::Attribute)> write) const
 {

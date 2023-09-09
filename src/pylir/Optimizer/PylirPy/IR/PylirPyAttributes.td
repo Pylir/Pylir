@@ -145,18 +145,6 @@ def PylirPy_ListAttr : TypeObjectSlotsAttr<"List",
 	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
 }
 
-def PylirPy_SetAttr : TypeObjectSlotsAttr<"Set",
-	[ParamSpec<ListPrint<"::mlir::Attribute", "Braces">, "value", "{}">], [], [{
-		std::vector<mlir::Attribute> temp = value.vec();
-        temp.erase(std::unique(temp.begin(), temp.end()), temp.end());
-		value = temp;
-	}]> {
-	let mnemonic = "set";
-	let summary = "python set";
-
-	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
-}
-
 def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ObjectAttrInterface,
     DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
 

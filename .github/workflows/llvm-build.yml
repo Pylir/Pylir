@@ -169,7 +169,7 @@ jobs:
           $use_lld `
           -DLLVM_BUILD_LLVM_C_DYLIB=OFF `
           -DLLVM_INCLUDE_BENCHMARKS=OFF `
-          -DLLVM_APPEND_VC_REV=OFF `
+          -DLLVM_APPEND_VC_REV=ON `
           -DLLD_BUILD_TOOLS=OFF `
           -DPython3_ROOT_DIR="$Env:pythonLocation" -DPython3_FIND_STRATEGY=LOCATION `
           $san_flag `
