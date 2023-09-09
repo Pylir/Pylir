@@ -8,8 +8,8 @@
 #include <pylir/Runtime/GC/Stack.hpp>
 #include <pylir/Support/Util.hpp>
 
-// Anything below 65535 would do basically
-pylir::rt::MarkAndSweep pylir::rt::gc __attribute__((init_priority(200)));
+// Anything below 65535 would do basically as compiler generated initializers have priority 65534.
+pylir::rt::MarkAndSweep pylir::rt::gc __attribute__((init_priority(65534)));
 
 pylir::rt::PyObject* pylir::rt::MarkAndSweep::alloc(std::size_t count)
 {
