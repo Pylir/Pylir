@@ -15,50 +15,84 @@ include "mlir/IR/OpBase.td"
 class PylirPy_Attr<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Attribute"> :
     AttrDef<PylirPy_Dialect, name, traits, baseCppClass>;
 
+/// Dictionary parameter containing the slots of a python object attribute.
 defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr", "::mlir::DictionaryAttr::get($_ctxt, {})">;
 
-class AttrSpecBuilder<string name, list<ParamSpec> spec, list<Trait> traits = [], string extraBuilderCode = "">
-	: PylirPy_Attr<name, traits> {
+/// Helper parameter class, specifying a `RefAttr` with the Python builtin `name` as default value.
+class DefaultType<string name, string description = ""> : DefaultValuedParameter<"RefAttr",
+	"RefAttr::get($_ctxt, Builtins::" # name # ".name)", description>;
 
-	let parameters = !dag(ins, !foreach(x, spec, x.type), !foreach(x, spec, x.name));
-
+/// Convenient base class for Python object attributes adding common methods and parameters.
+/// The fields `extraIns`, `extraBuilderArgs` and `extraBuilderPrologue` should be used by derived defs to add
+/// `$type_object` and, if `hasSlots` is 1, `$slots` to the parameters, builder and builder body.
+class PylirPy_PyObjAttr<string name, list<Trait> traits = [], bit hasSlots = 1>
+    : PylirPy_Attr<name, !listconcat(traits, [ObjectAttrInterface, DeclareAttrInterfaceMethods<SROAAttrInterface>])>
+{
+    /// The default builder usually has the same parameter types as the ones declared with default arguments.
+    /// This leads to build errors due to being a redeclaration of a method. Turn it off for the vast majority of
+    /// attributes.
     let skipDefaultBuilders = 1;
 
-    let builders = [ParamSpecBuilder<spec, extraBuilderCode>];
+    /// Extra parameters common to all Python object attributes that should be added to their `parameters` field.
+    /// This can be achieved by writing `let parameters = !con((ins ...), extraIns);`.
+    dag extraIns = !if(!eq(hasSlots, 1),
+        (ins DefaultType<name>:$type_object, SlotsMap:$slots),
+        (ins DefaultType<name>:$type_object)
+    );
+
+    /// Extra parameters common to all Python object attributes that should be added to `AttrBuilder`s.
+    /// This adds two C++ parameters called `typeObject` and `slots` if `hasSlots` is 1.
+    /// Both of these parameters are null attributes by default.
+    dag extraBuilderArgs = !if(!eq(hasSlots, 1),
+        (ins CArg<"RefAttr", "nullptr">:$typeObject,
+             CArg<"mlir::DictionaryAttr", "nullptr">:$slots),
+        (ins CArg<"RefAttr", "nullptr">:$typeObject)
+    );
+
+    /// Extra code common to all Python object attributes that should be added to the body of a `AttrBuilder`s.
+    /// This initializes the actual default values for `typeObject` and `slots` that are added by `extraBuilderArgs`.
+    code extraBuilderPrologue = [{
+        typeObject = typeObject ? typeObject : RefAttr::get($_ctxt, Builtins::}] # name # [{.name);
+    }] # !if(!eq(hasSlots, 0), "", [{
+        slots = slots ? slots : mlir::DictionaryAttr::get($_ctxt);
+    }]);
 }
 
-class TypeObjectSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = [], string extraBuilderCode = "">
-    : AttrSpecBuilder<name,
-    !listconcat(parameters, [ParamSpec<DefaultType<name>, "type_object">, ParamSpec<SlotsMap, "slots">]),
-    !listconcat(traits, [ObjectAttrInterface,
-						 DeclareAttrInterfaceMethods<SROAAttrInterface>]),
-										extraBuilderCode>;
-
-
-class TypeObjectNoSlotsAttr<string name, list<ParamSpec> parameters, list<Trait> traits = []>
-    : AttrSpecBuilder<name,
-    !listconcat(parameters, [ParamSpec<DefaultType<name>, "type_object">]),
-    !listconcat(traits, [ObjectAttrInterface,
-						 DeclareAttrInterfaceMethods<SROAAttrInterface>])>;
-
-
-def PylirPy_ObjectAttr : TypeObjectSlotsAttr<"Object", []> {
+def PylirPy_ObjectAttr : PylirPy_PyObjAttr<"Object"> {
 	let mnemonic = "obj";
 	let summary = "python object";
+
+	let parameters = extraIns;
+
+	let builders = [
+	    AttrBuilder<extraBuilderArgs, extraBuilderPrologue # [{
+	        return $_get($_ctxt, typeObject, slots);
+	    }]>
+	];
 
 	let assemblyFormat = "`<` $type_object (`,` $slots^)? `>`";
 }
 
-def PylirPy_IntAttr : TypeObjectSlotsAttr<"Int", [
-	ParamSpec<CustomPrint<AttrParameter<"pylir::BigInt", "", "const pylir::BigInt&">,
-											?, "$_printer << $_self.toString();">, "value">],
-	[ImmutableAttr]> {
+def BigIntParameter : AttrParameter<"pylir::BigInt", ""> {
+    let cppAccessorType = "const pylir::BigInt&";
+    let printer = "$_printer << $_self.toString();";
+}
+
+def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [ImmutableAttr]> {
 	let mnemonic = "int";
 	let summary = "python integer";
+
+    let parameters = !con((ins BigIntParameter:$value), extraIns);
 
 	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
 
 	let constBuilderCall = "::pylir::Py::IntAttr::get($_builder.getContext(), $0)";
+
+    let builders = [
+        AttrBuilder<!con((ins "const BigInt&":$value), extraBuilderArgs), extraBuilderPrologue # [{
+            return $_get($_ctxt, value, typeObject, slots);
+        }]>
+    ];
 
 	let returnType = "const ::pylir::BigInt&";
     let convertFromStorage = "$_self.getValue()";
@@ -68,9 +102,17 @@ def PylirPy_BoolAttr : DialectAttr<PylirPy_Dialect, CPred<"$_self.isa<::pylir::P
 	let summary = "python boolean";
 }
 
-def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter<"">, "value">], [ImmutableAttr]> {
+def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [ImmutableAttr]> {
 	let mnemonic = "float";
 	let summary = "python float";
+
+    let parameters = !con((ins APFloatParameter<"">:$value), extraIns);
+
+    let builders = [
+        AttrBuilder<!con((ins "const llvm::APFloat&":$value), extraBuilderArgs), extraBuilderPrologue # [{
+            return $_get($_ctxt, value, typeObject, slots);
+        }]>
+    ];
 
     let extraClassDeclaration = [{
         double getDoubleValue() const
@@ -85,19 +127,36 @@ def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter
     let convertFromStorage = "$_self.getDoubleValue()";
 }
 
-def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<StringRefParameter<>, "value">], [ImmutableAttr]> {
+def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [ImmutableAttr]> {
 	let mnemonic = "str";
 	let summary = "python string";
 
+    let parameters = !con((ins StringRefParameter<>:$value), extraIns);
+
 	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
+
+	let builders = [
+        AttrBuilder<!con((ins "llvm::StringRef":$value), extraBuilderArgs),
+            extraBuilderPrologue # [{
+            return $_get($_ctxt, value, typeObject, slots);
+        }]>
+    ];
 }
 
-def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
-	[ParamSpec<ListPrint<"::mlir::Attribute", "Paren">, "value", "{}">], [ImmutableAttr]> {
+def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [ImmutableAttr], /*hasSlots=*/0> {
 	let mnemonic = "tuple";
 	let summary = "python tuple";
 
-	let assemblyFormat = "`<` $value ( `,` struct($type_object)^)? `>`";
+    let parameters = !con((ins OptionalArrayRefParameter<"mlir::Attribute">:$value), extraIns);
+
+	let assemblyFormat = "`<` `(` (`)`) : ($value^ `)`)? ( `,` struct($type_object)^)? `>`";
+
+    let builders = [
+        AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$value), extraBuilderArgs),
+            extraBuilderPrologue # [{
+            return $_get($_ctxt, value, typeObject);
+        }]>
+    ];
 
 	let extraClassDeclaration = [{
 
@@ -138,11 +197,19 @@ def PylirPy_TupleAttr : TypeObjectNoSlotsAttr<"Tuple",
 	}];
 }
 
-def PylirPy_ListAttr : TypeObjectSlotsAttr<"List",
-	[ParamSpec<ListPrint<"::mlir::Attribute", "Square">, "value", "{}">]> {
+def PylirPy_ListAttr : PylirPy_PyObjAttr<"List"> {
 	let mnemonic = "list";
 
-	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
+    let parameters = !con((ins OptionalArrayRefParameter<"mlir::Attribute">:$value), extraIns);
+
+	let assemblyFormat = "`<` `[` (`]`) : ( $value^ `]`)? ( `,` struct($type_object, $slots)^)? `>`";
+
+	let builders = [
+        AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$value), extraBuilderArgs),
+            extraBuilderPrologue # [{
+            return $_get($_ctxt, value, typeObject, slots);
+        }]>
+    ];
 }
 
 def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ObjectAttrInterface,
@@ -239,28 +306,61 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ObjectAttrInterface,
     }];
 }
 
-def PylirPy_FunctionAttr : AttrSpecBuilder<"Function",
-	[ParamSpec<AttrParameter<"mlir::FlatSymbolRefAttr", "">, "value">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::StrAttr::get($_ctxt, \"\")">, "qual_name">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "defaults">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::pylir::Py::RefAttr::get($_ctxt, pylir::Builtins::None.name)">, "kw_defaults">,
-	 ParamSpec<DefaultValuedParameter<"mlir::Attribute", "::mlir::Attribute{}">, "dict">
-	 ], [DeclareAttrInterfaceMethods<ObjectAttrInterface>,
-	        DeclareAttrInterfaceMethods<SROAAttrInterface>, ImmutableAttr]>
+def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ImmutableAttr,
+    DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<SROAAttrInterface>]>
 {
 	let mnemonic = "function";
 	let summary = "python function";
 
+	let parameters = (ins
+	    "mlir::FlatSymbolRefAttr":$value,
+	    DefaultValuedParameter<"mlir::Attribute",
+	        "StrAttr::get($_ctxt, \"\")">:$qual_name,
+	    DefaultValuedParameter<"mlir::Attribute",
+	        "RefAttr::get($_ctxt, Builtins::None.name)">:$defaults,
+	    DefaultValuedParameter<"mlir::Attribute",
+	        "RefAttr::get($_ctxt, Builtins::None.name)">:$kw_defaults,
+	    DefaultValuedParameter<"mlir::Attribute", "mlir::Attribute{}">:$dict
+    );
+
 	let assemblyFormat = "`<` $value ( `,` struct($qual_name, $defaults, $kw_defaults, $dict)^)? `>`";
+
+	let builders = [
+        AttrBuilderWithInferredContext<(ins
+                        "mlir::FlatSymbolRefAttr":$value,
+                         CArg<"::mlir::Attribute", "{}">:$qualName,
+                         CArg<"::mlir::Attribute", "{}">:$defaults,
+                         CArg<"::mlir::Attribute", "{}">:$kwDefaults,
+                         CArg<"::mlir::Attribute", "{}">:$dict), [{
+            mlir::MLIRContext* context = value.getContext();
+            qualName = qualName ? qualName : StrAttr::get(context, "");
+            defaults = defaults ? defaults : RefAttr::get(context, Builtins::None.name);
+            kwDefaults = kwDefaults ? kwDefaults : RefAttr::get(context, Builtins::None.name);
+            return $_get(context, value, qualName, defaults, kwDefaults, dict);
+        }]>
+    ];
 }
 
-def PylirPy_TypeAttr : TypeObjectSlotsAttr<"Type",
-	[ParamSpec<DefaultValuedParameter<"::mlir::Attribute", "::pylir::Py::TupleAttr::get($_ctxt, {})">, "mro_tuple">,
-	 ParamSpec<DefaultValuedParameter<"::pylir::Py::TupleAttr", "::pylir::Py::TupleAttr::get($_ctxt, {})">,
-	                                                                                                "instance_slots">],
-	[ImmutableAttr]> {
+def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [ImmutableAttr]> {
 	let mnemonic = "type";
 	let summary = "python type";
+
+    let parameters = !con((ins
+        DefaultValuedParameter<"mlir::Attribute", "TupleAttr::get($_ctxt, {})">:$mro_tuple,
+        DefaultValuedParameter<"TupleAttr", "TupleAttr::get($_ctxt, {})">:$instance_slots
+    ), extraIns);
+
+    let builders = [
+        AttrBuilder<!con((ins
+            CArg<"mlir::Attribute", "{}">:$mroTuple,
+            CArg<"TupleAttr", "{}">:$instanceSlots
+        ), extraBuilderArgs),
+            extraBuilderPrologue # [{
+            mroTuple = mroTuple ? mroTuple : TupleAttr::get($_ctxt);
+            instanceSlots = instanceSlots ? instanceSlots : TupleAttr::get($_ctxt);
+            return $_get($_ctxt, mroTuple, instanceSlots, typeObject, slots);
+        }]>
+    ];
 
     let description = [{
         Attribute for representing Python `type` objects and subclasses. For the most part, it acts as any other
