@@ -85,11 +85,7 @@ def PylirPy_FloatAttr : TypeObjectSlotsAttr<"Float", [ParamSpec<APFloatParameter
     let convertFromStorage = "$_self.getDoubleValue()";
 }
 
-def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<CustomPrint<StringRefParameter<>, ?, [{
-	$_printer << "\"";
-	llvm::printEscapedString($_self, $_printer.getStream());
-	$_printer << "\"";
-}]>, "value">], [ImmutableAttr]> {
+def PylirPy_StrAttr : TypeObjectSlotsAttr<"Str", [ParamSpec<StringRefParameter<>, "value">], [ImmutableAttr]> {
 	let mnemonic = "str";
 	let summary = "python string";
 

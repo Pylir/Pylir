@@ -6,8 +6,9 @@
 
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
-#include <mlir/IR/FunctionImplementation.h>
 #include <mlir/IR/OpImplementation.h>
+#include <mlir/Interfaces/FunctionImplementation.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 
 #include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/TypeSwitch.h>
@@ -720,9 +721,6 @@ void pylir::Py::FuncOp::print(::mlir::OpAsmPrinter& p)
 }
 
 #include <pylir/Optimizer/PylirPy/IR/PylirPyEnums.cpp.inc>
-
-// TODO: Remove once upstream MLIR stops producing unqualified code in generated 'setPropertiesFromAttr'.
-using namespace mlir;
 
 #define GET_OP_CLASSES
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.cpp.inc>
