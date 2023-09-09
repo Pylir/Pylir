@@ -73,8 +73,7 @@ def PylirPy_ObjectAttr : PylirPy_PyObjAttr<"Object"> {
 	let assemblyFormat = "`<` $type_object (`,` $slots^)? `>`";
 }
 
-def BigIntParameter : AttrParameter<"pylir::BigInt", ""> {
-    let cppAccessorType = "const pylir::BigInt&";
+def BigIntParam : AttrParameter<"::pylir::BigInt", "Arbitrary sized integer", "const pylir::BigInt&"> {
     let printer = "$_printer << $_self.toString();";
 }
 
@@ -82,7 +81,7 @@ def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [ImmutableAttr]> {
 	let mnemonic = "int";
 	let summary = "python integer";
 
-    let parameters = !con((ins BigIntParameter:$value), extraIns);
+    let parameters = !con((ins BigIntParam:$value), extraIns);
 
 	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
 
@@ -392,10 +391,6 @@ def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [ImmutableAttr]> {
 def PylirPy_UnboundAttr : PylirPy_Attr<"Unbound"> {
     let mnemonic = "unbound";
     let summary = "python unbound value";
-}
-
-def BigIntParam : AttrParameter<"::pylir::BigInt", "Arbitrary sized integer", "const pylir::BigInt&"> {
-    let printer = "$_printer << $_self.toString();";
 }
 
 def PylirPy_FractionalAttr : PylirPy_Attr<"Fractional"> {
