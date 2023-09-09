@@ -4,7 +4,7 @@
 
 #include "Value.hpp"
 
-#include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 
 #include <pylir/Optimizer/PylirPy/Interfaces/KnownTypeObjectInterface.hpp>
 #include <pylir/Support/Macros.hpp>

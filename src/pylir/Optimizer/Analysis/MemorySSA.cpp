@@ -188,7 +188,7 @@ void pylir::MemorySSA::fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuild
                 continue;
             }
             llvm::SmallVector<mlir::RegionSuccessor> successors;
-            regionBranchOp.getSuccessorRegions(std::nullopt, successors);
+            regionBranchOp.getSuccessorRegions(mlir::RegionBranchPoint::parent(), successors);
             PYLIR_ASSERT(!successors.empty());
             auto* continueRegion = new mlir::Block;
 
@@ -249,7 +249,7 @@ void pylir::MemorySSA::fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuild
                     continue;
                 }
                 llvm::SmallVector<mlir::RegionSuccessor> subRegionSuccessors;
-                regionBranchOp.getSuccessorRegions(succ->getRegionNumber(), subRegionSuccessors);
+                regionBranchOp.getSuccessorRegions(succ, subRegionSuccessors);
                 fillRegion(*succ, builder, ssaBuilder, lastDefs, getRegionSuccBlocks(subRegionSuccessors));
                 fillWorkList(subRegionSuccessors);
             }

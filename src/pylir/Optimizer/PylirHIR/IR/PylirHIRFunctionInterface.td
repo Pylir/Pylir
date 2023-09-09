@@ -17,32 +17,6 @@ def PylirHIR_FunctionInterface : OpInterface<"FunctionInterface", [CallableOpInt
         }],
         "::mlir::Type", "getFunctionType">,
         InterfaceMethod<[{
-            Returns the function argument types based exclusively on
-            the type (to allow for this method may be called on function
-            declarations).
-        }],
-        "::llvm::ArrayRef<::mlir::Type>", "getArgumentTypes">,
-        InterfaceMethod<[{
-            Returns the function result types based exclusively on
-            the type (to allow for this method may be called on function
-            declarations).
-        }],
-        "::llvm::ArrayRef<::mlir::Type>", "getResultTypes">,
-        InterfaceMethod<[{
-            Get the array of argument attribute dictionaries. The method should return
-            an array attribute containing only dictionary attributes equal in number
-            to the number of function arguments. Alternatively, the method can return
-            null to indicate that the function has no argument attributes.
-        }],
-        "::mlir::ArrayAttr", "getArgAttrsAttr">,
-        InterfaceMethod<[{
-            Get the array of result attribute dictionaries. The method should return
-            an array attribute containing only dictionary attributes equal in number
-            to the number of function results. Alternatively, the method can return
-            null to indicate that the function has no result attributes.
-        }],
-        "::mlir::ArrayAttr", "getResAttrsAttr">,
-        InterfaceMethod<[{
             Returns the values used as default values for the parameters.
             See `getDefaultValuesMapping` to get a mapping of which default value corresponds to which parameter.
         }],

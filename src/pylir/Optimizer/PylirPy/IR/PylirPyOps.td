@@ -16,14 +16,14 @@ include "pylir/Optimizer/PylirPy/Interfaces/OnlyReadsValueInterface.td"
 include "pylir/Optimizer/Interfaces/MemoryFoldInterface.td"
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
-include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/EnumAttr.td"
-include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===--------------------------------------------------------------------------------------------------------------===//
 // Helper Classes

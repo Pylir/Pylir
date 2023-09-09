@@ -48,7 +48,7 @@ mlir::IRMapping pylir::Py::inlineCall(mlir::CallOpInterface call, mlir::Callable
     mlir::Block* preBlock = call->getBlock();
     mlir::Block* postBlock = preBlock->splitBlock(call);
     postBlock->addArguments(
-        callable.getCallableResults(),
+        callable.getResultTypes(),
         llvm::to_vector(llvm::map_range(call->getResults(), [](mlir::Value arg) { return arg.getLoc(); })));
 
     // Builder constructed here as we cannot get the context from any blocks within 'tempClone'.

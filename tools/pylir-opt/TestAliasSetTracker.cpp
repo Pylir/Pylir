@@ -5,7 +5,7 @@
 #include <mlir/Analysis/AliasAnalysis.h>
 #include <mlir/IR/AsmState.h>
 #include <mlir/IR/BuiltinOps.h>
-#include <mlir/IR/FunctionInterfaces.h>
+#include <mlir/Interfaces/FunctionInterfaces.h>
 #include <mlir/Pass/Pass.h>
 
 #include <pylir/Optimizer/Analysis/AliasSetTracker.hpp>

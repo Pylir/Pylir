@@ -449,8 +449,5 @@ void pylir::HIR::FuncOp::print(mlir::OpAsmPrinter& p)
 
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.cpp.inc"
 
-// TODO: Remove once upstream MLIR stops producing unqualified code in generated 'setPropertiesFromAttr'.
-using namespace mlir;
-
 #define GET_OP_CLASSES
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIROps.cpp.inc"

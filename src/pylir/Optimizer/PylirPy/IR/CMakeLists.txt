@@ -27,8 +27,27 @@ add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.c
   ObjectAttrInterface.cpp Value.cpp
   PylirPyOpSROA.cpp PylirPyOpsVerifier.cpp PylirPyTraits.cpp)
 add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen)
-target_link_libraries(PylirPyDialect PUBLIC PylirSupport MLIRIR MLIRInferTypeOpInterface PylirMemoryFoldInterface
-  PylirCaptureInterface PylirPyExceptionHandlingInterface PylirPyKnownTypeObjectInterface
-  PylirPyCopyObjectInterface PylirPyOnlyReadsValueInterface PylirSROAInterfaces
-  PRIVATE MLIRArithDialect MLIRControlFlowDialect PylirTransformsUtils MLIRDataLayoutInterfaces)
+target_link_libraries(PylirPyDialect
+  PUBLIC
+  MLIRFunctionInterfaces
+  MLIRIR
+  MLIRInferTypeOpInterface
+
+  PylirCaptureInterface
+  PylirMemoryFoldInterface
+  PylirPyCopyObjectInterface
+  PylirPyExceptionHandlingInterface
+  PylirPyKnownTypeObjectInterface
+  PylirPyOnlyReadsValueInterface
+  PylirSROAInterfaces
+  PylirSupport
+
+  PRIVATE
+
+  MLIRArithDialect
+  MLIRControlFlowDialect
+  MLIRDataLayoutInterfaces
+
+  PylirTransformsUtils
+)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)
