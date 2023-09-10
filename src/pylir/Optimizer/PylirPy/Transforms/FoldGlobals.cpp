@@ -271,8 +271,7 @@ void FoldGlobalsPass::runOnOperation()
                         [&](pylir::Py::MakeFuncOp makeFuncOp)
                         {
                             auto value = createGlobalValueFromGlobal(
-                                global, pylir::Py::FunctionAttr::get(&getContext(), makeFuncOp.getFunctionAttr()),
-                                false);
+                                       global, pylir::Py::FunctionAttr::get(makeFuncOp.getFunctionAttr()), false);
                             mlir::OpBuilder builder(makeFuncOp);
                             auto ref = pylir::Py::RefAttr::get(value);
                             auto c = builder.create<pylir::Py::ConstantOp>(makeFuncOp->getLoc(), ref);
