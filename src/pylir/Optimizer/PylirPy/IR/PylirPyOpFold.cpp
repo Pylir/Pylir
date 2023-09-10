@@ -1018,15 +1018,16 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(FoldAdaptor adaptor)
         return op.getInput();
     }
 
-    auto integer = adaptor.getInput().dyn_cast_or_null<Py::IntAttr>();
+    auto integer = adaptor.getInput().dyn_cast_or_null<IntAttrInterface>();
     if (!integer)
     {
         return nullptr;
     }
+    BigInt value = integer.getInteger();
     std::size_t bitWidth = mlir::DataLayout::closest(*this).getTypeSizeInBits(getResult().getType());
-    if (integer.getValue() < BigInt(0))
+    if (value < BigInt(0))
     {
-        auto optional = integer.getValue().tryGetInteger<std::intmax_t>();
+        auto optional = value.tryGetInteger<std::intmax_t>();
         if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, true).isSignedIntN(bitWidth))
         {
             // TODO: I will probably want a poison value here in the future.
@@ -1034,7 +1035,7 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(FoldAdaptor adaptor)
         }
         return mlir::IntegerAttr::get(getType(), *optional);
     }
-    auto optional = integer.getValue().tryGetInteger<std::uintmax_t>();
+    auto optional = value.tryGetInteger<std::uintmax_t>();
     if (!optional || !llvm::APInt(sizeof(*optional) * 8, *optional, false).isIntN(bitWidth))
     {
         // TODO: I will probably want a poison value here in the future.
@@ -1049,8 +1050,8 @@ mlir::OpFoldResult pylir::Py::IntToIndexOp::fold(FoldAdaptor adaptor)
 
 mlir::OpFoldResult pylir::Py::IntCmpOp::fold(FoldAdaptor adaptor)
 {
-    auto lhs = adaptor.getLhs().dyn_cast_or_null<IntAttr>();
-    auto rhs = adaptor.getRhs().dyn_cast_or_null<IntAttr>();
+    auto lhs = adaptor.getLhs().dyn_cast_or_null<IntAttrInterface>();
+    auto rhs = adaptor.getRhs().dyn_cast_or_null<IntAttrInterface>();
     if (!lhs || !rhs)
     {
         return nullptr;
@@ -1058,12 +1059,12 @@ mlir::OpFoldResult pylir::Py::IntCmpOp::fold(FoldAdaptor adaptor)
     bool result;
     switch (getPred())
     {
-        case IntCmpKind::eq: result = lhs.getValue() == rhs.getValue(); break;
-        case IntCmpKind::ne: result = lhs.getValue() != rhs.getValue(); break;
-        case IntCmpKind::lt: result = lhs.getValue() < rhs.getValue(); break;
-        case IntCmpKind::le: result = lhs.getValue() <= rhs.getValue(); break;
-        case IntCmpKind::gt: result = lhs.getValue() > rhs.getValue(); break;
-        case IntCmpKind::ge: result = lhs.getValue() >= rhs.getValue(); break;
+        case IntCmpKind::eq: result = lhs.getInteger() == rhs.getInteger(); break;
+        case IntCmpKind::ne: result = lhs.getInteger() != rhs.getInteger(); break;
+        case IntCmpKind::lt: result = lhs.getInteger() < rhs.getInteger(); break;
+        case IntCmpKind::le: result = lhs.getInteger() <= rhs.getInteger(); break;
+        case IntCmpKind::gt: result = lhs.getInteger() > rhs.getInteger(); break;
+        case IntCmpKind::ge: result = lhs.getInteger() >= rhs.getInteger(); break;
     }
     return mlir::BoolAttr::get(getContext(), result);
 }
@@ -1074,12 +1075,12 @@ mlir::OpFoldResult pylir::Py::IntCmpOp::fold(FoldAdaptor adaptor)
 
 mlir::OpFoldResult pylir::Py::IntToStrOp::fold(FoldAdaptor adaptor)
 {
-    auto integer = adaptor.getInput().dyn_cast_or_null<IntAttr>();
+    auto integer = adaptor.getInput().dyn_cast_or_null<IntAttrInterface>();
     if (!integer)
     {
         return nullptr;
     }
-    return StrAttr::get(getContext(), integer.getValue().toString());
+    return StrAttr::get(getContext(), integer.getInteger().toString());
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//
@@ -1372,7 +1373,7 @@ mlir::IntegerAttr toBuiltinInt(mlir::Operation* operation, mlir::Attribute attr,
     // getter in 'IntegerType'.
     auto bitWidth = mlir::DataLayout::closest(operation).getTypeSizeInBits(integerType);
 
-    std::string string = attr.cast<pylir::Py::IntAttr>().getValue().toString(largestSupportedRadixByBoth);
+    std::string string = attr.cast<pylir::Py::IntAttrInterface>().getInteger().toString(largestSupportedRadixByBoth);
     llvm::APInt integer(llvm::APInt::getSufficientBitsNeeded(string, largestSupportedRadixByBoth), string,
                         largestSupportedRadixByBoth);
     if (integer.getSignificantBits() > bitWidth)

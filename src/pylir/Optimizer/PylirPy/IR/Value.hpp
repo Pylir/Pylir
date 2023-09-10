@@ -7,7 +7,7 @@
 #include <mlir/IR/OpDefinition.h>
 #include <mlir/IR/SymbolTable.h>
 
-#include "ObjectAttrInterface.hpp"
+#include "PylirPyAttrInterfaces.hpp"
 #include "PylirPyOps.hpp"
 
 namespace pylir::Py

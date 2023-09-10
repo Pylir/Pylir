@@ -5,8 +5,8 @@
 #ifndef PYLIR_PY_ATTR_TABLEGEN
 #define PYLIR_PY_ATTR_TABLEGEN
 
+include "pylir/Optimizer/PylirPy/IR/PylirPyAttrInterfaces.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
-include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
 include "pylir/Optimizer/Util/TablegenUtil.td"
@@ -25,8 +25,11 @@ class DefaultType<string name, string description = ""> : DefaultValuedParameter
 /// Convenient base class for Python object attributes adding common methods and parameters.
 /// The fields `extraIns`, `extraBuilderArgs` and `extraBuilderPrologue` should be used by derived defs to add
 /// `$type_object` and, if `hasSlots` is 1, `$slots` to the parameters, builder and builder body.
-class PylirPy_PyObjAttr<string name, list<Trait> traits = [], bit hasSlots = 1>
-    : PylirPy_Attr<name, !listconcat(traits, [ObjectAttrInterface, DeclareAttrInterfaceMethods<SROAAttrInterface>])>
+class PylirPy_PyObjAttr<string name,
+    list<Trait> traits = [],
+    AttrInterface base = ObjectAttrInterface,
+    bit hasSlots = 1>
+    : PylirPy_Attr<name, !listconcat(traits, [base, DeclareAttrInterfaceMethods<SROAAttrInterface>])>
 {
     /// The default builder usually has the same parameter types as the ones declared with default arguments.
     /// This leads to build errors due to being a redeclaration of a method. Turn it off for the vast majority of
@@ -77,7 +80,7 @@ def BigIntParam : AttrParameter<"::pylir::BigInt", "Arbitrary sized integer", "c
     let printer = "$_printer << $_self.toString();";
 }
 
-def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [ImmutableAttr]> {
+def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [ImmutableAttr], /*base=*/IntAttrInterface> {
 	let mnemonic = "int";
 	let summary = "python integer";
 
@@ -93,12 +96,71 @@ def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [ImmutableAttr]> {
         }]>
     ];
 
+    let extraClassDeclaration = [{
+
+        //===------------------------------------------------------------------------------------------------------===//
+        // IntAttrInterface implementation
+        //===------------------------------------------------------------------------------------------------------===//
+
+        const BigInt& getInteger() const
+        {
+            return getValue();
+        }
+    }];
+
 	let returnType = "const ::pylir::BigInt&";
     let convertFromStorage = "$_self.getValue()";
 }
 
-def PylirPy_BoolAttr : DialectAttr<PylirPy_Dialect, CPred<"$_self.isa<::pylir::Py::BoolAttr>()">> {
+def BoolParameter : AttrParameter<"bool", "boolean"> {
+    let printer = [{$_printer << ($_self ? "True" : "False")}];
+    let parser = [{
+        mlir::AsmParser::KeywordSwitch<mlir::FailureOr<bool>>($_parser)
+            .Case("True", true)
+            .Case("False", false)
+            .Default(mlir::failure())
+    }];
+}
+
+def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [ImmutableAttr], /*base=*/BoolAttrInterface> {
+	let mnemonic = "bool";
 	let summary = "python boolean";
+
+    let parameters = !con((ins BoolParameter:$value), extraIns);
+
+	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
+
+	let constBuilderCall = "::pylir::Py::BoolAttr::get($_builder.getContext(), $0)";
+
+    let builders = [
+        AttrBuilder<!con((ins "bool":$value), extraBuilderArgs), extraBuilderPrologue # [{
+            return $_get($_ctxt, value, typeObject, slots);
+        }]>
+    ];
+
+    let extraClassDeclaration = [{
+
+        //===------------------------------------------------------------------------------------------------------===//
+        // IntAttrInterface implementation
+        //===------------------------------------------------------------------------------------------------------===//
+
+        BigInt getInteger() const
+        {
+            return BigInt(getValue());
+        }
+
+        //===------------------------------------------------------------------------------------------------------===//
+        // BoolAttrInterface implementation
+        //===------------------------------------------------------------------------------------------------------===//
+
+        bool getBoolean() const
+        {
+            return getValue();
+        }
+    }];
+
+	let returnType = "bool";
+    let convertFromStorage = "$_self.getValue()";
 }
 
 def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [ImmutableAttr]> {
@@ -142,7 +204,7 @@ def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [ImmutableAttr]> {
     ];
 }
 
-def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [ImmutableAttr], /*hasSlots=*/0> {
+def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [ImmutableAttr], /*base=*/ObjectAttrInterface,/*hasSlots=*/0> {
 	let mnemonic = "tuple";
 	let summary = "python tuple";
 

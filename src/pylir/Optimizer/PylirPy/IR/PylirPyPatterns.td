@@ -94,7 +94,7 @@ foreach lhs = [PylirPy_IntFromUnsignedOp, PylirPy_IntFromSignedOp] in {
 // IntCmpOp $kind, (IntFrom(Signed|Unsigned) $lhs), Constant $rhs and $rhs in Index
 // -> Arith_CmpIOp $kind, $lhs, (index)$rhs
 foreach lhs = [PylirPy_IntFromUnsignedOp, PylirPy_IntFromSignedOp] in {
-    def : Pat<(PylirPy_IntCmpOp:$op $kind, (lhs $lhs), (ResolvesTo<0> PylirPy_IntAttr:$rhs)),
+    def : Pat<(PylirPy_IntCmpOp:$op $kind, (lhs $lhs), (ResolvesTo<0> IntAttrInterface:$rhs)),
              (Arith_CmpIOp (NativeCodeCall<"toArithPredicate($0)"> $kind), $lhs,
                  (Arith_ConstantOp (NativeCodeCall<"toBuiltinInt($0.getOwner(), $1, $2.getType())"> $op, $rhs, $lhs))),
              [(Constraint<CPred<"static_cast<bool>(toBuiltinInt($0.getOwner(), $1, $2.getType()))">> $op, $rhs, $lhs)]>;
@@ -124,13 +124,13 @@ def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $cond, $lhs, $rhs)),
             }]>> $lhs, $rhs)]>;
 
 multiclass IntCommAndAssocPattern<Op op, string operator> {
-	def : Pat<(op (op $op, (ResolvesTo<0> PylirPy_IntAttr:$first)), (ResolvesTo<0> PylirPy_IntAttr:$second)),
+	def : Pat<(op (op $op, (ResolvesTo<0> IntAttrInterface:$first)), (ResolvesTo<0> IntAttrInterface:$second)),
 			(op $op,
-			(PylirPy_ConstantOp (BinOpAttrs<operator, PylirPy_IntAttr, PylirPy_IntAttr> $first, $second)))>;
+			(PylirPy_ConstantOp (BinOpAttrs<operator, IntAttrInterface, PylirPy_IntAttr> $first, $second)))>;
 
-	def : Pat<(op (op $x, (ResolvesTo<0> PylirPy_IntAttr:$first)), (op $y, (ResolvesTo<0> PylirPy_IntAttr:$second))),
+	def : Pat<(op (op $x, (ResolvesTo<0> IntAttrInterface:$first)), (op $y, (ResolvesTo<0> IntAttrInterface:$second))),
 			(op (op $x, $y),
-			(PylirPy_ConstantOp (BinOpAttrs<operator, PylirPy_IntAttr, PylirPy_IntAttr> $first, $second)))>;
+			(PylirPy_ConstantOp (BinOpAttrs<operator, IntAttrInterface, PylirPy_IntAttr> $first, $second)))>;
 }
 
 defm : IntCommAndAssocPattern<PylirPy_IntAddOp, "+">;

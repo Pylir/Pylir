@@ -20,13 +20,13 @@ mlir_tablegen(PylirPyAttrBase.h.inc -gen-attrdef-decls --attrdefs-dialect="py")
 add_public_tablegen_target(PylirPyIncGen)
 add_pylir_doc(PylirPyOps.td PylirPyDialect Dialect/ -gen-dialect-doc -dialect="py")
 
-add_pylir_interface(ATTR ObjectAttrInterface)
+add_pylir_interface(ATTR PylirPyAttrInterfaces)
 add_pylir_rewriter(PylirPyPatterns)
 
 add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
-  ObjectAttrInterface.cpp Value.cpp
+  PylirPyAttrInterfaces.cpp Value.cpp
   PylirPyOpSROA.cpp PylirPyOpsVerifier.cpp PylirPyTraits.cpp)
-add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen ObjectAttrInterfaceIncGen)
+add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen PylirPyAttrInterfacesIncGen)
 target_link_libraries(PylirPyDialect
   PUBLIC
   MLIRFunctionInterfaces

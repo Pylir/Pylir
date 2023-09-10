@@ -7,6 +7,8 @@
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
 
+#include <pylir/Support/BigInt.hpp>
+
 #include "PylirPyAttrBase.hpp"
 
-#include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.h.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttrInterfaces.h.inc"
