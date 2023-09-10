@@ -111,7 +111,11 @@ runs:
       id: calculate-cache-size
       run: |
         if ('${{inputs.sanitizers}}') {
-          "size=100M" >> $Env:GITHUB_OUTPUT
+          if ($IsWindows) {
+            "size=120M" >> $Env:GITHUB_OUTPUT
+          } else {
+            "size=100M" >> $Env:GITHUB_OUTPUT
+          }
         } else {
           "size=50M" >> $Env:GITHUB_OUTPUT
         }
