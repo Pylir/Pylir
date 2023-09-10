@@ -1,5 +1,8 @@
 name: LLVM Cron
 
+permissions:
+  actions: write
+
 on:
   workflow_dispatch:
   schedule:
