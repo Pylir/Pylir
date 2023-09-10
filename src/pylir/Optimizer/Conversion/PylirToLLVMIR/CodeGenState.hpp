@@ -604,11 +604,11 @@ struct PyTypeModel : PyObjectModelBase<PyTypeModel>
     }
 };
 
-inline bool needToBeRuntimeInit(pylir::Py::ObjectAttrInterface attr)
+inline bool needToBeRuntimeInit(Py::ObjectAttrInterface attr)
 {
     // Integer attrs currently need to be runtime init due to memory allocation in libtommath
     // Dict attr need to be runtime init due to the hash calculation
-    return attr.isa<pylir::Py::IntAttr, pylir::Py::DictAttr>();
+    return attr.isa<Py::IntAttr, Py::BoolAttr, Py::DictAttr>();
 }
 
 } // namespace pylir

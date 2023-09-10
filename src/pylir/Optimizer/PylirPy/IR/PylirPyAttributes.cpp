@@ -455,27 +455,6 @@ void printKVPair(mlir::AsmPrinter& printer, llvm::ArrayRef<std::pair<mlir::Attri
 
 } // namespace
 
-void pylir::Py::BoolAttr::print(mlir::AsmPrinter& printer) const
-{
-    printer << "<" << (getValue() ? "True" : "False") << ">";
-}
-
-mlir::Attribute pylir::Py::BoolAttr::parse(mlir::AsmParser& parser, mlir::Type)
-{
-    llvm::StringRef keyword;
-    llvm::SMLoc loc;
-    if (parser.parseLess() || parser.getCurrentLocation(&loc) || parser.parseKeyword(&keyword) || parser.parseGreater())
-    {
-        return {};
-    }
-    if (keyword != "True" && keyword != "False")
-    {
-        parser.emitError(loc, "Expected one of 'True' or 'False'");
-        return {};
-    }
-    return get(parser.getContext(), keyword == "True");
-}
-
 pylir::Py::RefAttr pylir::Py::FunctionAttr::getTypeObject() const
 {
     return RefAttr::get(getContext(), Builtins::Function.name);
@@ -497,35 +476,3 @@ mlir::DictionaryAttr pylir::Py::FunctionAttr::getSlots() const
 
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
-
-void pylir::Py::PylirPyDialect::printAttribute(mlir::Attribute attr, mlir::DialectAsmPrinter& os) const
-{
-    if (auto boolAttr = attr.dyn_cast<BoolAttr>())
-    {
-        os << BoolAttr::getMnemonic();
-        boolAttr.print(os);
-        return;
-    }
-    (void)generatedAttributePrinter(attr, os);
-}
-
-mlir::Attribute pylir::Py::PylirPyDialect::parseAttribute(mlir::DialectAsmParser& parser, mlir::Type type) const
-{
-    llvm::StringRef keyword;
-    mlir::Attribute res;
-    auto loc = parser.getCurrentLocation();
-    if (auto opt = generatedAttributeParser(parser, &keyword, type, res); opt.has_value())
-    {
-        if (mlir::failed(*opt))
-        {
-            return {};
-        }
-        return res;
-    }
-    if (keyword == BoolAttr::getMnemonic())
-    {
-        return BoolAttr::parse(parser, type);
-    }
-    parser.emitError(loc, "Unknown dialect attribute: ") << keyword;
-    return res;
-}

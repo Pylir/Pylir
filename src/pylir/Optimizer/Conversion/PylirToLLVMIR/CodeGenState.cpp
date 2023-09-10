@@ -303,15 +303,15 @@ void pylir::CodeGenState::initializeGlobal(mlir::LLVM::GlobalOp global, mlir::Op
                     global.getLoc(), builder.getF64Type(), builder.getF64FloatAttr(floatAttr.getDoubleValue()));
                 undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef, constant, 1);
             })
-        .Case(
-            [&](Py::IntAttr integer)
+        .Case<Py::IntAttr, Py::BoolAttr>(
+            [&](auto integerLike)
             {
-                auto result = m_globalBuffers.lookup(integer);
+                auto result = m_globalBuffers.lookup(integerLike);
                 if (!result)
                 {
                     mlir::OpBuilder::InsertionGuard bufferGuard{builder};
                     builder.setInsertionPointToStart(mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
-                    auto bigInt = integer.getValue();
+                    BigInt bigInt = integerLike.getInteger();
                     auto targetSizeTBytes =
                         m_typeConverter.getPlatformABI().getSizeT(builder.getContext()).getIntOrFloatBitWidth() / 8;
                     auto size = mp_pack_count(&bigInt.getHandle(), 0, targetSizeTBytes);
@@ -325,7 +325,7 @@ void pylir::CodeGenState::initializeGlobal(mlir::LLVM::GlobalOp global, mlir::Op
                     result.setUnnamedAddrAttr(
                         mlir::LLVM::UnnamedAddrAttr::get(builder.getContext(), mlir::LLVM::UnnamedAddr::Global));
                     m_symbolTable.insert(result);
-                    m_globalBuffers.insert({integer, result});
+                    m_globalBuffers.insert({integerLike, result});
                     builder.setInsertionPointToStart(&result.getInitializerRegion().emplaceBlock());
                     mlir::Value arrayUndef = builder.create<mlir::LLVM::UndefOp>(global.getLoc(), result.getType());
                     for (const auto& element : llvm::enumerate(data))

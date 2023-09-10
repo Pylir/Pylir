@@ -2,6 +2,6 @@
 //  See https://llvm.org/LICENSE.txt for license information.
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "ObjectAttrInterface.hpp"
+#include "PylirPyAttrInterfaces.hpp"
 
-#include "pylir/Optimizer/PylirPy/IR/ObjectAttrInterface.cpp.inc"
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttrInterfaces.cpp.inc"

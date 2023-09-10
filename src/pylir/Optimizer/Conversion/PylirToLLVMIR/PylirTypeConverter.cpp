@@ -198,6 +198,7 @@ mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::typeOf(pylir::Py::ObjectAt
         .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
         .Case([&](pylir::Py::FunctionAttr) { return getPyFunctionType(count); })
         .Case([&](pylir::Py::IntAttr) { return getPyIntType(count); })
+        .Case([&](pylir::Py::BoolAttr) { return getPyIntType(count); })
         .Case([&](pylir::Py::FloatAttr) { return getPyFloatType(count); })
         .Case([&](pylir::Py::DictAttr) { return getPyDictType(count); })
         .Default([&](auto) { return getPyObjectType(count); });
