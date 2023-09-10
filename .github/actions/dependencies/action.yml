@@ -113,7 +113,7 @@ runs:
         if ('${{inputs.sanitizers}}') {
           "size=100M" >> $Env:GITHUB_OUTPUT
         } else {
-          "size=30M" >> $Env:GITHUB_OUTPUT
+          "size=50M" >> $Env:GITHUB_OUTPUT
         }
 
     - name: Install CCache
