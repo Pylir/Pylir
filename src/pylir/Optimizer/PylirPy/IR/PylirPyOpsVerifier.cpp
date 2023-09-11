@@ -53,11 +53,14 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute, mlir:
     {
         return mlir::failure();
     }
-    for (auto iter : object.getSlots())
+    if (auto constantObjectAttr = mlir::dyn_cast<pylir::Py::ConstObjectAttrInterface>(attribute))
     {
-        if (mlir::failed(verify(op, iter.getValue(), collection)))
+        for (auto iter : constantObjectAttr.getSlots())
         {
-            return mlir::failure();
+            if (mlir::failed(verify(op, iter.getValue(), collection)))
+            {
+                return mlir::failure();
+            }
         }
     }
     return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(object)

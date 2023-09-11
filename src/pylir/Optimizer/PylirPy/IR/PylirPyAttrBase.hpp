@@ -9,7 +9,7 @@
 
 namespace pylir::Py
 {
-class ObjectAttrInterface;
+class ConstObjectAttrInterface;
 class GlobalValueOp;
 namespace detail
 {

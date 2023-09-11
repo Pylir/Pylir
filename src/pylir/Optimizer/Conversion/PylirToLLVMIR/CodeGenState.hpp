@@ -59,7 +59,7 @@ class CodeGenState
 
     void appendToGlobalInit(mlir::OpBuilder& builder, llvm::function_ref<void()> section);
 
-    mlir::LLVM::GlobalOp createGlobalConstant(mlir::OpBuilder& builder, pylir::Py::ObjectAttrInterface objectAttr);
+    mlir::LLVM::GlobalOp createGlobalConstant(mlir::OpBuilder& builder, pylir::Py::ConstObjectAttrInterface objectAttr);
 
 public:
     CodeGenState(PylirTypeConverter& typeConverter, mlir::ModuleOp module)
@@ -113,7 +113,7 @@ public:
 
     /// Generates code to create the initializer region for 'global' with the compile time constant 'objectAttr'.
     void initializeGlobal(mlir::LLVM::GlobalOp global, mlir::OpBuilder& builder,
-                          pylir::Py::ObjectAttrInterface objectAttr);
+                          pylir::Py::ConstObjectAttrInterface objectAttr);
 
     /// Generates code to translate the compile time constant 'attribute' to an PyObject pointer in LLVM and returns it.
     /// Attribute may be any kind of attribute from the 'py' dialect.

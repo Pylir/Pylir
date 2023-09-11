@@ -68,7 +68,7 @@ void replaceDictAggregate(T op, mlir::OpBuilder& builder,
 }
 
 void destructureSlots(
-    pylir::Py::ObjectAttrInterface attr,
+    pylir::Py::ConstObjectAttrInterface attr,
     llvm::function_ref<void(mlir::Attribute, mlir::SideEffects::Resource*, mlir::Type, mlir::Attribute)> write)
 {
     for (const auto& iter : attr.getSlots())

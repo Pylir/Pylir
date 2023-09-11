@@ -162,7 +162,7 @@ mlir::Attribute foldGetSlot(mlir::MLIRContext* context, mlir::Attribute objectOp
     }
     auto index = intAttr.getValue();
 
-    auto object = ref_cast_or_null<ObjectAttrInterface>(objectOp);
+    auto object = ref_cast_or_null<ConstObjectAttrInterface>(objectOp);
     if (!object)
     {
         return nullptr;

@@ -121,7 +121,7 @@ def PylirPy_GlobalValueAttr : AttrDef<PylirPy_Dialect, "GlobalValue", [NativeAtt
 
     let parameters = (ins StringRefParameter<>:$name,
                           DefaultValuedParameter<"bool", "false">:$constant,
-                          OptionalParameter<"pylir::Py::ObjectAttrInterface">:$initializer);
+                          OptionalParameter<"ConstObjectAttrInterface">:$initializer);
 
     // Required to make it properly mutable.
     let genStorageClass = 0;
@@ -138,7 +138,7 @@ def PylirPy_GlobalValueAttr : AttrDef<PylirPy_Dialect, "GlobalValue", [NativeAtt
         void setConstant(bool constant);
 
         /// Sets the initializer of this global value.
-        void setInitializer(ObjectAttrInterface initializer);
+        void setInitializer(ConstObjectAttrInterface initializer);
     }];
 
     let builders = [

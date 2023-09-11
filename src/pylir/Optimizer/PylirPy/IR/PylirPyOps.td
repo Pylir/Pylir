@@ -1129,7 +1129,7 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [DeclareOpInterfaceMethods
             SymbolNameAttr:$sym_name,
             OptionalAttr<StrAttr>:$sym_visibility,
             UnitAttr:$constant,
-            OptionalAttr<ObjectAttrInterface>:$initializer);
+            OptionalAttr<ConstObjectAttrInterface>:$initializer);
 
     let results = (outs);
 
