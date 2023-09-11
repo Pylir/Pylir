@@ -131,7 +131,7 @@ struct GlobalValueAttrStorage : mlir::AttributeStorage
         return mlir::success();
     }
 
-    mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&, ObjectAttrInterface attribute)
+    mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&, ConstObjectAttrInterface attribute)
     {
         initializer = attribute;
         return mlir::success();
@@ -139,7 +139,7 @@ struct GlobalValueAttrStorage : mlir::AttributeStorage
 
     llvm::StringRef name;
     bool constant;
-    mlir::Attribute initializer;
+    ConstObjectAttrInterface initializer;
 };
 
 } // namespace pylir::Py::detail
@@ -183,7 +183,7 @@ mlir::Attribute pylir::Py::GlobalValueAttr::parse(::mlir::AsmParser& parser, ::m
 
     // Default values.
     bool constant = false;
-    ObjectAttrInterface initializer = {};
+    ConstObjectAttrInterface initializer = {};
 
     while (mlir::succeeded(parser.parseOptionalComma()))
     {
@@ -268,12 +268,12 @@ void pylir::Py::GlobalValueAttr::setConstant(bool constant)
     (void)Base::mutate(constant);
 }
 
-pylir::Py::ObjectAttrInterface pylir::Py::GlobalValueAttr::getInitializer() const
+pylir::Py::ConstObjectAttrInterface pylir::Py::GlobalValueAttr::getInitializer() const
 {
-    return mlir::cast_or_null<ObjectAttrInterface>(getImpl()->initializer);
+    return getImpl()->initializer;
 }
 
-void pylir::Py::GlobalValueAttr::setInitializer(pylir::Py::ObjectAttrInterface initializer)
+void pylir::Py::GlobalValueAttr::setInitializer(ConstObjectAttrInterface initializer)
 {
     (void)Base::mutate(initializer);
 }

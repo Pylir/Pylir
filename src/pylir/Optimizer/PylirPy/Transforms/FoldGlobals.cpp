@@ -33,7 +33,7 @@ protected:
 
 private:
     pylir::Py::GlobalValueOp createGlobalValueFromGlobal(pylir::Py::GlobalOp globalOp,
-                                                         pylir::Py::ObjectAttrInterface initializer, bool constant)
+                                                         pylir::Py::ConstObjectAttrInterface initializer, bool constant)
     {
         PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
         mlir::OpBuilder builder(globalOp);
@@ -86,7 +86,7 @@ private:
         singleStore->erase();
 
         // Create the global value if the constant was not a reference but a constant object.
-        if (auto initializer = attr.dyn_cast<pylir::Py::ObjectAttrInterface>())
+        if (auto initializer = attr.dyn_cast<pylir::Py::ConstObjectAttrInterface>())
         {
             // Link the RefAttr created above as well.
             pylir::Py::RefAttr::get(createGlobalValueFromGlobal(globalOp, initializer, true));

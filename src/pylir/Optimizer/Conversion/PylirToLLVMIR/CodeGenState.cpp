@@ -213,7 +213,7 @@ mlir::Value pylir::CodeGenState::createRuntimeCall(mlir::Location loc, mlir::OpB
 }
 
 void pylir::CodeGenState::initializeGlobal(mlir::LLVM::GlobalOp global, mlir::OpBuilder& builder,
-                                           Py::ObjectAttrInterface objectAttr)
+                                           Py::ConstObjectAttrInterface objectAttr)
 {
     builder.setInsertionPointToStart(&global.getInitializerRegion().emplaceBlock());
     mlir::Value undef = builder.create<mlir::LLVM::UndefOp>(global.getLoc(), global.getType());
@@ -492,11 +492,11 @@ mlir::Value pylir::CodeGenState::getConstant(mlir::Location loc, mlir::OpBuilder
 
     return builder.create<mlir::LLVM::AddressOfOp>(
         loc, m_objectPtrType,
-        mlir::FlatSymbolRefAttr::get(createGlobalConstant(builder, attribute.cast<Py::ObjectAttrInterface>())));
+        mlir::FlatSymbolRefAttr::get(createGlobalConstant(builder, attribute.cast<Py::ConstObjectAttrInterface>())));
 }
 
 mlir::LLVM::GlobalOp pylir::CodeGenState::createGlobalConstant(mlir::OpBuilder& builder,
-                                                               Py::ObjectAttrInterface objectAttr)
+                                                               Py::ConstObjectAttrInterface objectAttr)
 {
     if (auto globalOp = m_globalConstants.lookup(objectAttr))
     {

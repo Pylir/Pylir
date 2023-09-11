@@ -29,7 +29,8 @@ class PylirPy_PyObjAttr<string name,
     list<Trait> traits = [],
     AttrInterface base = ObjectAttrInterface,
     bit hasSlots = 1>
-    : PylirPy_Attr<name, !listconcat(traits, [base, DeclareAttrInterfaceMethods<SROAAttrInterface>])>
+    : PylirPy_Attr<name, !listconcat(traits, [base, ConstObjectAttrInterface,
+     DeclareAttrInterfaceMethods<SROAAttrInterface>])>
 {
     /// The default builder usually has the same parameter types as the ones declared with default arguments.
     /// This leads to build errors due to being a redeclaration of a method. Turn it off for the vast majority of
@@ -273,7 +274,7 @@ def PylirPy_ListAttr : PylirPy_PyObjAttr<"List"> {
     ];
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ObjectAttrInterface,
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ConstObjectAttrInterface,
     DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
 
     let mnemonic = "dict";
@@ -368,7 +369,8 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ObjectAttrInterface,
 }
 
 def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ImmutableAttr,
-    DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<SROAAttrInterface>]>
+    DeclareAttrInterfaceMethods<ObjectAttrInterface>, DeclareAttrInterfaceMethods<ConstObjectAttrInterface>,
+    DeclareAttrInterfaceMethods<SROAAttrInterface>]>
 {
 	let mnemonic = "function";
 	let summary = "python function";
