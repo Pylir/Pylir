@@ -28,7 +28,7 @@ IncludeCategories:
     Priority: 7
   - Regex: '".*"'
     Priority: 8
-InsertNewlineAtEOF: true
+# TODO: Enable once using clang-format 16 in CI: InsertNewlineAtEOF: true
 KeepEmptyLinesAtTheStartOfBlocks: false
 Language: Cpp
 PointerAlignment: Left
