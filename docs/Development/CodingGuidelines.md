@@ -22,6 +22,91 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 This should be at the top of the file using the line comment syntax of the
 given language if possible.
 
+### Whitespace
+
+Unless overwritten by language specific guidelines, an 80 character column limit
+with an indentation of 2 is used.
+
+## CMake
+
+(source-file-list)=
+
+### Source File List
+
+A source file list must be indented, sorted alphabetically, contain one
+source file per line, and not contain any header files or similar.
+The closing parentheses after a source file should not be indented and always
+placed on the next line.
+
+Example:
+
+```cmake
+add_library(ALibrary
+  AThing.cpp
+  CThing.cpp
+  ZThing.cpp
+)
+```
+
+This allows easily copying and moving source file listings around while reducing
+the diff created by git.
+
+### Link Library List
+
+A link library list should be formatted the same as described in
+[](source-file-list).
+Additionally, linked targets must be grouped first by the
+[scope keyword](https://cmake.org/cmake/help/latest/command/target_link_libraries.html#libraries-for-a-target-and-or-its-dependents)
+in order of `INTERFACE`, `PUBLIC` and `PRIVATE`.
+An empty group must be omitted.
+No blank line must be inserted after a scope keyword.
+
+Groups themselves should ideally have a common prefix with which all libraries
+are prefixed.
+This prefix is used to alphabetically sort the groups.
+An exception is made for groups of libraries from within the codebase.
+These are always listed before any third party libraries.
+
+If linking multiple libraries from another project or module, consider putting
+blank lines inbetween groups of libraries from one project or module.
+
+Example:
+
+```cmake
+target_link_libraries(PylirMain
+  PUBLIC
+  Diagnostics
+  MLIRPass
+  
+  PRIVATE
+  CodeGen
+  CodeGenNew
+  
+  PylirLinker
+  PylirMemTransforms
+  
+  lldCOFF
+  lldELF
+  lldMachO
+  
+  MLIRBuiltinToLLVMIRTranslation
+  MLIRBytecodeReader
+  MLIRBytecodeWriter
+)
+```
+
+### Dependency list
+
+If the list of dependencies in `add_depdencies` is likely to grow, it should be
+formatted the same way as sources described in [](source-file-list).
+This is most notably the case for any CMake targets depending on code generation
+performed by TableGen.
+
+### Multiple `add_subdirectory`
+
+Unless there is a semantic reason not to, `add_subdirectory` calls should appear
+right after each other in alphabetical order.
+
 ## C++
 
 ### Tool Enforced Guidelines
@@ -46,12 +131,10 @@ in https://clang.llvm.org/extra/clang-tidy/#suppressing-undesired-diagnostics.
 If a check causes more false-positives than the value it provides, a PR
 disabling it in the `.clang-tidy` file should be created.
 
-### Other Guidelines
+The other sections list guidelines in no particular order that should be
+followed and cannot be enforced by `clang-format` or `clang-tidy`.
 
-This section lists guidelines in no particular order that should be followed
-and cannot be enforced by `clang-format` or `clang-tidy`.
-
-#### Use LLVM and STL datastructures
+### Use LLVM and STL datastructures
 
 The LLVM documentation contains a good guide recommending when to use which
 containers: https://llvm.org/docs/ProgrammersManual.html#picking-the-right-data-structure-for-a-task.
@@ -65,7 +148,7 @@ unless the reference stability provided by it is required.
 If an algorithm is both implemented in `<algorithm>` and
 `<llvm/ADT/STLExtras.h>`, prefer the LLVM version operating on ranges.
 
-#### Source code layout
+### Source code layout
 
 All source files are found in the `src` directory with an appropriate directory
 hierarchy for descriptive `#include`s.
@@ -77,7 +160,7 @@ Sometimes, special headers are created and `#include`d containing mostly lists
 of preprocessor macros.
 These should be suffixed as `*.def`.
 
-#### Use of `using namespace`
+### Use of `using namespace`
 
 `using namespace std;` is generally banned.
 If a symbol is found both in the `std` namespace and in the global namespace,
@@ -96,7 +179,7 @@ namespaces, the least amount of scopes necessary should be used to disambiguate
 the symbol on ALL references of the symbol.
 It should be consistent in the whole source file.
 
-#### `#include` style
+### `#include` style
 
 `#include <...>` should be used for header files not part of the current module
 or a submodule.
@@ -120,11 +203,11 @@ Example:
 #include "CodeGenState.hpp"
 ```
 
-#### Include guards
+### Include guards
 
 The codebase uses `#pragma once` exclusively and does not use include guards.
 
-#### Documentation style
+### Documentation style
 
 Doc strings are generally put in front of the given symbol and should way use
 `///` followed by one space.
