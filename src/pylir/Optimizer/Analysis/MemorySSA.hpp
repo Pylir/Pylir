@@ -18,44 +18,43 @@
 
 #include "MemorySSAIR.hpp"
 
-namespace mlir
-{
+namespace mlir {
 class ImplicitLocOpBuilder;
 } // namespace mlir
 
-namespace pylir
-{
+namespace pylir {
 
-class MemorySSA
-{
-    mlir::OwningOpRef<MemSSA::MemoryModuleOp> m_region;
-    llvm::DenseMap<mlir::Block*, mlir::Block*> m_blockMapping;
+class MemorySSA {
+  mlir::OwningOpRef<MemSSA::MemoryModuleOp> m_region;
+  llvm::DenseMap<mlir::Block*, mlir::Block*> m_blockMapping;
 
-    void createIR(mlir::Operation* operation);
+  void createIR(mlir::Operation* operation);
 
-    void optimizeUses(mlir::AnalysisManager& analysisManager);
+  void optimizeUses(mlir::AnalysisManager& analysisManager);
 
-    void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder, pylir::SSABuilder& ssaBuilder,
-                    llvm::MapVector<mlir::SideEffects::Resource*, pylir::SSABuilder::DefinitionsMap>& lastDefs,
-                    llvm::ArrayRef<mlir::Block*> regionSuccessors);
+  void fillRegion(mlir::Region& region, mlir::ImplicitLocOpBuilder& builder,
+                  pylir::SSABuilder& ssaBuilder,
+                  llvm::MapVector<mlir::SideEffects::Resource*,
+                                  pylir::SSABuilder::DefinitionsMap>& lastDefs,
+                  llvm::ArrayRef<mlir::Block*> regionSuccessors);
 
 public:
-    explicit MemorySSA(mlir::Operation* operation, mlir::AnalysisManager& analysisManager);
+  explicit MemorySSA(mlir::Operation* operation,
+                     mlir::AnalysisManager& analysisManager);
 
-    mlir::Region& getMemoryRegion()
-    {
-        return m_region->getBody();
-    }
+  mlir::Region& getMemoryRegion() {
+    return m_region->getBody();
+  }
 
-    void dump() const;
+  void dump() const;
 
-    void print(llvm::raw_ostream& out) const;
+  void print(llvm::raw_ostream& out) const;
 
-    friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os, const MemorySSA& ssa)
-    {
-        ssa.print(os);
-        return os;
-    }
+  friend llvm::raw_ostream& operator<<(llvm::raw_ostream& os,
+                                       const MemorySSA& ssa) {
+    ssa.print(os);
+    return os;
+  }
 };
 
 } // namespace pylir

@@ -164,7 +164,6 @@ Checks: >
   performance-unnecessary-value-param,
   portability-std-allocator-const,
   readability-avoid-const-params-in-decls,
-  readability-braces-around-statements,
   readability-const-return-type,
   readability-container-data-pointer,
   readability-container-size-empty,
@@ -199,59 +198,36 @@ FormatStyle: file
 HeaderFilterRegex: '.*\.hpp'
 
 CheckOptions:
-  - key: misc-unused-parameters.StrictMode
-    value: 1
-  - key: readability-identifier-naming.ClassCase
-    value: CamelCase
-  - key: readability-identifier-naming.ClassIgnoredRegexp
-    # Attempt to ignore cases such as X86_64. clang-tidy wants to turn it to CamelCase by simply removing the
-    # underscore. I'd rather it keep it as is.
-    value: '[[:alnum:]]*[0-9]+_[0-9]+|(const_)?iterator'
-  - key: readability-identifier-naming.UnionCase
-    value: CamelCase
-  - key: readability-identifier-naming.TypeTemplateParameterCase
-    value: CamelCase
-  - key: readability-identifier-naming.TypeAliasCase
-    # A lot of type aliases are to conform to STL interfaces while others are our own whose casing generally depend
-    # on their purpose.
-    value: aNy_CasE
-  - key: readability-identifier-naming.EnumCase
-    value: CamelCase
-  - key: readability-identifier-naming.EnumConstantCase
-    value: CamelCase
-  - key: readability-identifier-naming.ClassConstantCase
-    value: aNy_CasE
-  - key: readability-identifier-naming.GlobalConstantCase
-    # This is too broad of an option. It considers any global that is `const` or `constexpr` a GlobalConstant but
-    # their uses are widely different. Some are e.g. used as type_traits, others may be used to implement named
-    # parameter flags. These have different casing which I'd rather just handle manually.
-    value: aNy_CasE
-  - key: readability-identifier-naming.MacroDefinitionCase
-    value: UPPER_CASE
-  - key: readability-identifier-naming.ClassMemberCase
-    value: camelBack
-  - key: readability-identifier-naming.MethodCase
-    value: camelBack
-  - key: readability-identifier-naming.MethodIgnoredRegexp
-    # Ignoring methods from template specializations which obviously have to match, STL style methods, some LLVM style
-    # methods etc.
-    value: 'child_begin|child_end|push_back|emplace_back|insert(_.+)?|find(_.+)?|erase(_.+)?|isa(_.+)?|([a-z]+)_cast(_.+)?'
-  - key: readability-identifier-naming.FunctionCase
-    value: camelBack
-  - key: readability-identifier-naming.FunctionIgnoredRegexp
-    # Ignoring function overloads where the name obviously has to match.
-    value: 'hash_value|isa(_.+)?|([a-z]+)_cast(_.+)?'
-  - key: readability-identifier-naming.VariableCase
-    value: camelBack
-  - key: readability-identifier-naming.ValueTemplateParameterCase
-    value: camelBack
-  - key: readability-identifier-naming.PrivateMemberCase
-    value: camelBack
-  - key: readability-identifier-naming.PrivateMemberPrefix
-    value: m_
-  - key: readability-redundant-access-specifiers.CheckFirstDeclaration
-    value: 1
-  - key: readability-uniqueptr-delete-release.PreferResetCall
-    value: 1
-  - key: readability-simplify-boolean-expr.SimplifyDeMorgan
-    value: 0
+  misc-unused-parameters.StrictMode: true
+  readability-identifier-naming.ClassCase: CamelCase
+  # Attempt to ignore cases such as X86_64. clang-tidy wants to turn it to CamelCase by simply removing the
+  # underscore. I'd rather it keep it as is.
+  readability-identifier-naming.ClassIgnoredRegexp: '[[:alnum:]]*[0-9]+_[0-9]+|(const_)?iterator'
+  readability-identifier-naming.UnionCase: CamelCase
+  readability-identifier-naming.TypeTemplateParameterCase: CamelCase
+  # A lot of type aliases are to conform to STL interfaces while others are our own whose casing generally depend
+  # on their purpose.
+  readability-identifier-naming.TypeAliasCase: aNy_CasE
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.ClassConstantCase: aNy_CasE
+  # This is too broad of an option. It considers any global that is `const` or `constexpr` a GlobalConstant but
+  # their uses are widely different. Some are e.g. used as type_traits, others may be used to implement named
+  # parameter flags. These have different casing which I'd rather just handle manually.
+  readability-identifier-naming.GlobalConstantCase: aNy_CasE
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-identifier-naming.ClassMemberCase: camelBack
+  readability-identifier-naming.MethodCase: camelBack
+  # Ignoring methods from template specializations which obviously have to match, STL style methods, some LLVM style
+  # methods etc.
+  readability-identifier-naming.MethodIgnoredRegexp: 'child_begin|child_end|push_back|emplace_back|insert(_.+)?|find(_.+)?|erase(_.+)?|isa(_.+)?|([a-z]+)_cast(_.+)?'
+  readability-identifier-naming.FunctionCase: camelBack
+  # Ignoring function overloads where the name obviously has to match.
+  readability-identifier-naming.FunctionIgnoredRegexp: 'hash_value|isa(_.+)?|([a-z]+)_cast(_.+)?'
+  readability-identifier-naming.VariableCase: camelBack
+  readability-identifier-naming.ValueTemplateParameterCase: camelBack
+  readability-identifier-naming.PrivateMemberCase: camelBack
+  readability-identifier-naming.PrivateMemberPrefix: m_
+  readability-redundant-access-specifiers.CheckFirstDeclaration: true
+  readability-uniqueptr-delete-release.PreferResetCall: true
+  readability-simplify-boolean-expr.SimplifyDeMorgan: false

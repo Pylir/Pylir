@@ -7,19 +7,17 @@
 
 #include "Toolchain.hpp"
 
-namespace pylir
-{
-class MSVCToolchain : public Toolchain
-{
+namespace pylir {
+class MSVCToolchain : public Toolchain {
 protected:
-    [[nodiscard]] bool defaultsToPIC() const override
-    {
-        return true;
-    }
+  [[nodiscard]] bool defaultsToPIC() const override {
+    return true;
+  }
 
 public:
-    using Toolchain::Toolchain;
+  using Toolchain::Toolchain;
 
-    [[nodiscard]] bool link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const override;
+  [[nodiscard]] bool link(cli::CommandLine& commandLine,
+                          llvm::StringRef objectFile) const override;
 };
 } // namespace pylir

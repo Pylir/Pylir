@@ -13,11 +13,11 @@ option(PYLIR_FUZZER "Build fuzzers" OFF)
 option(PYLIR_COVERAGE "Compile with coverage" OFF)
 set(PYLIR_SANITIZERS "" CACHE STRING "Compile with given sanitizers")
 
-if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
-    option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" OFF)
-else()
-    option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" ON)
-endif()
+if (NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
+  option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" OFF)
+else ()
+  option(PYLIR_ENABLE_ASSERTIONS "Enable assertions" ON)
+endif ()
 
 ## Set up dependencies and global include and link directories.
 
@@ -37,16 +37,16 @@ message(STATUS "Checking ${VCS_HEADER} for version mismatch")
 file(READ ${VCS_HEADER} VCS_FILE)
 string(REGEX MATCH "#define LLVM_REVISION \"([a-z0-9]+)\"" VCS_MATCH ${VCS_FILE})
 if (CMAKE_MATCH_COUNT EQUAL 0)
-    message(WARNING "Failed to determine revision of LLVM installed. Proceed with caution.
+  message(WARNING "Failed to determine revision of LLVM installed. Proceed with caution.
 Required revision: ${PYLIR_REQUIRED_LLVM_REVISION}
 Found LLVM installation: ${MLIR_DIR}")
 else ()
-    if (NOT ${CMAKE_MATCH_1} STREQUAL PYLIR_REQUIRED_LLVM_REVISION)
-        message(WARNING "Installed LLVM revision (${CMAKE_MATCH_1}) does not match required revision.\
+  if (NOT ${CMAKE_MATCH_1} STREQUAL PYLIR_REQUIRED_LLVM_REVISION)
+    message(WARNING "Installed LLVM revision (${CMAKE_MATCH_1}) does not match required revision.\
         Compilation is likely to fail.
 Required revision: ${PYLIR_REQUIRED_LLVM_REVISION}
 Found LLVM installation: ${MLIR_DIR}")
-    endif ()
+  endif ()
 endif ()
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
@@ -69,9 +69,9 @@ set(PYLIR_TABLEGEN_EXE "pylir-tblgen")
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
-# Include directory where the various tablegen utilities place auto generated sources and headers.
+# Include directory where the various tablegen utilities place auto generated
+# sources and headers.
 include_directories(SYSTEM ${PROJECT_BINARY_DIR}/src)
-include_directories(src)
 include_directories(SYSTEM 3rdParty)
 link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
@@ -86,19 +86,20 @@ set(PYLIR_TOOLS_DIR ${CMAKE_BINARY_DIR}/bin)
 find_package(Python3 3.6 COMPONENTS Interpreter REQUIRED)
 
 if (PYLIR_BUILD_DOCS)
-    add_subdirectory(docs)
+  add_subdirectory(docs)
+endif ()
+
+if (PYLIR_FUZZER)
+  add_subdirectory(fuzzer)
 endif ()
 
 add_subdirectory(3rdParty)
 add_subdirectory(src)
 add_subdirectory(tools)
 if (PYLIR_BUILD_TESTS)
-    include(CTest)
-    enable_testing()
-    add_subdirectory(unittests)
-    add_subdirectory(test)
+  include(CTest)
+  enable_testing()
+  add_subdirectory(unittests)
+  add_subdirectory(test)
 endif ()
 
-if (PYLIR_FUZZER)
-    add_subdirectory(fuzzer)
-endif ()

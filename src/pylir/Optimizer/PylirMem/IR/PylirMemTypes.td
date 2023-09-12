@@ -9,12 +9,13 @@ include "pylir/Optimizer/PylirMem/IR/PylirMemBase.td"
 include "mlir/IR/BuiltinTypeInterfaces.td"
 include "mlir/IR/AttrTypeBase.td"
 
-class PylirMem_Type<string name, list<Trait> traits = [], string baseCppClass = "::mlir::Type"> :
-    TypeDef<PylirMem_Dialect, name, traits, baseCppClass>;
+class PylirMem_Type<string name, list<Trait> traits = [],
+    string baseCppClass = "::mlir::Type"> :
+  TypeDef<PylirMem_Dialect, name, traits, baseCppClass>;
 
 def PylirMem_MemoryType : PylirMem_Type<"Memory"> {
-    let mnemonic = "memory";
-    let summary = "python memory type";
+  let mnemonic = "memory";
+  let summary = "python memory type";
 }
 
 #endif

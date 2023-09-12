@@ -15,12 +15,11 @@
 #include "PylirPyDialect.hpp"
 #include "PylirPyOps.hpp"
 
-void pylir::Py::PylirPyDialect::initializeTypes()
-{
-    addTypes<
+void pylir::Py::PylirPyDialect::initializeTypes() {
+  addTypes<
 #define GET_TYPEDEF_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.cpp.inc"
-        >();
+      >();
 }
 
 #define GET_TYPEDEF_CLASSES

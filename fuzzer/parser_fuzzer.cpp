@@ -8,17 +8,17 @@
 #include <cstring>
 #include <string>
 
-extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size)
-{
-    std::string input(size, '\0');
-    std::memcpy(input.data(), data, size);
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data,
+                                      std::size_t size) {
+  std::string input(size, '\0');
+  std::memcpy(input.data(), data, size);
 
-    pylir::Diag::DiagnosticsManager manager;
-    pylir::Diag::Document document(input);
-    auto docManager = manager.createSubDiagnosticManager(document);
-    pylir::Parser parser(docManager);
+  pylir::Diag::DiagnosticsManager manager;
+  pylir::Diag::Document document(input);
+  auto docManager = manager.createSubDiagnosticManager(document);
+  pylir::Parser parser(docManager);
 
-    (void)parser.parseFileInput();
+  (void)parser.parseFileInput();
 
-    return 0;
+  return 0;
 }

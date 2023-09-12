@@ -7,12 +7,10 @@
 #include <mlir/IR/Attributes.h>
 #include <mlir/IR/BuiltinAttributes.h>
 
-namespace pylir::Py
-{
+namespace pylir::Py {
 class ConstObjectAttrInterface;
 class GlobalValueOp;
-namespace detail
-{
+namespace detail {
 struct GlobalValueAttrStorage;
 struct RefAttrStorage;
 } // namespace detail
@@ -22,17 +20,15 @@ struct RefAttrStorage;
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttrBase.h.inc"
 
 template <>
-struct llvm::PointerLikeTypeTraits<pylir::Py::RefAttr>
-{
-    static inline void* getAsVoidPointer(pylir::Py::RefAttr p)
-    {
-        return const_cast<void*>(p.getAsOpaquePointer());
-    }
+struct llvm::PointerLikeTypeTraits<pylir::Py::RefAttr> {
+  static inline void* getAsVoidPointer(pylir::Py::RefAttr p) {
+    return const_cast<void*>(p.getAsOpaquePointer());
+  }
 
-    static inline pylir::Py::RefAttr getFromVoidPointer(void* p)
-    {
-        return pylir::Py::RefAttr::getFromOpaquePointer(p);
-    }
+  static inline pylir::Py::RefAttr getFromVoidPointer(void* p) {
+    return pylir::Py::RefAttr::getFromOpaquePointer(p);
+  }
 
-    static constexpr int NumLowBitsAvailable = llvm::PointerLikeTypeTraits<mlir::Attribute>::NumLowBitsAvailable;
+  static constexpr int NumLowBitsAvailable =
+      llvm::PointerLikeTypeTraits<mlir::Attribute>::NumLowBitsAvailable;
 };

@@ -2,11 +2,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_library(PylirExternalModels ExternalModels.cpp)
+add_library(PylirExternalModels
+  ExternalModels.cpp
+)
 target_link_libraries(PylirExternalModels
-        PUBLIC MLIRIR
-        PRIVATE
-        MLIRControlFlowDialect
-        MLIRArithDialect
-        PylirConditionalBranchInterface
-        )
+  PUBLIC
+  MLIRIR
+  
+  PRIVATE
+  PylirConditionalBranchInterface
+  
+  MLIRArithDialect
+  MLIRControlFlowDialect
+)

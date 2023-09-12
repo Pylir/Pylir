@@ -9,16 +9,15 @@
 #include <llvm/IR/Dominators.h>
 #include <llvm/IR/PassManager.h>
 
-namespace pylir
-{
-class PlaceStatepointsPass : public llvm::PassInfoMixin<PlaceStatepointsPass>
-{
+namespace pylir {
+class PlaceStatepointsPass : public llvm::PassInfoMixin<PlaceStatepointsPass> {
 public:
-    explicit PlaceStatepointsPass() = default;
+  explicit PlaceStatepointsPass() = default;
 
-    llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager& AM);
+  llvm::PreservedAnalyses run(llvm::Module& M, llvm::ModuleAnalysisManager& AM);
 
-    bool runOnFunction(llvm::Function& F, llvm::DominatorTree& DT, llvm::TargetTransformInfo& TTI,
-                       const llvm::TargetLibraryInfo& TLI);
+  bool runOnFunction(llvm::Function& F, llvm::DominatorTree& DT,
+                     llvm::TargetTransformInfo& TTI,
+                     const llvm::TargetLibraryInfo& TLI);
 };
 } // namespace pylir

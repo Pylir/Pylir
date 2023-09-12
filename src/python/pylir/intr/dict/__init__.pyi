@@ -5,10 +5,8 @@
 def len(dict):
     pass
 
-
 def tryGetItem(dict, key, hash):
     pass
-
 
 def setItem(dict, key, hash, value):
     pass

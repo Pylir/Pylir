@@ -6,24 +6,21 @@
 
 #include "Toolchain.hpp"
 
-namespace pylir
-{
-class MinGWToolchain : public Toolchain
-{
-    ClangInstallation m_clangInstallation;
+namespace pylir {
+class MinGWToolchain : public Toolchain {
+  ClangInstallation m_clangInstallation;
 
-    void searchForClangInstallation(const cli::CommandLine& commandLine);
+  void searchForClangInstallation(const cli::CommandLine& commandLine);
 
 protected:
-
-    [[nodiscard]] bool defaultsToPIC() const override
-    {
-        return true;
-    }
+  [[nodiscard]] bool defaultsToPIC() const override {
+    return true;
+  }
 
 public:
-    MinGWToolchain(llvm::Triple triple, cli::CommandLine& commandLine);
+  MinGWToolchain(llvm::Triple triple, cli::CommandLine& commandLine);
 
-    [[nodiscard]] bool link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const override;
+  [[nodiscard]] bool link(cli::CommandLine& commandLine,
+                          llvm::StringRef objectFile) const override;
 };
 } // namespace pylir

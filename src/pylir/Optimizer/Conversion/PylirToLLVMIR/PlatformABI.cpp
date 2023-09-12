@@ -8,12 +8,10 @@
 
 #include <pylir/Support/Macros.hpp>
 
-std::size_t pylir::PlatformABI::getAlignOf(mlir::Type type) const
-{
-    return m_dataLayout.getTypeABIAlignment(type);
+std::size_t pylir::PlatformABI::getAlignOf(mlir::Type type) const {
+  return m_dataLayout.getTypeABIAlignment(type);
 }
 
-std::size_t pylir::PlatformABI::getSizeOf(mlir::Type type) const
-{
-    return m_dataLayout.getTypeSize(type);
+std::size_t pylir::PlatformABI::getSizeOf(mlir::Type type) const {
+  return m_dataLayout.getTypeSize(type);
 }

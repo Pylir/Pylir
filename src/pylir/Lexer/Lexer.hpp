@@ -18,75 +18,71 @@
 
 #include "Token.hpp"
 
-namespace pylir
-{
-class Lexer
-{
-    std::vector<Token> m_tokens;
-    Diag::Document::const_iterator m_current;
-    Diag::DiagnosticsDocManager* m_diagManager;
-    std::size_t m_depth = 0;
-    std::stack<std::pair<std::size_t, std::size_t>> m_indentation{{{0, static_cast<std::size_t>(-1)}}};
+namespace pylir {
+class Lexer {
+  std::vector<Token> m_tokens;
+  Diag::Document::const_iterator m_current;
+  Diag::DiagnosticsDocManager* m_diagManager;
+  std::size_t m_depth = 0;
+  std::stack<std::pair<std::size_t, std::size_t>> m_indentation{
+      {{0, static_cast<std::size_t>(-1)}}};
 
-    bool parseNext();
+  bool parseNext();
 
-    void parseIdentifier();
+  void parseIdentifier();
 
-    std::optional<std::string> parseLiteral(bool raw, bool bytes);
+  std::optional<std::string> parseLiteral(bool raw, bool bytes);
 
-    void parseNumber();
+  void parseNumber();
 
-    void parseIndent();
+  void parseIndent();
 
 public:
-    using value_type = Token;
-    using reference = const Token&;
-    using const_reference = reference;
-    using iterator = LazyCacheIterator<value_type, Lexer, &Lexer::parseNext, &Lexer::m_tokens>;
-    using const_iterator = iterator;
-    using difference_type = iterator::difference_type;
-    using size_type = std::size_t;
+  using value_type = Token;
+  using reference = const Token&;
+  using const_reference = reference;
+  using iterator =
+      LazyCacheIterator<value_type, Lexer, &Lexer::parseNext, &Lexer::m_tokens>;
+  using const_iterator = iterator;
+  using difference_type = iterator::difference_type;
+  using size_type = std::size_t;
 
-    explicit Lexer(Diag::DiagnosticsDocManager& diagManager);
+  explicit Lexer(Diag::DiagnosticsDocManager& diagManager);
 
-    ~Lexer() = default;
+  ~Lexer() = default;
 
-    Lexer(const Lexer&) = delete;
-    Lexer& operator=(const Lexer&) = delete;
+  Lexer(const Lexer&) = delete;
+  Lexer& operator=(const Lexer&) = delete;
 
-    Lexer(Lexer&&) noexcept = default;
-    Lexer& operator=(Lexer&&) noexcept = default;
+  Lexer(Lexer&&) noexcept = default;
+  Lexer& operator=(Lexer&&) noexcept = default;
 
-    [[nodiscard]] iterator begin()
-    {
-        return {*this, 0};
-    }
+  [[nodiscard]] iterator begin() {
+    return {*this, 0};
+  }
 
-    [[nodiscard]] const_iterator cbegin()
-    {
-        return begin();
-    }
+  [[nodiscard]] const_iterator cbegin() {
+    return begin();
+  }
 
-    [[nodiscard]] iterator end()
-    {
-        return {*this, static_cast<std::size_t>(-1)};
-    }
+  [[nodiscard]] iterator end() {
+    return {*this, static_cast<std::size_t>(-1)};
+  }
 
-    [[nodiscard]] const_iterator cend()
-    {
-        return end();
-    }
+  [[nodiscard]] const_iterator cend() {
+    return end();
+  }
 
-    template <class T, class S, class... Args>
-    [[nodiscard]] auto createError(const T& location, const S& message, Args&&... args) const
-    {
-        return Diag::DiagnosticsBuilder(*m_diagManager, Diag::Severity::Error, location, message,
-                                        std::forward<Args>(args)...);
-    }
+  template <class T, class S, class... Args>
+  [[nodiscard]] auto createError(const T& location, const S& message,
+                                 Args&&... args) const {
+    return Diag::DiagnosticsBuilder(*m_diagManager, Diag::Severity::Error,
+                                    location, message,
+                                    std::forward<Args>(args)...);
+  }
 
-    [[nodiscard]] Diag::DiagnosticsDocManager& getDiagManager() const
-    {
-        return *m_diagManager;
-    }
+  [[nodiscard]] Diag::DiagnosticsDocManager& getDiagManager() const {
+    return *m_diagManager;
+  }
 };
 } // namespace pylir

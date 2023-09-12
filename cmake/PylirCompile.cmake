@@ -14,50 +14,50 @@
 #   DEPENDS
 #       Optional list of extra dependencies
 macro(pylir_obj_compile)
-    cmake_parse_arguments(ARG "" "TARGET;SOURCE" "FLAGS;DEPENDS" ${ARGN})
-
-    file(RELATIVE_PATH TargetRel "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}")
-
-    if (CMAKE_GENERATOR MATCHES "Ninja|Makefiles")
-        # See https://cmake.org/cmake/help/latest/policy/CMP0116.html as to why this is currently relative.
-        set(depfile_cmd -M ${TargetRel}.d)
-        set(custom_command_extra DEPFILE ${TargetRel}.d)
-    else ()
-        get_target_property(depends_extra pylir-stdlib SOURCES)
-        get_target_property(targetSourceDir pylir-stdlib SOURCE_DIR)
-        list(TRANSFORM depends_extra PREPEND "${targetSourceDir}/")
-    endif ()
-
-    get_filename_component(SourceExt ${ARG_SOURCE} EXT)
-    if (${SourceExt} STREQUAL ".ll")
-        set(LANG "LLVM")
-    elseif (${SourceExt} STREQUAL ".mlir")
-        set(LANG "MLIR")
-    else ()
-        set(LANG "PY")
-    endif ()
-
-    # TODO: Figure out a more cooperative and cmake informed way of doing this.
-    set(pie_arg)
-    if (NOT APPLE)
-        set(pie_arg -fpie)
-    endif ()
-
-    set(sanitizer_arg)
-    if (PYLIR_SANITIZERS)
-        set(sanitizer_arg "-Xsanitize=${PYLIR_SANITIZERS}")
-    endif ()
-
-    get_filename_component(SourceAbs ${ARG_SOURCE} REALPATH)
-    add_custom_command(
-            OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}
-            COMMAND pylir ${SourceAbs} ${pie_arg} ${sanitizer_arg} -c -o ${TargetRel} $<$<CONFIG:Release>:-O3>
-            -I ${PROJECT_SOURCE_DIR}/src/python
-            ${ARG_FLAGS} ${depfile_cmd}
-            COMMENT "Building ${LANG} object ${TargetRel}"
-            DEPENDS ${SourceAbs} pylir ${depends_extra} ${ARG_DEPENDS}
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-            ${custom_command_extra}
-    )
-    set_source_files_properties(${ARG_TARGET} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
+  cmake_parse_arguments(ARG "" "TARGET;SOURCE" "FLAGS;DEPENDS" ${ARGN})
+  
+  file(RELATIVE_PATH TargetRel "${CMAKE_BINARY_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}")
+  
+  if (CMAKE_GENERATOR MATCHES "Ninja|Makefiles")
+    # See https://cmake.org/cmake/help/latest/policy/CMP0116.html as to why this is currently relative.
+    set(depfile_cmd -M ${TargetRel}.d)
+    set(custom_command_extra DEPFILE ${TargetRel}.d)
+  else ()
+    get_target_property(depends_extra pylir-stdlib SOURCES)
+    get_target_property(targetSourceDir pylir-stdlib SOURCE_DIR)
+    list(TRANSFORM depends_extra PREPEND "${targetSourceDir}/")
+  endif ()
+  
+  get_filename_component(SourceExt ${ARG_SOURCE} EXT)
+  if (${SourceExt} STREQUAL ".ll")
+    set(LANG "LLVM")
+  elseif (${SourceExt} STREQUAL ".mlir")
+    set(LANG "MLIR")
+  else ()
+    set(LANG "PY")
+  endif ()
+  
+  # TODO: Figure out a more cooperative and cmake informed way of doing this.
+  set(pie_arg)
+  if (NOT APPLE)
+    set(pie_arg -fpie)
+  endif ()
+  
+  set(sanitizer_arg)
+  if (PYLIR_SANITIZERS)
+    set(sanitizer_arg "-Xsanitize=${PYLIR_SANITIZERS}")
+  endif ()
+  
+  get_filename_component(SourceAbs ${ARG_SOURCE} REALPATH)
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${ARG_TARGET}
+    COMMAND pylir ${SourceAbs} ${pie_arg} ${sanitizer_arg} -c -o ${TargetRel} $<$<CONFIG:Release>:-O3>
+    -I ${PROJECT_SOURCE_DIR}/src/python
+    ${ARG_FLAGS} ${depfile_cmd}
+    COMMENT "Building ${LANG} object ${TargetRel}"
+    DEPENDS ${SourceAbs} pylir ${depends_extra} ${ARG_DEPENDS}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    ${custom_command_extra}
+  )
+  set_source_files_properties(${ARG_TARGET} PROPERTIES EXTERNAL_OBJECT true GENERATED true)
 endmacro()

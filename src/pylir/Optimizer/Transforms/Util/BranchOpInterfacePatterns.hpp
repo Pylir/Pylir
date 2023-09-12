@@ -4,12 +4,10 @@
 
 #pragma once
 
-namespace mlir
-{
+namespace mlir {
 class RewritePatternSet;
 } // namespace mlir
 
-namespace pylir
-{
+namespace pylir {
 void populateWithBranchOpInterfacePattern(mlir::RewritePatternSet& patterns);
 } // namespace pylir

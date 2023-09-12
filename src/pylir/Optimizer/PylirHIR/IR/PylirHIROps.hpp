@@ -22,148 +22,138 @@
 
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRFunctionInterface.h.inc"
 
-namespace pylir::HIR
-{
+namespace pylir::HIR {
 
-/// Function parameter class used to compactly represent a single python parameter and its properties within a function
-/// in the pyHIR dialect.
-class FunctionParameter
-{
-    mlir::Value m_parameter;
-    mlir::StringAttr m_name;
-    mlir::DictionaryAttr m_attrs;
-    mlir::Value m_defaultValue;
-    bool m_isPosRest;
-    bool m_isKeywordRest;
-    bool m_isKeywordOnly;
+/// Function parameter class used to compactly represent a single python
+/// parameter and its properties within a function in the pyHIR dialect.
+class FunctionParameter {
+  mlir::Value m_parameter;
+  mlir::StringAttr m_name;
+  mlir::DictionaryAttr m_attrs;
+  mlir::Value m_defaultValue;
+  bool m_isPosRest;
+  bool m_isKeywordRest;
+  bool m_isKeywordOnly;
 
 public:
-    /// Constructor creating a function parameter. 'parameter' is the block argument representing the parameter
-    /// within the functions body.
-    /// 'optionalName' is the name of the parameter for parameters which may be specified as a keyword.
-    /// 'attrs' is the dictionary attribute for any argument attributes.
-    /// 'optionalDefaultValue' is the default value for that parameter, used if no value has been specified for it in a
-    /// call.
-    /// 'isPosRest' is true if this parameter receives any leftover positional parameters.
-    /// 'isKeywordRest' is true if this parameter receives any leftover mapping parameters.
-    FunctionParameter(mlir::Value parameter, mlir::StringAttr optionalName, mlir::DictionaryAttr attrs,
-                      mlir::Value optionalDefaultValue, bool isPosRest, bool isKeywordRest,
-                      bool isKeywordOnly);
+  /// Constructor creating a function parameter. 'parameter' is the block
+  /// argument representing the parameter within the functions body.
+  /// 'optionalName' is the name of the parameter for parameters which may be
+  /// specified as a keyword. 'attrs' is the dictionary attribute for any
+  /// argument attributes. 'optionalDefaultValue' is the default value for that
+  /// parameter, used if no value has been specified for it in a call.
+  /// 'isPosRest' is true if this parameter receives any leftover positional
+  /// parameters. 'isKeywordRest' is true if this parameter receives any
+  /// leftover mapping parameters.
+  FunctionParameter(mlir::Value parameter, mlir::StringAttr optionalName,
+                    mlir::DictionaryAttr attrs,
+                    mlir::Value optionalDefaultValue, bool isPosRest,
+                    bool isKeywordRest, bool isKeywordOnly);
 
-    /// Returns the parameter value, used within the function body.
-    mlir::Value getParameter() const
-    {
-        return m_parameter;
-    }
+  /// Returns the parameter value, used within the function body.
+  mlir::Value getParameter() const {
+    return m_parameter;
+  }
 
-    /// Returns the argument attributes of this attribute.
-    mlir::DictionaryAttr getAttrs() const
-    {
-        return m_attrs;
-    }
+  /// Returns the argument attributes of this attribute.
+  mlir::DictionaryAttr getAttrs() const {
+    return m_attrs;
+  }
 
-    /// Returns the default value or null if this parameter has no default value.
-    mlir::Value getDefaultValue() const
-    {
-        return m_defaultValue;
-    }
+  /// Returns the default value or null if this parameter has no default value.
+  mlir::Value getDefaultValue() const {
+    return m_defaultValue;
+  }
 
-    /// Returns the name of this parameter used for parameters callable as a keyword, or null if this parameter does
-    /// not have a name.
-    mlir::StringAttr getName() const
-    {
-        return m_name;
-    }
+  /// Returns the name of this parameter used for parameters callable as a
+  /// keyword, or null if this parameter does not have a name.
+  mlir::StringAttr getName() const {
+    return m_name;
+  }
 
-    /// Returns true if this parameter receives any leftover positional parameters.
-    bool isPosRest() const
-    {
-        return m_isPosRest;
-    }
+  /// Returns true if this parameter receives any leftover positional
+  /// parameters.
+  bool isPosRest() const {
+    return m_isPosRest;
+  }
 
-    /// Returns true if this parameter receives any leftover keyword parameters.
-    bool isKeywordRest() const
-    {
-        return m_isKeywordRest;
-    }
+  /// Returns true if this parameter receives any leftover keyword parameters.
+  bool isKeywordRest() const {
+    return m_isKeywordRest;
+  }
 
-    /// Returns true if this parameter can only be assigned to via a keyword argument.
-    bool isKeywordOnly() const
-    {
-        return m_isKeywordOnly;
-    }
+  /// Returns true if this parameter can only be assigned to via a keyword
+  /// argument.
+  bool isKeywordOnly() const {
+    return m_isKeywordOnly;
+  }
 };
 
-/// Range object used to easily iterate over all parameters of a 'pyHIR' function.
+/// Range object used to easily iterate over all parameters of a 'pyHIR'
+/// function.
 class FunctionParameterRange
-    : public llvm::indexed_accessor_range<FunctionParameterRange, FunctionInterface, FunctionParameter,
-                                          FunctionParameter, FunctionParameter>
-{
-    using Base = llvm::indexed_accessor_range<FunctionParameterRange, FunctionInterface, FunctionParameter,
-                                              FunctionParameter, FunctionParameter>;
+    : public llvm::indexed_accessor_range<
+          FunctionParameterRange, FunctionInterface, FunctionParameter,
+          FunctionParameter, FunctionParameter> {
+  using Base =
+      llvm::indexed_accessor_range<FunctionParameterRange, FunctionInterface,
+                                   FunctionParameter, FunctionParameter,
+                                   FunctionParameter>;
 
-    friend Base;
+  friend Base;
 
-    // dereference function required by indexed_accessor_range.
-    static FunctionParameter dereference(FunctionInterface function, std::ptrdiff_t index);
+  // dereference function required by indexed_accessor_range.
+  static FunctionParameter dereference(FunctionInterface function,
+                                       std::ptrdiff_t index);
 
 public:
-    /// Constructor for any function implementing HIR::FunctionInterface.
-    explicit FunctionParameterRange(FunctionInterface function);
+  /// Constructor for any function implementing HIR::FunctionInterface.
+  explicit FunctionParameterRange(FunctionInterface function);
 };
 
 /// Struct used to build functions in the pyHIR dialect.
-class FunctionParameterSpec
-{
-    mlir::StringAttr m_name;
-    mlir::Value m_defaultValue;
-    bool m_isPosRest = false;
-    bool m_isKeywordRest = false;
-    bool m_isKeywordOnly = false;
+class FunctionParameterSpec {
+  mlir::StringAttr m_name;
+  mlir::Value m_defaultValue;
+  bool m_isPosRest = false;
+  bool m_isKeywordRest = false;
+  bool m_isKeywordOnly = false;
 
 public:
-    struct PosRest
-    {
-    };
-    struct KeywordRest
-    {
-    };
+  struct PosRest {};
+  struct KeywordRest {};
 
-    FunctionParameterSpec() = default;
+  FunctionParameterSpec() = default;
 
-    explicit FunctionParameterSpec(mlir::StringAttr name, mlir::Value defaultValue, bool keywordOnly = false)
-        : m_name(name), m_defaultValue(defaultValue), m_isKeywordOnly(keywordOnly)
-    {
-    }
+  explicit FunctionParameterSpec(mlir::StringAttr name,
+                                 mlir::Value defaultValue,
+                                 bool keywordOnly = false)
+      : m_name(name), m_defaultValue(defaultValue),
+        m_isKeywordOnly(keywordOnly) {}
 
-    explicit FunctionParameterSpec(PosRest) : m_isPosRest(true) {}
+  explicit FunctionParameterSpec(PosRest) : m_isPosRest(true) {}
 
-    explicit FunctionParameterSpec(KeywordRest) : m_isKeywordRest(true) {}
+  explicit FunctionParameterSpec(KeywordRest) : m_isKeywordRest(true) {}
 
-    mlir::StringAttr getName() const
-    {
-        return m_name;
-    }
+  mlir::StringAttr getName() const {
+    return m_name;
+  }
 
-    mlir::Value getDefaultValue() const
-    {
-        return m_defaultValue;
-    }
+  mlir::Value getDefaultValue() const {
+    return m_defaultValue;
+  }
 
-    bool isPosRest() const
-    {
-        return m_isPosRest;
-    }
+  bool isPosRest() const {
+    return m_isPosRest;
+  }
 
-    bool isKeywordRest() const
-    {
-        return m_isKeywordRest;
-    }
+  bool isKeywordRest() const {
+    return m_isKeywordRest;
+  }
 
-    bool isKeywordOnly() const
-    {
-        return m_isKeywordOnly;
-    }
+  bool isKeywordOnly() const {
+    return m_isKeywordOnly;
+  }
 };
 
 } // namespace pylir::HIR

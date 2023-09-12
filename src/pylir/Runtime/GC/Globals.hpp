@@ -8,8 +8,7 @@
 
 #include <tcb/span.hpp>
 
-namespace pylir::rt
-{
+namespace pylir::rt {
 
 tcb::span<PyObject**> getHandles();
 

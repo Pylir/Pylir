@@ -1,37 +1,12 @@
 ---
-AccessModifierOffset: -4
-AlignAfterOpenBracket: Align
+BasedOnStyle: LLVM
+
 AlignConsecutiveAssignments: None
-AlignConsecutiveDeclarations: None
 AlignEscapedNewlines: Left
-AlignOperands: Align
-AlignTrailingComments: true
-AllowAllParametersOfDeclarationOnNextLine: false
-AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: Never
-AllowShortLoopsOnASingleLine: false
-AlwaysBreakAfterReturnType: None
-AlwaysBreakBeforeMultilineStrings: false
 AlwaysBreakTemplateDeclarations: Yes
-BinPackArguments: true
-BinPackParameters: true
-BreakAfterJavaFieldAnnotations: true
-BreakBeforeBinaryOperators: NonAssignment
-BreakBeforeBraces: Allman
-BreakBeforeInheritanceComma: false
-BreakBeforeTernaryOperators: false
-BreakConstructorInitializers: BeforeColon
-BreakStringLiterals: false
-ColumnLimit: 120
 CompactNamespaces: false
-ConstructorInitializerAllOnOneLineOrOnePerLine: true
-Cpp11BracedListStyle: true
-DerivePointerAlignment: false
-DisableFormat: false
-ExperimentalAutoDetectBinPacking: false
-FixNamespaceComments: true
 IncludeBlocks: Regroup
 IncludeIsMainRegex: ''
 IncludeCategories:
@@ -53,32 +28,10 @@ IncludeCategories:
     Priority: 7
   - Regex: '".*"'
     Priority: 8
-IndentCaseLabels: true
-IndentPPDirectives: BeforeHash
-IndentWidth: 4
-IndentWrappedFunctionNames: true
-# Does not yet work, but hopefully some day
-IndentExternBlock: NoIndent
+InsertNewlineAtEOF: true
 KeepEmptyLinesAtTheStartOfBlocks: false
 Language: Cpp
-MaxEmptyLinesToKeep: 1
-NamespaceIndentation: None
 PointerAlignment: Left
-ReflowComments: true
-SortIncludes: CaseSensitive
-SortUsingDeclarations: true
-SpaceAfterCStyleCast: false
-SpaceAfterTemplateKeyword: true
-SpaceBeforeAssignmentOperators: true
-SpaceBeforeParens: ControlStatements
-SpaceInEmptyParentheses: false
-SpacesInAngles: false
-SpacesInCStyleCastParentheses: false
-SpacesInContainerLiterals: false
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
 Standard: c++17
-TabWidth: 4
-UseTab: Never
 
 ...

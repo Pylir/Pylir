@@ -4,6 +4,13 @@
 
 include(Catch)
 
-add_executable(markAndSweep_tests bestFitTree_tests.cpp)
-target_link_libraries(markAndSweep_tests Catch2::Catch2WithMain PylirTestRuntime PylirMarkAndSweep)
+add_executable(markAndSweep_tests
+  bestFitTree_tests.cpp
+)
+target_link_libraries(markAndSweep_tests
+  Catch2::Catch2WithMain
+  
+  PylirMarkAndSweep
+  PylirTestRuntime
+)
 catch_discover_tests(markAndSweep_tests)

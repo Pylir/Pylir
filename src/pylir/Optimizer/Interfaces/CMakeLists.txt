@@ -8,6 +8,14 @@ add_pylir_interface(OP MemoryFoldInterface LIBRARY LIB_PREFIX Pylir)
 
 add_pylir_interface(OP SROAOpInterfaces FILE SROAInterfaces LIB_PREFIX Pylir)
 add_pylir_interface(ATTR SROAAttrInterfaces FILE SROAInterfaces LIB_PREFIX Pylir)
-add_library(PylirSROAInterfaces SROAInterfaces.cpp)
-add_dependencies(PylirSROAInterfaces PylirSROAAttrInterfacesIncGen PylirSROAOpInterfacesIncGen)
-target_link_libraries(PylirSROAInterfaces PUBLIC MLIRIR)
+add_library(PylirSROAInterfaces
+  SROAInterfaces.cpp
+)
+add_dependencies(PylirSROAInterfaces
+  PylirSROAAttrInterfacesIncGen
+  PylirSROAOpInterfacesIncGen
+)
+target_link_libraries(PylirSROAInterfaces
+  PUBLIC
+  MLIRIR
+)

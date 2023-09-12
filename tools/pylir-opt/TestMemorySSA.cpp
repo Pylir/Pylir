@@ -14,29 +14,25 @@
 
 #include "Passes.hpp"
 
-namespace pylir::test
-{
+namespace pylir::test {
 #define GEN_PASS_DEF_TESTMEMORYSSAPASS
 #include "Passes.h.inc"
 } // namespace pylir::test
 
-namespace
-{
+namespace {
 
-class TestMemorySSA : public pylir::test::impl::TestMemorySSAPassBase<TestMemorySSA>
-{
+class TestMemorySSA
+    : public pylir::test::impl::TestMemorySSAPassBase<TestMemorySSA> {
 protected:
-    void runOnOperation() override;
+  void runOnOperation() override;
 
 public:
-    using Base::Base;
+  using Base::Base;
 };
 
-void TestMemorySSA::runOnOperation()
-{
-    for (auto func : getOperation().getOps<mlir::FunctionOpInterface>())
-    {
-        llvm::outs() << getChildAnalysis<pylir::MemorySSA>(func);
-    }
+void TestMemorySSA::runOnOperation() {
+  for (auto func : getOperation().getOps<mlir::FunctionOpInterface>()) {
+    llvm::outs() << getChildAnalysis<pylir::MemorySSA>(func);
+  }
 }
 } // namespace

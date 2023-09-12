@@ -13,17 +13,16 @@
 #include <pylir/Optimizer/PylirPy/Transforms/Passes.hpp>
 #include <pylir/Optimizer/Transforms/Passes.hpp>
 
-int main(int argc, char** argv)
-{
-    mlir::registerAllPasses();
-    pylir::registerConversionPasses();
-    pylir::registerTransformPasses();
-    pylir::Py::registerTransformPasses();
+int main(int argc, char** argv) {
+  mlir::registerAllPasses();
+  pylir::registerConversionPasses();
+  pylir::registerTransformPasses();
+  pylir::Py::registerTransformPasses();
 
-    mlir::DialectRegistry registry;
-    registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect>();
-    mlir::registerAllDialects(registry);
-    mlir::MLIRContext context(registry);
+  mlir::DialectRegistry registry;
+  registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect>();
+  mlir::registerAllDialects(registry);
+  mlir::MLIRContext context(registry);
 
-    return mlir::failed(mlir::mlirReduceMain(argc, argv, context));
+  return mlir::failed(mlir::mlirReduceMain(argc, argv, context));
 }

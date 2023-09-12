@@ -3,11 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_library(Parser
-  ParserExpressions.cpp
   Dumper.cpp
-  ParserStatements.cpp
-  Syntax.cpp
+  Parser.cpp
   ParserCompounds.cpp
+  ParserExpressions.cpp
+  ParserStatements.cpp
+  SemanticAnalysis.cpp
+  Syntax.cpp
   Visitor.cpp
-  Parser.cpp SemanticAnalysis.cpp)
-target_link_libraries(Parser PUBLIC Lexer)
+)
+target_link_libraries(Parser
+  PUBLIC
+  Lexer
+)

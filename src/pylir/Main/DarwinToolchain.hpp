@@ -9,25 +9,24 @@
 
 #include "Toolchain.hpp"
 
-namespace pylir
-{
-class DarwinToolchain : public Toolchain
-{
-    std::string m_sdkRoot;
-    std::optional<llvm::VersionTuple> m_sdkVersion;
-    ClangInstallation m_clangInstallation;
+namespace pylir {
+class DarwinToolchain : public Toolchain {
+  std::string m_sdkRoot;
+  std::optional<llvm::VersionTuple> m_sdkVersion;
+  ClangInstallation m_clangInstallation;
 
-    void deduceSDKRoot(const cli::CommandLine& commandLine);
+  void deduceSDKRoot(const cli::CommandLine& commandLine);
 
-    void searchForClangInstallation();
+  void searchForClangInstallation();
 
-    bool readSDKSettings(llvm::MemoryBuffer& buffer);
+  bool readSDKSettings(llvm::MemoryBuffer& buffer);
 
 public:
-    [[nodiscard]] bool defaultsToPIC() const override;
+  [[nodiscard]] bool defaultsToPIC() const override;
 
-    DarwinToolchain(llvm::Triple triple, cli::CommandLine& commandLine);
+  DarwinToolchain(llvm::Triple triple, cli::CommandLine& commandLine);
 
-    bool link(cli::CommandLine& commandLine, llvm::StringRef objectFile) const override;
+  bool link(cli::CommandLine& commandLine,
+            llvm::StringRef objectFile) const override;
 };
 } // namespace pylir

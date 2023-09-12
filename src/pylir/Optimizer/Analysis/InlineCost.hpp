@@ -12,38 +12,39 @@
 
 #include <cstddef>
 
-namespace pylir
-{
+namespace pylir {
 
-/// Class for fetching the inline cost of an operation. This is a class and not just a function as it has state, namely
-/// dialect interface implementations of 'pylir::DialectInlineCostInterface', which would otherwise have to be
+/// Class for fetching the inline cost of an operation. This is a class and not
+/// just a function as it has state, namely dialect interface implementations of
+/// 'pylir::DialectInlineCostInterface', which would otherwise have to be
 /// recomputed each time. See that interface to adjust cost of an operation.
-class InlineCost
-{
-    mlir::DialectInterfaceCollection<pylir::DialectInlineCostInterface> m_collection;
+class InlineCost {
+  mlir::DialectInterfaceCollection<pylir::DialectInlineCostInterface>
+      m_collection;
 
 public:
-    /// Constructs a 'InlineCost' instance and fetches all dialect interface implementations.
-    explicit InlineCost(mlir::MLIRContext* context);
+  /// Constructs a 'InlineCost' instance and fetches all dialect interface
+  /// implementations.
+  explicit InlineCost(mlir::MLIRContext* context);
 
-    /// Returns the inline cost of an operation in abstract units. If 'recurse' is true, recurses into any regions of
-    /// the operation and adds up their cost in the result as well.
-    std::size_t getCostOf(mlir::Operation* operation, bool recurse = false);
+  /// Returns the inline cost of an operation in abstract units. If 'recurse' is
+  /// true, recurses into any regions of the operation and adds up their cost in
+  /// the result as well.
+  std::size_t getCostOf(mlir::Operation* operation, bool recurse = false);
 };
 
-/// Convenience class for use by MLIRs AnalysisManager to cache inline cost calculations of an schedulable op.
-class InlineCostAnalysis
-{
-    std::size_t m_cost{0};
+/// Convenience class for use by MLIRs AnalysisManager to cache inline cost
+/// calculations of an schedulable op.
+class InlineCostAnalysis {
+  std::size_t m_cost{0};
 
 public:
-    /// Constructor with the operation whose size should be calculated.
-    explicit InlineCostAnalysis(mlir::Operation* operation);
+  /// Constructor with the operation whose size should be calculated.
+  explicit InlineCostAnalysis(mlir::Operation* operation);
 
-    /// Size of the operation that was used to construct this analysis.
-    [[nodiscard]] std::size_t getCost() const
-    {
-        return m_cost;
-    }
+  /// Size of the operation that was used to construct this analysis.
+  [[nodiscard]] std::size_t getCost() const {
+    return m_cost;
+  }
 };
 } // namespace pylir

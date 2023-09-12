@@ -10,48 +10,55 @@ include "pylir/Optimizer/Util/TablegenUtil.td"
 include "mlir/IR/AttrTypeBase.td"
 
 class PylirPyOpTrait<string name> : NativeOpTrait<name> {
-    let cppNamespace = "pylir::Py";
+  let cppNamespace = "pylir::Py";
 }
 
 class PylirPyAttrTrait<string name> : NativeAttrTrait<name> {
-    let cppNamespace = "pylir::Py";
+  let cppNamespace = "pylir::Py";
 }
 
-class PylirPyParamOpTrait<string name, string param> : ParamNativeOpTrait<name, param> {
-    let cppNamespace = "pylir::Py";
+class PylirPyParamOpTrait<string name, string param>
+  : ParamNativeOpTrait<name, param> {
+  let cppNamespace = "pylir::Py";
 }
 
-/// Signifies that the results of the operation it is bound to are always bound. If such an operation returns an unbound
-/// result, it is undefined behaviour.
+/// Signifies that the results of the operation it is bound to are always bound.
+/// If such an operation returns an unbound result, it is undefined behaviour.
 def AlwaysBound : PylirPyOpTrait<"AlwaysBound">;
 
-/// Signifies that the results of the operation returns a new immutable object. It therefore has distinct object
-/// identity from every other object marked 'ReturnsImmutable' or a 'MemAlloc' result.
+/// Signifies that the results of the operation returns a new immutable object.
+/// It therefore has distinct object identity from every other object marked
+/// 'ReturnsImmutable' or a 'MemAlloc' result.
 def ReturnsImmutable : PylirPyOpTrait<"ReturnsImmutable">;
 
-/// Automatically implements 'KnownTypeObjectInterface' for an operation, making it always return the builtin type
-/// 'type'.
-class KnownType<string type> : OpInterfaceImplementation<KnownTypeObjectInterface, [{
-    ::mlir::OpFoldResult getKnownTypeObject();
+/// Automatically implements 'KnownTypeObjectInterface' for an operation, making
+/// it always return the builtin type 'type'.
+class KnownType<string type>
+  : OpInterfaceImplementation<KnownTypeObjectInterface, [{
+  ::mlir::OpFoldResult getKnownTypeObject();
 }], [{
-    ::mlir::OpFoldResult $cppClass::getKnownTypeObject()
-    {
-        return pylir::Py::RefAttr::get(getContext(), pylir::Builtins::}] # type # [{.name);
-    }
+  ::mlir::OpFoldResult $cppClass::getKnownTypeObject() {
+    return pylir::Py::RefAttr::get(getContext(), pylir::Builtins::}]
+      # type # [{.name);
+  }
 }]>;
 
-/// Indicates that an attribute is of an immutable python object. This is mainly useful for the initializer of
-/// 'py.globalValue'.
+/// Indicates that an attribute is of an immutable python object. This is mainly
+/// useful for the initializer of 'py.globalValue'.
 def ImmutableAttr : PylirPyAttrTrait<"ImmutableAttr">;
 
-/// Op trait used to indicate that an exception handling variant of the op exists.
-/// Adding this trait makes the operation automatically implement 'AddableExceptionHandlingInterface'.
-/// The trait has to know for each operand whether it is a singular operand or variadic.
-/// By default it tries to deduce this information from traits, but if it is incapable of doing so, one has to supply an
-/// array of strings, containing the strings "Single" or "Variadic" for every ith operand of the op.
-class AddableExceptionHandling<string clazz, list<string> shape = []> : ParamNativeOpTrait<"AddableExceptionHandling",
-	"::pylir::Py::" # clazz # !foldl("", shape, acc, var, !strconcat(acc, ", ::pylir::Py::OperandShape::" # var))> {
-    let cppNamespace = "pylir::Py";
+/// Op trait used to indicate that an exception handling variant of the op
+/// exists. Adding this trait makes the operation automatically implement
+/// 'AddableExceptionHandlingInterface'. The trait has to know for each operand
+/// whether it is a singular operand or variadic. By default it tries to deduce
+/// this information from traits, but if it is incapable of doing so, one has to
+/// supply an array of strings, containing the strings "Single" or "Variadic"
+/// for every ith operand of the op.
+class AddableExceptionHandling<string clazz, list<string> shape = []>
+  : ParamNativeOpTrait<"AddableExceptionHandling",
+	"::pylir::Py::" # clazz # !foldl("", shape, acc, var,
+	    !strconcat(acc, ", ::pylir::Py::OperandShape::" # var))> {
+  let cppNamespace = "pylir::Py";
 }
 
 #endif

@@ -4,6 +4,5 @@
 
 __slots__: tuple[str]
 
-
 def call(self, *args):
     pass

@@ -8,23 +8,28 @@
 include "mlir/Pass/PassBase.td"
 
 def ConvertPylirToLLVMPass : Pass<"convert-pylir-to-llvm", "::mlir::ModuleOp"> {
-    let summary = "Convert Pylir dialects to LLVM dialect";
+  let summary = "Convert Pylir dialects to LLVM dialect";
 
-    let dependentDialects = ["::mlir::LLVM::LLVMDialect",
-                             "::pylir::Mem::PylirMemDialect",
-                             "::pylir::Py::PylirPyDialect"];
+  let dependentDialects = ["::mlir::LLVM::LLVMDialect",
+               "::pylir::Mem::PylirMemDialect",
+               "::pylir::Py::PylirPyDialect"];
 
-    let options = [
-        Option<"m_targetTripleCLI", "target-triple", "std::string",
-                    /*default=*/"LLVM_DEFAULT_TARGET_TRIPLE", "LLVM target triple">,
-        Option<"m_dataLayoutCLI", "data-layout", "std::string", /*default=*/"\"\"", "LLVM data layout">
-    ];
+  let options = [
+    Option<"m_targetTripleCLI", "target-triple", "std::string",
+          /*default=*/"LLVM_DEFAULT_TARGET_TRIPLE", "LLVM target triple">,
+    Option<"m_dataLayoutCLI", "data-layout", "std::string", /*default=*/"\"\"",
+      "LLVM data layout">
+  ];
 }
 
-def ConvertPylirPyToPylirMemPass : Pass<"convert-pylirPy-to-pylirMem", "::mlir::ModuleOp"> {
-    let summary = "Convert Pylir Py dialect to Pylir Mem dialect";
+def ConvertPylirPyToPylirMemPass : Pass<"convert-pylirPy-to-pylirMem",
+  "::mlir::ModuleOp"> {
+  let summary = "Convert Pylir Py dialect to Pylir Mem dialect";
 
-    let dependentDialects = ["::pylir::Mem::PylirMemDialect", "::mlir::arith::ArithDialect"];
+  let dependentDialects = [
+    "::pylir::Mem::PylirMemDialect",
+    "::mlir::arith::ArithDialect"
+  ];
 }
 
 #endif

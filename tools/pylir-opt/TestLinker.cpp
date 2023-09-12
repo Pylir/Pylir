@@ -6,32 +6,27 @@
 
 #include "Passes.hpp"
 
-namespace pylir::test
-{
+namespace pylir::test {
 #define GEN_PASS_DEF_TESTLINKERPASS
 #include "Passes.h.inc"
 } // namespace pylir::test
 
-namespace
-{
-class TestLinker : public pylir::test::impl::TestLinkerPassBase<TestLinker>
-{
+namespace {
+class TestLinker : public pylir::test::impl::TestLinkerPassBase<TestLinker> {
 protected:
-    void runOnOperation() override
-    {
-        llvm::SmallVector<mlir::OwningOpRef<mlir::ModuleOp>> modules;
-        llvm::transform(llvm::make_early_inc_range(getOperation().getOps<mlir::ModuleOp>()),
-                        std::back_inserter(modules),
-                        [](mlir::ModuleOp moduleOp)
-                        {
-                            moduleOp->remove();
-                            return moduleOp;
-                        });
-        auto linked = pylir::linkModules(modules);
-        getOperation().push_back(linked.release());
-    }
+  void runOnOperation() override {
+    llvm::SmallVector<mlir::OwningOpRef<mlir::ModuleOp>> modules;
+    llvm::transform(
+        llvm::make_early_inc_range(getOperation().getOps<mlir::ModuleOp>()),
+        std::back_inserter(modules), [](mlir::ModuleOp moduleOp) {
+          moduleOp->remove();
+          return moduleOp;
+        });
+    auto linked = pylir::linkModules(modules);
+    getOperation().push_back(linked.release());
+  }
 
 public:
-    using Base::Base;
+  using Base::Base;
 };
 } // namespace

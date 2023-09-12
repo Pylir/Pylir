@@ -14,13 +14,13 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/pylir/${TARGET_TRIPL
 function(collect_libs target listvar)
   set(worklist ${${listvar}})
   list(APPEND worklist ${target})
-
+  
   get_target_property(subDeps ${target} LINK_LIBRARIES)
   foreach (dep IN LISTS subDeps)
     if (NOT TARGET ${dep})
       continue()
     endif ()
-
+    
     get_target_property(depImported ${dep} IMPORTED)
     if (NOT dep IN_LIST worklist AND NOT ${depImported})
       collect_libs(${dep} worklist)
@@ -39,16 +39,25 @@ add_library(PylirRuntime STATIC
   Objects/Support.cpp
   Util/Pages.cpp
 )
-target_link_libraries(PylirRuntime PUBLIC PylirSupport)
+target_link_libraries(PylirRuntime
+  PUBLIC
+  PylirSupport
+)
 
 if (MSVC)
-  target_link_libraries(PylirRuntime PUBLIC unwind_static)
+  target_link_libraries(PylirRuntime
+    PUBLIC
+    unwind_static
+  )
 endif ()
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   find_path(LIBUNWIND_INCLUDE_DIR libunwind.h REQUIRED)
   find_library(LIBUNWIND_LIB unwind REQUIRED)
-  target_link_libraries(PylirRuntime PRIVATE ${LIBUNWIND_LIB})
+  target_link_libraries(PylirRuntime
+    PRIVATE
+    ${LIBUNWIND_LIB}
+  )
   target_include_directories(PylirRuntime PRIVATE ${LIBUNWIND_INCLUDE_DIR})
 endif ()
 
@@ -59,7 +68,6 @@ list(TRANSFORM LIBS REPLACE "(.+)" "$<TARGET_OBJECTS:\\1>")
 target_sources(PylirRuntime PRIVATE ${LIBS})
 
 add_subdirectory(MarkAndSweep)
-
 
 add_library(PylirRuntimeMain STATIC PylirRuntimeMain.cpp)
 

@@ -9,30 +9,25 @@
 
 #include "SSABuilder.hpp"
 
-namespace pylir
-{
+namespace pylir {
 template <class F>
-void updateSSAinRegion(pylir::SSABuilder& ssaBuilder, mlir::Region& region, F f)
-{
-    llvm::DenseSet<mlir::Block*> seen;
-    auto allPredSeen = [&](mlir::Block* block)
-    { return llvm::all_of(block->getPredecessors(), [&](mlir::Block* pred) { return seen.contains(pred); }); };
+void updateSSAinRegion(pylir::SSABuilder& ssaBuilder, mlir::Region& region,
+                       F f) {
+  llvm::DenseSet<mlir::Block*> seen;
+  auto allPredSeen = [&](mlir::Block* block) {
+    return llvm::all_of(block->getPredecessors(),
+                        [&](mlir::Block* pred) { return seen.contains(pred); });
+  };
 
-    for (auto& block : region)
-    {
-        if (!allPredSeen(&block))
-        {
-            ssaBuilder.markOpenBlock(&block);
-        }
-        f(&block);
-        seen.insert(&block);
-        for (auto* succ : block.getSuccessors())
-        {
-            if (ssaBuilder.isOpenBlock(succ) && allPredSeen(succ))
-            {
-                ssaBuilder.sealBlock(succ);
-            }
-        }
-    }
+  for (auto& block : region) {
+    if (!allPredSeen(&block))
+      ssaBuilder.markOpenBlock(&block);
+
+    f(&block);
+    seen.insert(&block);
+    for (auto* succ : block.getSuccessors())
+      if (ssaBuilder.isOpenBlock(succ) && allPredSeen(succ))
+        ssaBuilder.sealBlock(succ);
+  }
 }
 } // namespace pylir

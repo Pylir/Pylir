@@ -4,12 +4,18 @@
 
 add_pylir_passes(Passes Transforms PREFIX PylirMem)
 
-add_library(PylirMemTransforms HeapToStack.cpp)
-add_dependencies(PylirMemTransforms PylirMemTransformsPassIncGen)
+add_library(PylirMemTransforms
+  HeapToStack.cpp
+)
+add_dependencies(PylirMemTransforms
+  PylirMemTransformsPassIncGen
+)
 target_link_libraries(PylirMemTransforms
-        PUBLIC
-        MLIRPass
-        PRIVATE
-        PylirMemDialect PylirAnalysis
-        )
+  PUBLIC
+  MLIRPass
+  
+  PRIVATE
+  PylirAnalysis
+  PylirMemDialect
+)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirMemTransforms)

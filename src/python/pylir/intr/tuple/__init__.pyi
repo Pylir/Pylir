@@ -5,14 +5,11 @@
 def len(tuple):
     pass
 
-
 def getItem(tuple, index):
     pass
 
-
 def contains(tuple, element):
     pass
-
 
 def prepend(element, tuple):
     pass

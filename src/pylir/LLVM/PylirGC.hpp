@@ -6,7 +6,6 @@
 
 #include <llvm/IR/GCStrategy.h>
 
-namespace pylir
-{
+namespace pylir {
 void linkInGCStrategy();
 } // namespace pylir

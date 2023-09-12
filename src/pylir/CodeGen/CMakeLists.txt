@@ -8,6 +8,19 @@ set(LLVM_TARGET_DEFINITIONS CodeGenIntr.td)
 pylir_tablegen(CodeGenIntr.cpp.inc -gen-intrinsics)
 add_public_tablegen_target(CodeGenIntrIncGen)
 
-add_library(CodeGen CodeGen.cpp CompilerBuiltins.cpp)
-target_link_libraries(CodeGen PUBLIC PylirPyDialect Parser PRIVATE PylirTransformsUtils MLIRArithDialect MLIRControlFlowDialect)
+add_library(CodeGen
+  CodeGen.cpp
+  CompilerBuiltins.cpp
+)
+target_link_libraries(CodeGen
+  PUBLIC
+  Parser
+  PylirPyDialect
+  
+  PRIVATE
+  PylirTransformsUtils
+  
+  MLIRArithDialect
+  MLIRControlFlowDialect
+)
 add_dependencies(CodeGen CodeGenIntrIncGen)

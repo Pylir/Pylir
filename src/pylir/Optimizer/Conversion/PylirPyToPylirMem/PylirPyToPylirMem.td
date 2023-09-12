@@ -14,100 +14,106 @@ defvar TupleRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.tuple">;
 defvar TypeRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.type">;
 
 def : Pattern<(PylirPy_MakeTupleOp $args, $_), [
-    (PylirPy_ConstantOp:$tupleType TupleRef),
-    (Arith_ConstantOp:$size (NativeCodeCall<"$_builder.getIndexAttr($0.size())"> $args)),
-    (PylirMem_GCAllocObjectOp:$memory $tupleType, $size),
-    (PylirMem_InitTupleOp $memory, $args)
+  (PylirPy_ConstantOp:$tupleType TupleRef),
+  (Arith_ConstantOp:$size (NativeCodeCall<"$_builder.getIndexAttr($0.size())">
+    $args)),
+  (PylirMem_GCAllocObjectOp:$memory $tupleType, $size),
+  (PylirMem_InitTupleOp $memory, $args)
 ]>;
 
 def : Pattern<(PylirPy_TuplePrependOp $input, $tuple), [
-    (PylirPy_ConstantOp:$tupleType TupleRef),
-    (PylirPy_TupleLenOp:$prevSize $tuple),
-    (Arith_AddIOp:$newSize $prevSize, (Arith_ConstantOp ConstantAttr<IndexAttr, "1">)),
-    (PylirMem_GCAllocObjectOp:$memory $tupleType, $newSize),
-    (PylirMem_InitTuplePrependOp $memory, $input, $tuple)
+  (PylirPy_ConstantOp:$tupleType TupleRef),
+  (PylirPy_TupleLenOp:$prevSize $tuple),
+  (Arith_AddIOp:$newSize $prevSize, (Arith_ConstantOp ConstantAttr<IndexAttr,
+    "1">)),
+  (PylirMem_GCAllocObjectOp:$memory $tupleType, $newSize),
+  (PylirMem_InitTuplePrependOp $memory, $input, $tuple)
 ]>;
 
 def : Pattern<(PylirPy_TupleDropFrontOp $count, $tuple), [
-    (PylirPy_ConstantOp:$tupleType TupleRef),
-    (PylirPy_TupleLenOp:$prevSize $tuple),
-    (Arith_SubIOp:$newSize $prevSize, $count),
-    (PylirMem_GCAllocObjectOp:$memory $tupleType, $newSize),
-    (PylirMem_InitTupleDropFrontOp $memory, $count, $tuple)
+  (PylirPy_ConstantOp:$tupleType TupleRef),
+  (PylirPy_TupleLenOp:$prevSize $tuple),
+  (Arith_SubIOp:$newSize $prevSize, $count),
+  (PylirMem_GCAllocObjectOp:$memory $tupleType, $newSize),
+  (PylirMem_InitTupleDropFrontOp $memory, $count, $tuple)
 ]>;
 
 def : Pattern<(PylirPy_TupleCopyOp $tuple, $typeObj), [
-    (PylirPy_TupleLenOp:$size $tuple),
-    (PylirMem_GCAllocObjectOp:$memory $typeObj, $size),
-    (PylirMem_InitTupleCopyOp $memory, $tuple)
+  (PylirPy_TupleLenOp:$size $tuple),
+  (PylirMem_GCAllocObjectOp:$memory $typeObj, $size),
+  (PylirMem_InitTupleCopyOp $memory, $tuple)
 ]>;
 
 def : Pat<(PylirPy_ListToTupleOp $list), (PylirMem_InitTupleFromListOp
-    (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp TupleRef), (PylirPy_ListLenOp $list)), $list)>;
+  (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp TupleRef),
+    (PylirPy_ListLenOp $list)), $list)>;
 
-class GCWithSlots<ConstantAttr type_object>
-{
-    dag result = (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp:$c type_object),
-                                           (PylirPy_TupleLenOp (PylirPy_TypeSlotsOp $c)));
+class GCWithSlots<ConstantAttr type_object> {
+  dag result = (PylirMem_GCAllocObjectOp (PylirPy_ConstantOp:$c type_object),
+                       (PylirPy_TupleLenOp (PylirPy_TypeSlotsOp $c)));
 }
 
 defvar ListRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.list">;
 
 def : Pat<(PylirPy_MakeListOp $args, $_),
-    (PylirMem_InitListOp GCWithSlots<ListRef>.result, $args)>;
+  (PylirMem_InitListOp GCWithSlots<ListRef>.result, $args)>;
 
 defvar SetRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.set">;
 
 def : Pat<(PylirPy_MakeSetOp $args, $_),
-    (PylirMem_InitSetOp GCWithSlots<SetRef>.result, $args)>;
+  (PylirMem_InitSetOp GCWithSlots<SetRef>.result, $args)>;
 
 defvar StrRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.str">;
 
 def : Pat<(PylirPy_StrConcatOp $args),
-    (PylirMem_InitStrOp GCWithSlots<StrRef>.result, $args)>;
+  (PylirMem_InitStrOp GCWithSlots<StrRef>.result, $args)>;
 
 def : Pat<(PylirPy_StrCopyOp $arg, $typeObj),
-    (PylirMem_InitStrOp (PylirMem_GCAllocObjectOp $typeObj, (PylirPy_TupleLenOp (PylirPy_TypeSlotsOp $typeObj))),
-        (NativeCodeCall<"::llvm::SmallVector<::mlir::Value>{$0}"> $arg))>;
+  (PylirMem_InitStrOp (PylirMem_GCAllocObjectOp $typeObj, (PylirPy_TupleLenOp
+    (PylirPy_TypeSlotsOp $typeObj))),
+    (NativeCodeCall<"::llvm::SmallVector<::mlir::Value>{$0}"> $arg))>;
 
 def : Pat<(PylirPy_IntToStrOp $integer),
-    (PylirMem_InitStrFromIntOp GCWithSlots<StrRef>.result, $integer)>;
+  (PylirMem_InitStrFromIntOp GCWithSlots<StrRef>.result, $integer)>;
 
 defvar FunctionRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.function">;
 
 def : Pat<(PylirPy_MakeFuncOp $symbol),
-    (PylirMem_InitFuncOp GCWithSlots<FunctionRef>.result, $symbol)>;
+  (PylirMem_InitFuncOp GCWithSlots<FunctionRef>.result, $symbol)>;
 
 defvar BoolRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.bool">;
 
 defvar IndexSizedInteger = NativeCodeCall<[{
-    $_builder.getIntegerType(mlir::DataLayout::closest($0.getOwner()).getTypeSizeInBits($_builder.getIndexType()))
+  $_builder.getIntegerType(mlir::DataLayout::closest($0.getOwner())
+    .getTypeSizeInBits($_builder.getIndexType()))
 }]>;
 
 def : Pattern<(PylirPy_BoolFromI1Op:$op $input), [
-    (Arith_ExtUIOp:$boolToInt $input, (returnType (IndexSizedInteger $op))),
-    (Arith_IndexCastOp:$intToIndex $boolToInt, (returnType "$_builder.getIndexType()")),
-    (PylirMem_InitIntUnsignedOp GCWithSlots<BoolRef>.result, $intToIndex)
+  (Arith_ExtUIOp:$boolToInt $input, (returnType (IndexSizedInteger $op))),
+  (Arith_IndexCastOp:$intToIndex $boolToInt,
+    (returnType "$_builder.getIndexType()")),
+  (PylirMem_InitIntUnsignedOp GCWithSlots<BoolRef>.result, $intToIndex)
 ]>;
 
 defvar IntRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.int">;
 
 def : Pat<(PylirPy_IntFromSignedOp $input), (PylirMem_InitIntSignedOp
-    GCWithSlots<IntRef>.result, $input)>;
+  GCWithSlots<IntRef>.result, $input)>;
 
 def : Pat<(PylirPy_IntFromUnsignedOp $input), (PylirMem_InitIntUnsignedOp
-    GCWithSlots<IntRef>.result, $input)>;
+  GCWithSlots<IntRef>.result, $input)>;
 
 def : Pat<(PylirPy_IntAddOp $lhs, $rhs), (PylirMem_InitIntAddOp
-    GCWithSlots<IntRef>.result, $lhs, $rhs)>;
+  GCWithSlots<IntRef>.result, $lhs, $rhs)>;
 
 defvar FloatRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.float">;
 
 def : Pat<(PylirPy_FloatFromF64 $input),
-    (PylirMem_InitFloatOp GCWithSlots<FloatRef>.result, $input)>;
+  (PylirMem_InitFloatOp GCWithSlots<FloatRef>.result, $input)>;
 
 
 def : Pat<(PylirPy_MakeObjectOp $typeObj),
-    (PylirMem_InitObjectOp (PylirMem_GCAllocObjectOp $typeObj, (PylirPy_TupleLenOp (PylirPy_TypeSlotsOp $typeObj))))>;
+  (PylirMem_InitObjectOp (PylirMem_GCAllocObjectOp $typeObj,
+    (PylirPy_TupleLenOp (PylirPy_TypeSlotsOp $typeObj))))>;
 
 #endif

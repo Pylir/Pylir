@@ -15,44 +15,40 @@
 
 #include "Passes.hpp"
 
-namespace pylir::test
-{
+namespace pylir::test {
 #define GEN_PASS_DEF_TESTINLINERINTERFACEPASS
 #include "Passes.h.inc"
 } // namespace pylir::test
 
-namespace
-{
+namespace {
 
-class TestInlinerInterface : public pylir::test::impl::TestInlinerInterfacePassBase<TestInlinerInterface>
-{
+class TestInlinerInterface
+    : public pylir::test::impl::TestInlinerInterfacePassBase<
+          TestInlinerInterface> {
 protected:
-    void runOnOperation() override
-    {
-        llvm::SmallVector<mlir::CallOpInterface> calls;
-        getOperation()->walk([&](mlir::CallOpInterface call) { calls.push_back(call); });
-        mlir::SymbolTableCollection collection;
-        for (auto iter : calls)
-        {
-            auto ref =
-                iter.getCallableForCallee().dyn_cast<mlir::SymbolRefAttr>().dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-            if (!ref || !ref.getValue().startswith("inline"))
-            {
-                continue;
-            }
-            auto func = mlir::dyn_cast_or_null<mlir::CallableOpInterface>(iter.resolveCallable(&collection));
-            if (!func)
-            {
-                iter->emitError("Could not resolve function") << ref;
-                signalPassFailure();
-                return;
-            }
-            pylir::Py::inlineCall(iter, func);
-        }
+  void runOnOperation() override {
+    llvm::SmallVector<mlir::CallOpInterface> calls;
+    getOperation()->walk(
+        [&](mlir::CallOpInterface call) { calls.push_back(call); });
+    mlir::SymbolTableCollection collection;
+    for (auto iter : calls) {
+      auto ref = iter.getCallableForCallee()
+                     .dyn_cast<mlir::SymbolRefAttr>()
+                     .dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
+      if (!ref || !ref.getValue().startswith("inline")) continue;
+      auto func = mlir::dyn_cast_or_null<mlir::CallableOpInterface>(
+          iter.resolveCallable(&collection));
+      if (!func) {
+        iter->emitError("Could not resolve function") << ref;
+        signalPassFailure();
+        return;
+      }
+      pylir::Py::inlineCall(iter, func);
     }
+  }
 
 public:
-    using Base::Base;
+  using Base::Base;
 };
 
 } // namespace

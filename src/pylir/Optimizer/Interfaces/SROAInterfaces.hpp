@@ -12,7 +12,7 @@
 #include "pylir/Optimizer/Interfaces/SROAAttrInterfaces.h.inc"
 #include "pylir/Optimizer/Interfaces/SROAOpInterfaces.h.inc"
 
-namespace pylir
-{
-mlir::LogicalResult aggregateUseCanParticipateInSROA(const mlir::OpOperand& aggregateUse);
+namespace pylir {
+mlir::LogicalResult
+aggregateUseCanParticipateInSROA(const mlir::OpOperand& aggregateUse);
 } // namespace pylir

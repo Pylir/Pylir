@@ -4,6 +4,11 @@
 
 include(Catch)
 
-add_executable(lexer_tests lexer_tests.cpp)
-target_link_libraries(lexer_tests Catch2::Catch2WithMain Lexer)
+add_executable(lexer_tests
+  lexer_tests.cpp
+)
+target_link_libraries(lexer_tests
+  Catch2::Catch2WithMain
+  Lexer
+)
 catch_discover_tests(lexer_tests)

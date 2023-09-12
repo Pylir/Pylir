@@ -8,101 +8,82 @@
 
 #include "Passes.hpp"
 
-namespace pylir
-{
+namespace pylir {
 #define GEN_PASS_DEF_FIXPOINTPASS
 #include "pylir/Optimizer/Transforms/Passes.h.inc"
 } // namespace pylir
 
-namespace
-{
-class FixpointPass : public pylir::impl::FixpointPassBase<FixpointPass>
-{
-    mlir::OpPassManager m_passManager;
+namespace {
+class FixpointPass : public pylir::impl::FixpointPassBase<FixpointPass> {
+  mlir::OpPassManager m_passManager;
 
-    void runOnOperation() override;
+  void runOnOperation() override;
 
-    mlir::LogicalResult initialize(mlir::MLIRContext*) override
-    {
-        return mlir::parsePassPipeline(m_optimizationPipeline, m_passManager);
-    }
+  mlir::LogicalResult initialize(mlir::MLIRContext*) override {
+    return mlir::parsePassPipeline(m_optimizationPipeline, m_passManager);
+  }
 
-    void getDependentDialects(mlir::DialectRegistry& registry) const override
-    {
-        Base::getDependentDialects(registry);
-        // Above initialize will signal the error properly. This also gets called before `initialize`, hence we can't
-        // use m_passManager here.
-        mlir::OpPassManager temp;
-        if (mlir::failed(mlir::parsePassPipeline(m_optimizationPipeline, temp, llvm::nulls())))
-        {
-            return;
+  void getDependentDialects(mlir::DialectRegistry& registry) const override {
+    Base::getDependentDialects(registry);
+    // Above initialize will signal the error properly. This also gets called
+    // before `initialize`, hence we can't use m_passManager here.
+    mlir::OpPassManager temp;
+    if (mlir::failed(mlir::parsePassPipeline(m_optimizationPipeline, temp,
+                                             llvm::nulls())))
+      return;
+
+    temp.getDependentDialects(registry);
+  }
+
+  llvm::BLAKE3Result<> getFingerprint() {
+    llvm::BLAKE3 hasher;
+
+    auto addToHash = [&](const auto& data) {
+      hasher.update(llvm::ArrayRef<std::uint8_t>(
+          reinterpret_cast<const std::uint8_t*>(&data),
+          sizeof(std::remove_reference_t<
+                 decltype(data)>))); // NOLINT(bugprone-sizeof-expression)
+    };
+
+    getOperation()->walk([&](mlir::Operation* op) {
+      addToHash(op);
+      addToHash(op->hashProperties());
+      addToHash(op->getDiscardableAttrDictionary());
+      for (mlir::Region& region : op->getRegions()) {
+        for (mlir::Block& block : region) {
+          addToHash(&block);
+          for (mlir::BlockArgument& arg : block.getArguments())
+            addToHash(arg.getAsOpaquePointer());
         }
-        temp.getDependentDialects(registry);
-    }
+      }
+      addToHash(op->getLoc().getAsOpaquePointer());
+      for (mlir::Value operand : op->getOperands())
+        addToHash(operand.getAsOpaquePointer());
 
-    llvm::BLAKE3Result<> getFingerprint()
-    {
-        llvm::BLAKE3 hasher;
-
-        auto addToHash = [&](const auto& data)
-        {
-            hasher.update(llvm::ArrayRef<std::uint8_t>(
-                reinterpret_cast<const std::uint8_t*>(&data),
-                sizeof(std::remove_reference_t<decltype(data)>))); // NOLINT(bugprone-sizeof-expression)
-        };
-
-        getOperation()->walk(
-            [&](mlir::Operation* op)
-            {
-                addToHash(op);
-                addToHash(op->hashProperties());
-                addToHash(op->getDiscardableAttrDictionary());
-                for (mlir::Region& region : op->getRegions())
-                {
-                    for (mlir::Block& block : region)
-                    {
-                        addToHash(&block);
-                        for (mlir::BlockArgument& arg : block.getArguments())
-                        {
-                            addToHash(arg.getAsOpaquePointer());
-                        }
-                    }
-                }
-                addToHash(op->getLoc().getAsOpaquePointer());
-                for (mlir::Value operand : op->getOperands())
-                {
-                    addToHash(operand.getAsOpaquePointer());
-                }
-                for (mlir::Block* block : op->getSuccessors())
-                {
-                    addToHash(block);
-                }
-            });
-        return hasher.result();
-    }
+      for (mlir::Block* block : op->getSuccessors())
+        addToHash(block);
+    });
+    return hasher.result();
+  }
 
 public:
-    using Base::Base;
+  using Base::Base;
 };
 
-void FixpointPass::runOnOperation()
-{
-    auto startFingerprint = getFingerprint();
-    for (std::size_t i = 0; i < m_maxIterationCount; i++)
-    {
-        if (mlir::failed(runPipeline(m_passManager, getOperation())))
-        {
-            signalPassFailure();
-            return;
-        }
-        auto endFingerPrint = getFingerprint();
-        if (endFingerPrint == startFingerprint)
-        {
-            return;
-        }
-        startFingerprint = endFingerPrint;
+void FixpointPass::runOnOperation() {
+  auto startFingerprint = getFingerprint();
+  for (std::size_t i = 0; i < m_maxIterationCount; i++) {
+    if (mlir::failed(runPipeline(m_passManager, getOperation()))) {
+      signalPassFailure();
+      return;
     }
-    m_maxIterationReached++;
+    auto endFingerPrint = getFingerprint();
+    if (endFingerPrint == startFingerprint)
+      return;
+
+    startFingerprint = endFingerPrint;
+  }
+  m_maxIterationReached++;
 }
 
 } // namespace

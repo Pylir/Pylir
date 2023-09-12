@@ -9,20 +9,19 @@
 
 #include <llvm/ADT/TypeSwitch.h>
 
-void pylir::test::TestDialect::initialize()
-{
-    addOperations<
+void pylir::test::TestDialect::initialize() {
+  addOperations<
 #define GET_OP_LIST
 #include "TestOps.cpp.inc"
-        >();
-    addTypes<
+      >();
+  addTypes<
 #define GET_TYPEDEF_LIST
 #include "TestTypes.cpp.inc"
-        >();
-    addAttributes<
+      >();
+  addAttributes<
 #define GET_ATTRDEF_LIST
 #include "TestAttributes.cpp.inc"
-        >();
+      >();
 }
 
 #include "TestDialect.cpp.inc"

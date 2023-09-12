@@ -4,7 +4,20 @@
 
 add_pylir_rewriter(PylirPyToPylirMem)
 
-add_library(PylirPyToPylirMem PylirPyToPylirMem.cpp)
-add_dependencies(PylirPyToPylirMem PylirConversionPassIncGen PylirPyToPylirMemIncGen)
-target_link_libraries(PylirPyToPylirMem PUBLIC PylirPyDialect PylirMemDialect MLIRPass MLIRTransforms MLIRArithDialect)
+add_library(PylirPyToPylirMem
+  PylirPyToPylirMem.cpp
+)
+add_dependencies(PylirPyToPylirMem
+  PylirConversionPassIncGen
+  PylirPyToPylirMemIncGen
+)
+target_link_libraries(PylirPyToPylirMem
+  PRIVATE
+  PylirMemDialect
+  PylirPyDialect
+  
+  MLIRArithDialect
+  MLIRPass
+  MLIRTransforms
+)
 set_property(GLOBAL APPEND PROPERTY MLIR_CONVERSION_LIBS PylirPyToPylirMem)
