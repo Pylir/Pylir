@@ -249,6 +249,11 @@ jobs:
           git diff -U0 HEAD^ :^3rdParty '***.c' '***.h' '***.hpp' '***.cpp' \
            | ${{github.workspace}}/util/clang-format-diff.py -p1 -binary $(which clang-format-$LLVM_LINT_VERSION) \
            | tee ${{github.workspace}}/clang-format.patch
+          
+          if [ -s ${{github.workspace}}/clang-format.patch ] 
+          then
+            exit 1
+          fi
 
       - name: Upload clang-format patch
         if: ${{ failure() }}
