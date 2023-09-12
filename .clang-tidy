@@ -75,7 +75,6 @@ Checks: >
   clang-analyzer-core.NonNullParamChecker,
   clang-analyzer-core.NullDereference,
   clang-analyzer-core.StackAddrEscapeBase,
-  clang-analyzer-core.StackAddressEscape,
   clang-analyzer-core.UndefinedBinaryOperatorResult,
   clang-analyzer-core.uninitialized.ArraySubscript,
   clang-analyzer-core.uninitialized.Assign,

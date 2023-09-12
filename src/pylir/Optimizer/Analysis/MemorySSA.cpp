@@ -68,7 +68,7 @@ void maybeAddAccess(
     // operation. If we didn't special case this, it'd read from 'liveOnEntry'
     // which would technically be incorrect.
     // TODO: Figure out whether this matters. Gut feeling says no.
-    auto res = lastDefs.find(resource);
+    auto* res = lastDefs.find(resource);
     if (res == lastDefs.end())
       res =
           lastDefs.insert({nullptr, pylir::SSABuilder::DefinitionsMap{}}).first;
