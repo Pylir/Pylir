@@ -62,7 +62,8 @@ TEST_CASE("HashTable Erase", "[HashTable]") {
   pylir::HashTable<std::string_view, std::size_t> table;
   for (auto& iter : words) {
     auto [result, inserted] = table.insert({iter, 1});
-    if (inserted) continue;
+    if (inserted)
+      continue;
     result->value++;
   }
   std::string_view withoutDuplicates[] = {

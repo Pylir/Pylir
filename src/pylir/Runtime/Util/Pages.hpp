@@ -21,12 +21,7 @@ struct PageDeleter {
 class PagePtr : private std::unique_ptr<std::byte, PageDeleter> {
 public:
   PagePtr(std::byte* memory, std::size_t length)
-      : std::unique_ptr<std::byte, PageDeleter> {
-    memory, PageDeleter {
-      length
-    }
-  }
-  {}
+      : std::unique_ptr<std::byte, PageDeleter>(memory, PageDeleter{length}) {}
 
   using std::unique_ptr<std::byte, PageDeleter>::get;
   using std::unique_ptr<std::byte, PageDeleter>::operator*;

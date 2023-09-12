@@ -220,7 +220,8 @@ bool parseMappingArguments(
   std::int32_t index = 0;
   auto parseOnce = [&]() -> mlir::ParseResult {
     if (!parser.parseOptionalStar()) {
-      if (parser.parseStar()) return mlir::failure();
+      if (parser.parseStar())
+        return mlir::failure();
       mappings.push_back(index);
       index++;
       return parser.parseOperand(keys.emplace_back());

@@ -113,7 +113,7 @@ public:
     using Callable = decltype(detail::Overload{std::forward<F>(f)...});
     constexpr std::array<
         std::invoke_result_t<Callable, decltype(first<Args...>())&> (*)(
-            AbstractIntrusiveVariant&, Callable&&),
+            AbstractIntrusiveVariant&, Callable &&),
         sizeof...(Args)>
         calling = {{+[](AbstractIntrusiveVariant& base,
                         Callable&& callable) -> decltype(auto) {

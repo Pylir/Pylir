@@ -120,12 +120,10 @@ struct IterExpansion {
 
 using IterArg = std::variant<mlir::Value, IterExpansion>;
 
-#define TRIVIAL_RESOURCE(prefix)                              \
-  struct prefix##Resource                                     \
-      : mlir::SideEffects::Resource::Base<prefix##Resource> { \
-    llvm::StringRef getName() final {                         \
-      return #prefix "Resource";                              \
-    }                                                         \
+#define TRIVIAL_RESOURCE(prefix)                                   \
+  struct prefix##Resource                                          \
+      : mlir::SideEffects::Resource::Base<prefix##Resource> {      \
+    llvm::StringRef getName() final { return #prefix "Resource"; } \
   }
 
 /// Reads and writes from 'py.global'.

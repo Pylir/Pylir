@@ -37,7 +37,8 @@ protected:
              llvm::make_filter_range(op->getResults(), [](mlir::Value v) {
                return mlir::isa<pylir::Py::DynamicType>(v.getType());
              })) {
-          if (!analysis.escapes(result)) continue;
+          if (!analysis.escapes(result))
+            continue;
           if (first) {
             first = false;
           } else {

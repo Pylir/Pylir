@@ -130,7 +130,8 @@ collectExtendableInterfaceMethods(const mlir::tblgen::Operator& op) {
     // interface. A call to 'getInterface()' below would cause an assertion.
     if (!interfaceTrait ||
         mlir::isa<mlir::tblgen::SideEffectTrait>(interfaceTrait) ||
-        !interfaceTrait->shouldDeclareMethods()) continue;
+        !interfaceTrait->shouldDeclareMethods())
+      continue;
 
     mlir::tblgen::Interface interface = interfaceTrait->getInterface();
     for (const auto& [index, method] :
@@ -146,7 +147,8 @@ collectExtendableInterfaceMethods(const mlir::tblgen::Operator& op) {
 
   for (int i = 0; i < op.getNumArgs(); i++) {
     for (auto dec : op.getArgDecorators(i)) {
-      if (!dec.getDef().isSubClassOf("OpVariableGen")) continue;
+      if (!dec.getDef().isSubClassOf("OpVariableGen"))
+        continue;
 
       auto* namedCons =
           op.getArg(i).dyn_cast<mlir::tblgen::NamedTypeConstraint*>();
@@ -162,7 +164,8 @@ collectExtendableInterfaceMethods(const mlir::tblgen::Operator& op) {
       for (auto methodGen : gen.getMethodGens()) {
         mlir::FailureOr<ExtendableInterfaceMethod> method =
             findExtendableInterfaceMethod(interface, methodGen);
-        if (mlir::failed(method)) continue;
+        if (mlir::failed(method))
+          continue;
 
         auto res = result.find(*method);
         if (res == result.end()) {

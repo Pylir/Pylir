@@ -145,7 +145,8 @@ bool emitIntrinsics(const llvm::RecordKeeper& records,
 
   for (auto& def : records.getAllDerivedDefinitions("Op")) {
     mlir::tblgen::Operator op(def);
-    if (!opCanBeIntrinsic(op)) continue;
+    if (!opCanBeIntrinsic(op))
+      continue;
 
     auto opName = op.getOperationName().substr(op.getDialectName().size() + 1);
     std::replace(opName.begin(), opName.end(), '_', '.');
