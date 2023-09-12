@@ -223,7 +223,7 @@ CheckOptions:
   readability-identifier-naming.MethodIgnoredRegexp: 'child_begin|child_end|push_back|emplace_back|insert(_.+)?|find(_.+)?|erase(_.+)?|isa(_.+)?|([a-z]+)_cast(_.+)?'
   readability-identifier-naming.FunctionCase: camelBack
   # Ignoring function overloads where the name obviously has to match.
-  readability-identifier-naming.FunctionIgnoredRegexp: 'hash_value|isa(_.+)?|([a-z]+)_cast(_.+)?'
+  readability-identifier-naming.FunctionIgnoredRegexp: 'hash_value|isa(_.+)?|([a-z]+)_cast(_.+)?|LLVMFuzzerTestOneInput'
   readability-identifier-naming.VariableCase: camelBack
   readability-identifier-naming.ValueTemplateParameterCase: camelBack
   readability-identifier-naming.PrivateMemberCase: camelBack

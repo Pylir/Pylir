@@ -207,8 +207,8 @@ public:
     return create<Py::ConstantOp>(getPyBoolAttr(value));
   }
 
-  Py::ConstantOp createConstant(BigInt bigInt) {
-    return create<Py::ConstantOp>(getIntAttr(std::move(bigInt)));
+  Py::ConstantOp createConstant(const BigInt& bigInt) {
+    return create<Py::ConstantOp>(getIntAttr(bigInt));
   }
 
   Py::ConstantOp createConstant(double value) {

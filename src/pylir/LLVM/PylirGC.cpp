@@ -122,7 +122,7 @@ class PylirGCMetaDataPrinter final : public llvm::GCMetadataPrinter {
     };
 
     std::vector<CallSiteInfo> callSiteInfos;
-    auto currentFunction = stackMaps.getFnInfos().begin();
+    auto* currentFunction = stackMaps.getFnInfos().begin();
     std::size_t recordCount = 0;
     for (auto& iter : stackMaps.getCSInfos()) {
       const auto* programCounter = llvm::MCBinaryExpr::createAdd(
@@ -270,8 +270,8 @@ public:
   }
 };
 
-// NOLINTNEXTLINE(cert-err58-cpp)
 llvm::GCMetadataPrinterRegistry::Add<PylirGCMetaDataPrinter>
+    // NOLINTNEXTLINE(cert-err58-cpp)
     y("pylir-gc", "Pylir GC stackmap writer");
 
 } // namespace

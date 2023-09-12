@@ -205,7 +205,7 @@ jobs:
       - name: Run clang-tidy
         working-directory: ${{github.workspace}}/Pylir
         run: |
-          git diff -U0 HEAD^ :^3rdParty '***.c' '***.h' '***.hpp' '***.cpp' \
+          git diff -U0 HEAD^ :^3rdParty :^fuzzer '***.c' '***.h' '***.hpp' '***.cpp' \
            | clang-tidy-diff-$LLVM_LINT_VERSION.py -p1 -quiet -use-color -path ${{github.workspace}}/pylir-build \
              -export-fixes ${{github.workspace}}/fixes.yml -clang-tidy-binary $(which clang-tidy-$LLVM_LINT_VERSION) \
              -j$(nproc)
