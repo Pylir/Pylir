@@ -92,9 +92,9 @@ public:
     Base::getDependentDialects(registry);
     mlir::OpPassManager temp;
     if (mlir::failed(mlir::parsePassPipeline(m_optimizationPipeline, temp,
-                                             llvm::nulls()))) {
+                                             llvm::nulls())))
       return;
-    }
+
     temp.getDependentDialects(registry);
   }
 
@@ -116,7 +116,7 @@ protected:
     llvm::DenseSet<mlir::CallableOpInterface> disabledCallables;
     auto recursivePattern = [&](mlir::CallableOpInterface callable) {
       bool triggered = false;
-      for (auto iter = recursionDetection.begin();
+      for (auto* iter = recursionDetection.begin();
            iter != recursionDetection.end();) {
         auto& stateMachine = iter->second;
         stateMachine.cycle(callable);

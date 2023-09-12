@@ -232,7 +232,7 @@ FactList getActiveFactsFromPredecessors(mlir::Block* block, FactMap& facts,
   // Moving is proper here since we only ever visit an edge once.
   FactList result = std::move(*incomingFacts.front());
   for (FactList* other : llvm::drop_begin(incomingFacts)) {
-    for (auto* iter = result.begin(); iter != result.end();) {
+    for (const auto* iter = result.begin(); iter != result.end();) {
       if (!other->contains(*iter)) {
         iter = result.erase(iter);
         continue;
