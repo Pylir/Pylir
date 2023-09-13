@@ -8,20 +8,26 @@
 
 #include <cstddef>
 
-extern "C" void* pylir_gc_alloc(std::size_t);
+extern "C" {
 
-extern "C" std::size_t pylir_str_hash(pylir::rt::PyString& string);
+void* pylir_gc_alloc(std::size_t);
 
-extern "C" pylir::rt::PyObject* pylir_dict_lookup(pylir::rt::PyDict& dict, pylir::rt::PyObject& key, std::size_t hash);
+std::size_t pylir_str_hash(pylir::rt::PyString& string);
 
-extern "C" void pylir_dict_insert(pylir::rt::PyDict& dict, pylir::rt::PyObject& key, std::size_t hash,
-                                  pylir::rt::PyObject& value);
+pylir::rt::PyObject* pylir_dict_lookup(pylir::rt::PyDict& dict,
+                                       pylir::rt::PyObject& key,
+                                       std::size_t hash);
 
-extern "C" void pylir_dict_insert_unique(pylir::rt::PyDict& dict, pylir::rt::PyObject& key, std::size_t hash,
-                                         pylir::rt::PyObject& value);
+void pylir_dict_insert(pylir::rt::PyDict& dict, pylir::rt::PyObject& key,
+                       std::size_t hash, pylir::rt::PyObject& value);
 
-extern "C" void pylir_dict_erase(pylir::rt::PyDict& dict, pylir::rt::PyObject& key, std::size_t hash);
+void pylir_dict_insert_unique(pylir::rt::PyDict& dict, pylir::rt::PyObject& key,
+                              std::size_t hash, pylir::rt::PyObject& value);
 
-extern "C" void pylir_print(pylir::rt::PyString& string);
+void pylir_dict_erase(pylir::rt::PyDict& dict, pylir::rt::PyObject& key,
+                      std::size_t hash);
 
-extern "C" void pylir_raise(pylir::rt::PyBaseException& exception);
+void pylir_print(pylir::rt::PyString& string);
+
+void pylir_raise(pylir::rt::PyBaseException& exception);
+}

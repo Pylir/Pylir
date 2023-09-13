@@ -5,10 +5,8 @@
 def toStr(obj):
     pass
 
-
 def add(lhs, rhs):
     pass
-
 
 def cmp(pred, lhs, rhs):
     pass

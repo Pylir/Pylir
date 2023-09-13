@@ -6,8 +6,9 @@
 #define TYPE_SLOT(...)
 #endif
 
-/// Used for any type slots that the compiler may generate calls to when compiling python code. Note, for reversible
-/// operations, only the normal orientation is considered.
+/// Used for any type slots that the compiler may generate calls to when
+/// compiling python code. Note, for reversible operations, only the normal
+/// orientation is considered.
 #ifndef TYPE_SLOT_OP
 #define TYPE_SLOT_OP(...) TYPE_SLOT(__VA_ARGS__)
 #endif
@@ -21,7 +22,8 @@
 #endif
 
 #ifndef TYPE_SLOT_REV_BIN_OP
-#define TYPE_SLOT_REV_BIN_OP(slotName, revSlotName, cppName) TYPE_SLOT_BIN_OP(slotName, cppName)
+#define TYPE_SLOT_REV_BIN_OP(slotName, revSlotName, cppName) \
+  TYPE_SLOT_BIN_OP(slotName, cppName)
 #endif
 
 #ifndef TYPE_SLOT_TERNARY_OP

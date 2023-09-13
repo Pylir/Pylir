@@ -8,24 +8,21 @@
 #include "Passes.hpp"
 #include "TestDialect.hpp"
 
-namespace pylir::test
-{
+namespace pylir::test {
 #define GEN_PASS_DEF_TESTADDCHANGEPASS
 #include "Passes.h.inc"
 } // namespace pylir::test
 
-namespace
-{
-class TestAddChangePass : public pylir::test::impl::TestAddChangePassBase<TestAddChangePass>
-{
+namespace {
+class TestAddChangePass
+    : public pylir::test::impl::TestAddChangePassBase<TestAddChangePass> {
 protected:
-    void runOnOperation() override
-    {
-        auto builder = mlir::OpBuilder::atBlockEnd(getOperation().getBody());
-        builder.create<pylir::test::ChangeOp>(builder.getUnknownLoc());
-    }
+  void runOnOperation() override {
+    auto builder = mlir::OpBuilder::atBlockEnd(getOperation().getBody());
+    builder.create<pylir::test::ChangeOp>(builder.getUnknownLoc());
+  }
 
 public:
-    using Base::Base;
+  using Base::Base;
 };
 } // namespace

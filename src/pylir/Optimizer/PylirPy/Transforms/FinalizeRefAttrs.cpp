@@ -9,20 +9,19 @@
 
 #include "Passes.hpp"
 
-namespace pylir::Py
-{
+namespace pylir::Py {
 #define GEN_PASS_DEF_FINALIZEREFATTRSPASS
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
 } // namespace pylir::Py
 
-namespace
-{
-struct FinalizeRefAttrs : pylir::Py::impl::FinalizeRefAttrsPassBase<FinalizeRefAttrs>
-{
+namespace {
+struct FinalizeRefAttrs
+    : pylir::Py::impl::FinalizeRefAttrsPassBase<FinalizeRefAttrs> {
 protected:
-    void runOnOperation() override
-    {
-        getOperation()->walk([&](pylir::Py::GlobalValueOp valueOp) { pylir::Py::RefAttr::get(valueOp); });
-    }
+  void runOnOperation() override {
+    getOperation()->walk([&](pylir::Py::GlobalValueOp valueOp) {
+      pylir::Py::RefAttr::get(valueOp);
+    });
+  }
 };
 } // namespace

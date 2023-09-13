@@ -13,193 +13,204 @@
 #include "WinX64.hpp"
 #include "X86_64.hpp"
 
-pylir::PylirTypeConverter::PylirTypeConverter(mlir::MLIRContext* context, const llvm::Triple& triple,
-                                              llvm::DataLayout dataLayout, mlir::DataLayout&& mlirDataLayout)
-    : mlir::LLVMTypeConverter(context,
-                              [&]
-                              {
-                                  mlir::LowerToLLVMOptions options(context);
-                                  options.allocLowering = mlir::LowerToLLVMOptions::AllocLowering::None;
-                                  options.dataLayout = dataLayout;
-                                  return options;
-                              }()),
-      m_objectPtrType(mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE))
-{
-    switch (triple.getArch())
-    {
-        case llvm::Triple::x86_64:
-        {
-            if (triple.isOSWindows())
-            {
-                m_cabi = std::make_unique<pylir::WinX64>(std::move(mlirDataLayout));
-            }
-            else
-            {
-                m_cabi = std::make_unique<pylir::X86_64>(std::move(mlirDataLayout));
-            }
-            break;
-        }
-        default: llvm::errs() << triple.str() << " not yet implemented"; std::abort();
-    }
+pylir::PylirTypeConverter::PylirTypeConverter(mlir::MLIRContext* context,
+                                              const llvm::Triple& triple,
+                                              llvm::DataLayout dataLayout,
+                                              mlir::DataLayout&& mlirDataLayout)
+    : mlir::LLVMTypeConverter(
+          context,
+          [&] {
+            mlir::LowerToLLVMOptions options(context);
+            options.allocLowering =
+                mlir::LowerToLLVMOptions::AllocLowering::None;
+            options.dataLayout = dataLayout;
+            return options;
+          }()),
+      m_objectPtrType(
+          mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE)) {
+  switch (triple.getArch()) {
+  case llvm::Triple::x86_64:
+    if (triple.isOSWindows())
+      m_cabi = std::make_unique<pylir::WinX64>(std::move(mlirDataLayout));
+    else
+      m_cabi = std::make_unique<pylir::X86_64>(std::move(mlirDataLayout));
 
-    llvm::StringRef constSectionPrefix;
-    llvm::StringRef dataSectionPrefix;
-    // MachO requires a segment prefix in front of sections to denote their permissions. constants without
-    // relocations go into __TEXT, which is read-only, while __DATA, has read-write permission.
-    // See
-    // https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html
-    if (triple.isOSBinFormatMachO())
-    {
-        // Pretty much all our constants contain relocations. We therefore put them into __DATA.
-        constSectionPrefix = "__DATA,";
-        dataSectionPrefix = "__DATA,";
-    }
+    break;
+  default: llvm::errs() << triple.str() << " not yet implemented"; std::abort();
+  }
 
-    m_rootSection = mlir::StringAttr::get(context, dataSectionPrefix + "py_root");
-    m_collectionSection = mlir::StringAttr::get(context, dataSectionPrefix + "py_coll");
-    m_constantSection = mlir::StringAttr::get(context, constSectionPrefix + "py_const");
+  llvm::StringRef constSectionPrefix;
+  llvm::StringRef dataSectionPrefix;
+  // MachO requires a segment prefix in front of sections to denote their
+  // permissions. constants without relocations go into __TEXT, which is
+  // read-only, while __DATA, has read-write permission. See
+  // https://developer.apple.com/library/archive/documentation/Performance/Conceptual/CodeFootprint/Articles/MachOOverview.html
+  if (triple.isOSBinFormatMachO()) {
+    // Pretty much all our constants contain relocations. We therefore put them
+    // into __DATA.
+    constSectionPrefix = "__DATA,";
+    dataSectionPrefix = "__DATA,";
+  }
 
-    addConversion([&](pylir::Py::DynamicType)
-                  { return mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE); });
-    addConversion([&](pylir::Mem::MemoryType)
-                  { return mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE); });
+  m_rootSection = mlir::StringAttr::get(context, dataSectionPrefix + "py_root");
+  m_collectionSection =
+      mlir::StringAttr::get(context, dataSectionPrefix + "py_coll");
+  m_constantSection =
+      mlir::StringAttr::get(context, constSectionPrefix + "py_const");
+
+  addConversion([&](pylir::Py::DynamicType) {
+    return mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE);
+  });
+  addConversion([&](pylir::Mem::MemoryType) {
+    return mlir::LLVM::LLVMPointerType::get(&getContext(), REF_ADDRESS_SPACE);
+  });
 }
 
-namespace
-{
-std::string slotSizeNameSuffix(std::optional<unsigned int> slotSize)
-{
-    if (!slotSize)
-    {
-        return {};
-    }
-    return "[" + std::to_string(*slotSize) + "]";
+namespace {
+std::string slotSizeNameSuffix(std::optional<unsigned int> slotSize) {
+  if (!slotSize)
+    return {};
+
+  return "[" + std::to_string(*slotSize) + "]";
 }
 
-mlir::LLVM::LLVMArrayType getSlotEpilogue(mlir::MLIRContext* context, unsigned slotSize = 0)
-{
-    return mlir::LLVM::LLVMArrayType::get(mlir::LLVM::LLVMPointerType::get(context, pylir::REF_ADDRESS_SPACE),
-                                          slotSize);
+mlir::LLVM::LLVMArrayType getSlotEpilogue(mlir::MLIRContext* context,
+                                          unsigned slotSize = 0) {
+  return mlir::LLVM::LLVMArrayType::get(
+      mlir::LLVM::LLVMPointerType::get(context, pylir::REF_ADDRESS_SPACE),
+      slotSize);
 }
 
-mlir::LLVM::LLVMStructType lazyInitStructType(mlir::MLIRContext* context, llvm::StringRef name,
-                                              std::optional<unsigned int> slotSize, llvm::ArrayRef<mlir::Type> body)
-{
-    llvm::SmallString<16> storage;
-    auto type =
-        mlir::LLVM::LLVMStructType::getIdentified(context, (name + slotSizeNameSuffix(slotSize)).toStringRef(storage));
-    if (type.isInitialized())
-    {
-        return type;
-    }
-
-    auto temp = llvm::to_vector(body);
-    temp.push_back(getSlotEpilogue(context, slotSize.value_or(0)));
-    [[maybe_unused]] mlir::LogicalResult result = type.setBody(temp, false);
-    PYLIR_ASSERT(mlir::succeeded(result));
+mlir::LLVM::LLVMStructType
+lazyInitStructType(mlir::MLIRContext* context, llvm::StringRef name,
+                   std::optional<unsigned int> slotSize,
+                   llvm::ArrayRef<mlir::Type> body) {
+  llvm::SmallString<16> storage;
+  auto type = mlir::LLVM::LLVMStructType::getIdentified(
+      context, (name + slotSizeNameSuffix(slotSize)).toStringRef(storage));
+  if (type.isInitialized())
     return type;
+
+  auto temp = llvm::to_vector(body);
+  temp.push_back(getSlotEpilogue(context, slotSize.value_or(0)));
+  [[maybe_unused]] mlir::LogicalResult result = type.setBody(temp, false);
+  PYLIR_ASSERT(mlir::succeeded(result));
+  return type;
 }
 } // namespace
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyObjectType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyObject", slotSize, {m_objectPtrType});
+mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyObjectType(
+    std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(&getContext(), "PyObject", slotSize,
+                            {m_objectPtrType});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFunctionType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyFunction", slotSize,
-                              {m_objectPtrType, mlir::LLVM::LLVMPointerType::get(&getContext())});
+mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFunctionType(
+    std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(
+      &getContext(), "PyFunction", slotSize,
+      {m_objectPtrType, mlir::LLVM::LLVMPointerType::get(&getContext())});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyTupleType(std::optional<unsigned int> length)
-{
-    return lazyInitStructType(&getContext(), "PyTuple", length, {m_objectPtrType, getIndexType()});
+mlir::LLVM::LLVMStructType
+pylir::PylirTypeConverter::getPyTupleType(std::optional<unsigned int> length) {
+  return lazyInitStructType(&getContext(), "PyTuple", length,
+                            {m_objectPtrType, getIndexType()});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyListType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyList", slotSize, {m_objectPtrType, getIndexType(), m_objectPtrType});
+mlir::LLVM::LLVMStructType
+pylir::PylirTypeConverter::getPyListType(std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(&getContext(), "PyList", slotSize,
+                            {m_objectPtrType, getIndexType(), m_objectPtrType});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getBufferComponent()
-{
-    return mlir::LLVM::LLVMStructType::getLiteral(
-        &getContext(), {getIndexType(), getIndexType(), mlir::LLVM::LLVMPointerType::get(&getContext())});
+mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getBufferComponent() {
+  return mlir::LLVM::LLVMStructType::getLiteral(
+      &getContext(), {getIndexType(), getIndexType(),
+                      mlir::LLVM::LLVMPointerType::get(&getContext())});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyDictType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(
-        &getContext(), "PyDict", slotSize,
-        {m_objectPtrType, getBufferComponent(), getIndexType(), mlir::LLVM::LLVMPointerType::get(&getContext())});
+mlir::LLVM::LLVMStructType
+pylir::PylirTypeConverter::getPyDictType(std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(&getContext(), "PyDict", slotSize,
+                            {m_objectPtrType, getBufferComponent(),
+                             getIndexType(),
+                             mlir::LLVM::LLVMPointerType::get(&getContext())});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyStringType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyString", slotSize, {m_objectPtrType, getBufferComponent()});
+mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyStringType(
+    std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(&getContext(), "PyString", slotSize,
+                            {m_objectPtrType, getBufferComponent()});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getMPInt()
-{
-    auto mpInt = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "mp_int");
-    if (!mpInt.isInitialized())
-    {
-        [[maybe_unused]] auto result =
-            mpInt.setBody({m_cabi->getInt(&getContext()), m_cabi->getInt(&getContext()),
-                           mlir::LLVM::LLVMPointerType::get(&getContext()), m_cabi->getInt(&getContext())},
-                          false);
-        PYLIR_ASSERT(mlir::succeeded(result));
-    }
-    return mpInt;
+mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getMPInt() {
+  auto mpInt =
+      mlir::LLVM::LLVMStructType::getIdentified(&getContext(), "mp_int");
+  if (!mpInt.isInitialized()) {
+    [[maybe_unused]] auto result = mpInt.setBody(
+        {m_cabi->getInt(&getContext()), m_cabi->getInt(&getContext()),
+         mlir::LLVM::LLVMPointerType::get(&getContext()),
+         m_cabi->getInt(&getContext())},
+        false);
+    PYLIR_ASSERT(mlir::succeeded(result));
+  }
+  return mpInt;
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyIntType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyInt", slotSize, {m_objectPtrType, getMPInt()});
+mlir::LLVM::LLVMStructType
+pylir::PylirTypeConverter::getPyIntType(std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(&getContext(), "PyInt", slotSize,
+                            {m_objectPtrType, getMPInt()});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFloatType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyFloat", slotSize,
-                              {m_objectPtrType, mlir::Float64Type::get(&getContext())});
+mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyFloatType(
+    std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(
+      &getContext(), "PyFloat", slotSize,
+      {m_objectPtrType, mlir::Float64Type::get(&getContext())});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyBaseExceptionType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyBaseException", slotSize,
-                              {m_objectPtrType, mlir::IntegerType::get(&getContext(), getPointerBitwidth()),
-                               getUnwindHeaderType(), mlir::IntegerType::get(&getContext(), 32)});
+mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyBaseExceptionType(
+    std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(
+      &getContext(), "PyBaseException", slotSize,
+      {m_objectPtrType,
+       mlir::IntegerType::get(&getContext(), getPointerBitwidth()),
+       getUnwindHeaderType(), mlir::IntegerType::get(&getContext(), 32)});
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::getPyTypeType(std::optional<unsigned int> slotSize)
-{
-    return lazyInitStructType(&getContext(), "PyType", slotSize,
-                              {m_objectPtrType, getIndexType(), m_objectPtrType, m_objectPtrType, m_objectPtrType});
+mlir::LLVM::LLVMStructType
+pylir::PylirTypeConverter::getPyTypeType(std::optional<unsigned int> slotSize) {
+  return lazyInitStructType(&getContext(), "PyType", slotSize,
+                            {m_objectPtrType, getIndexType(), m_objectPtrType,
+                             m_objectPtrType, m_objectPtrType});
 }
 
-std::optional<pylir::Mem::LayoutType> pylir::PylirTypeConverter::getLayoutType(mlir::Attribute attr)
-{
-    return pylir::Mem::getLayoutType(attr, &m_layoutTypeCache);
+std::optional<pylir::Mem::LayoutType>
+pylir::PylirTypeConverter::getLayoutType(mlir::Attribute attr) {
+  return pylir::Mem::getLayoutType(attr, &m_layoutTypeCache);
 }
 
-mlir::LLVM::LLVMStructType pylir::PylirTypeConverter::typeOf(pylir::Py::ObjectAttrInterface objectAttr)
-{
-    unsigned count = pylir::Py::ref_cast<pylir::Py::TypeAttr>(objectAttr.getTypeObject()).getInstanceSlots().size();
-    return llvm::TypeSwitch<pylir::Py::ObjectAttrInterface, mlir::LLVM::LLVMStructType>(objectAttr)
-        .Case(
-            [&](pylir::Py::TupleAttr attr)
-            {
-                PYLIR_ASSERT(count == 0);
-                return getPyTupleType(attr.size());
-            })
-        .Case([&](pylir::Py::ListAttr) { return getPyListType(count); })
-        .Case([&](pylir::Py::StrAttr) { return getPyStringType(count); })
-        .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
-        .Case([&](pylir::Py::FunctionAttr) { return getPyFunctionType(count); })
-        .Case([&](pylir::Py::IntAttr) { return getPyIntType(count); })
-        .Case([&](pylir::Py::BoolAttr) { return getPyIntType(count); })
-        .Case([&](pylir::Py::FloatAttr) { return getPyFloatType(count); })
-        .Case([&](pylir::Py::DictAttr) { return getPyDictType(count); })
-        .Default([&](auto) { return getPyObjectType(count); });
+mlir::LLVM::LLVMStructType
+pylir::PylirTypeConverter::typeOf(pylir::Py::ObjectAttrInterface objectAttr) {
+  unsigned count =
+      pylir::Py::ref_cast<pylir::Py::TypeAttr>(objectAttr.getTypeObject())
+          .getInstanceSlots()
+          .size();
+  return llvm::TypeSwitch<pylir::Py::ObjectAttrInterface,
+                          mlir::LLVM::LLVMStructType>(objectAttr)
+      .Case([&](pylir::Py::TupleAttr attr) {
+        PYLIR_ASSERT(count == 0);
+        return getPyTupleType(attr.size());
+      })
+      .Case([&](pylir::Py::ListAttr) { return getPyListType(count); })
+      .Case([&](pylir::Py::StrAttr) { return getPyStringType(count); })
+      .Case([&](pylir::Py::TypeAttr) { return getPyTypeType(count); })
+      .Case([&](pylir::Py::FunctionAttr) { return getPyFunctionType(count); })
+      .Case([&](pylir::Py::IntAttr) { return getPyIntType(count); })
+      .Case([&](pylir::Py::BoolAttr) { return getPyIntType(count); })
+      .Case([&](pylir::Py::FloatAttr) { return getPyFloatType(count); })
+      .Case([&](pylir::Py::DictAttr) { return getPyDictType(count); })
+      .Default([&](auto) { return getPyObjectType(count); });
 }

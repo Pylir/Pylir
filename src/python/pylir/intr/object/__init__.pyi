@@ -5,6 +5,5 @@
 def hash(obj: object) -> int:
     pass
 
-
 def id(obj: object) -> int:
     pass

@@ -8,8 +8,31 @@ get_property(conversion_libs GLOBAL PROPERTY MLIR_CONVERSION_LIBS)
 add_pylir_passes(Passes Test NO_DOC)
 add_pylir_dialect(Test test NO_DOC)
 
-add_executable(pylir-opt main.cpp TestMemorySSA.cpp TestDialect.cpp TestInlinerInterface.cpp TestAliasSetTracker.cpp TestLoopInfo.cpp TestHelloWorld.cpp TestLinker.cpp TestInlineAll.cpp TestAddChange.cpp TestEscapeAnalysis.cpp)
-target_link_libraries(pylir-opt PRIVATE MLIRMlirOptMain ${dialect_libs} ${conversion_libs} PylirAnalysis PylirPyTransformsUtil PylirLinker PylirOptimizer PylirExternalModels)
+add_executable(pylir-opt
+  main.cpp
+  TestAddChange.cpp
+  TestAliasSetTracker.cpp
+  TestDialect.cpp
+  TestEscapeAnalysis.cpp
+  TestHelloWorld.cpp
+  TestInlineAll.cpp
+  TestInlinerInterface.cpp
+  TestLinker.cpp
+  TestLoopInfo.cpp
+  TestMemorySSA.cpp
+)
+target_link_libraries(pylir-opt
+  PRIVATE
+  PylirAnalysis
+  PylirExternalModels
+  PylirLinker
+  PylirOptimizer
+  PylirPyTransformsUtil
+  
+  MLIRMlirOptMain
+  ${dialect_libs}
+  ${conversion_libs}
+)
 target_include_directories(pylir-opt SYSTEM PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(pylir-opt TestPassIncGen)
 add_dependencies(pylir-opt TestIncGen)

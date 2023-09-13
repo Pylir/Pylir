@@ -5,8 +5,7 @@
 
 #pragma once
 
-namespace pylir
-{
+namespace pylir {
 
 int main(int argc, char** argv);
 } // namespace pylir

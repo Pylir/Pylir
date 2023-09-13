@@ -11,26 +11,22 @@
 
 #include "Passes.hpp"
 
-namespace pylir::test
-{
+namespace pylir::test {
 #define GEN_PASS_DEF_TESTLOOPINFOPASS
 #include "Passes.h.inc"
 } // namespace pylir::test
 
-namespace
-{
-class TestLoopInfo : public pylir::test::impl::TestLoopInfoPassBase<TestLoopInfo>
-{
+namespace {
+class TestLoopInfo
+    : public pylir::test::impl::TestLoopInfoPassBase<TestLoopInfo> {
 public:
-    using Base::Base;
+  using Base::Base;
 
 protected:
-    void runOnOperation() override
-    {
-        for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>())
-        {
-            getChildAnalysis<pylir::LoopInfo>(iter).print(llvm::outs());
-        }
+  void runOnOperation() override {
+    for (auto iter : getOperation().getOps<mlir::FunctionOpInterface>()) {
+      getChildAnalysis<pylir::LoopInfo>(iter).print(llvm::outs());
     }
+  }
 };
 } // namespace

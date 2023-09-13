@@ -11,31 +11,28 @@ extern "C" pylir::rt::PyObject** const pylir_collections_end;
 extern "C" pylir::rt::PyObject** const pylir_constants_start;
 extern "C" pylir::rt::PyObject** const pylir_constants_end;
 
-bool pylir::rt::isGlobal(PyObject* object)
-{
-    struct Ranges
-    {
-        pylir::rt::PyObject* constMin;
-        pylir::rt::PyObject* constMax;
-        pylir::rt::PyObject* collMin;
-        pylir::rt::PyObject* collMax;
-    };
-    static auto ranges = []
-    {
-        auto [constMin, constMax] = std::minmax_element(pylir_constants_start, pylir_constants_end);
-        auto [colMin, colMax] = std::minmax_element(pylir_collections_start, pylir_collections_end);
-        return Ranges{*constMin, *constMax, *colMin, *colMax};
-    }();
-    return (object >= ranges.constMin && object <= ranges.constMax)
-           || (object >= ranges.collMin && object <= ranges.collMax);
+bool pylir::rt::isGlobal(PyObject* object) {
+  struct Ranges {
+    pylir::rt::PyObject* constMin;
+    pylir::rt::PyObject* constMax;
+    pylir::rt::PyObject* collMin;
+    pylir::rt::PyObject* collMax;
+  };
+  static auto ranges = [] {
+    auto [constMin, constMax] =
+        std::minmax_element(pylir_constants_start, pylir_constants_end);
+    auto [colMin, colMax] =
+        std::minmax_element(pylir_collections_start, pylir_collections_end);
+    return Ranges{*constMin, *constMax, *colMin, *colMax};
+  }();
+  return (object >= ranges.constMin && object <= ranges.constMax) ||
+         (object >= ranges.collMin && object <= ranges.collMax);
 }
 
-tcb::span<pylir::rt::PyObject**> pylir::rt::getHandles()
-{
-    return {pylir_roots_start, pylir_roots_end};
+tcb::span<pylir::rt::PyObject**> pylir::rt::getHandles() {
+  return {pylir_roots_start, pylir_roots_end};
 }
 
-tcb::span<pylir::rt::PyObject*> pylir::rt::getCollections()
-{
-    return {pylir_collections_start, pylir_collections_end};
+tcb::span<pylir::rt::PyObject*> pylir::rt::getCollections() {
+  return {pylir_collections_start, pylir_collections_end};
 }

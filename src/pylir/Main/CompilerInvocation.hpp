@@ -28,70 +28,69 @@
 #include "DiagnosticsVerifier.hpp"
 #include "Toolchain.hpp"
 
-namespace pylir
-{
+namespace pylir {
 struct CodeGenOptions;
 
-class CompilerInvocation
-{
-    std::optional<mlir::MLIRContext> m_mlirContext;
-    std::unique_ptr<llvm::LLVMContext> m_llvmContext;
-    std::list<Diag::Document> m_documents;
-    std::list<Syntax::FileInput> m_fileInputs;
-    std::unique_ptr<llvm::TargetMachine> m_targetMachine;
-    llvm::raw_pwrite_stream* m_output = nullptr;
-    std::optional<llvm::sys::fs::TempFile> m_tempFile;
-    std::optional<llvm::raw_fd_ostream> m_outFileStream;
-    std::string m_compileStepOutputFilename;
-    std::string m_actionOutputFilename;
-    DiagnosticsVerifier* m_verifier;
+class CompilerInvocation {
+  std::optional<mlir::MLIRContext> m_mlirContext;
+  std::unique_ptr<llvm::LLVMContext> m_llvmContext;
+  std::list<Diag::Document> m_documents;
+  std::list<Syntax::FileInput> m_fileInputs;
+  std::unique_ptr<llvm::TargetMachine> m_targetMachine;
+  llvm::raw_pwrite_stream* m_output = nullptr;
+  std::optional<llvm::sys::fs::TempFile> m_tempFile;
+  std::optional<llvm::raw_fd_ostream> m_outFileStream;
+  std::string m_compileStepOutputFilename;
+  std::string m_actionOutputFilename;
+  DiagnosticsVerifier* m_verifier;
 
-    enum FileType
-    {
-        Python,
-        MLIR,
-        LLVM
-    };
+  enum FileType { Python, MLIR, LLVM };
 
 public:
-    enum Action
-    {
-        SyntaxOnly,
-        ObjectFile,
-        Assembly,
-        Link
-    };
+  enum Action { SyntaxOnly, ObjectFile, Assembly, Link };
 
 private:
-    void ensureMLIRContext(const llvm::opt::InputArgList& args);
+  void ensureMLIRContext(const llvm::opt::InputArgList& args);
 
-    mlir::LogicalResult ensureLLVMInit(const llvm::opt::InputArgList& args, const pylir::Toolchain& toolchain);
+  mlir::LogicalResult ensureLLVMInit(const llvm::opt::InputArgList& args,
+                                     const pylir::Toolchain& toolchain);
 
-    mlir::LogicalResult ensureOutputStream(const llvm::opt::InputArgList& args, Action action,
+  mlir::LogicalResult ensureOutputStream(const llvm::opt::InputArgList& args,
+                                         Action action,
+                                         cli::CommandLine& commandLine);
+
+  mlir::LogicalResult finalizeOutputStream(mlir::LogicalResult result,
                                            cli::CommandLine& commandLine);
 
-    mlir::LogicalResult finalizeOutputStream(mlir::LogicalResult result, cli::CommandLine& commandLine);
+  mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
+  codegenPythonToMLIR(const llvm::opt::InputArgList& args,
+                      const cli::CommandLine& commandLine,
+                      Diag::DiagnosticsManager& diagManager,
+                      Diag::DiagnosticsDocManager& mainModuleDiagManager);
 
-    mlir::FailureOr<mlir::OwningOpRef<mlir::ModuleOp>>
-        codegenPythonToMLIR(const llvm::opt::InputArgList& args, const cli::CommandLine& commandLine,
-                            Diag::DiagnosticsManager& diagManager, Diag::DiagnosticsDocManager& mainModuleDiagManager);
+  mlir::LogicalResult
+  ensureTargetMachine(const llvm::opt::InputArgList& args,
+                      cli::CommandLine& commandLine,
+                      const pylir::Toolchain& toolchain,
+                      std::optional<llvm::Triple> triple = {});
 
-    mlir::LogicalResult ensureTargetMachine(const llvm::opt::InputArgList& args, cli::CommandLine& commandLine,
-                                            const pylir::Toolchain& toolchain,
-                                            std::optional<llvm::Triple> triple = {});
+  mlir::LogicalResult compilation(llvm::opt::Arg* inputFile,
+                                  cli::CommandLine& commandLine,
+                                  const pylir::Toolchain& toolchain,
+                                  CompilerInvocation::Action action,
+                                  Diag::DiagnosticsManager& diagManager);
 
-    mlir::LogicalResult compilation(llvm::opt::Arg* inputFile, cli::CommandLine& commandLine,
-                                    const pylir::Toolchain& toolchain, CompilerInvocation::Action action,
-                                    Diag::DiagnosticsManager& diagManager);
-
-    Diag::Document& addDocument(std::string_view content, std::string filename);
+  Diag::Document& addDocument(std::string_view content, std::string filename);
 
 public:
-    explicit CompilerInvocation(DiagnosticsVerifier* verifier) : m_verifier(verifier) {}
+  explicit CompilerInvocation(DiagnosticsVerifier* verifier)
+      : m_verifier(verifier) {}
 
-    mlir::LogicalResult executeAction(llvm::opt::Arg* inputFile, cli::CommandLine& commandLine,
-                                      const pylir::Toolchain& toolchain, CompilerInvocation::Action action,
-                                      Diag::DiagnosticsManager& diagManager);
+  mlir::LogicalResult executeAction(llvm::opt::Arg* inputFile,
+                                    cli::CommandLine& commandLine,
+                                    const pylir::Toolchain& toolchain,
+                                    CompilerInvocation::Action action,
+                                    Diag::DiagnosticsManager& diagManager);
 };
 
 } // namespace pylir

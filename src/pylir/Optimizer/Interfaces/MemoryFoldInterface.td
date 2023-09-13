@@ -8,12 +8,15 @@
 include "mlir/IR/OpBase.td"
 
 def MemoryFoldInterface : OpInterface<"MemoryFoldInterface"> {
-    let cppNamespace = "::pylir";
+  let cppNamespace = "::pylir";
 
-    let methods = [
-        InterfaceMethod<[{}], "::mlir::LogicalResult", "foldUsage", (ins "mlir::Operation*":$lastClobber,
-                                                            "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$results)>
-    ];
+  let methods = [
+    InterfaceMethod<[{
+
+    }], "::mlir::LogicalResult", "foldUsage", (ins
+      "mlir::Operation*":$lastClobber,
+      "::llvm::SmallVectorImpl<::mlir::OpFoldResult>&":$results)>
+  ];
 }
 
 #endif

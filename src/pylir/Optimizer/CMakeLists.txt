@@ -4,26 +4,29 @@
 
 add_subdirectory(Analysis)
 add_subdirectory(Conversion)
+add_subdirectory(ExternalModels)
+add_subdirectory(Interfaces)
+add_subdirectory(Linker)
 add_subdirectory(PylirHIR)
 add_subdirectory(PylirMem)
 add_subdirectory(PylirPy)
-add_subdirectory(Interfaces)
 add_subdirectory(Transforms)
-add_subdirectory(Linker)
-add_subdirectory(ExternalModels)
 
-add_library(PylirOptimizer Optimizer.cpp)
+add_library(PylirOptimizer
+  Optimizer.cpp
+)
 target_link_libraries(PylirOptimizer
-        PRIVATE
-        MLIRArithToLLVM
-        MLIRArithTransforms
-        MLIRLLVMIRTransforms
-        MLIRPass
-        MLIRReconcileUnrealizedCasts
-        MLIRTransforms
-        PylirTransforms
-        PylirToLLVMIR
-        PylirPyTransforms
-        PylirPyToPylirMem
-        PylirMemTransforms
-        )
+  PRIVATE
+  PylirMemTransforms
+  PylirPyToPylirMem
+  PylirPyTransforms
+  PylirTransforms
+  PylirToLLVMIR
+  
+  MLIRArithToLLVM
+  MLIRArithTransforms
+  MLIRLLVMIRTransforms
+  MLIRPass
+  MLIRReconcileUnrealizedCasts
+  MLIRTransforms
+)

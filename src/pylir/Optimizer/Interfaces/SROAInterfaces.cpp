@@ -9,12 +9,12 @@
 #include "pylir/Optimizer/Interfaces/SROAAttrInterfaces.cpp.inc"
 #include "pylir/Optimizer/Interfaces/SROAOpInterfaces.cpp.inc"
 
-mlir::LogicalResult pylir::aggregateUseCanParticipateInSROA(const mlir::OpOperand& aggregateUse)
-{
-    auto op = mlir::dyn_cast_or_null<pylir::SROAReadWriteOpInterface>(aggregateUse.getOwner());
-    if (!op || &op.getAggregateOperand() != &aggregateUse)
-    {
-        return mlir::failure();
-    }
-    return op.getSROAKey();
+mlir::LogicalResult
+pylir::aggregateUseCanParticipateInSROA(const mlir::OpOperand& aggregateUse) {
+  auto op = mlir::dyn_cast_or_null<pylir::SROAReadWriteOpInterface>(
+      aggregateUse.getOwner());
+  if (!op || &op.getAggregateOperand() != &aggregateUse)
+    return mlir::failure();
+
+  return op.getSROAKey();
 }

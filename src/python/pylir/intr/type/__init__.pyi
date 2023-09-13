@@ -4,14 +4,11 @@
 
 __slots__: tuple[str]
 
-
 def mro(obj):
     pass
 
-
 def slots(obj):
     pass
-
 
 __name__: int
 __init__: int

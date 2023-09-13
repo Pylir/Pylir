@@ -8,22 +8,21 @@ using namespace pylir::rt;
 
 #include <iostream>
 
-namespace
-{
+namespace {
 
-PyObject& exceptHookImpl(PyFunction& /*function*/, PyTuple& args, PyDict& /*keywords*/)
-{
-    // TODO: check arguments
-    auto& exceptionType = args.getItem(0);
-    auto& exception = args.getItem(1);
-    auto type = exceptionType.getSlot(PyTypeObject::Slots::Name)->cast<PyString>().view();
-    if (type.substr(0, sizeof("builtins")) == "builtins.")
-    {
-        type = type.substr(sizeof("builtins"));
-    }
-    std::cerr << type << ": ";
-    std::cerr << Builtins::Str(exception).cast<PyString>().view() << std::endl;
-    return Builtins::None;
+PyObject& exceptHookImpl(PyFunction& /*function*/, PyTuple& args,
+                         PyDict& /*keywords*/) {
+  // TODO: check arguments
+  auto& exceptionType = args.getItem(0);
+  auto& exception = args.getItem(1);
+  auto type =
+      exceptionType.getSlot(PyTypeObject::Slots::Name)->cast<PyString>().view();
+  if (type.substr(0, sizeof("builtins")) == "builtins.")
+    type = type.substr(sizeof("builtins"));
+
+  std::cerr << type << ": ";
+  std::cerr << Builtins::Str(exception).cast<PyString>().view() << std::endl;
+  return Builtins::None;
 }
 
 StaticInstance<Builtins::Str> qualFunctionName("sys.__excepthook__");

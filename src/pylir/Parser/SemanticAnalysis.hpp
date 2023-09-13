@@ -12,88 +12,85 @@
 
 #include "Visitor.hpp"
 
-namespace pylir
-{
-class SemanticAnalysis : public Syntax::Visitor<SemanticAnalysis>
-{
-    Diag::DiagnosticsDocManager* m_manager;
-    IdentifierSet* m_globals = nullptr;
+namespace pylir {
+class SemanticAnalysis : public Syntax::Visitor<SemanticAnalysis> {
+  Diag::DiagnosticsDocManager* m_manager;
+  IdentifierSet* m_globals = nullptr;
 
-    using ScopeOwner = llvm::PointerUnion<Syntax::FuncDef*, Syntax::ClassDef*, Syntax::Lambda*>;
-    ScopeOwner m_currentScopeOwner;
-    bool m_inFunc = false;
-    bool m_inLoop = false;
+  using ScopeOwner =
+      llvm::PointerUnion<Syntax::FuncDef*, Syntax::ClassDef*, Syntax::Lambda*>;
+  ScopeOwner m_currentScopeOwner;
+  bool m_inFunc = false;
+  bool m_inLoop = false;
 
-    [[nodiscard]] Syntax::Scope* getCurrentScope() const
-    {
-        if (!m_currentScopeOwner)
-        {
-            return nullptr;
-        }
-        return llvm::TypeSwitch<decltype(m_currentScopeOwner), Syntax::Scope*>(m_currentScopeOwner)
-            .Case<Syntax::FuncDef*, Syntax::ClassDef*, Syntax::Lambda*>([](auto* ptr) -> Syntax::Scope*
-                                                                        { return &ptr->scope; });
-    }
+  [[nodiscard]] Syntax::Scope* getCurrentScope() const {
+    if (!m_currentScopeOwner)
+      return nullptr;
 
-    void addToNamespace(const Token& token)
-    {
-        addToNamespace(IdentifierToken{token});
-    }
+    return llvm::TypeSwitch<decltype(m_currentScopeOwner), Syntax::Scope*>(
+               m_currentScopeOwner)
+        .Case<Syntax::FuncDef*, Syntax::ClassDef*, Syntax::Lambda*>(
+            [](auto* ptr) -> Syntax::Scope* { return &ptr->scope; });
+  }
 
-    void addToNamespace(const IdentifierToken& token);
+  void addToNamespace(const Token& token) {
+    addToNamespace(IdentifierToken{token});
+  }
 
-    void addToNamespace(pylir::Syntax::Target& target);
+  void addToNamespace(const IdentifierToken& token);
 
-    void finishNamespace(ScopeOwner owner);
+  void addToNamespace(pylir::Syntax::Target& target);
+
+  void finishNamespace(ScopeOwner owner);
 
 public:
-    explicit SemanticAnalysis(Diag::DiagnosticsDocManager& manager) : m_manager(&manager) {}
+  explicit SemanticAnalysis(Diag::DiagnosticsDocManager& manager)
+      : m_manager(&manager) {}
 
-    using Visitor::visit;
+  using Visitor::visit;
 
-    template <class T, class S, class... Args>
-    [[nodiscard]] auto createError(const T& location, const S& message, Args&&... args) const
-    {
-        return Diag::DiagnosticsBuilder(*m_manager, Diag::Severity::Error, location, message,
-                                        std::forward<Args>(args)...);
-    }
+  template <class T, class S, class... Args>
+  [[nodiscard]] auto createError(const T& location, const S& message,
+                                 Args&&... args) const {
+    return Diag::DiagnosticsBuilder(*m_manager, Diag::Severity::Error, location,
+                                    message, std::forward<Args>(args)...);
+  }
 
-    void visit(Syntax::Yield& yield);
+  void visit(Syntax::Yield& yield);
 
-    void visit(Syntax::Atom& atom);
+  void visit(Syntax::Atom& atom);
 
-    void visit(Syntax::Assignment& assignment);
+  void visit(Syntax::Assignment& assignment);
 
-    void visit(Syntax::Lambda& lambda);
+  void visit(Syntax::Lambda& lambda);
 
-    void visit(Syntax::CompFor& compFor);
+  void visit(Syntax::CompFor& compFor);
 
-    void visit(Syntax::ReturnStmt& returnStmt);
+  void visit(Syntax::ReturnStmt& returnStmt);
 
-    void visit(Syntax::SingleTokenStmt& singleTokenStmt);
+  void visit(Syntax::SingleTokenStmt& singleTokenStmt);
 
-    void visit(Syntax::GlobalOrNonLocalStmt& globalOrNonLocalStmt);
+  void visit(Syntax::GlobalOrNonLocalStmt& globalOrNonLocalStmt);
 
-    void visit(Syntax::AssignmentStmt& assignmentStmt);
+  void visit(Syntax::AssignmentStmt& assignmentStmt);
 
-    void visit(Syntax::DelStmt& delStmt);
+  void visit(Syntax::DelStmt& delStmt);
 
-    void visit(Syntax::WithStmt& withStmt);
+  void visit(Syntax::WithStmt& withStmt);
 
-    void visit(Syntax::WhileStmt& whileStmt);
+  void visit(Syntax::WhileStmt& whileStmt);
 
-    void visit(Syntax::ForStmt& forStmt);
+  void visit(Syntax::ForStmt& forStmt);
 
-    void visit(Syntax::TryStmt& tryStmt);
+  void visit(Syntax::TryStmt& tryStmt);
 
-    void visit(Syntax::FuncDef& funcDef);
+  void visit(Syntax::FuncDef& funcDef);
 
-    void visit(Syntax::ClassDef& classDef);
+  void visit(Syntax::ClassDef& classDef);
 
-    void visit(Syntax::FileInput& fileInput)
-    {
-        m_globals = &fileInput.globals;
-        Visitor::visit(fileInput);
-    }
+  void visit(Syntax::FileInput& fileInput) {
+    m_globals = &fileInput.globals;
+    Visitor::visit(fileInput);
+  }
 };
 } // namespace pylir

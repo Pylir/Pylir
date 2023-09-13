@@ -4,7 +4,21 @@
 
 add_pylir_dialect(MemorySSAIR memSSA)
 
-add_library(PylirAnalysis MemorySSA.cpp MemorySSAIR.cpp InlineCost.cpp AliasSetTracker.cpp LoopInfo.cpp EscapeAnalysis.cpp)
-target_link_libraries(PylirAnalysis PUBLIC MLIRPass MLIRAnalysis
-  PRIVATE PylirCaptureInterface PRIVATE PylirTransformsUtils)
+add_library(PylirAnalysis
+  AliasSetTracker.cpp
+  EscapeAnalysis.cpp
+  InlineCost.cpp
+  LoopInfo.cpp
+  MemorySSA.cpp
+  MemorySSAIR.cpp
+)
+target_link_libraries(PylirAnalysis
+  PUBLIC
+  MLIRAnalysis
+  MLIRPass
+  
+  PRIVATE
+  PylirCaptureInterface
+  PylirTransformsUtils
+)
 add_dependencies(PylirAnalysis MemorySSAIRIncGen)

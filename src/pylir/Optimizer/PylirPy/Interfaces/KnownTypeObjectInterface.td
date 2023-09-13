@@ -8,21 +8,22 @@
 include "mlir/IR/OpBase.td"
 
 def KnownTypeObjectInterface : OpInterface<"KnownTypeObjectInterface"> {
-    let cppNamespace = "::pylir::Py";
+  let cppNamespace = "::pylir::Py";
 
-    let methods = [
-        InterfaceMethod<[{
-            Returns the type object of the result of this operation or nullptr if unknown.
-            The type object may either be a value or an attribute.
-        }], "::mlir::OpFoldResult", "getKnownTypeObject", (ins), "", [{
-            return $_op.getTypeObject();
-        }]>,
-    ];
+  let methods = [
+    InterfaceMethod<[{
+      Returns the type object of the result of this operation or nullptr if
+      unknown.
+      The type object may either be a value or an attribute.
+    }], "::mlir::OpFoldResult", "getKnownTypeObject", (ins), "", [{
+      return $_op.getTypeObject();
+    }]>,
+  ];
 
-    let verify = [{
-        static_assert(ConcreteOp::template hasTrait<::mlir::OpTrait::OneResult>());
-        return mlir::success();
-    }];
+  let verify = [{
+    static_assert(ConcreteOp::template hasTrait<::mlir::OpTrait::OneResult>());
+    return mlir::success();
+  }];
 }
 
 #endif

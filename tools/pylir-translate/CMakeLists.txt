@@ -14,8 +14,8 @@ target_link_libraries(pylir-translate
   MLIRParser
   MLIRPass
   MLIRSPIRVDialect
-  MLIRTranslateLib
   MLIRSupport
-  )
+  MLIRTranslateLib
+)
 
 mlir_check_link_libraries(pylir-translate)

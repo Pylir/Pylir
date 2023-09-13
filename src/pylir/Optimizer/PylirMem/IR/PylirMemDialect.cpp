@@ -21,20 +21,19 @@
 #include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.cpp.inc"
 #include "pylir/Optimizer/PylirMem/IR/PylirMemEnums.cpp.inc"
 
-void pylir::Mem::PylirMemDialect::initialize()
-{
-    addOperations<
+void pylir::Mem::PylirMemDialect::initialize() {
+  addOperations<
 #define GET_OP_LIST
 #include "pylir/Optimizer/PylirMem/IR/PylirMemOps.cpp.inc"
-        >();
-    addTypes<
+      >();
+  addTypes<
 #define GET_TYPEDEF_LIST
 #include "pylir/Optimizer/PylirMem/IR/PylirMemTypes.cpp.inc"
-        >();
-    addAttributes<
+      >();
+  addAttributes<
 #define GET_ATTRDEF_LIST
 #include "pylir/Optimizer/PylirMem/IR/PylirMemAttributes.cpp.inc"
-        >();
+      >();
 }
 
 #include <pylir/Optimizer/PylirMem/IR/PylirMemDialect.cpp.inc>

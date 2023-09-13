@@ -6,7 +6,19 @@ add_pylir_dialect(PylirHIR pyHIR)
 
 add_pylir_interface(OP PylirHIRFunctionInterface)
 
-add_library(PylirHIRDialect PylirHIRDialect.cpp PylirHIROps.cpp)
-add_dependencies(PylirHIRDialect PylirHIRIncGen PylirHIRFunctionInterfaceIncGen)
-target_link_libraries(PylirHIRDialect PUBLIC MLIRIR MLIRControlFlowInterfaces PylirPyDialect)
+add_library(PylirHIRDialect
+  PylirHIRDialect.cpp
+  PylirHIROps.cpp
+)
+add_dependencies(PylirHIRDialect
+  PylirHIRFunctionInterfaceIncGen
+  PylirHIRIncGen
+)
+target_link_libraries(PylirHIRDialect
+  PUBLIC
+  PylirPyDialect
+  
+  MLIRControlFlowInterfaces
+  MLIRIR
+)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirHIRDialect)

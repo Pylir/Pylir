@@ -9,17 +9,17 @@
 #include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.h.inc"
 
 template <>
-struct llvm::PointerLikeTypeTraits<pylir::Py::ExceptionHandlingInterface>
-{
-    static inline void* getAsVoidPointer(pylir::Py::ExceptionHandlingInterface p)
-    {
-        return const_cast<void*>(p.getAsOpaquePointer());
-    }
+struct llvm::PointerLikeTypeTraits<pylir::Py::ExceptionHandlingInterface> {
+  static inline void*
+  getAsVoidPointer(pylir::Py::ExceptionHandlingInterface p) {
+    return const_cast<void*>(p.getAsOpaquePointer());
+  }
 
-    static inline pylir::Py::ExceptionHandlingInterface getFromVoidPointer(void* p)
-    {
-        return pylir::Py::ExceptionHandlingInterface::getFromOpaquePointer(p);
-    }
+  static inline pylir::Py::ExceptionHandlingInterface
+  getFromVoidPointer(void* p) {
+    return pylir::Py::ExceptionHandlingInterface::getFromOpaquePointer(p);
+  }
 
-    static constexpr int NumLowBitsAvailable = llvm::PointerLikeTypeTraits<mlir::Operation*>::NumLowBitsAvailable;
+  static constexpr int NumLowBitsAvailable =
+      llvm::PointerLikeTypeTraits<mlir::Operation*>::NumLowBitsAvailable;
 };

@@ -8,37 +8,49 @@
 include "mlir/IR/OpBase.td"
 
 def ExceptionHandlingInterface : OpInterface<"ExceptionHandlingInterface"> {
-    let cppNamespace = "::pylir::Py";
+  let cppNamespace = "::pylir::Py";
 
-    let methods = [
-        InterfaceMethod<[{}], "::mlir::Block*", "getHappyPath", (ins)>,
-        InterfaceMethod<[{}], "::mlir::Block*", "getExceptionPath", (ins)>,
-        InterfaceMethod<[{}], "::mlir::MutableOperandRange", "getNormalDestOperandsMutable", (ins)>,
-        InterfaceMethod<[{}], "::mlir::MutableOperandRange", "getUnwindDestOperandsMutable", (ins)>,
-        InterfaceMethod<[{}], "::mlir::Operation*", "cloneWithoutExceptionHandling", (ins "::mlir::OpBuilder&":$builder)>,
-    ];
+  let methods = [
+    InterfaceMethod<[{}], "::mlir::Block*", "getHappyPath", (ins)>,
+    InterfaceMethod<[{}], "::mlir::Block*", "getExceptionPath", (ins)>,
+    InterfaceMethod<[{
 
-    let extraSharedClassDeclaration = [{
-        ::mlir::OperandRange getNormalDestOperands()
-        {
-            return static_cast<mlir::OperandRange>(this->getNormalDestOperandsMutable());
-        }
+    }], "::mlir::MutableOperandRange", "getNormalDestOperandsMutable", (ins)>,
+    InterfaceMethod<[{
 
-        ::mlir::OperandRange getUnwindDestOperands()
-        {
-            return static_cast<mlir::OperandRange>(this->getUnwindDestOperandsMutable());
-        }
-    }];
+    }], "::mlir::MutableOperandRange", "getUnwindDestOperandsMutable", (ins)>,
+    InterfaceMethod<[{
+
+    }],
+    "::mlir::Operation*",
+    "cloneWithoutExceptionHandling", (ins "::mlir::OpBuilder&":$builder)>,
+  ];
+
+  let extraSharedClassDeclaration = [{
+    ::mlir::OperandRange getNormalDestOperands()
+    {
+      return static_cast<mlir::OperandRange>(
+        this->getNormalDestOperandsMutable());
+    }
+
+    ::mlir::OperandRange getUnwindDestOperands()
+    {
+      return static_cast<mlir::OperandRange>(
+        this->getUnwindDestOperandsMutable());
+    }
+  }];
 }
 
 def AddableExceptionHandlingInterface : OpInterface<"AddableExceptionHandlingInterface"> {
-    let cppNamespace = "::pylir::Py";
+  let cppNamespace = "::pylir::Py";
 
-    let methods = [
-        InterfaceMethod<[{}], "::mlir::Operation*", "cloneWithExceptionHandling",
-            (ins "::mlir::OpBuilder&":$builder, "::mlir::Block*":$happy_path, "::mlir::Block*":$exception_path,
-                 "::mlir::ValueRange":$unwind_operands)>,
-    ];
+  let methods = [
+    InterfaceMethod<[{}], "::mlir::Operation*", "cloneWithExceptionHandling",
+      (ins "::mlir::OpBuilder&":$builder,
+           "::mlir::Block*":$happy_path,
+           "::mlir::Block*":$exception_path,
+           "::mlir::ValueRange":$unwind_operands)>,
+  ];
 }
 
 #endif

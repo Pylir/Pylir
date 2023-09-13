@@ -4,21 +4,32 @@
 
 add_pylir_passes(Passes Transform PREFIX PylirPy)
 
-add_library(PylirPyTransforms ExpandPyDialect.cpp FoldGlobals.cpp GlobalLoadStoreElimination.cpp GlobalSROA.cpp FinalizeRefAttrs.cpp Inliner.cpp)
-add_dependencies(PylirPyTransforms PylirPyTransformPassIncGen)
+add_library(PylirPyTransforms
+  ExpandPyDialect.cpp
+  FinalizeRefAttrs.cpp
+  FoldGlobals.cpp
+  GlobalLoadStoreElimination.cpp
+  GlobalSROA.cpp
+  Inliner.cpp
+)
+add_dependencies(PylirPyTransforms
+  PylirPyTransformPassIncGen
+)
 target_link_libraries(PylirPyTransforms
   PUBLIC
   MLIRPass
+  
   PRIVATE
   PylirAnalysis
   PylirPyDialect
-  PylirTransformsUtils
   PylirPyTransformsUtil
-  MLIRTransforms
+  PylirTransformsUtils
+  
   MLIRAnalysis
   MLIRArithDialect
   MLIRControlFlowDialect
-  )
+  MLIRTransforms
+)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyTransforms)
 
 add_subdirectory(Util)

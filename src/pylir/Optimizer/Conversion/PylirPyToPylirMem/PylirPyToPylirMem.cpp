@@ -15,66 +15,69 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Support/Variant.hpp>
 
-namespace pylir
-{
+namespace pylir {
 #define GEN_PASS_DEF_CONVERTPYLIRPYTOPYLIRMEMPASS
 #include "pylir/Optimizer/Conversion/Passes.h.inc"
 } // namespace pylir
 
-namespace
-{
+namespace {
 
-struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp>
-{
-    using mlir::OpRewritePattern<pylir::Py::MakeDictOp>::OpRewritePattern;
+struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp> {
+  using mlir::OpRewritePattern<pylir::Py::MakeDictOp>::OpRewritePattern;
 
-    mlir::LogicalResult matchAndRewrite(pylir::Py::MakeDictOp op, mlir::PatternRewriter& rewriter) const override
-    {
-        auto dict = rewriter.create<pylir::Py::ConstantOp>(
-            op.getLoc(), pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Dict.name));
-        auto slotCount = rewriter.create<pylir::Py::TupleLenOp>(
-            op.getLoc(), rewriter.create<pylir::Py::TypeSlotsOp>(op.getLoc(), dict));
-        auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict, slotCount);
-        auto init = rewriter.replaceOpWithNewOp<pylir::Mem::InitDictOp>(op, op.getType(), mem);
-        for (auto arg : op.getDictArgs())
-        {
-            auto& entry = pylir::get<pylir::Py::DictEntry>(arg);
-            rewriter.create<pylir::Py::DictSetItemOp>(op.getLoc(), init, entry.key, entry.hash, entry.value);
-        }
-        return mlir::success();
+  mlir::LogicalResult
+  matchAndRewrite(pylir::Py::MakeDictOp op,
+                  mlir::PatternRewriter& rewriter) const override {
+    auto dict = rewriter.create<pylir::Py::ConstantOp>(
+        op.getLoc(),
+        pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Dict.name));
+    auto slotCount = rewriter.create<pylir::Py::TupleLenOp>(
+        op.getLoc(),
+        rewriter.create<pylir::Py::TypeSlotsOp>(op.getLoc(), dict));
+    auto mem = rewriter.create<pylir::Mem::GCAllocObjectOp>(op.getLoc(), dict,
+                                                            slotCount);
+    auto init = rewriter.replaceOpWithNewOp<pylir::Mem::InitDictOp>(
+        op, op.getType(), mem);
+    for (auto arg : op.getDictArgs()) {
+      auto& entry = pylir::get<pylir::Py::DictEntry>(arg);
+      rewriter.create<pylir::Py::DictSetItemOp>(op.getLoc(), init, entry.key,
+                                                entry.hash, entry.value);
     }
+    return mlir::success();
+  }
 };
 
-struct ConvertPylirPyToPylirMem : pylir::impl::ConvertPylirPyToPylirMemPassBase<ConvertPylirPyToPylirMem>
-{
+struct ConvertPylirPyToPylirMem
+    : pylir::impl::ConvertPylirPyToPylirMemPassBase<ConvertPylirPyToPylirMem> {
 protected:
-    void runOnOperation() override;
+  void runOnOperation() override;
 
 public:
-    using Base::Base;
+  using Base::Base;
 };
 
 #include "pylir/Optimizer/Conversion/PylirPyToPylirMem/PylirPyToPylirMem.cpp.inc"
 
-void ConvertPylirPyToPylirMem::runOnOperation()
-{
-    mlir::ConversionTarget target(getContext());
-    target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
+void ConvertPylirPyToPylirMem::runOnOperation() {
+  mlir::ConversionTarget target(getContext());
+  target.markUnknownOpDynamicallyLegal([](auto...) { return true; });
 
-    target.addIllegalOp<pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp, pylir::Py::MakeDictOp,
-                        pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp, pylir::Py::ListToTupleOp,
-                        pylir::Py::BoolFromI1Op, pylir::Py::IntFromSignedOp, pylir::Py::IntFromUnsignedOp,
-                        pylir::Py::StrConcatOp, pylir::Py::IntToStrOp, pylir::Py::StrCopyOp,
-                        pylir::Py::TupleDropFrontOp, pylir::Py::TuplePrependOp, pylir::Py::IntAddOp,
-                        pylir::Py::TupleCopyOp, pylir::Py::FloatFromF64>();
+  target.addIllegalOp<
+      pylir::Py::MakeTupleOp, pylir::Py::MakeListOp, pylir::Py::MakeSetOp,
+      pylir::Py::MakeDictOp, pylir::Py::MakeFuncOp, pylir::Py::MakeObjectOp,
+      pylir::Py::ListToTupleOp, pylir::Py::BoolFromI1Op,
+      pylir::Py::IntFromSignedOp, pylir::Py::IntFromUnsignedOp,
+      pylir::Py::StrConcatOp, pylir::Py::IntToStrOp, pylir::Py::StrCopyOp,
+      pylir::Py::TupleDropFrontOp, pylir::Py::TuplePrependOp,
+      pylir::Py::IntAddOp, pylir::Py::TupleCopyOp, pylir::Py::FloatFromF64>();
 
-    mlir::RewritePatternSet patterns(&getContext());
-    populateWithGenerated(patterns);
-    patterns.insert<MakeDictOpConversion>(&getContext());
-    if (mlir::failed(mlir::applyPartialConversion(getOperation(), target, std::move(patterns))))
-    {
-        signalPassFailure();
-        return;
-    }
+  mlir::RewritePatternSet patterns(&getContext());
+  populateWithGenerated(patterns);
+  patterns.insert<MakeDictOpConversion>(&getContext());
+  if (mlir::failed(mlir::applyPartialConversion(getOperation(), target,
+                                                std::move(patterns)))) {
+    signalPassFailure();
+    return;
+  }
 }
 } // namespace

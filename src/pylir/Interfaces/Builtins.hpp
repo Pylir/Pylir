@@ -8,16 +8,15 @@
 
 #include <array>
 
-namespace pylir::Builtins
-{
+namespace pylir::Builtins {
 
-struct Builtin
-{
-    llvm::StringLiteral name;
-    bool isPublic;
+struct Builtin {
+  llvm::StringLiteral name;
+  bool isPublic;
 };
 
-#define COMPILER_BUILTIN(cppName, intrName) constexpr Builtin Pylir##cppName = {#intrName, false};
+#define COMPILER_BUILTIN(cppName, intrName) \
+  constexpr Builtin Pylir##cppName = {#intrName, false};
 #include "CompilerBuiltins.def"
 
 #define BUILTIN(x, s, isPublic, ...) constexpr Builtin x = {s, isPublic};
@@ -31,20 +30,17 @@ struct Builtin
 #include "CompilerBuiltins.def"
 };
 
-enum class TypeSlots
-{
+enum class TypeSlots {
 #define TYPE_SLOT(pythonName, cppName) cppName,
 #include "Slots.def"
 };
 
-enum class FunctionSlots
-{
+enum class FunctionSlots {
 #define FUNCTION_SLOT(pythonName, cppName) cppName,
 #include "Slots.def"
 };
 
-enum class BaseExceptionSlots
-{
+enum class BaseExceptionSlots {
 #define BASEEXCEPTION_SLOT(pythonName, cppName) cppName,
 #include "Slots.def"
 };

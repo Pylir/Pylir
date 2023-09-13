@@ -21,18 +21,17 @@
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRDialect.cpp.inc"
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRTypes.cpp.inc"
 
-void pylir::HIR::PylirHIRDialect::initialize()
-{
-    addOperations<
+void pylir::HIR::PylirHIRDialect::initialize() {
+  addOperations<
 #define GET_OP_LIST
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIROps.cpp.inc"
-        >();
-    addTypes<
+      >();
+  addTypes<
 #define GET_TYPEDEF_LIST
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRTypes.cpp.inc"
-        >();
-    addAttributes<
+      >();
+  addAttributes<
 #define GET_ATTRDEF_LIST
 #include "pylir/Optimizer/PylirHIR/IR/PylirHIRAttributes.cpp.inc"
-        >();
+      >();
 }

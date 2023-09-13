@@ -10,9 +10,9 @@
 #include <pylir/CodeGen/CodeGenOptions.hpp>
 #include <pylir/Parser/Syntax.hpp>
 
-namespace pylir
-{
+namespace pylir {
 
-mlir::OwningOpRef<mlir::ModuleOp> codegenNew(mlir::MLIRContext* context, const Syntax::FileInput& input,
-                                             Diag::DiagnosticsDocManager& docManager, CodeGenOptions options);
+mlir::OwningOpRef<mlir::ModuleOp>
+codegenNew(mlir::MLIRContext* context, const Syntax::FileInput& input,
+           Diag::DiagnosticsDocManager& docManager, CodeGenOptions options);
 } // namespace pylir

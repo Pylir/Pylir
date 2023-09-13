@@ -9,7 +9,7 @@ class FF<string name, string help> : Flag<["--"], name>, HelpText<help>;
 
 multiclass Eq<string name, string help> {
   def NAME #_EQ : Joined<["--"], name #"=">,
-                  HelpText<help>;
+          HelpText<help>;
   def : Separate<["--"], name>, Alias<!cast<Joined>(NAME #_EQ)>;
 }
 
@@ -39,7 +39,7 @@ def emit_pylir : F<"emit-pylir", "Emit Pylir IR">, Group<grp_actions>;
 def dump_ast : F<"dump-ast", "Dump AST for input file to stdout">, Group<grp_actions>;
 def S : F<"S", "Emit textual assembly file">, Group<grp_actions>;
 def M : JoinedOrSeparate<["-"], "M">, HelpText<"Write depfile of compilation to <file>">, MetaVarName<"<file>">,
-        Group<grp_actions>;
+    Group<grp_actions>;
 
 def grp_codegen : OptionGroup<"CodeGen">, HelpText<"Codegen options">;
 
@@ -53,7 +53,7 @@ def fno_lto : F<"fno-lto", "Disable link time optimization">, Group<grp_codegen>
 def fpie : F<"fpie", "Enable Position Independent Executables">, Group<grp_codegen>;
 def fno_pie : F<"fno-pie", "Disable Position Independent Executables">, Group<grp_codegen>;
 def fgc_EQ : Joined<["-"], "fgc=">, HelpText<"Garbage collector to use">, MetaVarName<"<name>">, Group<grp_codegen>,
-            Values<"markAndSweep">;
+      Values<"markAndSweep">;
 
 def grp_backend : OptionGroup<"Backend">, HelpText<"Backend options">;
 
@@ -70,7 +70,7 @@ def fintegrated_lld : F<"fintegrated-lld", "Use the builtin version of lld (defa
 defm sysroot : Eq<"sysroot", "Root directory of the system libraries">, Group<grp_link>;
 
 def grp_internal : OptionGroup<"Internal"> {
-    let Flags = [HelpHidden];
+  let Flags = [HelpHidden];
 }
 
 def Xstatistics : F<"Xstatistics", "Show pass statistics">, Group<grp_internal>;
@@ -86,6 +86,6 @@ def Xprint_pipeline : F<"Xprint-pipeline", "Print the pass pipeline to stderr">,
 def Xprint_module_scope : F<"Xprint-module-scope", "Use module scope for printing IR">, Group<grp_internal>;
 def verify : F<"verify", "Verify diagnostics output">, Group<grp_internal>;
 def Xsanitize_EQ : Joined<["-"], "Xsanitize=">, MetaVarName<"<sanitizers>">, Group<grp_internal>,
-    Values<"address,undefined,thread">;
+  Values<"address,undefined,thread">;
 def Xsanitize_codegen : F<"Xsanitize-codegen", "Enable Sanitizers in Pylir compiled code">, Group<grp_internal>;
 def Xnew_codegen : F<"Xnew-codegen", "Enable new CodeGen using pyHIR">, Group<grp_internal>;

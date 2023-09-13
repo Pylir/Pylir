@@ -12,27 +12,40 @@ mlir_tablegen(PylirPyDialect.h.inc -gen-dialect-decls -dialect="py")
 mlir_tablegen(PylirPyDialect.cpp.inc -gen-dialect-defs -dialect="py")
 mlir_tablegen(PylirPyEnums.h.inc -gen-enum-decls)
 mlir_tablegen(PylirPyEnums.cpp.inc -gen-enum-defs)
-mlir_tablegen(PylirPyAttributes.cpp.inc -gen-attrdef-defs --attrdefs-dialect="py")
+mlir_tablegen(PylirPyAttributes.cpp.inc -gen-attrdef-defs
+  --attrdefs-dialect="py")
 set(LLVM_TARGET_DEFINITIONS PylirPyAttributes.td)
-mlir_tablegen(PylirPyAttributes.h.inc -gen-attrdef-decls --attrdefs-dialect="py")
+mlir_tablegen(PylirPyAttributes.h.inc -gen-attrdef-decls
+  --attrdefs-dialect="py")
 set(LLVM_TARGET_DEFINITIONS PylirPyAttrBase.td)
-mlir_tablegen(PylirPyAttrBase.h.inc -gen-attrdef-decls --attrdefs-dialect="py")
+mlir_tablegen(PylirPyAttrBase.h.inc -gen-attrdef-decls
+  --attrdefs-dialect="py")
 add_public_tablegen_target(PylirPyIncGen)
-add_pylir_doc(PylirPyOps.td PylirPyDialect Dialect/ -gen-dialect-doc -dialect="py")
+add_pylir_doc(PylirPyOps.td PylirPyDialect Dialect/ -gen-dialect-doc
+  -dialect="py")
 
 add_pylir_interface(ATTR PylirPyAttrInterfaces)
 add_pylir_rewriter(PylirPyPatterns)
 
-add_library(PylirPyDialect PylirPyDialect.cpp PylirPyOps.cpp PylirPyAttributes.cpp PylirPyTypes.cpp PylirPyOpFold.cpp
-  PylirPyAttrInterfaces.cpp Value.cpp
-  PylirPyOpSROA.cpp PylirPyOpsVerifier.cpp PylirPyTraits.cpp)
-add_dependencies(PylirPyDialect PylirPyIncGen PylirPyPatternsIncGen PylirPyAttrInterfacesIncGen)
+add_library(PylirPyDialect
+  PylirPyAttrInterfaces.cpp
+  PylirPyAttributes.cpp
+  PylirPyDialect.cpp
+  PylirPyOps.cpp
+  PylirPyOpFold.cpp
+  PylirPyOpSROA.cpp
+  PylirPyOpsVerifier.cpp
+  PylirPyTraits.cpp
+  PylirPyTypes.cpp
+  Value.cpp
+)
+add_dependencies(PylirPyDialect
+  PylirPyIncGen
+  PylirPyPatternsIncGen
+  PylirPyAttrInterfacesIncGen
+)
 target_link_libraries(PylirPyDialect
   PUBLIC
-  MLIRFunctionInterfaces
-  MLIRIR
-  MLIRInferTypeOpInterface
-
   PylirCaptureInterface
   PylirMemoryFoldInterface
   PylirPyCopyObjectInterface
@@ -41,13 +54,16 @@ target_link_libraries(PylirPyDialect
   PylirPyOnlyReadsValueInterface
   PylirSROAInterfaces
   PylirSupport
-
+  
+  MLIRFunctionInterfaces
+  MLIRIR
+  MLIRInferTypeOpInterface
+  
   PRIVATE
-
+  PylirTransformsUtils
+  
   MLIRArithDialect
   MLIRControlFlowDialect
   MLIRDataLayoutInterfaces
-
-  PylirTransformsUtils
 )
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirPyDialect)

@@ -8,8 +8,7 @@
 
 #include <memory>
 
-namespace pylir::Mem
-{
+namespace pylir::Mem {
 #define GEN_PASS_REGISTRATION
 #define GEN_PASS_DECL
 #include "pylir/Optimizer/PylirMem/Transforms/Passes.h.inc"

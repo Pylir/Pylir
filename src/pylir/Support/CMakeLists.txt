@@ -2,5 +2,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_library(PylirSupport STATIC Text.cpp TextData.cpp BigInt.cpp)
-target_link_libraries(PylirSupport PRIVATE utf8proc PUBLIC tommath)
+add_library(PylirSupport
+  STATIC
+  BigInt.cpp
+  Text.cpp
+  TextData.cpp
+)
+target_link_libraries(PylirSupport
+  PRIVATE
+  utf8proc
+  
+  PUBLIC
+  tommath
+)

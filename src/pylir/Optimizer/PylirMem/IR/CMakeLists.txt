@@ -4,7 +4,20 @@
 
 add_pylir_dialect(PylirMem pyMem)
 
-add_library(PylirMemDialect PylirMemDialect.cpp PylirMemOps.cpp Value.cpp)
-add_dependencies(PylirMemDialect PylirMemIncGen)
-target_link_libraries(PylirMemDialect PUBLIC MLIRIR PylirPyDialect PylirSupport MLIRInferTypeOpInterface)
+add_library(PylirMemDialect
+  PylirMemDialect.cpp
+  PylirMemOps.cpp
+  Value.cpp
+)
+add_dependencies(PylirMemDialect
+  PylirMemIncGen
+)
+target_link_libraries(PylirMemDialect
+  PUBLIC
+  PylirPyDialect
+  PylirSupport
+  
+  MLIRIR
+  MLIRInferTypeOpInterface
+)
 set_property(GLOBAL APPEND PROPERTY MLIR_DIALECT_LIBS PylirMemDialect)

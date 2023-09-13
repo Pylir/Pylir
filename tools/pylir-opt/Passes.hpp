@@ -8,8 +8,7 @@
 
 #include <memory>
 
-namespace pylir::test
-{
+namespace pylir::test {
 #define GEN_PASS_REGISTRATION
 #define GEN_PASS_DECL
 #include "Passes.h.inc"

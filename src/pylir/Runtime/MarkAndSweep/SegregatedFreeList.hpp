@@ -9,30 +9,28 @@
 #include <memory>
 #include <vector>
 
-namespace pylir::rt
-{
+namespace pylir::rt {
 
 class PyObject;
 
-class SegregatedFreeList
-{
-    std::size_t m_sizeClass;
-    std::byte* m_head = nullptr;
-    std::vector<PagePtr> m_pages;
+class SegregatedFreeList {
+  std::size_t m_sizeClass;
+  std::byte* m_head = nullptr;
+  std::vector<PagePtr> m_pages;
 
-    [[nodiscard]] PagePtr newPage() const;
+  [[nodiscard]] PagePtr newPage() const;
 
 public:
-    explicit SegregatedFreeList(std::size_t sizeClass) : m_sizeClass(sizeClass) {}
+  explicit SegregatedFreeList(std::size_t sizeClass) : m_sizeClass(sizeClass) {}
 
-    ~SegregatedFreeList();
-    SegregatedFreeList(SegregatedFreeList&&) noexcept = default;
-    SegregatedFreeList& operator=(SegregatedFreeList&&) noexcept = default;
-    SegregatedFreeList(const SegregatedFreeList&) = delete;
-    SegregatedFreeList& operator=(const SegregatedFreeList&) = delete;
+  ~SegregatedFreeList();
+  SegregatedFreeList(SegregatedFreeList&&) noexcept = default;
+  SegregatedFreeList& operator=(SegregatedFreeList&&) noexcept = default;
+  SegregatedFreeList(const SegregatedFreeList&) = delete;
+  SegregatedFreeList& operator=(const SegregatedFreeList&) = delete;
 
-    PyObject* nextCell();
+  PyObject* nextCell();
 
-    void sweep();
+  void sweep();
 };
 } // namespace pylir::rt

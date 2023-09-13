@@ -11,548 +11,508 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Support/BigInt.hpp>
 
-namespace pylir
-{
-class PyBuilder : public mlir::OpBuilder
-{
-    mlir::Location m_loc;
+namespace pylir {
+class PyBuilder : public mlir::OpBuilder {
+  mlir::Location m_loc;
 
-    void implementBlock(mlir::Block* block)
-    {
-        if (auto* next = getBlock()->getNextNode())
-        {
-            block->insertBefore(next);
-        }
-        else
-        {
-            getBlock()->getParent()->push_back(block);
-        }
-        setInsertionPointToStart(block);
-    }
+  void implementBlock(mlir::Block* block) {
+    if (auto* next = getBlock()->getNextNode())
+      block->insertBefore(next);
+    else
+      getBlock()->getParent()->push_back(block);
+
+    setInsertionPointToStart(block);
+  }
 
 public:
-    explicit PyBuilder(mlir::Operation* operationBefore)
-        : mlir::OpBuilder(operationBefore), m_loc(operationBefore->getLoc())
-    {
-    }
+  explicit PyBuilder(mlir::Operation* operationBefore)
+      : mlir::OpBuilder(operationBefore), m_loc(operationBefore->getLoc()) {}
 
-    explicit PyBuilder(mlir::MLIRContext* context, std::optional<mlir::Location> loc = {})
-        : mlir::OpBuilder(context), m_loc(loc.value_or(getUnknownLoc()))
-    {
-    }
+  explicit PyBuilder(mlir::MLIRContext* context,
+                     std::optional<mlir::Location> loc = {})
+      : mlir::OpBuilder(context), m_loc(loc.value_or(getUnknownLoc())) {}
 
-    [[nodiscard]] mlir::Location getCurrentLoc() const
-    {
-        return m_loc;
-    }
+  [[nodiscard]] mlir::Location getCurrentLoc() const {
+    return m_loc;
+  }
 
-    void setCurrentLoc(mlir::Location loc)
-    {
-        m_loc = loc;
-    }
+  void setCurrentLoc(mlir::Location loc) {
+    m_loc = loc;
+  }
 
-    Py::UnboundAttr getUnboundAttr()
-    {
-        return Py::UnboundAttr::get(getContext());
-    }
+  Py::UnboundAttr getUnboundAttr() {
+    return Py::UnboundAttr::get(getContext());
+  }
 
-    Py::ObjectAttr getObjectAttr(Py::RefAttr type, mlir::DictionaryAttr slots = {})
-    {
-        return Py::ObjectAttr::get(context, type, slots);
-    }
+  Py::ObjectAttr getObjectAttr(Py::RefAttr type,
+                               mlir::DictionaryAttr slots = {}) {
+    return Py::ObjectAttr::get(context, type, slots);
+  }
 
-    Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {}, pylir::Py::TupleAttr instanceSlots = {},
-                             mlir::DictionaryAttr slots = {})
-    {
-        return Py::TypeAttr::get(context, mroTuple, instanceSlots, {}, slots);
-    }
+  Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {},
+                           pylir::Py::TupleAttr instanceSlots = {},
+                           mlir::DictionaryAttr slots = {}) {
+    return Py::TypeAttr::get(context, mroTuple, instanceSlots, {}, slots);
+  }
 
-    Py::IntAttr getIntAttr(BigInt bigInt)
-    {
-        return Py::IntAttr::get(getContext(), std::move(bigInt));
-    }
+  Py::IntAttr getIntAttr(const BigInt& bigInt) {
+    return Py::IntAttr::get(getContext(), bigInt);
+  }
 
-    Py::BoolAttr getPyBoolAttr(bool value)
-    {
-        return Py::BoolAttr::get(getContext(), value);
-    }
+  Py::BoolAttr getPyBoolAttr(bool value) {
+    return Py::BoolAttr::get(getContext(), value);
+  }
 
-    Py::FloatAttr getFloatAttr(double value)
-    {
-        return Py::FloatAttr::get(getContext(), llvm::APFloat(value));
-    }
+  Py::FloatAttr getFloatAttr(double value) {
+    return Py::FloatAttr::get(getContext(), llvm::APFloat(value));
+  }
 
-    Py::StrAttr getStrAttr(llvm::StringRef value)
-    {
-        return Py::StrAttr::get(getContext(), value);
-    }
+  Py::StrAttr getStrAttr(llvm::StringRef value) {
+    return Py::StrAttr::get(getContext(), value);
+  }
 
-    Py::TupleAttr getTupleAttr(llvm::ArrayRef<mlir::Attribute> value = {})
-    {
-        return Py::TupleAttr::get(getContext(), value);
-    }
+  Py::TupleAttr getTupleAttr(llvm::ArrayRef<mlir::Attribute> value = {}) {
+    return Py::TupleAttr::get(getContext(), value);
+  }
 
-    Py::ListAttr getListAttr(llvm::ArrayRef<mlir::Attribute> value = {})
-    {
-        return Py::ListAttr::get(getContext(), value);
-    }
+  Py::ListAttr getListAttr(llvm::ArrayRef<mlir::Attribute> value = {}) {
+    return Py::ListAttr::get(getContext(), value);
+  }
 
-    Py::DictAttr getDictAttr(llvm::ArrayRef<Py::DictAttr::Entry> value = {})
-    {
-        return Py::DictAttr::get(getContext(), value);
-    }
+  Py::DictAttr getDictAttr(llvm::ArrayRef<Py::DictAttr::Entry> value = {}) {
+    return Py::DictAttr::get(getContext(), value);
+  }
 
-    Py::FunctionAttr getFunctionAttr(mlir::FlatSymbolRefAttr value, mlir::Attribute qualName = {},
-                                     mlir::Attribute defaults = {}, mlir::Attribute kwDefaults = {},
-                                     mlir::Attribute dict = {})
-    {
-        return Py::FunctionAttr::get(context, value, qualName, defaults, kwDefaults, dict);
-    }
+  Py::FunctionAttr getFunctionAttr(mlir::FlatSymbolRefAttr value,
+                                   mlir::Attribute qualName = {},
+                                   mlir::Attribute defaults = {},
+                                   mlir::Attribute kwDefaults = {},
+                                   mlir::Attribute dict = {}) {
+    return Py::FunctionAttr::get(context, value, qualName, defaults, kwDefaults,
+                                 dict);
+  }
 
-    Py::DynamicType getDynamicType()
-    {
-        return getType<Py::DynamicType>();
-    }
+  Py::DynamicType getDynamicType() {
+    return getType<Py::DynamicType>();
+  }
 
-    using mlir::OpBuilder::create;
+  using mlir::OpBuilder::create;
 
-    template <class Op>
-    Op create()
-    {
-        return mlir::OpBuilder::create<Op>(getCurrentLoc());
-    }
+  template <class Op>
+  Op create() {
+    return mlir::OpBuilder::create<Op>(getCurrentLoc());
+  }
 
-    template <class Op, class First, class... Args>
-    std::enable_if_t<!std::is_same_v<std::decay_t<First>, mlir::Location>, Op> create(First&& first, Args&&... args)
-    {
-        return mlir::OpBuilder::create<Op>(getCurrentLoc(), std::forward<First>(first), std::forward<Args>(args)...);
-    }
+  template <class Op, class First, class... Args>
+  std::enable_if_t<!std::is_same_v<std::decay_t<First>, mlir::Location>, Op>
+  create(First&& first, Args&&... args) {
+    return mlir::OpBuilder::create<Op>(getCurrentLoc(),
+                                       std::forward<First>(first),
+                                       std::forward<Args>(args)...);
+  }
 
-#define BUILTIN(name, str, ...)                       \
-    Py::RefAttr get##name##Builtin()                  \
-    {                                                 \
-        return Py::RefAttr::get(getContext(), (str)); \
-    }
+#define BUILTIN(name, str, ...)                   \
+  Py::RefAttr get##name##Builtin() {              \
+    return Py::RefAttr::get(getContext(), (str)); \
+  }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
-#define BUILTIN(name, ...)                                   \
-    Py::ConstantOp create##name##Ref()                       \
-    {                                                        \
-        return create<Py::ConstantOp>(get##name##Builtin()); \
-    }
+#define BUILTIN(name, ...)                               \
+  Py::ConstantOp create##name##Ref() {                   \
+    return create<Py::ConstantOp>(get##name##Builtin()); \
+  }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
-#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                                                                    \
-    mlir::Value createPylir##name##Intrinsic(mlir::Value first, mlir::Value second, mlir::Value third,                 \
-                                             mlir::Block* exceptBlock = nullptr)                                       \
-    {                                                                                                                  \
-        if (!exceptBlock)                                                                                              \
-        {                                                                                                              \
-            return create<Py::CallOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                   \
-                                      mlir::ValueRange{first, second, third})                                          \
-                .getResult(0);                                                                                         \
-        }                                                                                                              \
-        auto* happyPath = new mlir::Block;                                                                             \
-        auto op = create<Py::InvokeOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                  \
-                                       mlir::ValueRange{first, second, third}, mlir::ValueRange{}, mlir::ValueRange{}, \
-                                       happyPath, exceptBlock);                                                        \
-        implementBlock(happyPath);                                                                                     \
-        return op.getResult(0);                                                                                        \
-    }
+#define COMPILER_BUILTIN_TERNARY_OP(name, slotName)                          \
+  mlir::Value createPylir##name##Intrinsic(                                  \
+      mlir::Value first, mlir::Value second, mlir::Value third,              \
+      mlir::Block* exceptBlock = nullptr) {                                  \
+    if (!exceptBlock)                                                        \
+      return create<Py::CallOp>(getDynamicType(),                            \
+                                COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
+                                mlir::ValueRange{first, second, third})      \
+          .getResult(0);                                                     \
+                                                                             \
+    auto* happyPath = new mlir::Block;                                       \
+    auto op = create<Py::InvokeOp>(                                          \
+        getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),       \
+        mlir::ValueRange{first, second, third}, mlir::ValueRange{},          \
+        mlir::ValueRange{}, happyPath, exceptBlock);                         \
+    implementBlock(happyPath);                                               \
+    return op.getResult(0);                                                  \
+  }
 
-#define COMPILER_BUILTIN_BIN_OP(name, slotName)                                                                       \
-    mlir::Value createPylir##name##Intrinsic(mlir::Value lhs, mlir::Value rhs, mlir::Block* exceptBlock = nullptr)    \
-    {                                                                                                                 \
-        if (!exceptBlock)                                                                                             \
-        {                                                                                                             \
-            return create<Py::CallOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                  \
-                                      mlir::ValueRange{lhs, rhs})                                                     \
-                .getResult(0);                                                                                        \
-        }                                                                                                             \
-        auto* happyPath = new mlir::Block;                                                                            \
-        auto op = create<Py::InvokeOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),                 \
-                                       mlir::ValueRange{lhs, rhs}, mlir::ValueRange{}, mlir::ValueRange{}, happyPath, \
-                                       exceptBlock);                                                                  \
-        implementBlock(happyPath);                                                                                    \
-        return op.getResult(0);                                                                                       \
-    }
+#define COMPILER_BUILTIN_BIN_OP(name, slotName)                               \
+  mlir::Value createPylir##name##Intrinsic(                                   \
+      mlir::Value lhs, mlir::Value rhs, mlir::Block* exceptBlock = nullptr) { \
+    if (!exceptBlock)                                                         \
+      return create<Py::CallOp>(getDynamicType(),                             \
+                                COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),  \
+                                mlir::ValueRange{lhs, rhs})                   \
+          .getResult(0);                                                      \
+                                                                              \
+    auto* happyPath = new mlir::Block;                                        \
+    auto op = create<Py::InvokeOp>(                                           \
+        getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName),        \
+        mlir::ValueRange{lhs, rhs}, mlir::ValueRange{}, mlir::ValueRange{},   \
+        happyPath, exceptBlock);                                              \
+    implementBlock(happyPath);                                                \
+    return op.getResult(0);                                                   \
+  }
 
-#define COMPILER_BUILTIN_UNARY_OP(name, slotName)                                                          \
-    mlir::Value createPylir##name##Intrinsic(mlir::Value val, mlir::Block* exceptBlock = nullptr)          \
-    {                                                                                                      \
-        if (!exceptBlock)                                                                                  \
-        {                                                                                                  \
-            return create<Py::CallOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), val)  \
-                .getResult(0);                                                                             \
-        }                                                                                                  \
-        auto* happyPath = new mlir::Block;                                                                 \
-        auto op = create<Py::InvokeOp>(getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), val, \
-                                       mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptBlock);    \
-        implementBlock(happyPath);                                                                         \
-        return op.getResult(0);                                                                            \
-    }
+#define COMPILER_BUILTIN_UNARY_OP(name, slotName)                            \
+  mlir::Value createPylir##name##Intrinsic(                                  \
+      mlir::Value val, mlir::Block* exceptBlock = nullptr) {                 \
+    if (!exceptBlock)                                                        \
+      return create<Py::CallOp>(getDynamicType(),                            \
+                                COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), \
+                                val)                                         \
+          .getResult(0);                                                     \
+                                                                             \
+    auto* happyPath = new mlir::Block;                                       \
+    auto op = create<Py::InvokeOp>(                                          \
+        getDynamicType(), COMPILER_BUILTIN_SLOT_TO_API_NAME(slotName), val,  \
+        mlir::ValueRange{}, mlir::ValueRange{}, happyPath, exceptBlock);     \
+    implementBlock(happyPath);                                               \
+    return op.getResult(0);                                                  \
+  }
 
 #include <pylir/Interfaces/CompilerBuiltins.def>
 
-    Py::ConstantOp createConstant(mlir::Attribute constant)
-    {
-        if (auto ref = constant.dyn_cast<Py::RefAttr>())
-        {
-            return create<Py::ConstantOp>(ref);
-        }
-        if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
-        {
-            return create<Py::ConstantOp>(unbound);
-        }
-        return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
-    }
+  Py::ConstantOp createConstant(mlir::Attribute constant) {
+    if (auto ref = constant.dyn_cast<Py::RefAttr>())
+      return create<Py::ConstantOp>(ref);
 
-    template <std::size_t n>
-    Py::ConstantOp createConstant(const char (&c)[n])
-    {
-        return create<Py::ConstantOp>(getStrAttr(c));
-    }
+    if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
+      return create<Py::ConstantOp>(unbound);
 
-    Py::ConstantOp createConstant(llvm::StringRef string)
-    {
-        return create<Py::ConstantOp>(getStrAttr(string));
-    }
+    return create<Py::ConstantOp>(constant.cast<Py::ObjectAttrInterface>());
+  }
 
-    template <class Integer>
-    std::enable_if_t<std::is_integral_v<std::decay_t<Integer>> && !std::is_same_v<bool, std::decay_t<Integer>>>
-        createConstant(Integer) = delete;
+  template <std::size_t n>
+  Py::ConstantOp createConstant(const char (&c)[n]) {
+    return create<Py::ConstantOp>(getStrAttr(c));
+  }
 
-    Py::ConstantOp createConstant(bool value)
-    {
-        return create<Py::ConstantOp>(getPyBoolAttr(value));
-    }
+  Py::ConstantOp createConstant(llvm::StringRef string) {
+    return create<Py::ConstantOp>(getStrAttr(string));
+  }
 
-    Py::ConstantOp createConstant(BigInt bigInt)
-    {
-        return create<Py::ConstantOp>(getIntAttr(std::move(bigInt)));
-    }
+  template <class Integer>
+  std::enable_if_t<std::is_integral_v<std::decay_t<Integer>> &&
+                   !std::is_same_v<bool, std::decay_t<Integer>>>
+      createConstant(Integer) = delete;
 
-    Py::ConstantOp createConstant(double value)
-    {
-        return create<Py::ConstantOp>(getFloatAttr(value));
-    }
+  Py::ConstantOp createConstant(bool value) {
+    return create<Py::ConstantOp>(getPyBoolAttr(value));
+  }
 
-    Py::TypeOfOp createTypeOf(mlir::Value value)
-    {
-        return create<Py::TypeOfOp>(value);
-    }
+  Py::ConstantOp createConstant(const BigInt& bigInt) {
+    return create<Py::ConstantOp>(getIntAttr(bigInt));
+  }
 
-    template <class T, std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>* = nullptr>
-    Py::GetSlotOp createGetSlot(mlir::Value object, T slot)
-    {
-        return create<Py::GetSlotOp>(object, create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)));
-    }
+  Py::ConstantOp createConstant(double value) {
+    return create<Py::ConstantOp>(getFloatAttr(value));
+  }
 
-    template <class T, std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>* = nullptr>
-    Py::SetSlotOp createSetSlot(mlir::Value object, T slot, mlir::Value value)
-    {
-        return create<Py::SetSlotOp>(object, create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)),
-                                     value);
-    }
+  Py::TypeOfOp createTypeOf(mlir::Value value) {
+    return create<Py::TypeOfOp>(value);
+  }
 
-    Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index, mlir::Value hash)
-    {
-        return create<Py::DictTryGetItemOp>(dict, index, hash);
-    }
+  template <class T, std::enable_if_t<std::disjunction_v<
+                         std::is_integral<T>, std::is_enum<T>>>* = nullptr>
+  Py::GetSlotOp createGetSlot(mlir::Value object, T slot) {
+    return create<Py::GetSlotOp>(object, create<mlir::arith::ConstantIndexOp>(
+                                             static_cast<std::size_t>(slot)));
+  }
 
-    Py::DictSetItemOp createDictSetItem(mlir::Value dict, mlir::Value key, mlir::Value hash, mlir::Value value)
-    {
-        return create<Py::DictSetItemOp>(dict, key, hash, value);
-    }
+  template <class T, std::enable_if_t<std::disjunction_v<
+                         std::is_integral<T>, std::is_enum<T>>>* = nullptr>
+  Py::SetSlotOp createSetSlot(mlir::Value object, T slot, mlir::Value value) {
+    return create<Py::SetSlotOp>(
+        object,
+        create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)),
+        value);
+  }
 
-    Py::DictDelItemOp createDictDelItem(mlir::Value dict, mlir::Value key, mlir::Value hash)
-    {
-        return create<Py::DictDelItemOp>(dict, key, hash);
-    }
+  Py::DictTryGetItemOp createDictTryGetItem(mlir::Value dict, mlir::Value index,
+                                            mlir::Value hash) {
+    return create<Py::DictTryGetItemOp>(dict, index, hash);
+  }
 
-    Py::DictLenOp createDictLen(mlir::Value dict)
-    {
-        return create<Py::DictLenOp>(dict);
-    }
+  Py::DictSetItemOp createDictSetItem(mlir::Value dict, mlir::Value key,
+                                      mlir::Value hash, mlir::Value value) {
+    return create<Py::DictSetItemOp>(dict, key, hash, value);
+  }
 
-    Py::TupleGetItemOp createTupleGetItem(mlir::Value tuple, mlir::Value index)
-    {
-        return create<Py::TupleGetItemOp>(tuple, index);
-    }
+  Py::DictDelItemOp createDictDelItem(mlir::Value dict, mlir::Value key,
+                                      mlir::Value hash) {
+    return create<Py::DictDelItemOp>(dict, key, hash);
+  }
 
-    Py::TupleLenOp createTupleLen(mlir::Value tuple)
-    {
-        return create<Py::TupleLenOp>(tuple);
-    }
+  Py::DictLenOp createDictLen(mlir::Value dict) {
+    return create<Py::DictLenOp>(dict);
+  }
 
-    Py::TuplePrependOp createTuplePrepend(mlir::Value element, mlir::Value tuple)
-    {
-        return create<Py::TuplePrependOp>(element, tuple);
-    }
+  Py::TupleGetItemOp createTupleGetItem(mlir::Value tuple, mlir::Value index) {
+    return create<Py::TupleGetItemOp>(tuple, index);
+  }
 
-    Py::TupleDropFrontOp createTupleDropFront(mlir::Value count, mlir::Value tuple)
-    {
-        return create<Py::TupleDropFrontOp>(count, tuple);
-    }
+  Py::TupleLenOp createTupleLen(mlir::Value tuple) {
+    return create<Py::TupleLenOp>(tuple);
+  }
 
-    Py::ListResizeOp createListResize(mlir::Value list, mlir::Value length)
-    {
-        return create<Py::ListResizeOp>(list, length);
-    }
+  Py::TuplePrependOp createTuplePrepend(mlir::Value element,
+                                        mlir::Value tuple) {
+    return create<Py::TuplePrependOp>(element, tuple);
+  }
 
-    Py::ListSetItemOp createListSetItem(mlir::Value list, mlir::Value index, mlir::Value element)
-    {
-        return create<Py::ListSetItemOp>(list, index, element);
-    }
+  Py::TupleDropFrontOp createTupleDropFront(mlir::Value count,
+                                            mlir::Value tuple) {
+    return create<Py::TupleDropFrontOp>(count, tuple);
+  }
 
-    Py::ListLenOp createListLen(mlir::Value list)
-    {
-        return create<Py::ListLenOp>(list);
-    }
+  Py::ListResizeOp createListResize(mlir::Value list, mlir::Value length) {
+    return create<Py::ListResizeOp>(list, length);
+  }
 
-    Py::ListToTupleOp createListToTuple(mlir::Value list)
-    {
-        return create<Py::ListToTupleOp>(list);
-    }
+  Py::ListSetItemOp createListSetItem(mlir::Value list, mlir::Value index,
+                                      mlir::Value element) {
+    return create<Py::ListSetItemOp>(list, index, element);
+  }
 
-    Py::FunctionCallOp createFunctionCall(mlir::Value function, llvm::ArrayRef<mlir::Value> arguments)
-    {
-        return create<Py::FunctionCallOp>(function, arguments);
-    }
+  Py::ListLenOp createListLen(mlir::Value list) {
+    return create<Py::ListLenOp>(list);
+  }
 
-    Py::ObjectHashOp createObjectHash(mlir::Value object)
-    {
-        return create<Py::ObjectHashOp>(object);
-    }
+  Py::ListToTupleOp createListToTuple(mlir::Value list) {
+    return create<Py::ListToTupleOp>(list);
+  }
 
-    Py::ObjectIdOp createObjectId(mlir::Value object)
-    {
-        return create<Py::ObjectIdOp>(object);
-    }
+  Py::FunctionCallOp createFunctionCall(mlir::Value function,
+                                        llvm::ArrayRef<mlir::Value> arguments) {
+    return create<Py::FunctionCallOp>(function, arguments);
+  }
 
-    Py::TypeMROOp createTypeMRO(mlir::Value typeObject)
-    {
-        return create<Py::TypeMROOp>(typeObject);
-    }
+  Py::ObjectHashOp createObjectHash(mlir::Value object) {
+    return create<Py::ObjectHashOp>(object);
+  }
 
-    Py::StrCopyOp createStrCopy(mlir::Value string, mlir::Value typeObject)
-    {
-        return create<Py::StrCopyOp>(string, typeObject);
-    }
+  Py::ObjectIdOp createObjectId(mlir::Value object) {
+    return create<Py::ObjectIdOp>(object);
+  }
 
-    Py::StrHashOp createStrHash(mlir::Value string)
-    {
-        return create<Py::StrHashOp>(string);
-    }
+  Py::TypeMROOp createTypeMRO(mlir::Value typeObject) {
+    return create<Py::TypeMROOp>(typeObject);
+  }
 
-    Py::StrEqualOp createStrEqual(mlir::Value lhs, mlir::Value rhs)
-    {
-        return create<Py::StrEqualOp>(lhs, rhs);
-    }
+  Py::StrCopyOp createStrCopy(mlir::Value string, mlir::Value typeObject) {
+    return create<Py::StrCopyOp>(string, typeObject);
+  }
 
-    Py::StrConcatOp createStrConcat(llvm::ArrayRef<mlir::Value> strings)
-    {
-        return create<Py::StrConcatOp>(strings);
-    }
+  Py::StrHashOp createStrHash(mlir::Value string) {
+    return create<Py::StrHashOp>(string);
+  }
 
-    template <class T, std::enable_if_t<std::disjunction_v<std::is_integral<T>, std::is_enum<T>>>* = nullptr>
-    Py::MROLookupOp createMROLookup(mlir::Value mroTuple, T slot)
-    {
-        return create<Py::MROLookupOp>(mroTuple, create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)));
-    }
+  Py::StrEqualOp createStrEqual(mlir::Value lhs, mlir::Value rhs) {
+    return create<Py::StrEqualOp>(lhs, rhs);
+  }
 
-    Py::TupleContainsOp createTupleContains(mlir::Value tuple, mlir::Value element)
-    {
-        return create<Py::TupleContainsOp>(tuple, element);
-    }
+  Py::StrConcatOp createStrConcat(llvm::ArrayRef<mlir::Value> strings) {
+    return create<Py::StrConcatOp>(strings);
+  }
 
-    Py::MakeTupleOp createMakeTuple()
-    {
-        return create<Py::MakeTupleOp>(llvm::ArrayRef<Py::IterArg>{});
-    }
+  template <class T, std::enable_if_t<std::disjunction_v<
+                         std::is_integral<T>, std::is_enum<T>>>* = nullptr>
+  Py::MROLookupOp createMROLookup(mlir::Value mroTuple, T slot) {
+    return create<Py::MROLookupOp>(
+        mroTuple,
+        create<mlir::arith::ConstantIndexOp>(static_cast<std::size_t>(slot)));
+  }
 
-    mlir::Value createMakeTuple(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
-        if (!unwindPath
-            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
-        {
-            return create<Py::MakeTupleOp>(args);
-        }
-        auto* happyPath = new mlir::Block;
-        auto op = create<Py::MakeTupleExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
-        implementBlock(happyPath);
-        return op;
-    }
+  Py::TupleContainsOp createTupleContains(mlir::Value tuple,
+                                          mlir::Value element) {
+    return create<Py::TupleContainsOp>(tuple, element);
+  }
 
-    Py::MakeListOp createMakeList()
-    {
-        return create<Py::MakeListOp>(llvm::ArrayRef<Py::IterArg>{});
-    }
+  Py::MakeTupleOp createMakeTuple() {
+    return create<Py::MakeTupleOp>(llvm::ArrayRef<Py::IterArg>{});
+  }
 
-    mlir::Value createMakeList(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
-        if (!unwindPath
-            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
-        {
-            return create<Py::MakeListOp>(args);
-        }
-        auto* happyPath = new mlir::Block;
-        auto op = create<Py::MakeListExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
-        implementBlock(happyPath);
-        return op;
-    }
+  mlir::Value createMakeTuple(llvm::ArrayRef<Py::IterArg> args,
+                              mlir::Block* unwindPath) {
+    if (!unwindPath || llvm::all_of(args, [](const Py::IterArg& arg) {
+          return std::holds_alternative<mlir::Value>(arg);
+        }))
+      return create<Py::MakeTupleOp>(args);
 
-    Py::MakeSetOp createMakeSet()
-    {
-        return create<Py::MakeSetOp>(llvm::ArrayRef<Py::IterArg>{});
-    }
+    auto* happyPath = new mlir::Block;
+    auto op = create<Py::MakeTupleExOp>(args, happyPath, mlir::ValueRange{},
+                                        unwindPath, mlir::ValueRange{});
+    implementBlock(happyPath);
+    return op;
+  }
 
-    mlir::Value createMakeSet(llvm::ArrayRef<Py::IterArg> args, mlir::Block* unwindPath)
-    {
-        if (!unwindPath
-            || llvm::all_of(args, [](const Py::IterArg& arg) { return std::holds_alternative<mlir::Value>(arg); }))
-        {
-            return create<Py::MakeSetOp>(args);
-        }
-        auto* happyPath = new mlir::Block;
-        auto op = create<Py::MakeSetExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
-        implementBlock(happyPath);
-        return op;
-    }
+  Py::MakeListOp createMakeList() {
+    return create<Py::MakeListOp>(llvm::ArrayRef<Py::IterArg>{});
+  }
 
-    Py::MakeDictOp createMakeDict()
-    {
-        return create<Py::MakeDictOp>(llvm::ArrayRef<Py::DictArg>{});
-    }
+  mlir::Value createMakeList(llvm::ArrayRef<Py::IterArg> args,
+                             mlir::Block* unwindPath) {
+    if (!unwindPath || llvm::all_of(args, [](const Py::IterArg& arg) {
+          return std::holds_alternative<mlir::Value>(arg);
+        }))
+      return create<Py::MakeListOp>(args);
 
-    mlir::Value createMakeDict(llvm::ArrayRef<Py::DictArg> args, mlir::Block* unwindPath)
-    {
-        if (!unwindPath
-            || llvm::all_of(args, [](const Py::DictArg& arg) { return std::holds_alternative<Py::DictEntry>(arg); }))
-        {
-            return create<Py::MakeDictOp>(args);
-        }
-        auto* happyPath = new mlir::Block;
-        auto op = create<Py::MakeDictExOp>(args, happyPath, mlir::ValueRange{}, unwindPath, mlir::ValueRange{});
-        implementBlock(happyPath);
-        return op;
-    }
+    auto* happyPath = new mlir::Block;
+    auto op = create<Py::MakeListExOp>(args, happyPath, mlir::ValueRange{},
+                                       unwindPath, mlir::ValueRange{});
+    implementBlock(happyPath);
+    return op;
+  }
 
-    Py::MakeFuncOp createMakeFunc(mlir::FlatSymbolRefAttr function)
-    {
-        return create<Py::MakeFuncOp>(function);
-    }
+  Py::MakeSetOp createMakeSet() {
+    return create<Py::MakeSetOp>(llvm::ArrayRef<Py::IterArg>{});
+  }
 
-    Py::MakeObjectOp createMakeObject(mlir::Value typeObject)
-    {
-        return create<Py::MakeObjectOp>(typeObject);
-    }
+  mlir::Value createMakeSet(llvm::ArrayRef<Py::IterArg> args,
+                            mlir::Block* unwindPath) {
+    if (!unwindPath || llvm::all_of(args, [](const Py::IterArg& arg) {
+          return std::holds_alternative<mlir::Value>(arg);
+        }))
+      return create<Py::MakeSetOp>(args);
 
-    mlir::Operation* createUnpack(std::size_t count, std::optional<std::size_t> restIndex, mlir::Value iterable,
-                                  mlir::Block* unwindPath)
-    {
-        if (!unwindPath)
-        {
-            return create<Py::UnpackOp>(count, restIndex, iterable);
-        }
-        auto* happyPath = new mlir::Block;
-        auto op = create<Py::UnpackExOp>(count, restIndex, iterable, happyPath, mlir::ValueRange{}, unwindPath,
-                                         mlir::ValueRange{});
-        implementBlock(happyPath);
-        return op;
-    }
+    auto* happyPath = new mlir::Block;
+    auto op = create<Py::MakeSetExOp>(args, happyPath, mlir::ValueRange{},
+                                      unwindPath, mlir::ValueRange{});
+    implementBlock(happyPath);
+    return op;
+  }
 
-    Py::IsOp createIs(mlir::Value lhs, mlir::Value rhs)
-    {
-        return create<Py::IsOp>(lhs, rhs);
-    }
+  Py::MakeDictOp createMakeDict() {
+    return create<Py::MakeDictOp>(llvm::ArrayRef<Py::DictArg>{});
+  }
 
-    Py::BoolToI1Op createBoolToI1(mlir::Value input)
-    {
-        return create<Py::BoolToI1Op>(input);
-    }
+  mlir::Value createMakeDict(llvm::ArrayRef<Py::DictArg> args,
+                             mlir::Block* unwindPath) {
+    if (!unwindPath || llvm::all_of(args, [](const Py::DictArg& arg) {
+          return std::holds_alternative<Py::DictEntry>(arg);
+        }))
+      return create<Py::MakeDictOp>(args);
 
-    Py::BoolFromI1Op createBoolFromI1(mlir::Value input)
-    {
-        return create<Py::BoolFromI1Op>(input);
-    }
+    auto* happyPath = new mlir::Block;
+    auto op = create<Py::MakeDictExOp>(args, happyPath, mlir::ValueRange{},
+                                       unwindPath, mlir::ValueRange{});
+    implementBlock(happyPath);
+    return op;
+  }
 
-    Py::IntFromSignedOp createIntFromSigned(mlir::Value integer)
-    {
-        return create<Py::IntFromSignedOp>(integer);
-    }
+  Py::MakeFuncOp createMakeFunc(mlir::FlatSymbolRefAttr function) {
+    return create<Py::MakeFuncOp>(function);
+  }
 
-    Py::IntFromUnsignedOp createIntFromUnsigned(mlir::Value integer)
-    {
-        return create<Py::IntFromUnsignedOp>(integer);
-    }
+  Py::MakeObjectOp createMakeObject(mlir::Value typeObject) {
+    return create<Py::MakeObjectOp>(typeObject);
+  }
 
-    Py::IntToIndexOp createIntToIndex(mlir::Value object)
-    {
-        return create<Py::IntToIndexOp>(object);
-    }
+  mlir::Operation* createUnpack(std::size_t count,
+                                std::optional<std::size_t> restIndex,
+                                mlir::Value iterable, mlir::Block* unwindPath) {
+    if (!unwindPath)
+      return create<Py::UnpackOp>(count, restIndex, iterable);
 
-    Py::IntCmpOp createIntCmp(Py::IntCmpKind kind, mlir::Value lhs, mlir::Value rhs)
-    {
-        return create<Py::IntCmpOp>(kind, lhs, rhs);
-    }
+    auto* happyPath = new mlir::Block;
+    auto op = create<Py::UnpackExOp>(count, restIndex, iterable, happyPath,
+                                     mlir::ValueRange{}, unwindPath,
+                                     mlir::ValueRange{});
+    implementBlock(happyPath);
+    return op;
+  }
 
-    Py::IntAddOp createIntAdd(mlir::Value lhs, mlir::Value rhs)
-    {
-        return create<Py::IntAddOp>(lhs, rhs);
-    }
+  Py::IsOp createIs(mlir::Value lhs, mlir::Value rhs) {
+    return create<Py::IsOp>(lhs, rhs);
+  }
 
-    Py::IntToStrOp createIntToStr(mlir::Value object)
-    {
-        return create<Py::IntToStrOp>(object);
-    }
+  Py::BoolToI1Op createBoolToI1(mlir::Value input) {
+    return create<Py::BoolToI1Op>(input);
+  }
 
-    Py::GlobalValueOp createGlobalValue(llvm::StringRef symbolName, bool constant = false,
-                                        Py::ConstObjectAttrInterface initializer = {}, bool external = false)
-    {
-        return create<Py::GlobalValueOp>(symbolName, external ? mlir::StringAttr{} : getStringAttr("private"), constant,
-                                         initializer);
-    }
+  Py::BoolFromI1Op createBoolFromI1(mlir::Value input) {
+    return create<Py::BoolFromI1Op>(input);
+  }
 
-    Py::GlobalOp createGlobal(llvm::StringRef symbolName)
-    {
-        return create<Py::GlobalOp>(symbolName, getStringAttr("private"), getDynamicType(), nullptr);
-    }
+  Py::IntFromSignedOp createIntFromSigned(mlir::Value integer) {
+    return create<Py::IntFromSignedOp>(integer);
+  }
 
-    Py::StoreOp createStore(mlir::Value value, mlir::FlatSymbolRefAttr handle)
-    {
-        return create<Py::StoreOp>(value, handle);
-    }
+  Py::IntFromUnsignedOp createIntFromUnsigned(mlir::Value integer) {
+    return create<Py::IntFromUnsignedOp>(integer);
+  }
 
-    Py::LoadOp createLoad(mlir::FlatSymbolRefAttr handle)
-    {
-        return create<Py::LoadOp>(getDynamicType(), handle);
-    }
+  Py::IntToIndexOp createIntToIndex(mlir::Value object) {
+    return create<Py::IntToIndexOp>(object);
+  }
 
-    Py::IsUnboundValueOp createIsUnboundValue(mlir::Value value)
-    {
-        return create<Py::IsUnboundValueOp>(value);
-    }
+  Py::IntCmpOp createIntCmp(Py::IntCmpKind kind, mlir::Value lhs,
+                            mlir::Value rhs) {
+    return create<Py::IntCmpOp>(kind, lhs, rhs);
+  }
 
-    Py::RaiseOp createRaise(mlir::Value exception)
-    {
-        return create<Py::RaiseOp>(exception);
-    }
+  Py::IntAddOp createIntAdd(mlir::Value lhs, mlir::Value rhs) {
+    return create<Py::IntAddOp>(lhs, rhs);
+  }
 
-    Py::InvokeOp createInvoke(llvm::ArrayRef<mlir::Type> resultTypes, mlir::FlatSymbolRefAttr callee,
-                              llvm::ArrayRef<mlir::Value> operands, mlir::Block* happyPath,
-                              llvm::ArrayRef<mlir::Value> normalOperands, mlir::Block* unwindPath,
-                              llvm::ArrayRef<mlir::Value> unwindOperands)
-    {
-        return create<Py::InvokeOp>(resultTypes, callee, operands, normalOperands, unwindOperands, happyPath,
-                                    unwindPath);
-    }
+  Py::IntToStrOp createIntToStr(mlir::Value object) {
+    return create<Py::IntToStrOp>(object);
+  }
 
-    Py::FunctionInvokeOp createFunctionInvoke(mlir::Value callee, llvm::ArrayRef<mlir::Value> operands,
-                                              mlir::Block* happyPath, llvm::ArrayRef<mlir::Value> normalOperands,
-                                              mlir::Block* unwindPath, llvm::ArrayRef<mlir::Value> unwindOperands)
-    {
-        return create<Py::FunctionInvokeOp>(callee, operands, normalOperands, unwindOperands, happyPath, unwindPath);
-    }
+  Py::GlobalValueOp
+  createGlobalValue(llvm::StringRef symbolName, bool constant = false,
+                    Py::ConstObjectAttrInterface initializer = {},
+                    bool external = false) {
+    return create<Py::GlobalValueOp>(
+        symbolName, external ? mlir::StringAttr{} : getStringAttr("private"),
+        constant, initializer);
+  }
+
+  Py::GlobalOp createGlobal(llvm::StringRef symbolName) {
+    return create<Py::GlobalOp>(symbolName, getStringAttr("private"),
+                                getDynamicType(), nullptr);
+  }
+
+  Py::StoreOp createStore(mlir::Value value, mlir::FlatSymbolRefAttr handle) {
+    return create<Py::StoreOp>(value, handle);
+  }
+
+  Py::LoadOp createLoad(mlir::FlatSymbolRefAttr handle) {
+    return create<Py::LoadOp>(getDynamicType(), handle);
+  }
+
+  Py::IsUnboundValueOp createIsUnboundValue(mlir::Value value) {
+    return create<Py::IsUnboundValueOp>(value);
+  }
+
+  Py::RaiseOp createRaise(mlir::Value exception) {
+    return create<Py::RaiseOp>(exception);
+  }
+
+  Py::InvokeOp createInvoke(llvm::ArrayRef<mlir::Type> resultTypes,
+                            mlir::FlatSymbolRefAttr callee,
+                            llvm::ArrayRef<mlir::Value> operands,
+                            mlir::Block* happyPath,
+                            llvm::ArrayRef<mlir::Value> normalOperands,
+                            mlir::Block* unwindPath,
+                            llvm::ArrayRef<mlir::Value> unwindOperands) {
+    return create<Py::InvokeOp>(resultTypes, callee, operands, normalOperands,
+                                unwindOperands, happyPath, unwindPath);
+  }
+
+  Py::FunctionInvokeOp createFunctionInvoke(
+      mlir::Value callee, llvm::ArrayRef<mlir::Value> operands,
+      mlir::Block* happyPath, llvm::ArrayRef<mlir::Value> normalOperands,
+      mlir::Block* unwindPath, llvm::ArrayRef<mlir::Value> unwindOperands) {
+    return create<Py::FunctionInvokeOp>(callee, operands, normalOperands,
+                                        unwindOperands, happyPath, unwindPath);
+  }
 };
 } // namespace pylir

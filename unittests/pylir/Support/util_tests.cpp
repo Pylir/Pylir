@@ -8,10 +8,11 @@
 
 #include <pylir/Support/Util.hpp>
 
-TEMPLATE_TEST_CASE("Count trailing zeros", "[util]", std::uint8_t, std::uint16_t, std::uint32_t, std::uint64_t)
-{
-    CHECK(pylir::countTrailingZeros(TestType(0)) == std::numeric_limits<TestType>::digits);
-    CHECK(pylir::countTrailingZeros(TestType(42)) == 1);
-    CHECK(pylir::countTrailingZeros(TestType(0xF0)) == 4);
-    CHECK(pylir::countTrailingZeros(TestType(0x80)) == 7);
+TEMPLATE_TEST_CASE("Count trailing zeros", "[util]", std::uint8_t,
+                   std::uint16_t, std::uint32_t, std::uint64_t) {
+  CHECK(pylir::countTrailingZeros(TestType(0)) ==
+        std::numeric_limits<TestType>::digits);
+  CHECK(pylir::countTrailingZeros(TestType(42)) == 1);
+  CHECK(pylir::countTrailingZeros(TestType(0xF0)) == 4);
+  CHECK(pylir::countTrailingZeros(TestType(0x80)) == 7);
 }

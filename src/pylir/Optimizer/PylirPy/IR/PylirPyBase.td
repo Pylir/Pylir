@@ -8,31 +8,34 @@
 include "mlir/IR/DialectBase.td"
 
 def PylirPy_Dialect : Dialect {
-    let name = "py";
-    let summary = "A dialect representing python programs";
-    let description = [{
-        TODO
-    }];
-    let cppNamespace = "::pylir::Py";
+  let name = "py";
+  let summary = "A dialect representing python programs";
+  let description = [{
+    TODO
+  }];
+  let cppNamespace = "::pylir::Py";
 
-    let dependentDialects = ["::mlir::arith::ArithDialect", "::mlir::cf::ControlFlowDialect"];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::cf::ControlFlowDialect"
+  ];
 
-    let hasConstantMaterializer = 1;
-    let hasCanonicalizer = 1;
+  let hasConstantMaterializer = 1;
+  let hasCanonicalizer = 1;
 
-    let useDefaultAttributePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
 
-    let useDefaultTypePrinterParser = 1;
+  let useDefaultTypePrinterParser = 1;
 
-    let usePropertiesForAttributes = 1;
+  let usePropertiesForAttributes = 1;
 
-    let extraClassDeclaration = [{
-        void initializeAttributes();
+  let extraClassDeclaration = [{
+    void initializeAttributes();
 
-        void initializeTypes();
+    void initializeTypes();
 
-        void initializeExternalModels();
-    }];
+    void initializeExternalModels();
+  }];
 }
 
 #endif
