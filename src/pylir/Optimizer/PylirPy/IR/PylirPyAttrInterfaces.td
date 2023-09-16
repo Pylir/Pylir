@@ -252,7 +252,8 @@ def FunctionAttrInterface : RefAttrImplementable<"FunctionAttrInterface",
 
   let methods = [
     InterfaceMethod<[{
-      TODO
+      Returns a symbol reference to the `py.func` this function attribute refers
+      to.
     }],
     "mlir::FlatSymbolRefAttr", "getValue", (ins)>,
     canImplementMethod
