@@ -12,6 +12,8 @@
 #include "PylirPyAttributes.hpp"
 #include "PylirPyTraits.hpp"
 
+using namespace mlir;
+
 mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value) {
   if (auto op = value.getDefiningOp<pylir::Py::KnownTypeObjectInterface>())
     return op.getKnownTypeObject();
@@ -117,9 +119,9 @@ mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute) {
     return mlir::StringAttr::get(attribute.getContext(),
                                  ref_cast<StrAttr>(attribute).getValue());
   case BuiltinMethodKind::Int:
-    return FractionalAttr::get(attribute.getContext(),
-                               ref_cast<IntAttr>(attribute).getValue(),
-                               BigInt(1));
+    return FractionalAttr::get(
+        attribute.getContext(),
+        dyn_cast<IntAttrInterface>(attribute).getInteger(), BigInt(1));
   case BuiltinMethodKind::Float:
     auto [nom, denom] =
         toRatio(ref_cast<FloatAttr>(attribute).getDoubleValue());

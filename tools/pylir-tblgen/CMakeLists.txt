@@ -4,8 +4,9 @@
 
 add_tablegen(pylir-tblgen PYLIR
   IntrinsicGen.cpp
-  main.cpp
   OpVariableDecoratorGen.cpp
+  WrapInterfaceGen.cpp
+  main.cpp
 )
 target_link_libraries(pylir-tblgen
   PRIVATE

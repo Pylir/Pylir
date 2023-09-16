@@ -19,6 +19,9 @@
 #include "PylirPyOps.hpp"
 #include "Value.hpp"
 
+using namespace mlir;
+using namespace pylir::Py;
+
 template <>
 struct mlir::FieldParser<llvm::APFloat> {
   static mlir::FailureOr<llvm::APFloat> parse(mlir::AsmParser& parser) {
@@ -115,17 +118,59 @@ struct GlobalValueAttrStorage : mlir::AttributeStorage {
   }
 
   mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&,
-                             ConstObjectAttrInterface attribute) {
+                             ConcreteObjectAttrInterface attribute) {
     initializer = attribute;
     return mlir::success();
   }
 
   llvm::StringRef name;
   bool constant;
-  ConstObjectAttrInterface initializer;
+  ConcreteObjectAttrInterface initializer;
 };
 
 } // namespace pylir::Py::detail
+
+namespace {
+
+#define GEN_WRAP_CLASSES
+#include "pylir/Optimizer/PylirPy/IR/PylirPyWrapInterfaces.h.inc"
+
+template <class Interface>
+struct RefAttrWrapInterface
+    : WrapInterface<RefAttrWrapInterface<Interface>, Interface> {
+  /// Returns the underlying instance that all interface methods are forwarded
+  /// to by default.
+  Interface getUnderlying(Attribute attribute) const {
+    return cast<Interface>(
+        cast<RefAttr>(attribute).getSymbol().getInitializerAttr());
+  }
+
+  /// Returns true if the `RefAttr` implements `Interface`.
+  bool canImplement(Attribute thisAttr, std::in_place_type_t<Interface>) const {
+    RefAttr refAttr = cast<RefAttr>(thisAttr);
+    // Guard against not yet linked `RefAttr`s.
+    if (!refAttr.getSymbol())
+      return false;
+
+    // If the interface inherits from `ConstObjectAttrInterface` it has an
+    // implicit conversion to it and it is known that the symbol has to be
+    // constant for the cast to be valid.
+    if constexpr (std::is_convertible_v<Interface, ConstObjectAttrInterface>)
+      if (!refAttr.getSymbol().getConstant())
+        return false;
+
+    // `RefAttr` without symbols never implements any interface, not even
+    // `ObjectAttrInterface`.
+    return isa_and_nonnull<Interface>(refAttr.getSymbol().getInitializerAttr());
+  }
+};
+
+} // namespace
+
+template <class... Interfaces>
+static void addRefAttrInterfaces(MLIRContext* context) {
+  RefAttr::attachInterface<RefAttrWrapInterface<Interfaces>...>(*context);
+}
 
 mlir::FlatSymbolRefAttr pylir::Py::RefAttr::getRef() const {
   return getImpl()->identity.cast<mlir::FlatSymbolRefAttr>();
@@ -162,7 +207,7 @@ mlir::Attribute pylir::Py::GlobalValueAttr::parse(::mlir::AsmParser& parser,
 
   // Default values.
   bool constant = false;
-  ConstObjectAttrInterface initializer = {};
+  ConcreteObjectAttrInterface initializer = {};
 
   while (mlir::succeeded(parser.parseOptionalComma())) {
     llvm::StringRef keyword;
@@ -234,13 +279,13 @@ void pylir::Py::GlobalValueAttr::setConstant(bool constant) {
   (void)Base::mutate(constant);
 }
 
-pylir::Py::ConstObjectAttrInterface
+pylir::Py::ConcreteObjectAttrInterface
 pylir::Py::GlobalValueAttr::getInitializer() const {
   return getImpl()->initializer;
 }
 
 void pylir::Py::GlobalValueAttr::setInitializer(
-    ConstObjectAttrInterface initializer) {
+    ConcreteObjectAttrInterface initializer) {
   (void)Base::mutate(initializer);
 }
 
@@ -249,6 +294,10 @@ void pylir::Py::PylirPyDialect::initializeAttributes() {
 #define GET_ATTRDEF_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
       >();
+  addRefAttrInterfaces<
+#define GEN_WRAP_LIST
+#include "pylir/Optimizer/PylirPy/IR/PylirPyWrapInterfaces.h.inc"
+      >(getContext());
 }
 
 namespace {

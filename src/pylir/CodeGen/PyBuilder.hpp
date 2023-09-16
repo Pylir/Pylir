@@ -468,7 +468,7 @@ public:
 
   Py::GlobalValueOp
   createGlobalValue(llvm::StringRef symbolName, bool constant = false,
-                    Py::ConstObjectAttrInterface initializer = {},
+                    Py::ConcreteObjectAttrInterface initializer = {},
                     bool external = false) {
     return create<Py::GlobalValueOp>(
         symbolName, external ? mlir::StringAttr{} : getStringAttr("private"),

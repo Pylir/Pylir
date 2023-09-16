@@ -16,6 +16,9 @@
 
 #include "Passes.hpp"
 
+using namespace mlir;
+using namespace pylir::Py;
+
 namespace pylir::Py {
 #define GEN_PASS_DEF_FOLDGLOBALSPASS
 #include "pylir/Optimizer/PylirPy/Transforms/Passes.h.inc"
@@ -30,10 +33,9 @@ protected:
   void runOnOperation() override;
 
 private:
-  pylir::Py::GlobalValueOp
-  createGlobalValueFromGlobal(pylir::Py::GlobalOp globalOp,
-                              pylir::Py::ConstObjectAttrInterface initializer,
-                              bool constant) {
+  pylir::Py::GlobalValueOp createGlobalValueFromGlobal(
+      pylir::Py::GlobalOp globalOp,
+      pylir::Py::ConcreteObjectAttrInterface initializer, bool constant) {
     PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
     mlir::OpBuilder builder(globalOp);
     return builder.create<pylir::Py::GlobalValueOp>(
@@ -86,8 +88,7 @@ private:
 
     // Create the global value if the constant was not a reference but a
     // constant object.
-    if (auto initializer =
-            attr.dyn_cast<pylir::Py::ConstObjectAttrInterface>()) {
+    if (auto initializer = dyn_cast<ConcreteObjectAttrInterface>(attr)) {
       // Link the RefAttr created above as well.
       pylir::Py::RefAttr::get(
           createGlobalValueFromGlobal(globalOp, initializer, true));

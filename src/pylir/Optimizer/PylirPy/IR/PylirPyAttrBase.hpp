@@ -8,7 +8,7 @@
 #include <mlir/IR/BuiltinAttributes.h>
 
 namespace pylir::Py {
-class ConstObjectAttrInterface;
+class ConcreteObjectAttrInterface;
 class GlobalValueOp;
 namespace detail {
 struct GlobalValueAttrStorage;

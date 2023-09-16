@@ -9,9 +9,7 @@ include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Arith/IR/ArithOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
-class ResolvesTo<int constOnly = 1>
-	: NativeCodeCall<"::resolvesToPattern($_self, $0, "
-	    # !if(constOnly, "true", "false") # ")">;
+def ResolvesTo : NativeCodeCall<"::resolvesToPattern($_self, $0)">;
 
 def prependTupleConst
   : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
@@ -27,7 +25,7 @@ def : Pat<(PylirPy_TuplePrependOp $input,
        }() }]> $input, $args), ConstantAttr<DenseI32ArrayAttr, "{}">)>;
 
 def : Pat<(PylirPy_TuplePrependOp $input,
-            (ResolvesTo<0> PylirPy_TupleAttr:$args)),
+            (ResolvesTo PylirPy_TupleAttr:$args)),
               (prependTupleConst $input, $args)>;
 
 def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),
@@ -117,7 +115,7 @@ foreach lhs = [PylirPy_IntFromUnsignedOp, PylirPy_IntFromSignedOp] in {
 // Index -> Arith_CmpIOp $kind, $lhs, (index)$rhs
 foreach lhs = [PylirPy_IntFromUnsignedOp, PylirPy_IntFromSignedOp] in {
   def : Pat<(PylirPy_IntCmpOp:$op $kind, (lhs $lhs),
-    (ResolvesTo<0> IntAttrInterface:$rhs)),
+    (ConstantLikeMatcher IntAttrInterface:$rhs)),
        (Arith_CmpIOp (NativeCodeCall<"toArithPredicate($0)"> $kind), $lhs,
          (Arith_ConstantOp
           (NativeCodeCall<"toBuiltinInt($0.getOwner(), $1, $2.getType())">
@@ -157,13 +155,13 @@ def : Pat<(PylirPy_IsUnboundValueOp (SelectOp $cond, $lhs, $rhs)),
       }]>> $lhs, $rhs)]>;
 
 multiclass IntCommAndAssocPattern<Op op, string operator> {
-	def : Pat<(op (op $op, (ResolvesTo<0> IntAttrInterface:$first)), (
-	  ResolvesTo<0> IntAttrInterface:$second)), (op $op,
+	def : Pat<(op (op $op, (ConstantLikeMatcher IntAttrInterface:$first)), (
+	  ConstantLikeMatcher IntAttrInterface:$second)), (op $op,
 			(PylirPy_ConstantOp (BinOpAttrs<operator, IntAttrInterface,
 			  PylirPy_IntAttr> $first, $second)))>;
 
-	def : Pat<(op (op $x, (ResolvesTo<0> IntAttrInterface:$first)), (op $y,
-	  (ResolvesTo<0> IntAttrInterface:$second))), (op (op $x, $y),
+	def : Pat<(op (op $x, (ConstantLikeMatcher IntAttrInterface:$first)), (op $y,
+	  (ConstantLikeMatcher IntAttrInterface:$second))), (op (op $x, $y),
 			(PylirPy_ConstantOp
 			  (BinOpAttrs<operator, IntAttrInterface, PylirPy_IntAttr>
 			    $first, $second)))>;
