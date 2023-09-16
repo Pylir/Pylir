@@ -30,6 +30,9 @@
 #include "Passes.hpp"
 #include "Util/InlinerUtil.hpp"
 
+using namespace mlir;
+using namespace pylir::Py;
+
 #define DEBUG_TYPE "inliner"
 
 namespace pylir::Py {
@@ -426,7 +429,7 @@ std::optional<GradeResult> gradeFromKnownConstants(
           // not as hardcoded.
           if (auto constant = knownConstants.lookup(
                   call.getCallableForCallee().dyn_cast<mlir::Value>())) {
-            if (auto func = Py::ref_cast<Py::FunctionAttr>(constant)) {
+            if (auto func = dyn_cast<FunctionAttrInterface>(constant)) {
               callable =
                   collection.lookupNearestSymbolFrom<mlir::CallableOpInterface>(
                       call, func.getValue());
