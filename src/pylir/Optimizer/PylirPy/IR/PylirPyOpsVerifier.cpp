@@ -106,8 +106,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
         if (auto ref = functionAttr.getKwDefaults()
                            .dyn_cast_or_null<pylir::Py::RefAttr>();
             !ref || ref.getRef().getValue() != pylir::Builtins::None.name)
-          if (!pylir::Py::ref_cast<pylir::Py::DictAttr>(
-                  functionAttr.getKwDefaults()))
+          if (!isa<DictAttrInterface>(functionAttr.getKwDefaults()))
             return op->emitOpError(
                 "Expected __kwdefaults__ to refer to a dictionary\n");
 
@@ -119,7 +118,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
                 "Expected __defaults__ to refer to a tuple\n");
 
         if (functionAttr.getDict())
-          if (!pylir::Py::ref_cast<pylir::Py::DictAttr>(functionAttr.getDict()))
+          if (!isa<DictAttrInterface>(functionAttr.getDict()))
             return op->emitOpError(
                 "Expected __dict__ to refer to a dictionary\n");
 

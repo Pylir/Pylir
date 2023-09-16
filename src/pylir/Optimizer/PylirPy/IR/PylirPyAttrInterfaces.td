@@ -214,4 +214,30 @@ def TypeAttrInterface : RefAttrImplementable<"TypeAttrInterface",
   ];
 }
 
+def DictAttrInterface : RefAttrImplementable<"DictAttrInterface",
+  [ConstObjectAttrInterface]> {
+  let cppNamespace = "::pylir::Py";
+
+  let description = [{
+    Interface implemented by any attribute that subclasses `builtins.dict`.
+
+    Implies an implementation of `ConstObjectAttrInterface`.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the value for a given key in the dictionary.
+      Returns a null attribute if not found.
+      The key must be a `RefAttr` or `ObjectAttrInterface`.
+    }],
+    "mlir::Attribute", "lookup", (ins "mlir::Attribute":$key)>,
+    InterfaceMethod<[{
+      Returns the list of key-value pairs of the dictionary in insertion order.
+    }],
+    "llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>>",
+    "getKeyValuePairs", (ins)>,
+    canImplementMethod
+  ];
+}
+
 #endif

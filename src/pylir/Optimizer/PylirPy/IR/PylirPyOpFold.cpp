@@ -407,7 +407,7 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::DictTryGetItemOp::fold(FoldAdaptor adaptor) {
-  auto constantDict = ref_cast_or_null<DictAttr>(adaptor.getDict());
+  auto constantDict = dyn_cast_or_null<DictAttrInterface>(adaptor.getDict());
   if (!constantDict)
     return nullptr;
 
@@ -486,7 +486,7 @@ mlir::LogicalResult pylir::Py::DictTryGetItemOp::foldUsage(
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::DictLenOp::fold(FoldAdaptor adaptor) {
-  auto constantDict = ref_cast_or_null<DictAttr>(adaptor.getInput());
+  auto constantDict = dyn_cast_or_null<DictAttrInterface>(adaptor.getInput());
   if (!constantDict)
     return nullptr;
 

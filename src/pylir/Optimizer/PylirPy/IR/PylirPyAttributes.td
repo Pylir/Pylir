@@ -271,7 +271,8 @@ def PylirPy_ListAttr : PylirPy_PyObjAttr<"List"> {
   ];
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ConcreteObjectAttrInterface,
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DictAttrInterface,
+  ConcreteObjectAttrInterface,
   DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
 
   let mnemonic = "dict";
