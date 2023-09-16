@@ -383,7 +383,8 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DictAttrInterface,
 }
 
 def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ImmutableAttr,
-  ConcreteObjectAttrInterface, DeclareAttrInterfaceMethods<ObjectAttrInterface>,
+  FunctionAttrInterface, ConcreteObjectAttrInterface,
+  DeclareAttrInterfaceMethods<ObjectAttrInterface>,
   DeclareAttrInterfaceMethods<ConstObjectAttrInterface>,
   DeclareAttrInterfaceMethods<SROAAttrInterface>]>
 {

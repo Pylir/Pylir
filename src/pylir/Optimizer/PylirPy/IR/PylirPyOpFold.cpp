@@ -773,7 +773,7 @@ pylir::Py::FunctionCallOp::canonicalize(FunctionCallOp op,
     if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
       return mlir::failure();
 
-    auto functionAttr = ref_cast_or_null<FunctionAttr>(attribute);
+    auto functionAttr = dyn_cast_or_null<FunctionAttrInterface>(attribute);
     if (!functionAttr)
       return mlir::failure();
 
@@ -804,7 +804,7 @@ pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp op,
     if (!mlir::matchPattern(op.getFunction(), mlir::m_Constant(&attribute)))
       return mlir::failure();
 
-    auto functionAttr = ref_cast_or_null<FunctionAttr>(attribute);
+    auto functionAttr = dyn_cast_or_null<FunctionAttrInterface>(attribute);
     if (!functionAttr)
       return mlir::failure();
 

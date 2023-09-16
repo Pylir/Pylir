@@ -240,4 +240,23 @@ def DictAttrInterface : RefAttrImplementable<"DictAttrInterface",
   ];
 }
 
+def FunctionAttrInterface : RefAttrImplementable<"FunctionAttrInterface",
+  [ObjectAttrInterface]> {
+  let cppNamespace = "::pylir::Py";
+
+  let description = [{
+    Interface implemented by any attribute that subclasses `builtins.function`.
+
+    Implies an implementation of `ObjectAttrInterface`.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      TODO
+    }],
+    "mlir::FlatSymbolRefAttr", "getValue", (ins)>,
+    canImplementMethod
+  ];
+}
+
 #endif
