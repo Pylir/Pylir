@@ -157,7 +157,7 @@ def TupleAttrInterface : RefAttrImplementable<"TupleAttrInterface",
 
   let methods = [
     InterfaceMethod<[{
-      Returns the boolean value of this attribute.
+      Returns the elements of this tuple.
     }],
     "llvm::ArrayRef<mlir::Attribute>", "getElements", (ins)>,
     canImplementMethod
