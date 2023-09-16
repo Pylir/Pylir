@@ -459,8 +459,7 @@ void pylir::CodeGenState::initializeGlobal(
           for (const auto& [key, value] : dict.getKeyValuePairs()) {
             auto keyValue = getConstant(global.getLoc(), builder, key);
             auto layoutType = m_typeConverter.getLayoutType(
-                Py::ref_cast<Py::ObjectAttrInterface>(key, false)
-                    .getTypeObject());
+                dyn_cast<ObjectAttrInterface>(key).getTypeObject());
             mlir::Value hash;
             if (layoutType == Mem::LayoutType::String) {
               hash = createRuntimeCall(global.getLoc(), builder,

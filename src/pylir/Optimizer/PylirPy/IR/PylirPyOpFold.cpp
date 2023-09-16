@@ -219,7 +219,7 @@ resolveTupleOperands(mlir::Operation* context, mlir::Value operand) {
   llvm::SmallVector<mlir::OpFoldResult> result;
   mlir::Attribute attr;
   if (mlir::matchPattern(operand, mlir::m_Constant(&attr))) {
-    auto tuple = pylir::Py::ref_cast_or_null<TupleAttrInterface>(attr);
+    auto tuple = dyn_cast_or_null<TupleAttrInterface>(attr);
     if (!tuple) {
       result.emplace_back(nullptr);
       return result;

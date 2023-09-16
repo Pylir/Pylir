@@ -47,9 +47,7 @@ std::optional<bool> pylir::Py::isUnbound(mlir::Value value) {
 namespace {
 pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute,
                                               llvm::StringRef method) {
-  auto typeObject =
-      pylir::Py::ref_cast<pylir::Py::ObjectAttrInterface>(attribute, false)
-          .getTypeObject();
+  auto typeObject = dyn_cast<ObjectAttrInterface>(attribute).getTypeObject();
   if (!typeObject)
     return pylir::Py::BuiltinMethodKind::Unknown;
 
