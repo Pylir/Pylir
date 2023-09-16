@@ -422,7 +422,8 @@ def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ImmutableAttr,
   ];
 }
 
-def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [ImmutableAttr]> {
+def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [ImmutableAttr],
+  /*base=*/TypeAttrInterface> {
 	let mnemonic = "type";
 	let summary = "python type";
 

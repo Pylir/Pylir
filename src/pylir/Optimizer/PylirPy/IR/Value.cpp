@@ -67,7 +67,7 @@ pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute,
     return *opt;
 
   auto mro = dyn_cast_or_null<TupleAttrInterface>(
-      pylir::Py::ref_cast<pylir::Py::TypeAttr>(typeObject).getMroTuple());
+      dyn_cast<TypeAttrInterface>(typeObject).getMroTuple());
   if (!mro)
     return pylir::Py::BuiltinMethodKind::Unknown;
 

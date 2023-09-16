@@ -153,7 +153,7 @@ mlir::Attribute foldGetSlot(mlir::MLIRContext* context,
   if (!object)
     return nullptr;
 
-  auto typeAttr = ref_cast_or_null<Py::TypeAttr>(object.getTypeObject());
+  auto typeAttr = dyn_cast_or_null<TypeAttrInterface>(object.getTypeObject());
   if (!typeAttr)
     return nullptr;
 

@@ -11,6 +11,9 @@
 #include <pylir/Optimizer/PylirMem/IR/Value.hpp>
 #include <pylir/Optimizer/PylirPy/IR/Value.hpp>
 
+using namespace mlir;
+using namespace pylir::Py;
+
 void pylir::CodeGenState::appendToGlobalInit(
     mlir::OpBuilder& builder, llvm::function_ref<void()> section) {
   mlir::OpBuilder::InsertionGuard guard{builder};
@@ -516,7 +519,7 @@ void pylir::CodeGenState::initializeGlobal(
 
   auto initMap = objectAttr.getSlots();
   for (auto [index, slotName] : llvm::enumerate(
-           Py::ref_cast<Py::TypeAttr>(typeObject).getInstanceSlots())) {
+           dyn_cast<TypeAttrInterface>(typeObject).getInstanceSlots())) {
     mlir::Value value;
     auto element = initMap.get(slotName.cast<Py::StrAttr>().getValue());
     if (!element)

@@ -51,7 +51,7 @@ std::optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr) {
   if (auto result = mapLayoutType(attr))
     return result;
 
-  auto type = ref_cast<Py::TypeAttr>(attr);
+  auto type = dyn_cast<TypeAttrInterface>(attr);
   if (!type)
     return std::nullopt;
 
