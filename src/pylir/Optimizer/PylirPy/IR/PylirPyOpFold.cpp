@@ -1259,15 +1259,6 @@ mlir::IntegerAttr toBuiltinInt(mlir::Operation* operation, mlir::Attribute attr,
   return mlir::IntegerAttr::get(integerType, integer.sextOrTrunc(bitWidth));
 }
 
-mlir::LogicalResult resolvesToPattern(mlir::Operation* operation,
-                                      mlir::Attribute& result) {
-  if (!mlir::matchPattern(operation->getResult(0), mlir::m_Constant(&result)))
-    return mlir::failure();
-
-  result = dyn_cast_or_null<ObjectAttrInterface>(result);
-  return mlir::success();
-}
-
 #include "pylir/Optimizer/PylirPy/IR/PylirPyPatterns.cpp.inc"
 } // namespace
 
