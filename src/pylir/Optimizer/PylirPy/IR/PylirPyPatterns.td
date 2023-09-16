@@ -9,6 +9,8 @@ include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Arith/IR/ArithOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
+def ResolvesTo : NativeCodeCall<"::resolvesToPattern($_self, $0)">;
+
 def prependTupleConst
   : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
