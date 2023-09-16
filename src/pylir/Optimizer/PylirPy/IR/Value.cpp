@@ -117,7 +117,8 @@ mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute) {
     // There is only really RefAttr that can tell us the object identity.
     return attribute.dyn_cast<RefAttr>();
   case BuiltinMethodKind::Str:
-    return mlir::StringAttr::get(attribute.getContext(),
+    return mlir::StringAttr::get(
+        attribute.getContext(),
         dyn_cast<StrAttrInterface>(attribute).getValue());
   case BuiltinMethodKind::Int:
     return FractionalAttr::get(
