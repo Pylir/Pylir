@@ -13,6 +13,9 @@
 #include "WinX64.hpp"
 #include "X86_64.hpp"
 
+using namespace mlir;
+using namespace pylir::Py;
+
 pylir::PylirTypeConverter::PylirTypeConverter(mlir::MLIRContext* context,
                                               const llvm::Triple& triple,
                                               llvm::DataLayout dataLayout,
@@ -194,10 +197,9 @@ pylir::PylirTypeConverter::getLayoutType(mlir::Attribute attr) {
 
 mlir::LLVM::LLVMStructType
 pylir::PylirTypeConverter::typeOf(pylir::Py::ObjectAttrInterface objectAttr) {
-  unsigned count =
-      pylir::Py::ref_cast<pylir::Py::TypeAttr>(objectAttr.getTypeObject())
-          .getInstanceSlots()
-          .size();
+  unsigned count = dyn_cast<TypeAttrInterface>(objectAttr.getTypeObject())
+                       .getInstanceSlots()
+                       .size();
   return llvm::TypeSwitch<pylir::Py::ObjectAttrInterface,
                           mlir::LLVM::LLVMStructType>(objectAttr)
       .Case([&](pylir::Py::TupleAttr attr) {

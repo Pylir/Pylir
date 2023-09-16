@@ -190,4 +190,28 @@ def TupleAttrInterface : RefAttrImplementable<"TupleAttrInterface",
   }];
 }
 
+def TypeAttrInterface : RefAttrImplementable<"TypeAttrInterface",
+  [ObjectAttrInterface]> {
+  let cppNamespace = "::pylir::Py";
+
+  let description = [{
+    Interface implemented by any attribute that subclasses `builtins.type`.
+
+    Implies an implementation of `ObjectAttrInterface`.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the MRO tuple of this type.
+    }],
+    "mlir::Attribute", "getMroTuple", (ins)>,
+    InterfaceMethod<[{
+      Returns the list of slots that an instance of this type contains.
+      This must be a tuple of strings.
+    }],
+    "pylir::Py::TupleAttrInterface", "getInstanceSlots", (ins)>,
+    canImplementMethod
+  ];
+}
+
 #endif

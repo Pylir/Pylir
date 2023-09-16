@@ -153,7 +153,7 @@ mlir::Attribute foldGetSlot(mlir::MLIRContext* context,
   if (!object)
     return nullptr;
 
-  auto typeAttr = ref_cast_or_null<Py::TypeAttr>(object.getTypeObject());
+  auto typeAttr = dyn_cast_or_null<TypeAttrInterface>(object.getTypeObject());
   if (!typeAttr)
     return nullptr;
 
@@ -826,7 +826,7 @@ pylir::Py::FunctionInvokeOp::canonicalize(FunctionInvokeOp op,
 //===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TypeMROOp::fold(FoldAdaptor adaptor) {
-  auto object = ref_cast_or_null<TypeAttr>(adaptor.getTypeObject());
+  auto object = dyn_cast_or_null<TypeAttrInterface>(adaptor.getTypeObject());
   if (!object)
     return nullptr;
 
@@ -838,7 +838,7 @@ mlir::OpFoldResult pylir::Py::TypeMROOp::fold(FoldAdaptor adaptor) {
 //===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TypeSlotsOp::fold(FoldAdaptor adaptor) {
-  auto object = ref_cast_or_null<TypeAttr>(adaptor.getTypeObject());
+  auto object = dyn_cast_or_null<TypeAttrInterface>(adaptor.getTypeObject());
   if (!object)
     return nullptr;
 
