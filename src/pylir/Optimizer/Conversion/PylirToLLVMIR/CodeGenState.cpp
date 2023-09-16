@@ -313,7 +313,7 @@ void pylir::CodeGenState::initializeGlobal(
       .Case([&](Py::ListAttr attr) {
         auto sizeConstant = builder.create<mlir::LLVM::ConstantOp>(
             global.getLoc(), m_typeConverter.getIndexType(),
-            builder.getI64IntegerAttr(attr.getValue().size()));
+            builder.getI64IntegerAttr(attr.getElements().size()));
         undef = builder.create<mlir::LLVM::InsertValueOp>(
             global.getLoc(), undef, sizeConstant, 1);
         auto tupleObject = m_globalBuffers.lookup(attr);
@@ -323,12 +323,12 @@ void pylir::CodeGenState::initializeGlobal(
               mlir::cast<mlir::ModuleOp>(m_symbolTable.getOp()).getBody());
           tupleObject = builder.create<mlir::LLVM::GlobalOp>(
               global.getLoc(),
-              m_typeConverter.getPyTupleType(attr.getValue().size()), true,
+              m_typeConverter.getPyTupleType(attr.getElements().size()), true,
               mlir::LLVM::Linkage::Private, "tuple$", nullptr, 0,
               REF_ADDRESS_SPACE, true);
           initializeGlobal(
               tupleObject, builder,
-              Py::TupleAttr::get(attr.getContext(), attr.getValue()));
+              Py::TupleAttr::get(attr.getContext(), attr.getElements()));
           tupleObject.setUnnamedAddrAttr(mlir::LLVM::UnnamedAddrAttr::get(
               builder.getContext(), mlir::LLVM::UnnamedAddr::Global));
           m_symbolTable.insert(tupleObject);

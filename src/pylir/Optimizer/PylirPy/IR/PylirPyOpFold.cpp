@@ -39,7 +39,7 @@ struct TupleExpansionRemover : mlir::OpRewritePattern<T> {
           if (auto constant = mlir::dyn_cast<pylir::Py::ConstantOp>(definingOp))
             // TODO: StringAttr
             return constant.getConstant()
-                .template isa<pylir::Py::ListAttr, pylir::Py::TupleAttr>();
+                .template isa<pylir::Py::ListAttr, TupleAttrInterface>();
 
           return mlir::isa<pylir::Py::MakeTupleOp, pylir::Py::MakeTupleExOp>(
               definingOp);
@@ -68,9 +68,9 @@ protected:
               })
           .Case([&](pylir::Py::ConstantOp constant) {
             llvm::TypeSwitch<mlir::Attribute>(constant.getConstant())
-                .Case<pylir::Py::ListAttr, pylir::Py::TupleAttr>(
+                .Case<pylir::Py::ListAttr, TupleAttrInterface>(
                     [&](auto attr) {
-                      auto values = attr.getValue();
+                      auto values = attr.getElements();
                       begin = currentArgs.erase(begin);
                       auto range = llvm::map_range(
                           values, [&](mlir::Attribute attribute) {
@@ -219,7 +219,7 @@ resolveTupleOperands(mlir::Operation* context, mlir::Value operand) {
   llvm::SmallVector<mlir::OpFoldResult> result;
   mlir::Attribute attr;
   if (mlir::matchPattern(operand, mlir::m_Constant(&attr))) {
-    auto tuple = pylir::Py::ref_cast_or_null<pylir::Py::TupleAttr>(attr);
+    auto tuple = pylir::Py::ref_cast_or_null<TupleAttrInterface>(attr);
     if (!tuple) {
       result.emplace_back(nullptr);
       return result;
@@ -298,9 +298,9 @@ doConstantIterExpansion(llvm::ArrayRef<::mlir::Attribute> operands,
     }
     begin++;
     if (!llvm::TypeSwitch<mlir::Attribute, bool>(pair.value())
-             .Case<pylir::Py::TupleAttr, pylir::Py::ListAttr>([&](auto attr) {
-               result.insert(result.end(), attr.getValue().begin(),
-                             attr.getValue().end());
+             .Case<TupleAttrInterface, pylir::Py::ListAttr>([&](auto attr) {
+               result.insert(result.end(), attr.getElements().begin(),
+                             attr.getElements().end());
                return true;
              })
              // TODO: string attr
@@ -572,7 +572,7 @@ mlir::OpFoldResult pylir::Py::TupleLenOp::fold(FoldAdaptor adaptor) {
       makeTuple && makeTuple.getIterExpansionAttr().empty())
     return mlir::IntegerAttr::get(getType(), makeTuple.getArguments().size());
 
-  if (auto tuple = ref_cast_or_null<TupleAttr>(adaptor.getInput()))
+  if (auto tuple = dyn_cast_or_null<TupleAttrInterface>(adaptor.getInput()))
     return mlir::IntegerAttr::get(getType(), tuple.size());
 
   return nullptr;
@@ -587,7 +587,7 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(FoldAdaptor adaptor) {
   if (!element)
     return nullptr;
 
-  if (auto tuple = ref_cast_or_null<TupleAttr>(adaptor.getTuple())) {
+  if (auto tuple = dyn_cast_or_null<TupleAttrInterface>(adaptor.getTuple())) {
     llvm::SmallVector<mlir::Attribute> values{element};
     values.append(tuple.begin(), tuple.end());
     return Py::TupleAttr::get(getContext(), values);
@@ -600,7 +600,7 @@ mlir::OpFoldResult pylir::Py::TuplePrependOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(FoldAdaptor adaptor) {
-  auto constant = ref_cast_or_null<TupleAttr>(adaptor.getTuple());
+  auto constant = dyn_cast_or_null<TupleAttrInterface>(adaptor.getTuple());
   if (constant && constant.empty())
     return Py::TupleAttr::get(getContext());
 
@@ -611,7 +611,7 @@ mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(FoldAdaptor adaptor) {
   if (index.getValue().getZExtValue() > constant.size())
     return Py::TupleAttr::get(getContext());
 
-  return Py::TupleAttr::get(getContext(), constant.getValue().drop_front(
+  return Py::TupleAttr::get(getContext(), constant.getElements().drop_front(
                                               index.getValue().getZExtValue()));
 }
 
@@ -629,11 +629,11 @@ mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(FoldAdaptor adaptor) {
       getTypeOf(getTuple()) == mlir::OpFoldResult(type))
     return getTuple();
 
-  auto constant = ref_cast_or_null<TupleAttr>(adaptor.getTuple());
+  auto constant = dyn_cast_or_null<TupleAttrInterface>(adaptor.getTuple());
   if (!constant || !type)
     return nullptr;
 
-  return Py::TupleAttr::get(getContext(), constant.getValue(), type);
+  return Py::TupleAttr::get(getContext(), constant.getElements(), type);
 }
 
 //===----------------------------------------------------------------------===//
@@ -641,7 +641,7 @@ mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TupleContainsOp::fold(FoldAdaptor adaptor) {
-  if (auto tuple = ref_cast_or_null<TupleAttr>(adaptor.getTuple()))
+  if (auto tuple = dyn_cast_or_null<TupleAttrInterface>(adaptor.getTuple()))
     if (auto element = adaptor.getElement())
       return mlir::BoolAttr::get(getContext(),
                                  llvm::is_contained(tuple, element));
@@ -995,7 +995,8 @@ mlir::OpFoldResult pylir::Py::BoolFromI1Op::fold(FoldAdaptor adaptor) {
 //===--------------------------------------------------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::MROLookupOp::fold(FoldAdaptor adaptor) {
-  if (auto tuple = ref_cast_or_null<TupleAttr>(adaptor.getMroTuple())) {
+  if (auto tuple =
+          dyn_cast_or_null<TupleAttrInterface>(adaptor.getMroTuple())) {
     for (auto iter : tuple) {
       auto result = foldGetSlot(getContext(), iter, adaptor.getSlot());
       if (!result)
@@ -1162,9 +1163,9 @@ pylir::Py::MakeTupleOp prependTupleConst(mlir::OpBuilder& builder,
                                          mlir::Location loc, mlir::Value input,
                                          mlir::Attribute attr) {
   llvm::SmallVector<mlir::Value> arguments{input};
-  for (const auto& iter : attr.cast<pylir::Py::TupleAttr>()) {
+  for (Attribute iter : cast<TupleAttrInterface>(attr))
     arguments.emplace_back(builder.create<pylir::Py::ConstantOp>(loc, iter));
-  }
+
   return builder.create<pylir::Py::MakeTupleOp>(
       loc, input.getType(), arguments, builder.getDenseI32ArrayAttr({}));
 }
@@ -1256,15 +1257,6 @@ mlir::IntegerAttr toBuiltinInt(mlir::Operation* operation, mlir::Attribute attr,
     return nullptr;
 
   return mlir::IntegerAttr::get(integerType, integer.sextOrTrunc(bitWidth));
-}
-
-mlir::LogicalResult resolvesToPattern(mlir::Operation* operation,
-                                      mlir::Attribute& result) {
-  if (!mlir::matchPattern(operation->getResult(0), mlir::m_Constant(&result)))
-    return mlir::failure();
-
-  result = dyn_cast_or_null<ObjectAttrInterface>(result);
-  return mlir::success();
 }
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyPatterns.cpp.inc"

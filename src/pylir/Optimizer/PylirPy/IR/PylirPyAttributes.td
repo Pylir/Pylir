@@ -222,55 +222,31 @@ def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [ImmutableAttr]> {
 }
 
 def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [ImmutableAttr],
-  /*base=*/ObjectAttrInterface,/*hasSlots=*/0> {
+  /*base=*/TupleAttrInterface, /*hasSlots=*/0> {
 	let mnemonic = "tuple";
 	let summary = "python tuple";
 
   let parameters = !con((ins
-    OptionalArrayRefParameter<"mlir::Attribute">:$value),
+    OptionalArrayRefParameter<"mlir::Attribute">:$elements),
   extraIns);
 
 	let assemblyFormat = [{
-	  `<` `(` (`)`) : ($value^ `)`)? ( `,` struct($type_object)^)? `>`
+	  `<` `(` (`)`) : ($elements^ `)`)? ( `,` struct($type_object)^)? `>`
 	}];
 
   let builders = [
-    AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$value),
+    AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$elements),
       extraBuilderArgs),
       extraBuilderPrologue # [{
-      return $_get($_ctxt, value, typeObject);
+      return $_get($_ctxt, elements, typeObject);
     }]>
   ];
 
 	let extraClassDeclaration = [{
 
-    [[nodiscard]] mlir::Attribute operator[](std::size_t index) const {
-      return getValue()[index];
-    }
-
     /// Returns all slots of the tuple in a dictionary, which is always empty.
-	  ::mlir::DictionaryAttr getSlots() const {
-      return ::mlir::DictionaryAttr::getWithSorted(getContext(), {});
-    }
-
-	  /// Returns true if the tuple contains no elements.
-	  [[nodiscard]] bool empty() const {
-      return getValue().empty();
-	  }
-
-    /// Returns the amount of elements within the tuple.
-	  [[nodiscard]] std::size_t size() const {
-      return getValue().size();
-	  }
-
-    /// Returns the begin iterator to the first element in the tuple.
-    [[nodiscard]] auto begin() const {
-      return getValue().begin();
-    }
-
-    /// Returns the end iterator past the last element in the tuple.
-    [[nodiscard]] auto end() const {
-      return getValue().end();
+	  mlir::DictionaryAttr getSlots() const {
+      return mlir::DictionaryAttr::getWithSorted(getContext(), {});
     }
 	}];
 }
@@ -279,18 +255,18 @@ def PylirPy_ListAttr : PylirPy_PyObjAttr<"List"> {
 	let mnemonic = "list";
 
   let parameters = !con((ins
-    OptionalArrayRefParameter<"mlir::Attribute">:$value),
+    OptionalArrayRefParameter<"mlir::Attribute">:$elements),
   extraIns);
 
 	let assemblyFormat = [{
-	  `<` `[` (`]`) : ( $value^ `]`)? ( `,` struct($type_object, $slots)^)? `>`
+	  `<` `[` (`]`) : ( $elements^ `]`)? ( `,` struct($type_object, $slots)^)? `>`
 	}];
 
 	let builders = [
-    AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$value),
+    AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$elements),
       extraBuilderArgs),
       extraBuilderPrologue # [{
-      return $_get($_ctxt, value, typeObject, slots);
+      return $_get($_ctxt, elements, typeObject, slots);
     }]>
   ];
 }
