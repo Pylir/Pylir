@@ -9,6 +9,9 @@
 #include "PylirPyAttributes.hpp"
 #include "Value.hpp"
 
+using namespace mlir;
+using namespace pylir::Py;
+
 namespace {
 
 template <class SymbolOp>
@@ -57,7 +60,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
 
   return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(object)
       .Case<pylir::Py::TupleAttr, pylir::Py::ListAttr>([&](auto sequence) {
-        for (auto iter : sequence.getValue())
+        for (auto iter : sequence.getElements())
           if (mlir::failed(verify(op, iter, collection)))
             return mlir::failure();
 
@@ -111,8 +114,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
         if (auto ref = functionAttr.getDefaults()
                            .dyn_cast_or_null<pylir::Py::RefAttr>();
             !ref || ref.getRef().getValue() != pylir::Builtins::None.name)
-          if (!pylir::Py::ref_cast<pylir::Py::TupleAttr>(
-                  functionAttr.getDefaults()))
+          if (!dyn_cast<TupleAttrInterface>(functionAttr.getDefaults()))
             return op->emitOpError(
                 "Expected __defaults__ to refer to a tuple\n");
 
@@ -127,8 +129,7 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
         if (mlir::failed(verify(op, typeAttr.getMroTuple(), collection)))
           return mlir::failure();
 
-        auto mro =
-            pylir::Py::ref_cast<pylir::Py::TupleAttr>(typeAttr.getMroTuple());
+        auto mro = dyn_cast<TupleAttrInterface>(typeAttr.getMroTuple());
         if (!mro)
           return op->emitOpError("Expected MRO to refer to a tuple\n");
 

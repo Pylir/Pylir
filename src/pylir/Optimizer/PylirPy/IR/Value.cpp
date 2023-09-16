@@ -13,6 +13,7 @@
 #include "PylirPyTraits.hpp"
 
 using namespace mlir;
+using namespace pylir::Py;
 
 mlir::OpFoldResult pylir::Py::getTypeOf(mlir::Value value) {
   if (auto op = value.getDefiningOp<pylir::Py::KnownTypeObjectInterface>())
@@ -65,7 +66,7 @@ pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute,
   if (auto opt = getBuiltinMethod(typeObject))
     return *opt;
 
-  auto mro = pylir::Py::ref_cast_or_null<pylir::Py::TupleAttr>(
+  auto mro = dyn_cast_or_null<TupleAttrInterface>(
       pylir::Py::ref_cast<pylir::Py::TypeAttr>(typeObject).getMroTuple());
   if (!mro)
     return pylir::Py::BuiltinMethodKind::Unknown;

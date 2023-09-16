@@ -8,6 +8,8 @@
 
 #include "pylir/Optimizer/PylirPy/IR/Value.hpp"
 
+using namespace mlir;
+
 std::optional<pylir::Mem::LayoutType>
 pylir::Mem::getLayoutType(mlir::Value value,
                           llvm::DenseMap<mlir::Attribute, LayoutType>* cache) {
@@ -49,11 +51,11 @@ std::optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr) {
   if (auto result = mapLayoutType(attr))
     return result;
 
-  auto type = ref_cast<TypeAttr>(attr);
+  auto type = ref_cast<Py::TypeAttr>(attr);
   if (!type)
     return std::nullopt;
 
-  auto mro = ref_cast<TupleAttr>(type.getMroTuple());
+  auto mro = dyn_cast<TupleAttrInterface>(type.getMroTuple());
   for (mlir::Attribute iter : mro)
     if (auto result = mapLayoutType(iter))
       return result;

@@ -9,8 +9,6 @@ include "mlir/IR/PatternBase.td"
 include "mlir/Dialect/Arith/IR/ArithOps.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 
-def ResolvesTo : NativeCodeCall<"::resolvesToPattern($_self, $0)">;
-
 def prependTupleConst
   : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
@@ -25,7 +23,7 @@ def : Pat<(PylirPy_TuplePrependOp $input,
        }() }]> $input, $args), ConstantAttr<DenseI32ArrayAttr, "{}">)>;
 
 def : Pat<(PylirPy_TuplePrependOp $input,
-            (ResolvesTo PylirPy_TupleAttr:$args)),
+            (ConstantLikeMatcher TupleAttrInterface:$args)),
               (prependTupleConst $input, $args)>;
 
 def : Pat<(PylirPy_TupleDropFrontOp (ConstantLikeMatcher IndexAttr:$count),

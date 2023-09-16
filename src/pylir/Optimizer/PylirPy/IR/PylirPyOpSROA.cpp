@@ -378,8 +378,8 @@ void pylir::Py::ListAttr::destructureAggregate(
   destructureSlots(*this, write);
   auto indexType = mlir::IndexType::get(getContext());
   write(nullptr, ListResource::get(), indexType,
-        mlir::IntegerAttr::get(indexType, getValue().size()));
-  for (auto [index, iter] : llvm::enumerate(getValue()))
+        mlir::IntegerAttr::get(indexType, getElements().size()));
+  for (auto [index, iter] : llvm::enumerate(getElements()))
     write(mlir::IntegerAttr::get(indexType, index), ListResource::get(),
           DynamicType::get(getContext()), iter);
 }

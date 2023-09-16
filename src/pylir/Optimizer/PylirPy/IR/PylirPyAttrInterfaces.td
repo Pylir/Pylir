@@ -145,4 +145,49 @@ def BoolAttrInterface : RefAttrImplementable<"BoolAttrInterface",
   let convertFromStorage = "$_self.getBoolean()";
 }
 
+def TupleAttrInterface : RefAttrImplementable<"TupleAttrInterface",
+  [ObjectAttrInterface]> {
+  let cppNamespace = "::pylir::Py";
+
+  let description = [{
+    Interface implemented by any attribute that subclasses `builtins.tuple`.
+
+    Implies an implementation of `ObjectAttrInterface`.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the boolean value of this attribute.
+    }],
+    "llvm::ArrayRef<mlir::Attribute>", "getElements", (ins)>,
+    canImplementMethod
+  ];
+
+  let extraSharedClassDeclaration = [{
+    [[nodiscard]] mlir::Attribute operator[](std::size_t index) const {
+      return $_attr.getElements()[index];
+    }
+
+    /// Returns true if the tuple contains no elements.
+    [[nodiscard]] bool empty() const {
+      return $_attr.getElements().empty();
+    }
+
+    /// Returns the amount of elements within the tuple.
+    [[nodiscard]] std::size_t size() const {
+      return $_attr.getElements().size();
+    }
+
+    /// Returns the begin iterator to the first element in the tuple.
+    [[nodiscard]] auto begin() const {
+      return $_attr.getElements().begin();
+    }
+
+    /// Returns the end iterator past the last element in the tuple.
+    [[nodiscard]] auto end() const {
+      return $_attr.getElements().end();
+    }
+  }];
+}
+
 #endif
