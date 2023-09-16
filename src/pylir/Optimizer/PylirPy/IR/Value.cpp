@@ -80,9 +80,8 @@ pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute,
       if (auto opt = getBuiltinMethod(ref))
         return *opt;
 
-    auto baseType =
-        pylir::Py::ref_cast_or_null<pylir::Py::TypeAttr>(iter, true);
-    if (!baseType)
+    auto baseType = dyn_cast_or_null<ConcreteObjectAttrInterface>(iter);
+    if (!isa_and_nonnull<TypeAttrInterface>(baseType))
       return pylir::Py::BuiltinMethodKind::Unknown;
 
     auto func = baseType.getSlots().get(method);
