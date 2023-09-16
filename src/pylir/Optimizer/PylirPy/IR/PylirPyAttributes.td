@@ -206,7 +206,8 @@ def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [ImmutableAttr],
   let convertFromStorage = "$_self.getDoubleValue()";
 }
 
-def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [ImmutableAttr]> {
+def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [ImmutableAttr],
+  /*base=*/StrAttrInterface> {
 	let mnemonic = "str";
 	let summary = "python string";
 
