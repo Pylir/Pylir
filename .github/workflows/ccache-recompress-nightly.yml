@@ -39,11 +39,11 @@ jobs:
       - name: Install Dependencies
         uses: ./Pylir/.github/actions/dependencies
         with:
-          c-compiler: ${{inputs.c-compiler}}
-          cpp-compiler: ${{inputs.cpp-compiler}}
-          sanitizers: ${{inputs.sanitizers}}
-          runtime_lib: ${{inputs.runtime_lib}}
-          shared_libs: ${{inputs.shared_libs}}
+          c-compiler: ${{matrix.c-compiler}}
+          cpp-compiler: ${{matrix.cpp-compiler}}
+          sanitizers: ${{matrix.sanitizers}}
+          runtime_lib: ${{matrix.runtime_lib}}
+          shared_libs: ${{matrix.shared_libs}}
 
       - name: Compress ccache
         run: |
