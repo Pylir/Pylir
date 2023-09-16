@@ -279,4 +279,23 @@ def FloatAttrInterface : RefAttrImplementable<"FloatAttrInterface",
   ];
 }
 
+def StrAttrInterface : RefAttrImplementable<"StrAttrInterface",
+  [ObjectAttrInterface]> {
+  let cppNamespace = "::pylir::Py";
+
+  let description = [{
+    Interface implemented by any attribute that subclasses `builtins.str`.
+
+    Implies an implementation of `ObjectAttrInterface`.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns string value of this attribute.
+    }],
+    "llvm::StringRef", "getValue", (ins)>,
+    canImplementMethod
+  ];
+}
+
 #endif

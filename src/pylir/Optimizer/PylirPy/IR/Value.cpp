@@ -118,7 +118,7 @@ mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute) {
     return attribute.dyn_cast<RefAttr>();
   case BuiltinMethodKind::Str:
     return mlir::StringAttr::get(attribute.getContext(),
-                                 ref_cast<StrAttr>(attribute).getValue());
+        dyn_cast<StrAttrInterface>(attribute).getValue());
   case BuiltinMethodKind::Int:
     return FractionalAttr::get(
         attribute.getContext(),
