@@ -24,6 +24,9 @@
 #include "CodeGenState.hpp"
 #include "PylirTypeConverter.hpp"
 
+using namespace mlir;
+using namespace pylir::Py;
+
 namespace pylir {
 #define GEN_PASS_DEF_CONVERTPYLIRTOLLVMPASS
 #include "pylir/Optimizer/Conversion/Passes.h.inc"
@@ -1031,7 +1034,7 @@ struct GCAllocObjectConstTypeConversion
     if (!constant)
       return mlir::failure();
 
-    auto typeAttr = Py::ref_cast<Py::TypeAttr>(constant.getConstant());
+    auto typeAttr = dyn_cast<TypeAttrInterface>(constant.getConstant());
     if (!typeAttr)
       return mlir::failure();
 
@@ -1672,7 +1675,7 @@ struct ReturnOpConversion : ConvertPylirOpToLLVMPattern<Py::ReturnOp> {
 };
 
 class ConvertPylirToLLVMPass
-    : public impl::ConvertPylirToLLVMPassBase<ConvertPylirToLLVMPass> {
+    : public pylir::impl::ConvertPylirToLLVMPassBase<ConvertPylirToLLVMPass> {
 protected:
   void runOnOperation() override;
 

@@ -33,9 +33,8 @@ class DefaultType<string name, string description = "">
 /// `$slots` to the parameters, builder and builder body.
 class PylirPy_PyObjAttr<string name,
   list<Trait> traits = [],
-  AttrInterface base = ObjectAttrInterface,
   bit hasSlots = 1>
-  : PylirPy_Attr<name, !listconcat(traits, [base, ConcreteObjectAttrInterface,
+  : PylirPy_Attr<name, !listconcat(traits, [ConcreteObjectAttrInterface,
    DeclareAttrInterfaceMethods<SROAAttrInterface>])>
 {
   /// The default builder usually has the same parameter types as the ones
@@ -94,8 +93,7 @@ def BigIntParam : AttrParameter<"::pylir::BigInt", "Arbitrary sized integer",
   let printer = "$_printer << $_self.toString();";
 }
 
-def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [ImmutableAttr],
-  /*base=*/IntAttrInterface> {
+def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [IntAttrInterface]> {
 	let mnemonic = "int";
 	let summary = "python integer";
 
@@ -137,8 +135,7 @@ def BoolParameter : AttrParameter<"bool", "boolean"> {
   }];
 }
 
-def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [ImmutableAttr],
-  /*base=*/BoolAttrInterface> {
+def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [BoolAttrInterface]> {
 	let mnemonic = "bool";
 	let summary = "python boolean";
 
@@ -180,8 +177,7 @@ def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [ImmutableAttr],
   let convertFromStorage = "$_self.getValue()";
 }
 
-def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [ImmutableAttr],
-  /*base=*/FloatAttrInterface> {
+def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [FloatAttrInterface]> {
 	let mnemonic = "float";
 	let summary = "python float";
 
@@ -206,8 +202,7 @@ def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [ImmutableAttr],
   let convertFromStorage = "$_self.getDoubleValue()";
 }
 
-def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [ImmutableAttr],
-  /*base=*/StrAttrInterface> {
+def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [StrAttrInterface]> {
 	let mnemonic = "str";
 	let summary = "python string";
 
@@ -223,8 +218,8 @@ def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [ImmutableAttr],
   ];
 }
 
-def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [ImmutableAttr],
-  /*base=*/TupleAttrInterface, /*hasSlots=*/0> {
+def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [TupleAttrInterface],
+  /*hasSlots=*/0> {
 	let mnemonic = "tuple";
 	let summary = "python tuple";
 
@@ -384,9 +379,8 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DictAttrInterface,
   }];
 }
 
-def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ImmutableAttr,
-  FunctionAttrInterface, ConcreteObjectAttrInterface,
-  DeclareAttrInterfaceMethods<ObjectAttrInterface>,
+def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ FunctionAttrInterface,
+  ConcreteObjectAttrInterface, DeclareAttrInterfaceMethods<ObjectAttrInterface>,
   DeclareAttrInterfaceMethods<ConstObjectAttrInterface>,
   DeclareAttrInterfaceMethods<SROAAttrInterface>]>
 {
@@ -426,8 +420,7 @@ def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ImmutableAttr,
   ];
 }
 
-def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [ImmutableAttr],
-  /*base=*/TypeAttrInterface> {
+def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [TypeAttrInterface]> {
 	let mnemonic = "type";
 	let summary = "python type";
 

@@ -44,10 +44,6 @@ class ReturnsImmutable
   }
 };
 
-template <class ConcreteType>
-class ImmutableAttr
-    : public mlir::AttributeTrait::TraitBase<ConcreteType, ImmutableAttr> {};
-
 enum class OperandShape {
   Single,
   Variadic,

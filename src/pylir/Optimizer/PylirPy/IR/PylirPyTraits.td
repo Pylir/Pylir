@@ -43,10 +43,6 @@ class KnownType<string type>
   }
 }]>;
 
-/// Indicates that an attribute is of an immutable python object. This is mainly
-/// useful for the initializer of 'py.globalValue'.
-def ImmutableAttr : PylirPyAttrTrait<"ImmutableAttr">;
-
 /// Op trait used to indicate that an exception handling variant of the op
 /// exists. Adding this trait makes the operation automatically implement
 /// 'AddableExceptionHandlingInterface'. The trait has to know for each operand
