@@ -180,7 +180,8 @@ def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [ImmutableAttr],
   let convertFromStorage = "$_self.getValue()";
 }
 
-def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [ImmutableAttr]> {
+def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [ImmutableAttr],
+  /*base=*/FloatAttrInterface> {
 	let mnemonic = "float";
 	let summary = "python float";
 

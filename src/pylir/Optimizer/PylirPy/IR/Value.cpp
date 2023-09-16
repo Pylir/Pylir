@@ -124,7 +124,7 @@ mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute) {
         dyn_cast<IntAttrInterface>(attribute).getInteger(), BigInt(1));
   case BuiltinMethodKind::Float:
     auto [nom, denom] =
-        toRatio(ref_cast<FloatAttr>(attribute).getDoubleValue());
+        toRatio(dyn_cast<FloatAttrInterface>(attribute).getDoubleValue());
     return FractionalAttr::get(attribute.getContext(), std::move(nom),
                                std::move(denom));
   }
