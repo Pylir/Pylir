@@ -1,0 +1,49 @@
+name: CCache Recompress Nightly
+
+permissions:
+  actions: write
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  ccache-recompress-nightly:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2022, cpp-compiler: clang-cl, c-compiler: clang-cl, runtime_lib: "MultiThreaded" }
+          - { os: windows-2022, cpp-compiler: clang-cl, c-compiler: clang-cl, runtime_lib: "MultiThreadedDebug" }
+          - { os: windows-2022, cpp-compiler: clang++, c-compiler: clang }
+          - { os: windows-2022, cpp-compiler: clang++, c-compiler: clang, sanitizers: "address,undefined" }
+          - { os: ubuntu-22.04, cpp-compiler: clang++, c-compiler: clang }
+          - { os: ubuntu-22.04, cpp-compiler: clang++, c-compiler: clang, shared_libs: "ON" }
+          - { os: ubuntu-22.04, cpp-compiler: clang++, c-compiler: clang, sanitizers: "thread" }
+          - { os: ubuntu-22.04, cpp-compiler: clang++, c-compiler: clang, sanitizers: "address,undefined" }
+          - { os: ubuntu-22.04, cpp-compiler: g++-10, c-compiler: gcc-10 }
+          - { os: macos-12, cpp-compiler: clang++, c-compiler: clang }
+    runs-on: ${{matrix.os}}
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout Repo for Actions
+        uses: actions/checkout@v3
+        with:
+          path: Pylir
+
+      - name: Install Dependencies
+        uses: ./Pylir/.github/actions/dependencies
+        with:
+          c-compiler: ${{matrix.c-compiler}}
+          cpp-compiler: ${{matrix.cpp-compiler}}
+          sanitizers: ${{matrix.sanitizers}}
+          runtime_lib: ${{matrix.runtime_lib}}
+          shared_libs: ${{matrix.shared_libs}}
+
+      - name: Compress ccache
+        run: |
+          ccache --recompress 20
