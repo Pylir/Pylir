@@ -16,6 +16,10 @@
 #include "PylirPyOps.hpp"
 #include "Value.hpp"
 
+using namespace mlir;
+using namespace pylir;
+using namespace pylir::Py;
+
 namespace {
 template <class T>
 struct TupleExpansionRemover : mlir::OpRewritePattern<T> {
@@ -145,11 +149,11 @@ mlir::Attribute foldGetSlot(mlir::MLIRContext* context,
 
   auto index = intAttr.getValue();
 
-  auto object = ref_cast_or_null<ConstObjectAttrInterface>(objectOp);
+  auto object = dyn_cast_or_null<ConstObjectAttrInterface>(objectOp);
   if (!object)
     return nullptr;
 
-  auto typeAttr = ref_cast_or_null<TypeAttr>(object.getTypeObject());
+  auto typeAttr = ref_cast_or_null<Py::TypeAttr>(object.getTypeObject());
   if (!typeAttr)
     return nullptr;
 
@@ -321,8 +325,7 @@ mlir::OpFoldResult pylir::Py::ConstantOp::fold(FoldAdaptor) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TypeOfOp::fold(FoldAdaptor adaptor) {
-  if (auto input =
-          ref_cast_or_null<ObjectAttrInterface>(adaptor.getObject(), false))
+  if (auto input = dyn_cast_or_null<ObjectAttrInterface>(adaptor.getObject()))
     return input.getTypeObject();
 
   return getTypeOf(getObject());
@@ -1256,12 +1259,11 @@ mlir::IntegerAttr toBuiltinInt(mlir::Operation* operation, mlir::Attribute attr,
 }
 
 mlir::LogicalResult resolvesToPattern(mlir::Operation* operation,
-                                      mlir::Attribute& result, bool constOnly) {
+                                      mlir::Attribute& result) {
   if (!mlir::matchPattern(operation->getResult(0), mlir::m_Constant(&result)))
     return mlir::failure();
 
-  result = pylir::Py::ref_cast_or_null<pylir::Py::ObjectAttrInterface>(
-      result, constOnly);
+  result = dyn_cast_or_null<ObjectAttrInterface>(result);
   return mlir::success();
 }
 

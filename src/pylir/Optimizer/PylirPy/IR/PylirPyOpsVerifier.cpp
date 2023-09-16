@@ -30,15 +30,16 @@ verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
 
 mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
                            mlir::SymbolTableCollection& collection) {
+  if (auto ref = attribute.dyn_cast<pylir::Py::RefAttr>()) {
+    if (!ref.getSymbol())
+      return op->emitOpError("RefAttr '")
+             << ref.getRef() << "' does not refer to a 'py.globalValue'";
+
+    return mlir::success();
+  }
+
   auto object = attribute.dyn_cast<pylir::Py::ObjectAttrInterface>();
   if (!object) {
-    if (auto ref = attribute.dyn_cast<pylir::Py::RefAttr>()) {
-      if (!ref.getSymbol())
-        return op->emitOpError("RefAttr '")
-               << ref.getRef() << "' does not refer to a 'py.globalValue'";
-
-      return mlir::success();
-    }
     if (!attribute.isa<pylir::Py::UnboundAttr, pylir::Py::GlobalValueAttr>())
       return op->emitOpError("Not allowed attribute '")
              << attribute << "' found\n";

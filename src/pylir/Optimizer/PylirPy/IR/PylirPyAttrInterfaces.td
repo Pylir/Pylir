@@ -7,7 +7,39 @@
 
 include "mlir/IR/OpBase.td"
 
-def ObjectAttrInterface : AttrInterface<"ObjectAttrInterface"> {
+/// Base class for all attribute interfaces that should also be able to be
+/// implementable by `RefAttr`. Any `RefAttr` that refers to a symbol that
+/// implements a given interface automatically implements that interface as
+/// well. If the attribute is a "sub-interface" of `ConstObjectAttrInterface`,
+/// then the symbol referred to by the `RefAttr` must additionally be constant.
+class RefAttrImplementable<string name, list<Interface> baseInterfaces = []>
+  : AttrInterface<name, baseInterfaces> {
+
+  /// Interface method that should be appended to the methods array of any
+  /// subclass of `RefAttrImplementable`. It automatically adds the necessary
+  /// hooks to allow `RefAttr` to implement the interface.
+  InterfaceMethod canImplementMethod = InterfaceMethod<[{
+    This method is used by the `classof` mechanism of the given interface
+    implementation to allow an implementation to dynamically determine whether
+    it implements the given interface.
+    The implementation has a parameter containing the interface type to avoid
+    clashing with the corresponding method of any other interface implemented.
+
+    Returns true for attributes where the interface is directly attached to in
+    ODS.
+  }], "bool", "canImplement",
+    (ins "std::in_place_type_t<" # cppNamespace # "::" # name # ">":$tagType),
+     [{
+    return true;
+  }]>;
+
+  let extraClassOf = [{
+    return $_attr.canImplement(std::in_place_type<}]
+      # cppNamespace # "::" # name # [{>);
+  }];
+}
+
+def ObjectAttrInterface : RefAttrImplementable<"ObjectAttrInterface"> {
   let cppNamespace = "::pylir::Py";
 
   let description = [{
@@ -20,11 +52,13 @@ def ObjectAttrInterface : AttrInterface<"ObjectAttrInterface"> {
     InterfaceMethod<[{
       Returns the `#py.ref` referring to the type object of this attribute.
       Mustn't be null.
-    }], "::pylir::Py::RefAttr", "getTypeObject", (ins)>
+    }], "::pylir::Py::RefAttr", "getTypeObject", (ins)>,
+    canImplementMethod
   ];
 }
 
-def ConstObjectAttrInterface : AttrInterface<"ConstObjectAttrInterface", [ObjectAttrInterface]> {
+def ConstObjectAttrInterface : RefAttrImplementable<"ConstObjectAttrInterface",
+  [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
   let description = [{
@@ -49,11 +83,26 @@ def ConstObjectAttrInterface : AttrInterface<"ConstObjectAttrInterface", [Object
     InterfaceMethod<[{
       Returns a dictionary containing all slots of the attribute.
       Mustn't be null.
-    }], "::mlir::DictionaryAttr", "getSlots", (ins)>
+    }], "::mlir::DictionaryAttr", "getSlots", (ins)>,
+    canImplementMethod
   ];
 }
 
-def IntAttrInterface : AttrInterface<"IntAttrInterface",
+def ConcreteObjectAttrInterface : AttrInterface<"ConcreteObjectAttrInterface",
+  [ConstObjectAttrInterface]> {
+  let cppNamespace = "pylir::Py";
+
+  let description = [{
+    This interface is implemented by all attributes that represent concrete
+    python objects. It is most notably not implemented by `RefAttr`.
+
+    This interface doesn't have any methods but is rather used as a marker
+    or trait that additionally also implies an implementation of
+    `ConstObjectAttrInterface`.
+  }];
+}
+
+def IntAttrInterface : RefAttrImplementable<"IntAttrInterface",
   [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
@@ -66,14 +115,16 @@ def IntAttrInterface : AttrInterface<"IntAttrInterface",
     InterfaceMethod<[{
       Returns the big integer value of this attribute.
     }],
-    "pylir::BigInt", "getInteger", (ins)>
+    "pylir::BigInt", "getInteger", (ins)>,
+    canImplementMethod
   ];
 
   let returnType = "pylir::BigInt";
   let convertFromStorage = "$_self.getInteger()";
 }
 
-def BoolAttrInterface : AttrInterface<"BoolAttrInterface", [IntAttrInterface]> {
+def BoolAttrInterface : RefAttrImplementable<"BoolAttrInterface",
+  [IntAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
   let description = [{
@@ -86,7 +137,8 @@ def BoolAttrInterface : AttrInterface<"BoolAttrInterface", [IntAttrInterface]> {
     InterfaceMethod<[{
       Returns the boolean value of this attribute.
     }],
-    "bool", "getBoolean", (ins)>
+    "bool", "getBoolean", (ins)>,
+    canImplementMethod
   ];
 
   let returnType = "bool";

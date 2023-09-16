@@ -27,6 +27,10 @@ add_pylir_doc(PylirPyOps.td PylirPyDialect Dialect/ -gen-dialect-doc
 add_pylir_interface(ATTR PylirPyAttrInterfaces)
 add_pylir_rewriter(PylirPyPatterns)
 
+set(LLVM_TARGET_DEFINITIONS PylirPyAttrInterfaces.td)
+pylir_tablegen(PylirPyWrapInterfaces.h.inc -gen-wrap-interfaces)
+add_public_tablegen_target(PylirPyWrapInterfacesIncGen)
+
 add_library(PylirPyDialect
   PylirPyAttrInterfaces.cpp
   PylirPyAttributes.cpp
@@ -43,6 +47,7 @@ add_dependencies(PylirPyDialect
   PylirPyIncGen
   PylirPyPatternsIncGen
   PylirPyAttrInterfacesIncGen
+  PylirPyWrapInterfacesIncGen
 )
 target_link_libraries(PylirPyDialect
   PUBLIC

@@ -35,7 +35,7 @@ class PylirPy_PyObjAttr<string name,
   list<Trait> traits = [],
   AttrInterface base = ObjectAttrInterface,
   bit hasSlots = 1>
-  : PylirPy_Attr<name, !listconcat(traits, [base, ConstObjectAttrInterface,
+  : PylirPy_Attr<name, !listconcat(traits, [base, ConcreteObjectAttrInterface,
    DeclareAttrInterfaceMethods<SROAAttrInterface>])>
 {
   /// The default builder usually has the same parameter types as the ones
@@ -295,7 +295,7 @@ def PylirPy_ListAttr : PylirPy_PyObjAttr<"List"> {
   ];
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ConstObjectAttrInterface,
+def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ConcreteObjectAttrInterface,
   DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
 
   let mnemonic = "dict";
@@ -406,7 +406,7 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [ConstObjectAttrInterface,
 }
 
 def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ImmutableAttr,
-  DeclareAttrInterfaceMethods<ObjectAttrInterface>,
+  ConcreteObjectAttrInterface, DeclareAttrInterfaceMethods<ObjectAttrInterface>,
   DeclareAttrInterfaceMethods<ConstObjectAttrInterface>,
   DeclareAttrInterfaceMethods<SROAAttrInterface>]>
 {

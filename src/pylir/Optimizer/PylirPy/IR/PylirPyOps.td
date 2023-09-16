@@ -101,7 +101,7 @@ def DictResource : Resource<"::pylir::Py::DictResource">;
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoMemoryEffect,
   KnownType<"Tuple">, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface,
-                  PylirPy_RefAttr, PylirPy_GlobalValueAttr]>:$constant);
+    PylirPy_RefAttr, PylirPy_GlobalValueAttr]>:$constant);
   let results = (outs DynamicType:$result);
 
   let assemblyFormat = [{
@@ -1240,7 +1240,7 @@ def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [
       SymbolNameAttr:$sym_name,
       OptionalAttr<StrAttr>:$sym_visibility,
       UnitAttr:$constant,
-      OptionalAttr<ConstObjectAttrInterface>:$initializer);
+      OptionalAttr<ConcreteObjectAttrInterface>:$initializer);
 
   let results = (outs);
 
