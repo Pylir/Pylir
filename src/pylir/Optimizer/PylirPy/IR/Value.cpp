@@ -119,7 +119,8 @@ mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute) {
     return mlir::StringAttr::get(attribute.getContext(),
                                  ref_cast<StrAttr>(attribute).getValue());
   case BuiltinMethodKind::Int:
-    return FractionalAttr::get(attribute.getContext(),
+    return FractionalAttr::get(
+        attribute.getContext(),
         dyn_cast<IntAttrInterface>(attribute).getInteger(), BigInt(1));
   case BuiltinMethodKind::Float:
     auto [nom, denom] =

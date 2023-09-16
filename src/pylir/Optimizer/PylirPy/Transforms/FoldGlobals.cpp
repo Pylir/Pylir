@@ -33,8 +33,8 @@ protected:
   void runOnOperation() override;
 
 private:
-  pylir::Py::GlobalValueOp
-  createGlobalValueFromGlobal(pylir::Py::GlobalOp globalOp,
+  pylir::Py::GlobalValueOp createGlobalValueFromGlobal(
+      pylir::Py::GlobalOp globalOp,
       pylir::Py::ConcreteObjectAttrInterface initializer, bool constant) {
     PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
     mlir::OpBuilder builder(globalOp);
