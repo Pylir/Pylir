@@ -260,4 +260,23 @@ def FunctionAttrInterface : RefAttrImplementable<"FunctionAttrInterface",
   ];
 }
 
+def FloatAttrInterface : RefAttrImplementable<"FloatAttrInterface",
+  [ObjectAttrInterface]> {
+  let cppNamespace = "::pylir::Py";
+
+  let description = [{
+    Interface implemented by any attribute that subclasses `builtins.float`.
+
+    Implies an implementation of `ObjectAttrInterface`.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns double value of this attribute.
+    }],
+    "double", "getDoubleValue", (ins)>,
+    canImplementMethod
+  ];
+}
+
 #endif
