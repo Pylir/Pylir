@@ -418,6 +418,11 @@ def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ FunctionAttrInterface,
       return $_get(context, value, qualName, defaults, kwDefaults, dict);
     }]>
   ];
+
+
+  let extraClassDeclaration = [{
+    TypeAttrInterface getTypeObject() const;
+  }];
 }
 
 def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [TypeAttrInterface]> {

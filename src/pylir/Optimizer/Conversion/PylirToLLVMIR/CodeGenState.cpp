@@ -254,12 +254,9 @@ void pylir::CodeGenState::initializeGlobal(
   mlir::Value undef =
       builder.create<mlir::LLVM::UndefOp>(global.getLoc(), global.getType());
   auto typeObject = objectAttr.getTypeObject();
-  PYLIR_ASSERT(typeObject);
-  PYLIR_ASSERT(typeObject.getSymbol().getInitializerAttr() &&
-               "Type objects can't be a declaration");
 
-  auto typeObj = builder.create<mlir::LLVM::AddressOfOp>(
-      global.getLoc(), m_objectPtrType, objectAttr.getTypeObject().getRef());
+  auto typeObj =
+      getConstant(global.getLoc(), builder, objectAttr.getTypeObject());
   undef = builder.create<mlir::LLVM::InsertValueOp>(global.getLoc(), undef,
                                                     typeObj, 0);
   llvm::TypeSwitch<Py::ObjectAttrInterface>(objectAttr)

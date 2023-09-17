@@ -153,10 +153,7 @@ mlir::Attribute foldGetSlot(mlir::MLIRContext* context,
   if (!object)
     return nullptr;
 
-  auto typeAttr = dyn_cast_or_null<TypeAttrInterface>(object.getTypeObject());
-  if (!typeAttr)
-    return nullptr;
-
+  TypeAttrInterface typeAttr = object.getTypeObject();
   if (index.uge(typeAttr.getInstanceSlots().size()))
     return nullptr;
 
@@ -1034,12 +1031,13 @@ pylir::Py::GlobalValueOp::fold(FoldAdaptor,
       Builtins::Float.name, Builtins::Int.name,   Builtins::Bool.name,
       Builtins::Str.name,   Builtins::Tuple.name,
   };
-  if (!getConstant() && getInitializer() &&
-      immutableTypes.contains(
-          getInitializer()->getTypeObject().getRef().getValue())) {
-    setConstantAttr(mlir::UnitAttr::get(getContext()));
-    return mlir::success();
-  }
+  if (!getConstant() && getInitializer())
+    if (auto refAttr = dyn_cast<RefAttr>(getInitializer()->getTypeObject()))
+      if (refAttr && immutableTypes.contains(refAttr.getRef().getValue())) {
+        setConstantAttr(mlir::UnitAttr::get(getContext()));
+        return mlir::success();
+      }
+
   return mlir::failure();
 }
 

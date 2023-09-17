@@ -155,13 +155,9 @@ struct GlobalValueOpConversion
         Builtins::Str.name,
     };
     bool constant = op.getConstant();
-    if (!op.isDeclaration()) {
-      constant =
-          (constant ||
-           immutable.contains(
-               op.getInitializer()->getTypeObject().getRef().getValue())) &&
-          !needToBeRuntimeInit(*op.getInitializer());
-    }
+    if (!op.isDeclaration())
+      constant = constant && !needToBeRuntimeInit(*op.getInitializer());
+
     auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(
         op, type, constant, linkage, op.getName(), mlir::Attribute{}, 0,
         REF_ADDRESS_SPACE, true);
