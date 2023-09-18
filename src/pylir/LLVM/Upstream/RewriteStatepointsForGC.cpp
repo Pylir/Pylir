@@ -966,7 +966,7 @@ static Value *findBasePointer(Value *I, DefiningValueMapTy &Cache,
 
   // Return a phi state for a base defining value.  We'll generate a new
   // base state for known bases and expect to find a cached state otherwise.
-  auto GetStateForBDV = [&](Value *BaseValue, Value *Input) {
+  auto GetStateForBDV = [&](Value *BaseValue, [[maybe_unused]] Value *Input) {
     auto I = States.find(BaseValue);
     if (I != States.end())
       return I->second;
@@ -1281,7 +1281,8 @@ static Value *findBasePointer(Value *I, DefiningValueMapTy &Cache,
 // pointer in live.  Note that derived can be equal to base if the original
 // pointer was a base pointer.
 static void findBasePointers(const StatepointLiveSetTy &live,
-                             PointerToBaseTy &PointerToBase, DominatorTree *DT,
+                             PointerToBaseTy &PointerToBase,
+                             [[maybe_unused]] DominatorTree *DT,
                              DefiningValueMapTy &DVCache,
                              IsKnownBaseMapTy &KnownBases) {
   for (Value *ptr : live) {
@@ -1884,7 +1885,7 @@ makeStatepointExplicit(DominatorTree &, CallBase *Call,
 static void
 insertRelocationStores(iterator_range<Value::user_iterator> GCRelocs,
                        DenseMap<Value *, AllocaInst *> &AllocaMap,
-                       DenseSet<Value *> &VisitedLiveValues) {
+                       [[maybe_unused]] DenseSet<Value *> &VisitedLiveValues) {
   for (User *U : GCRelocs) {
     GCRelocateInst *Relocate = dyn_cast<GCRelocateInst>(U);
     if (!Relocate)
@@ -1919,7 +1920,7 @@ insertRelocationStores(iterator_range<Value::user_iterator> GCRelocs,
 static void insertRematerializationStores(
     const RematerializedValueMapTy &RematerializedValues,
     DenseMap<Value *, AllocaInst *> &AllocaMap,
-    DenseSet<Value *> &VisitedLiveValues) {
+    [[maybe_unused]] DenseSet<Value *> &VisitedLiveValues) {
   for (auto RematerializedValuePair: RematerializedValues) {
     Instruction *RematerializedValue = RematerializedValuePair.first;
     Value *OriginalValue = RematerializedValuePair.second;
@@ -3185,7 +3186,7 @@ static void checkBasicSSA(DominatorTree &DT, GCPtrLivenessData &Data,
 }
 #endif
 
-static void computeLiveInValues(DominatorTree &DT, Function &F,
+static void computeLiveInValues([[maybe_unused]] DominatorTree &DT, Function &F,
                                 GCPtrLivenessData &Data) {
   SmallSetVector<BasicBlock *, 32> Worklist;
 
