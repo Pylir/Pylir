@@ -314,7 +314,7 @@ static std::string suffixed_name_or(Value *V, StringRef Suffix,
 // given instruction. Values defined by that instruction are not considered
 // live.  Values used by that instruction are considered live.
 static void analyzeParsePointLiveness(
-    DominatorTree &DT, GCPtrLivenessData &OriginalLivenessData, CallBase *Call,
+    DominatorTree &, GCPtrLivenessData &OriginalLivenessData, CallBase *Call,
     PartiallyConstructedSafepointRecord &Result) {
   StatepointLiveSetTy LiveSet;
   findLiveSetAtInst(Call, OriginalLivenessData, LiveSet);
@@ -1403,10 +1403,10 @@ static AttributeList legalizeCallAttributes(LLVMContext &Ctx,
 ///   statepointToken - statepoint instruction to which relocates should be
 ///   bound.
 ///   Builder - Llvm IR builder to be used to construct new calls.
-static void CreateGCRelocates(ArrayRef<Value *> LiveVariables,
-                              ArrayRef<Value *> BasePtrs,
-                              Instruction *StatepointToken,
-                              IRBuilder<> &Builder) {
+[[maybe_unused]] static void CreateGCRelocates(ArrayRef<Value *> LiveVariables,
+                                               ArrayRef<Value *> BasePtrs,
+                                               Instruction *StatepointToken,
+                                               IRBuilder<> &Builder) {
   if (LiveVariables.empty())
     return;
 
@@ -1564,7 +1564,7 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
   ArrayRef<Value *> GCArgs(LiveVariables);
   uint64_t StatepointID = StatepointDirectives::DefaultStatepointID;
   uint32_t NumPatchBytes = 0;
-  uint32_t Flags = uint32_t(StatepointFlags::None);
+  [[maybe_unused]] uint32_t Flags = uint32_t(StatepointFlags::None);
 
   SmallVector<Value *, 8> CallArgs(Call->args());
   std::optional<ArrayRef<Use>> DeoptArgs;
@@ -1842,7 +1842,7 @@ makeStatepointExplicitImpl(CallBase *Call, /* to replace */
 // WARNING: Does not do any fixup to adjust users of the original live
 // values.  That's the callers responsibility.
 static void
-makeStatepointExplicit(DominatorTree &DT, CallBase *Call,
+makeStatepointExplicit(DominatorTree &, CallBase *Call,
                        PartiallyConstructedSafepointRecord &Result,
                        std::vector<DeferredReplacement> &Replacements,
                        const PointerToBaseTy &PointerToBase,
@@ -1938,9 +1938,9 @@ static void insertRematerializationStores(
 }
 
 /// Do all the relocation update via allocas and mem2reg
-static void relocationViaAlloca(
-    Function &F, DominatorTree &DT, ArrayRef<Value *> Live,
-    ArrayRef<PartiallyConstructedSafepointRecord> Records) {
+[[maybe_unused]] static void
+relocationViaAlloca(Function &F, DominatorTree &DT, ArrayRef<Value *> Live,
+                    ArrayRef<PartiallyConstructedSafepointRecord> Records) {
 #ifndef NDEBUG
   // record initial number of (static) allocas; we'll check we have the same
   // number when we get done.
@@ -2275,7 +2275,7 @@ static bool AreEquivalentPhiNodes(PHINode &OrigRootPhi, PHINode &AlternateRootPh
 
 // Find derived pointers that can be recomputed cheap enough and fill
 // RematerizationCandidates with such candidates.
-static void
+[[maybe_unused]] static void
 findRematerializationCandidates(PointerToBaseTy PointerToBase,
                                 RematCandTy &RematerizationCandidates,
                                 TargetTransformInfo &TTI) {
@@ -2337,11 +2337,10 @@ findRematerializationCandidates(PointerToBaseTy PointerToBase,
 // to relocate. Remove this values from the live set, rematerialize them after
 // statepoint and record them in "Info" structure. Note that similar to
 // relocated values we don't do any user adjustments here.
-static void rematerializeLiveValues(CallBase *Call,
-                                    PartiallyConstructedSafepointRecord &Info,
-                                    PointerToBaseTy &PointerToBase,
-                                    RematCandTy &RematerizationCandidates,
-                                    TargetTransformInfo &TTI) {
+[[maybe_unused]] static void rematerializeLiveValues(
+    CallBase *Call, PartiallyConstructedSafepointRecord &Info,
+    PointerToBaseTy &PointerToBase, RematCandTy &RematerizationCandidates,
+    TargetTransformInfo &) {
   // Record values we are going to delete from this statepoint live set.
   // We can not di this in following loop due to iterator invalidation.
   SmallVector<Value *, 32> LiveValuesToBeDeleted;
@@ -2509,7 +2508,7 @@ static bool inlineGetBaseAndOffset(Function &F,
 }
 
 static bool insertParsePoints(Function &F, DominatorTree &DT,
-                              TargetTransformInfo &TTI,
+                              TargetTransformInfo &,
                               SmallVectorImpl<CallBase *> &ToUpdate,
                               DefiningValueMapTy &DVCache,
                               IsKnownBaseMapTy &KnownBases) {

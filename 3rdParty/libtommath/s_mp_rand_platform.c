@@ -87,7 +87,6 @@ static mp_err s_read_getrandom(void *p, size_t n)
 static mp_err s_read_urandom(void *p, size_t n)
 {
    int fd;
-   char *q = (char *)p;
 
    do {
       fd = open(MP_DEV_URANDOM, O_RDONLY);
@@ -103,7 +102,6 @@ static mp_err s_read_urandom(void *p, size_t n)
          close(fd);
          return MP_ERR;
       }
-      q += ret;
       n -= (size_t)ret;
    }
 
