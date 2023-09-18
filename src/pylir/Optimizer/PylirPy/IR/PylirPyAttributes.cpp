@@ -148,9 +148,17 @@ struct RefAttrWrapInterface
   /// Returns true if the `RefAttr` implements `Interface`.
   bool canImplement(Attribute thisAttr, std::in_place_type_t<Interface>) const {
     RefAttr refAttr = cast<RefAttr>(thisAttr);
-    // Guard against not yet linked `RefAttr`s.
+    // The below is a tradeoff/hack done to support parsing a `RefAttr` where
+    // an interface is required. While parsing, the `RefAttr` is not guaranteed
+    // to already reference a symbol. Any check whether the `RefAttr` implements
+    // a given interface must therefore be deferred to verification. Yet we want
+    // strong typing in attributes such as `ObjectAttr` which hold instances
+    // of `TypeAttrInterface` and hence need an interface instance.
+    // The workaround is therefore to allow the cast while the symbol is still
+    // undefined and only error later in verification (and hopefully not user
+    // code).
     if (!refAttr.getSymbol())
-      return false;
+      return true;
 
     // If the interface inherits from `ConstObjectAttrInterface` it has an
     // implicit conversion to it and it is known that the symbol has to be
@@ -159,7 +167,7 @@ struct RefAttrWrapInterface
       if (!refAttr.getSymbol().getConstant())
         return false;
 
-    // `RefAttr` without symbols never implements any interface, not even
+    // `RefAttr` without initializers never implements any interface, not even
     // `ObjectAttrInterface`.
     return isa_and_nonnull<Interface>(refAttr.getSymbol().getInitializerAttr());
   }
@@ -372,16 +380,10 @@ UniqueOutput unique(llvm::ArrayRef<pylir::Py::DictAttr::Entry> entries) {
 } // namespace
 
 pylir::Py::DictAttr pylir::Py::DictAttr::get(mlir::MLIRContext* context,
-                                             llvm::ArrayRef<Entry> entries,
-                                             RefAttr typeObject,
-                                             mlir::DictionaryAttr slots) {
-  typeObject =
-      typeObject ? typeObject : RefAttr::get(context, Builtins::Dict.name);
-  slots = slots ? slots : mlir::DictionaryAttr::get(context, {});
-
+                                             llvm::ArrayRef<Entry> entries) {
   auto result = ::unique(entries);
   return Base::get(context, result.normalizedKeysUnique,
-                   result.keyValuePairsUnique, typeObject, slots);
+                   result.keyValuePairsUnique);
 }
 
 mlir::Attribute pylir::Py::DictAttr::lookup(mlir::Attribute key) const {
@@ -452,11 +454,6 @@ void printKVPair(
 }
 
 } // namespace
-
-TypeAttrInterface pylir::Py::FunctionAttr::getTypeObject() const {
-  return llvm::cast<TypeAttrInterface>(
-      RefAttr::get(getContext(), Builtins::Function.name));
-}
 
 mlir::DictionaryAttr pylir::Py::FunctionAttr::getSlots() const {
   llvm::SmallVector<mlir::NamedAttribute> vector = {

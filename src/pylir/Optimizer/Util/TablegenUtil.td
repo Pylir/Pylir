@@ -26,11 +26,17 @@ class InterfaceImplementation<InterfaceTrait interface,
 /// the class name of the Op this trait is attached to. This allows injecting
 /// interface implementations into the class.
 class OpInterfaceImplementation<OpInterfaceTrait interface,
-  code extraClassDeclaration, code extraClassDefinition>
+  code extraClassDeclaration, code extraClassDefinition = "">
   : InterfaceImplementation<interface, extraClassDeclaration,
       extraClassDefinition> {
   list<Trait> dependentTraits = [];
 }
 
+class AttrInterfaceImplementation<AttrInterface interface,
+  code extraClassDeclaration, code extraClassDefinition = "">
+  : InterfaceImplementation<interface, extraClassDeclaration,
+      extraClassDefinition> {
+  list<Trait> dependentTraits = [];
+}
 
 #endif

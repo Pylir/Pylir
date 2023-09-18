@@ -626,11 +626,7 @@ mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(FoldAdaptor adaptor) {
       getTypeOf(getTuple()) == mlir::OpFoldResult(type))
     return getTuple();
 
-  auto constant = dyn_cast_or_null<TupleAttrInterface>(adaptor.getTuple());
-  if (!constant || !type)
-    return nullptr;
-
-  return Py::TupleAttr::get(getContext(), constant.getElements(), type);
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
