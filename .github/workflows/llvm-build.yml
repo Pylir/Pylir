@@ -122,23 +122,8 @@ jobs:
             }
           }
           $runtime_lib = ''
-          switch ('${{inputs.runtime_lib}}') {
-            "MultiThreaded" {
-              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MT'
-            }
-            "MultiThreadedDebug" {
-              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MTd'
-            }
-            "MultiThreadedDLL" {
-              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MD'
-            }
-            "MultiThreadedDebugDLL" {
-              $runtime_lib = '-DLLVM_USE_CRT_RELEASE=MDd'
-            }
-            "" {}
-            Default {
-              throw 'Unknown runtime library ${{inputs.runtime_lib}}'
-            }
+          if ('${{inputs.runtime_lib}}') {
+            $runtime_lib = '-DCMAKE_MSVC_RUNTIME_LIBRARY=${{inputs.runtime_lib}}'
           }
 
           $exe_suffix = ''
