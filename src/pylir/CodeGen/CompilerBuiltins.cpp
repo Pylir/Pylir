@@ -9,9 +9,11 @@
 
 #include "CodeGen.hpp"
 
-namespace {
-
+using namespace mlir;
+using namespace pylir::Py;
 using namespace pylir::Builtins;
+
+namespace {
 
 void implementBlock(mlir::OpBuilder& builder, mlir::Block* block) {
   PYLIR_ASSERT(block);
@@ -375,12 +377,16 @@ void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder,
 } // namespace
 
 void pylir::CodeGen::createCompilerBuiltinsImpl() {
-  m_builder.createGlobalValue(
-      Builtins::None.name, true,
-      m_builder.getObjectAttr(m_builder.getNoneTypeBuiltin()), true);
-  m_builder.createGlobalValue(
-      Builtins::NotImplemented.name, true,
-      m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()), true);
+  // This function is called at the end of compiling the `builtins` module.
+  // At that point in time, it is safe to cast the types to `TypeAttrInterface`.
+  m_builder.createGlobalValue(Builtins::None.name, /*constant=*/true,
+                              m_builder.getObjectAttr(cast<TypeAttrInterface>(
+                                  m_builder.getNoneTypeBuiltin())),
+                              /*external=*/true);
+  m_builder.createGlobalValue(Builtins::NotImplemented.name, /*constant=*/true,
+                              m_builder.getObjectAttr(cast<TypeAttrInterface>(
+                                  m_builder.getNotImplementedTypeBuiltin())),
+                              /*external=*/true);
 
 #define COMPILER_BUILTIN_REV_BIN_OP(name, slotName, revSlotName)            \
   buildRevBinOpCompilerBuiltin(m_builder,                                   \

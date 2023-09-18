@@ -20,70 +20,54 @@ class PylirPy_Attr<string name, list<Trait> traits = [],
 defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr",
   "::mlir::DictionaryAttr::get($_ctxt, {})">;
 
-/// Helper parameter class, specifying a `RefAttr` with the Python builtin
-/// `name` as default value.
-class DefaultType<string name, string description = "">
-  : DefaultValuedParameter<"RefAttr",
-      "RefAttr::get($_ctxt, Builtins::" # name # ".name)", description>;
+/// Trait used to automatically implement `ObjectAttrInterface` that returns
+/// a `RefAttr` to `type`. This should only be used by builtins where the given
+/// type object is guaranteed to exist.
+class KnownTypeAttr<string type>
+  : AttrInterfaceImplementation<ObjectAttrInterface, [{
+  ::pylir::Py::TypeAttrInterface getTypeObject() const;
+}], [{
+  ::pylir::Py::TypeAttrInterface $cppClass::getTypeObject() const {
+    return llvm::cast<::pylir::Py::TypeAttrInterface>(
+      pylir::Py::RefAttr::get(getContext(),
+        pylir::Builtins::}] # type # [{.name)
+    );
+  }
+}]>;
+
+/// Trait used to automatically implement `ConstObjectAttrInterface` and return
+/// an empty dictionary for slots.
+def EmptySlotsAttr
+  : AttrInterfaceImplementation<ConstObjectAttrInterface, [{
+  ::mlir::DictionaryAttr getSlots() const {
+    return mlir::DictionaryAttr::get(getContext());
+  }
+}]>;
 
 /// Convenient base class for Python object attributes adding common methods and
 /// parameters.
-/// The fields `extraIns`, `extraBuilderArgs` and `extraBuilderPrologue` should
-/// be used by derived defs to add `$type_object` and, if `hasSlots` is 1,
-/// `$slots` to the parameters, builder and builder body.
 class PylirPy_PyObjAttr<string name,
-  list<Trait> traits = [],
-  bit hasSlots = 1>
-  : PylirPy_Attr<name, !listconcat(traits, [ConcreteObjectAttrInterface,
-   DeclareAttrInterfaceMethods<SROAAttrInterface>])>
-{
-  /// The default builder usually has the same parameter types as the ones
-  /// declared with default arguments. This leads to build errors due to being a
-  /// redeclaration of a method. Turn it off for the vast majority of
-  /// attributes.
-  let skipDefaultBuilders = 1;
+  list<Trait> traits = []>
+  : PylirPy_Attr<name, !listconcat([ConcreteObjectAttrInterface,
+   KnownTypeAttr<name>, DeclareAttrInterfaceMethods<SROAAttrInterface>],
+   traits)>;
 
-  /// Extra parameters common to all Python object attributes that should be
-  /// added to their `parameters` field.
-  /// This can be achieved by writing
-  /// `let parameters = !con((ins ...), extraIns);`.
-  dag extraIns = !if(!eq(hasSlots, 1),
-    (ins DefaultType<name>:$type_object, SlotsMap:$slots),
-    (ins DefaultType<name>:$type_object)
-  );
-
-  /// Extra parameters common to all Python object attributes that should be
-  /// added to `AttrBuilder`s. This adds two C++ parameters called `typeObject`
-  /// and `slots` if `hasSlots` is 1. Both of these parameters are null
-  /// attributes by default.
-  dag extraBuilderArgs = !if(!eq(hasSlots, 1),
-    (ins CArg<"RefAttr", "nullptr">:$typeObject,
-       CArg<"mlir::DictionaryAttr", "nullptr">:$slots),
-    (ins CArg<"RefAttr", "nullptr">:$typeObject)
-  );
-
-  /// Extra code common to all Python object attributes that should be added to
-  /// the body of a `AttrBuilder`s. This initializes the actual default values
-  /// for `typeObject` and `slots` that are added by `extraBuilderArgs`.
-  code extraBuilderPrologue = [{
-    typeObject = typeObject ? typeObject : RefAttr::get($_ctxt, Builtins::}]
-      # name # [{.name);
-  }] # !if(!eq(hasSlots, 0), "", [{
-    slots = slots ? slots : mlir::DictionaryAttr::get($_ctxt);
-  }]);
-}
-
-def PylirPy_ObjectAttr : PylirPy_PyObjAttr<"Object"> {
+def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [ConcreteObjectAttrInterface,
+  DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
 	let mnemonic = "obj";
 	let summary = "python object";
 
-	let parameters = extraIns;
+	let parameters = (ins "TypeAttrInterface":$type_object, SlotsMap:$slots);
+
+	let skipDefaultBuilders = 1;
 
 	let builders = [
-	    AttrBuilder<extraBuilderArgs, extraBuilderPrologue # [{
-	        return $_get($_ctxt, typeObject, slots);
-	    }]>
-	];
+    AttrBuilder<(ins "TypeAttrInterface":$typeObject,
+      CArg<"mlir::DictionaryAttr", "{}">:$slots), [{
+      slots = slots ? slots : DictionaryAttr::get($_ctxt);
+  	  return $_get($_ctxt, typeObject, slots);
+    }]>
+  ];
 
 	let assemblyFormat = "`<` $type_object (`,` $slots^)? `>`";
 }
@@ -93,22 +77,16 @@ def BigIntParam : AttrParameter<"::pylir::BigInt", "Arbitrary sized integer",
   let printer = "$_printer << $_self.toString();";
 }
 
-def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [IntAttrInterface]> {
+def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [IntAttrInterface,
+  EmptySlotsAttr]> {
 	let mnemonic = "int";
 	let summary = "python integer";
 
-  let parameters = !con((ins BigIntParam:$value), extraIns);
+  let parameters = (ins BigIntParam:$value);
 
-	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
+	let assemblyFormat = "`<` $value `>`";
 
 	let constBuilderCall = "::pylir::Py::IntAttr::get($_builder.getContext(), $0)";
-
-  let builders = [
-    AttrBuilder<!con((ins "const BigInt&":$value), extraBuilderArgs),
-      extraBuilderPrologue # [{
-      return $_get($_ctxt, value, typeObject, slots);
-    }]>
-  ];
 
   let extraClassDeclaration = [{
 
@@ -135,24 +113,18 @@ def BoolParameter : AttrParameter<"bool", "boolean"> {
   }];
 }
 
-def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [BoolAttrInterface]> {
+def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [BoolAttrInterface,
+  EmptySlotsAttr]> {
 	let mnemonic = "bool";
 	let summary = "python boolean";
 
-  let parameters = !con((ins BoolParameter:$value), extraIns);
+  let parameters = (ins BoolParameter:$value);
 
-	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
+	let assemblyFormat = "`<` $value `>`";
 
 	let constBuilderCall = [{
 	  ::pylir::Py::BoolAttr::get($_builder.getContext(), $0)
 	}];
-
-  let builders = [
-    AttrBuilder<!con((ins "bool":$value), extraBuilderArgs),
-      extraBuilderPrologue # [{
-      return $_get($_ctxt, value, typeObject, slots);
-    }]>
-  ];
 
   let extraClassDeclaration = [{
 
@@ -177,18 +149,12 @@ def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [BoolAttrInterface]> {
   let convertFromStorage = "$_self.getValue()";
 }
 
-def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [FloatAttrInterface]> {
+def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [FloatAttrInterface,
+  EmptySlotsAttr]> {
 	let mnemonic = "float";
 	let summary = "python float";
 
-  let parameters = !con((ins APFloatParameter<"">:$value), extraIns);
-
-  let builders = [
-    AttrBuilder<!con((ins "const llvm::APFloat&":$value), extraBuilderArgs),
-      extraBuilderPrologue # [{
-      return $_get($_ctxt, value, typeObject, slots);
-    }]>
-  ];
+  let parameters = (ins APFloatParameter<"">:$value);
 
   let extraClassDeclaration = [{
     double getDoubleValue() const {
@@ -196,81 +162,64 @@ def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [FloatAttrInterface]> {
     }
   }];
 
-  let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
+  let assemblyFormat = "`<` $value `>`";
 
   let returnType = "double";
   let convertFromStorage = "$_self.getDoubleValue()";
 }
 
-def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [StrAttrInterface]> {
+def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [StrAttrInterface,
+  EmptySlotsAttr]> {
 	let mnemonic = "str";
 	let summary = "python string";
 
-  let parameters = !con((ins StringRefParameter<>:$value), extraIns);
+  let parameters = (ins StringRefParameter<>:$value);
 
-	let assemblyFormat = "`<` $value ( `,` struct($type_object, $slots)^)? `>`";
-
-	let builders = [
-    AttrBuilder<!con((ins "llvm::StringRef":$value), extraBuilderArgs),
-      extraBuilderPrologue # [{
-      return $_get($_ctxt, value, typeObject, slots);
-    }]>
-  ];
+	let assemblyFormat = "`<` $value `>`";
 }
 
-def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [TupleAttrInterface],
-  /*hasSlots=*/0> {
+def PylirPy_TupleAttr : PylirPy_PyObjAttr<"Tuple", [TupleAttrInterface,
+  EmptySlotsAttr]> {
 	let mnemonic = "tuple";
 	let summary = "python tuple";
 
-  let parameters = !con((ins
-    OptionalArrayRefParameter<"mlir::Attribute">:$elements),
-  extraIns);
+  let parameters = (ins OptionalArrayRefParameter<"mlir::Attribute">:$elements);
 
 	let assemblyFormat = [{
-	  `<` `(` (`)`) : ($elements^ `)`)? ( `,` struct($type_object)^)? `>`
+	  `<` `(` (`)`) : ($elements^ `)`)? `>`
 	}];
+
+  let skipDefaultBuilders = 1;
 
   let builders = [
-    AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$elements),
-      extraBuilderArgs),
-      extraBuilderPrologue # [{
-      return $_get($_ctxt, elements, typeObject);
+    AttrBuilder<(ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$elements),
+    [{
+      return $_get($_ctxt, elements);
     }]>
   ];
-
-	let extraClassDeclaration = [{
-
-    /// Returns all slots of the tuple in a dictionary, which is always empty.
-	  mlir::DictionaryAttr getSlots() const {
-      return mlir::DictionaryAttr::getWithSorted(getContext(), {});
-    }
-	}];
 }
 
-def PylirPy_ListAttr : PylirPy_PyObjAttr<"List"> {
+def PylirPy_ListAttr : PylirPy_PyObjAttr<"List", [EmptySlotsAttr]> {
 	let mnemonic = "list";
 
-  let parameters = !con((ins
-    OptionalArrayRefParameter<"mlir::Attribute">:$elements),
-  extraIns);
+  let parameters = (ins OptionalArrayRefParameter<"mlir::Attribute">:$elements);
 
 	let assemblyFormat = [{
-	  `<` `[` (`]`) : ( $elements^ `]`)? ( `,` struct($type_object, $slots)^)? `>`
+	  `<` `[` (`]`) : ( $elements^ `]`)? `>`
 	}];
 
+	let skipDefaultBuilders = 1;
+
 	let builders = [
-    AttrBuilder<!con((ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$elements),
-      extraBuilderArgs),
-      extraBuilderPrologue # [{
-      return $_get($_ctxt, elements, typeObject, slots);
+    AttrBuilder<(ins CArg<"llvm::ArrayRef<mlir::Attribute>", "{}">:$elements),
+    [{
+      return $_get($_ctxt, elements);
     }]>
   ];
 }
 
-def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DictAttrInterface,
-  ConcreteObjectAttrInterface,
-  DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
+def PylirPy_DictAttr : PylirPy_PyObjAttr<"Dict", [DictAttrInterface,
+  EmptySlotsAttr]> {
 
   let mnemonic = "dict";
   let summary = "python dictionary";
@@ -308,8 +257,7 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DictAttrInterface,
 
     Syntax:
     ```
-    optional-attrs ::= (`type_object` | `slots`) `=` attr
-    dict ::= `#py.dict` `<` `{` { attr [`norm` attr] `to` attr } `}` [`,` optional-attrs { `,` optional-attrs} ] `>`
+    dict ::= `#py.dict` `<` `{` { attr [`norm` attr] `to` attr } `}` `>`
     ```
 
     Examples:
@@ -324,19 +272,14 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DictAttrInterface,
     ArrayRefParameter<"std::pair<mlir::Attribute, std::size_t>">:
       $normalized_keys_internal,
     ArrayRefParameter<"std::pair<mlir::Attribute, mlir::Attribute>">:
-      $key_value_pairs,
-    DefaultType<"Dict">:$type_object, SlotsMap:$slots);
+      $key_value_pairs);
 
   let builders = [
-    AttrBuilder<(ins
-      CArg<"llvm::ArrayRef<Entry>", "{}">:$entries,
-      CArg<"::pylir::Py::RefAttr", "{}">:$typeObject,
-      CArg<"mlir::DictionaryAttr", "{}">:$slots)>
+    AttrBuilder<(ins CArg<"llvm::ArrayRef<Entry>", "{}">:$entries)>
   ];
 
   let assemblyFormat = [{
-    `<` custom<KVPair>($key_value_pairs, $normalized_keys_internal)
-        (`,` struct($type_object, $slots)^)? `>`
+    `<` custom<KVPair>($key_value_pairs, $normalized_keys_internal) `>`
   }];
 
   let extraClassDeclaration = [{
@@ -379,11 +322,8 @@ def PylirPy_DictAttr : PylirPy_Attr<"Dict", [DictAttrInterface,
   }];
 }
 
-def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ FunctionAttrInterface,
-  ConcreteObjectAttrInterface, DeclareAttrInterfaceMethods<ObjectAttrInterface>,
-  DeclareAttrInterfaceMethods<ConstObjectAttrInterface>,
-  DeclareAttrInterfaceMethods<SROAAttrInterface>]>
-{
+def PylirPy_FunctionAttr : PylirPy_PyObjAttr<"Function",
+  [FunctionAttrInterface]> {
 	let mnemonic = "function";
 	let summary = "python function";
 
@@ -419,9 +359,8 @@ def PylirPy_FunctionAttr : PylirPy_Attr<"Function", [ FunctionAttrInterface,
     }]>
   ];
 
-
   let extraClassDeclaration = [{
-    TypeAttrInterface getTypeObject() const;
+    mlir::DictionaryAttr getSlots() const;
   }];
 }
 
@@ -429,22 +368,25 @@ def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [TypeAttrInterface]> {
 	let mnemonic = "type";
 	let summary = "python type";
 
-  let parameters = !con((ins
+  let parameters = (ins
     DefaultValuedParameter<"mlir::Attribute", "TupleAttr::get($_ctxt, {})">:
       $mro_tuple,
     DefaultValuedParameter<"TupleAttr", "TupleAttr::get($_ctxt, {})">:
-      $instance_slots
-  ), extraIns);
+      $instance_slots,
+    SlotsMap:$slots
+  );
+
+  let skipDefaultBuilders = 1;
 
   let builders = [
-    AttrBuilder<!con((ins
+    AttrBuilder<(ins
       CArg<"mlir::Attribute", "{}">:$mroTuple,
-      CArg<"TupleAttr", "{}">:$instanceSlots
-    ), extraBuilderArgs),
-      extraBuilderPrologue # [{
+      CArg<"TupleAttr", "{}">:$instanceSlots,
+      CArg<"mlir::DictionaryAttr", "{}">:$slots), [{
       mroTuple = mroTuple ? mroTuple : TupleAttr::get($_ctxt);
       instanceSlots = instanceSlots ? instanceSlots : TupleAttr::get($_ctxt);
-      return $_get($_ctxt, mroTuple, instanceSlots, typeObject, slots);
+      slots = slots ? slots : DictionaryAttr::get($_ctxt);
+      return $_get($_ctxt, mroTuple, instanceSlots, slots);
     }]>
   ];
 
@@ -463,7 +405,7 @@ def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [TypeAttrInterface]> {
 
     Syntax:
     ```
-    optional-attrs ::= (`type_object` | `slots` | `mro_tuple` | `instance_slots`) `=` attr
+    optional-attrs ::= (`slots` | `mro_tuple` | `instance_slots`) `=` attr
     dict ::= `#py.type` [ `<` optional-attrs { `,` optional-attrs} ] `>` ]
     ```
 

@@ -44,7 +44,7 @@ public:
     return Py::UnboundAttr::get(getContext());
   }
 
-  Py::ObjectAttr getObjectAttr(Py::RefAttr type,
+  Py::ObjectAttr getObjectAttr(Py::TypeAttrInterface type,
                                mlir::DictionaryAttr slots = {}) {
     return Py::ObjectAttr::get(context, type, slots);
   }
@@ -52,7 +52,7 @@ public:
   Py::TypeAttr getTypeAttr(mlir::Attribute mroTuple = {},
                            pylir::Py::TupleAttr instanceSlots = {},
                            mlir::DictionaryAttr slots = {}) {
-    return Py::TypeAttr::get(context, mroTuple, instanceSlots, {}, slots);
+    return Py::TypeAttr::get(context, mroTuple, instanceSlots, slots);
   }
 
   Py::IntAttr getIntAttr(const BigInt& bigInt) {
