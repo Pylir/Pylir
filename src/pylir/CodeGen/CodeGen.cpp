@@ -1202,7 +1202,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ForStmt& forStmt) {
   if (!iterable) {
     return;
   }
-  auto loc = getLoc(forStmt, forStmt.forKeyword);
+  [[maybe_unused]] auto loc = getLoc(forStmt, forStmt.forKeyword);
   visitForConstruct(
       *forStmt.targetList, iterable, [&] { visit(*forStmt.suite); },
       forStmt.elseSection);
@@ -1737,7 +1737,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {
   }
   auto qualifiedName =
       m_qualifiers + std::string(classDef.className.getValue());
-  auto name = m_builder.createConstant(qualifiedName);
+  [[maybe_unused]] auto name = m_builder.createConstant(qualifiedName);
 
   std::optional<CodeGen::Scope> functionScope;
   pylir::Py::FuncOp func;
