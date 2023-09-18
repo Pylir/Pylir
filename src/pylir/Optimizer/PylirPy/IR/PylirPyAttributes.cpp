@@ -453,8 +453,9 @@ void printKVPair(
 
 } // namespace
 
-pylir::Py::RefAttr pylir::Py::FunctionAttr::getTypeObject() const {
-  return RefAttr::get(getContext(), Builtins::Function.name);
+TypeAttrInterface pylir::Py::FunctionAttr::getTypeObject() const {
+  return llvm::cast<TypeAttrInterface>(
+      RefAttr::get(getContext(), Builtins::Function.name));
 }
 
 mlir::DictionaryAttr pylir::Py::FunctionAttr::getSlots() const {

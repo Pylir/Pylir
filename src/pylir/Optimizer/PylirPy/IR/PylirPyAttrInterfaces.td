@@ -52,7 +52,9 @@ def ObjectAttrInterface : RefAttrImplementable<"ObjectAttrInterface"> {
     InterfaceMethod<[{
       Returns the `#py.ref` referring to the type object of this attribute.
       Mustn't be null.
-    }], "::pylir::Py::RefAttr", "getTypeObject", (ins)>,
+    }], "::pylir::Py::TypeAttrInterface", "getTypeObject", (ins), [{
+      return llvm::cast<pylir::Py::TypeAttrInterface>($_attr.getTypeObject());
+    }]>,
     canImplementMethod
   ];
 }

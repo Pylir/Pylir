@@ -45,11 +45,9 @@ std::optional<bool> pylir::Py::isUnbound(mlir::Value value) {
 }
 
 namespace {
-pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute,
+pylir::Py::BuiltinMethodKind getBuiltinMethod(ObjectAttrInterface attribute,
                                               llvm::StringRef method) {
-  auto typeObject = dyn_cast<ObjectAttrInterface>(attribute).getTypeObject();
-  if (!typeObject)
-    return pylir::Py::BuiltinMethodKind::Unknown;
+  TypeAttrInterface typeObject = attribute.getTypeObject();
 
   auto getBuiltinMethod = [](pylir::Py::RefAttr ref) {
     return llvm::StringSwitch<std::optional<pylir::Py::BuiltinMethodKind>>(
@@ -61,11 +59,12 @@ pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute,
               pylir::Py::BuiltinMethodKind::Object)
         .Default(std::nullopt);
   };
-  if (auto opt = getBuiltinMethod(typeObject))
-    return *opt;
 
-  auto mro = dyn_cast_or_null<TupleAttrInterface>(
-      dyn_cast<TypeAttrInterface>(typeObject).getMroTuple());
+  if (auto refAttr = dyn_cast<RefAttr>(typeObject))
+    if (auto opt = getBuiltinMethod(refAttr))
+      return *opt;
+
+  auto mro = dyn_cast_or_null<TupleAttrInterface>(typeObject.getMroTuple());
   if (!mro)
     return pylir::Py::BuiltinMethodKind::Unknown;
 
@@ -95,12 +94,20 @@ pylir::Py::BuiltinMethodKind getBuiltinMethod(mlir::Attribute attribute,
 
 pylir::Py::BuiltinMethodKind
 pylir::Py::getHashFunction(mlir::Attribute attribute) {
-  return getBuiltinMethod(attribute, "__hash__");
+  auto objectAttr = dyn_cast<ObjectAttrInterface>(attribute);
+  if (!objectAttr)
+    return BuiltinMethodKind::Unknown;
+
+  return getBuiltinMethod(objectAttr, "__hash__");
 }
 
 pylir::Py::BuiltinMethodKind
 pylir::Py::getEqualsFunction(mlir::Attribute attribute) {
-  return getBuiltinMethod(attribute, "__eq__");
+  auto objectAttr = dyn_cast<ObjectAttrInterface>(attribute);
+  if (!objectAttr)
+    return BuiltinMethodKind::Unknown;
+
+  return getBuiltinMethod(objectAttr, "__eq__");
 }
 
 mlir::Attribute pylir::Py::getCanonicalEqualsForm(mlir::Attribute attribute) {

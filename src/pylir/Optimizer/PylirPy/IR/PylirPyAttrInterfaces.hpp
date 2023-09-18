@@ -11,4 +11,8 @@
 
 #include "PylirPyAttrBase.hpp"
 
+namespace pylir::Py {
+class TypeAttrInterface;
+} // namespace pylir::Py
+
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttrInterfaces.h.inc"
