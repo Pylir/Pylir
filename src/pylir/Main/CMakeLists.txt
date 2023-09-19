@@ -59,6 +59,8 @@ target_link_libraries(PylirMain
   MLIRBytecodeWriter
   MLIRDLTIDialect
   MLIRToLLVMIRTranslationRegistration
+  
+  ctre::ctre
 )
 add_dependencies(PylirMain PylirMainOptsTableGen)
 target_compile_definitions(PylirMain PRIVATE PYLIR_VERSION="${PROJECT_VERSION}")

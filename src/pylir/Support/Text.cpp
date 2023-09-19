@@ -4,7 +4,7 @@
 
 #include "Text.hpp"
 
-#include <utf8proc/utf8proc.h>
+#include <utf8proc.h>
 
 std::optional<pylir::Text::Encoding>
 pylir::Text::checkForBOM(std::string_view bytes) {

@@ -21,6 +21,16 @@ endif ()
 
 ## Set up dependencies and global include and link directories.
 
+# All platforms we currently care about default to PIC. This is also required
+# when linking a shared library (including a static into a shared).
+set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE "BOOL" "")
+
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+# NO_POLICY_SCOPE makes policy changes done in the include affect the caller.
+include(CMakePolicies NO_POLICY_SCOPE)
+
+add_subdirectory(3rdParty)
+
 find_package(Threads REQUIRED)
 link_libraries(Threads::Threads)
 find_package(MLIR REQUIRED CONFIG)
@@ -56,8 +66,7 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
 list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-# NO_POLICY_SCOPE makes policy changes done in the include affect the caller.
-include(HandlePylirOptions NO_POLICY_SCOPE)
+include(HandlePylirOptions)
 include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
@@ -93,7 +102,6 @@ if (PYLIR_FUZZER)
   add_subdirectory(fuzzer)
 endif ()
 
-add_subdirectory(3rdParty)
 add_subdirectory(src)
 add_subdirectory(tools)
 if (PYLIR_BUILD_TESTS)
