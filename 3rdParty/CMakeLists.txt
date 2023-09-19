@@ -2,11 +2,57 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_compile_definitions(DO_NOT_USE_WMAIN)
-add_subdirectory(Catch2-3.1.0 EXCLUDE_FROM_ALL)
-add_subdirectory(fmt-7.1.3 EXCLUDE_FROM_ALL)
-add_subdirectory(utf8proc EXCLUDE_FROM_ALL)
-add_subdirectory(libtommath EXCLUDE_FROM_ALL)
+include(CPM)
+
+CPMAddPackage("gh:catchorg/Catch2@3.3.0")
+CPMAddPackage("gh:fmtlib/fmt#7.1.3")
+CPMAddPackage("gh:hanickadot/compile-time-regular-expressions#v3.8")
+CPMAddPackage(
+  NAME libtommath
+  GIT_TAG eda0bd6ae5705ab90b866dfb52c5f15c23687f81
+  GITHUB_REPOSITORY libtom/libtommath
+  DOWNLOAD_ONLY YES
+  EXCLUDE_FROM_ALL
+  SYSTEM
+)
+CPMAddPackage(
+  NAME utf8proc
+  VERSION 2.8.0
+  GITHUB_REPOSITORY JuliaStrings/utf8proc
+  DOWNLOAD_ONLY YES
+  EXCLUDE_FROM_ALL
+  SYSTEM
+)
+
+#==============================================================================#
+# utf8proc
+#==============================================================================#
+
+add_library(utf8proc STATIC EXCLUDE_FROM_ALL ${utf8proc_SOURCE_DIR}/utf8proc.c)
+target_compile_definitions(utf8proc PUBLIC UTF8PROC_STATIC)
+target_include_directories(utf8proc SYSTEM PUBLIC ${utf8proc_SOURCE_DIR})
+
+#==============================================================================#
+# libtommath
+#==============================================================================#
+
+file(GLOB tommath_srcs "${libtommath_SOURCE_DIR}/*.c")
+add_library(tommath STATIC EXCLUDE_FROM_ALL ${tommath_srcs})
+target_include_directories(tommath SYSTEM PUBLIC ${libtommath_SOURCE_DIR})
+target_compile_definitions(tommath
+  PUBLIC MP_NO_ZERO_ON_FREE MP_NO_FILE MP_FIXED_CUTOFFS)
+
+#==============================================================================#
+# Catch2
+#==============================================================================#
+
+# Workaround for https://github.com/cpm-cmake/CPM.cmake/issues/475.
+list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
+
+#==============================================================================#
+# libunwind
+#==============================================================================#
+
 if (MSVC)
   # Workaround for cmake issue:
   # https://gitlab.kitware.com/cmake/cmake/-/commit/b41fab928551d5a71af2c16b34f9683d872818b0
