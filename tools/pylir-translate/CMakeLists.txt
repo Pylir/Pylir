@@ -5,7 +5,7 @@
 get_property(dialect_libs GLOBAL PROPERTY MLIR_DIALECT_LIBS)
 get_property(translation_libs GLOBAL PROPERTY MLIR_TRANSLATION_LIBS)
 
-add_executable(pylir-translate main.cpp)
+add_executable(pylir-translate EXCLUDE_FROM_ALL main.cpp)
 target_link_libraries(pylir-translate
   PRIVATE
   ${dialect_libs}

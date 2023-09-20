@@ -22,7 +22,7 @@ function(add_pylir_doc td_filename output_file output_directory command)
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${output_file}.md
     ${PYLIR_PREPROCESS_MLIR_MD})
   add_custom_target(${output_file}DocGen DEPENDS ${GEN_DOC_FILE})
-  add_dependencies(mlir-doc ${output_file}DocGen)
+  add_dependencies(pylir-doc ${output_file}DocGen)
 endfunction()
 
 #

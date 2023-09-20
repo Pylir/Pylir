@@ -54,11 +54,13 @@ target_link_libraries(PylirMain
   
   ${llvm_all}
   
+  MLIRArithDialect
   MLIRBuiltinToLLVMIRTranslation
   MLIRBytecodeReader
   MLIRBytecodeWriter
+  MLIRControlFlowDialect
   MLIRDLTIDialect
-  MLIRToLLVMIRTranslationRegistration
+  MLIRLLVMToLLVMIRTranslation
   
   ctre::ctre
 )

@@ -124,6 +124,7 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
             $use_lld `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
+            -DPYLIR_INCLUDE_LLVM_BUILD=OFF `
             -DLLVM_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/llvm/" `
             -DMLIR_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/mlir/" `
             -DLLD_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/lld/" `
@@ -190,6 +191,7 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
             -DPYLIR_ENABLE_ASSERTIONS=ON \
+            -DPYLIR_INCLUDE_LLVM_BUILD=OFF \
             -DLLVM_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/llvm/" \
             -DMLIR_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/mlir/" \
             -DLLD_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/lld/" \
@@ -305,6 +307,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" `
             -DPYLIR_ENABLE_ASSERTIONS=ON `
             -DPYLIR_BUILD_DOCS=ON `
+            -DPYLIR_INCLUDE_LLVM_BUILD=OFF `
             -DLLVM_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/llvm/" `
             -DMLIR_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/mlir/" `
             -DLLD_DIR="${{steps.llvm-fetch.outputs.install-dir}}/lib/cmake/lld/" `

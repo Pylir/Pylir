@@ -24,7 +24,6 @@ target_link_libraries(PylirOptimizer
   PylirToLLVMIR
   
   MLIRArithToLLVM
-  MLIRArithTransforms
   MLIRLLVMIRTransforms
   MLIRPass
   MLIRReconcileUnrealizedCasts

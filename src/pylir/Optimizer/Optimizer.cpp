@@ -83,7 +83,6 @@ void pylir::registerOptimizationPipelines() {
       "to LLVM",
       [](mlir::OpPassManager& pm, const PylirLLVMOptions& options) {
         auto* nested = &pm.nestAny();
-        nested->addPass(mlir::arith::createArithExpandOpsPass());
         nested->addPass(mlir::createArithToLLVMConversionPass());
         pm.addPass(createConvertPylirToLLVMPass(ConvertPylirToLLVMPassOptions{
             options.targetTriple, options.dataLayout}));
