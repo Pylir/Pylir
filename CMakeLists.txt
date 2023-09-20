@@ -58,6 +58,9 @@ if (PYLIR_INCLUDE_LLVM_BUILD)
   set(LLVM_USE_SANITIZER "${llvm_sanitizer_default}" CACHE
     STRING "Sanitizers to use when building LLVM")
   
+  # Purposefully enable console output as LLVM takes a long time to clone and
+  # users would not get feedback otherwise.
+  set(FETCHCONTENT_QUIET FALSE)
   CPMAddPackage(
     NAME llvm_project
     GITHUB_REPOSITORY llvm/llvm-project
@@ -72,6 +75,10 @@ if (PYLIR_INCLUDE_LLVM_BUILD)
     # out of the cache until https://github.com/cpm-cmake/CPM.cmake/issues/492
     # is implemented.
     NO_CACHE TRUE
+    GIT_PROGRESS TRUE
+    # Required for ninja:
+    # https://gitlab.kitware.com/cmake/cmake/-/issues/18238#note_440475.
+    USES_TERMINAL_DOWNLOAD TRUE
     OPTIONS "LLVM_ENABLE_PROJECTS mlir\\\\;lld"
     # The interface given by an "In-tree" LLVM build is not identical to the one
     # given by the LLVM Config when using `find_package`. To workaround this,
