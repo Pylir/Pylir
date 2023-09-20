@@ -6,7 +6,6 @@
 
 #include <mlir/Conversion/ArithToLLVM/ArithToLLVM.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
-#include <mlir/Dialect/Arith/Transforms/Passes.h>
 #include <mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h>
 #include <mlir/Dialect/LLVMIR/Transforms/Passes.h>
 #include <mlir/Pass/PassManager.h>
