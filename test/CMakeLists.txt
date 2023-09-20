@@ -5,7 +5,6 @@
 set(PYLIR_TEST_DEPENDS
   FileCheck count not split-file
   pylir-opt
-  pylir-translate
   pylir
   pylir-tblgen
   pylir-stdlib
@@ -33,6 +32,8 @@ configure_file(
   ${PYLIR_TOOLS_DIR}/pylir-lit.py
   @ONLY
 )
+
+add_custom_target(pylir-test-depends ALL DEPENDS ${PYLIR_TEST_DEPENDS})
 
 add_test(NAME lit-tests COMMAND ${Python3_EXECUTABLE} ${PYLIR_TOOLS_DIR}/pylir-lit.py "${CMAKE_CURRENT_BINARY_DIR}" -v)
 set_tests_properties(lit-tests PROPERTIES TIMEOUT 3600)

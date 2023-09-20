@@ -7,9 +7,8 @@
 #include <mlir/Tools/mlir-translate/MlirTranslateMain.h>
 
 int main(int argc, char** argv) {
-  mlir::registerAllTranslations();
-
-  // TODO: Register standalone translations here.
+  mlir::registerFromLLVMIRTranslation();
+  mlir::registerToLLVMIRTranslation();
 
   return failed(
       mlir::mlirTranslateMain(argc, argv, "MLIR Translation Testing Tool"));

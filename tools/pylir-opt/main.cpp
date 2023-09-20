@@ -3,18 +3,21 @@
 //  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <mlir/Bytecode/BytecodeWriter.h>
+#include <mlir/Conversion/Passes.h>
 #include <mlir/Debug/Counter.h>
+#include <mlir/Dialect/DLTI/DLTI.h>
+#include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/AsmState.h>
 #include <mlir/IR/Dialect.h>
 #include <mlir/IR/MLIRContext.h>
-#include <mlir/InitAllDialects.h>
-#include <mlir/InitAllPasses.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Support/FileUtilities.h>
 #include <mlir/Support/Timing.h>
 #include <mlir/Support/ToolUtilities.h>
 #include <mlir/Tools/ParseUtilities.h>
 #include <mlir/Tools/mlir-opt/MlirOptMain.h>
+#include <mlir/Transforms/Passes.h>
 
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/InitLLVM.h>
@@ -182,12 +185,16 @@ mlir::LogicalResult mlirOptMain(
 } // namespace
 
 int main(int argc, char** argv) {
-  mlir::registerAllPasses();
+  mlir::registerTransformsPasses();
+  mlir::registerReconcileUnrealizedCasts();
+  mlir::registerArithToLLVMConversionPass();
 
   mlir::DialectRegistry registry;
   registry.insert<pylir::Mem::PylirMemDialect, pylir::Py::PylirPyDialect,
-                  pylir::test::TestDialect, pylir::HIR::PylirHIRDialect>();
-  mlir::registerAllDialects(registry);
+                  pylir::test::TestDialect, pylir::HIR::PylirHIRDialect,
+                  mlir::DLTIDialect, mlir::scf::SCFDialect,
+                  mlir::arith::ArithDialect, mlir::LLVM::LLVMDialect,
+                  mlir::func::FuncDialect>();
 
   pylir::registerExternalModels(registry);
 

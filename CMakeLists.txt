@@ -11,6 +11,8 @@ option(PYLIR_BUILD_TESTS "Build tests" ON)
 option(PYLIR_BUILD_DOCS "Build documentation" OFF)
 option(PYLIR_FUZZER "Build fuzzers" OFF)
 option(PYLIR_COVERAGE "Compile with coverage" OFF)
+option(PYLIR_INCLUDE_LLVM_BUILD
+  "Whether to download and build LLVM as part of Pylir" ON)
 set(PYLIR_SANITIZERS "" CACHE STRING "Compile with given sanitizers")
 
 if (NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG")
@@ -31,32 +33,125 @@ include(CMakePolicies NO_POLICY_SCOPE)
 
 add_subdirectory(3rdParty)
 
-find_package(Threads REQUIRED)
-link_libraries(Threads::Threads)
-find_package(MLIR REQUIRED CONFIG)
-find_package(LLD REQUIRED)
-
-message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
-message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/.pinned-llvm-revision PYLIR_REQUIRED_LLVM_REVISION)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  ${CMAKE_CURRENT_SOURCE_DIR}/.pinned-llvm-revision)
 string(STRIP ${PYLIR_REQUIRED_LLVM_REVISION} PYLIR_REQUIRED_LLVM_REVISION)
 
-find_file(VCS_HEADER VCSRevision.h PATHS ${LLVM_INCLUDE_DIRS} PATH_SUFFIXES llvm/Support/ REQUIRED NO_DEFAULT_PATH)
-message(STATUS "Checking ${VCS_HEADER} for version mismatch")
-file(READ ${VCS_HEADER} VCS_FILE)
-string(REGEX MATCH "#define LLVM_REVISION \"([a-z0-9]+)\"" VCS_MATCH ${VCS_FILE})
-if (CMAKE_MATCH_COUNT EQUAL 0)
-  message(WARNING "Failed to determine revision of LLVM installed. Proceed with caution.
+if (PYLIR_INCLUDE_LLVM_BUILD)
+  include(CPM)
+  
+  # Default LLVM options to corresponding Pylir options.
+  set(PYLIR_LLVM_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}"
+    CACHE STRING "Build type to use for LLVM compilation")
+  option(LLVM_ENABLE_ASSERTIONS "Whether to build LLVM with assertions"
+    ${PYLIR_ENABLE_ASSERTIONS})
+  
+  string(REPLACE "address" "Address" llvm_sanitizer_default
+    "${PYLIR_SANITIZERS}")
+  string(REPLACE "undefined" "Undefined" llvm_sanitizer_default
+    "${llvm_sanitizer_default}")
+  string(REPLACE "thread" "Thread" llvm_sanitizer_default
+    "${llvm_sanitizer_default}")
+  string(REPLACE "," ";" llvm_sanitizer_default "${llvm_sanitizer_default}")
+  
+  set(LLVM_USE_SANITIZER "${llvm_sanitizer_default}" CACHE
+    STRING "Sanitizers to use when building LLVM")
+  
+  CPMAddPackage(
+    NAME llvm_project
+    GITHUB_REPOSITORY llvm/llvm-project
+    GIT_TAG ${PYLIR_REQUIRED_LLVM_REVISION}
+    EXCLUDE_FROM_ALL
+    SYSTEM
+    SOURCE_SUBDIR llvm
+    # Putting it into cache leads to the cache being populated for a copy for
+    # every LLVM tag ever used. These take a very long time to download due to
+    # the repo size. When not using the cache, cmake will actually just use a
+    # `git fetch` and checkout when updating which is a lot faster. Keep LLVM
+    # out of the cache until https://github.com/cpm-cmake/CPM.cmake/issues/492
+    # is implemented.
+    NO_CACHE TRUE
+    OPTIONS "LLVM_ENABLE_PROJECTS mlir\\\\;lld"
+    # The interface given by an "In-tree" LLVM build is not identical to the one
+    # given by the LLVM Config when using `find_package`. To workaround this,
+    # add an external project to the LLVM build that is called from within LLVM
+    # via `add_subdirectory`. This gives us the chance to inspect and set the
+    # required variables to get both build types to parity.
+    "LLVM_EXTERNAL_PROJECTS Pylir"
+    "LLVM_EXTERNAL_PYLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/cmake/LLVM-Unified-Adaptor"
+    "LLVM_INCLUDE_TESTING OFF"
+    "LLVM_INCLUDE_BENCHMARKS OFF"
+    "LLVM_INCLUDE_DOCS OFF"
+    # Targets currently tested with Pylir
+    # TODO: Make this an option that is automatically quoted.
+    "LLVM_TARGETS_TO_BUILD X86\\\\;AArch64"
+    "CMAKE_BUILD_TYPE ${PYLIR_LLVM_CMAKE_BUILD_TYPE}"
+    "LLVM_USE_SANITIZER ${LLVM_USE_SANITIZER}"
+  )
+  
+  # LLVMs cmake file currently has a bug where it sets `EXCLUDE_FROM_ALL` to
+  # `OFF` within a macro(!), affecting all targets created afterwards.
+  # Workaround this by manually going over all targets and explicitly excluding
+  # them again.
+  macro(exclude_all_targets_recursive dir)
+    get_property(subdirectories DIRECTORY ${dir} PROPERTY SUBDIRECTORIES)
+    foreach (subdir ${subdirectories})
+      exclude_all_targets_recursive(${subdir})
+    endforeach ()
+    
+    get_property(current_targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS)
+    foreach (target IN LISTS current_targets)
+      set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL "ON")
+    endforeach ()
+  endmacro()
+
+  exclude_all_targets_recursive("${llvm_project_SOURCE_DIR}/llvm")
+  exclude_all_targets_recursive("${llvm_project_SOURCE_DIR}/mlir")
+  exclude_all_targets_recursive("${llvm_project_SOURCE_DIR}/lld")
+  
+  # Fetch the variables set by `LLVM-Unified-Adaptor` cmake from the global
+  # property and apply them to this scope as `find_package(LLVM)` would.
+  get_property(propagated_flags GLOBAL PROPERTY PYLIR_PROPAGATED_LLVM_FLAGS)
+  foreach (pair IN LISTS propagated_flags)
+    # A list element has the form "var=value" where `value` has all `;`
+    # replaced with `,`.
+    string(REGEX MATCH "^[^ =]+" var_key "${pair}")
+    string(LENGTH "${pair}" var_length)
+    string(LENGTH "${var_key}" var_key_length)
+    math(EXPR var_key_length "${var_key_length}+1")
+    string(SUBSTRING "${pair}" "${var_key_length}" "-1" var_value)
+    string(REPLACE "," ";" var_value "${var_value}")
+    set(${var_key} ${var_value})
+  endforeach ()
+
+else ()
+  find_package(Threads REQUIRED)
+  link_libraries(Threads::Threads)
+  find_package(MLIR REQUIRED CONFIG)
+  find_package(LLD REQUIRED)
+  
+  message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+  message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+  
+  find_file(VCS_HEADER VCSRevision.h PATHS ${LLVM_INCLUDE_DIRS} PATH_SUFFIXES llvm/Support/ REQUIRED NO_DEFAULT_PATH)
+  message(STATUS "Checking ${VCS_HEADER} for version mismatch")
+  file(READ ${VCS_HEADER} VCS_FILE)
+  string(REGEX MATCH "#define LLVM_REVISION \"([a-z0-9]+)\"" VCS_MATCH ${VCS_FILE})
+  if (CMAKE_MATCH_COUNT EQUAL 0)
+    message(WARNING "Failed to determine revision of LLVM installed. Proceed with caution.
 Required revision: ${PYLIR_REQUIRED_LLVM_REVISION}
 Found LLVM installation: ${MLIR_DIR}")
-else ()
-  if (NOT ${CMAKE_MATCH_1} STREQUAL PYLIR_REQUIRED_LLVM_REVISION)
-    message(WARNING "Installed LLVM revision (${CMAKE_MATCH_1}) does not match required revision.\
+  else ()
+    if (NOT ${CMAKE_MATCH_1} STREQUAL PYLIR_REQUIRED_LLVM_REVISION)
+      message(WARNING "Installed LLVM revision (${CMAKE_MATCH_1}) does not match required revision.\
         Compilation is likely to fail.
 Required revision: ${PYLIR_REQUIRED_LLVM_REVISION}
 Found LLVM installation: ${MLIR_DIR}")
+    endif ()
   endif ()
+  
+  link_directories(${LLVM_BUILD_LIBRARY_DIR})
 endif ()
 
 set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
@@ -65,7 +160,6 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 
 list(APPEND CMAKE_MODULE_PATH ${MLIR_CMAKE_DIR})
 list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(HandlePylirOptions)
 include(TableGen)
 include(AddLLVM)
@@ -78,11 +172,11 @@ set(PYLIR_TABLEGEN_EXE "pylir-tblgen")
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
 include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
+include_directories(SYSTEM ${LLD_INCLUDE_DIRS})
 # Include directory where the various tablegen utilities place auto generated
 # sources and headers.
 include_directories(SYSTEM ${PROJECT_BINARY_DIR}/src)
 include_directories(SYSTEM 3rdParty)
-link_directories(${LLVM_BUILD_LIBRARY_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

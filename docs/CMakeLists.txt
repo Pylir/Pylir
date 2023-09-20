@@ -2,6 +2,9 @@
 #  See https://llvm.org/LICENSE.txt for license information.
 #  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Create phony target used to collect build dependencies.
+add_custom_target(pylir-doc)
+
 find_program(SPHINX_EXECUTABLE NAMES sphinx-build REQUIRED)
 
 set(PYLIR_PREPROCESS_MLIR_MD "${CMAKE_CURRENT_SOURCE_DIR}/preprocess_mlir_md.py"
@@ -21,7 +24,7 @@ add_custom_target(create-build-dir
 set_target_properties(create-build-dir
   PROPERTIES ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/source")
 
-add_dependencies(create-build-dir mlir-doc)
+add_dependencies(create-build-dir pylir-doc)
 
 add_custom_target(docs
   ${SPHINX_EXECUTABLE} -b html . ../build -W --keep-going -n
