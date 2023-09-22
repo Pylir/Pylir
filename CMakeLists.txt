@@ -61,20 +61,17 @@ if (PYLIR_INCLUDE_LLVM_BUILD)
   # Purposefully enable console output as LLVM takes a long time to clone and
   # users would not get feedback otherwise.
   set(FETCHCONTENT_QUIET FALSE)
+  # These variables have to be unset if updating the LLVM version or similar
+  # as they may still point to the previous directory otherwise.
+  unset(LLVM_EXTERNAL_LLD_SOURCE_DIR CACHE)
+  unset(LLVM_EXTERNAL_MLIR_SOURCE_DIR CACHE)
   CPMAddPackage(
     NAME llvm_project
     GITHUB_REPOSITORY llvm/llvm-project
     GIT_TAG ${PYLIR_REQUIRED_LLVM_REVISION}
-    EXCLUDE_FROM_ALL
-    SYSTEM
+    EXCLUDE_FROM_ALL TRUE
+    SYSTEM TRUE
     SOURCE_SUBDIR llvm
-    # Putting it into cache leads to the cache being populated for a copy for
-    # every LLVM tag ever used. These take a very long time to download due to
-    # the repo size. When not using the cache, cmake will actually just use a
-    # `git fetch` and checkout when updating which is a lot faster. Keep LLVM
-    # out of the cache until https://github.com/cpm-cmake/CPM.cmake/issues/492
-    # is implemented.
-    NO_CACHE TRUE
     GIT_PROGRESS TRUE
     # Required for ninja:
     # https://gitlab.kitware.com/cmake/cmake/-/issues/18238#note_440475.
