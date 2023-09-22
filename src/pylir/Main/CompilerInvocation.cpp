@@ -659,8 +659,8 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
     if (m_targetMachine->addPassesToEmitFile(
             codeGenPasses, *m_output, nullptr,
             action == pylir::CompilerInvocation::Assembly
-                ? llvm::CGFT_AssemblyFile
-                : llvm::CGFT_ObjectFile)) {
+                ? llvm::CodeGenFileType::AssemblyFile
+                : llvm::CodeGenFileType::ObjectFile)) {
       std::string_view format = action == pylir::CompilerInvocation::Assembly
                                     ? "Assembly"
                                     : "Object file";
@@ -861,15 +861,15 @@ mlir::LogicalResult pylir::CompilerInvocation::ensureTargetMachine(
     return mlir::failure();
   }
 
-  auto optLevel = llvm::StringSwitch<std::optional<llvm::CodeGenOpt::Level>>(
+  auto optLevel = llvm::StringSwitch<std::optional<llvm::CodeGenOptLevel>>(
                       args.getLastArgValue(OPT_O, "0"))
-                      .Case("0", llvm::CodeGenOpt::None)
-                      .Case("1", llvm::CodeGenOpt::Less)
-                      .Case("2", llvm::CodeGenOpt::Default)
-                      .Case("3", llvm::CodeGenOpt::Aggressive)
-                      .Case("4", llvm::CodeGenOpt::Aggressive)
-                      .Case("s", llvm::CodeGenOpt::Default)
-                      .Case("z", llvm::CodeGenOpt::Default)
+                      .Case("0", llvm::CodeGenOptLevel::None)
+                      .Case("1", llvm::CodeGenOptLevel::Less)
+                      .Case("2", llvm::CodeGenOptLevel::Default)
+                      .Case("3", llvm::CodeGenOptLevel::Aggressive)
+                      .Case("4", llvm::CodeGenOptLevel::Aggressive)
+                      .Case("s", llvm::CodeGenOptLevel::Default)
+                      .Case("z", llvm::CodeGenOptLevel::Default)
                       .Default(std::nullopt);
   if (!optLevel) {
     auto* optArg = args.getLastArg(OPT_O);
