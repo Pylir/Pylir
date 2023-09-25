@@ -8,14 +8,16 @@
 
 #include "Value.hpp"
 
+using namespace pylir::Py;
+
 namespace {
 
 mlir::FailureOr<mlir::Attribute> getDictKey(mlir::Value keyOperand) {
-  mlir::Attribute attr;
+  EqualsAttrInterface attr;
   if (!mlir::matchPattern(keyOperand, mlir::m_Constant(&attr)))
     return mlir::failure();
 
-  auto canon = pylir::Py::getCanonicalEqualsForm(attr);
+  auto canon = attr.getCanonicalAttribute();
   if (!canon)
     return mlir::failure();
 
@@ -27,10 +29,10 @@ mlir::LogicalResult dictOpCanParticipateInSROA(T op) {
   return mlir::success(
       op.getMappingExpansion().empty() &&
       llvm::all_of(op.getKeys(), [](mlir::Value val) {
-        mlir::Attribute attr;
-        return mlir::matchPattern(val, mlir::m_Constant(&attr)) &&
-               pylir::Py::getCanonicalEqualsForm(attr) != nullptr;
-      }));
+                         EqualsAttrInterface attr;
+                         return mlir::matchPattern(val,
+                                                   mlir::m_Constant(&attr));
+                       }));
 }
 
 template <class T>
@@ -59,11 +61,10 @@ void replaceDictAggregate(
                                                            op.getKeys().size());
   write(nullptr, pylir::Py::DictResource::get(), size);
   for (auto [key, value] : llvm::zip(op.getKeys(), op.getValues())) {
-    mlir::Attribute attr;
+    EqualsAttrInterface attr;
     bool result = mlir::matchPattern(key, mlir::m_Constant(&attr));
     PYLIR_ASSERT(result);
-    write(pylir::Py::getCanonicalEqualsForm(attr),
-          pylir::Py::DictResource::get(), value);
+    write(attr.getCanonicalAttribute(), pylir::Py::DictResource::get(), value);
   }
 }
 
@@ -393,8 +394,8 @@ void pylir::Py::DictAttr::destructureAggregate(
   write(nullptr, DictResource::get(), indexType,
         mlir::IntegerAttr::get(indexType, getKeyValuePairs().size()));
   for (auto [key, value] : getKeyValuePairs())
-    write(getCanonicalEqualsForm(key), DictResource::get(),
-          DynamicType::get(getContext()), value);
+    write(mlir::cast<EqualsAttrInterface>(key).getCanonicalAttribute(),
+          DictResource::get(), DynamicType::get(getContext()), value);
 }
 
 void pylir::Py::FunctionAttr::destructureAggregate(

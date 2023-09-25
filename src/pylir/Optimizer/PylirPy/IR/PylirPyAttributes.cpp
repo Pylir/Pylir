@@ -20,6 +20,7 @@
 #include "Value.hpp"
 
 using namespace mlir;
+using namespace pylir;
 using namespace pylir::Py;
 
 template <>
@@ -56,6 +57,44 @@ llvm::hash_code hash_value(const pylir::BigInt& bigInt) {
 }
 } // namespace pylir
 
+//===----------------------------------------------------------------------===//
+// IntAttr
+//===----------------------------------------------------------------------===//
+
+Attribute IntAttr::getCanonicalAttribute() const {
+  return FractionalAttr::get(getContext(), getInteger(), BigInt(1));
+}
+
+//===----------------------------------------------------------------------===//
+// BoolAttr
+//===----------------------------------------------------------------------===//
+
+Attribute Py::BoolAttr::getCanonicalAttribute() const {
+  return FractionalAttr::get(getContext(), BigInt(getValue() ? 1 : 0),
+                             BigInt(1));
+}
+
+//===----------------------------------------------------------------------===//
+// FloatAttr
+//===----------------------------------------------------------------------===//
+
+Attribute Py::FloatAttr::getCanonicalAttribute() const {
+  auto [nom, denom] = toRatio(getDoubleValue());
+  return FractionalAttr::get(getContext(), std::move(nom), std::move(denom));
+}
+
+//===----------------------------------------------------------------------===//
+// StrAttr
+//===----------------------------------------------------------------------===//
+
+Attribute StrAttr::getCanonicalAttribute() const {
+  return StringAttr::get(getContext(), getValue());
+}
+
+//===----------------------------------------------------------------------===//
+// RefAttr
+//===----------------------------------------------------------------------===//
+
 namespace pylir::Py::detail {
 struct RefAttrStorage : mlir::AttributeStorage {
   using KeyTy = std::tuple<mlir::FlatSymbolRefAttr>;
@@ -80,54 +119,6 @@ struct RefAttrStorage : mlir::AttributeStorage {
   mlir::SymbolRefAttr identity;
   mlir::Operation* value{};
 };
-
-struct GlobalValueAttrStorage : mlir::AttributeStorage {
-  using KeyTy = std::tuple<llvm::StringRef, bool, mlir::Attribute>;
-
-  explicit GlobalValueAttrStorage(const KeyTy& key)
-      : name(std::get<llvm::StringRef>(key)), constant(std::get<bool>(key)),
-        initializer(std::get<mlir::Attribute>(key)) {}
-
-  bool operator==(const KeyTy& key) const {
-    return std::get<llvm::StringRef>(key) == name;
-  }
-
-  static llvm::hash_code hashKey(const KeyTy& key) {
-    return llvm::hash_value(std::get<llvm::StringRef>(key));
-  }
-
-  static GlobalValueAttrStorage*
-  construct(mlir::AttributeStorageAllocator& allocator, const KeyTy& key) {
-    return new (allocator.allocate<GlobalValueAttrStorage>())
-        GlobalValueAttrStorage(std::make_tuple(
-            allocator.copyInto(std::get<llvm::StringRef>(key)),
-            std::get<bool>(key), std::get<mlir::Attribute>(key)));
-  }
-
-  [[nodiscard]] KeyTy getAsKey() const {
-    return std::make_tuple(name, constant, initializer);
-  }
-
-  static KeyTy getKey(llvm::StringRef name) {
-    return std::make_tuple(name, false, nullptr);
-  }
-
-  mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&, bool c) {
-    constant = c;
-    return mlir::success();
-  }
-
-  mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&,
-                             ConcreteObjectAttrInterface attribute) {
-    initializer = attribute;
-    return mlir::success();
-  }
-
-  llvm::StringRef name;
-  bool constant;
-  ConcreteObjectAttrInterface initializer;
-};
-
 } // namespace pylir::Py::detail
 
 namespace {
@@ -187,6 +178,60 @@ mlir::FlatSymbolRefAttr pylir::Py::RefAttr::getRef() const {
 pylir::Py::GlobalValueOp pylir::Py::RefAttr::getSymbol() const {
   return mlir::dyn_cast_or_null<GlobalValueOp>(getImpl()->value);
 }
+
+//===----------------------------------------------------------------------===//
+// GlobalValueAttr
+//===----------------------------------------------------------------------===//
+
+namespace pylir::Py::detail {
+struct GlobalValueAttrStorage : mlir::AttributeStorage {
+  using KeyTy = std::tuple<llvm::StringRef, bool, mlir::Attribute>;
+
+  explicit GlobalValueAttrStorage(const KeyTy& key)
+      : name(std::get<llvm::StringRef>(key)), constant(std::get<bool>(key)),
+        initializer(std::get<mlir::Attribute>(key)) {}
+
+  bool operator==(const KeyTy& key) const {
+    return std::get<llvm::StringRef>(key) == name;
+  }
+
+  static llvm::hash_code hashKey(const KeyTy& key) {
+    return llvm::hash_value(std::get<llvm::StringRef>(key));
+  }
+
+  static GlobalValueAttrStorage*
+  construct(mlir::AttributeStorageAllocator& allocator, const KeyTy& key) {
+    return new (allocator.allocate<GlobalValueAttrStorage>())
+        GlobalValueAttrStorage(std::make_tuple(
+            allocator.copyInto(std::get<llvm::StringRef>(key)),
+            std::get<bool>(key), std::get<mlir::Attribute>(key)));
+  }
+
+  [[nodiscard]] KeyTy getAsKey() const {
+    return std::make_tuple(name, constant, initializer);
+  }
+
+  static KeyTy getKey(llvm::StringRef name) {
+    return std::make_tuple(name, false, nullptr);
+  }
+
+  mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&, bool c) {
+    constant = c;
+    return mlir::success();
+  }
+
+  mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&,
+                             ConcreteObjectAttrInterface attribute) {
+    initializer = attribute;
+    return mlir::success();
+  }
+
+  llvm::StringRef name;
+  bool constant;
+  ConcreteObjectAttrInterface initializer;
+};
+
+} // namespace pylir::Py::detail
 
 /// global-value ::= `#py.globalValue` `<` name { (`,` `const`)? (`,`
 /// `initializer` `=` attr) }`>`
@@ -297,16 +342,9 @@ void pylir::Py::GlobalValueAttr::setInitializer(
   (void)Base::mutate(initializer);
 }
 
-void pylir::Py::PylirPyDialect::initializeAttributes() {
-  addAttributes<
-#define GET_ATTRDEF_LIST
-#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
-      >();
-  addRefAttrInterfaces<
-#define GEN_WRAP_LIST
-#include "pylir/Optimizer/PylirPy/IR/PylirPyWrapInterfaces.h.inc"
-      >(getContext());
-}
+//===----------------------------------------------------------------------===//
+// DictAttr
+//===----------------------------------------------------------------------===//
 
 namespace {
 
@@ -331,32 +369,13 @@ struct UniqueOutput {
       keyValuePairsUnique;
 };
 
-mlir::Attribute noRefCastNormalize(mlir::Attribute attr) {
-  return llvm::TypeSwitch<mlir::Attribute, mlir::Attribute>(attr)
-      .Case([](pylir::Py::IntAttr intAttr) {
-        return pylir::Py::FractionalAttr::get(
-            intAttr.getContext(), intAttr.getValue(), pylir::BigInt(1));
-      })
-      .Case([](pylir::Py::FloatAttr floatAttr) {
-        auto [nom, denom] = pylir::toRatio(floatAttr.getDoubleValue());
-        return pylir::Py::FractionalAttr::get(floatAttr.getContext(),
-                                              std::move(nom), std::move(denom));
-      })
-      .Case([](pylir::Py::StrAttr strAttr) {
-        return mlir::StringAttr::get(strAttr.getContext(), strAttr.getValue());
-      })
-      .Default(attr);
-}
-
 UniqueOutput unique(llvm::ArrayRef<pylir::Py::DictAttr::Entry> entries) {
   // Doing this step ahead of time with a MapVector purely to get the correct
   // size ahead of time. Changing size would require rehashing.
   llvm::MapVector<mlir::Attribute, std::pair<mlir::Attribute, mlir::Attribute>>
       map;
   for (auto [key, normKey, value] : entries) {
-    if (!normKey)
-      normKey = noRefCastNormalize(key);
-
+    PYLIR_ASSERT(key && normKey && value);
     auto [iter, inserted] = map.insert({normKey, {key, value}});
     if (!inserted)
       // We have to retain the key, but update the value it is mapped to.
@@ -367,7 +386,7 @@ UniqueOutput unique(llvm::ArrayRef<pylir::Py::DictAttr::Entry> entries) {
   // between memory usage and lookup speed, especially in the case of a key not
   // being within the dictionary.
   UniqueOutput result;
-  result.normalizedKeysUnique.resize(10 * map.size() / 9);
+  result.normalizedKeysUnique.resize(std::ceil(10 * map.size() / 9.0));
   result.keyValuePairsUnique.reserve(map.size());
   for (auto& [key, pair] : map) {
     result.normalizedKeysUnique[lookup(result.normalizedKeysUnique, key)] = {
@@ -390,13 +409,17 @@ mlir::Attribute pylir::Py::DictAttr::lookup(mlir::Attribute key) const {
   if (getNormalizedKeysInternal().empty())
     return nullptr;
 
-  auto index =
-      ::lookup(getNormalizedKeysInternal(), getCanonicalEqualsForm(key));
-  const auto& entry = getNormalizedKeysInternal()[index];
-  if (!entry.first)
+  auto equalsAttrInterface = mlir::dyn_cast<EqualsAttrInterface>(key);
+  if (!equalsAttrInterface)
     return nullptr;
 
-  return getKeyValuePairs()[entry.second].second;
+  std::size_t bucket = ::lookup(getNormalizedKeysInternal(),
+                                equalsAttrInterface.getCanonicalAttribute());
+  auto [normalizedKey, index] = getNormalizedKeysInternal()[bucket];
+  if (!normalizedKey)
+    return nullptr;
+
+  return getKeyValuePairs()[index].second;
 }
 
 namespace {
@@ -409,22 +432,13 @@ mlir::LogicalResult parseKVPair(
   llvm::SmallVector<pylir::Py::DictAttr::Entry> entries;
   auto parseResult =
       parser.parseCommaSeparatedList(mlir::AsmParser::Delimiter::Braces, [&] {
-        mlir::Attribute key;
-        mlir::Attribute normKey;
+        EqualsAttrInterface key;
         mlir::Attribute value;
-        if (parser.parseAttribute(key))
+        if (parser.parseAttribute(key) || parser.parseKeyword("to") ||
+            parser.parseAttribute(value))
           return mlir::failure();
 
-        if (mlir::succeeded(parser.parseOptionalKeyword("norm"))) {
-          if (mlir::failed(parser.parseAttribute(normKey)))
-            return mlir::failure();
-        } else {
-          normKey = noRefCastNormalize(key);
-        }
-        if (parser.parseKeyword("to") || parser.parseAttribute(value))
-          return mlir::failure();
-
-        entries.emplace_back(key, normKey, value);
+        entries.emplace_back(key, key.getCanonicalAttribute(), value);
         return mlir::success();
       });
   if (mlir::failed(parseResult))
@@ -442,18 +456,18 @@ void printKVPair(
     llvm::ArrayRef<std::pair<mlir::Attribute, mlir::Attribute>> values,
     llvm::ArrayRef<std::pair<mlir::Attribute, std::size_t>>) {
   printer << "{";
-  llvm::interleaveComma(values, printer.getStream(), [&](auto pair) {
-    printer << pair.first;
-    if (auto canonical = pylir::Py::getCanonicalEqualsForm(pair.first);
-        canonical != noRefCastNormalize(pair.first))
-      printer << " norm " << canonical;
-
-    printer << " to " << pair.second;
-  });
+  llvm::interleaveComma(values, printer.getStream(),
+                        [&](std::pair<mlir::Attribute, mlir::Attribute> pair) {
+                          printer << pair.first << " to " << pair.second;
+                        });
   printer << "}";
 }
 
 } // namespace
+
+//===----------------------------------------------------------------------===//
+// FunctionAttr
+//===----------------------------------------------------------------------===//
 
 mlir::DictionaryAttr pylir::Py::FunctionAttr::getSlots() const {
   llvm::SmallVector<mlir::NamedAttribute> vector = {
@@ -469,6 +483,17 @@ mlir::DictionaryAttr pylir::Py::FunctionAttr::getSlots() const {
   vector.emplace_back(mlir::NamedAttribute(
       mlir::StringAttr::get(getContext(), "__qualname__"), getQualName()));
   return mlir::DictionaryAttr::get(getContext(), vector);
+}
+
+void pylir::Py::PylirPyDialect::initializeAttributes() {
+  addAttributes<
+#define GET_ATTRDEF_LIST
+#include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
+      >();
+  addRefAttrInterfaces<
+#define GEN_WRAP_LIST
+#include "pylir/Optimizer/PylirPy/IR/PylirPyWrapInterfaces.h.inc"
+      >(getContext());
 }
 
 #define GET_ATTRDEF_CLASSES

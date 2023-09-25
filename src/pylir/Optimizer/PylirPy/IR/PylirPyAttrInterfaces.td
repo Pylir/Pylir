@@ -300,4 +300,27 @@ def StrAttrInterface : RefAttrImplementable<"StrAttrInterface",
   ];
 }
 
+def EqualsAttrInterface
+  : AttrInterface<"EqualsAttrInterface", [ObjectAttrInterface]> {
+  let cppNamespace = "::pylir::Py";
+
+  let description = [{
+    Interface used to support equality as specified in Python in attributes.
+  }];
+
+  let methods = [
+    InterfaceMethod<[{
+      Returns the attribute acting as the canonical form for checking equality.
+      The precise kind of attribute returned is unspecified.
+      However, all instances of a python attribute that should compare equal
+      must return the exact same attribute from this function.
+      This makes it possible to compare the attributes returned by this function
+      to check for equality in python semantics.
+
+      Must not return null.
+    }],
+    "mlir::Attribute", "getCanonicalAttribute", (ins)>
+  ];
+}
+
 #endif

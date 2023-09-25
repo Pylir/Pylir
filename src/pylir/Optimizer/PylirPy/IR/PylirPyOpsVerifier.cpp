@@ -73,21 +73,21 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
 
           if (mlir::failed(verify(op, value, collection)))
             return mlir::failure();
-
-          if (pylir::Py::getHashFunction(key) ==
-              pylir::Py::BuiltinMethodKind::Unknown)
-            return op->emitOpError(
-                "Constant dictionary not allowed to have key whose type's "
-                "'__hash__' method is not off of a builtin.");
         }
-        for (const auto& entry :
+        for (auto [canonicalKey, index] :
              llvm::make_filter_range(dict.getNormalizedKeysInternal(),
                                      [](auto pair) { return pair.first; })) {
-          const auto& kv = dict.getKeyValuePairs()[entry.second];
-          if (entry.first != pylir::Py::getCanonicalEqualsForm(kv.first))
+          auto [key, value] = dict.getKeyValuePairs()[index];
+          auto equalsAttrInterface = dyn_cast<EqualsAttrInterface>(key);
+          if (!equalsAttrInterface)
+            return op->emitOpError("Expected key in '")
+                   << DictAttr::getMnemonic()
+                   << "' to implement 'EqualsAttrInterface'";
+
+          if (canonicalKey != equalsAttrInterface.getCanonicalAttribute())
             return op->emitOpError("Incorrect normalized key entry '")
-                   << entry.first << "' for key-value pair '(" << kv.first
-                   << ", " << kv.second << ")'";
+                   << canonicalKey << "' for key-value pair '(" << key << ", "
+                   << value << ")'";
         }
         return mlir::success();
       })
