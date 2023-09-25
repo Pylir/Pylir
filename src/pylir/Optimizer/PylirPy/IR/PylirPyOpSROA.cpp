@@ -26,9 +26,8 @@ mlir::FailureOr<mlir::Attribute> getDictKey(mlir::Value keyOperand) {
 
 template <class T>
 mlir::LogicalResult dictOpCanParticipateInSROA(T op) {
-  return mlir::success(
-      op.getMappingExpansion().empty() &&
-      llvm::all_of(op.getKeys(), [](mlir::Value val) {
+  return mlir::success(op.getMappingExpansion().empty() &&
+                       llvm::all_of(op.getKeys(), [](mlir::Value val) {
                          EqualsAttrInterface attr;
                          return mlir::matchPattern(val,
                                                    mlir::m_Constant(&attr));
