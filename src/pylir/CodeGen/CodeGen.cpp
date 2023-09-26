@@ -1615,7 +1615,7 @@ mlir::Value pylir::CodeGen::visitFunction(
         PYLIR_UNREACHABLE;
       }
       auto& entry = pylir::get<Py::DictEntry>(iter);
-      mlir::Attribute key;
+      Py::EqualsAttrInterface key;
       if (!mlir::matchPattern(entry.key, mlir::m_Constant(&key))) {
         // Should not be possible, keys are always 'StrAttr's.
         PYLIR_UNREACHABLE;
@@ -1625,8 +1625,7 @@ mlir::Value pylir::CodeGen::visitFunction(
         // TODO: emit error as required
         PYLIR_UNREACHABLE;
       }
-      keywordDefaultParams.emplace_back(Py::DictAttr::DeduceNormalizedTag{},
-                                        key, value);
+      keywordDefaultParams.emplace_back(key, value);
     }
     Py::GlobalValueOp valueOp;
     {

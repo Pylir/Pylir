@@ -15,44 +15,6 @@ py.func @test() {
 
 // -----
 
-py.globalValue const @builtins.type = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
-py.globalValue const @builtins.object = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.object>)>>
-py.globalValue const @builtins.function = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.str = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.None = #py.type
-
-py.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
-
-py.globalValue const @Foo = #py.type<mro_tuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>, slots = {
-    __hash__ = #py.function<@foo>
-}>
-
-py.globalValue @bar = #py.obj<#py.ref<@Foo>>
-// expected-error@below {{Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.}}
-py.globalValue @dict = #py.dict<{#py.ref<@bar> to #py.ref<@builtins.None>}>
-
-// -----
-
-py.globalValue const @builtins.type = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.type>, #py.ref<@builtins.object>)>>
-py.globalValue const @builtins.object = #py.type<mro_tuple = #py.tuple<(#py.ref<@builtins.object>)>>
-py.globalValue const @builtins.function = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.str = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.None = #py.type
-
-py.func private @foo(!py.dynamic, !py.dynamic, !py.dynamic) -> !py.dynamic
-
-py.globalValue @Foo = #py.type<mro_tuple = #py.tuple<(#py.ref<@Foo>, #py.ref<@builtins.object>)>>
-
-py.globalValue @bar = #py.obj<#py.ref<@Foo>>
-// expected-error@below {{Constant dictionary not allowed to have key whose type's '__hash__' method is not off of a builtin.}}
-py.globalValue @dict = #py.dict<{#py.ref<@bar> to #py.ref<@builtins.None>}>
-
-// -----
-
 // expected-error@below {{Expected integer attribute initializer}}
 py.global @lol1 : index = 5.3 : f64
 
@@ -154,7 +116,7 @@ py.globalValue @builtins.int = #py.type
 
 py.globalValue @lol = #py.int<5>
 
-// expected-error@below {{Incorrect normalized key entry '#py.ref<@lol>' for key-value pair '(#py.ref<@lol>, #py.int<3>)'}}
+// expected-error@below {{invalid kind of attribute specified}}
 py.globalValue @foo = #py.dict<{#py.ref<@lol> to #py.int<3>}>
 
 // -----

@@ -78,7 +78,7 @@ def BigIntParam : AttrParameter<"::pylir::BigInt", "Arbitrary sized integer",
 }
 
 def PylirPy_IntAttr : PylirPy_PyObjAttr<"Int", [IntAttrInterface,
-  EmptySlotsAttr]> {
+  EmptySlotsAttr, DeclareAttrInterfaceMethods<EqualsAttrInterface>]> {
 	let mnemonic = "int";
 	let summary = "python integer";
 
@@ -114,7 +114,7 @@ def BoolParameter : AttrParameter<"bool", "boolean"> {
 }
 
 def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [BoolAttrInterface,
-  EmptySlotsAttr]> {
+  EmptySlotsAttr,  DeclareAttrInterfaceMethods<EqualsAttrInterface>]> {
 	let mnemonic = "bool";
 	let summary = "python boolean";
 
@@ -150,7 +150,7 @@ def PylirPy_BoolAttr : PylirPy_PyObjAttr<"Bool", [BoolAttrInterface,
 }
 
 def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [FloatAttrInterface,
-  EmptySlotsAttr]> {
+  EmptySlotsAttr,  DeclareAttrInterfaceMethods<EqualsAttrInterface>]> {
 	let mnemonic = "float";
 	let summary = "python float";
 
@@ -169,7 +169,7 @@ def PylirPy_FloatAttr : PylirPy_PyObjAttr<"Float", [FloatAttrInterface,
 }
 
 def PylirPy_StrAttr : PylirPy_PyObjAttr<"Str", [StrAttrInterface,
-  EmptySlotsAttr]> {
+  EmptySlotsAttr,  DeclareAttrInterfaceMethods<EqualsAttrInterface>]> {
 	let mnemonic = "str";
 	let summary = "python string";
 
@@ -302,8 +302,8 @@ def PylirPy_DictAttr : PylirPy_PyObjAttr<"Dict", [DictAttrInterface,
 
       /// Constructs an entry by specifying the key and the mapped to value.
       /// The normalized value will be deduced from the key.
-      Entry(DeduceNormalizedTag, mlir::Attribute key, mlir::Attribute value)
-        : key(key), normalizedKey(nullptr), value(value)
+      Entry(EqualsAttrInterface key, mlir::Attribute value)
+        : key(key), normalizedKey(key.getCanonicalAttribute()), value(value)
       {}
     };
 

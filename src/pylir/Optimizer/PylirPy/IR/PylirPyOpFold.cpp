@@ -183,9 +183,9 @@ foldMakeDict(llvm::iterator_range<pylir::Py::DictArgsIterator> args) {
     // If we can extract a canonical constant key we have the most accurate
     // result. Otherwise, we just fall back to checking whether the value has
     // been seen before.
-    mlir::Attribute constantKey;
+    EqualsAttrInterface constantKey;
     if (mlir::matchPattern(entry->key, mlir::m_Constant(&constantKey))) {
-      if (auto canonical = pylir::Py::getCanonicalEqualsForm(constantKey)) {
+      if (auto canonical = constantKey.getCanonicalAttribute()) {
         if (seen.insert(canonical).second) {
           result.push_back(iter);
           continue;
