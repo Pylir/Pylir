@@ -211,19 +211,17 @@ class CodeGen {
                            bool additionalConstCondition,
                            const BaseToken& location);
 
-    struct FunctionParameter
-    {
-        std::string name;
-        enum Kind
-        {
-            Normal,
-            PosOnly,
-            KeywordOnly,
-            PosRest,
-            KeywordRest,
-        } kind;
-        bool hasDefaultParam;
-    };
+  struct FunctionParameter {
+    std::string name;
+    enum Kind {
+      Normal,
+      PosOnly,
+      KeywordOnly,
+      PosRest,
+      KeywordRest,
+    } kind;
+    bool hasDefaultParam;
+  };
 
   struct UnpackResults {
     mlir::Value parameterValue;

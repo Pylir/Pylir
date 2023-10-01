@@ -541,8 +541,9 @@ mlir::Value pylir::CodeGenState::getConstant(mlir::Location loc,
                                              mlir::OpBuilder& builder,
                                              mlir::Attribute attribute) {
   if (auto ref = attribute.dyn_cast<Py::GlobalValueAttr>())
-    return builder.create<mlir::LLVM::AddressOfOp>(loc, m_objectPtrType,
-                                                  mlir::FlatSymbolRefAttr::get(getGlobalValue(builder, ref)));
+    return builder.create<mlir::LLVM::AddressOfOp>(
+        loc, m_objectPtrType,
+        mlir::FlatSymbolRefAttr::get(getGlobalValue(builder, ref)));
 
   if (auto value = attribute.dyn_cast<Py::GlobalValueAttr>())
     return builder.create<mlir::LLVM::AddressOfOp>(

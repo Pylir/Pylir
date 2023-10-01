@@ -29,72 +29,70 @@ protected:
     std::vector<pylir::SROAReadWriteOpInterface> uses;
   };
 
-  std::vector<GlobalSROAPass::Aggregate>
-  collectReplaceAble();
+  std::vector<GlobalSROAPass::Aggregate> collectReplaceAble();
 
 public:
   using Base::Base;
 };
 
-std::vector<GlobalSROAPass::Aggregate> GlobalSROAPass::collectReplaceAble()
-{
-    struct Uses
-    {
-        std::vector<pylir::Py::ConstantOp> users;
-        bool allDirect = true;
-    };
+std::vector<GlobalSROAPass::Aggregate> GlobalSROAPass::collectReplaceAble() {
+  struct Uses {
+    std::vector<pylir::Py::ConstantOp> users;
+    bool allDirect = true;
+  };
 
-    llvm::MapVector<pylir::Py::GlobalValueAttr, Uses> eligible;
-    mlir::AttrTypeWalker walker;
-    walker.addWalk([&](pylir::Py::GlobalValueAttr globalValueAttr) { eligible[globalValueAttr].allDirect = false; });
+  llvm::MapVector<pylir::Py::GlobalValueAttr, Uses> eligible;
+  mlir::AttrTypeWalker walker;
+  walker.addWalk([&](pylir::Py::GlobalValueAttr globalValueAttr) {
+    eligible[globalValueAttr].allDirect = false;
+  });
 
-    getOperation()->walk(
-        [&](mlir::Operation* operation)
-        {
-            if (auto constantOp = mlir::dyn_cast<pylir::Py::ConstantOp>(operation))
-            {
-                if (auto globalValueAttr = mlir::dyn_cast<pylir::Py::GlobalValueAttr>(constantOp.getConstant()))
-                {
-                    eligible[globalValueAttr].users.push_back(constantOp);
-                    return;
-                }
-            }
-            walker.walk(operation->getAttrDictionary());
-        });
+  getOperation()->walk([&](mlir::Operation* operation) {
+    if (auto constantOp = mlir::dyn_cast<pylir::Py::ConstantOp>(operation)) {
+      if (auto globalValueAttr = mlir::dyn_cast<pylir::Py::GlobalValueAttr>(
+              constantOp.getConstant())) {
+        eligible[globalValueAttr].users.push_back(constantOp);
+        return;
+      }
+    }
+    walker.walk(operation->getAttrDictionary());
+  });
 
-    std::vector<Aggregate> result;
-    for (auto&& [valueAttr, uses] :
-         llvm::make_filter_range(eligible, [](auto&& pair) { return pair.second.allDirect; }))
-    {
-        // If it is public or just a declaration we cannot set all its uses and hence can't replace it.
-        if (!valueAttr.getInitializer().isa<pylir::Py::SROAAttrInterface>())
-        {
-            continue;
-        }
+  std::vector<Aggregate> result;
+  for (auto&& [valueAttr, uses] : llvm::make_filter_range(
+           eligible, [](auto&& pair) { return pair.second.allDirect; })) {
+    // If it is public or just a declaration we cannot set all its uses and
+    // hence can't replace it.
+    if (!valueAttr.getInitializer().isa<pylir::Py::SROAAttrInterface>())
+      continue;
 
     std::vector<pylir::Py::ConstantOp> constantOps;
     std::vector<pylir::SROAReadWriteOpInterface> readWriteOp;
 
-        auto canSROAReplace = [&](pylir::Py::ConstantOp constantOp) -> mlir::LogicalResult
-        {
-            if (llvm::all_of(constantOp->getUses(), [](const mlir::OpOperand& use)
-                             { return mlir::succeeded(pylir::aggregateUseCanParticipateInSROA(use)); }))
-            {
-                constantOps.push_back(constantOp);
-                llvm::transform(constantOp->getUses(), std::back_inserter(readWriteOp),
-                                [](mlir::OpOperand& operand)
-                                { return mlir::cast<pylir::SROAReadWriteOpInterface>(operand.getOwner()); });
-                return mlir::success();
-            }
-            return mlir::failure();
-        };
+    auto canSROAReplace =
+        [&](pylir::Py::ConstantOp constantOp) -> mlir::LogicalResult {
+      if (llvm::all_of(constantOp->getUses(), [](const mlir::OpOperand& use) {
+            return mlir::succeeded(
+                pylir::aggregateUseCanParticipateInSROA(use));
+          })) {
+        constantOps.push_back(constantOp);
+        llvm::transform(constantOp->getUses(), std::back_inserter(readWriteOp),
+                        [](mlir::OpOperand& operand) {
+                          return mlir::cast<pylir::SROAReadWriteOpInterface>(
+                              operand.getOwner());
+                        });
+        return mlir::success();
+      }
+      return mlir::failure();
+    };
 
     if (llvm::any_of(uses.users, [&](pylir::Py::ConstantOp user) {
           return mlir::failed(canSROAReplace(user));
         }))
       continue;
 
-    result.push_back({valueAttr, std::move(constantOps), std::move(readWriteOp)});
+    result.push_back(
+        {valueAttr, std::move(constantOps), std::move(readWriteOp)});
   }
   return result;
 }
@@ -210,7 +208,8 @@ void GlobalSROAPass::runOnOperation() {
         else
           type = placeHolder.stores.front().getOperand(0).getType();
 
-mlir::Location loc = aggregate.refs.front()->getLoc();        auto symbol = builder.create<pylir::Py::GlobalOp>(
+        mlir::Location loc = aggregate.refs.front()->getLoc();
+        auto symbol = builder.create<pylir::Py::GlobalOp>(
             loc,
             (aggregate.globalValue.getName() +
              (suffix.empty() ? "" : "$" + suffix))

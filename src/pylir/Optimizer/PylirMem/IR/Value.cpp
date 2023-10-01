@@ -82,15 +82,19 @@ pylir::Mem::layoutTypeToTypeObject(mlir::MLIRContext* context,
                                    pylir::Mem::LayoutType layoutType) {
   switch (layoutType) {
   case pylir::Mem::LayoutType::Object:
-    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Object.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Object.name);
   case pylir::Mem::LayoutType::Type:
     return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Type.name);
   case pylir::Mem::LayoutType::Float:
-    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Float.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Float.name);
   case pylir::Mem::LayoutType::Function:
-    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Function.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Function.name);
   case pylir::Mem::LayoutType::Tuple:
-    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Tuple.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Tuple.name);
   case pylir::Mem::LayoutType::List:
     return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::List.name);
   case pylir::Mem::LayoutType::String:
@@ -101,7 +105,7 @@ pylir::Mem::layoutTypeToTypeObject(mlir::MLIRContext* context,
     return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Int.name);
   case pylir::Mem::LayoutType::BaseException:
     return pylir::Py::GlobalValueAttr::get(context,
-                                   pylir::Builtins::BaseException.name);
+                                           pylir::Builtins::BaseException.name);
   }
   PYLIR_UNREACHABLE;
 }

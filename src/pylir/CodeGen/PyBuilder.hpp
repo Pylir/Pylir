@@ -110,7 +110,7 @@ public:
                                        std::forward<Args>(args)...);
   }
 
-#define BUILTIN(name, str, ...)                   \
+#define BUILTIN(name, str, ...)                           \
   Py::GlobalValueAttr get##name##Builtin() {              \
     return Py::GlobalValueAttr::get(getContext(), (str)); \
   }
@@ -469,16 +469,14 @@ public:
   createGlobalValue(llvm::StringRef symbolName, bool constant = false,
                     Py::ConcreteObjectAttrInterface initializer = {},
                     bool external = false) {
-    auto result = getAttr<Py::GlobalValueAttr>(
-        symbolName);
-        result.setInitializer( initializer);
-  result.setConstant(constant);
-        if (external)
-        {
-            create<Py::ExternalOp>(symbolName, result);
-        }
-        return result;
+    auto result = getAttr<Py::GlobalValueAttr>(symbolName);
+    result.setInitializer(initializer);
+    result.setConstant(constant);
+    if (external) {
+      create<Py::ExternalOp>(symbolName, result);
     }
+    return result;
+  }
 
   Py::GlobalOp createGlobal(llvm::StringRef symbolName) {
     return create<Py::GlobalOp>(symbolName, getStringAttr("private"),

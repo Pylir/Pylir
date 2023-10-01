@@ -161,8 +161,7 @@ struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<Py::GlobalOp> {
               op.getLoc(), global.getType(), attr);
           rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), constant);
         })
-        .Case<Py::ObjectAttrInterface, Py::GlobalValueAttr>(
-                [&](auto attr) {
+        .Case<Py::ObjectAttrInterface, Py::GlobalValueAttr>([&](auto attr) {
           mlir::Value address =
               codeGenState.getConstant(op.getLoc(), rewriter, attr);
           rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), address);
@@ -431,7 +430,8 @@ struct ListResizeOpConversion
           op.getLoc(), newCapacity, adaptor.getLength());
 
       auto tupleType = rewriter.create<Py::ConstantOp>(
-          op.getLoc(), Py::GlobalValueAttr::get(getContext(), Builtins::Tuple.name));
+          op.getLoc(),
+          Py::GlobalValueAttr::get(getContext(), Builtins::Tuple.name));
       mlir::Value tupleMemory = rewriter.create<Mem::GCAllocObjectOp>(
           op.getLoc(), tupleType, newCapacity);
       tupleMemory = unrealizedConversion(rewriter, tupleMemory, typeConverter);
@@ -919,7 +919,8 @@ struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T> {
       rewriter.setInsertionPointToStart(&op->getParentRegion()->front());
       catchType = this->codeGenState.getConstant(
           op.getLoc(), rewriter,
-          Py::GlobalValueAttr::get(this->getContext(), Builtins::BaseException.name));
+          Py::GlobalValueAttr::get(this->getContext(),
+                                   Builtins::BaseException.name));
     }
     // We use a integer of pointer width instead of a pointer to keep it opaque
     // to statepoint passes. Those do not support aggregates in aggregates.
@@ -1137,7 +1138,8 @@ struct InitListOpConversion
     list.size(op.getLoc()).store(op.getLoc(), size);
 
     auto tupleType = rewriter.create<Py::ConstantOp>(
-        op.getLoc(), Py::GlobalValueAttr::get(getContext(), Builtins::Tuple.name));
+        op.getLoc(),
+        Py::GlobalValueAttr::get(getContext(), Builtins::Tuple.name));
     auto tupleMemory =
         rewriter.create<Mem::GCAllocObjectOp>(op.getLoc(), tupleType, size);
     mlir::Value tupleInit = rewriter.create<Mem::InitTupleOp>(
@@ -1639,8 +1641,8 @@ void ConvertPylirToLLVMPass::runOnOperation() {
   mlir::RewritePatternSet patternSet(&getContext());
   mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
   patternSet.insert<
-      ConstantOpConversion, ExternalOpConversion,
-      GlobalOpConversion, StoreOpConversion, LoadOpConversion, IsOpConversion,
+      ConstantOpConversion, ExternalOpConversion, GlobalOpConversion,
+      StoreOpConversion, LoadOpConversion, IsOpConversion,
       IsUnboundValueOpConversion, TypeOfOpConversion, TupleGetItemOpConversion,
       TupleLenOpConversion, GetSlotOpConversion, SetSlotOpConversion,
       StrEqualOpConversion, StackAllocObjectOpConversion,
