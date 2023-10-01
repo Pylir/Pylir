@@ -379,10 +379,12 @@ void buildGetAttributeOpCompilerBuiltin(pylir::PyBuilder& builder,
 void pylir::CodeGen::createCompilerBuiltinsImpl() {
   // This function is called at the end of compiling the `builtins` module.
   // At that point in time, it is safe to cast the types to `TypeAttrInterface`.
-  m_builder.createGlobalValue(Builtins::None.name, /*constant=*/true,
+  m_builder.createGlobalValue(
+      Builtins::None.name, /*constant=*/true,
       m_builder.getObjectAttr(m_builder.getNoneTypeBuiltin()),
       /*external=*/true);
-  m_builder.createGlobalValue(Builtins::NotImplemented.name, /*constant=*/true,
+  m_builder.createGlobalValue(
+      Builtins::NotImplemented.name, /*constant=*/true,
       m_builder.getObjectAttr(m_builder.getNotImplementedTypeBuiltin()),
       /*external=*/true);
 
