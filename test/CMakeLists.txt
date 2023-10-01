@@ -2,6 +2,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(PYLIR_TEST_EXEC_FLAGS "" CACHE STRING
+  "pylir flags to use when compiling the E2E execution tests")
+
 set(PYLIR_TEST_DEPENDS
   FileCheck count not split-file
   pylir-opt
