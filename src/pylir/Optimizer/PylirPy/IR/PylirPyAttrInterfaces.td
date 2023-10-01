@@ -8,25 +8,26 @@
 include "mlir/IR/OpBase.td"
 
 /// Base class for all attribute interfaces that should also be able to be
-/// implementable by `RefAttr`. Any `RefAttr` that refers to a symbol that
-/// implements a given interface automatically implements that interface as
-/// well. If the attribute is a "sub-interface" of `ConstObjectAttrInterface`,
-/// then the symbol referred to by the `RefAttr` must additionally be constant.
-class RefAttrImplementable<string name, list<Interface> baseInterfaces = []>
-  : AttrInterface<name, baseInterfaces> {
+/// implementable by `GlobalValueAttr`. Any `GlobalValueAttr` that refers to a
+/// symbol that implements a given interface automatically implements that
+/// interface as well. If the attribute is a "sub-interface" of
+/// `ConstObjectAttrInterface`, then the symbol referred to by the
+/// `GlobalValueAttr` must additionally be constant.
+class GlobalValueAttrImplementable<string name,
+  list<Interface> baseInterfaces = []> : AttrInterface<name, baseInterfaces> {
 
   /// Interface method that should be appended to the methods array of any
-  /// subclass of `RefAttrImplementable`. It automatically adds the necessary
-  /// hooks to allow `RefAttr` to implement the interface.
+  /// subclass of `GlobalValueAttrImplementable`. It automatically adds the
+  /// necessary hooks to allow `GlobalValueAttr` to implement the interface.
   InterfaceMethod canImplementMethod = InterfaceMethod<[{
-    This method is used by the `classof` mechanism of the given interface
-    implementation to allow an implementation to dynamically determine whether
-    it implements the given interface.
-    The implementation has a parameter containing the interface type to avoid
-    clashing with the corresponding method of any other interface implemented.
+    This method is used by the `classof` mechanism of `}] # name # [{` to allow
+    an implementation to dynamically determine whether it implements the
+    interface.
+    The implementation has a parameter containing `}] # name # [{` to avoid
+    clashing with corresponding methods of any other interfaces implemented.
 
-    Returns true for attributes where the interface is directly attached to in
-    ODS.
+    Returns true for attributes `}] # name # [{` is directly attached to
+    in ODS.
   }], "bool", "canImplement",
     (ins "std::in_place_type_t<" # cppNamespace # "::" # name # ">":$tagType),
      [{
@@ -39,7 +40,7 @@ class RefAttrImplementable<string name, list<Interface> baseInterfaces = []>
   }];
 }
 
-def ObjectAttrInterface : RefAttrImplementable<"ObjectAttrInterface"> {
+def ObjectAttrInterface : GlobalValueAttrImplementable<"ObjectAttrInterface"> {
   let cppNamespace = "::pylir::Py";
 
   let description = [{
@@ -59,8 +60,9 @@ def ObjectAttrInterface : RefAttrImplementable<"ObjectAttrInterface"> {
   ];
 }
 
-def ConstObjectAttrInterface : RefAttrImplementable<"ConstObjectAttrInterface",
-  [ObjectAttrInterface]> {
+def ConstObjectAttrInterface
+  : GlobalValueAttrImplementable<"ConstObjectAttrInterface",
+      [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
   let description = [{
@@ -90,21 +92,7 @@ def ConstObjectAttrInterface : RefAttrImplementable<"ConstObjectAttrInterface",
   ];
 }
 
-def ConcreteObjectAttrInterface : AttrInterface<"ConcreteObjectAttrInterface",
-  [ConstObjectAttrInterface]> {
-  let cppNamespace = "pylir::Py";
-
-  let description = [{
-    This interface is implemented by all attributes that represent concrete
-    python objects. It is most notably not implemented by `RefAttr`.
-
-    This interface doesn't have any methods but is rather used as a marker
-    or trait that additionally also implies an implementation of
-    `ConstObjectAttrInterface`.
-  }];
-}
-
-def IntAttrInterface : RefAttrImplementable<"IntAttrInterface",
+def IntAttrInterface : GlobalValueAttrImplementable<"IntAttrInterface",
   [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
@@ -125,7 +113,7 @@ def IntAttrInterface : RefAttrImplementable<"IntAttrInterface",
   let convertFromStorage = "$_self.getInteger()";
 }
 
-def BoolAttrInterface : RefAttrImplementable<"BoolAttrInterface",
+def BoolAttrInterface : GlobalValueAttrImplementable<"BoolAttrInterface",
   [IntAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
@@ -147,7 +135,7 @@ def BoolAttrInterface : RefAttrImplementable<"BoolAttrInterface",
   let convertFromStorage = "$_self.getBoolean()";
 }
 
-def TupleAttrInterface : RefAttrImplementable<"TupleAttrInterface",
+def TupleAttrInterface : GlobalValueAttrImplementable<"TupleAttrInterface",
   [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
@@ -192,7 +180,7 @@ def TupleAttrInterface : RefAttrImplementable<"TupleAttrInterface",
   }];
 }
 
-def TypeAttrInterface : RefAttrImplementable<"TypeAttrInterface",
+def TypeAttrInterface : GlobalValueAttrImplementable<"TypeAttrInterface",
   [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
@@ -216,7 +204,7 @@ def TypeAttrInterface : RefAttrImplementable<"TypeAttrInterface",
   ];
 }
 
-def DictAttrInterface : RefAttrImplementable<"DictAttrInterface",
+def DictAttrInterface : GlobalValueAttrImplementable<"DictAttrInterface",
   [ConstObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
@@ -242,8 +230,9 @@ def DictAttrInterface : RefAttrImplementable<"DictAttrInterface",
   ];
 }
 
-def FunctionAttrInterface : RefAttrImplementable<"FunctionAttrInterface",
-  [ObjectAttrInterface]> {
+def FunctionAttrInterface
+  : GlobalValueAttrImplementable<"FunctionAttrInterface",
+    [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
   let description = [{
@@ -262,7 +251,7 @@ def FunctionAttrInterface : RefAttrImplementable<"FunctionAttrInterface",
   ];
 }
 
-def FloatAttrInterface : RefAttrImplementable<"FloatAttrInterface",
+def FloatAttrInterface : GlobalValueAttrImplementable<"FloatAttrInterface",
   [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 
@@ -281,7 +270,7 @@ def FloatAttrInterface : RefAttrImplementable<"FloatAttrInterface",
   ];
 }
 
-def StrAttrInterface : RefAttrImplementable<"StrAttrInterface",
+def StrAttrInterface : GlobalValueAttrImplementable<"StrAttrInterface",
   [ObjectAttrInterface]> {
   let cppNamespace = "::pylir::Py";
 

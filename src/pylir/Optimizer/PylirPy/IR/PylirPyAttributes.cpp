@@ -56,6 +56,11 @@ llvm::hash_code hash_value(const pylir::BigInt& bigInt) {
 }
 } // namespace pylir
 
+bool ConcreteObjectAttribute::classof(mlir::Attribute attribute) {
+  return llvm::isa<ObjectAttr, IntAttr, BoolAttr, FloatAttr, StrAttr, TupleAttr,
+                   ListAttr, DictAttr, FunctionAttr, TypeAttr>(attribute);
+}
+
 //===----------------------------------------------------------------------===//
 // IntAttr
 //===----------------------------------------------------------------------===//
@@ -137,17 +142,6 @@ struct GlobalValueAttrWrapInterface
   /// Returns true if the `GlobalValueAttr` implements `Interface`.
   bool canImplement(Attribute thisAttr, std::in_place_type_t<Interface>) const {
     auto globalValueAttr = cast<GlobalValueAttr>(thisAttr);
-    // The below is a tradeoff/hack done to support parsing a `GlobalValueAttr`
-    // where an interface is required. While parsing, the `GlobalValueAttr` is
-    // not guaranteed to already have an initializer. Any check whether the
-    // `GlobalValueAttr` implements a given interface must therefore be deferred
-    // to verification. Yet we want strong typing in attributes such as
-    // `ObjectAttr` which hold instances of `TypeAttrInterface` and hence need
-    // an interface instance. The workaround is therefore to allow the cast
-    // while the symbol is still undefined and only error later in verification
-    // (and hopefully not user code).
-    if (!globalValueAttr.getInitializer())
-      return true;
 
     // If the interface inherits from `ConstObjectAttrInterface` it has an
     // implicit conversion to it and it is known that the symbol has to be
@@ -156,7 +150,7 @@ struct GlobalValueAttrWrapInterface
       if (!globalValueAttr.getConstant())
         return false;
 
-    return isa<Interface>(globalValueAttr.getInitializer());
+    return isa_and_nonnull<Interface>(globalValueAttr.getInitializer());
   }
 };
 
@@ -174,11 +168,11 @@ static void addGlobalValueAttrInterfaces(MLIRContext* context) {
 
 namespace pylir::Py::detail {
 struct GlobalValueAttrStorage : mlir::AttributeStorage {
-  using KeyTy = std::tuple<llvm::StringRef, bool, mlir::Attribute>;
+  using KeyTy = std::tuple<llvm::StringRef, bool, ConcreteObjectAttribute>;
 
   explicit GlobalValueAttrStorage(const KeyTy& key)
       : name(std::get<llvm::StringRef>(key)), constant(std::get<bool>(key)),
-        initializer(std::get<mlir::Attribute>(key)) {}
+        initializer(std::get<ConcreteObjectAttribute>(key)) {}
 
   bool operator==(const KeyTy& key) const {
     return std::get<llvm::StringRef>(key) == name;
@@ -193,7 +187,7 @@ struct GlobalValueAttrStorage : mlir::AttributeStorage {
     return new (allocator.allocate<GlobalValueAttrStorage>())
         GlobalValueAttrStorage(std::make_tuple(
             allocator.copyInto(std::get<llvm::StringRef>(key)),
-            std::get<bool>(key), std::get<mlir::Attribute>(key)));
+            std::get<bool>(key), std::get<ConcreteObjectAttribute>(key)));
   }
 
   [[nodiscard]] KeyTy getAsKey() const {
@@ -210,14 +204,14 @@ struct GlobalValueAttrStorage : mlir::AttributeStorage {
   }
 
   mlir::LogicalResult mutate(mlir::AttributeStorageAllocator&,
-                             ConcreteObjectAttrInterface attribute) {
+                             ConcreteObjectAttribute attribute) {
     initializer = attribute;
     return mlir::success();
   }
 
   llvm::StringRef name;
   bool constant;
-  ConcreteObjectAttrInterface initializer;
+  ConcreteObjectAttribute initializer;
 };
 
 } // namespace pylir::Py::detail
@@ -241,7 +235,7 @@ mlir::Attribute GlobalValueAttr::parse(AsmParser& parser, Type) {
 
   // Default values.
   bool constant = false;
-  ConcreteObjectAttrInterface initializer = {};
+  ConcreteObjectAttribute initializer = {};
 
   while (mlir::succeeded(parser.parseOptionalComma())) {
     llvm::StringRef keyword;
@@ -311,13 +305,13 @@ void pylir::Py::GlobalValueAttr::setConstant(bool constant) {
   (void)Base::mutate(constant);
 }
 
-pylir::Py::ConcreteObjectAttrInterface
+pylir::Py::ConcreteObjectAttribute
 pylir::Py::GlobalValueAttr::getInitializer() const {
   return getImpl()->initializer;
 }
 
 void pylir::Py::GlobalValueAttr::setInitializer(
-    ConcreteObjectAttrInterface initializer) {
+    ConcreteObjectAttribute initializer) {
   (void)Base::mutate(initializer);
 }
 

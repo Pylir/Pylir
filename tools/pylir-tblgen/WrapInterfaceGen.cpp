@@ -92,7 +92,7 @@ static bool emit(const llvm::RecordKeeper& records, llvm::raw_ostream& rawOs) {
   // monotonically, allowing us to get the list of records in lexical order,
   // as they are defined in the TableGen file.
   std::vector<llvm::Record*> sortedDefs(
-      records.getAllDerivedDefinitions("RefAttrImplementable"));
+      records.getAllDerivedDefinitions("GlobalValueAttrImplementable"));
   llvm::sort(sortedDefs, [](llvm::Record* lhs, llvm::Record* rhs) {
     return lhs->getID() < rhs->getID();
   });

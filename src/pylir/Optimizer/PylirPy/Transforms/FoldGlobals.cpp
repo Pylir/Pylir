@@ -33,9 +33,10 @@ protected:
   void runOnOperation() override;
 
 private:
-  pylir::Py::GlobalValueAttr createGlobalValueFromGlobal(
-      pylir::Py::GlobalOp globalOp,
-      pylir::Py::ConcreteObjectAttrInterface initializer, bool constant) {
+  pylir::Py::GlobalValueAttr
+  createGlobalValueFromGlobal(pylir::Py::GlobalOp globalOp,
+                              pylir::Py::ConcreteObjectAttribute initializer,
+                              bool constant) {
     PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
     auto globalValueAttr = pylir::Py::GlobalValueAttr::get(
         globalOp->getContext(), globalOp.getSymName());
@@ -82,11 +83,12 @@ private:
       if (!constantStorage)
         constantStorage = attr.dyn_cast<pylir::Py::UnboundAttr>();
 
-      if (!constantStorage)
+      if (!constantStorage) {
+        // Cast is safe as this is not a `GlobalValueAttr` nor `UnboundAttr`
+        // but must be a store of type `!py.dynamic`.
         constantStorage = createGlobalValueFromGlobal(
-            globalOp, mlir::cast<pylir::Py::ConcreteObjectAttrInterface>(attr),
-            true);
-
+            globalOp, cast<ConcreteObjectAttribute>(attr), true);
+      }
     } else {
       constantStorage = attr;
     }
