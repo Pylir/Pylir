@@ -1,4 +1,4 @@
-# RUN: pylir %rt_link_flags %s -o %t
+# RUN: pylir %s -o %t
 # RUN: %t | FileCheck %s --match-full-lines
 
 for i in (3, 5, 6):
