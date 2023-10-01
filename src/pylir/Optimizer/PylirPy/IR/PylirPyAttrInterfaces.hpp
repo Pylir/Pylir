@@ -11,6 +11,15 @@
 
 namespace pylir::Py {
 class TypeAttrInterface;
+
+/// Base class of all attributes that represent python objects.
+class ObjectBaseAttribute : public mlir::Attribute {
+public:
+  using mlir::Attribute::Attribute;
+
+  static bool classof(mlir::Attribute attribute);
+};
+
 } // namespace pylir::Py
 
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttrInterfaces.h.inc"

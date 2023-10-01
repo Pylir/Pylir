@@ -4,4 +4,13 @@
 
 #include "PylirPyAttrInterfaces.hpp"
 
+#include "PylirPyAttributes.hpp"
+
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttrInterfaces.cpp.inc"
+
+using namespace pylir::Py;
+
+bool ObjectBaseAttribute::classof(mlir::Attribute attribute) {
+  return llvm::isa<GlobalValueAttr>(attribute) ||
+         ConcreteObjectAttribute::classof(attribute);
+}

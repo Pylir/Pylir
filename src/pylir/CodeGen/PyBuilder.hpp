@@ -43,7 +43,7 @@ public:
     return Py::UnboundAttr::get(getContext());
   }
 
-  Py::ObjectAttr getObjectAttr(Py::TypeAttrInterface type,
+  Py::ObjectAttr getObjectAttr(Py::ObjectBaseAttribute type,
                                mlir::DictionaryAttr slots = {}) {
     return Py::ObjectAttr::get(context, type, slots);
   }
@@ -467,14 +467,14 @@ public:
 
   Py::GlobalValueAttr
   createGlobalValue(llvm::StringRef symbolName, bool constant = false,
-                    Py::ConcreteObjectAttrInterface initializer = {},
+                    Py::ConcreteObjectAttribute initializer = {},
                     bool external = false) {
     auto result = getAttr<Py::GlobalValueAttr>(symbolName);
     result.setInitializer(initializer);
     result.setConstant(constant);
-    if (external) {
+    if (external)
       create<Py::ExternalOp>(symbolName, result);
-    }
+
     return result;
   }
 

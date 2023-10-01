@@ -17,9 +17,35 @@
 #include "PylirPyAttrInterfaces.hpp"
 #include "PylirPyTraits.hpp"
 
-namespace pylir::Py::detail {
+namespace pylir::Py {
+namespace detail {
 struct GlobalValueAttrStorage;
-} // namespace pylir::Py::detail
+} // namespace detail
+
+/// Base class of all attributes that represent concrete python objects.
+/// It is most notably not the base class of `GlobalValueAttr`.
+class ConcreteObjectAttribute : public ObjectBaseAttribute {
+public:
+  using ObjectBaseAttribute::ObjectBaseAttribute;
+
+  /// All concrete object attributes implement `ObjectAttrInterface` and
+  /// `ConstObjectAttrInterface`.
+  operator ObjectAttrInterface() const {
+    if (!*this)
+      return nullptr;
+    return cast<ObjectAttrInterface>();
+  }
+
+  operator ConstObjectAttrInterface() const {
+    if (!*this)
+      return nullptr;
+    return cast<ConstObjectAttrInterface>();
+  }
+
+  static bool classof(mlir::Attribute attribute);
+};
+
+} // namespace pylir::Py
 
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.h.inc"

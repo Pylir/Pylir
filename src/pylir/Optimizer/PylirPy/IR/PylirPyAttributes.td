@@ -48,22 +48,22 @@ def EmptySlotsAttr
 /// Convenient base class for Python object attributes adding common methods and
 /// parameters.
 class PylirPy_PyObjAttr<string name,
-  list<Trait> traits = []>
-  : PylirPy_Attr<name, !listconcat([ConcreteObjectAttrInterface,
+  list<Trait> traits = [], string baseCppClass = "ConcreteObjectAttribute">
+  : PylirPy_Attr<name, !listconcat([ConstObjectAttrInterface,
    KnownTypeAttr<name>, DeclareAttrInterfaceMethods<SROAAttrInterface>],
-   traits)>;
+   traits), baseCppClass>;
 
-def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [ConcreteObjectAttrInterface,
-  DeclareAttrInterfaceMethods<SROAAttrInterface>]> {
+def PylirPy_ObjectAttr : PylirPy_Attr<"Object", [ConstObjectAttrInterface,
+  DeclareAttrInterfaceMethods<SROAAttrInterface>], "ConcreteObjectAttribute"> {
 	let mnemonic = "obj";
 	let summary = "python object";
 
-	let parameters = (ins "TypeAttrInterface":$type_object, SlotsMap:$slots);
+	let parameters = (ins "ObjectBaseAttribute":$type_object, SlotsMap:$slots);
 
 	let skipDefaultBuilders = 1;
 
 	let builders = [
-    AttrBuilder<(ins "TypeAttrInterface":$typeObject,
+    AttrBuilder<(ins "ObjectBaseAttribute":$typeObject,
       CArg<"mlir::DictionaryAttr", "{}">:$slots), [{
       slots = slots ? slots : DictionaryAttr::get($_ctxt);
   	  return $_get($_ctxt, typeObject, slots);
@@ -440,8 +440,8 @@ def PylirPy_FractionalAttr : PylirPy_Attr<"Fractional"> {
   let assemblyFormat = "`<` $nominator `,` $denominator `>`";
 }
 
-def PylirPy_GlobalValueAttr : AttrDef<PylirPy_Dialect, "GlobalValue",
-    [NativeAttrTrait<"IsMutable">]> {
+def PylirPy_GlobalValueAttr : PylirPy_Attr<"GlobalValue",
+    [NativeAttrTrait<"IsMutable">], "ObjectBaseAttribute"> {
   let mnemonic = "globalValue";
 
   let description = [{
@@ -477,7 +477,7 @@ def PylirPy_GlobalValueAttr : AttrDef<PylirPy_Dialect, "GlobalValue",
 
   let parameters = (ins StringRefParameter<>:$name,
               DefaultValuedParameter<"bool", "false">:$constant,
-              OptionalParameter<"ConcreteObjectAttrInterface">:$initializer);
+              OptionalParameter<"ConcreteObjectAttribute">:$initializer);
 
   // Required to make it properly mutable.
   let genStorageClass = 0;
@@ -496,7 +496,7 @@ def PylirPy_GlobalValueAttr : AttrDef<PylirPy_Dialect, "GlobalValue",
     void setConstant(bool constant);
 
     /// Sets the initializer of this global value.
-    void setInitializer(ConcreteObjectAttrInterface initializer);
+    void setInitializer(ConcreteObjectAttribute initializer);
   }];
 
   let builders = [
