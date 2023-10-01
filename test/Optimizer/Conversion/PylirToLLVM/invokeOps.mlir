@@ -5,9 +5,10 @@ py.func @foo() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.BaseException = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @invoke_test(%trueValue : !py.dynamic) -> !py.dynamic {
     %result = invoke @foo() : () -> !py.dynamic

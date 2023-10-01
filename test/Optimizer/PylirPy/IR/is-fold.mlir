@@ -1,9 +1,10 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
 // Stubs
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.bool = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 // CHECK-LABEL: @same_value
 // CHECK: %[[RES:.*]] = arith.constant true
@@ -17,9 +18,10 @@ py.func @same_value() -> i1 {
 // -----
 
 // Stubs
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.bool = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 // CHECK-LABEL: @two_allocs
 // CHECK: %[[RES:.*]] = arith.constant false
@@ -34,16 +36,17 @@ py.func @two_allocs(%arg0 : !py.dynamic) -> i1 {
 // -----
 
 // Stubs
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.bool = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 // CHECK-LABEL: @singletons
 // CHECK: %[[RES:.*]] = arith.constant true
 // CHECK: return %[[RES]]
 py.func @singletons() -> i1 {
-    %0 = constant(#py.ref<@builtins.bool>)
-    %1 = constant(#py.ref<@builtins.bool>)
+    %0 = constant(#builtins_tuple)
+    %1 = constant(#builtins_tuple)
     %2 = is %0, %1
     return %2 : i1
 }
@@ -52,8 +55,8 @@ py.func @singletons() -> i1 {
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
 py.func @singletons_not() -> i1 {
-    %0 = constant(#py.ref<@builtins.bool>)
-    %1 = constant(#py.ref<@builtins.tuple>)
+    %0 = constant(#builtins_type)
+    %1 = constant(#builtins_tuple)
     %2 = is %0, %1
     return %2 : i1
 }
@@ -61,15 +64,16 @@ py.func @singletons_not() -> i1 {
 // -----
 
 // Stubs
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.bool = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 // CHECK-LABEL: @alloca_symbol
 // CHECK: %[[RES:.*]] = arith.constant false
 // CHECK: return %[[RES]]
 py.func @alloca_symbol(%arg0 : !py.dynamic) -> i1 {
-    %0 = constant(#py.ref<@builtins.bool>)
+    %0 = constant(#builtins_tuple)
     %1 = makeTuple (%arg0)
     %2 = is %0, %1
     %3 = is %1, %0

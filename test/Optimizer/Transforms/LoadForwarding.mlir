@@ -1,12 +1,14 @@
 // RUN: pylir-opt %s -pass-pipeline='builtin.module(any(pylir-load-forwarding))' --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">)>}>
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @foo = #py.type<slots = {instance_slots = #py.tuple<(#py.str<"test">)>}>
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">)>}>>
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#foo = #py.globalValue<foo, initializer = #py.type<slots = {instance_slots = #py.tuple<(#py.str<"test">)>}>>
 
 py.func @test_get_slot() -> !py.dynamic {
-    %0 = constant(#py.ref<@foo>)
+    %0 = constant(#foo)
     %1 = makeObject %0
     %2 = constant(#py.str<"value">)
     %c0 = arith.constant 0 : index
@@ -21,9 +23,12 @@ py.func @test_get_slot() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func private @bar()
 
@@ -68,9 +73,12 @@ py.func @test_dict_len() -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test_dict_lookup_setitem(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %0 = constant(#py.str<"value">)
@@ -85,9 +93,12 @@ py.func @test_dict_lookup_setitem(%arg0 : !py.dynamic, %hash : index) -> !py.dyn
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test_dict_lookup_delitem(%arg0 : !py.dynamic, %hash: index) -> !py.dynamic {
     %0 = constant(#py.str<"value">)
@@ -102,9 +113,12 @@ py.func @test_dict_lookup_delitem(%arg0 : !py.dynamic, %hash: index) -> !py.dyna
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test_dict_lookup_makeDict(%hash : index) -> (!py.dynamic, !py.dynamic) {
     %0 = constant(#py.str<"value">)
@@ -122,9 +136,12 @@ py.func @test_dict_lookup_makeDict(%hash : index) -> (!py.dynamic, !py.dynamic) 
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test_list_len() -> index {
     %0 = constant(#py.str<"value">)
@@ -140,9 +157,12 @@ py.func @test_list_len() -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test_resources(%arg0 : !py.dynamic) -> index {
     %0 = arith.constant 5 : index
@@ -162,10 +182,14 @@ py.func @test_resources(%arg0 : !py.dynamic) -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.float = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
+py.external @builtins.float, #builtins_float
 
 py.func @test_dict_lookup_makeDict_equal(%hash : index) -> !py.dynamic {
     %0 = constant(#py.int<5>)
@@ -181,10 +205,14 @@ py.func @test_dict_lookup_makeDict_equal(%hash : index) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.float = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
+py.external @builtins.float, #builtins_float
 
 py.func @test_dict_lookup_makeDict_not_equal(%hash : index) -> !py.dynamic {
     %0 = constant(#py.int<5>)
@@ -200,10 +228,14 @@ py.func @test_dict_lookup_makeDict_not_equal(%hash : index) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.float = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
+py.external @builtins.float, #builtins_float
 
 py.func @test_dict_lookup_makeDict_neg(%hash : index, %key : !py.dynamic) -> !py.dynamic {
     %0 = constant(#py.int<5>)

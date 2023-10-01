@@ -1,9 +1,5 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
-
 py.func @test(%length : index) -> index {
     %1 = makeList ()
     list_resize %1 to %length
@@ -87,10 +83,6 @@ py.func @test3(%length : index) -> index {
 // CHECK-NEXT: // {{.*}} py.list_len
 
 // -----
-
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
 
 py.func private @bar()
 

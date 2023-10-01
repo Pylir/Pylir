@@ -1,13 +1,20 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type // stub
-py.globalValue @builtins.object = #py.type // stub
-py.globalValue @builtins.function = #py.type // stub
-py.globalValue @builtins.str = #py.type // stub
-py.globalValue @builtins.None = #py.type // stub
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_object = #py.globalValue<builtins.object, initializer = #py.type>
+py.external @builtins.object, #builtins_object
+#builtins_function = #py.globalValue<builtins.function, initializer = #py.type>
+py.external @builtins.function, #builtins_function
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_None = #py.globalValue<builtins.None, initializer = #py.type>
+py.external @builtins.None, #builtins_None
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
-py.globalValue @foo = #py.function<@bar>
+#foo = #py.globalValue<foo, initializer = #py.function<@bar>>
+py.external @foo, #foo
 
 py.func @bar(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
     return %arg0 : !py.dynamic

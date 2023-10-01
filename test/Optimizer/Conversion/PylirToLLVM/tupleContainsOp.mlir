@@ -1,12 +1,15 @@
 // RUN: pylir-opt %s --convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @one = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_object = #py.globalValue<builtins.object, initializer = #py.type>
+py.external @builtins.object, #builtins_object
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#one = #py.globalValue<one, initializer = #py.type>
 
 py.func @linear_search(%tuple : !py.dynamic) -> i1 {
-    %0 = constant(#py.ref<@one>)
+    %0 = constant(#one)
     %1 = tuple_contains %0 in %tuple
     return %1 : i1
 }

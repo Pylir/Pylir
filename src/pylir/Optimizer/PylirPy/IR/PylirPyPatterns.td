@@ -12,8 +12,6 @@ include "pylir/Optimizer/PylirPy/IR/PylirPyOps.td"
 def prependTupleConst
   : NativeCodeCall<"prependTupleConst($_builder, $_loc, $0, $1)">;
 
-defvar TypeRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.type">;
-
 def : Pat<(PylirPy_TuplePrependOp $input,
   (PylirPy_MakeTupleOp $args, DenseArrayCount<0>)), (PylirPy_MakeTupleOp
       (NativeCodeCall<[{ [&]{
@@ -55,7 +53,7 @@ def : Pat<(PylirPy_TupleDropFrontOp $count1,
   (PylirPy_TupleDropFrontOp $count2, $tuple)),
       (PylirPy_TupleDropFrontOp (Arith_AddIOp $count1, $count2), $tuple)>;
 
-defvar TupleRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.tuple">;
+defvar TupleRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.tuple">;
 
 def : Pat<(PylirPy_TupleDropFrontOp
   (ConstantLikeMatcher ConstantAttr<IndexAttr,"0">), $tuple),

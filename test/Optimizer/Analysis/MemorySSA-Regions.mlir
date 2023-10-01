@@ -1,9 +1,5 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
-
 py.func @test(%arg0 : i1, %length : index) -> index {
     %2 = makeList ()
     scf.if %arg0 {

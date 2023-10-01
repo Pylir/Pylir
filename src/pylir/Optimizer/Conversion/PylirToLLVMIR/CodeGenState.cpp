@@ -476,8 +476,7 @@ void pylir::CodeGenState::initializeGlobal(
         });
       })
       .Case([&](Py::TypeAttr attr) {
-        auto layoutType = m_typeConverter.getLayoutType(Py::RefAttr::get(
-            builder.getContext(), mlir::FlatSymbolRefAttr::get(global)));
+        auto layoutType = m_typeConverter.getLayoutType(attr);
         PYLIR_ASSERT(layoutType);
         {
           auto instanceType = m_typeConverter.mapLayoutTypeToLLVM(*layoutType);
@@ -541,9 +540,9 @@ void pylir::CodeGenState::initializeGlobal(
 mlir::Value pylir::CodeGenState::getConstant(mlir::Location loc,
                                              mlir::OpBuilder& builder,
                                              mlir::Attribute attribute) {
-  if (auto ref = attribute.dyn_cast<Py::RefAttr>())
+  if (auto ref = attribute.dyn_cast<Py::GlobalValueAttr>())
     return builder.create<mlir::LLVM::AddressOfOp>(loc, m_objectPtrType,
-                                                   ref.getRef());
+                                                  mlir::FlatSymbolRefAttr::get(getGlobalValue(builder, ref)));
 
   if (auto value = attribute.dyn_cast<Py::GlobalValueAttr>())
     return builder.create<mlir::LLVM::AddressOfOp>(

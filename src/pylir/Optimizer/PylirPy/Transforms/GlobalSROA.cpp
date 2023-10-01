@@ -24,71 +24,86 @@ protected:
   void runOnOperation() override;
 
   struct Aggregate {
-    pylir::Py::GlobalValueOp globalValue;
+    pylir::Py::GlobalValueAttr globalValue;
     std::vector<pylir::Py::ConstantOp> refs;
     std::vector<pylir::SROAReadWriteOpInterface> uses;
   };
 
-  std::vector<Aggregate>
-  collectReplaceAble(mlir::SymbolTableCollection& collection);
+  std::vector<GlobalSROAPass::Aggregate>
+  collectReplaceAble();
 
 public:
   using Base::Base;
 };
 
-std::vector<GlobalSROAPass::Aggregate>
-GlobalSROAPass::collectReplaceAble(mlir::SymbolTableCollection& collection) {
-  mlir::SymbolUserMap users(collection, getOperation());
-  std::vector<Aggregate> result;
-  for (auto valueOp : getOperation().getOps<pylir::Py::GlobalValueOp>()) {
-    // If it is public or just a declaration we cannot set all its uses and
-    // hence can't replace it.
-    if (valueOp.isPublic() || valueOp.isDeclaration() ||
-        !valueOp.getInitializerAttr().isa<pylir::Py::SROAAttrInterface>())
-      continue;
-
-    std::vector<pylir::Py::ConstantOp> constantOp;
-    std::vector<pylir::SROAReadWriteOpInterface> readWriteOp;
-
-    auto canSROAReplace =
-        [&](mlir::Operation* operation) -> mlir::LogicalResult {
-      auto ref = mlir::dyn_cast<pylir::Py::ConstantOp>(operation);
-      // The 'py.constant' also has to contain the ref attr. A simple use within
-      // an aggregate attribute (eg. '#py.tuple<(#py.ref<@valueOp>)>') can't be
-      // replaced.
-      if (!ref || !ref.getConstant().isa<pylir::Py::RefAttr>())
-        return mlir::failure();
-
-      if (llvm::all_of(operation->getUses(), [](const mlir::OpOperand& use) {
-            return mlir::succeeded(
-                pylir::aggregateUseCanParticipateInSROA(use));
-          })) {
-        constantOp.push_back(ref);
-        llvm::transform(operation->getUses(), std::back_inserter(readWriteOp),
-                        [](mlir::OpOperand& operand) {
-                          return mlir::cast<pylir::SROAReadWriteOpInterface>(
-                              operand.getOwner());
-                        });
-        return mlir::success();
-      }
-      return mlir::failure();
+std::vector<GlobalSROAPass::Aggregate> GlobalSROAPass::collectReplaceAble()
+{
+    struct Uses
+    {
+        std::vector<pylir::Py::ConstantOp> users;
+        bool allDirect = true;
     };
 
-    if (llvm::any_of(users.getUsers(valueOp), [&](mlir::Operation* user) {
+    llvm::MapVector<pylir::Py::GlobalValueAttr, Uses> eligible;
+    mlir::AttrTypeWalker walker;
+    walker.addWalk([&](pylir::Py::GlobalValueAttr globalValueAttr) { eligible[globalValueAttr].allDirect = false; });
+
+    getOperation()->walk(
+        [&](mlir::Operation* operation)
+        {
+            if (auto constantOp = mlir::dyn_cast<pylir::Py::ConstantOp>(operation))
+            {
+                if (auto globalValueAttr = mlir::dyn_cast<pylir::Py::GlobalValueAttr>(constantOp.getConstant()))
+                {
+                    eligible[globalValueAttr].users.push_back(constantOp);
+                    return;
+                }
+            }
+            walker.walk(operation->getAttrDictionary());
+        });
+
+    std::vector<Aggregate> result;
+    for (auto&& [valueAttr, uses] :
+         llvm::make_filter_range(eligible, [](auto&& pair) { return pair.second.allDirect; }))
+    {
+        // If it is public or just a declaration we cannot set all its uses and hence can't replace it.
+        if (!valueAttr.getInitializer().isa<pylir::Py::SROAAttrInterface>())
+        {
+            continue;
+        }
+
+    std::vector<pylir::Py::ConstantOp> constantOps;
+    std::vector<pylir::SROAReadWriteOpInterface> readWriteOp;
+
+        auto canSROAReplace = [&](pylir::Py::ConstantOp constantOp) -> mlir::LogicalResult
+        {
+            if (llvm::all_of(constantOp->getUses(), [](const mlir::OpOperand& use)
+                             { return mlir::succeeded(pylir::aggregateUseCanParticipateInSROA(use)); }))
+            {
+                constantOps.push_back(constantOp);
+                llvm::transform(constantOp->getUses(), std::back_inserter(readWriteOp),
+                                [](mlir::OpOperand& operand)
+                                { return mlir::cast<pylir::SROAReadWriteOpInterface>(operand.getOwner()); });
+                return mlir::success();
+            }
+            return mlir::failure();
+        };
+
+    if (llvm::any_of(uses.users, [&](pylir::Py::ConstantOp user) {
           return mlir::failed(canSROAReplace(user));
         }))
       continue;
 
-    result.push_back({valueOp, std::move(constantOp), std::move(readWriteOp)});
+    result.push_back({valueAttr, std::move(constantOps), std::move(readWriteOp)});
   }
   return result;
 }
 
 void GlobalSROAPass::runOnOperation() {
-  mlir::SymbolTableCollection collection;
+  mlir::SymbolTable symbolTable(getOperation());
   bool changed = false;
   while (true) {
-    auto aggregates = collectReplaceAble(collection);
+    auto aggregates = collectReplaceAble();
     if (aggregates.empty())
       break;
 
@@ -116,7 +131,7 @@ void GlobalSROAPass::runOnOperation() {
       llvm::MapVector<std::pair<mlir::Attribute, mlir::SideEffects::Resource*>,
                       LoadStorePlaceHolders>
           placeHolders;
-      aggregate.globalValue.getInitializerAttr()
+      aggregate.globalValue.getInitializer()
           .cast<pylir::Py::SROAAttrInterface>()
           .destructureAggregate([&](mlir::Attribute key,
                                     mlir::SideEffects::Resource* resource,
@@ -165,10 +180,7 @@ void GlobalSROAPass::runOnOperation() {
         readWrite.erase();
       }
 
-      mlir::OpBuilder builder(aggregate.globalValue);
-      auto& symbolTable = collection.getSymbolTable(
-          aggregate.globalValue
-              ->getParentWithTrait<mlir::OpTrait::SymbolTable>());
+      auto builder = mlir::OpBuilder::atBlockEnd(getOperation().getBody());
       for (auto& [attr, placeHolder] : placeHolders) {
         // The suffix here has no actual semantic meaning, it is just here for
         // the clarity of the generated IR. The produced symbol retains the
@@ -198,9 +210,9 @@ void GlobalSROAPass::runOnOperation() {
         else
           type = placeHolder.stores.front().getOperand(0).getType();
 
-        auto symbol = builder.create<pylir::Py::GlobalOp>(
-            aggregate.globalValue->getLoc(),
-            (aggregate.globalValue.getSymName() +
+mlir::Location loc = aggregate.refs.front()->getLoc();        auto symbol = builder.create<pylir::Py::GlobalOp>(
+            loc,
+            (aggregate.globalValue.getName() +
              (suffix.empty() ? "" : "$" + suffix))
                 .str(),
             builder.getStringAttr("private"), type,
@@ -222,7 +234,7 @@ void GlobalSROAPass::runOnOperation() {
           store->erase();
         }
       }
-      symbolTable.erase(aggregate.globalValue);
+
       llvm::for_each(aggregate.refs, std::mem_fn(&mlir::Operation::erase));
     }
   }

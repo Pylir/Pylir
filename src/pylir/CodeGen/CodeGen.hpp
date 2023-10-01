@@ -34,7 +34,7 @@ class CodeGen {
   Diag::DiagnosticsDocManager* m_docManager;
   mlir::Value m_classNamespace{};
   std::unordered_map<std::string, std::size_t> m_implNames;
-  std::unordered_map<std::string_view, Py::RefAttr> m_builtinNamespace;
+  std::unordered_map<std::string_view, Py::GlobalValueAttr> m_builtinNamespace;
   bool m_constantClass = false;
 
   struct Loop {
@@ -211,30 +211,19 @@ class CodeGen {
                            bool additionalConstCondition,
                            const BaseToken& location);
 
-  template <class T>
-  T dereference(mlir::Attribute attr) {
-    if (auto val = attr.dyn_cast_or_null<T>())
-      return val;
-
-    auto ref = attr.dyn_cast_or_null<mlir::FlatSymbolRefAttr>();
-    if (!ref)
-      return nullptr;
-
-    auto globalValue = m_module.lookupSymbol<Py::GlobalValueOp>(ref);
-    return globalValue.getInitializerAttr().dyn_cast_or_null<T>();
-  }
-
-  struct FunctionParameter {
-    std::string name;
-    enum Kind {
-      Normal,
-      PosOnly,
-      KeywordOnly,
-      PosRest,
-      KeywordRest,
-    } kind;
-    bool hasDefaultParam;
-  };
+    struct FunctionParameter
+    {
+        std::string name;
+        enum Kind
+        {
+            Normal,
+            PosOnly,
+            KeywordOnly,
+            PosRest,
+            KeywordRest,
+        } kind;
+        bool hasDefaultParam;
+    };
 
   struct UnpackResults {
     mlir::Value parameterValue;

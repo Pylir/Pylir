@@ -1,10 +1,5 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
-
 py.func @test() -> index {
     %0 = constant(#py.str<"test">)
     %hash = str_hash %0

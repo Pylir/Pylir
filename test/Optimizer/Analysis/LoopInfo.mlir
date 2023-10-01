@@ -1,11 +1,5 @@
 // RUN: pylir-opt %s --test-loop-info --split-input-file | FileCheck %s
 
-
-py.globalValue const @builtins.type = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.int = #py.type
-
 py.func @__init__() {
 	%one = constant(#py.int<1>)
 	%zero = constant(#py.int<0>)

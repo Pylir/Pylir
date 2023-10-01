@@ -1,18 +1,23 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test() -> !py.dynamic {
     %0 = constant(#py.tuple<()>)
-    %1 = constant(#py.ref<@builtins.tuple>)
+    %1 = constant(#builtins_tuple)
     %2 = tuple_prepend %1, %0
     return %2 : !py.dynamic
 }
 
+// CHECK: #[[$TUPLE:.*]] = #py.globalValue<builtins.tuple{{.*}}>
+
 // CHECK-LABEL: @test
-// CHECK: %[[C:.*]] = constant(#py.tuple<(#py.ref<@builtins.tuple>)>)
+// CHECK: %[[C:.*]] = constant(#py.tuple<(#[[$TUPLE]])>)
 // CHECK: return %[[C]]
 
 py.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {

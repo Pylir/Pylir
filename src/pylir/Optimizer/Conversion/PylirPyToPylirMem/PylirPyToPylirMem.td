@@ -10,8 +10,8 @@ include "pylir/Optimizer/PylirMem/IR/PylirMemOps.td"
 include "mlir/Dialect/Arith/IR/ArithOps.td"
 include "mlir/IR/PatternBase.td"
 
-defvar TupleRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.tuple">;
-defvar TypeRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.type">;
+defvar TupleRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.tuple">;
+defvar TypeRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.type">;
 
 def : Pattern<(PylirPy_MakeTupleOp $args, $_), [
   (PylirPy_ConstantOp:$tupleType TupleRef),
@@ -53,17 +53,17 @@ class GCWithSlots<ConstantAttr type_object> {
                        (PylirPy_TupleLenOp (PylirPy_TypeSlotsOp $c)));
 }
 
-defvar ListRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.list">;
+defvar ListRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.list">;
 
 def : Pat<(PylirPy_MakeListOp $args, $_),
   (PylirMem_InitListOp GCWithSlots<ListRef>.result, $args)>;
 
-defvar SetRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.set">;
+defvar SetRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.set">;
 
 def : Pat<(PylirPy_MakeSetOp $args, $_),
   (PylirMem_InitSetOp GCWithSlots<SetRef>.result, $args)>;
 
-defvar StrRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.str">;
+defvar StrRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.str">;
 
 def : Pat<(PylirPy_StrConcatOp $args),
   (PylirMem_InitStrOp GCWithSlots<StrRef>.result, $args)>;
@@ -76,12 +76,12 @@ def : Pat<(PylirPy_StrCopyOp $arg, $typeObj),
 def : Pat<(PylirPy_IntToStrOp $integer),
   (PylirMem_InitStrFromIntOp GCWithSlots<StrRef>.result, $integer)>;
 
-defvar FunctionRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.function">;
+defvar FunctionRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.function">;
 
 def : Pat<(PylirPy_MakeFuncOp $symbol),
   (PylirMem_InitFuncOp GCWithSlots<FunctionRef>.result, $symbol)>;
 
-defvar BoolRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.bool">;
+defvar BoolRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.bool">;
 
 defvar IndexSizedInteger = NativeCodeCall<[{
   $_builder.getIntegerType(mlir::DataLayout::closest($0.getOwner())
@@ -95,7 +95,7 @@ def : Pattern<(PylirPy_BoolFromI1Op:$op $input), [
   (PylirMem_InitIntUnsignedOp GCWithSlots<BoolRef>.result, $intToIndex)
 ]>;
 
-defvar IntRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.int">;
+defvar IntRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.int">;
 
 def : Pat<(PylirPy_IntFromSignedOp $input), (PylirMem_InitIntSignedOp
   GCWithSlots<IntRef>.result, $input)>;
@@ -106,7 +106,7 @@ def : Pat<(PylirPy_IntFromUnsignedOp $input), (PylirMem_InitIntUnsignedOp
 def : Pat<(PylirPy_IntAddOp $lhs, $rhs), (PylirMem_InitIntAddOp
   GCWithSlots<IntRef>.result, $lhs, $rhs)>;
 
-defvar FloatRef = ConstantStrAttr<PylirPy_RefAttr, "builtins.float">;
+defvar FloatRef = ConstantStrAttr<PylirPy_GlobalValueAttr, "builtins.float">;
 
 def : Pat<(PylirPy_FloatFromF64 $input),
   (PylirMem_InitFloatOp GCWithSlots<FloatRef>.result, $input)>;

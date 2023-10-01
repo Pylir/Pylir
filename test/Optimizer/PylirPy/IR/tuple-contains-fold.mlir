@@ -1,10 +1,12 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @test1(%arg0 : !py.dynamic) -> i1 {
-    %0 = constant(#py.ref<@builtins.tuple>)
+    %0 = constant(#builtins_tuple)
     %1 = makeTuple (* %arg0, %0)
     %2 = tuple_contains %0 in %1
     return %2 : i1
@@ -15,7 +17,7 @@ py.func @test1(%arg0 : !py.dynamic) -> i1 {
 // CHECK: return %[[C1]]
 
 py.func @test2(%arg0 : !py.dynamic) -> i1 {
-    %0 = constant(#py.ref<@builtins.tuple>)
+    %0 = constant(#builtins_tuple)
     %1 = tuple_prepend %0, %arg0
     %2 = tuple_contains %0 in %1
     return %2 : i1

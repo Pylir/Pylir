@@ -392,7 +392,7 @@ mlir::OpFoldResult pylir::Py::IsOp::fold(FoldAdaptor adaptor) {
   };
 
   if (doesNotAlias(getLhs()) &&
-      (mlir::isa_and_nonnull<RefAttr>(adaptor.getRhs()) ||
+      (mlir::isa_and_nonnull<GlobalValueAttr>(adaptor.getRhs()) ||
        doesNotAlias(getRhs())))
     return mlir::BoolAttr::get(getContext(), false);
 
@@ -617,12 +617,12 @@ mlir::OpFoldResult pylir::Py::TupleDropFrontOp::fold(FoldAdaptor adaptor) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult pylir::Py::TupleCopyOp::fold(FoldAdaptor adaptor) {
-  auto type = adaptor.getTypeObject().dyn_cast_or_null<RefAttr>();
+  auto type = adaptor.getTypeObject().dyn_cast_or_null<GlobalValueAttr>();
   // Forwarding it is safe in the case that the types of the input tuple as well
   // as the resulting tuple are identical and that the type is fully immutable.
   // In the future this may be computed, but for the time being, the
   // `builtins.tuple` will be special cased as known immutable.
-  if (type && type.getRef().getValue() == Builtins::Tuple.name &&
+  if (type && type.getName() == Builtins::Tuple.name &&
       getTypeOf(getTuple()) == mlir::OpFoldResult(type))
     return getTuple();
 
@@ -1014,27 +1014,6 @@ mlir::OpFoldResult pylir::Py::MROLookupOp::fold(FoldAdaptor adaptor) {
       return result;
   }
   return Py::UnboundAttr::get(getContext());
-}
-
-//===--------------------------------------------------------------------------------------------------------------===//
-// GlobalValueOp fold
-//===--------------------------------------------------------------------------------------------------------------===//
-
-mlir::LogicalResult
-pylir::Py::GlobalValueOp::fold(FoldAdaptor,
-                               llvm::SmallVectorImpl<mlir::OpFoldResult>&) {
-  static llvm::StringSet<> immutableTypes = {
-      Builtins::Float.name, Builtins::Int.name,   Builtins::Bool.name,
-      Builtins::Str.name,   Builtins::Tuple.name,
-  };
-  if (!getConstant() && getInitializer())
-    if (auto refAttr = dyn_cast<RefAttr>(getInitializer()->getTypeObject()))
-      if (refAttr && immutableTypes.contains(refAttr.getRef().getValue())) {
-        setConstantAttr(mlir::UnitAttr::get(getContext()));
-        return mlir::success();
-      }
-
-  return mlir::failure();
 }
 
 //===--------------------------------------------------------------------------------------------------------------===//

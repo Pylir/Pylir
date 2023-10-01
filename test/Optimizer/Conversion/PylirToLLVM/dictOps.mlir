@@ -1,9 +1,11 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue const @builtins.type = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @lookup(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %0 = constant(#py.str<"key">)
@@ -20,10 +22,12 @@ py.func @lookup(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 
 // -----
 
-py.globalValue const @builtins.type = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @insert(%arg0 : !py.dynamic, %value : !py.dynamic, %hash : index) {
     %0 = constant(#py.str<"key">)

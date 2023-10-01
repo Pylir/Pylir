@@ -32,9 +32,9 @@ std::optional<LayoutType>
 getLayoutType(mlir::Attribute attr,
               llvm::DenseMap<mlir::Attribute, LayoutType>* cache = nullptr);
 
-/// Returns the 'RefAttr' for the builtin type object corresponding to the given
-/// layout type.
-Py::RefAttr layoutTypeToTypeObject(mlir::MLIRContext* context,
-                                   LayoutType layoutType);
+/// Returns the 'GlobalValueAttr' for the builtin type object corresponding to
+/// the given layout type.
+Py::GlobalValueAttr layoutTypeToTypeObject(mlir::MLIRContext* context,
+                                           LayoutType layoutType);
 
 } // namespace pylir::Mem

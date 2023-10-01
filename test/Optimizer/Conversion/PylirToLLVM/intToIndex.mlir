@@ -1,8 +1,11 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue const @builtins.type = #py.type
-py.globalValue const @builtins.int = #py.type
-py.globalValue const @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, const, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_int = #py.globalValue<builtins.int, const, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @foo(%value : !py.dynamic) -> index {
     %0 = int_toIndex %value

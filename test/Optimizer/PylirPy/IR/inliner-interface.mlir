@@ -1,9 +1,10 @@
 // RUN: pylir-opt %s --test-inliner-interface --split-input-file | FileCheck %s
 // RUN: pylir-opt %s --test-inliner-interface --split-input-file -mlir-print-debuginfo -mlir-print-local-scope  | FileCheck %s --check-prefix INLINE-LOC
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.BaseException = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func private @create_exception() -> !py.dynamic
 
@@ -64,18 +65,19 @@ py.func @__init__() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.BaseException = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.str = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.function = #py.type
-py.globalValue const @builtins.None = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_dict= #py.globalValue<builtins.dict, const, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
 
-py.globalValue "private" @function
+#function = #py.globalValue<function>
 
 py.func @inline_foo(%arg0 : i1) -> !py.dynamic {
-    %f = constant(#py.ref<@function>)
+  %f = constant(#function)
 	%0 = function_call %f()
 	cf.cond_br %arg0, ^throw, ^normal_return
 
@@ -100,9 +102,11 @@ py.func @__init__() -> !py.dynamic {
 	return %e : !py.dynamic
 }
 
+// CHECK: #[[$FUNCTION:.*]] = #py.globalValue<function>
+
 // CHECK-LABEL: @__init__
 // CHECK-NEXT: %[[RANDOM:.*]] = test.random
-// CHECK-NEXT: %[[F:.*]] = constant(#py.ref<@function>)
+// CHECK-NEXT: %[[F:.*]] = constant(#[[$FUNCTION]])
 // CHECK-NEXT: %[[EX:.*]] = function_call %[[F]]()
 // CHECK-NEXT: cf.cond_br %[[RANDOM]], ^[[THROW:.*]], ^[[CONTINUE:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[THROW]]:
@@ -113,7 +117,7 @@ py.func @__init__() -> !py.dynamic {
 // CHECK-NEXT: ^[[CONTINUE]]
 // CHECK-SAME: %[[EX:[[:alnum:]]+]]
 // CHECK-NEXT: test.use(%[[EX]])
-// CHECK-NEXT: %[[F:.*]] = constant(#py.ref<@function>)
+// CHECK-NEXT: %[[F:.*]] = constant(#[[$FUNCTION]])
 // CHECK-NEXT: %[[EX:.*]] = function_invoke %[[F]]()
 // CHECK-NEXT: label ^[[SUCCESS:[[:alnum:]]+]] unwind ^[[HANDLER:[[:alnum:]]+]]
 // CHECK-NEXT: ^[[SUCCESS]]
@@ -134,18 +138,21 @@ py.func @__init__() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.BaseException = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.str = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.function = #py.type
-py.globalValue const @builtins.None = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_dict= #py.globalValue<builtins.dict, const, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_BaseException = #py.globalValue<builtins.BaseException, initializer = #py.type>
+py.external @builtins.BaseException, #builtins_BaseException
 
-py.globalValue "private" @function
+#function = #py.globalValue<function>
 
 py.func @inline_foo() -> !py.dynamic {
-    %0 = constant(#py.ref<@builtins.BaseException>) loc("source.mlir":146:69)
+    %0 = constant(#builtins_BaseException) loc("source.mlir":146:69)
     %1 = makeObject %0 loc("source.mlir":147:49)
 	py.raise %1
 }
@@ -156,24 +163,27 @@ py.func @test_loc() -> !py.dynamic {
 }
 
 // INLINE-LOC-LABEL: @test_loc
-// INLINE-LOC-NEXT: %[[TYPE:.*]] = constant(#py.ref<@builtins.BaseException>) loc(callsite("source.mlir":146:69 at "source.mlir":152:74))
+// INLINE-LOC-NEXT: %[[TYPE:.*]] = constant(#py.globalValue<builtins.BaseException{{.*}}>) loc(callsite("source.mlir":146:69 at "source.mlir":152:74))
 // INLINE-LOC-NEXT: %[[EX:.*]] = makeObject %[[TYPE]] loc(callsite("source.mlir":147:49 at "source.mlir":152:74))
 // INLINE-LOC-NEXT: raise %[[EX]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.BaseException = #py.type
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.str = #py.type
-py.globalValue const @builtins.dict = #py.type
-py.globalValue const @builtins.function = #py.type
-py.globalValue const @builtins.None = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_dict= #py.globalValue<builtins.dict, const, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_BaseException = #py.globalValue<builtins.BaseException, initializer = #py.type>
+py.external @builtins.BaseException, #builtins_BaseException
 
-py.globalValue "private" @function
+#function = #py.globalValue<function>
 
 py.func @inline_foo() -> !py.dynamic {
-    %0 = constant(#py.ref<@builtins.BaseException>)
+    %0 = constant(#builtins_BaseException)
     %1 = makeObject %0
 	py.raise %1
 }
@@ -191,8 +201,10 @@ py.func @__init__() -> !py.dynamic {
     return %1 : !py.dynamic
 }
 
+// CHECK: #[[$BASE:.*]] = #py.globalValue<builtins.BaseException{{,|>}}
+
 // CHECK-LABEL: @__init__
-// CHECK-NEXT: %[[TYPE:.*]] = constant(#py.ref<@builtins.BaseException>)
+// CHECK-NEXT: %[[TYPE:.*]] = constant(#[[$BASE]])
 // CHECK-NEXT: %[[EX:.*]] = makeObject %[[TYPE]]
 // CHECK-NEXT: raise %[[EX]]
 

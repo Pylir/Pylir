@@ -12,41 +12,52 @@ py.func @make_object(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @a = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#a = #py.globalValue<a, initializer = #py.type>
 
 py.func @constant_obj() -> !py.dynamic {
-    %0 = constant(#py.obj<#py.ref<@a>>)
+    %0 = constant(#py.obj<#a>)
     %1 = typeOf %0
     return %1 : !py.dynamic
 }
+
+// CHECK: #[[$A:.*]] = #py.globalValue<a{{.*}}>
 
 // CHECK-LABEL: @constant_obj
-// CHECK: %[[CONST:.*]] = constant(#py.ref<@a>)
+// CHECK: %[[CONST:.*]] = constant(#[[$A]])
 // CHECK: return %[[CONST]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @a = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#a = #py.globalValue<a, initializer = #py.type>
 
 py.func @global_value() -> !py.dynamic {
-    %0 = constant(#py.ref<@a>)
+    %0 = constant(#a)
     %1 = typeOf %0
     return %1 : !py.dynamic
 }
 
+// CHECK: #[[$TYPE:.*]] = #py.globalValue<builtins.type{{.*}}>
+
 // CHECK-LABEL: @global_value
-// CHECK: %[[CONST:.*]] = constant(#py.ref<@builtins.type>)
+// CHECK: %[[CONST:.*]] = constant(#[[$TYPE]])
 // CHECK: return %[[CONST]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = str_copy %arg0 : %arg1
@@ -61,8 +72,10 @@ py.func @str_copy(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0, %arg1)
@@ -70,14 +83,18 @@ py.func @type_refineable(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynami
     return %1 : !py.dynamic
 }
 
+// CHECK: #[[$TUPLE:.*]] = #py.globalValue<builtins.tuple{{.*}}>
+
 // CHECK-LABEL: @type_refineable
-// CHECK: %[[CONST:.*]] = constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[CONST:.*]] = constant(#[[$TUPLE]])
 // CHECK: return %[[CONST]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
     %0 = tuple_prepend %arg0, %arg1
@@ -85,6 +102,8 @@ py.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic 
     return %1 : !py.dynamic
 }
 
+// CHECK: #[[$TUPLE:.*]] = #py.globalValue<builtins.tuple{{.*}}>
+
 // CHECK-LABEL: @tuple_prepend
-// CHECK: %[[CONST:.*]] = constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[CONST:.*]] = constant(#[[$TUPLE]])
 // CHECK: return %[[CONST]]

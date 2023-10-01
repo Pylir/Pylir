@@ -1,11 +1,15 @@
 // RUN: pylir-opt %s --pylir-heap-to-stack=max-object-size=32 --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+
+// CHECK: #[[$TUPLE:.*]] = #py.globalValue<builtins.tuple{{.*}}>
 
 py.func @test() {
     %c0 = arith.constant 0 : index
-    %t = constant(#py.ref<@builtins.tuple>)
+    %t = constant(#builtins_tuple)
     %m0 = pyMem.gcAllocObject %t[%c0]
     %0 = pyMem.initTuple %m0 to ()
     %m1 = pyMem.gcAllocObject %t[%c0]
@@ -24,7 +28,7 @@ py.func @test() {
 
 // CHECK-LABEL: @test
 // CHECK: %[[C:.*]] = arith.constant 0
-// CHECK: %[[T:.*]] = constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[T:.*]] = constant(#[[$TUPLE]])
 // CHECK: pyMem.stackAllocObject tuple %[[T]][0]
 // CHECK: pyMem.gcAllocObject %[[T]][%[[C]]]
 // CHECK: pyMem.stackAllocObject tuple %[[T]][0]
@@ -32,7 +36,7 @@ py.func @test() {
 
 py.func @too_large() {
     %c = arith.constant 128 : index
-    %t = constant(#py.ref<@builtins.tuple>)
+    %t = constant(#builtins_tuple)
     %m0 = pyMem.gcAllocObject %t[%c]
     %0 = pyMem.initTuple %m0 to ()
     return
@@ -40,5 +44,5 @@ py.func @too_large() {
 
 // CHECK-LABEL: @too_large
 // CHECK: %[[C:.*]] = arith.constant 128
-// CHECK: %[[T:.*]] = constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[T:.*]] = constant(#[[$TUPLE]])
 // CHECK: pyMem.gcAllocObject %[[T]][%[[C]]]

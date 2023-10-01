@@ -1,9 +1,11 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.bool = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @test1(%arg0 : !py.dynamic) -> i1 {
     %0 = constant(#py.int<5>)
@@ -192,9 +194,12 @@ py.func @test_eq() -> i1 {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 // CHECK-LABEL: @test_redundant_convert_1
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]: index

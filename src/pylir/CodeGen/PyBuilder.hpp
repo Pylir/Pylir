@@ -7,7 +7,6 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/IR/Builders.h>
 
-#include <pylir/Optimizer/PylirPy/IR/PylirPyAttrBase.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
 #include <pylir/Support/BigInt.hpp>
 
@@ -112,8 +111,8 @@ public:
   }
 
 #define BUILTIN(name, str, ...)                   \
-  Py::RefAttr get##name##Builtin() {              \
-    return Py::RefAttr::get(getContext(), (str)); \
+  Py::GlobalValueAttr get##name##Builtin() {              \
+    return Py::GlobalValueAttr::get(getContext(), (str)); \
   }
 #include <pylir/Interfaces/BuiltinsModule.def>
 
@@ -180,7 +179,7 @@ public:
 #include <pylir/Interfaces/CompilerBuiltins.def>
 
   Py::ConstantOp createConstant(mlir::Attribute constant) {
-    if (auto ref = constant.dyn_cast<Py::RefAttr>())
+    if (auto ref = constant.dyn_cast<Py::GlobalValueAttr>())
       return create<Py::ConstantOp>(ref);
 
     if (auto unbound = constant.dyn_cast<Py::UnboundAttr>())
@@ -466,14 +465,20 @@ public:
     return create<Py::IntToStrOp>(object);
   }
 
-  Py::GlobalValueOp
+  Py::GlobalValueAttr
   createGlobalValue(llvm::StringRef symbolName, bool constant = false,
                     Py::ConcreteObjectAttrInterface initializer = {},
                     bool external = false) {
-    return create<Py::GlobalValueOp>(
-        symbolName, external ? mlir::StringAttr{} : getStringAttr("private"),
-        constant, initializer);
-  }
+    auto result = getAttr<Py::GlobalValueAttr>(
+        symbolName);
+        result.setInitializer( initializer);
+  result.setConstant(constant);
+        if (external)
+        {
+            create<Py::ExternalOp>(symbolName, result);
+        }
+        return result;
+    }
 
   Py::GlobalOp createGlobal(llvm::StringRef symbolName) {
     return create<Py::GlobalOp>(symbolName, getStringAttr("private"),

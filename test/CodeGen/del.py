@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
+# CHECK-DAG: #[[$UNBOUND:.*]] = #py.globalValue<builtins.UnboundLocalError,
+# CHECK-DAG: #[[$NAME_ERROR:.*]] = #py.globalValue<builtins.NameError,
 def g():
     global a
     del a
@@ -11,7 +13,7 @@ def g():
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.NameError>)
+# CHECK: %[[NAME_ERROR:.*]] = constant(#[[$NAME_ERROR]])
 # CHECK: %[[MRO:.*]] = type_mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = function_call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
@@ -32,7 +34,7 @@ def local():
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.UnboundLocalError>)
+# CHECK: %[[NAME_ERROR:.*]] = constant(#[[$UNBOUND]])
 # CHECK: %[[MRO:.*]] = type_mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = function_call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})
@@ -59,7 +61,7 @@ def closure():
 # CHECK: cf.cond_br %[[IS_UNBOUND]], ^[[UNBOUND_BLOCK:.*]], ^[[DEL_BLOCK:[[:alnum:]]+]]
 
 # CHECK: ^[[UNBOUND_BLOCK]]:
-# CHECK: %[[NAME_ERROR:.*]] = constant(#py.ref<@builtins.UnboundLocalError>)
+# CHECK: %[[NAME_ERROR:.*]] = constant(#[[$UNBOUND]])
 # CHECK: %[[MRO:.*]] = type_mro %[[NAME_ERROR]]
 # CHECK: %[[NEW:.*]] = mroLookup %{{.*}} in %[[MRO]]
 # CHECK: %[[EXC:.*]] = function_call %[[NEW]](%[[NEW]], %{{.*}}, %{{.*}})

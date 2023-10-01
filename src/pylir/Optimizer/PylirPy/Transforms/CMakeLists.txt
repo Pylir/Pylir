@@ -6,7 +6,6 @@ add_pylir_passes(Passes Transform PREFIX PylirPy)
 
 add_library(PylirPyTransforms
   ExpandPyDialect.cpp
-  FinalizeRefAttrs.cpp
   FoldGlobals.cpp
   GlobalLoadStoreElimination.cpp
   GlobalSROA.cpp

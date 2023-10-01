@@ -33,14 +33,21 @@ protected:
   void runOnOperation() override;
 
 private:
-  pylir::Py::GlobalValueOp createGlobalValueFromGlobal(
+  pylir::Py::GlobalValueAttr createGlobalValueFromGlobal(
       pylir::Py::GlobalOp globalOp,
       pylir::Py::ConcreteObjectAttrInterface initializer, bool constant) {
     PYLIR_ASSERT(globalOp.getType().isa<pylir::Py::DynamicType>());
-    mlir::OpBuilder builder(globalOp);
-    return builder.create<pylir::Py::GlobalValueOp>(
-        globalOp->getLoc(), globalOp.getSymName(),
-        globalOp.getSymVisibilityAttr(), constant, initializer);
+    auto globalValueAttr = pylir::Py::GlobalValueAttr::get(
+        globalOp->getContext(), globalOp.getSymName());
+    globalValueAttr.setConstant(constant);
+    globalValueAttr.setInitializer(initializer);
+
+    if (globalOp.isPublic()) {
+      mlir::OpBuilder builder(globalOp);
+      builder.create<pylir::Py::ExternalOp>(
+          globalOp->getLoc(), globalValueAttr.getName(), globalValueAttr);
+    }
+    return globalValueAttr;
   }
 
   void replaceLoadsWithAttr(llvm::ArrayRef<mlir::Operation*> users,
@@ -71,13 +78,14 @@ private:
       // value there isn't a lot to be done except replace all loads with such a
       // reference. Otherwise if not unbound, we create a global value with the
       // constant as initializer instead of the handle.
-      constantStorage = attr.dyn_cast<pylir::Py::RefAttr>();
+      constantStorage = attr.dyn_cast<pylir::Py::GlobalValueAttr>();
       if (!constantStorage)
         constantStorage = attr.dyn_cast<pylir::Py::UnboundAttr>();
 
       if (!constantStorage)
-        constantStorage = pylir::Py::RefAttr::get(
-            &getContext(), mlir::FlatSymbolRefAttr::get(globalOp));
+        constantStorage = createGlobalValueFromGlobal(
+            globalOp, mlir::cast<pylir::Py::ConcreteObjectAttrInterface>(attr),
+            true);
 
     } else {
       constantStorage = attr;
@@ -85,14 +93,6 @@ private:
 
     replaceLoadsWithAttr(users, constantStorage);
     singleStore->erase();
-
-    // Create the global value if the constant was not a reference but a
-    // constant object.
-    if (auto initializer = dyn_cast<ConcreteObjectAttrInterface>(attr)) {
-      // Link the RefAttr created above as well.
-      pylir::Py::RefAttr::get(
-          createGlobalValueFromGlobal(globalOp, initializer, true));
-    }
     globalOp->erase();
     m_singleStoreGlobalsConverted++;
   }
@@ -245,12 +245,11 @@ void FoldGlobalsPass::runOnOperation() {
                     pylir::Py::FunctionAttr::get(makeFuncOp.getFunctionAttr()),
                     false);
                 mlir::OpBuilder builder(makeFuncOp);
-                auto ref = pylir::Py::RefAttr::get(value);
                 auto c = builder.create<pylir::Py::ConstantOp>(
-                    makeFuncOp->getLoc(), ref);
+                    makeFuncOp->getLoc(), value);
                 makeFuncOp->replaceAllUsesWith(c);
                 makeFuncOp->erase();
-                return ref;
+                return value;
               })
               .Default({nullptr});
       if (!ref)

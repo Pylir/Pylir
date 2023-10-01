@@ -38,7 +38,7 @@ class KnownType<string type>
   ::mlir::OpFoldResult getKnownTypeObject();
 }], [{
   ::mlir::OpFoldResult $cppClass::getKnownTypeObject() {
-    return pylir::Py::RefAttr::get(getContext(), pylir::Builtins::}]
+    return pylir::Py::GlobalValueAttr::get(getContext(), pylir::Builtins::}]
       # type # [{.name);
   }
 }]>;

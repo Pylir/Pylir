@@ -1,6 +1,6 @@
 # RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
-# CHECK-LABEL: __init__
+# CHECK-LABEL: func @__init__
 
 global x
 

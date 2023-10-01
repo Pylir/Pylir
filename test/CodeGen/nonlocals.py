@@ -1,5 +1,6 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
+# CHECK-DAG: #[[$CELL:.*]] = #py.globalValue<builtins.cell,
 def foo():
     x = 3
 
@@ -7,7 +8,7 @@ def foo():
         return x
 
 # CHECK-LABEL: func private @"foo$impl[0]"
-# CHECK: %[[CELL:.*]] = constant(#py.ref<@builtins.cell>)
+# CHECK: %[[CELL:.*]] = constant(#[[$CELL]])
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[CELL]])
 # CHECK: %[[NEW_METHOD:.*]] = getSlot %[[CELL]][%{{.*}}]
 # CHECK: %[[X:.*]] = function_call %[[NEW_METHOD]](%[[NEW_METHOD]], %[[TUPLE]], %{{[[:alnum:]]+}})
