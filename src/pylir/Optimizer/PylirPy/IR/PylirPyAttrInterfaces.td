@@ -51,10 +51,10 @@ def ObjectAttrInterface : GlobalValueAttrImplementable<"ObjectAttrInterface"> {
 
   let methods = [
     InterfaceMethod<[{
-      Returns the `#py.ref` referring to the type object of this attribute.
+      Returns the attribute representing the type object of this attribute.
       Mustn't be null.
-    }], "::pylir::Py::TypeAttrInterface", "getTypeObject", (ins), [{
-      return llvm::cast<pylir::Py::TypeAttrInterface>($_attr.getTypeObject());
+    }], "::pylir::Py::ObjectBaseAttribute", "getTypeObject", (ins), [{
+      return $_attr.getTypeObject();
     }]>,
     canImplementMethod
   ];

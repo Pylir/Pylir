@@ -26,13 +26,10 @@ defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr",
 /// type object is guaranteed to exist.
 class KnownTypeAttr<string type>
   : AttrInterfaceImplementation<ObjectAttrInterface, [{
-  ::pylir::Py::TypeAttrInterface getTypeObject() const;
+  ::pylir::Py::ObjectBaseAttribute getTypeObject() const;
 }], [{
-  ::pylir::Py::TypeAttrInterface $cppClass::getTypeObject() const {
-    return llvm::cast<::pylir::Py::TypeAttrInterface>(
-      pylir::Py::GlobalValueAttr::get(getContext(),
-        pylir::Builtins::}] # type # [{.name)
-    );
+  ::pylir::Py::ObjectBaseAttribute $cppClass::getTypeObject() const {
+    return pylir::Py::GlobalValueAttr::get(getContext(), pylir::Builtins::}] # type # [{.name);
   }
 }]>;
 
