@@ -107,3 +107,17 @@ py.func @tuple_prepend(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic 
 // CHECK-LABEL: @tuple_prepend
 // CHECK: %[[CONST:.*]] = constant(#[[$TUPLE]])
 // CHECK: return %[[CONST]]
+
+// -----
+
+// CHECK: #[[$U:.*]] = #py.globalValue<imported>
+
+// CHECK-LABEL: func @unknown_type
+py.func @unknown_type() -> !py.dynamic {
+    // CHECK: %[[C:.*]] = constant(#[[$U]])
+    // CHECK-NEXT: return %[[C]]
+
+    %0 = constant(#py.obj<#py.globalValue<imported>>)
+    %1 = typeOf %0
+    return %1 : !py.dynamic
+}

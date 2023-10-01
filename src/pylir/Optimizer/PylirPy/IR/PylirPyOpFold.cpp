@@ -153,7 +153,10 @@ mlir::Attribute foldGetSlot(mlir::MLIRContext* context,
   if (!object)
     return nullptr;
 
-  TypeAttrInterface typeAttr = object.getTypeObject();
+  auto typeAttr = dyn_cast<TypeAttrInterface>(object.getTypeObject());
+  if (!typeAttr)
+    return nullptr;
+
   if (index.uge(typeAttr.getInstanceSlots().size()))
     return nullptr;
 
