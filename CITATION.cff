@@ -1,0 +1,30 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Pylir
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Markus
+    family-names: Böck
+    email: markus.boeck02@gmail.com
+    orcid: 'https://orcid.org/0009-0006-1009-5770'
+  - given-names: Pylir Contributors
+repository-code: 'https://github.com/Pylir/Pylir'
+url: 'https://pylir.github.io/Pylir/'
+abstract: >-
+  pylir is an optimizing ahead-of-time compiler for python.
+  The goal of the project is to compile python code to
+  native executables that run as fast as possible through
+  the use of optimizations. Despite being ahead-of-time, the
+  goal is to achieve as high of language conformance as is
+  possible and reasonable.
+keywords:
+  - LLVM
+  - MLIR
+  - Compilers
+  - Python
+license: Apache-2.0
