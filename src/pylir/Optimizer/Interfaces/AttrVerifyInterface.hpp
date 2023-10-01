@@ -8,4 +8,3 @@
 #include <mlir/IR/SymbolTable.h>
 
 #include "pylir/Optimizer/Interfaces/AttrVerifyInterface.h.inc"
-
