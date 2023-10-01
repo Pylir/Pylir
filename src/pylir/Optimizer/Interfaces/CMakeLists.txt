@@ -2,6 +2,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+add_pylir_interface(Attr AttrVerifyInterface LIBRARY LIB_PREFIX Pylir)
 add_pylir_interface(OP CaptureInterface LIBRARY LIB_PREFIX Pylir)
 add_pylir_interface(OP ConditionalBranchInterface LIBRARY LIB_PREFIX Pylir)
 add_pylir_interface(OP MemoryFoldInterface LIBRARY LIB_PREFIX Pylir)

@@ -10,6 +10,7 @@
 #include "Value.hpp"
 
 using namespace mlir;
+using namespace pylir;
 using namespace pylir::Py;
 
 namespace {
@@ -22,120 +23,13 @@ verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
   if (auto* symbol = symbolTable.lookupNearestSymbolFrom(op, name)) {
     auto casted = mlir::dyn_cast<SymbolOp>(symbol);
     if (!casted)
-      return op->emitOpError("Expected '")
+      return op->emitError("Expected '")
              << name << "' to be of kind '" << kindName << "', not '"
              << symbol->getName() << "'";
 
     return casted;
   }
   return op->emitOpError("Failed to find symbol named '") << name << "'";
-}
-
-mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
-                           mlir::SymbolTableCollection& collection) {
-  if (isa<GlobalValueAttr>(attribute))
-    return success();
-  auto object = attribute.dyn_cast<pylir::Py::ObjectAttrInterface>();
-  if (!object) {
-    if (!attribute.isa<pylir::Py::UnboundAttr, pylir::Py::GlobalValueAttr>())
-      return op->emitOpError("Not allowed attribute '")
-             << attribute << "' found\n";
-
-    return mlir::success();
-  }
-  if (mlir::failed(::verify(op, object.getTypeObject(), collection)))
-    return mlir::failure();
-
-  if (auto constantObjectAttr =
-          mlir::dyn_cast<pylir::Py::ConstObjectAttrInterface>(attribute))
-    for (auto iter : constantObjectAttr.getSlots())
-      if (mlir::failed(verify(op, iter.getValue(), collection)))
-        return mlir::failure();
-
-  return llvm::TypeSwitch<mlir::Attribute, mlir::LogicalResult>(object)
-      .Case<pylir::Py::TupleAttr, pylir::Py::ListAttr>([&](auto sequence) {
-        for (auto iter : sequence.getElements())
-          if (mlir::failed(verify(op, iter, collection)))
-            return mlir::failure();
-
-        return mlir::success();
-      })
-      .Case([&](pylir::Py::DictAttr dict) -> mlir::LogicalResult {
-        for (auto [key, value] : dict.getKeyValuePairs()) {
-          if (mlir::failed(verify(op, key, collection)))
-            return mlir::failure();
-
-          if (mlir::failed(verify(op, value, collection)))
-            return mlir::failure();
-        }
-        for (auto [canonicalKey, index] :
-             llvm::make_filter_range(dict.getNormalizedKeysInternal(),
-                                     [](auto pair) { return pair.first; })) {
-          auto [key, value] = dict.getKeyValuePairs()[index];
-          auto equalsAttrInterface = dyn_cast<EqualsAttrInterface>(key);
-          if (!equalsAttrInterface)
-            return op->emitOpError("Expected key in '")
-                   << DictAttr::getMnemonic()
-                   << "' to implement 'EqualsAttrInterface'";
-
-          if (canonicalKey != equalsAttrInterface.getCanonicalAttribute())
-            return op->emitOpError("Incorrect normalized key entry '")
-                   << canonicalKey << "' for key-value pair '(" << key << ", "
-                   << value << ")'";
-        }
-        return mlir::success();
-      })
-      .Case([&](pylir::Py::FunctionAttr functionAttr) -> mlir::LogicalResult {
-        if (!functionAttr.getValue())
-          return op->emitOpError(
-              "Expected function attribute to contain a symbol reference\n");
-
-        if (mlir::failed(verifySymbolUse<mlir::FunctionOpInterface>(
-                op, functionAttr.getValue(), collection,
-                "FunctionOpInterface")))
-          return mlir::failure();
-
-        // These shouldn't return failure as they are just fancy slot accessors
-        // (for now), which have been verified above.
-        if (auto ref = functionAttr.getKwDefaults()
-                           .dyn_cast_or_null<pylir::Py::GlobalValueAttr>();
-            !ref || ref.getName() != pylir::Builtins::None.name)
-          if (!isa<DictAttrInterface>(functionAttr.getKwDefaults()))
-            return op->emitOpError(
-                "Expected __kwdefaults__ to refer to a dictionary\n");
-
-        if (auto ref = functionAttr.getDefaults()
-                           .dyn_cast_or_null<pylir::Py::GlobalValueAttr>();
-            !ref || ref.getName() != pylir::Builtins::None.name)
-          if (!dyn_cast<TupleAttrInterface>(functionAttr.getDefaults()))
-            return op->emitOpError(
-                "Expected __defaults__ to refer to a tuple\n");
-
-        if (functionAttr.getDict())
-          if (!isa<DictAttrInterface>(functionAttr.getDict()))
-            return op->emitOpError(
-                "Expected __dict__ to refer to a dictionary\n");
-
-        return mlir::success();
-      })
-      .Case([&](pylir::Py::TypeAttr typeAttr) -> mlir::LogicalResult {
-        if (mlir::failed(verify(op, typeAttr.getMroTuple(), collection)))
-          return mlir::failure();
-
-        auto mro = dyn_cast<TupleAttrInterface>(typeAttr.getMroTuple());
-        if (!mro)
-          return op->emitOpError("Expected MRO to refer to a tuple\n");
-
-        if (!llvm::all_of(typeAttr.getInstanceSlots(),
-                          [](mlir::Attribute attr) {
-                            return attr.isa<pylir::Py::StrAttr>();
-                          }))
-          return op->emitOpError(
-              "Expected 'instance_slots' to refer to a tuple of strings\n");
-
-        return mlir::success();
-      })
-      .Default(mlir::success());
 }
 
 mlir::LogicalResult verifyCall(::mlir::SymbolTableCollection& symbolTable,
@@ -165,12 +59,73 @@ mlir::LogicalResult verifyCall(::mlir::SymbolTableCollection& symbolTable,
 } // namespace
 
 //===----------------------------------------------------------------------===//
-// ConstantOp verification
+// DictAttr verification
 //===----------------------------------------------------------------------===//
 
-mlir::LogicalResult pylir::Py::ConstantOp::verifySymbolUses(
-    ::mlir::SymbolTableCollection& symbolTable) {
-  return ::verify(*this, getConstantAttr(), symbolTable);
+LogicalResult DictAttr::verifyStructure(Operation* op,
+                                        SymbolTableCollection&) const {
+  for (auto [canonicalKey, index] : llvm::make_filter_range(
+           getNormalizedKeysInternal(), [](auto pair) { return pair.first; })) {
+    auto [key, value] = getKeyValuePairs()[index];
+    auto equalsAttrInterface = llvm::dyn_cast<EqualsAttrInterface>(key);
+    if (!equalsAttrInterface)
+      return op->emitError() << "Expected key in '" << DictAttr::getMnemonic()
+                             << "' to implement 'EqualsAttrInterface'";
+
+    if (canonicalKey != equalsAttrInterface.getCanonicalAttribute())
+      return op->emitError()
+             << "Incorrect normalized key entry '" << canonicalKey
+             << "' for key-value pair '(" << key << ", " << value << ")'";
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// FunctionAttr verification
+//===----------------------------------------------------------------------===//
+
+LogicalResult
+FunctionAttr::verifyStructure(Operation* op,
+                              SymbolTableCollection& collection) const {
+  if (failed(verifySymbolUse<FunctionOpInterface>(op, getValue(), collection,
+                                                  "FunctionOpInterface")))
+    return failure();
+
+  if (auto ref = llvm::dyn_cast_or_null<GlobalValueAttr>(getKwDefaults());
+      !ref || ref.getName() != Builtins::None.name)
+    if (!llvm::isa<DictAttrInterface>(getKwDefaults()))
+      return op->emitError(
+          "Expected __kwdefaults__ to refer to a dictionary\n");
+
+  if (auto ref = llvm::dyn_cast_or_null<GlobalValueAttr>(getDefaults());
+      !ref || ref.getName() != Builtins::None.name)
+    if (!llvm::dyn_cast<TupleAttrInterface>(getDefaults()))
+      return op->emitError("Expected __defaults__ to refer to a tuple\n");
+
+  if (getDict())
+    if (!llvm::isa<DictAttrInterface>(getDict()))
+      return op->emitError("Expected __dict__ to refer to a dictionary\n");
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// TypeAttr verification
+//===----------------------------------------------------------------------===//
+
+LogicalResult Py::TypeAttr::verifyStructure(Operation* op,
+                                            SymbolTableCollection&) const {
+  auto mro = llvm::dyn_cast<TupleAttrInterface>(getMroTuple());
+  if (!mro)
+    return op->emitOpError("Expected MRO to refer to a tuple\n");
+
+  if (!llvm::all_of(getInstanceSlots(),
+                    [](Attribute attr) { return llvm::isa<StrAttr>(attr); }))
+    return op->emitError(
+        "Expected 'instance_slots' to refer to a tuple of strings\n");
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -211,32 +166,30 @@ mlir::LogicalResult pylir::Py::UnpackExOp::verify() {
 // GlobalOp verification
 //===----------------------------------------------------------------------===//
 
-mlir::LogicalResult pylir::Py::GlobalOp::verifySymbolUses(
-    ::mlir::SymbolTableCollection& symbolTable) {
+LogicalResult GlobalOp::verify() {
   if (!getInitializerAttr())
-    return mlir::success();
+    return success();
 
-  return llvm::TypeSwitch<mlir::Type, mlir::LogicalResult>(getType())
-      .Case([&](DynamicType) -> mlir::LogicalResult {
-        if (!getInitializerAttr()
-                 .isa<ObjectAttrInterface, GlobalValueAttr, UnboundAttr>())
+  return llvm::TypeSwitch<Type, LogicalResult>(getType())
+      .Case([&](DynamicType) -> LogicalResult {
+        if (!isa<ObjectAttrInterface, GlobalValueAttr, UnboundAttr>(
+                getInitializerAttr()))
           return emitOpError("Expected initializer of type "
                              "'ObjectAttrInterface' or 'GlobalValueAttr' "
                              "to global value");
-
-        return ::verify(*this, getInitializerAttr(), symbolTable);
+        return success();
       })
-      .Case([&](mlir::IndexType) -> mlir::LogicalResult {
-        if (!getInitializerAttr().isa<mlir::IntegerAttr>())
+      .Case([&](IndexType) -> LogicalResult {
+        if (!isa<IntegerAttr>(getInitializerAttr()))
           return emitOpError("Expected integer attribute initializer");
 
-        return mlir::success();
+        return success();
       })
-      .Case([&](mlir::FloatType) -> mlir::LogicalResult {
-        if (!getInitializerAttr().isa<mlir::FloatAttr>())
+      .Case([&](FloatType) -> LogicalResult {
+        if (!isa<FloatAttr>(getInitializerAttr()))
           return emitOpError("Expected float attribute initializer");
 
-        return mlir::success();
+        return success();
       });
 }
 
