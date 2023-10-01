@@ -29,8 +29,8 @@ struct MakeDictOpConversion : mlir::OpRewritePattern<pylir::Py::MakeDictOp> {
   matchAndRewrite(pylir::Py::MakeDictOp op,
                   mlir::PatternRewriter& rewriter) const override {
     auto dict = rewriter.create<pylir::Py::ConstantOp>(
-        op.getLoc(),
-        pylir::Py::RefAttr::get(getContext(), pylir::Builtins::Dict.name));
+        op.getLoc(), pylir::Py::GlobalValueAttr::get(
+                         getContext(), pylir::Builtins::Dict.name));
     auto slotCount = rewriter.create<pylir::Py::TupleLenOp>(
         op.getLoc(),
         rewriter.create<pylir::Py::TypeSlotsOp>(op.getLoc(), dict));

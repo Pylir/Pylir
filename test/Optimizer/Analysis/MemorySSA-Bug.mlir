@@ -1,10 +1,5 @@
 // RUN: pylir-opt %s --test-memory-ssa --split-input-file
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.list = #py.type
-
 py.func @test4(%length : index) -> index {
     %1 = makeList ()
     cf.br ^condition

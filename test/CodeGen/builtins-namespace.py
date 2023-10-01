@@ -1,10 +1,12 @@
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
-# CHECK-LABEL: __init__
+# CHECK: #[[$OBJECT:.*]] = #py.globalValue<builtins.object,
+
+# CHECK-LABEL: func @__init__
 
 object
 
-# CHECK: constant(#py.ref<@builtins.object>)
+# CHECK: constant(#[[$OBJECT]])
 
 # CHECK: %[[VALUE:.*]] = load @BaseException
 # CHECK: store %[[VALUE]] : !py.dynamic into @x

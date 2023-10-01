@@ -1,5 +1,7 @@
 # RUN: pylir %s -emit-pylir -o - -c -S | FileCheck %s
 
+# CHECK-DAG: #[[$BOOL:.*]] = #py.globalValue<builtins.bool,
+
 # CHECK-LABEL: @"bin_ops$impl[0]"
 # CHECK-SAME: %{{[[:alnum:]]+}}
 # CHECK-SAME: %[[A:[[:alnum:]]+]]
@@ -69,7 +71,7 @@ def boolean_ops(a, b):
     # CHECK: %[[TUPLE:.*]] = makeTuple ()
     # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
     # CHECK: %[[RES:.*]] = call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
-    # CHECK: %[[BOOL:.*]] = constant(#py.ref<@builtins.bool>)
+    # CHECK: %[[BOOL:.*]] = constant(#[[$BOOL]])
     # CHECK: %[[TYPE:.*]] = typeOf %[[RES]]
     # CHECK: %[[IS_BOOL:.*]] = is %[[TYPE]], %[[BOOL]]
     # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
@@ -96,7 +98,7 @@ def boolean_ops(a, b):
     # CHECK: %[[TUPLE:.*]] = makeTuple ()
     # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
     # CHECK: %[[RES:.*]] = call @pylir__call__(%[[A]], %[[TUPLE]], %[[DICT]])
-    # CHECK: %[[BOOL:.*]] = constant(#py.ref<@builtins.bool>)
+    # CHECK: %[[BOOL:.*]] = constant(#[[$BOOL]])
     # CHECK: %[[TYPE:.*]] = typeOf %[[RES]]
     # CHECK: %[[IS_BOOL:.*]] = is %[[TYPE]], %[[BOOL]]
     # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[RES]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]
@@ -120,7 +122,7 @@ def boolean_ops(a, b):
     # CHECK: store %[[ARG]] : !py.dynamic into @c
 
     c = not a
-    # CHECK: %[[BOOL:.*]] = constant(#py.ref<@builtins.bool>)
+    # CHECK: %[[BOOL:.*]] = constant(#[[$BOOL]])
     # CHECK: %[[TYPE:.*]] = typeOf %[[A]]
     # CHECK: %[[IS_BOOL:.*]] = is %[[TYPE]], %[[BOOL]]
     # CHECK: cf.cond_br %[[IS_BOOL]], ^[[CONTINUE:.*]](%[[A]] : !py.dynamic), ^[[CALC_BOOL:[[:alnum:]]+]]

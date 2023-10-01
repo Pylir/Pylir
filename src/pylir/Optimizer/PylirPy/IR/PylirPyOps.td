@@ -7,7 +7,6 @@
 
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTypes.td"
-include "pylir/Optimizer/PylirPy/IR/PylirPyAttrBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
@@ -101,7 +100,7 @@ def DictResource : Resource<"::pylir::Py::DictResource">;
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoMemoryEffect,
   KnownType<"Tuple">, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
   let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface,
-    PylirPy_RefAttr, PylirPy_GlobalValueAttr]>:$constant);
+    PylirPy_GlobalValueAttr]>:$constant);
   let results = (outs DynamicType:$result);
 
   let assemblyFormat = [{
@@ -1232,33 +1231,9 @@ def PylirPy_ExternalOp : PylirPy_Op<"external", [Symbol]> {
   }];
 }
 
-def PylirPy_GlobalValueOp : PylirPy_Op<"globalValue", [
-  DeclareOpInterfaceMethods<Symbol, ["isDeclaration"]>,
-  DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
-
-  let arguments = (ins
-      SymbolNameAttr:$sym_name,
-      OptionalAttr<StrAttr>:$sym_visibility,
-      UnitAttr:$constant,
-      OptionalAttr<ConcreteObjectAttrInterface>:$initializer);
-
-  let results = (outs);
-
-  let assemblyFormat = [{
-    ($sym_visibility^)? (`const` $constant^)? $sym_name (`=` $initializer^)? attr-dict
-  }];
-
-  let description = [{
-    This op creates a global value whose lifetime is global.
-    If marked as constant, operations that write to it are undefined behaviour.
-  }];
-
-  let hasFolder = 1;
-}
-
 defvar GlobalOpSupportedTypes = AnyTypeOf<[DynamicType, Index, F64]>;
 defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr,
-  F64Attr, PylirPy_RefAttr, PylirPy_GlobalValueAttr]>;
+  F64Attr, PylirPy_GlobalValueAttr]>;
 
 def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {

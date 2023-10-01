@@ -16,6 +16,10 @@
 #include "PylirPyAttrInterfaces.hpp"
 #include "PylirPyTraits.hpp"
 
+namespace pylir::Py::detail {
+struct GlobalValueAttrStorage;
+} // namespace pylir::Py::detail
+
 #define GET_ATTRDEF_CLASSES
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.h.inc"
 

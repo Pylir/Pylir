@@ -1,9 +1,13 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_object = #py.globalValue<builtins.object, initializer = #py.type>
+py.external @builtins.object, #builtins_object
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @test() -> !py.dynamic {
     %0 = constant(#py.int<5>)

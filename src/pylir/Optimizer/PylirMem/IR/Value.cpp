@@ -29,12 +29,11 @@ std::optional<pylir::Mem::LayoutType> getLayoutTypeImpl(mlir::Attribute attr) {
 
   auto mapLayoutType =
       [](mlir::Attribute attribute) -> std::optional<pylir::Mem::LayoutType> {
-    auto ref = attribute.dyn_cast<RefAttr>();
+    auto ref = attribute.dyn_cast<GlobalValueAttr>();
     if (!ref)
       return std::nullopt;
 
-    return llvm::StringSwitch<std::optional<LayoutType>>(
-               ref.getRef().getValue())
+    return llvm::StringSwitch<std::optional<LayoutType>>(ref.getName())
         .Case(Builtins::Object.name, LayoutType::Object)
         .Case(Builtins::Type.name, LayoutType::Type)
         .Case(Builtins::Float.name, LayoutType::Float)
@@ -78,31 +77,35 @@ pylir::Mem::getLayoutType(mlir::Attribute attr,
   return result;
 }
 
-pylir::Py::RefAttr
+pylir::Py::GlobalValueAttr
 pylir::Mem::layoutTypeToTypeObject(mlir::MLIRContext* context,
                                    pylir::Mem::LayoutType layoutType) {
   switch (layoutType) {
   case pylir::Mem::LayoutType::Object:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Object.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Object.name);
   case pylir::Mem::LayoutType::Type:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Type.name);
+    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Type.name);
   case pylir::Mem::LayoutType::Float:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Float.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Float.name);
   case pylir::Mem::LayoutType::Function:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Function.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Function.name);
   case pylir::Mem::LayoutType::Tuple:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Tuple.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::Tuple.name);
   case pylir::Mem::LayoutType::List:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::List.name);
+    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::List.name);
   case pylir::Mem::LayoutType::String:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Str.name);
+    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Str.name);
   case pylir::Mem::LayoutType::Dict:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Dict.name);
+    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Dict.name);
   case pylir::Mem::LayoutType::Int:
-    return pylir::Py::RefAttr::get(context, pylir::Builtins::Int.name);
+    return pylir::Py::GlobalValueAttr::get(context, pylir::Builtins::Int.name);
   case pylir::Mem::LayoutType::BaseException:
-    return pylir::Py::RefAttr::get(context,
-                                   pylir::Builtins::BaseException.name);
+    return pylir::Py::GlobalValueAttr::get(context,
+                                           pylir::Builtins::BaseException.name);
   }
   PYLIR_UNREACHABLE;
 }

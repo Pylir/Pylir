@@ -1,10 +1,14 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+
+// CHECK: #[[$TUPLE:.*]] = #py.globalValue<builtins.tuple{{,|>}}
 
 py.func @test() -> !py.dynamic {
-    %0 = constant(#py.tuple<(#py.ref<@builtins.tuple>)>)
+    %0 = constant(#py.tuple<(#builtins_tuple)>)
     %1 = arith.constant 1 : index
     %result = tuple_dropFront %1, %0
     return %result : !py.dynamic
@@ -35,7 +39,7 @@ py.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // CHECK-LABEL: @test3
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK-NEXT: %[[C:.*]] = constant(#py.ref<@builtins.tuple>)
+// CHECK-NEXT: %[[C:.*]] = constant(#[[$TUPLE]])
 // CHECK-NEXT: %[[TUPLE:.*]] = tuple_copy %[[ARG0]] : %[[C]]
 // CHECK-NEXT: return %[[TUPLE]]
 
@@ -75,6 +79,6 @@ py.func @test6(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> !py.dynamic {
 // CHECK-LABEL: @test6
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK: %[[C:.*]] = constant(#py.ref<@builtins.tuple>)
+// CHECK: %[[C:.*]] = constant(#[[$TUPLE]])
 // CHECK: %[[COPY:.*]] = tuple_copy %[[ARG1]] : %[[C]]
 // CHECK: return %[[COPY]]

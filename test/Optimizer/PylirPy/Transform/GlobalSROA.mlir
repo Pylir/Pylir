@@ -1,30 +1,32 @@
 // RUN: pylir-opt %s --pylir-global-sroa --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
-py.globalValue "private" @thing = #py.dict<{}>
+#thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @test(%hash: index) -> !py.dynamic {
-    %0 = constant(#py.ref<@thing>)
+    %0 = constant(#thing)
     %1 = constant(#py.str<"lol">)
     %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
 py.func @foo(%hash: index, %arg0 : !py.dynamic) {
-    %0 = constant(#py.ref<@thing>)
+    %0 = constant(#thing)
     %1 = constant(#py.str<"lol">)
     dict_setItem %0[%1 hash(%hash)] to %arg0
     return
 }
 
-// CHECK: global "private" @[[$DES:.*]] : !py.dynamic
-
 // CHECK-LABEL: py.func @test
-// CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = load @[[$DES:.*]] : !py.dynamic
 // CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
@@ -34,136 +36,146 @@ py.func @foo(%hash: index, %arg0 : !py.dynamic) {
 // CHECK: store %[[ARG1]] : !py.dynamic into @[[$DES]]
 // CHECK-NOT: dict_setItem
 
+// CHECK: global "private" @[[$DES]] : !py.dynamic
+
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
-py.globalValue "private" @thing = #py.dict<{}>
+#thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @store_only(%hash: index, %arg0 : !py.dynamic) {
-    %0 = constant(#py.ref<@thing>)
+    %0 = constant(#thing)
     %1 = constant(#py.str<"lol">)
     dict_setItem %0[%1 hash(%hash)] to %arg0
     return
 }
 
-// CHECK: global "private" @[[$DES:.*]] : !py.dynamic
-
 // CHECK-LABEL: py.func @store_only
 // CHECK-SAME: %{{[[:alnum:]]+}}
 // CHECK-SAME: %[[ARG1:[[:alnum:]]+]]
-// CHECK: store %[[ARG1]] : !py.dynamic into @[[$DES]]
+// CHECK: store %[[ARG1]] : !py.dynamic into @[[$DES:.*]]
 // CHECK-NOT: dict_setItem
 
+// CHECK: global "private" @[[$DES]] : !py.dynamic
+
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
-py.globalValue "private" @thing = #py.dict<{}>
+#thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @load_only(%hash: index) -> !py.dynamic {
-    %0 = constant(#py.ref<@thing>)
+    %0 = constant(#thing)
     %1 = constant(#py.str<"lol">)
     %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
-
-// CHECK: global "private" @[[$DES:.*]] : !py.dynamic
 
 // CHECK-LABEL: py.func @load_only
-// CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = load @[[$DES:.*]] : !py.dynamic
 // CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
+// CHECK: global "private" @[[$DES]] : !py.dynamic
+
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
-py.globalValue "private" @thing = #py.dict<{#py.str<"lol"> to #py.int<5>}>
+#thing = #py.globalValue<thing, initializer = #py.dict<{#py.str<"lol"> to #py.int<5>}>>
 
 py.func @init_attr(%hash: index) -> !py.dynamic {
-    %0 = constant(#py.ref<@thing>)
+    %0 = constant(#thing)
     %1 = constant(#py.str<"lol">)
     %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
-// CHECK-NOT: globalValue "private" thing
-
-// CHECK: global "private" @[[$DES:.*]] : !py.dynamic = #py.int<5>
+// CHECK-NOT: globalValue<thing
 
 // CHECK-LABEL: py.func @init_attr
-// CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = load @[[$DES:.*]] : !py.dynamic
 // CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
 
-// -----
-
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.int = #py.type
-
-py.globalValue "private" @thing = #py.dict<{#py.str<"lol"> to #py.int<5>}>
-
-// CHECK-NOT: globalValue "private" thing
-
-// CHECK: global "private" @[[DES:.*]] : !py.dynamic = #py.int<5>
-
+// CHECK: global "private" @[[$DES]] : !py.dynamic = #py.int<5>
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
-py.globalValue "private" @thing = #py.dict<{}>
+#thing = #py.globalValue<thing, initializer = #py.dict<{}>>
 
 py.func @sub_attr(%hash: index) -> !py.dynamic {
-    %0 = constant(#py.dict<{#py.int<5> to #py.ref<@thing>}>)
+    %0 = constant(#py.dict<{#py.int<5> to #thing}>)
     %1 = constant(#py.str<"lol">)
     %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
-// CHECK: globalValue "private" @thing = #py.dict<{}>
-// CHECK: constant(#py.dict<{#py.int<5> to #py.ref<@thing>}>)
+// CHECK: globalValue<thing, initializer = #py.dict<{}>>
+// CHECK: constant(#py.dict<{#py.int<5> to #thing}>)
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.float = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
+py.external @builtins.float, #builtins_float
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
-py.globalValue "private" @thing = #py.dict<{#py.int<3> to #py.int<5>}>
+#thing = #py.globalValue<thing, initializer = #py.dict<{#py.int<3> to #py.int<5>}>>
 
 py.func @init_attr(%hash: index) -> !py.dynamic {
-    %0 = constant(#py.ref<@thing>)
+    %0 = constant(#thing)
     %1 = constant(#py.float<3.0>)
     %2 = dict_tryGetItem %0[%1 hash(%hash)]
     return %2 : !py.dynamic
 }
 
-// CHECK-NOT: globalValue "private" thing
-
-// CHECK: global "private" @[[$DES:.*]] : !py.dynamic = #py.int<5>
+// CHECK-NOT: globalValue<thing
 
 // CHECK-LABEL: py.func @init_attr
-// CHECK: %[[LOAD:.*]] = load @[[$DES]] : !py.dynamic
+// CHECK: %[[LOAD:.*]] = load @[[$DES:.*]] : !py.dynamic
 // CHECK-NOT: dict_tryGetItem
 // CHECK-NEXT: return %[[LOAD]]
+
+// CHECK: global "private" @[[$DES]] : !py.dynamic = #py.int<5>

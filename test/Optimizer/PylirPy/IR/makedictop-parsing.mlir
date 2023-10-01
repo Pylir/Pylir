@@ -1,11 +1,17 @@
 // RUN: pylir-opt %s | pylir-opt | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.list = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_list= #py.globalValue<builtins.list, initializer = #py.type>
+py.external @builtins.list, #builtins_list
 
 // CHECK-LABEL: @makedictop_test
 py.func @makedictop_test(%hash: index) -> !py.dynamic {

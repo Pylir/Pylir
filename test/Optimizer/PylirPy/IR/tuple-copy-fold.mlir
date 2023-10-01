@@ -1,7 +1,9 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
     %2 = tuple_copy %arg0 : %arg1
@@ -18,7 +20,7 @@ py.func @test(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> 
 
 py.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = makeTuple (%arg0)
-	%1 = constant(#py.ref<@builtins.tuple>)
+	%1 = constant(#builtins_tuple)
 	%2 = tuple_copy %0 : %1
 	return %2 : !py.dynamic
 }
@@ -30,7 +32,7 @@ py.func @test2(%arg0 : !py.dynamic) -> !py.dynamic {
 
 py.func @test3(%arg0 : !py.dynamic) -> !py.dynamic {
 	%0 = list_toTuple %arg0
-	%1 = constant(#py.ref<@builtins.tuple>)
+	%1 = constant(#builtins_tuple)
 	%2 = tuple_copy %0 : %1
 	return %2 : !py.dynamic
 }

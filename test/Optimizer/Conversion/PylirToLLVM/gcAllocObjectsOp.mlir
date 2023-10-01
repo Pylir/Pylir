@@ -1,13 +1,14 @@
 // RUN: pylir-opt %s -convert-arith-to-llvm -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file | FileCheck %s
 
-
-py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">,#py.str<"__eq__">,#py.str<"__hash__">)>}>
-
-py.globalValue const @builtins.tuple = #py.type // stub
-py.globalValue const @builtins.str = #py.type // stub
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @foo() -> !pyMem.memory {
-    %0 = constant(#py.ref<@builtins.str>)
+    %0 = constant(#builtins_str)
     %c0 = arith.constant 0 : index
     %1 = pyMem.gcAllocObject %0[%c0]
     return %1 : !pyMem.memory
@@ -37,10 +38,12 @@ py.func @foo() -> !pyMem.memory {
 
 // -----
 
-py.globalValue const @builtins.type = #py.type<slots = {__slots__ = #py.tuple<(#py.str<"__slots__">,#py.str<"__eq__">,#py.str<"__hash__">)>}>
-
-py.globalValue const @builtins.tuple = #py.type // stub
-py.globalValue const @builtins.str = #py.type // stub
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @foo(%arg0 : !py.dynamic) -> !pyMem.memory {
     %c0 = arith.constant 0 : index

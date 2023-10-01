@@ -1,12 +1,11 @@
 // RUN: pylir-opt %s -p 'builtin.module(any(pylir-expand-py-dialect))' --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.StopIteration = #py.type
-py.globalValue @builtins.ValueError = #py.type
-py.globalValue @builtins.iter = #py.type
-py.globalValue @builtins.next = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
 
 py.func private @pylir__call__(!py.dynamic, !py.dynamic, !py.dynamic) ->  !py.dynamic
 
@@ -15,14 +14,19 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
     return %a, %b, %c : !py.dynamic, !py.dynamic, !py.dynamic
 }
 
+// CHECK-DAG: #[[$STOP:.*]] = #py.globalValue<builtins.StopIteration{{.*}}>
+// CHECK-DAG: #[[$VALUE:.*]] = #py.globalValue<builtins.ValueError{{.*}}>
+// CHECK-DAG: #[[$ITER:.*]] = #py.globalValue<builtins.iter{{.*}}>
+// CHECK-DAG: #[[$NEXT:.*]] = #py.globalValue<builtins.next{{.*}}>
+
 // CHECK-LABEL: py.func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[STOP_ITER:.*]] = constant(#py.ref<@builtins.StopIteration>)
-// CHECK: %[[ITER_F:.*]] = constant(#py.ref<@builtins.iter>)
+// CHECK: %[[STOP_ITER:.*]] = constant(#[[$STOP]])
+// CHECK: %[[ITER_F:.*]] = constant(#[[$ITER]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = call @pylir__call__(%[[ITER_F]], %[[TUPLE]], %[[DICT]])
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[A:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -41,7 +45,7 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 // CHECK: raise %[[EXC]]
 
 // CHECK: ^[[VALUE_ERROR_BLOCK]]:
-// CHECK: %[[VALUE_ERROR:.*]] = constant(#py.ref<@builtins.ValueError>)
+// CHECK: %[[VALUE_ERROR:.*]] = constant(#[[$VALUE]])
 // CHECK: %[[TUPLE:.*]] = makeTuple ()
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[EXC:.*]] = call @pylir__call__(%[[VALUE_ERROR]], %[[TUPLE]], %[[DICT]])
@@ -49,7 +53,7 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 
 // CHECK: ^[[REST_ARGS]]:
 // CHECK: %[[ONE:.*]] = arith.constant 1
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[ELEMENT:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -63,7 +67,7 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 // CHECK: cf.br ^[[REST_ARGS]]
 
 // CHECK: ^[[EXHAUSTED]](%[[EXC:.*]]: !py.dynamic):
-// CHECK: %[[STOP_ITER:.*]] = constant(#py.ref<@builtins.StopIteration>)
+// CHECK: %[[STOP_ITER:.*]] = constant(#[[$STOP]])
 // CHECK: %[[EXC_TYPE:.*]] = typeOf %[[EXC]]
 // CHECK: %[[IS_STOP_ITER:.*]] = is %[[STOP_ITER]], %[[EXC_TYPE]]
 // CHECK: cf.cond_br %[[IS_STOP_ITER]], ^[[EXHAUSTED:.*]], ^[[RERAISE:[[:alnum:]]+]]
@@ -87,13 +91,12 @@ py.func @test(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.dynamic
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.StopIteration = #py.type
-py.globalValue @builtins.ValueError = #py.type
-py.globalValue @builtins.iter = #py.type
-py.globalValue @builtins.next = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
 
 py.func private @pylir__call__(!py.dynamic, !py.dynamic, !py.dynamic) ->  !py.dynamic
 
@@ -102,35 +105,40 @@ py.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.
     return %a, %b, %c : !py.dynamic, !py.dynamic, !py.dynamic
 }
 
+// CHECK-DAG: #[[$STOP:.*]] = #py.globalValue<builtins.StopIteration{{.*}}>
+// CHECK-DAG: #[[$VALUE:.*]] = #py.globalValue<builtins.ValueError{{.*}}>
+// CHECK-DAG: #[[$ITER:.*]] = #py.globalValue<builtins.iter{{.*}}>
+// CHECK-DAG: #[[$NEXT:.*]] = #py.globalValue<builtins.next{{.*}}>
+
 // CHECK-LABEL: py.func @no_rest_arg
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[STOP_ITER:.*]] = constant(#py.ref<@builtins.StopIteration>)
-// CHECK: %[[ITER_F:.*]] = constant(#py.ref<@builtins.iter>)
+// CHECK: %[[STOP_ITER:.*]] = constant(#[[$STOP]])
+// CHECK: %[[ITER_F:.*]] = constant(#[[$ITER]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = call @pylir__call__(%[[ITER_F]], %[[TUPLE]], %[[DICT]])
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[A:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[B:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[C:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[EXHAUSTED:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -145,7 +153,7 @@ py.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.
 // CHECK: raise %[[EXC]]
 
 // CHECK: ^[[VALUE_ERROR_BLOCK]]:
-// CHECK: %[[VALUE_ERROR:.*]] = constant(#py.ref<@builtins.ValueError>)
+// CHECK: %[[VALUE_ERROR:.*]] = constant(#[[$VALUE]])
 // CHECK: %[[TUPLE:.*]] = makeTuple ()
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[EXC:.*]] = call @pylir__call__(%[[VALUE_ERROR]], %[[TUPLE]], %[[DICT]])
@@ -167,13 +175,12 @@ py.func @no_rest_arg(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !py.
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.StopIteration = #py.type
-py.globalValue @builtins.ValueError = #py.type
-py.globalValue @builtins.iter = #py.type
-py.globalValue @builtins.next = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
 
 py.func private @pylir__call__(!py.dynamic, !py.dynamic, !py.dynamic) ->  !py.dynamic
 
@@ -188,17 +195,22 @@ py.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !
     raise %e
 }
 
+// CHECK-DAG: #[[$STOP:.*]] = #py.globalValue<builtins.StopIteration{{.*}}>
+// CHECK-DAG: #[[$VALUE:.*]] = #py.globalValue<builtins.ValueError{{.*}}>
+// CHECK-DAG: #[[$ITER:.*]] = #py.globalValue<builtins.iter{{.*}}>
+// CHECK-DAG: #[[$NEXT:.*]] = #py.globalValue<builtins.next{{.*}}>
+
 // CHECK-LABEL: py.func @test
 // CHECK-SAME: %[[ARG0:[[:alnum:]]+]]
-// CHECK: %[[STOP_ITER:.*]] = constant(#py.ref<@builtins.StopIteration>)
-// CHECK: %[[ITER_F:.*]] = constant(#py.ref<@builtins.iter>)
+// CHECK: %[[STOP_ITER:.*]] = constant(#[[$STOP]])
+// CHECK: %[[ITER_F:.*]] = constant(#[[$ITER]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ARG0]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[ITER:.*]] = invoke @pylir__call__(%[[ITER_F]], %[[TUPLE]], %[[DICT]])
 // CHECK-NEXT: label ^[[CONTINUE:.*]] unwind ^[[ERROR:[[:alnum:]]+]]
 
 // CHECK: ^[[CONTINUE]]:
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[A:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -217,7 +229,7 @@ py.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !
 // CHECK: cf.br ^[[ERROR]](%[[EXC]] : !py.dynamic)
 
 // CHECK: ^[[VALUE_ERROR_BLOCK]]:
-// CHECK: %[[VALUE_ERROR:.*]] = constant(#py.ref<@builtins.ValueError>)
+// CHECK: %[[VALUE_ERROR:.*]] = constant(#[[$VALUE]])
 // CHECK: %[[TUPLE:.*]] = makeTuple ()
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[EXC:.*]] = invoke @pylir__call__(%[[VALUE_ERROR]], %[[TUPLE]], %[[DICT]])
@@ -228,7 +240,7 @@ py.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !
 
 // CHECK: ^[[REST_ARGS]]:
 // CHECK: %[[ONE:.*]] = arith.constant 1
-// CHECK: %[[NEXT_F:.*]] = constant(#py.ref<@builtins.next>)
+// CHECK: %[[NEXT_F:.*]] = constant(#[[$NEXT]])
 // CHECK: %[[TUPLE:.*]] = makeTuple (%[[ITER]])
 // CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 // CHECK: %[[ELEMENT:.*]] = invoke @pylir__call__(%[[NEXT_F]], %[[TUPLE]], %[[DICT]])
@@ -242,7 +254,7 @@ py.func @test_exception(%iterable : !py.dynamic) -> (!py.dynamic, !py.dynamic, !
 // CHECK: cf.br ^[[REST_ARGS]]
 
 // CHECK: ^[[EXHAUSTED]](%[[EXC:.*]]: !py.dynamic):
-// CHECK: %[[STOP_ITER:.*]] = constant(#py.ref<@builtins.StopIteration>)
+// CHECK: %[[STOP_ITER:.*]] = constant(#[[$STOP]])
 // CHECK: %[[EXC_TYPE:.*]] = typeOf %[[EXC]]
 // CHECK: %[[IS_STOP_ITER:.*]] = is %[[STOP_ITER]], %[[EXC_TYPE]]
 // CHECK: cf.cond_br %[[IS_STOP_ITER]], ^[[EXHAUSTED:.*]], ^[[RERAISE:[[:alnum:]]+]]

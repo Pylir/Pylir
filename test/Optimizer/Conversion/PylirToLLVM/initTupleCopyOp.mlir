@@ -1,12 +1,15 @@
 // RUN: pylir-opt %s -convert-arith-to-llvm -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file | FileCheck %s
 
 
-py.globalValue const @builtins.type = #py.type
-py.globalValue const @builtins.list = #py.type
-py.globalValue const @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, const, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_list = #py.globalValue<builtins.list, const, initializer = #py.type>
+py.external @builtins.list, #builtins_list
+#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @foo(%tuple : !py.dynamic) -> !py.dynamic {
-    %0 = constant(#py.ref<@builtins.tuple>)
+    %0 = constant(#builtins_tuple)
     %c0 = arith.constant 0 : index
     %1 = pyMem.gcAllocObject %0[%c0]
     %2 = pyMem.initTupleCopy %1 to (* %tuple)

@@ -1,10 +1,15 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.float = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
+py.external @builtins.float, #builtins_float
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @constant_tuple() -> index {
     %0 = constant(#py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>)
@@ -18,16 +23,21 @@ py.func @constant_tuple() -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.float = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_float = #py.globalValue<builtins.float, initializer = #py.type>
+py.external @builtins.float, #builtins_float
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
-py.globalValue @foo = #py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>
+#foo = #py.globalValue<foo, initializer = #py.tuple<(#py.int<0>, #py.str<"text">, #py.float<5.0>)>>
 
 py.func @constant_tuple() -> index {
-    %0 = constant(#py.ref<@foo>)
+    %0 = constant(#foo)
     %1 = tuple_len %0
     return %1 : index
 }
@@ -38,8 +48,10 @@ py.func @constant_tuple() -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @make_tuple(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> index {
     %0 = makeTuple (%arg0, %arg1)
@@ -50,5 +62,3 @@ py.func @make_tuple(%arg0 : !py.dynamic, %arg1 : !py.dynamic) -> index {
 // CHECK-LABEL: @make_tuple
 // CHECK: %[[RESULT:.*]] = arith.constant 2 : index
 // CHECK: return %[[RESULT]]
-
-// -----

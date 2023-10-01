@@ -33,14 +33,8 @@ verifySymbolUse(mlir::Operation* op, mlir::SymbolRefAttr name,
 
 mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
                            mlir::SymbolTableCollection& collection) {
-  if (auto ref = attribute.dyn_cast<pylir::Py::RefAttr>()) {
-    if (!ref.getSymbol())
-      return op->emitOpError("RefAttr '")
-             << ref.getRef() << "' does not refer to a 'py.globalValue'";
-
-    return mlir::success();
-  }
-
+  if (isa<GlobalValueAttr>(attribute))
+    return success();
   auto object = attribute.dyn_cast<pylir::Py::ObjectAttrInterface>();
   if (!object) {
     if (!attribute.isa<pylir::Py::UnboundAttr, pylir::Py::GlobalValueAttr>())
@@ -104,15 +98,15 @@ mlir::LogicalResult verify(mlir::Operation* op, mlir::Attribute attribute,
         // These shouldn't return failure as they are just fancy slot accessors
         // (for now), which have been verified above.
         if (auto ref = functionAttr.getKwDefaults()
-                           .dyn_cast_or_null<pylir::Py::RefAttr>();
-            !ref || ref.getRef().getValue() != pylir::Builtins::None.name)
+                           .dyn_cast_or_null<pylir::Py::GlobalValueAttr>();
+            !ref || ref.getName() != pylir::Builtins::None.name)
           if (!isa<DictAttrInterface>(functionAttr.getKwDefaults()))
             return op->emitOpError(
                 "Expected __kwdefaults__ to refer to a dictionary\n");
 
         if (auto ref = functionAttr.getDefaults()
-                           .dyn_cast_or_null<pylir::Py::RefAttr>();
-            !ref || ref.getRef().getValue() != pylir::Builtins::None.name)
+                           .dyn_cast_or_null<pylir::Py::GlobalValueAttr>();
+            !ref || ref.getName() != pylir::Builtins::None.name)
           if (!dyn_cast<TupleAttrInterface>(functionAttr.getDefaults()))
             return op->emitOpError(
                 "Expected __defaults__ to refer to a tuple\n");
@@ -214,18 +208,6 @@ mlir::LogicalResult pylir::Py::UnpackExOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
-// GlobalValueOp verification
-//===----------------------------------------------------------------------===//
-
-mlir::LogicalResult pylir::Py::GlobalValueOp::verifySymbolUses(
-    ::mlir::SymbolTableCollection& symbolTable) {
-  if (!isDeclaration())
-    return ::verify(*this, getInitializerAttr(), symbolTable);
-
-  return mlir::success();
-}
-
-//===----------------------------------------------------------------------===//
 // GlobalOp verification
 //===----------------------------------------------------------------------===//
 
@@ -237,10 +219,10 @@ mlir::LogicalResult pylir::Py::GlobalOp::verifySymbolUses(
   return llvm::TypeSwitch<mlir::Type, mlir::LogicalResult>(getType())
       .Case([&](DynamicType) -> mlir::LogicalResult {
         if (!getInitializerAttr()
-                 .isa<ObjectAttrInterface, RefAttr, UnboundAttr>())
-          return emitOpError(
-              "Expected initializer of type 'ObjectAttrInterface' or 'RefAttr' "
-              "to global value");
+                 .isa<ObjectAttrInterface, GlobalValueAttr, UnboundAttr>())
+          return emitOpError("Expected initializer of type "
+                             "'ObjectAttrInterface' or 'GlobalValueAttr' "
+                             "to global value");
 
         return ::verify(*this, getInitializerAttr(), symbolTable);
       })

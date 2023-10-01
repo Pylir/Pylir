@@ -9,8 +9,6 @@
 
 #include <pylir/Support/BigInt.hpp>
 
-#include "PylirPyAttrBase.hpp"
-
 namespace pylir::Py {
 class TypeAttrInterface;
 } // namespace pylir::Py

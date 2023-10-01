@@ -21,7 +21,7 @@ defvar SlotsMap = DefaultValuedParameter<"::mlir::DictionaryAttr",
   "::mlir::DictionaryAttr::get($_ctxt, {})">;
 
 /// Trait used to automatically implement `ObjectAttrInterface` that returns
-/// a `RefAttr` to `type`. This should only be used by builtins where the given
+/// a `GlobalValueAttr` to `type`. This should only be used by builtins where the given
 /// type object is guaranteed to exist.
 class KnownTypeAttr<string type>
   : AttrInterfaceImplementation<ObjectAttrInterface, [{
@@ -29,7 +29,7 @@ class KnownTypeAttr<string type>
 }], [{
   ::pylir::Py::TypeAttrInterface $cppClass::getTypeObject() const {
     return llvm::cast<::pylir::Py::TypeAttrInterface>(
-      pylir::Py::RefAttr::get(getContext(),
+      pylir::Py::GlobalValueAttr::get(getContext(),
         pylir::Builtins::}] # type # [{.name)
     );
   }
@@ -245,11 +245,11 @@ def PylirPy_DictAttr : PylirPy_PyObjAttr<"Dict", [DictAttrInterface,
     It is therefore not possible to have arbitrary keys in a `DictAttr`.
 
     Additionally, it is necessary to also specify a "normalized key" when
-    constructing a `DictAttr` or within the IR syntax, if using a `RefAttr` as
+    constructing a `DictAttr` or within the IR syntax, if using a `GlobalValueAttr` as
     key that does not use identity equality as equals function.
     The normalized key is the result of calling `getCanonicalEqualsForm` on the
     actual key of an entry and is what is used to determine whether two keys are
-    equal. Given a `RefAttr` referring to a `py.globalValue` with the given
+    equal. Given a `GlobalValueAttr` referring to a `py.globalValue` with the given
     equals function of the initializer argument, the following attribute kinds
     are returned by `getCanonicalEqualsForm`:
     * `py.int`, `py.float` -> `py.frac`
@@ -308,7 +308,7 @@ def PylirPy_DictAttr : PylirPy_PyObjAttr<"Dict", [DictAttrInterface,
     };
 
     /// Returns the value for a given key in the dictionary. Returns a null
-    /// attribute if not found. The key must be a 'RefAttr' or
+    /// attribute if not found. The key must be a 'GlobalValueAttr' or
     /// 'ObjectAttrInterface'.
     mlir::Attribute lookup(mlir::Attribute key) const;
 
@@ -332,9 +332,9 @@ def PylirPy_FunctionAttr : PylirPy_PyObjAttr<"Function",
 	    DefaultValuedParameter<"mlir::Attribute",
 	        "StrAttr::get($_ctxt, \"\")">:$qual_name,
 	    DefaultValuedParameter<"mlir::Attribute",
-	        "RefAttr::get($_ctxt, Builtins::None.name)">:$defaults,
+	        "GlobalValueAttr::get($_ctxt, Builtins::None.name)">:$defaults,
 	    DefaultValuedParameter<"mlir::Attribute",
-	        "RefAttr::get($_ctxt, Builtins::None.name)">:$kw_defaults,
+	        "GlobalValueAttr::get($_ctxt, Builtins::None.name)">:$kw_defaults,
 	    DefaultValuedParameter<"mlir::Attribute", "mlir::Attribute{}">:$dict
   );
 
@@ -352,9 +352,9 @@ def PylirPy_FunctionAttr : PylirPy_PyObjAttr<"Function",
       mlir::MLIRContext* context = value.getContext();
       qualName = qualName ? qualName : StrAttr::get(context, "");
       defaults = defaults ? defaults
-        : RefAttr::get(context, Builtins::None.name);
+        : GlobalValueAttr::get(context, Builtins::None.name);
       kwDefaults = kwDefaults ? kwDefaults
-        : RefAttr::get(context, Builtins::None.name);
+        : GlobalValueAttr::get(context, Builtins::None.name);
       return $_get(context, value, qualName, defaults, kwDefaults, dict);
     }]>
   ];
@@ -436,6 +436,76 @@ def PylirPy_FractionalAttr : PylirPy_Attr<"Fractional"> {
   let parameters = (ins BigIntParam:$nominator, BigIntParam:$denominator);
 
   let assemblyFormat = "`<` $nominator `,` $denominator `>`";
+}
+
+def PylirPy_GlobalValueAttr : AttrDef<PylirPy_Dialect, "GlobalValue",
+    [NativeAttrTrait<"IsMutable">]> {
+  let mnemonic = "globalValue";
+
+  let description = [{
+    A `#py.globalValue` is a special kind of attribute, representing an instance
+    of a globally accessibly Python object.
+    The op is optionally initialized with `$initializer`, dictating the type and
+    initial value of the global value.
+    If no `$initializer` is given, the op must have been marked external using a
+    `py.external` in the module.
+    It differs from other attributes in the following way:
+    * It is mutable unless marked with `const`.
+      The attribute can be turned into an SSA-value using `py.constant` and
+      mutated with the usual operations.
+      If marked `const`, any operations writing to the `py.globalValue` leads to
+      undefined behaviour.
+    * It has nominal identity instead of structural identity.
+      This means that two `#py.globalValue` instances that have different names
+      are considered different objects.
+      A `py.is` operation comparing these would therefore result in `False`.
+
+    Syntax:
+    ```text
+    global-value ::= `#py.globalValue` `<` name { (`,` `const`)? (`,` `initializer` `=` attr) } `>`
+    ```
+
+    Examples:
+    ```text
+    #py.globalValue<builtins.str, const, initializer = #py.type<mro_tuple = #py.tuple<()>>>
+    #py.globalValue<builtins.list>
+    #py.globalValue<builtins.type, initializer = #py.type>
+    ```
+  }];
+
+  let parameters = (ins StringRefParameter<>:$name,
+              DefaultValuedParameter<"bool", "false">:$constant,
+              OptionalParameter<"ConcreteObjectAttrInterface">:$initializer);
+
+  // Required to make it properly mutable.
+  let genStorageClass = 0;
+
+  // Don't want to use the default builder as it includes the mutable
+  // parameters.
+  let skipDefaultBuilders = 1;
+
+  // Have to do a completely custom parse and print for the time being as for a
+  // variety of reasons, mutable cyclic attributes cannot be parsed and printed
+  // by the ODS generated prints and parsers at this point in time.
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    /// Sets whether this global value is constant or not.
+    void setConstant(bool constant);
+
+    /// Sets the initializer of this global value.
+    void setInitializer(ConcreteObjectAttrInterface initializer);
+  }];
+
+  let builders = [
+    AttrBuilder<(ins "::llvm::StringRef":$name), [{
+      return $_get($_ctxt, name);
+    }]>,
+  ];
+
+  let constBuilderCall = [{
+    ::pylir::Py::GlobalValueAttr::get($_builder.getContext(), $0)
+  }];
 }
 
 #endif

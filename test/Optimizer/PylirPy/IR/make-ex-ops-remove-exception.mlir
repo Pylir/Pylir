@@ -1,9 +1,11 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.BaseException = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
@@ -26,9 +28,12 @@ py.func @make_tuple_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
@@ -51,9 +56,12 @@ py.func @make_tuple_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
@@ -76,9 +84,12 @@ py.func @make_list_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
@@ -101,9 +112,12 @@ py.func @make_list_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
@@ -126,9 +140,12 @@ py.func @make_set_ex_op_unique(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
     %0 = makeTuple (%arg0)
@@ -151,9 +168,12 @@ py.func @make_set_ex_op(%arg0 : !py.dynamic) -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_dict_ex_op_unique(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %1 = constant(#py.int<3>)
@@ -176,9 +196,12 @@ py.func @make_dict_ex_op_unique(%arg0 : !py.dynamic, %hash : index) -> !py.dynam
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.func @make_dict_ex_op(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
     %1 = constant(#py.int<3>)
@@ -198,5 +221,3 @@ py.func @make_dict_ex_op(%arg0 : !py.dynamic, %hash : index) -> !py.dynamic {
 // CHECK: %[[THREE:.*]] = constant(#py.int<3>)
 // CHECK: %[[DICT:.*]] = makeDict (%[[THREE]] hash(%[[HASH]]) : %[[ARG0]])
 // CHECK: return %[[DICT]]
-
-// -----

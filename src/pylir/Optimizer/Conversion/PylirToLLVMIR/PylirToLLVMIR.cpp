@@ -121,57 +121,6 @@ struct ExternalOpConversion
   }
 };
 
-struct GlobalValueOpConversion
-    : public ConvertPylirOpToLLVMPattern<Py::GlobalValueOp> {
-  using ConvertPylirOpToLLVMPattern<
-      Py::GlobalValueOp>::ConvertPylirOpToLLVMPattern;
-
-  mlir::LogicalResult
-  matchAndRewrite(Py::GlobalValueOp op, OpAdaptor,
-                  mlir::ConversionPatternRewriter& rewriter) const override {
-    mlir::Type type;
-    if (op.isDeclaration())
-      type = typeConverter.getPyObjectType();
-    else
-      type = typeConverter.typeOf(*op.getInitializer());
-
-    mlir::LLVM::Linkage linkage;
-    switch (op.getVisibility()) {
-    case mlir::SymbolTable::Visibility::Public:
-      linkage = mlir::LLVM::linkage::Linkage::External;
-      break;
-    case mlir::SymbolTable::Visibility::Private:
-      linkage = mlir::LLVM::linkage::Linkage::Internal;
-      break;
-    case mlir::SymbolTable::Visibility::Nested: PYLIR_UNREACHABLE;
-    }
-    if (op.isDeclaration())
-      linkage = mlir::LLVM::linkage::Linkage::External;
-
-    static llvm::DenseSet<llvm::StringRef> immutable = {
-        Builtins::Tuple.name,
-        Builtins::Float.name,
-        Builtins::Str.name,
-    };
-    bool constant = op.getConstant();
-    if (!op.isDeclaration())
-      constant = constant && !needToBeRuntimeInit(*op.getInitializer());
-
-    auto global = rewriter.replaceOpWithNewOp<mlir::LLVM::GlobalOp>(
-        op, type, constant, linkage, op.getName(), mlir::Attribute{}, 0,
-        REF_ADDRESS_SPACE, true);
-    if (!op.isDeclaration()) {
-      if (!global.getConstant())
-        global.setSectionAttr(typeConverter.getCollectionSection());
-      else
-        global.setSectionAttr(typeConverter.getConstantSection());
-
-      codeGenState.initializeGlobal(global, rewriter, *op.getInitializer());
-    }
-    return mlir::success();
-  }
-};
-
 struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<Py::GlobalOp> {
   using ConvertPylirOpToLLVMPattern<Py::GlobalOp>::ConvertPylirOpToLLVMPattern;
 
@@ -212,12 +161,7 @@ struct GlobalOpConversion : public ConvertPylirOpToLLVMPattern<Py::GlobalOp> {
               op.getLoc(), global.getType(), attr);
           rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), constant);
         })
-        .Case([&](Py::RefAttr attr) {
-          mlir::Value address = rewriter.create<mlir::LLVM::AddressOfOp>(
-              op.getLoc(), global.getType(), attr.getRef());
-          rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), address);
-        })
-        .Case([&](Py::ObjectAttrInterface attr) {
+        .Case<Py::ObjectAttrInterface, Py::GlobalValueAttr>([&](auto attr) {
           mlir::Value address =
               codeGenState.getConstant(op.getLoc(), rewriter, attr);
           rewriter.create<mlir::LLVM::ReturnOp>(op.getLoc(), address);
@@ -486,7 +430,8 @@ struct ListResizeOpConversion
           op.getLoc(), newCapacity, adaptor.getLength());
 
       auto tupleType = rewriter.create<Py::ConstantOp>(
-          op.getLoc(), Py::RefAttr::get(getContext(), Builtins::Tuple.name));
+          op.getLoc(),
+          Py::GlobalValueAttr::get(getContext(), Builtins::Tuple.name));
       mlir::Value tupleMemory = rewriter.create<Mem::GCAllocObjectOp>(
           op.getLoc(), tupleType, newCapacity);
       tupleMemory = unrealizedConversion(rewriter, tupleMemory, typeConverter);
@@ -974,7 +919,8 @@ struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T> {
       rewriter.setInsertionPointToStart(&op->getParentRegion()->front());
       catchType = this->codeGenState.getConstant(
           op.getLoc(), rewriter,
-          Py::RefAttr::get(this->getContext(), Builtins::BaseException.name));
+          Py::GlobalValueAttr::get(this->getContext(),
+                                   Builtins::BaseException.name));
     }
     // We use a integer of pointer width instead of a pointer to keep it opaque
     // to statepoint passes. Those do not support aggregates in aggregates.
@@ -1192,7 +1138,8 @@ struct InitListOpConversion
     list.size(op.getLoc()).store(op.getLoc(), size);
 
     auto tupleType = rewriter.create<Py::ConstantOp>(
-        op.getLoc(), Py::RefAttr::get(getContext(), Builtins::Tuple.name));
+        op.getLoc(),
+        Py::GlobalValueAttr::get(getContext(), Builtins::Tuple.name));
     auto tupleMemory =
         rewriter.create<Mem::GCAllocObjectOp>(op.getLoc(), tupleType, size);
     mlir::Value tupleInit = rewriter.create<Mem::InitTupleOp>(
@@ -1694,8 +1641,8 @@ void ConvertPylirToLLVMPass::runOnOperation() {
   mlir::RewritePatternSet patternSet(&getContext());
   mlir::cf::populateControlFlowToLLVMConversionPatterns(converter, patternSet);
   patternSet.insert<
-      ConstantOpConversion, GlobalValueOpConversion, ExternalOpConversion,
-      GlobalOpConversion, StoreOpConversion, LoadOpConversion, IsOpConversion,
+      ConstantOpConversion, ExternalOpConversion, GlobalOpConversion,
+      StoreOpConversion, LoadOpConversion, IsOpConversion,
       IsUnboundValueOpConversion, TypeOfOpConversion, TupleGetItemOpConversion,
       TupleLenOpConversion, GetSlotOpConversion, SetSlotOpConversion,
       StrEqualOpConversion, StackAllocObjectOpConversion,

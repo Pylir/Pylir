@@ -8,7 +8,6 @@
 #include <mlir/IR/DialectImplementation.h>
 
 #include <llvm/ADT/MapVector.h>
-#include <llvm/ADT/ScopeExit.h>
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/TypeSwitch.h>
@@ -127,56 +126,46 @@ namespace {
 #include "pylir/Optimizer/PylirPy/IR/PylirPyWrapInterfaces.h.inc"
 
 template <class Interface>
-struct RefAttrWrapInterface
-    : WrapInterface<RefAttrWrapInterface<Interface>, Interface> {
+struct GlobalValueAttrWrapInterface
+    : WrapInterface<GlobalValueAttrWrapInterface<Interface>, Interface> {
   /// Returns the underlying instance that all interface methods are forwarded
   /// to by default.
   Interface getUnderlying(Attribute attribute) const {
-    return cast<Interface>(
-        cast<RefAttr>(attribute).getSymbol().getInitializerAttr());
+    return cast<Interface>(cast<GlobalValueAttr>(attribute).getInitializer());
   }
 
-  /// Returns true if the `RefAttr` implements `Interface`.
+  /// Returns true if the `GlobalValueAttr` implements `Interface`.
   bool canImplement(Attribute thisAttr, std::in_place_type_t<Interface>) const {
-    RefAttr refAttr = cast<RefAttr>(thisAttr);
-    // The below is a tradeoff/hack done to support parsing a `RefAttr` where
-    // an interface is required. While parsing, the `RefAttr` is not guaranteed
-    // to already reference a symbol. Any check whether the `RefAttr` implements
-    // a given interface must therefore be deferred to verification. Yet we want
-    // strong typing in attributes such as `ObjectAttr` which hold instances
-    // of `TypeAttrInterface` and hence need an interface instance.
-    // The workaround is therefore to allow the cast while the symbol is still
-    // undefined and only error later in verification (and hopefully not user
-    // code).
-    if (!refAttr.getSymbol())
+    auto globalValueAttr = cast<GlobalValueAttr>(thisAttr);
+    // The below is a tradeoff/hack done to support parsing a `GlobalValueAttr`
+    // where an interface is required. While parsing, the `GlobalValueAttr` is
+    // not guaranteed to already have an initializer. Any check whether the
+    // `GlobalValueAttr` implements a given interface must therefore be deferred
+    // to verification. Yet we want strong typing in attributes such as
+    // `ObjectAttr` which hold instances of `TypeAttrInterface` and hence need
+    // an interface instance. The workaround is therefore to allow the cast
+    // while the symbol is still undefined and only error later in verification
+    // (and hopefully not user code).
+    if (!globalValueAttr.getInitializer())
       return true;
 
     // If the interface inherits from `ConstObjectAttrInterface` it has an
     // implicit conversion to it and it is known that the symbol has to be
     // constant for the cast to be valid.
     if constexpr (std::is_convertible_v<Interface, ConstObjectAttrInterface>)
-      if (!refAttr.getSymbol().getConstant())
+      if (!globalValueAttr.getConstant())
         return false;
 
-    // `RefAttr` without initializers never implements any interface, not even
-    // `ObjectAttrInterface`.
-    return isa_and_nonnull<Interface>(refAttr.getSymbol().getInitializerAttr());
+    return isa<Interface>(globalValueAttr.getInitializer());
   }
 };
 
 } // namespace
 
 template <class... Interfaces>
-static void addRefAttrInterfaces(MLIRContext* context) {
-  RefAttr::attachInterface<RefAttrWrapInterface<Interfaces>...>(*context);
-}
-
-mlir::FlatSymbolRefAttr pylir::Py::RefAttr::getRef() const {
-  return getImpl()->identity.cast<mlir::FlatSymbolRefAttr>();
-}
-
-pylir::Py::GlobalValueOp pylir::Py::RefAttr::getSymbol() const {
-  return mlir::dyn_cast_or_null<GlobalValueOp>(getImpl()->value);
+static void addGlobalValueAttrInterfaces(MLIRContext* context) {
+  GlobalValueAttr::attachInterface<GlobalValueAttrWrapInterface<Interfaces>...>(
+      *context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -235,28 +224,20 @@ struct GlobalValueAttrStorage : mlir::AttributeStorage {
 
 /// global-value ::= `#py.globalValue` `<` name { (`,` `const`)? (`,`
 /// `initializer` `=` attr) }`>`
-mlir::Attribute pylir::Py::GlobalValueAttr::parse(::mlir::AsmParser& parser,
-                                                  ::mlir::Type) {
-  // Keep a thread local stack to know whether we are printing any nested
-  // `#py.globalValue`. Nested occurrences need to not print the initializer to
-  // break any potential cycles.
-  // TODO: Upstream should add support for this pattern.
-  thread_local llvm::SetVector<llvm::StringRef> seenGlobalValueAttr;
-
+mlir::Attribute GlobalValueAttr::parse(AsmParser& parser, Type) {
   std::string name;
   if (parser.parseLess() || parser.parseKeywordOrString(&name))
     return nullptr;
 
   GlobalValueAttr attr = get(parser.getContext(), name);
-
-  if (!seenGlobalValueAttr.insert(name)) {
+  FailureOr<AsmParser::CyclicParseReset> reset =
+      parser.tryStartCyclicParse(attr);
+  if (failed(reset)) {
     if (parser.parseGreater())
       return nullptr;
 
     return attr;
   }
-
-  auto exit = llvm::make_scope_exit([&] { seenGlobalValueAttr.pop_back(); });
 
   // Default values.
   bool constant = false;
@@ -297,20 +278,18 @@ mlir::Attribute pylir::Py::GlobalValueAttr::parse(::mlir::AsmParser& parser,
   return attr;
 }
 
-void pylir::Py::GlobalValueAttr::print(::mlir::AsmPrinter& printer) const {
-  thread_local llvm::SetVector<GlobalValueAttr> seenGlobalValueAttr;
-
+void GlobalValueAttr::print(AsmPrinter& printer) const {
   printer << '<';
 
   printer.printKeywordOrString(getName());
 
   // Break a potential cycle by not printing a nested `#py.globalValue`.
-  if (!seenGlobalValueAttr.insert(*this)) {
+  FailureOr<AsmPrinter::CyclicPrintReset> reset =
+      printer.tryStartCyclicPrint(*this);
+  if (failed(reset)) {
     printer << '>';
     return;
   }
-
-  auto exit = llvm::make_scope_exit([&] { seenGlobalValueAttr.pop_back(); });
 
   if (getConstant())
     printer << ", const";
@@ -490,7 +469,7 @@ void pylir::Py::PylirPyDialect::initializeAttributes() {
 #define GET_ATTRDEF_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyAttributes.cpp.inc"
       >();
-  addRefAttrInterfaces<
+  addGlobalValueAttrInterfaces<
 #define GEN_WRAP_LIST
 #include "pylir/Optimizer/PylirPy/IR/PylirPyWrapInterfaces.h.inc"
       >(getContext());

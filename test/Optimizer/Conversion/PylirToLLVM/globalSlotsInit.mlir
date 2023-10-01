@@ -1,12 +1,16 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue const @builtins.type = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">,#py.str<"__hash__">)>>
+#builtins_type = #py.globalValue<builtins.type, const, initializer = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">,#py.str<"__hash__">)>, mro_tuple = #py.tuple<(#py.globalValue<builtins.type>)>>>
+py.external @builtins.type, #builtins_type
 
-py.globalValue const @builtins.object = #py.type // stub
-py.globalValue const @builtins.str = #py.type // stub
-py.globalValue const @builtins.tuple = #py.type // stub
+#builtins_object = #py.globalValue<builtins.object, const, initializer = #py.type>
+py.external @builtins.object, #builtins_object
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
-// CHECK-LABEL: @builtins.type
+// CHECK-LABEL: llvm.mlir.global external constant @builtins.type
 // CHECK-NEXT: %[[UNDEF:.*]] = llvm.mlir.undef
 // CHECK-NEXT: %[[TYPE:.*]] = llvm.mlir.addressof @builtins.type
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]

@@ -434,7 +434,6 @@ mlir::LogicalResult pylir::CompilerInvocation::compilation(
     if (args.hasArg(OPT_Xtiming))
       manager.enableTiming();
 
-    manager.addPass(pylir::Py::createFinalizeRefAttrsPass());
     bool produceDebugInfo =
         args.getLastArgValue(OPT_g, "0") != llvm::StringRef{"0"};
     if (!produceDebugInfo)

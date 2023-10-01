@@ -1,11 +1,14 @@
 // RUN: pylir-opt %s -canonicalize --split-input-file | FileCheck %s
 
-py.globalValue const @builtins.type = #py.type<instance_slots = <(#py.str<"first">, #py.str<"second">)>>
-py.globalValue const @builtins.tuple = #py.type
-py.globalValue const @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, const, initializer = #py.type<instance_slots = <(#py.str<"first">, #py.str<"second">)>>>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test() -> !py.dynamic {
-    %0 = constant(#py.ref<@builtins.type>)
+    %0 = constant(#builtins_type)
     %1 = type_slots %0
     return %1 : !py.dynamic
 }

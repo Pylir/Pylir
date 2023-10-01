@@ -1,10 +1,15 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_object = #py.globalValue<builtins.object, initializer = #py.type>
+py.external @builtins.object, #builtins_object
+#builtins_dict = #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @test() -> !py.dynamic {
     %0 = constant(#py.dict<{#py.str<"Hello"> to #py.str<"World">}>)

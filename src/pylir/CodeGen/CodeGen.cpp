@@ -17,6 +17,7 @@
 #include <pylir/Optimizer/PylirPy/IR/PylirPyAttributes.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyDialect.hpp>
 #include <pylir/Optimizer/PylirPy/IR/PylirPyOps.hpp>
+#include <pylir/Optimizer/PylirPy/IR/Value.hpp>
 #include <pylir/Parser/Visitor.hpp>
 #include <pylir/Support/Functional.hpp>
 #include <pylir/Support/ValueReset.hpp>
@@ -42,7 +43,7 @@ pylir::CodeGen::CodeGen(mlir::MLIRContext* context,
     if (iter.name.substr(0, builtinsModule.size()) != builtinsModule)
       continue;
     m_builtinNamespace.emplace(iter.name.substr(builtinsModule.size()),
-                               Py::RefAttr::get(context, iter.name));
+                               Py::GlobalValueAttr::get(context, iter.name));
   }
 }
 
@@ -1627,7 +1628,7 @@ mlir::Value pylir::CodeGen::visitFunction(
       }
       keywordDefaultParams.emplace_back(key, value);
     }
-    Py::GlobalValueOp valueOp;
+    Py::GlobalValueAttr valueOp;
     {
       mlir::OpBuilder::InsertionGuard guard{m_builder};
       m_builder.setInsertionPointToEnd(m_module.getBody());
@@ -1641,7 +1642,7 @@ mlir::Value pylir::CodeGen::visitFunction(
               m_builder.getDictAttr(keywordDefaultParams)),
           *constExport);
     }
-    return m_builder.createConstant(Py::RefAttr::get(valueOp));
+    return m_builder.createConstant(valueOp);
   }
 
   mlir::Value value =
@@ -1781,7 +1782,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {
     func.erase();
   });
 
-  std::vector<Py::RefAttr> basesConst;
+  std::vector<Py::GlobalValueAttr> basesConst;
   if (classDef.inheritance) {
     for (const auto& iter : classDef.inheritance->argumentList) {
       if (iter.maybeName || iter.maybeExpansionsOrEqual) {
@@ -1804,20 +1805,18 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {
   }
 
   std::vector<mlir::Attribute> mroTuple{
-      Py::RefAttr::get(m_builder.getContext(), qualifiedName)};
+      Py::GlobalValueAttr::get(m_builder.getContext(), qualifiedName)};
   llvm::SmallVector<mlir::Attribute> instanceSlots;
   if (basesConst.empty()) {
-    if (qualifiedName != m_builder.getObjectBuiltin().getRef().getValue()) {
+    if (qualifiedName != m_builder.getObjectBuiltin().getName()) {
       mroTuple.push_back(m_builder.getObjectBuiltin());
     }
   } else {
     PYLIR_ASSERT(basesConst.size() == 1 &&
                  "Multiple inheritance not yet implemented");
-    auto typeAttr = basesConst[0]
-                        .getSymbol()
-                        .getInitializerAttr()
-                        .cast<pylir::Py::TypeAttr>();
-    auto baseMRO = dereference<Py::TupleAttr>(typeAttr.getMroTuple());
+    auto typeAttr = basesConst[0].getInitializer().cast<pylir::Py::TypeAttr>();
+    auto baseMRO =
+        mlir::dyn_cast<Py::TupleAttrInterface>(typeAttr.getMroTuple());
     PYLIR_ASSERT(baseMRO);
     mroTuple.insert(mroTuple.end(), baseMRO.begin(), baseMRO.end());
     instanceSlots = llvm::to_vector(typeAttr.getInstanceSlots());
@@ -1860,7 +1859,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {
         instanceSlots.push_back(attr);
         continue;
       }
-      auto tuple = dereference<Py::TupleAttr>(attr);
+      auto tuple = mlir::dyn_cast<Py::TupleAttrInterface>(attr);
       if (!tuple) {
         // TODO: diagnostic
         PYLIR_UNREACHABLE;
@@ -1873,7 +1872,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {
   slots.emplace_back(m_builder.getStringAttr("__name__"),
                      m_builder.getStrAttr(classDef.className.getValue()));
 
-  Py::GlobalValueOp valueOp;
+  Py::GlobalValueAttr valueOp;
   {
     mlir::OpBuilder::InsertionGuard guard{m_builder};
     m_builder.setInsertionPointToEnd(m_module.getBody());
@@ -1885,7 +1884,7 @@ void pylir::CodeGen::visit(const pylir::Syntax::ClassDef& classDef) {
         true);
   }
   writeIdentifier(classDef.className.getValue(),
-                  m_builder.createConstant(Py::RefAttr::get(valueOp)));
+                  m_builder.createConstant(valueOp));
 }
 
 void pylir::CodeGen::visit(const Syntax::Suite& suite) {
@@ -2608,8 +2607,8 @@ pylir::CodeGen::intrinsicConstant(pylir::CodeGen::Intrinsic&& intrinsic) {
 mlir::Value pylir::buildException(PyBuilder& builder, std::string_view kind,
                                   std::vector<Py::IterArg> args,
                                   mlir::Block* exceptionHandler) {
-  auto typeObj =
-      builder.createConstant(Py::RefAttr::get(builder.getContext(), kind));
+  auto typeObj = builder.createConstant(
+      Py::GlobalValueAttr::get(builder.getContext(), kind));
   args.emplace(args.begin(), typeObj);
   mlir::Value tuple = builder.createMakeTuple(args, exceptionHandler);
   auto dict = builder.createConstant(builder.getDictAttr());

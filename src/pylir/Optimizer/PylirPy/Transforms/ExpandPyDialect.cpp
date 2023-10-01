@@ -50,8 +50,8 @@ mlir::Value callOrInvoke(
                 pylir::Builtins::PylirCall.name,
                 mlir::ValueRange{
                     builder.create<pylir::Py::ConstantOp>(
-                        loc, pylir::Py::RefAttr::get(builder.getContext(),
-                                                     callable.name)),
+                        loc, pylir::Py::GlobalValueAttr::get(
+                                 builder.getContext(), callable.name)),
                     builder.create<pylir::Py::MakeTupleOp>(loc, args),
                     builder.create<pylir::Py::ConstantOp>(
                         loc, pylir::Py::DictAttr::get(builder.getContext())),
@@ -68,8 +68,8 @@ mlir::Value callOrInvoke(
                 pylir::Builtins::PylirCall.name,
                 mlir::ValueRange{
                     builder.create<pylir::Py::ConstantOp>(
-                        loc, pylir::Py::RefAttr::get(builder.getContext(),
-                                                     callable.name)),
+                        loc, pylir::Py::GlobalValueAttr::get(
+                                 builder.getContext(), callable.name)),
                     builder.create<pylir::Py::MakeTupleOp>(loc, args),
                     builder.create<pylir::Py::ConstantOp>(
                         loc, pylir::Py::DictAttr::get(builder.getContext())),
@@ -151,8 +151,8 @@ void restIterIntoList(mlir::Block* dest, mlir::Location loc,
   stopIterationHandler->insertBefore(dest);
   rewriter.setInsertionPointToStart(stopIterationHandler);
   auto stopIterationType = rewriter.create<pylir::Py::ConstantOp>(
-      loc, pylir::Py::RefAttr::get(loc.getContext(),
-                                   pylir::Builtins::StopIteration.name));
+      loc, pylir::Py::GlobalValueAttr::get(
+               loc.getContext(), pylir::Builtins::StopIteration.name));
   auto typeOf = rewriter.create<pylir::Py::TypeOfOp>(
       loc, stopIterationHandler->getArgument(0));
   auto isStopIteration =
@@ -255,8 +255,8 @@ struct UnpackOpPattern : mlir::OpRewritePattern<TargetOp> {
     rewriter.setInsertionPointToEnd(block);
     mlir::Location loc = op.getLoc();
     auto stopIterationType = rewriter.create<pylir::Py::ConstantOp>(
-        loc, pylir::Py::RefAttr::get(this->getContext(),
-                                     pylir::Builtins::StopIteration.name));
+        loc, pylir::Py::GlobalValueAttr::get(
+                 this->getContext(), pylir::Builtins::StopIteration.name));
 
     auto iterObject = callOrInvoke(loc, rewriter, dest, pylir::Builtins::Iter,
                                    {op.getIterable()}, exceptionHandler);

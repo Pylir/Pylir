@@ -1,12 +1,16 @@
 // RUN: pylir-opt %s  -convert-arith-to-llvm -convert-pylir-to-llvm --reconcile-unrealized-casts --split-input-file --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">)>>
-py.globalValue @builtins.str = #py.type
-py.globalValue @builtins.object = #py.type
-py.globalValue @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type<instance_slots = #py.tuple<(#py.str<"__eq__">)>>>
+py.external @builtins.type, #builtins_type
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
+#builtins_object = #py.globalValue<builtins.object, initializer = #py.type>
+py.external @builtins.object, #builtins_object
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @foo() -> !py.dynamic {
-    %0 = constant(#py.ref<@builtins.tuple>)
+    %0 = constant(#builtins_tuple)
     %c0 = arith.constant 0 : index
     %2 = getSlot %0[%c0]
     return %2 : !py.dynamic

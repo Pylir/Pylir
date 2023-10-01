@@ -1,8 +1,11 @@
 // RUN: pylir-opt %s --pylir-fold-globals --split-input-file | FileCheck %s
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : !py.dynamic
 
@@ -17,21 +20,24 @@ py.func @bar() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-// CHECK: globalValue "private" const @foo = #py.int<5>
+// CHECK: #[[$FOO:.*]] = #py.globalValue<foo, const, initializer = #py.int<5>>
 
 // CHECK-LABEL: @test
 // CHECK-NOT: store %{{.*}} into @foo
 // CHECK: return
 
 // CHECK-LABEL: @bar
-// CHECK-NEXT: %[[C:.*]] = constant(#py.ref<@foo>)
+// CHECK-NEXT: %[[C:.*]] = constant(#[[$FOO]])
 // CHECK-NEXT: return %[[C]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : !py.dynamic
 
@@ -59,15 +65,17 @@ py.func @bar() {
 
 // -----
 
-
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : !py.dynamic
 
 py.func @test() {
-    %0 = constant(#py.ref<@builtins.int>)
+    %0 = constant(#builtins_int)
     store %0 : !py.dynamic into @foo
     return
 }
@@ -77,20 +85,25 @@ py.func @bar() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
+// CHECK: #[[$INT:.*]] = #py.globalValue<builtins.int{{,|>}}
+
 // CHECK-LABEL: @test
 // CHECK-NOT: store %{{.*}} : !py.dynamic into @foo
 // CHECK: return
 
 // CHECK-LABEL: @bar
-// CHECK-NEXT: %[[C:.*]] = constant(#py.ref<@builtins.int>)
+// CHECK-NEXT: %[[C:.*]] = constant(#[[$INT]])
 // CHECK-NEXT: return %[[C]]
 
 // -----
 
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : !py.dynamic
 
@@ -115,13 +128,20 @@ py.func @bar() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.int = #py.type
-py.globalValue @builtins.function = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.dict = #py.type
-py.globalValue @builtins.None = #py.type
-py.globalValue @builtins.str = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
+#builtins_function = #py.globalValue<builtins.function, initializer = #py.type>
+py.external @builtins.function, #builtins_function
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_dict= #py.globalValue<builtins.dict, initializer = #py.type>
+py.external @builtins.dict, #builtins_dict
+#builtins_None = #py.globalValue<builtins.None, initializer = #py.type>
+py.external @builtins.None, #builtins_None
+#builtins_str = #py.globalValue<builtins.str, initializer = #py.type>
+py.external @builtins.str, #builtins_str
 
 py.func @real(%arg0 : !py.dynamic, %arg1 : !py.dynamic, %arg2 : !py.dynamic) -> !py.dynamic {
     %0 = typeOf %arg0
@@ -141,7 +161,7 @@ py.func @bar() -> !py.dynamic {
     return %0 : !py.dynamic
 }
 
-// CHECK: globalValue "private" @foo = #py.function<@real>
+// CHECK: #[[$FOO:.*]] = #py.globalValue<foo, initializer = #py.function<@real>>
 
 // CHECK-LABEL: @test
 // CHECK-NOT: makeFunc
@@ -149,14 +169,17 @@ py.func @bar() -> !py.dynamic {
 // CHECK: return
 
 // CHECK-LABEL: @bar
-// CHECK-NEXT: %[[C:.*]] = constant(#py.ref<@foo>)
+// CHECK-NEXT: %[[C:.*]] = constant(#[[$FOO]])
 // CHECK-NEXT: return %[[C]]
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : !py.dynamic
 
@@ -202,9 +225,12 @@ py.func @test() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @bar : !py.dynamic
 py.global "private" @foo : !py.dynamic
@@ -242,9 +268,12 @@ py.func @other2() -> !py.dynamic {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : index
 
@@ -296,9 +325,12 @@ py.func @bar() -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : index = 3 : index
 
@@ -322,9 +354,12 @@ py.func @bar() -> index {
 
 // -----
 
-py.globalValue @builtins.type = #py.type
-py.globalValue @builtins.tuple = #py.type
-py.globalValue @builtins.int = #py.type
+#builtins_type = #py.globalValue<builtins.type, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
+#builtins_int = #py.globalValue<builtins.int, initializer = #py.type>
+py.external @builtins.int, #builtins_int
 
 py.global "private" @foo : index = 5 : index
 

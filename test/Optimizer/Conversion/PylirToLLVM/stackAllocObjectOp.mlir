@@ -1,10 +1,12 @@
 // RUN: pylir-opt %s -convert-pylir-to-llvm='target-triple=x86_64-w64-windows-gnu' --split-input-file | FileCheck %s
 
-py.globalValue const @builtins.type = #py.type
-py.globalValue const @builtins.tuple = #py.type
+#builtins_type = #py.globalValue<builtins.type, const, initializer = #py.type>
+py.external @builtins.type, #builtins_type
+#builtins_tuple = #py.globalValue<builtins.tuple, const, initializer = #py.type>
+py.external @builtins.tuple, #builtins_tuple
 
 py.func @foo() -> index {
-    %0 = constant(#py.ref<@builtins.tuple>)
+    %0 = constant(#builtins_tuple)
     %1 = pyMem.stackAllocObject tuple %0[0]
     %2 = pyMem.initTuple %1 to ()
     %3 = tuple_len %2

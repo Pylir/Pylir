@@ -1,21 +1,18 @@
-#  // Copyright 2022 Markus Böck
-#  //
-#  // Licensed under the Apache License v2.0 with LLVM Exceptions.
-#  // See https://llvm.org/LICENSE.txt for license information.
-#  // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
 # RUN: pylir %s -emit-pylir -o - -S | FileCheck %s
 
-# CHECK-LABEL: __init__
+# CHECK-DAG: #[[$NONE:.*]] = #py.globalValue<builtins.None,
+# CHECK-DAG: #[[$CELL:.*]] = #py.globalValue<builtins.cell,
+
+# CHECK-LABEL: func @__init__
 
 # CHECK: %[[RES:.*]] = makeFunc @"foo$cc[0]"
 # CHECK: %[[NAME:.*]] = constant(#py.str<"foo">)
 # CHECK: setSlot %[[RES]][%{{.*}}] to %[[NAME]]
-# CHECK: %[[DEFAULTS:.*]] = constant(#py.ref<@builtins.None>)
+# CHECK: %[[DEFAULTS:.*]] = constant(#[[$NONE]])
 # CHECK: setSlot %[[RES]][%{{.*}}] to %[[DEFAULTS]]
-# CHECK: %[[KWDEFAULTS:.*]] = constant(#py.ref<@builtins.None>)
+# CHECK: %[[KWDEFAULTS:.*]] = constant(#[[$NONE]])
 # CHECK: setSlot %[[RES]][%{{.*}}] to %[[KWDEFAULTS]]
-# CHECK: %[[CLOSURE:.*]] = constant(#py.ref<@builtins.None>)
+# CHECK: %[[CLOSURE:.*]] = constant(#[[$NONE]])
 # CHECK: setSlot %[[RES]][%{{.*}}] to %[[CLOSURE]]
 # CHECK: store %[[RES]] : !py.dynamic into @foo
 
@@ -26,12 +23,12 @@ def foo():
     lambda a=3, *, c=1: x + y
 
 # CHECK-LABEL: func private @"foo$impl[0]"
-# CHECK: %[[CELL_TYPE:.*]] = constant(#py.ref<@builtins.cell>)
+# CHECK: %[[CELL_TYPE:.*]] = constant(#[[$CELL]])
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = getSlot %[[CELL_TYPE]][%{{.*}}]
 # CHECK: %[[Y:.*]] = function_call %[[NEW]](%[[NEW]], %[[TUPLE]], %[[DICT]])
-# CHECK: %[[CELL_TYPE:.*]] = constant(#py.ref<@builtins.cell>)
+# CHECK: %[[CELL_TYPE:.*]] = constant(#[[$CELL]])
 # CHECK: %[[TUPLE:.*]] = makeTuple (%[[CELL_TYPE]])
 # CHECK: %[[DICT:.*]] = constant(#py.dict<{}>)
 # CHECK: %[[NEW:.*]] = getSlot %[[CELL_TYPE]][%{{.*}}]
