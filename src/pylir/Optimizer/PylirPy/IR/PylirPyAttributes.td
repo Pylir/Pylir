@@ -9,6 +9,7 @@ include "pylir/Optimizer/PylirPy/IR/PylirPyAttrInterfaces.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyBase.td"
 include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
+include "pylir/Optimizer/Interfaces/AttrVerifyInterface.td"
 include "pylir/Optimizer/Util/TablegenUtil.td"
 include "mlir/IR/OpBase.td"
 
@@ -219,7 +220,7 @@ def PylirPy_ListAttr : PylirPy_PyObjAttr<"List", [EmptySlotsAttr]> {
 }
 
 def PylirPy_DictAttr : PylirPy_PyObjAttr<"Dict", [DictAttrInterface,
-  EmptySlotsAttr]> {
+  EmptySlotsAttr, DeclareAttrInterfaceMethods<AttrVerifyInterface>]> {
 
   let mnemonic = "dict";
   let summary = "python dictionary";
@@ -323,7 +324,7 @@ def PylirPy_DictAttr : PylirPy_PyObjAttr<"Dict", [DictAttrInterface,
 }
 
 def PylirPy_FunctionAttr : PylirPy_PyObjAttr<"Function",
-  [FunctionAttrInterface]> {
+  [FunctionAttrInterface, DeclareAttrInterfaceMethods<AttrVerifyInterface>]> {
 	let mnemonic = "function";
 	let summary = "python function";
 
@@ -364,7 +365,8 @@ def PylirPy_FunctionAttr : PylirPy_PyObjAttr<"Function",
   }];
 }
 
-def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [TypeAttrInterface]> {
+def PylirPy_TypeAttr : PylirPy_PyObjAttr<"Type", [TypeAttrInterface,
+  DeclareAttrInterfaceMethods<AttrVerifyInterface>]> {
 	let mnemonic = "type";
 	let summary = "python type";
 

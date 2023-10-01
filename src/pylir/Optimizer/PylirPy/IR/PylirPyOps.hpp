@@ -16,6 +16,7 @@
 
 #include <llvm/ADT/iterator.h>
 
+#include <pylir/Optimizer/Interfaces/AttrVerifyInterface.hpp>
 #include <pylir/Optimizer/Interfaces/CaptureInterface.hpp>
 #include <pylir/Optimizer/Interfaces/MemoryFoldInterface.hpp>
 #include <pylir/Optimizer/Interfaces/SROAInterfaces.hpp>

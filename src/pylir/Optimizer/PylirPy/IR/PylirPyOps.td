@@ -12,6 +12,7 @@ include "pylir/Optimizer/PylirPy/IR/PylirPyTraits.td"
 include "pylir/Optimizer/PylirPy/Interfaces/ExceptionHandlingInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/CopyObjectInterface.td"
 include "pylir/Optimizer/PylirPy/Interfaces/OnlyReadsValueInterface.td"
+include "pylir/Optimizer/Interfaces/AttrVerifyInterface.td"
 include "pylir/Optimizer/Interfaces/MemoryFoldInterface.td"
 include "pylir/Optimizer/Interfaces/CaptureInterface.td"
 include "pylir/Optimizer/Interfaces/SROAInterfaces.td"
@@ -98,7 +99,7 @@ def DictResource : Resource<"::pylir::Py::DictResource">;
 //===----------------------------------------------------------------------===//
 
 def PylirPy_ConstantOp : PylirPy_Op<"constant", [ConstantLike, NoMemoryEffect,
-  KnownType<"Tuple">, DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+  KnownType<"Tuple">]> {
   let arguments = (ins AnyAttrOf<[PylirPy_UnboundAttr, ObjectAttrInterface,
     PylirPy_GlobalValueAttr]>:$constant);
   let results = (outs DynamicType:$result);
@@ -1235,8 +1236,7 @@ defvar GlobalOpSupportedTypes = AnyTypeOf<[DynamicType, Index, F64]>;
 defvar GlobalOpSupportedAttrs = AnyAttrOf<[ObjectAttrInterface, IndexAttr,
   F64Attr, PylirPy_GlobalValueAttr]>;
 
-def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol,
-  DeclareOpInterfaceMethods<SymbolUserOpInterface>]> {
+def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol, VerifyAttributesOpTrait]> {
 
   let arguments = (ins
       SymbolNameAttr:$sym_name,
@@ -1259,6 +1259,8 @@ def PylirPy_GlobalOp : PylirPy_Op<"global", [Symbol,
     If the global does not have an initializer loading from it before a value
     has ever been stored in it is undefined behaviour.
   }];
+
+  let hasVerifier = 1;
 }
 
 def PylirPy_LoadOp : PylirPy_Op<"load", [
@@ -1348,7 +1350,8 @@ def PylirPy_InvokeOp
 }
 
 def PylirPy_FuncOp : PylirPy_Op<"func", [FunctionOpInterface, IsolatedFromAbove,
-  OpAsmOpInterface, AutomaticAllocationScope, CallableOpInterface]> {
+  OpAsmOpInterface, AutomaticAllocationScope, CallableOpInterface,
+  VerifyAttributesOpTrait]> {
   let arguments = (ins StrAttr:$sym_name,
            TypeAttrOf<FunctionType>:$function_type,
            OptionalAttr<StrAttr>:$sym_visibility,

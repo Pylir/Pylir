@@ -8,6 +8,7 @@
 #include <mlir/IR/BuiltinAttributes.h>
 
 #include <pylir/Interfaces/Builtins.hpp>
+#include <pylir/Optimizer/Interfaces/AttrVerifyInterface.hpp>
 #include <pylir/Optimizer/Interfaces/SROAInterfaces.hpp>
 #include <pylir/Support/BigInt.hpp>
 

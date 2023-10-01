@@ -35,7 +35,7 @@ add_library(PylirPyDialect
   PylirPyOps.cpp
   PylirPyOpFold.cpp
   PylirPyOpSROA.cpp
-  PylirPyOpsVerifier.cpp
+  PylirPyVerifiers.cpp
   PylirPyTraits.cpp
   PylirPyTypes.cpp
   Value.cpp
@@ -48,6 +48,7 @@ add_dependencies(PylirPyDialect
 )
 target_link_libraries(PylirPyDialect
   PUBLIC
+  PylirAttrVerifyInterface
   PylirCaptureInterface
   PylirMemoryFoldInterface
   PylirPyCopyObjectInterface
