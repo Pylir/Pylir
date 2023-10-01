@@ -11,6 +11,6 @@ py.func @test() -> i1 {
 // CHECK-LABEL: @test
 // CHECK-NEXT: %[[HANDLE:.*]] = llvm.mlir.addressof @handle
 // CHECK-NEXT: %[[VALUE:.*]] = llvm.load %[[HANDLE]]
-// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
+// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.zero
 // CHECK-NEXT: %[[RESULT:.*]] = llvm.icmp "eq" %[[VALUE]], %[[NULL]]
 // CHECK-NEXT: llvm.return %[[RESULT]]

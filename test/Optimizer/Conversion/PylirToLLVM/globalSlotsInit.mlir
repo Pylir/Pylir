@@ -22,8 +22,8 @@ py.external @builtins.tuple, #builtins_tuple
 // CHECK-NEXT: %[[UNDEF4:.*]] = llvm.insertvalue %[[MRO]], %[[UNDEF3]][3]
 // CHECK-NEXT: %[[ADDRESS:.*]] = llvm.mlir.addressof
 // CHECK-NEXT: %[[UNDEF5:.*]] = llvm.insertvalue %[[ADDRESS]], %[[UNDEF4]][4]
-// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
+// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.zero
 // CHECK-NEXT: %[[UNDEF6:.*]] = llvm.insertvalue %[[NULL]], %[[UNDEF5]][5, 0]
-// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
+// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.zero
 // CHECK-NEXT: %[[UNDEF7:.*]] = llvm.insertvalue %[[NULL]], %[[UNDEF6]][5, 1]
 // CHECK-NEXT: llvm.return %[[UNDEF7]]

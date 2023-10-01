@@ -433,7 +433,7 @@ void pylir::CodeGenState::initializeGlobal(
         auto zeroI = builder.create<mlir::LLVM::ConstantOp>(
             global.getLoc(), m_typeConverter.getIndexType(),
             builder.getIndexAttr(0));
-        auto null = builder.create<mlir::LLVM::NullOp>(
+        auto null = builder.create<mlir::LLVM::ZeroOp>(
             global.getLoc(),
             mlir::LLVM::LLVMPointerType::get(builder.getContext()));
         undef = builder.create<mlir::LLVM::InsertValueOp>(
@@ -519,7 +519,7 @@ void pylir::CodeGenState::initializeGlobal(
     auto element = initMap.get(slotName.cast<Py::StrAttr>().getValue());
     if (!element)
       value =
-          builder.create<mlir::LLVM::NullOp>(global.getLoc(), m_objectPtrType);
+          builder.create<mlir::LLVM::ZeroOp>(global.getLoc(), m_objectPtrType);
     else
       value = getConstant(global.getLoc(), builder, element);
 
@@ -551,7 +551,7 @@ mlir::Value pylir::CodeGenState::getConstant(mlir::Location loc,
         mlir::FlatSymbolRefAttr::get(getGlobalValue(builder, value)));
 
   if (attribute.isa<Py::UnboundAttr>())
-    return builder.create<mlir::LLVM::NullOp>(loc, m_objectPtrType);
+    return builder.create<mlir::LLVM::ZeroOp>(loc, m_objectPtrType);
 
   return builder.create<mlir::LLVM::AddressOfOp>(
       loc, m_objectPtrType,

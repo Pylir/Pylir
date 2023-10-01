@@ -225,7 +225,7 @@ struct IsUnboundValueOpConversion
   mlir::LogicalResult
   matchAndRewrite(Py::IsUnboundValueOp op, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter& rewriter) const override {
-    auto null = rewriter.create<mlir::LLVM::NullOp>(
+    auto null = rewriter.create<mlir::LLVM::ZeroOp>(
         op.getLoc(), adaptor.getValue().getType());
     rewriter.replaceOpWithNewOp<mlir::LLVM::ICmpOp>(
         op, mlir::LLVM::ICmpPredicate::eq, adaptor.getValue(), null);
@@ -907,8 +907,14 @@ struct InvokeOpsConversion : public ConvertPylirOpToLLVMPattern<T> {
       llvm::SmallVector<mlir::Value> operands{callee};
       operands.append(adaptor.getCallOperands().begin(),
                       adaptor.getCallOperands().end());
+      assert(resultTypes.size() == 1 &&
+             "Lowering currently only supports one return type");
       rewriter.replaceOpWithNewOp<mlir::LLVM::InvokeOp>(
-          op, resultTypes, operands, op.getHappyPath(),
+          op,
+          LLVM::LLVMFunctionType::get(
+              resultTypes.front(),
+              llvm::to_vector(adaptor.getCallOperands().getTypes())),
+          /*callee=*/nullptr, operands, op.getHappyPath(),
           adaptor.getNormalDestOperands(), endBlock, mlir::ValueRange{});
     }
 
@@ -1539,7 +1545,7 @@ struct MROLookupOpConversion : ConvertPylirOpToLLVMPattern<Py::MROLookupOp> {
         loc, mlir::LLVM::ICmpPredicate::ult, conditionBlock->getArgument(0),
         tupleSize);
     auto* body = new mlir::Block;
-    mlir::Value unbound = rewriter.create<mlir::LLVM::NullOp>(
+    mlir::Value unbound = rewriter.create<mlir::LLVM::ZeroOp>(
         loc, endBlock->getArgument(0).getType());
     rewriter.create<mlir::LLVM::CondBrOp>(loc, isLess, body, endBlock, unbound);
 

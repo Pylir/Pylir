@@ -125,7 +125,7 @@ mlir::Value pylir::WinX64::callFunc(mlir::OpBuilder& builder,
         auto falseConstant = builder.create<mlir::LLVM::ConstantOp>(
             loc, builder.getI1Type(), builder.getBoolAttr(false));
         auto null =
-            builder.create<mlir::LLVM::NullOp>(loc, tempAlloca.getType());
+            builder.create<mlir::LLVM::ZeroOp>(loc, tempAlloca.getType());
         auto gep = builder.create<mlir::LLVM::GEPOp>(loc, null.getType(), null,
                                                      mlir::ValueRange{one});
         auto size = builder.create<mlir::LLVM::PtrToIntOp>(

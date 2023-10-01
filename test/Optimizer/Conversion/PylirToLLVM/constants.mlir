@@ -40,7 +40,7 @@ py.func @constants() -> !py.dynamic {
 // CHECK-NEXT: %[[UNDEF1:.*]] = llvm.insertvalue %[[TYPE]], %[[UNDEF]][0]
 // CHECK-NEXT: %[[SIZE:.*]] = llvm.mlir.constant(1 : i{{.*}})
 // CHECK-NEXT: %[[UNDEF2:.*]] = llvm.insertvalue %[[SIZE]], %[[UNDEF1]][1]
-// CHECK-NEXT: %[[NULLPTR:.*]] = llvm.mlir.null
+// CHECK-NEXT: %[[NULLPTR:.*]] = llvm.mlir.zero
 // CHECK-NEXT: %[[UNDEF3:.*]] = llvm.insertvalue %[[NULLPTR]], %[[UNDEF2]][2, 0]
 // CHECK-NEXT: llvm.return %[[UNDEF3]]
 
