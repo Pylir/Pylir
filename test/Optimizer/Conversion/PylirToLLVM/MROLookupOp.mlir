@@ -23,7 +23,7 @@ py.func @test(%tuple : !py.dynamic) -> !py.dynamic {
 
 // CHECK-NEXT: ^[[COND]](%[[ITER:.*]]: i{{.*}}):
 // CHECK-NEXT: %[[LESS:.*]] = llvm.icmp "ult" %[[ITER]], %[[LEN]]
-// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.null
+// CHECK-NEXT: %[[NULL:.*]] = llvm.mlir.zero
 // CHECK-NEXT: llvm.cond_br %[[LESS]], ^[[BODY:.*]], ^[[EXIT:.*]](%[[NULL]] : {{.*}})
 // CHECK-NEXT: ^[[BODY]]:
 // CHECK-NEXT: %[[GEP:.*]] = llvm.getelementptr %[[TUPLE]][0, 2]
