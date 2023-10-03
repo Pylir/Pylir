@@ -10,6 +10,12 @@ endif ()
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/pylir/${TARGET_TRIPLE}")
 
+if (MSVC)
+  add_compile_options(/EHsc)
+else ()
+  add_compile_options(-fexceptions)
+endif ()
+
 # Collects all non-imported targets that 'target' links against transitively into 'listvar', including 'target' itself.
 function(collect_libs target listvar)
   set(worklist ${${listvar}})
